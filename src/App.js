@@ -87,6 +87,13 @@ import HostelKassa from "./Components/Sectors/Hostel/kassa/kassa";
 import Objects from "./Components/Sectors/Building/Objects/Objects";
 import Debts from "./Components/Debts/Debts";
 import ProductionOrders from "./Components/Sectors/Production/Orders/Orders";
+import ConsultingClients from "./Components/Sectors/Consulting/client/client";
+import ConsultingClientRequests from "./Components/Sectors/Consulting/client-requests/client-requests";
+import ConsultingCafeKassa from "./Components/Sectors/Consulting/Kassa/Kassa";
+import ConsultingSchoolTeachers from "./Components/Sectors/Consulting/Teachers/Teachers";
+import ConsultingSalary from "./Components/Sectors/Consulting/salary/salary";
+import ConsultingSale from "./Components/Sectors/Consulting/sale/sale";
+import ConsultingServices from "./Components/Sectors/Consulting/services/services";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -746,6 +753,62 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProductionOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/client"
+              element={
+                <ProtectedRoute>
+                  <ConsultingClients />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/client-requests"
+              element={
+                <ProtectedRoute>
+                  <ConsultingClientRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/kassa*"
+              element={
+                <ProtectedRoute>
+                  <ConsultingCafeKassa />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/teachers"
+              element={
+                <ProtectedRoute>
+                  <ConsultingSchoolTeachers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/salary"
+              element={
+                <ProtectedRoute>
+                  <ConsultingSalary />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/sale"
+              element={
+                <ProtectedRoute>
+                  <ConsultingSale />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/services"
+              element={
+                <ProtectedRoute>
+                  <ConsultingServices />
                 </ProtectedRoute>
               }
             />

@@ -7,25 +7,24 @@ import {
   Warehouse,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  BsDiagram3,
-  BsDiagram3Fill,
-  BsFileEarmarkPerson,
-  BsListCheck,
-} from "react-icons/bs";
+import { BsFileEarmarkPerson, BsListCheck } from "react-icons/bs";
 import {
   FaBuilding,
+  FaCashRegister,
+  FaChalkboardTeacher,
+  FaClipboardList,
   FaCog,
+  FaCogs,
   FaComments,
-  FaGlobe,
-  FaHeadset,
+  FaMoneyBill,
   FaRegCalendarAlt,
   FaRegChartBar,
   FaRegClipboard,
   FaRegListAlt,
   FaRegUser,
-  FaRobot,
+  FaShoppingCart,
   FaTags,
+  FaUsers,
 } from "react-icons/fa";
 import { NavLink } from "react-router-dom";
 import "./Sidebar.scss";
@@ -49,91 +48,122 @@ const HIDE_RULES = [
         "Закупки",
         "Сотрудники",
         "Бронирование",
-        // "Касса"
         "Клиенты",
         "Отделы",
         "Аналитика Отделов",
       ],
     },
   },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/zakaz"] } },
-  { when: { sector: "Кафе" }, show: { toIncludes: ["/crm/sklad"] } },
-  { when: { sector: "Кафе" }, show: { toIncludes: ["/crm/sklad"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/cafe/analytics"] } },
-  // { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/cafe/stock"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/kassa"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/cafe/reports"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/sell"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/cafe/payroll"] } },
-  { when: { sector: "Гостиница" }, hide: { toIncludes: ["crm/analytics"] } },
+
+  {
+    when: { sector: "Кафе" },
+    hide: {
+      toIncludes: [
+        "/crm/zakaz",
+        "/crm/cafe/analytics",
+        "/crm/kassa",
+        "/crm/cafe/reports",
+        "/crm/sell",
+        "/crm/cafe/payroll",
+        "/crm/obzor",
+        "/crm/raspisanie",
+        "/crm/sklad",
+        "/crm/cafe/reservation",
+        "/crm/cafe/purchasing",
+        "/crm/analytics",
+        "/crm/debts",
+      ],
+    },
+    show: { toIncludes: ["/crm/sklad"] },
+  },
+
   {
     when: { sector: "Гостиница" },
-    hide: { toIncludes: ["/crm/hostel/clients"] },
+    hide: {
+      toIncludes: [
+        "crm/analytics",
+        "/crm/hostel/clients",
+        "/crm/hostel/bar",
+        "/crm/zakaz",
+        "/crm/hostel/obzor",
+        "/crm/kassa",
+        "/crm/sell",
+        "/crm/obzor",
+        "/crm/raspisanie",
+        "/crm/hostel/analytics",
+        "/crm/debts",
+      ],
+    },
   },
-  { when: { sector: "Гостиница" }, hide: { toIncludes: ["/crm/hostel/bar"] } },
+
   {
-    when: { sector: "Гостиница" },
-    hide: { toIncludes: ["/crm/zakaz"] },
+    when: { sector: "Барбершоп" },
+    hide: {
+      toIncludes: [
+        "crm/employ",
+        "crm/clients",
+        "crm/analytics",
+        "crm/kassa",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "crm/raspisanie",
+        "/crm/debts",
+      ],
+    },
   },
+
   {
-    when: { sector: "Гостиница" },
-    hide: { toIncludes: ["/crm/hostel/obzor"] },
+    when: { sector: "Школа" },
+    hide: {
+      toIncludes: [
+        "/crm/zakaz",
+        "/crm/obzor",
+        "crm/clients",
+        "crm/analytics",
+        "crm/employ",
+        "crm/kassa",
+        "crm/raspisanie",
+        "/crm/debts",
+      ],
+    },
   },
-  { when: { sector: "Гостиница" }, hide: { toIncludes: ["/crm/kassa"] } },
-  { when: { sector: "Гостиница" }, hide: { toIncludes: ["/crm/sell"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["crm/employ"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["crm/clients"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["crm/analytics"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["crm/kassa"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["/crm/zakaz"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["/crm/obzor"] } },
-  { when: { sector: "Гостиница" }, hide: { toIncludes: ["/crm/obzor"] } },
-  { when: { sector: "Гостиница" }, hide: { toIncludes: ["/crm/raspisanie"] } },
+
   {
-    when: { sector: "Гостиница" },
-    hide: { toIncludes: ["/crm/hostel/analytics"] },
+    when: { sector: "Магазин" },
+    hide: {
+      toIncludes: [
+        "/crm/обзор",
+        "/crm/zakaz",
+        "/crm/market/analytics",
+        "/crm/market/bar",
+        "/crm/market/history",
+      ],
+    },
   },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["/crm/obzor"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["crm/clients"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/obzor"] } },
-  { when: { sector: "Магазин" }, hide: { toIncludes: ["/crm/obzor"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["/crm/zakaz"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["crm/raspisanie"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["/crm/zakaz"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["crm/analytics"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["crm/employ"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["crm/kassa"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["crm/raspisanie"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/zakaz"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/cafe/reservation"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/raspisanie"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/sklad"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/cafe/purchasing"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/analytics"] } },
-  { when: { sector: "Кафе" }, hide: { toIncludes: ["/crm/debts"] } },
-  { when: { sector: "Барбершоп" }, hide: { toIncludes: ["/crm/debts"] } },
-  { when: { sector: "Школа" }, hide: { toIncludes: ["/crm/debts"] } },
-  { when: { sector: "Гостиница" }, hide: { toIncludes: ["/crm/debts"] } },
+
   {
     when: { sector: "Строительная компания" },
-    hide: { toIncludes: ["/crm/debts"] },
-  },
-  { when: { sector: "Магазин" }, hide: { toIncludes: ["/crm/zakaz"] } },
-  {
-    when: { sector: "Строительная компания" },
-    hide: { toIncludes: ["/crm/obzor"] },
+    hide: {
+      toIncludes: ["/crm/debts", "/crm/obzor"],
+    },
   },
   {
-    when: { sector: "Магазин" },
-    hide: { toIncludes: ["/crm/market/analytics"] },
-  },
-  {
-    when: { sector: "Магазин" },
-    hide: { toIncludes: ["/crm/market/bar"] },
-  },
-  {
-    when: { sector: "Магазин" },
-    hide: { toIncludes: ["/crm/market/history"] },
+    when: { sector: "Консалтинг" },
+    hide: {
+      toIncludes: [
+        "/crm/debts",
+        "/crm/obzor",
+        "/crm/brand-category",
+        "/crm/clients",
+        "/crm/sell",
+        "/crm/kassa",
+        "/crm/employ",
+        "/crm/sklad",
+        "/crm/zakaz",
+        "/crm/analytics",
+        "/crm/raspisanie",
+      ],
+    },
   },
 ];
 
@@ -500,6 +530,59 @@ const MENU_CONFIG = {
         implemented: true,
       },
     ],
+
+    consulting: [
+      {
+        label: "Клиенты",
+        to: "/crm/consulting/client",
+        icon: <FaUsers className="sidebar__menu-icon" />,
+        permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Заявки клиентов",
+        to: "/crm/consulting/client-requests",
+        icon: <FaClipboardList className="sidebar__menu-icon" />,
+        permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Касса",
+        to: "/crm/consulting/kassa",
+        icon: <FaCashRegister className="sidebar__menu-icon" />,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+      {
+        label: "Сотрудники",
+        to: "/crm/consulting/teachers",
+        icon: <FaChalkboardTeacher className="sidebar__menu-icon" />,
+        permission: "can_view_employees",
+        implemented: true,
+      },
+      {
+        label: "Зарплата",
+        to: "/crm/consulting/salary",
+        icon: <FaMoneyBill className="sidebar__menu-icon" />,
+        permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Продажи",
+        to: "/crm/consulting/sale",
+        icon: <FaShoppingCart className="sidebar__menu-icon" />,
+        permission: "can_view_sale",
+        implemented: true,
+      },
+      {
+        label: "Услуги",
+        to: "/crm/consulting/services",
+        icon: <FaCogs className="sidebar__menu-icon" />,
+        permission: "can_view_clients",
+        implemented: true,
+      },
+    ],
+
     // ...внутри MENU_CONFIG.sector
   },
 
@@ -555,9 +638,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         setSector(data.sector?.name);
         const tariffName = data.subscription_plan?.name || "Старт";
         setTariff(tariffName);
-        console.log("Sidebar - Loaded tariff:", tariffName);
       } catch (err) {
-        console.error("Ошибка загрузки тарифа:", err);
         setTariff("Старт");
       }
     };
@@ -582,7 +663,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       const data = await response.json();
       setUserAccesses(data);
     } catch (err) {
-      console.error("Ошибка при получении доступов пользователя:", err);
       setUserAccesses({});
     } finally {
       setLoadingAccesses(false);
@@ -593,24 +673,15 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     fetchUserAccesses();
   }, [fetchUserAccesses]);
 
-  // Логируем userAccesses для отладки
-  useEffect(() => {
-    if (userAccesses && Object.keys(userAccesses).length > 0) {
-      console.log("Sidebar - User accesses:", userAccesses);
-    }
-  }, [userAccesses]);
-
   const [openDropdown, setOpenDropdown] = useState(false);
 
   // Функция для проверки доступа к пункту меню
   const hasPermission = useCallback(
     (permission) => {
       if (!userAccesses || Object.keys(userAccesses).length === 0) {
-        console.log(`Sidebar - No user accesses for permission: ${permission}`);
         return false;
       }
       const hasAccess = userAccesses[permission] === true;
-      console.log(`Sidebar - Permission ${permission}: ${hasAccess}`);
       return hasAccess;
     },
     [userAccesses]
@@ -622,16 +693,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
     // Для тарифа "Старт" не показываем секторные пункты меню
     if (tariff === "Старт") {
-      console.log("Sidebar - Start tariff, hiding sector menu items");
       return [];
     }
 
     const sectorName = company.sector.name.toLowerCase();
     const sectorKey = sectorName.replace(/\s+/g, "_");
-
-    console.log("Sidebar - Sector name:", company.sector.name);
-    console.log("Sidebar - Sector key:", sectorKey);
-    console.log("Sidebar - Tariff:", tariff);
 
     // Маппинг названий секторов на ключи конфигурации
     const sectorMapping = {
@@ -644,22 +710,15 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       магазин: "market",
       кафе: "cafe",
       производство: "production",
+      консалтинг: "consulting",
     };
 
     const configKey = sectorMapping[sectorKey] || sectorKey;
     const sectorConfig = MENU_CONFIG.sector[configKey] || [];
 
-    console.log("Sidebar - Config key:", configKey);
-    console.log("Sidebar - Sector config:", sectorConfig);
-
-    const filteredItems = sectorConfig.filter((item) => {
-      const hasAccess = hasPermission(item.permission);
-      console.log(
-        `Sidebar - Checking ${item.label} (${item.permission}): ${hasAccess}`
-      );
-      return hasAccess;
-    });
-    console.log("Sidebar - Filtered sector items:", filteredItems);
+    const filteredItems = sectorConfig.filter((item) =>
+      hasPermission(item.permission)
+    );
 
     return filteredItems;
   }, [sector, company, hasPermission, tariff]);
@@ -684,14 +743,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   // Применение гибких правил скрытия (HIDE_RULES)
   const hiddenByRules = useMemo(() => {
     const result = { labels: new Set(), toIncludes: [] };
-    console.log(
-      "Sidebar - Applying HIDE_RULES for tariff:",
-      tariff,
-      "sector:",
-      sector
-    );
 
-    HIDE_RULES.forEach((rule, index) => {
+    HIDE_RULES.forEach((rule) => {
       const { when = {}, hide = {} } = rule;
       const sectorOk = !when.sector || when.sector === sector;
       const tariffOk = !when.tariff || when.tariff === tariff;
@@ -700,23 +753,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       const tariffNotInOk =
         !when.tariffNotIn || (tariff && !when.tariffNotIn.includes(tariff));
 
-      console.log(`Sidebar - Rule ${index}:`, {
-        when,
-        sectorOk,
-        tariffOk,
-        tariffInOk,
-        tariffNotInOk,
-        applies: sectorOk && tariffOk && tariffInOk && tariffNotInOk,
-      });
-
       if (sectorOk && tariffOk && tariffInOk && tariffNotInOk) {
         (hide.labels || []).forEach((l) => result.labels.add(l));
         (hide.toIncludes || []).forEach((p) => result.toIncludes.push(p));
       }
     });
 
-    console.log("Sidebar - Hidden labels:", Array.from(result.labels));
-    console.log("Sidebar - Hidden toIncludes:", result.toIncludes);
     return result;
   }, [sector, tariff]);
 
@@ -761,13 +803,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     // Применяем правила скрытия
     const filteredItems = items.filter((item) => {
       if (!item.implemented) {
-        console.log(`Sidebar - Filtering out ${item.label}: not implemented`);
         return false;
       }
 
       // Гибкие правила скрытия
       if (hiddenByRules.labels.has(item.label)) {
-        console.log(`Sidebar - Filtering out ${item.label}: hidden by rules`);
         return false;
       }
       if (
@@ -775,20 +815,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         typeof item.to === "string" &&
         hiddenByRules.toIncludes.some((p) => item.to.includes(p))
       ) {
-        console.log(
-          `Sidebar - Filtering out ${item.label}: hidden by toIncludes rules`
-        );
         return false;
       }
 
-      console.log(`Sidebar - Keeping ${item.label}`);
       return true;
     });
 
-    console.log(
-      "Sidebar - Final menu items:",
-      filteredItems.map((item) => item.label)
-    );
     return filteredItems;
   }, [
     loadingAccesses,
