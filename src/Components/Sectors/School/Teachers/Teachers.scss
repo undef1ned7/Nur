@@ -1,0 +1,494 @@
+
+
+// /* src/components/Education/Teachers.scss */
+// @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap");
+
+// :root {
+//   --primary: #f7d74f;
+//   --primary-dark: #d4b800;
+//   --text: #0f172a;
+//   --muted: #6b7280;
+//   --border: #e5e7eb;
+//   --surface: #ffffff;
+//   --radius: 12px;
+//   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+// }
+
+// /* Блок строго изолирован: Schoolteachers */
+// .Schoolteachers,
+// .Schoolteachers * { box-sizing: border-box; }
+
+// .Schoolteachers {
+//   font-family: "Montserrat", sans-serif;
+//   background: var(--surface);
+//   border-radius: var(--radius);
+//   padding: 24px;
+//   box-shadow: var(--shadow);
+//   display: flex;
+//   flex-direction: column;
+//   gap: 20px;
+
+//   min-height: 0;
+//   overflow: hidden;
+// }
+
+// /* Header */
+// .Schoolteachers__header {
+//   display: grid;
+//   grid-template-areas: "title toolbar";
+//   grid-template-columns: 1fr auto;
+//   align-items: end;
+//   gap: 12px;
+// }
+// .Schoolteachers__titleWrap { grid-area: title; }
+// .Schoolteachers__title { font-size: 22px; font-weight: 800; color: var(--text); margin: 0; }
+// .Schoolteachers__subtitle { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
+
+// .Schoolteachers__toolbar {
+//   grid-area: toolbar;
+//   display: grid;
+//   grid-template-columns: auto minmax(260px, 420px) auto;
+//   gap: 10px;
+//   align-items: center;
+// }
+
+// /* Tabs */
+// .Schoolteachers__tabs { display: inline-flex; gap: 8px; }
+// .Schoolteachers__tab {
+//   padding: 8px 12px;
+//   border-radius: 10px;
+//   border: 1px solid var(--border);
+//   background: #f9fafb;
+//   font-weight: 600;
+//   cursor: pointer;
+// }
+// .Schoolteachers__tab.is-active {
+//   border-color: transparent;
+//   background: var(--primary);
+//   color: #111;
+// }
+
+// /* Search */
+// .Schoolteachers__search { position: relative; }
+// .Schoolteachers__searchInput {
+//   width: 100%;
+//   padding: 10px 12px 10px 32px;
+//   border-radius: 12px;
+//   border: 1px solid var(--border);
+//   font-size: 14px;
+// }
+// .Schoolteachers__searchInput:focus { outline: none; border-color: var(--primary); }
+// .Schoolteachers__searchIcon {
+//   position: absolute; left: 10px; top: 50%;
+//   transform: translateY(-50%);
+//   color: var(--muted);
+//   font-size: 14px;
+//   pointer-events: none;
+// }
+
+// /* Buttons */
+// .Schoolteachers__btn {
+//   display: inline-flex; align-items: center; gap: 6px;
+//   padding: 10px 14px; border-radius: 12px; font-size: 14px; font-weight: 700;
+//   border: 1px solid transparent; cursor: pointer; transition: .15s ease; white-space: nowrap;
+// }
+// .Schoolteachers__btn:active { transform: translateY(1px); }
+// .Schoolteachers__btn:disabled { opacity: .6; cursor: not-allowed; }
+// .Schoolteachers__btn--primary { background: var(--primary); color: #111; }
+// .Schoolteachers__btn--primary:hover { background: var(--primary-dark); }
+// .Schoolteachers__btn--secondary { background: #f9fafb; border: 1px solid var(--border); color: var(--text); }
+// .Schoolteachers__btn--danger { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
+// .Schoolteachers__btn--danger:hover { background: rgba(239,68,68,.06); }
+
+// /* Alerts */
+// .Schoolteachers__alert {
+//   padding: 10px 12px;
+//   border-radius: 12px;
+//   font-size: 14px;
+//   background: rgba(231, 76, 60, 0.12);
+//   color: #e74c3c;
+//   border: 1px solid rgba(231, 76, 60, 0.35);
+// }
+
+// /* List (внутренний скролл) */
+// .Schoolteachers__list {
+//   display: grid;
+//   gap: 10px;
+
+//   flex: 1 1 auto;
+//   min-height: 0;
+//   overflow: auto;
+
+//   max-height: calc(100vh - 260px);
+//   padding-right: 2px;
+// }
+
+// /* Card */
+// .Schoolteachers__card {
+//   display: flex;
+//   justify-content: space-between;
+//   align-items: stretch;
+//   gap: 10px;
+//   padding: 14px;
+//   border: 1px solid var(--border);
+//   border-radius: 14px;
+//   background: #f8fafc;
+//   transition: background .2s ease;
+// }
+// .Schoolteachers__card:hover { background: #eef2ff; }
+// .Schoolteachers__cardLeft { display: flex; gap: 12px; align-items: flex-start; }
+// .Schoolteachers__avatar {
+//   min-width: 40px; height: 40px; border-radius: 50%;
+//   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+//   color: #fff; font-weight: 800; font-size: 14px;
+//   display: grid; place-items: center; box-shadow: var(--shadow);
+// }
+// .Schoolteachers__name { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+// .Schoolteachers__meta { display: flex; gap: 8px; flex-wrap: wrap; }
+// .Schoolteachers__meta span { font-size: 13px; color: var(--muted); }
+
+// .Schoolteachers__rowActions { display: inline-flex; gap: 8px; align-items: center; }
+
+// /* Modal (по центру, поверх всего) */
+// .Schoolteachers__modalOverlay {
+//   position: fixed; inset: 0;
+//   background: rgba(0, 0, 0, 0.5);
+//   display: flex; align-items: center; justify-content: center;
+//   z-index: 9999;  /* поверх */
+//   overflow: auto;
+// }
+// .Schoolteachers__modal {
+//   background: var(--surface);
+//   border-radius: 14px;
+//   padding: 20px;
+//   width: 100%;
+//   max-width: 640px;
+//   box-shadow: var(--shadow);
+//   animation: st-fade .18s ease;
+//   max-height: 90vh;
+//   overflow: auto;
+// }
+// @keyframes st-fade { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+// .Schoolteachers__modalHeader {
+//   display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+// }
+// .Schoolteachers__modalTitle { font-size: 18px; font-weight: 800; margin: 0; }
+// .Schoolteachers__iconBtn {
+//   background: none; border: none; cursor: pointer;
+//   color: var(--muted); font-size: 18px; padding: 6px; border-radius: 8px;
+// }
+// .Schoolteachers__iconBtn:hover { color: var(--text); background: #f3f4f6; }
+
+// /* Form */
+// .Schoolteachers__form { display: flex; flex-direction: column; gap: 16px; }
+// .Schoolteachers__formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+// .Schoolteachers__field { display: flex; flex-direction: column; gap: 6px; }
+// .Schoolteachers__field--full { grid-column: 1 / -1; }
+// .Schoolteachers__label { font-size: 14px; font-weight: 700; color: var(--muted); }
+// .Schoolteachers__req { color: #ef4444; }
+// .Schoolteachers__input {
+//   padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: #fff; font-family: inherit;
+// }
+// .Schoolteachers__input:focus { outline: none; border-color: var(--primary); }
+
+// .Schoolteachers__formActions { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+// .Schoolteachers__actionsSpacer { flex: 1 1 auto; }
+// .Schoolteachers__actionsRight { display: flex; gap: 10px; }
+
+// /* Узкие скроллбары */
+// .Schoolteachers__list,
+// .Schoolteachers__modal {
+//   scrollbar-width: thin;
+//   scrollbar-color: rgba(0,0,0,.25) transparent;
+// }
+// .Schoolteachers__list::-webkit-scrollbar,
+// .Schoolteachers__modal::-webkit-scrollbar { width: 8px; height: 8px; }
+// .Schoolteachers__list::-webkit-scrollbar-thumb,
+// .Schoolteachers__modal::-webkit-scrollbar-thumb {
+//   background: rgba(0,0,0,.25);
+//   border-radius: 8px;
+// }
+// .Schoolteachers__list::-webkit-scrollbar-thumb:hover,
+// .Schoolteachers__modal::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.35); }
+
+// /* Адаптация */
+// @media (max-width: 960px) {
+//   .Schoolteachers__header {
+//     grid-template-areas:
+//       "title"
+//       "toolbar";
+//     grid-template-columns: 1fr;
+//   }
+//   .Schoolteachers__toolbar { grid-template-columns: 1fr; }
+// }
+// @media (max-width: 640px) {
+//   .Schoolteachers__btn--primary { width: 100%; justify-content: center; }
+//   .Schoolteachers__tabs { width: 100%; }
+//   .Schoolteachers__tab { flex: 1 1 auto; text-align: center; }
+//   .Schoolteachers__formGrid { grid-template-columns: 1fr; }
+//   .Schoolteachers__modal { width: 96vw; }
+// }
+
+
+
+/* src/components/Education/Teachers.scss */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap");
+
+/* В :root — только цвета */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+/* Блок строго изолирован: Schoolteachers */
+.Schoolteachers,
+.Schoolteachers * { box-sizing: border-box; }
+
+.Schoolteachers {
+  /* локальные токены блока */
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  font-family: "Montserrat", sans-serif;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Header */
+.Schoolteachers__header {
+  display: grid;
+  grid-template-areas: "title toolbar";
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 12px;
+}
+.Schoolteachers__titleWrap { grid-area: title; }
+.Schoolteachers__title { font-size: 22px; font-weight: 800; color: var(--text); margin: 0; }
+.Schoolteachers__subtitle { font-size: 13px; color: var(--muted); margin: 2px 0 0; }
+
+.Schoolteachers__toolbar {
+  grid-area: toolbar;
+  display: grid;
+  grid-template-columns: auto minmax(260px, 420px) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Tabs */
+.Schoolteachers__tabs { display: inline-flex; gap: 8px; }
+.Schoolteachers__tab {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #f9fafb;
+  font-weight: 600;
+  cursor: pointer;
+}
+.Schoolteachers__tab.is-active {
+  border-color: transparent;
+  background: var(--primary);
+  color: #111;
+}
+
+/* Search */
+.Schoolteachers__search { position: relative; }
+.Schoolteachers__searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 32px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  background: #fff;
+}
+.Schoolteachers__searchInput:focus { outline: none; border-color: var(--primary); }
+.Schoolteachers__searchIcon {
+  position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* Buttons */
+.Schoolteachers__btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 14px; border-radius: 12px; font-size: 14px; font-weight: 700;
+  border: 1px solid transparent; cursor: pointer; transition: .15s ease; white-space: nowrap;
+}
+.Schoolteachers__btn:active { transform: translateY(1px); }
+.Schoolteachers__btn:disabled { opacity: .6; cursor: not-allowed; }
+.Schoolteachers__btn--primary { background: var(--primary); color: #111; }
+.Schoolteachers__btn--primary:hover { background: var(--primary-dark); }
+.Schoolteachers__btn--secondary { background: #f9fafb; border: 1px solid var(--border); color: var(--text); }
+.Schoolteachers__btn--danger { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
+.Schoolteachers__btn--danger:hover { background: rgba(239,68,68,.06); }
+
+/* Alerts */
+.Schoolteachers__alert {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  background: rgba(231, 76, 60, 0.12);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.35);
+}
+
+/* List (внутренний скролл) */
+.Schoolteachers__list {
+  display: grid;
+  gap: 10px;
+
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+
+  max-height: calc(100vh - 260px);
+  padding-right: 2px;
+}
+
+/* Card */
+.Schoolteachers__card {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f8fafc;
+  transition: background .2s ease;
+}
+.Schoolteachers__card:hover { background: #eef2ff; }
+.Schoolteachers__cardLeft { display: flex; gap: 12px; align-items: flex-start; }
+.Schoolteachers__avatar {
+  min-width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff; font-weight: 800; font-size: 14px;
+  display: grid; place-items: center; box-shadow: var(--shadow);
+}
+.Schoolteachers__name { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+.Schoolteachers__meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.Schoolteachers__meta span { font-size: 13px; color: var(--muted); }
+
+.Schoolteachers__rowActions { display: inline-flex; gap: 8px; align-items: center; }
+
+/* Pagination */
+.Schoolteachers__pagination {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px;
+}
+.Schoolteachers__pageBtn {
+  min-width: 34px; height: 34px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--border); background: #fff;
+  cursor: pointer; font-size: 14px; line-height: 1;
+}
+.Schoolteachers__pageBtn[disabled] { opacity: .5; cursor: default; }
+.Schoolteachers__pageBtn--active { background: var(--primary); border-color: var(--primary-dark); font-weight: 700; }
+.Schoolteachers__dots { padding: 0 4px; color: var(--muted); }
+.Schoolteachers__pageInfo { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+/* Modal (по центру, поверх всего) */
+.Schoolteachers__modalOverlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  overflow: auto;
+}
+.Schoolteachers__modal {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 20px;
+  width: 100%;
+  max-width: 640px;
+  box-shadow: var(--shadow);
+  animation: st-fade .18s ease;
+  max-height: 90vh;
+  overflow: auto;
+}
+@keyframes st-fade { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+.Schoolteachers__modalHeader {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+}
+.Schoolteachers__modalTitle { font-size: 18px; font-weight: 800; margin: 0; }
+.Schoolteachers__iconBtn {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 18px; padding: 6px; border-radius: 8px;
+}
+.Schoolteachers__iconBtn:hover { color: var(--text); background: #f3f4f6; }
+
+/* Form */
+.Schoolteachers__form { display: flex; flex-direction: column; gap: 16px; }
+.Schoolteachers__formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.Schoolteachers__field { display: flex; flex-direction: column; gap: 6px; }
+.Schoolteachers__field--full { grid-column: 1 / -1; }
+.Schoolteachers__label { font-size: 14px; font-weight: 700; color: var(--muted); }
+.Schoolteachers__req { color: #ef4444; }
+.Schoolteachers__input {
+  padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: #fff; font-family: inherit;
+}
+.Schoolteachers__input:focus { outline: none; border-color: var(--primary); }
+
+.Schoolteachers__formActions { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.Schoolteachers__actionsSpacer { flex: 1 1 auto; }
+.Schoolteachers__actionsRight { display: flex; gap: 10px; }
+
+/* Confirm modal */
+.Schoolteachers__confirm {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(0,0,0,.18);
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px;
+  animation: st-fade .18s ease;
+}
+.Schoolteachers__confirmTitle { font-size: 18px; font-weight: 800; margin: 0 0 8px; color: var(--text); }
+.Schoolteachers__confirmText { font-size: 14px; color: var(--text); margin: 0 0 14px; }
+.Schoolteachers__confirmActions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Узкие скроллбары */
+.Schoolteachers__list,
+.Schoolteachers__modal {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,.25) transparent;
+}
+.Schoolteachers__list::-webkit-scrollbar,
+.Schoolteachers__modal::-webkit-scrollbar { width: 8px; height: 8px; }
+.Schoolteachers__list::-webkit-scrollbar-thumb,
+.Schoolteachers__modal::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,.25);
+  border-radius: 8px;
+}
+.Schoolteachers__list::-webkit-scrollbar-thumb:hover,
+.Schoolteachers__modal::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.35); }
+
+/* Адаптация */
+@media (max-width: 960px) {
+  .Schoolteachers__header {
+    grid-template-areas:
+      "title"
+      "toolbar";
+    grid-template-columns: 1fr;
+  }
+  .Schoolteachers__toolbar { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .Schoolteachers__btn--primary { width: 100%; justify-content: center; }
+  .Schoolteachers__tabs { width: 100%; }
+  .Schoolteachers__tab { flex: 1 1 auto; text-align: center; }
+  .Schoolteachers__formGrid { grid-template-columns: 1fr; }
+  .Schoolteachers__modal { width: 96vw; }
+}

@@ -1,0 +1,269 @@
+/* Общий стиль под твой UI с табами как на скрине */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #fff;
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.rh {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Tabs */
+.rh__tabs {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.rh__tab {
+  background: transparent;
+  border: none;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 8px 2px;
+  position: relative;
+  cursor: pointer;
+
+  &--active {
+    color: var(--text);
+  }
+  &--active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -9px;
+    height: 3px;
+    background: var(--primary);
+    border-radius: 3px;
+  }
+}
+
+/* Header & actions */
+.rh__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.rh__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.rh__subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.rh__actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.rh__search {
+  position: relative;
+}
+.rh__searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+.rh__searchInput {
+  width: 280px;
+  padding: 10px 12px 10px 32px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  outline: none;
+}
+
+/* Buttons */
+.rh__btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+
+  &--primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    font-weight: 600;
+  }
+  &--secondary {
+    background: #fff;
+  }
+}
+
+.rh__empty {
+  padding: 16px;
+  color: var(--muted);
+}
+
+/* List/rows */
+.rh__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rh__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.rh__rowLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rh__name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rh__meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rh__badge {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.rh__price {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rh__desc {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 800px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rh__rowRight {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Modal */
+.rh__modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+
+.rh__modal {
+  width: 720px;
+  max-width: calc(100vw - 24px);
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.rh__modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rh__modalTitle {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.rh__iconBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.rh__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rh__formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .rh__formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rh__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rh__label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.rh__req {
+  color: #ef4444;
+}
+
+.rh__input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.rh__formActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}

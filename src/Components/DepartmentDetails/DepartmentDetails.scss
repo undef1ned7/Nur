@@ -1,0 +1,504 @@
+// DepartmentDetails.module.scss (фрагмент, убедитесь, что он содержит эти стили)
+
+/* ... (предыдущие стили для контейнера, хедера, таблицы и т.д.) ... */
+
+// Modal Styling
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.inline-access-list {
+  height: 100px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  row-gap: 10px;
+  label {
+    display: flex;
+    column-gap: 15px;
+  }
+}
+
+.modalContent {
+  // background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+
+  h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 24px;
+  }
+
+  .closeButton {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #aaa;
+
+    &:hover {
+      color: #666;
+    }
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .cancelButton {
+      background-color: #eee;
+      color: #555;
+      &:hover {
+        background-color: #ddd;
+      }
+    }
+
+    .submitButton {
+      background-color: #f7d74f; // Yellow
+      color: #333;
+      font-weight: bold;
+      &:hover {
+        background-color: darken(#f7d74f, 10%);
+      }
+    }
+  }
+}
+
+// Form component styling (Input, Select)
+.formGroup {
+  margin-bottom: 15px;
+
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+    font-size: 14px;
+  }
+
+  input[type="text"],
+  select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: #f7d74f;
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.2);
+    }
+  }
+
+  select[multiple] {
+    min-height: 120px;
+    padding: 10px;
+  }
+}
+
+/* DepartmentDetails.module.scss */
+
+// Основной контейнер страницы
+.container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  // background-color: #f0f2f5; // Светлый фон страницы
+  min-height: 100vh; // Минимальная высота на весь экран
+  display: flex;
+  flex-direction: column; // Элементы располагаются по вертикали
+}
+
+// Хедер страницы деталей отдела
+.header {
+  display: flex;
+  justify-content: space-between; // Элементы по краям
+  align-items: center; // Выравнивание по центру по вертикали
+  margin-bottom: 20px;
+  // background-color: #fff; // Белый фон для хедера
+  // padding: 15px 20px;
+  border-radius: 8px;
+  // box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); // Легкая тень
+}
+
+.departmentHeader {
+  display: flex;
+  align-items: center;
+  gap: 15px; // Отступ между кнопкой "Назад" и заголовком
+
+  .backButton {
+    background: none;
+    border: none;
+    color: #555; // Серый цвет текста
+    font-size: 16px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 5px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+      background-color: #eee; // Легкий фон при наведении
+    }
+  }
+
+  h2 {
+    margin: 0; // Убрать стандартные отступы
+    font-size: 24px;
+    color: #333; // Темный цвет текста
+  }
+}
+
+.userSection {
+  display: flex;
+  align-items: center;
+  gap: 15px; // Отступы между элементами секции пользователя
+
+  .icon {
+    font-size: 20px;
+    color: #888; // Серый цвет иконок
+  }
+
+  .userName {
+    font-weight: bold;
+    color: #333;
+  }
+
+  .addEmployeeButton {
+    background-color: #f7d74f; // Желтая кнопка
+    color: #333;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+
+    &:hover {
+      background-color: darken(#f7d74f, 10%); // Затемнение при наведении
+    }
+  }
+}
+
+// Контейнер таблицы сотрудников
+.employeeTableContainer {
+  flex-grow: 1; // Занимает доступное пространство
+  // background-color: #fff; // Белый фон
+  // border-radius: 8px;
+  // box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden; // Гарантирует скругленные углы для содержимого таблицы
+  margin-top: 20px; // Отступ снизу от хедера
+}
+
+.employeeTable {
+  width: 100%; // Таблица на всю ширину контейнера
+  border-collapse: collapse; // Убираем двойные границы
+
+  th,
+  td {
+    text-align: left; // Выравнивание текста влево
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee; // Разделитель строк
+  }
+
+  th {
+    background-color: #f8f8f8; // Светлый фон для заголовков таблицы
+    font-weight: bold;
+    color: #555;
+    font-size: 14px;
+    text-transform: uppercase; // Заголовки капсом
+  }
+
+  td {
+    color: #333;
+    font-size: 16px;
+  }
+
+  tr:last-child td {
+    border-bottom: none; // Убираем нижнюю границу у последней строки
+  }
+
+  // Стили для списка доступов (тегов)
+  .accessList {
+    display: flex;
+    flex-wrap: wrap; // Перенос тегов на новую строку при необходимости
+    gap: 5px; // Отступ между тегами
+
+    .accessTag {
+      background-color: #e0f2f7; // Светло-голубой фон для тегов
+      color: #2196f3; // Темно-синий цвет текста
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .noAccess {
+      color: #999;
+      font-style: italic;
+    }
+  }
+
+  // Кнопка с тремя точками для действий
+  .actionDots {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+    &:hover {
+      color: #333;
+    }
+  }
+  .row-btn {
+    display: flex;
+    align-items: center;
+    column-gap: 20px;
+  }
+
+  .noEmployees {
+    text-align: center;
+    padding: 40px;
+    color: #777;
+    font-style: italic;
+  }
+}
+
+// Футер страницы (может быть общим для всех страниц)
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 30px;
+  padding: 15px 0;
+  color: #777;
+  font-size: 14px;
+
+  .pagination {
+    display: flex;
+    gap: 10px;
+
+    .arrow {
+      cursor: pointer;
+      padding: 5px;
+      &:hover {
+        color: #333;
+      }
+    }
+  }
+}
+
+/* --- Стили для Модальных Окон и Форм (скопированы для удобства) --- */
+// В идеале эти стили должны быть в отдельных SCSS-файлах для Modal, Input, Select,
+// или в глобальном файле стилей, если они используются повсеместно.
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5); // Полупрозрачный черный фон
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; // Поверх всего остального
+}
+
+.modalContent {
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3); // Тень для выделения модалки
+  max-width: 500px; // Максимальная ширина
+  width: 90%; // Адаптивная ширина
+  position: relative;
+
+  h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 24px;
+  }
+
+  .closeButton {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #aaa;
+
+    &:hover {
+      color: #666;
+    }
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; // Отступ между полями формы
+  }
+
+  .modalActions {
+    display: flex;
+    justify-content: flex-end; // Кнопки справа
+    gap: 10px;
+    margin-top: 25px;
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .cancelButton {
+      background-color: #eee;
+      color: #555;
+      &:hover {
+        background-color: #ddd;
+      }
+    }
+
+    .submitButton {
+      background-color: #f7d74f; // Желтая кнопка
+      color: #333;
+      font-weight: bold;
+      &:hover {
+        background-color: darken(#f7d74f, 10%);
+      }
+    }
+  }
+}
+
+// Стили для групп формы (лейбл + инпут/селект)
+.formGroup {
+  margin-bottom: 15px;
+
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+    font-size: 14px;
+  }
+
+  input[type="text"],
+  select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    box-sizing: border-box; // Включаем padding и border в общую ширину/высоту
+
+    &:focus {
+      outline: none;
+      border-color: #f7d74f; // Цвет рамки при фокусе
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.2); // Легкая тень при фокусе
+    }
+  }
+
+  select[multiple] {
+    min-height: 120px; // Увеличиваем высоту для мультивыбора
+    padding: 10px;
+  }
+}
+
+.dropdownToggle {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  text-align: left;
+  background: white;
+  cursor: pointer;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 40px;
+  width: 100%;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  padding: 8px;
+}
+
+.dropdownItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  cursor: pointer;
+
+  span {
+    font-size: 14px;
+  }
+}
+
+.saveButton {
+  width: 100%;
+  margin-top: 10px;
+  background-color: #ffd700;
+  border: none;
+  border-radius: 4px;
+  padding: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 115px;
+  margin-left: auto;
+  display: block;
+}
+.accessList {
+  max-width: 265px;
+  position: relative;
+}
+
+@media (max-width: 500px) {
+  .header {
+    flex-direction: column;
+    align-items: start;
+  }
+}

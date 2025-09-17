@@ -1,0 +1,254 @@
+/* ========== styles.css (vanilla CSS, без Tailwind) ========== */
+
+/* ---- Базовые переменные темы ---- */
+:root{
+  --bg: #f1f5f9;             /* slate-100 */
+  --text: #0f172a;           /* slate-900 */
+  --muted: #475569;          /* slate-600 */
+  --muted-700:#334155;       /* slate-700 */
+  --muted-800:#1f2937;       /* slate-800 */
+
+  --white:#fff;
+  --black: #000;
+  --black-30: rgba(0,0,0,.30);
+
+  --slate-50:#f8fafc;
+  --slate-100:#f1f5f9;
+  --slate-200:#e2e8f0;
+
+  --emerald-50:#ecfdf5;
+  --emerald-200:#a7f3d0;
+  --emerald-700:#047857;
+  --emerald-800:#065f46;
+
+  --blue-50:#eff6ff;
+  --blue-200:#bfdbfe;
+  --blue-700:#1d4ed8;
+
+  --rose-50:#fff1f2;
+  --rose-200:#fecdd3;
+  --rose-700:#be123c;
+
+  --amber-50:#fffbeb;
+  --amber-200:#fde68a;
+  --amber-800:#92400e;
+
+  --violet-50:#f5f3ff;
+  --violet-200:#ddd6fe;
+  --violet-700:#6d28d9;
+
+  --border: var(--slate-200);
+  --ring:   var(--slate-200);
+
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,.1), 0 8px 10px -6px rgba(0,0,0,.1);
+}
+
+/* ---- База/типографика ---- */
+html,body,#root{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
+
+/* ---- Утилиты (аналог ключевых tailwind-классов, использованных в макете) ---- */
+.mx-auto{margin-left:auto;margin-right:auto}
+.max-w-7xl{max-width:80rem}
+.p-6{padding:1.5rem}
+.p-5{padding:1.25rem}
+.p-4{padding:1rem}
+.px-4{padding-left:1rem;padding-right:1rem}
+.px-3{padding-left:.75rem;padding-right:.75rem}
+.px-2_5{padding-left:.625rem;padding-right:.625rem}
+.py-2{padding-top:.5rem;padding-bottom:.5rem}
+.py-1{padding-top:.25rem;padding-bottom:.25rem}
+.py-1_5{padding-top:.375rem;padding-bottom:.375rem}
+.mb-6{margin-bottom:1.5rem}
+.mb-3{margin-bottom:.75rem}
+.mb-2{margin-bottom:.5rem}
+.mt-8{margin-top:2rem}
+.mt-6{margin-top:1.5rem}
+.mt-2{margin-top:.5rem}
+.mt-1{margin-top:.25rem}
+
+.flex{display:flex}
+.inline-flex{display:inline-flex}
+.items-center{align-items:center}
+.items-end{align-items:flex-end}
+.justify-between{justify-content:space-between}
+.gap-2{gap:.5rem}
+.gap-3{gap:.75rem}
+.gap-4{gap:1rem}
+.flex-col{flex-direction:column}
+.flex-1{flex:1 1 auto}
+.min-w-14{min-width:3.5rem}
+.w-full{width:100%}
+.w-40{width:10rem}
+.w-36{width:9rem}
+.text-center{text-align:center}
+.text-left{text-align:left}
+.align-top{vertical-align:top}
+.whitespace-nowrap{white-space:nowrap}
+.overflow-hidden{overflow:hidden}
+
+.grid{display:grid}
+.grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}
+.gap-3{gap:.75rem}
+.table-fixed{table-layout:fixed}
+.min-w-full{min-width:100%}
+
+.rounded-lg{border-radius:var(--radius-lg)}
+.rounded-xl{border-radius:var(--radius-xl)}
+.rounded-2xl{border-radius:var(--radius-2xl)}
+.rounded-full{border-radius:9999px}
+
+.border{border:1px solid var(--border)}
+.border-t{border-top:1px solid var(--border)}
+.border-slate-100{border-color:var(--slate-100)}
+.border-slate-200{border-color:var(--slate-200)}
+.border-slate-900{border-color:var(--text)}
+.border-emerald-200{border-color:var(--emerald-200)}
+.border-rose-200{border-color:var(--rose-200)}
+
+.bg-white{background:var(--white)}
+.bg-slate-50{background:var(--slate-50)}
+.bg-slate-100{background:var(--slate-100)}
+.bg-emerald-50{background:var(--emerald-50)}
+.bg-amber-50{background:var(--amber-50)}
+.bg-blue-50{background:var(--blue-50)}
+.bg-rose-50{background:var(--rose-50)}
+.bg-violet-50{background:var(--violet-50)}
+.bg-black\/30{background:var(--black-30)} /* overlay */
+
+.text-slate-900{color:var(--text)}
+.text-slate-800{color:var(--muted-800)}
+.text-slate-700{color:var(--muted-700)}
+.text-slate-600{color:var(--muted)}
+.text-emerald-800{color:var(--emerald-800)}
+.text-emerald-700{color:var(--emerald-700)}
+.text-amber-800{color:var(--amber-800)}
+.text-blue-700{color:var(--blue-700)}
+.text-rose-700{color:var(--rose-700)}
+.text-violet-700{color:var(--violet-700)}
+.text-white{color:#fff}
+
+.text-xs{font-size:.75rem;line-height:1rem}
+.text-sm{font-size:.875rem;line-height:1.25rem}
+.text-lg{font-size:1.125rem;line-height:1.75rem}
+.text-2xl{font-size:1.5rem;line-height:2rem}
+
+.font-medium{font-weight:500}
+.font-semibold{font-weight:600}
+.font-bold{font-weight:700}
+.tracking-tight{letter-spacing:-0.01em}
+
+.shadow-sm{box-shadow:var(--shadow-sm)}
+.shadow-xl{box-shadow:var(--shadow-xl)}
+
+.ring-1{box-shadow:0 0 0 1px var(--ring) inset}
+.ring-emerald-200{--ring:var(--emerald-200)}
+.ring-blue-200{--ring:var(--blue-200)}
+.ring-rose-200{--ring:var(--rose-200)}
+.ring-amber-200{--ring:var(--amber-200)}
+.ring-slate-200{--ring:var(--slate-200)}
+
+.outline-none{outline:none}
+.bg-transparent{background:transparent}
+
+.h-5{height:1.25rem}.w-5{width:1.25rem}
+.h-4{height:1rem}.w-4{width:1rem}
+.h-3\.5{height:.875rem}.w-3\.5{width:.875rem}
+
+/* hover / responsive / disabled псевдоклассы для используемых в коде имён */
+.hover\:bg-slate-50:hover{background:var(--slate-50)}
+.disabled\:opacity-60:disabled{opacity:.6}
+
+@media (min-width:640px){
+  .sm\:flex-row{flex-direction:row}
+  .sm\:items-end{align-items:flex-end}
+  .sm\:justify-between{justify-content:space-between}
+  .sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:768px){
+  .md\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .md\:grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .md\:w-auto{width:auto}
+}
+@media (min-width:1024px){
+  .lg\:grid-cols-5{grid-template-columns:repeat(5,minmax(0,1fr))}
+}
+
+/* ---- Общие компоненты (кнопки, инпуты, чипы, карточки, таблица) ---- */
+button{
+  font: inherit; cursor: pointer; border:1px solid var(--border);
+  background: var(--white); color: var(--muted-800);
+  padding:.5rem .75rem; border-radius: var(--radius-xl);
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+button:hover{background:var(--slate-50)}
+button:focus-visible{outline:2px solid var(--slate-200); outline-offset:2px}
+
+.btn-primary{
+  border-color: var(--text); background: var(--text); color:#fff;
+}
+.btn-primary:hover{filter:brightness(0.95)}
+
+input, select, textarea{
+  font: inherit; color: var(--muted-800);
+  background: #fff; border:1px solid var(--slate-200);
+  border-radius: var(--radius-xl);
+  padding:.5rem .75rem;
+}
+input:focus, select:focus, textarea:focus{
+  outline:2px solid var(--slate-200); outline-offset:2px;
+}
+
+.card{
+  border:1px solid var(--slate-200);
+  background:#fff; border-radius:var(--radius-2xl);
+  box-shadow:var(--shadow-sm);
+}
+
+.chip{
+  display:inline-flex; align-items:center; gap:.5rem;
+  border:1px solid var(--slate-200); background:var(--slate-50);
+  color:var(--muted-700); border-radius:9999px; padding:.25rem .625rem;
+  font-size:.75rem; font-weight:500;
+}
+
+.table{
+  width:100%; border-collapse:collapse; table-layout:fixed;
+}
+.table thead tr{background:var(--slate-50); color:var(--muted); font-size:.875rem}
+.table th,.table td{padding:.75rem; border-top:1px solid var(--slate-100); vertical-align:top}
+.table .nowrap{white-space:nowrap}
+
+/* ---- Бейджи статусов ---- */
+.badge{display:inline-flex;align-items:center;gap:.25rem;
+  border-radius:9999px;padding:.25rem .5rem;font-size:.75rem;font-weight:500;border:1px solid transparent}
+.badge--done{background:var(--emerald-50); color:var(--emerald-700); border-color:var(--emerald-200)}
+.badge--in_progress{background:var(--blue-50); color:var(--blue-700); border-color:var(--blue-200)}
+.badge--blocked{background:var(--rose-50); color:var(--rose-700); border-color:var(--rose-200)}
+.badge--review{background:var(--amber-50); color:var(--amber-800); border-color:var(--amber-200)}
+.badge--new{background:var(--violet-50); color:var(--violet-700); border-color:var(--violet-200)}
+
+/* ---- Модалка ---- */
+.modal-overlay{
+  position:fixed; inset:0; background:var(--black-30);
+}
+.modal{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:50;
+}
+.modal-card{
+  position:relative; width:100%; max-width:40rem; background:#fff;
+  border-radius:var(--radius-2xl); box-shadow:var(--shadow-xl); padding:1.25rem;
+}
+
+/* ---- Иконка «refresh» ---- */
+@keyframes spin{to{transform:rotate(360deg)}}
+.animate-spin{animation:spin 1s linear infinite}

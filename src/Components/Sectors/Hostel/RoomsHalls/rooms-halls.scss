@@ -1,0 +1,334 @@
+/* src/components/Booking/rooms-halls.scss */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap");
+
+/* В :root — только цвета */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+/* Блок rh: свой namespace + локальные токены (не в :root) */
+.rh {
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  /* Tabs */
+  &__tabs {
+    display: flex;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+  }
+
+  &__tab {
+    background: transparent;
+    border: none;
+    font-weight: 700;
+    color: var(--muted);
+    padding: 8px 2px;
+    position: relative;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover { color: var(--text); }
+
+    &--active { color: var(--text); }
+    &--active::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; bottom: -9px;
+      height: 3px;
+      background: var(--primary);
+      border-radius: 3px;
+    }
+  }
+
+  /* Header & actions */
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  &__title {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  &__subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* Search */
+  &__search { position: relative; }
+  &__searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.6;
+    font-size: 14px;
+  }
+  &__searchInput {
+    width: 300px;
+    max-width: 100%;
+    padding: 10px 12px 10px 32px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    outline: none;
+    font-size: 14px;
+
+    &:focus { border-color: var(--primary); }
+  }
+
+  /* Buttons */
+  &__btn {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+    font-weight: 700;
+    transition: .2s;
+
+    &:active { transform: translateY(1px); }
+
+    &--primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #111;
+      &:hover { background: var(--primary-dark); }
+    }
+    &--secondary {
+      background: #fff;
+      color: var(--text);
+      &:hover { background: #f9fafb; }
+    }
+  }
+
+  /* Empty */
+  &__empty {
+    padding: 16px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* List/rows */
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    background: #fafafa;
+  }
+
+  &__rowLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  &__name {
+    font-weight: 700;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  &__meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  &__badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+  }
+
+  &__price {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  &__desc {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 800px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__rowRight {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* Modal */
+  &__modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    display: grid;
+    place-items: center;
+    z-index: 1000;
+    padding: 12px;
+  }
+
+  &__modal {
+    width: 720px;
+    max-width: 96vw;
+    background: var(--surface);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+    border: 1px solid var(--border);
+    max-height: 92vh;
+    overflow: auto;
+  }
+
+  &__modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  &__modalTitle {
+    font-weight: 800;
+    font-size: 18px;
+  }
+
+  &__iconBtn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  /* Form */
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__formGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__label {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  &__req { color: #ef4444; }
+
+  &__input {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    outline: none;
+    font-size: 14px;
+    background: #fff;
+
+    &:focus { border-color: var(--primary); }
+  }
+
+  /* === строгое отображение ошибок === */
+  &__input--invalid {
+    border-color: #ef4444;
+    background: #fff7f7;
+  }
+  &__fieldError {
+    color: #b91c1c;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  &__formError {
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    color: #b91c1c;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+
+  &__formActions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  /* Адаптация до 320px */
+  @media (max-width: 640px) {
+    padding: 16px;
+
+    &__formGrid { grid-template-columns: 1fr; }
+    &__modal     { padding: 12px; }
+    &__searchInput { width: 100%; }
+  }
+
+  @media (max-width: 360px) {
+    &__title { font-size: 18px; }
+    &__btn { padding: 9px 12px; }
+    &__row { padding: 12px; }
+  }
+}

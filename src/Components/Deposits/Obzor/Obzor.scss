@@ -1,0 +1,855 @@
+.obzor {
+  // background: #fff;
+  font-family: sans-serif;
+  color: #000;
+  padding: 20px;
+
+  &__dow {
+    display: flex;
+    gap: 20px;
+    padding-bottom: 30px;
+  }
+
+  &__panel {
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+    padding: 20px;
+    width: 100%;
+    background: #fff;
+
+    &--pokazatel {
+    }
+
+    &--storefront {
+    }
+
+    &--reviews {
+      background: linear-gradient(to bottom, #fff 0%, #fff 70%, #fffdfd 100%);
+    }
+
+    &--orders {
+    }
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+
+    &--storefront {
+    }
+
+    &--reviews {
+    }
+
+    &--orders {
+    }
+  }
+
+  &__title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+
+    &--storefront {
+      font-size: 16px;
+    }
+
+    &--orders {
+      font-size: 16px;
+    }
+
+    &--reviews {
+      font-size: 16px;
+    }
+  }
+
+  &__tab-panel {
+    display: flex;
+    gap: 12px;
+  }
+
+  &__tab {
+    font-weight: 600;
+    font-size: 14px;
+    color: #888;
+    cursor: pointer;
+
+    &--active {
+      color: #ffd600;
+      border-bottom: 2px solid #ffd600;
+    }
+  }
+
+  &__action {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 14px;
+    text-decoration: underline;
+    cursor: pointer;
+    transition: color 0.3s;
+
+    &:hover {
+      color: #444;
+    }
+
+    &--more,
+    &--go,
+    &--all-shipments,
+    &--details,
+    &--all-orders,
+    &--all-reviews {
+    }
+  }
+
+  &__content {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 10px;
+
+    &--metrics {
+    }
+
+    &--review {
+      flex: 1;
+    }
+  }
+
+  &__metric {
+    flex: 1;
+    min-width: 120px;
+    border-right: 1px solid #eee;
+    padding: 10px;
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+
+  &__label {
+    color: #999;
+    font-size: 14px;
+    margin-bottom: 4px;
+
+    &--storefront {
+      font-size: 13px;
+    }
+
+    &--goal {
+      font-size: 13px;
+    }
+  }
+
+  &__value {
+    font-weight: 700;
+    font-size: 16px;
+
+    &--storefront {
+      font-size: 14px;
+    }
+
+    &--goal {
+      font-size: 14px;
+    }
+
+    &--green {
+      color: #1bb954;
+    }
+  }
+
+  &__body {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    &--storefront {
+    }
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    &--storefront {
+    }
+
+    &--goal {
+    }
+
+    &--review {
+      gap: 16px;
+      align-items: flex-start;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+  }
+
+  &__icon {
+    width: 36px;
+    height: 36px;
+    background-color: #f0f0f0;
+    border-radius: 50%;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &--doc,
+    &--box {
+    }
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    background-color: #ffd600;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #e6c200;
+    }
+
+    &--update {
+    }
+  }
+
+  &__cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-top: 24px;
+  }
+
+  &__card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+    padding: 20px;
+    flex: 1;
+    min-width: 250px;
+
+    &--shipments {
+    }
+
+    &--goals {
+    }
+  }
+
+  &__badge {
+    background: #eee;
+    font-size: 13px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+
+  &__table {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 10px;
+
+    &--shipments {
+      .obzor__row {
+        grid-template-columns: 60px 120px 1fr;
+      }
+    }
+
+    &--orders {
+      .obzor__row {
+        grid-template-columns: 80px 1fr 160px 100px 24px;
+      }
+    }
+  }
+
+  &__row {
+    display: grid;
+    align-items: center;
+    font-size: 14px;
+    color: #444;
+
+    &--head {
+      font-weight: 600;
+      color: #888;
+    }
+  }
+
+  &__cell {
+    padding: 8px;
+
+    &--id {
+      font-weight: 700;
+    }
+
+    &--date {
+    }
+
+    &--amount {
+    }
+
+    &--menu {
+      text-align: right;
+      font-size: 20px;
+      cursor: pointer;
+      color: #888;
+    }
+  }
+
+  &__status {
+    background: #eee;
+    padding: 4px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 13px;
+
+    &--green {
+      background: #e6f7ec;
+      color: #2e8b57;
+      font-weight: 600;
+    }
+
+    &--gray {
+      background: #f2f2f2;
+      color: #888;
+    }
+  }
+
+  &__count {
+    background: #eee;
+    font-size: 13px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 6px;
+  }
+
+  &__logo {
+    width: 80px;
+    height: 24px;
+    object-fit: contain;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+
+    &--goals {
+    }
+
+    &--reviews {
+      gap: 0;
+    }
+  }
+
+  &__circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 600;
+    position: relative;
+
+    &::before {
+      content: "";
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background: #fff;
+      border-radius: 50%;
+      z-index: -2;
+    }
+
+    &--orange {
+      background: conic-gradient(#ff9500 0% 25%, #f0f0f0 25% 100%);
+      color: #ff9500;
+      z-index: 1;
+    }
+
+    &--blue {
+      background: conic-gradient(#007aff 0% 75%, #f0f0f0 75% 100%);
+      color: #007aff;
+      z-index: 1;
+    }
+  }
+
+  &__avatar {
+    width: 36px;
+    height: 36px;
+    background-color: #e0e0e0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 600;
+    color: #444;
+  }
+
+  &__review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  &__review-author {
+    font-size: 14px;
+    font-weight: 600;
+    color: #444;
+  }
+
+  &__rating {
+    font-size: 14px;
+    color: #ff9500;
+  }
+
+  &__review-text {
+    font-size: 14px;
+    color: #444;
+    line-height: 1.4;
+  }
+
+  &__review-date {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+  }
+
+  &__menu {
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+  }
+
+  &__bottom {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-top: 24px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .obzor {
+    padding: 15px;
+
+    &__dow {
+      flex-direction: column;
+      gap: 15px;
+      padding-bottom: 20px;
+    }
+
+    &__panel {
+      padding: 15px;
+    }
+
+    &__header {
+      gap: 8px;
+      padding-bottom: 8px;
+    }
+
+    &__title {
+      font-size: 16px;
+
+      &--storefront,
+      &--orders,
+      &--reviews {
+        font-size: 14px;
+      }
+    }
+
+    &__tab-panel {
+      gap: 8px;
+    }
+
+    &__tab {
+      font-size: 13px;
+    }
+
+    &__action {
+      font-size: 13px;
+    }
+
+    &__content {
+      gap: 15px;
+      padding: 8px;
+    }
+
+    &__metric {
+      min-width: 100px;
+      padding: 8px;
+    }
+
+    &__label {
+      font-size: 13px;
+
+      &--storefront,
+      &--goal {
+        font-size: 12px;
+      }
+    }
+
+    &__value {
+      font-size: 14px;
+
+      &--storefront,
+      &--goal {
+        font-size: 13px;
+      }
+    }
+
+    &__body {
+      margin-top: 12px;
+      gap: 12px;
+    }
+
+    &__item {
+      gap: 8px;
+
+      &--review {
+        padding: 8px;
+      }
+    }
+
+    &__icon {
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
+    }
+
+    &__button {
+      margin-top: 15px;
+      padding: 10px;
+      font-size: 14px;
+    }
+
+    &__cards {
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    &__card {
+      padding: 15px;
+      min-width: 100%;
+    }
+
+    &__table {
+      gap: 8px;
+      padding-top: 8px;
+
+      &--shipments {
+        .obzor__row {
+          grid-template-columns: 50px 100px 1fr;
+        }
+      }
+
+      &--orders {
+        .obzor__row {
+          grid-template-columns: 70px 1fr 120px 80px 20px;
+        }
+      }
+    }
+
+    &__row {
+      font-size: 13px;
+    }
+
+    &__cell {
+      padding: 6px;
+
+      &--menu {
+        font-size: 18px;
+      }
+    }
+
+    &__status {
+      padding: 3px 8px;
+      font-size: 12px;
+    }
+
+    &__count {
+      font-size: 12px;
+      padding: 2px 6px;
+    }
+
+    &__logo {
+      width: 60px;
+      height: 20px;
+    }
+
+    &__list {
+      gap: 8px;
+      padding: 8px;
+    }
+
+    &__circle {
+      width: 50px;
+      height: 50px;
+      font-size: 14px;
+
+      &::before {
+        width: 42px;
+        height: 42px;
+      }
+    }
+
+    &__avatar {
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
+    }
+
+    &__review-author {
+      font-size: 13px;
+    }
+
+    &__rating {
+      font-size: 13px;
+    }
+
+    &__review-text {
+      font-size: 13px;
+    }
+
+    &__review-date {
+      font-size: 11px;
+    }
+
+    &__menu {
+      font-size: 18px;
+    }
+
+    &__bottom {
+      gap: 15px;
+      margin-top: 15px;
+    }
+  }
+}
+
+@media screen and (max-width: 320px) {
+  .obzor {
+    padding: 10px;
+
+    &__dow {
+      gap: 10px;
+      padding-bottom: 15px;
+    }
+
+    &__panel {
+      padding: 10px;
+    }
+
+    &__header {
+      gap: 6px;
+      padding-bottom: 6px;
+    }
+
+    &__title {
+      font-size: 14px;
+
+      &--storefront,
+      &--orders,
+      &--reviews {
+        font-size: 13px;
+      }
+    }
+
+    &__tab-panel {
+      gap: 6px;
+    }
+
+    &__tab {
+      font-size: 12px;
+    }
+
+    &__action {
+      font-size: 12px;
+    }
+
+    &__content {
+      gap: 10px;
+      padding: 6px;
+    }
+
+    &__metric {
+      min-width: 80px;
+      padding: 6px;
+    }
+
+    &__label {
+      font-size: 12px;
+
+      &--storefront,
+      &--goal {
+        font-size: 11px;
+      }
+    }
+
+    &__value {
+      font-size: 13px;
+
+      &--storefront,
+      &--goal {
+        font-size: 12px;
+      }
+    }
+
+    &__body {
+      margin-top: 10px;
+      gap: 10px;
+    }
+
+    &__item {
+      gap: 6px;
+
+      &--review {
+        padding: 6px;
+      }
+    }
+
+    &__icon {
+      width: 28px;
+      height: 28px;
+      font-size: 14px;
+    }
+
+    &__button {
+      margin-top: 10px;
+      padding: 8px;
+      font-size: 13px;
+    }
+
+    &__cards {
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    &__card {
+      padding: 10px;
+    }
+
+    &__table {
+      gap: 6px;
+      padding-top: 6px;
+
+      &--shipments {
+        .obzor__row {
+          grid-template-columns: 40px 80px 1fr;
+        }
+      }
+
+      &--orders {
+        .obzor__row {
+          grid-template-columns: 60px 1fr 100px 60px 18px;
+        }
+      }
+    }
+
+    &__row {
+      font-size: 12px;
+    }
+
+    &__cell {
+      padding: 4px;
+
+      &--menu {
+        font-size: 16px;
+      }
+    }
+
+    &__status {
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+
+    &__count {
+      font-size: 11px;
+      padding: 1px 5px;
+    }
+
+    &__logo {
+      width: 50px;
+      height: 18px;
+    }
+
+    &__list {
+      gap: 6px;
+      padding: 6px;
+    }
+
+    &__circle {
+      width: 45px;
+      height: 45px;
+      font-size: 13px;
+
+      &::before {
+        width: 38px;
+        height: 38px;
+      }
+    }
+
+    &__avatar {
+      width: 28px;
+      height: 28px;
+      font-size: 14px;
+    }
+
+    &__review-author {
+      font-size: 12px;
+    }
+
+    &__rating {
+      font-size: 12px;
+    }
+
+    &__review-text {
+      font-size: 12px;
+    }
+
+    &__review-date {
+      font-size: 10px;
+    }
+
+    &__menu {
+      font-size: 16px;
+    }
+
+    &__bottom {
+      gap: 10px;
+      margin-top: 10px;
+    }
+  }
+}

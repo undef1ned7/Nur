@@ -1,0 +1,213 @@
+.raspisanie {
+  padding: 1rem;
+  thead {
+    .fc-col-header-cell-cushion {
+      text-transform: uppercase;
+      color: #FCE000;
+      padding: 10px 15px;
+      border-radius: 10px;
+    }
+  }
+  &__header {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+
+    button {
+      background-color: #f4f4f4;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      &:hover {
+        background-color: #e0e0e0;
+      }
+    }
+  }
+
+  .fc {
+    .fc-daygrid-day-number {
+      font-size: 12px;
+      padding: 4px;
+    }
+
+    .fc-daygrid-day-frame {
+      padding: 4px;
+    }
+
+    .fc-event {
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      min-height: 70px;
+      background: #CFEEA8;
+      white-space: normal;
+      line-height: 1.2;
+    }
+    .fc-event-main {
+      color: #000 !important;
+      font-size: 16px;
+    }
+
+    .fc-event-title {
+      white-space: normal;
+    }
+
+    .fc-event {
+      &.event-type-run {
+        background-color: #f8b26a;
+      }
+
+      &.event-type-meeting {
+        background-color: #aedaa6;
+        color: #000;
+      }
+
+      &.event-type-team {
+        background-color: #f5c7a9;
+        color: #000;
+      }
+
+      &.event-type-focus {
+        background-color: #b4b9f0;
+      }
+
+      &.event-type-default {
+        background-color: #b8b8ff;
+      }
+    }
+
+    .fc-daygrid-event-dot {
+      display: none;
+    }
+  }
+}
+
+.fc-event-main span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #91929E;
+  margin-top: 5px;
+}
+
+.fc-theme-standard th {
+  border: none;
+  background: none;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+@media screen and (max-width: 480px) {
+  .raspisanie {
+    padding: 0.5rem;
+    max-width: 100%;
+    overflow-x: hidden;
+
+    &__header {
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+
+      button {
+        width: 100%;
+        padding: 8px;
+        font-size: 12px;
+        border-radius: 6px;
+        gap: 4px;
+      }
+    }
+
+    .fc {
+      .fc-col-header-cell-cushion {
+        padding: 6px 8px;
+        font-size: 10px;
+        border-radius: 8px;
+      }
+
+      .fc-daygrid-day-number {
+        font-size: 10px;
+        padding: 2px;
+      }
+
+      .fc-daygrid-day-frame {
+        padding: 2px;
+      }
+
+      .fc-event {
+        padding: 6px;
+        font-size: 11px;
+        min-height: 50px;
+        border-radius: 6px;
+        line-height: 1.1;
+      }
+
+      .fc-event-main {
+        font-size: 12px;
+      }
+
+      .fc-event-title {
+        white-space: normal;
+      }
+    }
+  }
+
+  .fc-event-main span {
+    font-size: 10px;
+    margin-top: 3px;
+  }
+}
+
+@media screen and (max-width: 320px) {
+  .raspisanie {
+    padding: 0.3rem;
+
+    &__header {
+      gap: 0.3rem;
+
+      button {
+        padding: 6px;
+        font-size: 11px;
+        border-radius: 5px;
+      }
+    }
+
+    .fc {
+      .fc-col-header-cell-cushion {
+        padding: 5px 6px;
+        font-size: 9px;
+        border-radius: 6px;
+      }
+
+      .fc-daygrid-day-number {
+        font-size: 9px;
+        padding: 1px;
+      }
+
+      .fc-daygrid-day-frame {
+        padding: 1px;
+      }
+
+      .fc-event {
+        padding: 4px;
+        font-size: 10px;
+        min-height: 40px;
+        border-radius: 5px;
+      }
+
+      .fc-event-main {
+        font-size: 11px;
+      }
+    }
+
+    .fc-event-main span {
+      font-size: 9px;
+      margin-top: 2px;
+    }
+  }
+}

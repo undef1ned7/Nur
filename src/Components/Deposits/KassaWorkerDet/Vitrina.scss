@@ -1,0 +1,938 @@
+
+.vitrina {
+  // font-family: "Inter", sans-serif;
+  padding: 16px;
+  // background: #fff;
+
+  &__header {
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 12px;
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 16px;
+  }
+
+  &__tab {
+    font-size: 14px;
+    color: #6b7280;
+    cursor: pointer;
+    padding-bottom: 6px;
+
+    &--active {
+      color: #111827;
+      border-bottom: 2px solid #facc15;
+      font-weight: 600;
+    }
+  }
+
+  &__toolbar {
+    margin: 16px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+
+    &-div {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+  }
+
+  &__add-button {
+    width: 32px;
+    height: 32px;
+    background: #facc15;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  &__total {
+    font-size: 14px;
+    color: #374151;
+  }
+
+  &__controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  &__search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px 10px;
+    width: 100%;
+    height: 35px;
+  }
+
+  &__search-icon {
+    color: #9ca3af;
+    margin-right: 6px;
+  }
+
+  &__search {
+    border: none;
+    outline: none;
+    font-size: 14px;
+    width: 100%;
+    color: #111827;
+  }
+
+  &__filter-button {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+
+    thead {
+      background: #f3f4f6;
+
+      th {
+        text-align: left;
+        padding: 12px;
+        font-size: 13px;
+        color: #6b7280;
+      }
+    }
+
+    tbody {
+      tr {
+        border-bottom: 1px solid #e5e7eb;
+
+        td {
+          padding: 12px;
+          font-size: 14px;
+          color: #374151;
+        }
+      }
+    }
+  }
+
+  &__name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__image-placeholder {
+    width: 36px;
+    height: 48px;
+    background: #e5e7eb;
+    border-radius: 8px;
+  }
+
+  &__more-icon {
+    color: #9ca3af;
+    cursor: pointer;
+  }
+
+  &__pagination {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 16px;
+    font-size: 14px;
+    gap: 8px;
+  }
+
+  &__pagination-info {
+    color: #6b7280;
+  }
+
+  &__arrow {
+    color: #6b7280;
+    cursor: pointer;
+  }
+
+  &__filter-modal {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    background: #fff;
+    z-index: 1000;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  &__filter-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  &__filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .vitrina__close-icon {
+      cursor: pointer;
+      color: #9ca3af;
+    }
+  }
+
+  &__filter-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 16px;
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .vitrina__dropdown {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #f9fafb;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .vitrina__tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+
+      .vitrina__tag {
+        background: #e5e7eb;
+        border-radius: 16px;
+        padding: 4px 10px;
+        font-size: 13px;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: default;
+
+        svg {
+          cursor: pointer;
+        }
+      }
+    }
+
+    .vitrina__range {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        text-align: center;
+        background: #f9fafb;
+      }
+    }
+  }
+
+  &__reset {
+    font-family: sans-serif;
+    font-weight: bold;
+    background-color: white;
+    height: 30px;
+    border: none;
+    font-size: 13px;
+    color: #ef4444;
+    cursor: pointer;
+    text-decoration: underline;
+    width: fit-content;
+  }
+
+  &__filter-footer {
+    margin-top: auto;
+
+    .vitrina__reset--full {
+      text-align: center;
+      width: 100%;
+      color: #ef4444;
+      text-decoration: underline;
+      font-weight: bold;
+      font-family: sans-serif;
+    }
+  }
+
+  &__overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 999;
+  }
+}
+
+.edit-modal {
+  font-family: "Inter", sans-serif;
+
+  &__overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 999;
+  }
+
+  &__content {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    background: #fff;
+    z-index: 1000;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    width: 430px;
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .edit-modal__close-icon {
+      cursor: pointer;
+      color: #9ca3af;
+    }
+  }
+
+  &__image {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  &__image-placeholder {
+    width: 80px;
+    height: 120px;
+    background: #e5e7eb;
+    border-radius: 8px;
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    p {
+      font-size: 13px;
+      color: #3b82f6;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    input {
+      padding: 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #f9fafb;
+      text-align: left;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: auto;
+  }
+
+  &__reset {
+    font-family: sans-serif;
+    font-weight: bold;
+    background: none;
+    border: none;
+    font-size: 14px;
+    color: #ef4444;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  &__save {
+    font-family: sans-serif;
+    font-weight: bold;
+    background: #facc15;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    color: #111827;
+    cursor: pointer;
+  }
+}
+
+.add-modal {
+  font-family: "Inter", sans-serif;
+
+  &__overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 999;
+  }
+
+  &__content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    padding: 20px 12px;
+    border-radius: 8px;
+    width: 360px;
+    max-width: 90%;
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .add-modal__close-icon {
+      cursor: pointer;
+      color: #9ca3af;
+    }
+  }
+
+  &__upload {
+    border: 2px dashed #e5e7eb;
+    padding: 12px;
+    text-align: center;
+    border-radius: 8px;
+    margin-bottom: 8px;
+
+    &-text {
+      font-size: 13px;
+      color: #374151;
+      margin: 0;
+    }
+
+    &-hint {
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    input {
+      display: none;
+    }
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #111827;
+    }
+  }
+
+  &__input,
+  &__select {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #f9fafb;
+    color: #374151;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: auto;
+  }
+
+  &__cancel {
+    font-family: sans-serif;
+    font-weight: bold;
+    background: none;
+    border: none;
+    font-size: 13px;
+    color: #6b7280;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  &__save {
+    font-family: sans-serif;
+    font-weight: bold;
+    background: #facc15;
+    border: none;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 13px;
+    color: #111827;
+    cursor: pointer;
+  }
+}
+
+/* ... (Ваши существующие стили для kass-worker-container, header, toolbar, table, footer и т.д.) ... */
+
+// --- Стили для встроенных Input и Select ---
+.form-group {
+    margin-bottom: 15px; // Отступ между полями
+    label {
+        display: block; // Метка на отдельной строке
+        margin-bottom: 5px;
+        font-weight: 500;
+        color: #333;
+    }
+}
+
+.form-input,
+.form-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box; // Учитываем padding и border в общей ширине
+    
+    &:focus {
+        outline: none;
+        border-color: #007bff; // Цвет рамки при фокусе
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    }
+}
+
+.form-select {
+    appearance: none; // Убираем стандартные стили для select
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292%22%20height%3D%22292%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4L146.7%20209.7L6%2069.4%20146.7%200.7L287%2069.4z%22%2F%3E%3C%2Fsvg%3E'); // Стрелка для select
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px;
+    padding-right: 30px; // Отступ для стрелки
+}
+
+
+// --- Стили для встроенного Modal (если они не глобальные) ---
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    position: relative;
+    width: 90%;
+    max-width: 500px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+
+    h3 {
+        margin: 0;
+        font-size: 20px;
+        color: #333;
+    }
+
+    .modal-close-icon {
+        cursor: pointer;
+        color: #666;
+        &:hover {
+            color: #333;
+        }
+    }
+}
+
+// Переименованные классы для формы и кнопок внутри модального окна
+.kass-worker-form { /* Этот класс уже был, он будет применяться к форме внутри модалки */
+    padding: 20px 0 0 0; // Учитываем внутренний padding модалки
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.kass-worker-modal-actions { /* Этот класс уже был */
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+
+    .kass-worker-cancel-button { /* Этот класс уже был */
+        background-color: #f0f0f0;
+        color: #333;
+        border: 1px solid #ddd;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+
+        &:hover {
+            background-color: #e0e0e0;
+        }
+    }
+
+    .kass-worker-submit-button { /* Этот класс уже был */
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+
+        &:hover {
+            background-color: #218838;
+        }
+
+        &:disabled {
+            background-color: #e0e0e0;
+            cursor: not-allowed;
+        }
+    }
+}
+
+/* Filter Modal specific styles (из вашего оригинального кода Kassa.scss) - можно их перенести в KassWorker.scss если хотите, 
+   но в целом они относятся к Filter Modal, который у вас пока в Kassa.jsx */
+.vitrina__overlay { // ...
+}
+.vitrina__filter-modal { // ...
+}
+// ... и все остальные vitrina__ классы для фильтров
+
+
+
+
+
+// Modal buttons
+.vitrina__button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease, color 0.2s ease;
+
+    &--save {
+        background-color: #007bff;
+        color: white;
+
+        &:hover {
+            background-color: #0056b3;
+        }
+    }
+
+    &--cancel {
+        background-color: #f0f0f0;
+        color: #333;
+
+        &:hover {
+            background-color: #e0e0e0;
+        }
+    }
+
+    &--reset {
+        background-color: #dc3545; // Red for delete/reset
+        color: white;
+
+        &:hover {
+            background-color: #c82333;
+        }
+    }
+}
+
+// Overlay for modals
+.vitrina__overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+// Base modal styles
+.vitrina__modal {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 25px;
+    max-width: 500px;
+    width: 90%;
+    position: relative;
+    z-index: 1001; // Above overlay
+    animation: fadeInScale 0.3s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.vitrina__modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+
+    h3 {
+        margin: 0;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .vitrina__close-icon {
+        cursor: pointer;
+        color: #888;
+        &:hover {
+            color: #333;
+        }
+    }
+}
+
+.vitrina__modal-section {
+    margin-bottom: 15px;
+
+    label {
+        display: block;
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .vitrina__modal-input {
+        width: calc(100% - 20px); // Adjust for padding
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s ease;
+
+        &:focus {
+            border-color: #007bff;
+        }
+
+        &[readOnly] {
+            background-color: #f0f0f0;
+            cursor: not-allowed;
+        }
+    }
+}
+
+.vitrina__modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    margin-top: 20px;
+}
+
+// Filter Modal specific styles (can also use .vitrina__modal for base)
+.vitrina__filter-modal {
+    position: fixed; // Fixed position to appear over content
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 25px;
+    max-width: 400px;
+    width: 90%;
+    z-index: 1001;
+    animation: fadeInScale 0.3s ease-out;
+
+    .vitrina__filter-content {
+        // No specific styling needed beyond what's defined in vitrina__modal-section
+    }
+
+    .vitrina__filter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 15px;
+
+        h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .vitrina__close-icon {
+            cursor: pointer;
+            color: #888;
+            &:hover {
+                color: #333;
+            }
+        }
+    }
+
+    .vitrina__filter-section {
+        margin-bottom: 15px;
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+    }
+
+    .vitrina__dropdown {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #f8f8f8;
+
+        span {
+            font-size: 14px;
+            color: #333;
+        }
+    }
+
+    .vitrina__filter-footer {
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    .vitrina__reset {
+        background-color: #f0f0f0;
+        color: #333;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s ease;
+
+        &--full {
+            width: 100%;
+        }
+
+        &:hover {
+            background-color: #e0e0e0;
+        }
+    }
+}

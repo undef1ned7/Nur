@@ -1,0 +1,144 @@
+/* src/components/Reports/reports.scss */
+
+/* только цвета в :root */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+/* ===== Блок REPORTS (изоляция) ===== */
+.reports {
+  /* локальные токены блока */
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, .05);
+
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--text);
+
+  /* Tabs */
+  &__tabs {
+    display: flex; gap: 16px; border-bottom: 1px solid var(--border);
+    padding-bottom: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-gutter: stable;
+  }
+  &__tab {
+    background: transparent; border: none; font-weight: 700; color: var(--muted);
+    padding: 8px 2px; position: relative; cursor: pointer; white-space: nowrap;
+    &:hover { color: var(--text); }
+    &--active { color: var(--text); }
+    &--active::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 3px;
+      background: var(--primary); border-radius: 3px;
+    }
+  }
+
+  &__header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+  &__title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; margin: 0; color: var(--text); }
+  &__subtitle { font-size: 13px; color: var(--muted); }
+  &__actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* кнопки */
+  &__btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: .18s; border: 1px solid var(--border); background: #fff; color: var(--text);
+    &:active { transform: translateY(1px); }
+    &--secondary { background: #fff; &:hover { background: #f9fafb; } }
+  }
+
+  /* Controls */
+  &__controls {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+    padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: #fafafa;
+  }
+  &__filter { display: flex; align-items: center; gap: 8px; }
+  &__filterIcon { color: var(--muted); }
+  &__select {
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: #fff;
+    outline: none; transition: border-color .15s, box-shadow .15s;
+    &:focus { border-color: var(--primary-dark); box-shadow: 0 0 0 3px rgba(247,215,79,.24); }
+  }
+  &__series { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  &__check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text);
+    input { width: 16px; height: 16px; }
+  }
+  &__dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 2px solid transparent; }
+  &__dot--income { background: var(--primary); border-color: var(--primary-dark); }
+  &__dot--expense { background: #64748b; border-color: #475569; }
+
+  /* KPIs */
+  &__kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  &__kpi { border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: #fff; }
+  &__kpiLabel { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  &__kpiValue { font-size: 18px; font-weight: 800; color: var(--text); }
+
+  /* Chart */
+  &__chartCard { border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+  &__chartHead { padding: 12px 14px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  &__chart { padding: 8px 14px 16px; }
+  &__chartLabels { display: grid; grid-template-columns: repeat(var(--cols, 8), 1fr); gap: 6px; margin-top: 8px; }
+  &__chartLabel { font-size: 12px; color: var(--muted); text-align: center; }
+  &__svg { width: 100%; height: 220px; display: block; }
+  &__grid { stroke: #e5e7eb; stroke-width: 1; shape-rendering: crispEdges; }
+  &__poly { fill: none; stroke-width: 2; }
+  &__poly--income { stroke: var(--primary-dark); }
+  &__poly--expense { stroke: #475569; }
+  &__dotPoint { stroke: #fff; stroke-width: 1; }
+  &__dotPoint--income { fill: var(--primary-dark); }
+  &__dotPoint--expense { fill: #475569; }
+  &__legend {
+    display: flex; gap: 16px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--border);
+    background: #fafafa; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;
+  }
+  &__legendDot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  &__legendDot--income { background: var(--primary-dark); }
+  &__legendDot--expense { background: #475569; }
+
+  /* Table */
+  &__tableWrap { border: 1px solid var(--border); border-radius: 10px; overflow: auto; background: #fff; }
+  &__table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 920px; }
+  &__table thead th {
+    position: sticky; top: 0; background: #f9fafb; color: #111;
+    border-bottom: 1px solid var(--border); font-size: 13px; text-align: left; padding: 10px;
+  }
+  &__table tbody td { border-bottom: 1px solid var(--border); padding: 10px; font-size: 14px; }
+  &__table tfoot td { font-weight: 800; padding: 12px; border-top: 1px solid var(--border); background: #fafafa; }
+  &__empty { padding: 16px; color: var(--muted); text-align: center; }
+
+  /* Уведомления */
+  &__alert {
+    padding: 10px 12px; border-radius: 10px; font-size: 14px;
+    background: rgba(231,76,60,.12); color: #e74c3c; border: 1px solid rgba(231,76,60,.35);
+  }
+
+  /* Adaptive */
+  @media (max-width: 1024px) {
+    &__kpis { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 720px) {
+    &__kpis { grid-template-columns: repeat(2, 1fr); }
+    &__controls { align-items: stretch; }
+    &__series { gap: 10px; }
+  }
+  @media (max-width: 400px) {
+    padding: 18px;
+    &__title { font-size: 18px; gap: 8px; }
+    &__btn { padding: 9px 12px; }
+    &__select { padding: 9px 10px; }
+  }
+  /* уверенная работа до 320px */
+  @media (max-width: 320px) {
+    padding: 16px;
+    &__controls { gap: 8px; padding: 10px; }
+    &__kpi { padding: 12px; }
+  }
+}

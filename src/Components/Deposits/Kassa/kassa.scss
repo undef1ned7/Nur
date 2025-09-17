@@ -1,0 +1,611 @@
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #fff;
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* ================== WRAPPER ================== */
+.vitrina {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--text);
+}
+
+.vitrina--error {
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+/* ================== HEADER + TABS ================== */
+.vitrina__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vitrina__tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vitrina__tab {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 700;
+  cursor: default;
+  color: var(--text);
+}
+
+.vitrina__tab--active {
+  background: var(--primary);
+  border-color: var(--primary-dark);
+}
+
+/* ================== TOOLBAR ================== */
+.vitrina__toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.vitrina__toolbar-div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vitrina__total {
+  font-weight: 800;
+}
+.kassa {
+  .edit-modal__content {
+    top: 50%;
+    width: auto;
+  }
+}
+.vitrina__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  // width: 100%;
+  // flex-wrap: wrap;
+}
+
+.vitrina__search-wrapper {
+  position: relative;
+}
+
+.vitrina__search {
+  padding: 10px 12px;
+  // border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  min-width: 220px;
+  background-color: transparent;
+  border: none;
+  // background: #fff;
+  transition: 0.15s;
+  &-wrapper {
+    width: auto !important;
+  }
+}
+
+.vitrina__filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--primary);
+  border: 1px solid var(--primary-dark);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vitrina__filter-button:hover {
+  background: var(--primary-dark);
+}
+
+/* ================== TABLE (list & detail) ================== */
+.table-wrapper {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: auto;
+  background: #fff;
+}
+
+.vitrina__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 760px;
+}
+
+.vitrina__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f9fafb;
+  color: #111;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  text-align: left;
+  padding: 10px;
+}
+
+.vitrina__table tbody td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px;
+  font-size: 14px;
+}
+
+.vitrina__table tbody tr:hover {
+  background: #fafafa;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.kassa__rowClickable {
+  cursor: pointer;
+}
+
+/* ================== KASSA TABS (detail page) ================== */
+.kassa__tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.kassa__tab {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.kassa__tab--active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.kassa__grow {
+  flex: 1;
+}
+
+/* бейджи на будущее (если добавишь) */
+.kassa__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.kassa__tag--in {
+  color: #0a3;
+  background: rgba(22, 163, 74, 0.08);
+  border-color: #bbf7d0;
+}
+.kassa__tag--out {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fee2e2;
+}
+
+/* ================== MODAL: create cashbox ================== */
+.edit-modal {
+  /* wrapper for positioning children */
+}
+
+.edit-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.edit-modal__content {
+  width: min(560px, 92vw);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 61;
+}
+
+.edit-modal__header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 800;
+}
+
+.edit-modal__close-icon {
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.edit-modal__section {
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.edit-modal__section label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.edit-modal__section input,
+.edit-modal__section textarea,
+.edit-modal__section select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+.edit-modal__section input:focus,
+.edit-modal__section textarea:focus,
+.edit-modal__section select:focus {
+  border-color: var(--primary-dark);
+  box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+}
+
+.edit-modal__footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.edit-modal__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--primary);
+  border: 1px solid var(--primary-dark);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-modal__save:hover {
+  background: var(--primary-dark);
+}
+
+/* ================== RESPONSIVE ================== */
+@media (max-width: 720px) {
+  .vitrina {
+    padding: 14px;
+  }
+  .vitrina__toolbar {
+    align-items: stretch;
+  }
+  .vitrina__search {
+    min-width: unset;
+    width: 100%;
+  }
+}
+/* ================== MODAL: улучшенная ================== */
+.edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+/* затемнение + блюр + fade-in */
+.edit-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45); /* slate-900/45 */
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: em-overlay-in 0.18s ease-out both;
+}
+
+/* карточка модалки + pop-in анимация */
+.edit-modal__content {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.98);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
+  width: min(640px, 92vw);
+  max-height: min(86vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: em-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) 0.04s both;
+}
+
+/* шапка */
+.edit-modal__header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 800;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* кнопка закрытия */
+.edit-modal__close-icon {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  width: 32px;
+  height: 32px;
+  line-height: 1;
+  border-radius: 10px;
+  font-size: 18px;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.15s;
+}
+.edit-modal__close-icon:hover {
+  background: #f3f4f6;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+/* контент — скролл внутри */
+.edit-modal__section {
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  overflow: auto;
+  flex: 1; /* тянем на высоту */
+}
+
+/* инпуты / селекты */
+.edit-modal__section label {
+  font-size: 13px;
+  color: #6b7280;
+}
+.edit-modal__section input,
+.edit-modal__section textarea,
+.edit-modal__section select {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: 0.15s;
+}
+.edit-modal__section input:focus,
+.edit-modal__section textarea:focus,
+.edit-modal__section select:focus {
+  border-color: #d4b800;
+  box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+}
+
+/* «липкий» футер с легкой вуалью сверху */
+.edit-modal__footer {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), #fff 60%);
+  backdrop-filter: blur(1px);
+}
+
+/* кнопки */
+.edit-modal__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f7d74f;
+  border: 1px solid #d4b800;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.edit-modal__save:hover {
+  background: #d4b800;
+}
+
+.edit-modal__cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.edit-modal__cancel:hover {
+  background: #f3f4f6;
+}
+
+/* скроллбар внутри контента (незаметный) */
+.edit-modal__section::-webkit-scrollbar {
+  width: 8px;
+}
+.edit-modal__section::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 8px;
+}
+.edit-modal__section::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
+}
+
+/* ====== мобильный bottom-sheet режим ====== */
+@media (max-width: 560px) {
+  .edit-modal__content {
+    left: 50%;
+    top: auto;
+    bottom: 0;
+    transform: translateX(-50%) translateY(8px);
+    width: 100vw;
+    max-width: 100vw;
+    max-height: 92vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    animation: em-sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) 0.02s both;
+  }
+}
+
+/* ====== анимации ====== */
+@keyframes em-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes em-pop-in {
+  from {
+    transform: translate(-50%, -48%) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes em-sheet-up {
+  from {
+    transform: translateX(-50%) translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+/* ====== ЛЕЙАУТ ДЕТАЛЕЙ КАССЫ: список + контент ====== */
+.kassa__layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.kassa__side {
+  width: 280px;
+  min-width: 240px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.kassa__sideHead {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: #f9fafb;
+  font-weight: 800;
+}
+.kassa__sideSearch {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.kassa__sideList {
+  max-height: 70vh;
+  overflow: auto;
+}
+.kassa__sideItem {
+  display: flex;
+  width: 100%;
+  text-align: left;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fff;
+  cursor: pointer;
+  transition: 0.15s;
+  color: var(--text);
+}
+.kassa__sideItem:hover {
+  background: #fafafa;
+}
+.kassa__sideItem--active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.kassa__content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* фикс для подписей графика отчёта (динамические колонки) */
+.reports__chartLabels {
+  --cols: 8;
+}
+
+/* уменьшение внутренних отступов таблицы отчёта внутри детали */
+.kassa__content .reports__tableWrap {
+  margin-top: 8px;
+}

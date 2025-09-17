@@ -1,0 +1,258 @@
+// :root {
+//   /* только цвета */
+//   --primary: #f7d74f;
+//   --primary-dark: #d4b800;
+//   --text: #0f172a;
+//   --muted: #6b7280;
+//   --border: #e5e7eb;
+//   --surface: #ffffff;
+// }
+
+// .barberhistory, .barberhistory * { box-sizing: border-box; }
+
+// .barberhistory{
+//   --radius: 14px;
+//   --shadow: 0 10px 30px rgba(2, 6, 23, .12);
+//   --tap: 44px;
+
+//   background: var(--surface);
+//   border-radius: var(--radius);
+//   padding: 24px;
+//   box-shadow: 0 4px 16px rgba(0,0,0,.05);
+//   display: flex;
+//   flex-direction: column;
+//   gap: 18px;
+// }
+
+// /* Header */
+// .barberhistory__header{ display:grid; grid-template-columns:1fr; gap:12px; }
+// .barberhistory__titleWrap{ display:grid; gap:4px; }
+// .barberhistory__title{ font-size:20px; font-weight:800; color:var(--text); margin:0; }
+// .barberhistory__subtitle{ font-size:13px; color:var(--muted); }
+
+// /* Actions */
+// .barberhistory__actions{
+//   display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end; min-width:0;
+// }
+
+// /* Filters */
+// .barberhistory__filters{
+//   display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; min-width:0;
+// }
+// .barberhistory__input{
+//   padding:10px 12px; border:1px solid var(--border); border-radius:10px;
+//   font-size:14px; min-height:40px; background:#fff; width:100%;
+// }
+// .barberhistory__input:focus{ outline:none; border-color:var(--primary); }
+// .barberhistory__input::placeholder{ color:var(--muted); opacity:.85; }
+
+// /* Export side */
+// .barberhistory__export{ display:grid; grid-auto-flow:column; gap:10px; align-items:center; }
+// .barberhistory__total{ color:var(--muted); font-size:14px; white-space:nowrap; }
+
+// /* Buttons */
+// .barberhistory__btn{
+//   display:inline-flex; align-items:center; gap:8px;
+//   height:40px; padding:0 14px; border-radius:12px; border:1px solid transparent;
+//   background:#fff; color:var(--text); font-weight:700; font-size:14px; cursor:pointer;
+//   transition:.18s; line-height:1; white-space:nowrap; flex-shrink:0;
+// }
+// .barberhistory__btn svg{ width:18px; height:18px; flex:0 0 auto; }
+// .barberhistory__btn:active{ transform: translateY(1px); }
+// .barberhistory__btn--primary{ background:var(--primary); color:#111; }
+// .barberhistory__btn--primary:hover{ background:var(--primary-dark); }
+// .barberhistory__btn--primary:disabled{ opacity:.6; cursor:default; transform:none; }
+
+// /* Alert */
+// .barberhistory__alert{
+//   padding:10px 12px; border-radius:12px; font-size:14px;
+//   background:rgba(231,76,60,.12); color:#e74c3c; border:1px solid rgba(231,76,60,.35);
+// }
+
+// /* Table scroll */
+// .barberhistory__tableWrap{
+//   overflow:auto; max-height:clamp(320px,60vh,720px);
+//   -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding-right:6px;
+// }
+// .barberhistory__tableWrap::-webkit-scrollbar{ width:8px; height:8px; }
+// .barberhistory__tableWrap::-webkit-scrollbar-thumb{ background:#e2e8f0; border-radius:8px; }
+
+// /* Table */
+// .barberhistory__table{ width:100%; border-collapse:collapse; min-width:560px; }
+// .barberhistory__table thead th{
+//   text-align:left; padding:12px; background:var(--primary); color:#111; font-size:14px;
+//   font-weight:700; position:sticky; top:0; z-index:1;
+// }
+// .barberhistory__table tbody td{
+//   padding:12px; font-size:14px; border-bottom:1px solid var(--border); vertical-align:top;
+// }
+// .barberhistory__table tbody tr:hover td{ background:#f1f5f9; }
+
+// .barberhistory__th--right{ text-align:right; }
+// .barberhistory__td--right{ text-align:right; white-space:nowrap; }
+// .barberhistory__loading{ text-align:center; color:var(--muted); padding:18px 0; }
+
+// /* Responsive */
+// @media (max-width: 900px){
+//   .barberhistory__filters{ grid-template-columns: 1fr 1fr; }
+// }
+// @media (max-width: 720px){
+//   .barberhistory{ padding:16px; border-radius:10px; gap:16px; }
+//   .barberhistory__title{ font-size:18px; }
+//   .barberhistory__actions{ grid-template-columns:1fr; }
+//   .barberhistory__filters{ grid-template-columns:1fr; }
+//   .barberhistory__table{ min-width:500px; }
+// }
+// @media (max-width: 380px){
+//   .barberhistory{ padding:14px; }
+//   .barberhistory__btnText{ display:none; } /* прячем подпись только на очень узких */
+//   .barberhistory__table{ min-width:460px; }
+//   .barberhistory__table thead th, .barberhistory__table tbody td{ padding:10px; font-size:13.5px; }
+// }
+// @media (max-width: 320px){
+//   .barberhistory{ padding:12px; gap:14px; }
+//   .barberhistory__input{ font-size:13px; padding:9px 10px; min-height:38px; }
+//   .barberhistory__btn{ font-size:12.8px; padding:0 10px; height:38px; }
+//   .barberhistory__table{ min-width:420px; }
+//   .barberhistory__table thead th, .barberhistory__table tbody td{ padding:8px; font-size:12.8px; }
+// }
+
+// /* reduce motion */
+// @media (prefers-reduced-motion: reduce){
+//   .barberhistory__btn{ transition:none !important; }
+// }
+
+
+
+:root {
+  /* только цвета */
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+.barberhistory, .barberhistory * { box-sizing: border-box; }
+
+.barberhistory{
+  --radius: 14px;
+  --shadow: 0 10px 30px rgba(2, 6, 23, .12);
+  --tap: 44px;
+
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.05);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Header */
+.barberhistory__header{ display:grid; grid-template-columns:1fr; gap:12px; }
+.barberhistory__titleWrap{ display:grid; gap:4px; }
+.barberhistory__title{ font-size:20px; font-weight:800; color:var(--text); margin:0; }
+.barberhistory__subtitle{ font-size:13px; color:var(--muted); }
+
+/* Actions */
+.barberhistory__actions{
+  display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end; min-width:0;
+}
+
+/* Filters */
+.barberhistory__filters{
+  display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:10px; min-width:0;
+}
+.barberhistory__input{
+  padding:10px 12px; border:1px solid var(--border); border-radius:10px;
+  font-size:14px; min-height:40px; background:#fff; width:100%;
+}
+.barberhistory__input:focus{ outline:none; border-color:var(--primary); }
+.barberhistory__input::placeholder{ color:var(--muted); opacity:.85; }
+
+/* Export side */
+.barberhistory__export{ display:grid; grid-auto-flow:column; gap:10px; align-items:center; }
+.barberhistory__total{ color:var(--muted); font-size:14px; white-space:nowrap; }
+
+/* Buttons */
+.barberhistory__btn{
+  display:inline-flex; align-items:center; gap:8px;
+  height:40px; padding:0 14px; border-radius:12px; border:1px solid transparent;
+  background:#fff; color:var(--text); font-weight:700; font-size:14px; cursor:pointer;
+  transition:.18s; line-height:1; white-space:nowrap; flex-shrink:0;
+}
+.barberhistory__btn svg{ width:18px; height:18px; flex:0 0 auto; }
+.barberhistory__btn:active{ transform: translateY(1px); }
+.barberhistory__btn--primary{ background:var(--primary); color:#111; }
+.barberhistory__btn--primary:hover{ background:var(--primary-dark); }
+.barberhistory__btn--primary:disabled{ opacity:.6; cursor:default; transform:none; }
+
+/* Alert */
+.barberhistory__alert{
+  padding:10px 12px; border-radius:12px; font-size:14px;
+  background:rgba(231,76,60,.12); color:#e74c3c; border:1px solid rgba(231,76,60,.35);
+}
+
+/* Table scroll */
+.barberhistory__tableWrap{
+  overflow:auto; max-height:clamp(320px,60vh,720px);
+  -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding-right:6px;
+}
+.barberhistory__tableWrap::-webkit-scrollbar{ width:8px; height:8px; }
+.barberhistory__tableWrap::-webkit-scrollbar-thumb{ background:#e2e8f0; border-radius:8px; }
+
+/* Table */
+.barberhistory__table{ width:100%; border-collapse:collapse; min-width:560px; }
+.barberhistory__table thead th{
+  text-align:left; padding:12px; background:var(--primary); color:#111; font-size:14px;
+  font-weight:700; position:sticky; top:0; z-index:1;
+}
+.barberhistory__table tbody td{
+  padding:12px; font-size:14px; border-bottom:1px solid var(--border); vertical-align:top;
+}
+.barberhistory__table tbody tr:hover td{ background:#f1f5f9; }
+
+.barberhistory__th--right{ text-align:right; }
+.barberhistory__td--right{ text-align:right; white-space:nowrap; }
+.barberhistory__loading{ text-align:center; color:var(--muted); padding:18px 0; }
+
+/* Pager */
+.barberhistory__pager{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.barberhistory__pageList{display:flex;gap:6px;list-style:none;margin:0;padding:0}
+.barberhistory__pageBtn{border:1px solid var(--border);background:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+.barberhistory__pageBtn:hover{background:#f9fafb}
+.barberhistory__pageBtn.is-active{background:var(--primary);border-color:var(--primary);color:#111}
+.barberhistory__pageBtn:disabled{opacity:.6;cursor:default}
+.barberhistory__dots{color:var(--muted);align-self:flex-end;padding-bottom:2px}
+
+/* Responsive */
+@media (max-width: 900px){
+  .barberhistory__filters{ grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 720px){
+  .barberhistory{ padding:16px; border-radius:10px; gap:16px; }
+  .barberhistory__title{ font-size:18px; }
+  .barberhistory__actions{ grid-template-columns:1fr; }
+  .barberhistory__filters{ grid-template-columns:1fr; }
+  .barberhistory__table{ min-width:500px; }
+}
+@media (max-width: 380px){
+  .barberhistory{ padding:14px; }
+  .barberhistory__btnText{ display:none; } /* прячем подпись только на очень узких */
+  .barberhistory__table{ min-width:460px; }
+  .barberhistory__table thead th, .barberhistory__table tbody td{ padding:10px; font-size:13.5px; }
+}
+@media (max-width: 320px){
+  .barberhistory{ padding:12px; gap:14px; }
+  .barberhistory__input{ font-size:13px; padding:9px 10px; min-height:38px; }
+  .barberhistory__btn{ font-size:12.8px; padding:0 10px; height:38px; }
+  .barberhistory__table{ min-width:420px; }
+  .barberhistory__table thead th, .barberhistory__table tbody td{ padding:8px; font-size:12.8px; }
+}
+
+/* reduce motion */
+@media (prefers-reduced-motion: reduce){
+  .barberhistory__btn{ transition:none !important; }
+}

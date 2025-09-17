@@ -1,0 +1,63 @@
+/* DepartmentAnalyticsChart.module.scss */
+
+.chartContainer {
+  position: relative;
+  height: 400px;
+  width: 100%;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 64px;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  border-radius: 50%;
+  height: 12px;
+  width: 12px;
+  border-bottom: 2px solid #333; /* Dark gray for the spinner */
+}
+
+.loadingText {
+  margin-left: 1rem; /* Equivalent to ml-4 */
+  color: #555; /* Equivalent to text-gray-700 */
+}
+
+.errorContainer {
+  text-align: center;
+  color: #dc2626; /* Equivalent to text-red-600 */
+  padding: 1rem; /* Equivalent to p-4 */
+  border: 1px solid #fca5a5; /* Equivalent to border border-red-300 */
+  background-color: #fef2f2; /* Equivalent to bg-red-50 */
+  border-radius: 0.375rem; /* Equivalent to rounded-md */
+}
+
+.errorTitle {
+  font-weight: bold;
+}
+
+.errorMessage {
+  font-size: 0.875rem; /* Equivalent to text-sm */
+  margin-top: 0.5rem; /* Equivalent to mt-2 */
+}
+
+.noDataContainer {
+  text-align: center;
+  color: #4b5563; /* Equivalent to text-gray-600 */
+  padding: 1rem; /* Equivalent to p-4 */
+  border: 1px solid #d1d5db; /* Equivalent to border border-gray-300 */
+  background-color: #f9fafb; /* Equivalent to bg-gray-50 */
+  border-radius: 0.375rem; /* Equivalent to rounded-md */
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
