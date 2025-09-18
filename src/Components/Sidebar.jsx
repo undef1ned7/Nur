@@ -138,7 +138,7 @@ const HIDE_RULES = [
     when: { sector: "Магазин" },
     hide: {
       toIncludes: [
-        "/crm/обзор",
+        "/crm/obzor",
         "/crm/zakaz",
         "/crm/market/analytics",
         "/crm/market/bar",
@@ -791,7 +791,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       школа: "school",
       магазин: "market",
       кафе: "cafe",
-      производство: "production",
+      // производство: "production",
       консалтинг: "consulting",
       склад: "warehouse",
     };
