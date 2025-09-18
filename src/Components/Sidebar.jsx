@@ -9,13 +9,16 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BsFileEarmarkPerson, BsListCheck } from "react-icons/bs";
 import {
+  FaBoxOpen,
   FaBuilding,
   FaCashRegister,
   FaChalkboardTeacher,
+  FaChartLine,
   FaClipboardList,
   FaCog,
   FaCogs,
   FaComments,
+  FaExchangeAlt,
   FaMoneyBill,
   FaRegCalendarAlt,
   FaRegChartBar,
@@ -24,7 +27,10 @@ import {
   FaRegUser,
   FaShoppingCart,
   FaTags,
+  FaTrashAlt,
+  FaTruckLoading,
   FaUsers,
+  FaWarehouse,
 } from "react-icons/fa";
 import { NavLink } from "react-router-dom";
 import "./Sidebar.scss";
@@ -158,6 +164,24 @@ const HIDE_RULES = [
         "/crm/sell",
         "/crm/kassa",
         "/crm/employ",
+        "/crm/sklad",
+        "/crm/zakaz",
+        "/crm/analytics",
+        "/crm/raspisanie",
+      ],
+    },
+  },
+  {
+    when: { sector: "Склад" },
+    hide: {
+      toIncludes: [
+        "/crm/debts",
+        "/crm/obzor",
+        "/crm/brand-category",
+        "/crm/clients",
+        "/crm/sell",
+        // "/crm/kassa",
+        // "/crm/employ",
         "/crm/sklad",
         "/crm/zakaz",
         "/crm/analytics",
@@ -582,6 +606,64 @@ const MENU_CONFIG = {
         implemented: true,
       },
     ],
+    warehouse: [
+      {
+        label: "Клиенты",
+        to: "/crm/warehouse/clients",
+        icon: <FaUsers className="sidebar__menu-icon" />, // 👥
+        permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Аналитика",
+        to: "/crm/warehouse/analytics",
+        icon: <FaChartLine className="sidebar__menu-icon" />, // 📈
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Товары",
+        to: "/crm/warehouse/products",
+        icon: <FaBoxOpen className="sidebar__menu-icon" />, // 📦
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Справочники",
+        to: "/crm/warehouse/directories",
+        icon: <FaTags className="sidebar__menu-icon" />, // 🏷️ бренды/категории
+        permission: "can_view_brand_category",
+        implemented: true,
+      },
+      {
+        label: "Остатки",
+        to: "/crm/warehouse/stocks",
+        icon: <FaWarehouse className="sidebar__menu-icon" />, // 🏭
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Операции (Перемещения)",
+        to: "/crm/warehouse/movements",
+        icon: <FaExchangeAlt className="sidebar__menu-icon" />, // 🔄
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Поставки",
+        to: "/crm/warehouse/supply",
+        icon: <FaTruckLoading className="sidebar__menu-icon" />, // 🚚
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Списание",
+        to: "/crm/warehouse/write_offs",
+        icon: <FaTrashAlt className="sidebar__menu-icon" />, // 🗑️
+        permission: "can_view_products",
+        implemented: true,
+      },
+    ],
 
     // ...внутри MENU_CONFIG.sector
   },
@@ -711,6 +793,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       кафе: "cafe",
       производство: "production",
       консалтинг: "consulting",
+      склад: "warehouse",
     };
 
     const configKey = sectorMapping[sectorKey] || sectorKey;

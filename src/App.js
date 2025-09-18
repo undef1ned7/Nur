@@ -94,6 +94,14 @@ import ConsultingSchoolTeachers from "./Components/Sectors/Consulting/Teachers/T
 import ConsultingSalary from "./Components/Sectors/Consulting/salary/salary";
 import ConsultingSale from "./Components/Sectors/Consulting/sale/sale";
 import ConsultingServices from "./Components/Sectors/Consulting/services/services";
+import WarehouseAnalytics from "./Components/Sectors/Warehouse/Analytics/Analytics";
+import WarehouseClients from "./Components/Sectors/Warehouse/Clients/Clients";
+import WarehouseDirectories from "./Components/Sectors/Warehouse/Directories/Directories";
+import WarehouseMovements from "./Components/Sectors/Warehouse/Movements/Movements";
+import WarehouseProducts from "./Components/Sectors/Warehouse/Products/Products";
+import WarehouseStocks from "./Components/Sectors/Warehouse/Stocks/Stocks";
+import WarehouseSupply from "./Components/Sectors/Warehouse/Supply/Supply";
+import WarehouseWriteOffs from "./Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -809,6 +817,70 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ConsultingServices />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/analytics"
+              element={
+                <ProtectedRoute>
+                  <WarehouseAnalytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/clients"
+              element={
+                <ProtectedRoute>
+                  <WarehouseClients />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/directories"
+              element={
+                <ProtectedRoute>
+                  <WarehouseDirectories />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/movements"
+              element={
+                <ProtectedRoute>
+                  <WarehouseMovements />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/products"
+              element={
+                <ProtectedRoute>
+                  <WarehouseProducts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/stocks"
+              element={
+                <ProtectedRoute>
+                  <WarehouseStocks />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/supply"
+              element={
+                <ProtectedRoute>
+                  <WarehouseSupply />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="warehouse/write_offs"
+              element={
+                <ProtectedRoute>
+                  <WarehouseWriteOffs />
                 </ProtectedRoute>
               }
             />
