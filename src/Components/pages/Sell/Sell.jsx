@@ -231,11 +231,9 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
 
   const handlePrintReceipt = async () => {
     try {
-      const result = await dispatch(
-        productCheckout({ id: start?.id, bool: true, clientId: clientId })
-      ).unwrap();
-      await dispatch(addCashFlows(cashData)).unwrap();
       if (debt === "debt") {
+        if (clientId === "") return alert("Выберите клиента");
+        if (phone === "") return alert("Введите номер телефона");
         await createDebt({
           name: client?.full_name,
           phone: phone,
@@ -252,6 +250,11 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           })
         ).unwrap();
       }
+      const result = await dispatch(
+        productCheckout({ id: start?.id, bool: true, clientId: clientId })
+      ).unwrap();
+      await dispatch(addCashFlows(cashData)).unwrap();
+
       if (result?.sale_id) {
         const pdfBlob = await dispatch(
           getProductCheckout(result.sale_id)
@@ -293,15 +296,10 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
       // const client = filterClient.find((item) => item.id === clientId);
 
       // потом выполняем checkout
-      const result = await dispatch(
-        productCheckout({ id: start?.id, bool: false, clientId })
-      ).unwrap();
 
-      // потом сохраняем кэш-флоу
-      await dispatch(addCashFlows(cashData)).unwrap();
-
-      // если есть долг — создаём
       if (debt === "debt") {
+        if (clientId === "") return alert("Выберите клиента");
+        if (phone === "") return alert("Введите номер телефона");
         await createDebt({
           name: client?.full_name,
           phone: phone,
@@ -319,6 +317,15 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           })
         ).unwrap();
       }
+
+      const result = await dispatch(
+        productCheckout({ id: start?.id, bool: false, clientId })
+      ).unwrap();
+
+      // потом сохраняем кэш-флоу
+      await dispatch(addCashFlows(cashData)).unwrap();
+
+      // если есть долг — создаём
 
       onClose();
     } catch (err) {
@@ -455,19 +462,21 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
               )}
             </div>
 
-            <div className="add-modal__section">
-              <label>Тип оплаты</label>
-              <select
-                name="clientId"
-                className="add-modal__input"
-                value={debt}
-                onChange={(e) => setDebt(e.target.value)}
-                required
-              >
-                <option value={""}>-- Выберите тип оплаты --</option>
-                <option value={"debt"}>Долг</option>
-              </select>
-            </div>
+            {company?.sector?.name === "Магазин" && (
+              <div className="add-modal__section">
+                <label>Тип оплаты</label>
+                <select
+                  name="clientId"
+                  className="add-modal__input"
+                  value={debt}
+                  onChange={(e) => setDebt(e.target.value)}
+                  required
+                >
+                  <option value={""}>-- Выберите тип оплаты --</option>
+                  <option value={"debt"}>Долг</option>
+                </select>
+              </div>
+            )}
 
             {debt === "debt" && (
               <div className="add-modal__section">
