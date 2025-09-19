@@ -44,6 +44,12 @@ import { useSale } from "../../../store/slices/saleSlice";
 import { useUser } from "../../../store/slices/userSlice";
 import BarcodeScanner from "./BarcodeScanner";
 import { useMemo } from "react";
+import api from "../../../api";
+
+async function createDebt(payload) {
+  const res = await api.post("/main/debts/", payload);
+  return res.data;
+}
 
 const SellModal = ({ onClose, id, selectCashBox }) => {
   const { list: cashBoxes } = useCash();
@@ -55,6 +61,7 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
     amount: "",
   });
   const [discount, setDiscount] = useState("");
+  const [phone, setPhone] = useState("");
 
   const { list } = useClient();
   const [clientId, setClientId] = useState("");
@@ -80,6 +87,7 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [isTabSelected, setIsTabSelected] = useState(true);
   const { company } = useUser();
+  const [debt, setDebt] = useState();
   // const [state, setState] = useState({ barcode: "" });
   const debouncedSearch = useDebounce((value) => {
     dispatch(doSearch({ search: value }));
@@ -219,6 +227,7 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
   const navigate = useNavigate();
 
   // console.log(clientId);
+  const client = filterClient.find((item) => item.id === clientId);
 
   const handlePrintReceipt = async () => {
     try {
@@ -226,6 +235,23 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
         productCheckout({ id: start?.id, bool: true, clientId: clientId })
       ).unwrap();
       await dispatch(addCashFlows(cashData)).unwrap();
+      if (debt === "debt") {
+        await createDebt({
+          name: client?.full_name,
+          phone: phone,
+          amount: start?.total,
+        });
+      }
+      if (clientId !== "") {
+        await dispatch(
+          createDeal({
+            clientId: clientId,
+            title: client?.full_name, // заголовок
+            statusRu: "Продажа", // маппинг в kind внутри thunk
+            amount: start?.total,
+          })
+        ).unwrap();
+      }
       if (result?.sale_id) {
         const pdfBlob = await dispatch(
           getProductCheckout(result.sale_id)
@@ -264,10 +290,36 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
 
   const handlePrintInvoice = async () => {
     try {
+      // const client = filterClient.find((item) => item.id === clientId);
+
+      // потом выполняем checkout
       const result = await dispatch(
-        productCheckout({ id: start?.id, bool: false, clientId: clientId })
+        productCheckout({ id: start?.id, bool: false, clientId })
       ).unwrap();
+
+      // потом сохраняем кэш-флоу
       await dispatch(addCashFlows(cashData)).unwrap();
+
+      // если есть долг — создаём
+      if (debt === "debt") {
+        await createDebt({
+          name: client?.full_name,
+          phone: phone,
+          amount: start?.total,
+        });
+      }
+
+      if (clientId !== "") {
+        await dispatch(
+          createDeal({
+            clientId: clientId,
+            title: client?.full_name, // заголовок
+            statusRu: "Продажа", // маппинг в kind внутри thunk
+            amount: start?.total,
+          })
+        ).unwrap();
+      }
+
       onClose();
     } catch (err) {
       alert(err.detail);
@@ -402,6 +454,35 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
                 </select>
               )}
             </div>
+
+            <div className="add-modal__section">
+              <label>Тип оплаты</label>
+              <select
+                name="clientId"
+                className="add-modal__input"
+                value={debt}
+                onChange={(e) => setDebt(e.target.value)}
+                required
+              >
+                <option value={""}>-- Выберите тип оплаты --</option>
+                <option value={"debt"}>Долг</option>
+              </select>
+            </div>
+
+            {debt === "debt" && (
+              <div className="add-modal__section">
+                <label>Телефон *</label>
+                <input
+                  name="title"
+                  className="add-modal__input"
+                  placeholder="Введите номер телефона"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+
             {start?.items.map((product, idx) => (
               <div className="receipt__item" key={idx}>
                 <p className="receipt__item-name">
@@ -1593,7 +1674,7 @@ const Sell = () => {
                     onChange={() => toggleSelectAllOnPage(filterField)}
                   />
                 </th>
-                <th></th>
+                {/* <th></th> */}
                 <th>№</th>
                 <th>Клиент</th>
                 <th>Цена</th>
@@ -1616,13 +1697,13 @@ const Sell = () => {
                       onChange={() => toggleRow(item.id)}
                     />
                   </td>
-                  <td onClick={(e) => e.stopPropagation()}>
+                  {/* <td onClick={(e) => e.stopPropagation()}>
                     <MoreVertical
                       size={16}
                       onClick={() => handleEdit(item)}
                       style={{ cursor: "pointer" }}
                     />
-                  </td>
+                  </td> */}
                   <td>{index + 1}</td>
                   <td>{item.client_name ? item.client_name : "Нет имени"}</td>
                   <td>{item.total}</td>

@@ -36,6 +36,7 @@ import {
   getCashBoxes,
   useCash,
 } from "../../../store/slices/cashSlice";
+import { createDeal } from "../../../store/creators/saleThunk";
 
 /* ===================== ВСПОМОГАТЕЛЬНЫЕ МОДАЛКИ ===================== */
 
@@ -687,6 +688,17 @@ const AddModal = ({ onClose, onSaveSuccess, cashBoxes, selectCashBox }) => {
           amount: product?.purchase_price * product?.quantity,
         })
       ).unwrap();
+      if (client !== "") {
+        await dispatch(
+          createDeal({
+            clientId: newItemData?.client,
+            title: newItemData?.name,
+            statusRu: "Продажа",
+            amount: newItemData?.purchase_price,
+            // debtMonths: dealStatus === "Долги" ? Number(debtMonths) : undefined,
+          })
+        ).unwrap();
+      }
       onClose();
       onSaveSuccess();
     } catch (err) {

@@ -15,6 +15,7 @@ import {
   fetchClientsAsync,
 } from "../../../../store/creators/clientCreators";
 import { useClient } from "../../../../store/slices/ClientSlice";
+import { createDeal } from "../../../../store/creators/saleThunk";
 
 /* ---------- helpers ---------- */
 const toDate10 = (v) => {
@@ -52,6 +53,8 @@ const AddModal = ({ onClose }) => {
     description: "",
   });
   const [showInputs, setShowInputs] = useState(false);
+  const [dealStatus, setDealStatus] = useState("");
+  const [debtMonths, setDebtMonths] = useState("");
 
   const [newClient, setNewClient] = useState({
     full_name: "",
@@ -99,6 +102,15 @@ const AddModal = ({ onClose }) => {
     }
     try {
       await dispatch(createJob(state)).unwrap();
+      await dispatch(
+        createDeal({
+          clientId: selectedContractorId,
+          title: state?.title,
+          statusRu: dealStatus,
+          amount: state?.amount,
+          debtMonths: dealStatus === "Долги" ? Number(debtMonths) : undefined,
+        })
+      ).unwrap();
       dispatch(getJobs());
       onClose();
     } catch (err) {
@@ -227,6 +239,37 @@ const AddModal = ({ onClose }) => {
               >
                 Создать
               </button>
+            </div>
+          )}
+
+          <div className="add-modal__section">
+            <label>Статус</label>
+            <select
+              name="contractor_entity_type"
+              className="add-modal__input"
+              value={dealStatus}
+              onChange={(e) => setDealStatus(e.target.value)}
+            >
+              <option value="Продажа">Оплатить сразу</option>
+              <option value="Долги">Долг</option>
+            </select>
+          </div>
+
+          {dealStatus === "Долги" && (
+            <div
+              className="add-modal__section"
+              style={{ display: "grid", gap: 8 }}
+            >
+              <label>Срок долга (месяцев)</label>
+              <input
+                className="add-modal__input"
+                type="number"
+                min={1}
+                step={1}
+                value={debtMonths}
+                onChange={(e) => setDebtMonths(e.target.value)}
+                placeholder="Например, 6"
+              />
             </div>
           )}
 

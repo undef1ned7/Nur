@@ -34,6 +34,7 @@ import { useDepartments } from "../../../store/slices/departmentSlice";
 import { useProducts } from "../../../store/slices/productSlice";
 import { useUser } from "../../../store/slices/userSlice";
 import AddProductBarcode from "../Sklad/AddProductBarcode";
+import { createDeal } from "../../../store/creators/saleThunk";
 
 /* ======================= Edit Modal ======================= */
 const EditModal = ({ order, onClose, onSaveSuccess, onDeleteConfirm }) => {
@@ -446,7 +447,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
 
   const [activeTab, setActiveTab] = useState(null);
   const [isTabSelected, setIsTabSelected] = useState(false);
-
+  const [selectedContractorId, setSelectedContractorId] = useState("");
   const [newItemData, setNewItemData] = useState({
     name: "",
     barcode: "",
@@ -467,6 +468,8 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
     type: "suppliers",
   });
   const [showInputs, setShowInputs] = useState(false);
+  const [dealStatus, setDealStatus] = useState("");
+  const [debtMonths, setDebtMonths] = useState("");
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -520,6 +523,17 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
 
     try {
       await dispatch(createProductAsync(payload)).unwrap();
+      if (client !== "") {
+        await dispatch(
+          createDeal({
+            clientId: newItemData?.client,
+            title: newItemData?.name,
+            statusRu: "Продажа",
+            amount: newItemData?.purchase_price,
+            // debtMonths: dealStatus === "Долги" ? Number(debtMonths) : undefined,
+          })
+        ).unwrap();
+      }
       onClose();
       onSaveSuccess();
     } catch (err) {
