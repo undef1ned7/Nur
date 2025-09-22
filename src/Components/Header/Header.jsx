@@ -30,7 +30,7 @@ const pageTitles = {
 
   // Строительная сфера
   "/crm/building/work": "Процесс работы",
-  "/crm/building/objects": "Объекты",
+  "/crm/building/objects": "Квартиры",
 
   // Барбершоп
   "/crm/barber/clients": "Клиенты",
@@ -73,6 +73,8 @@ const pageTitles = {
   "/crm/cafe/stock": "Склад",
   "/crm/cafe/tables": "Столы",
   "/crm/cafe/kassa": "Касса",
+
+  "/crm/production/warehouse": "Склад",
 
   // Доп. услуги
   "/crm/instagram": "Instagram",

@@ -1,3 +1,4 @@
+// src/store/creators/userCreators.js
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import {
   registerUser,
@@ -14,39 +15,41 @@ export const registerUserAsync = createAsyncThunk(
   async (props, { rejectWithValue }) => {
     try {
       const response = await registerUser(props.formData);
-      // console.log(response);
       if (response.status) {
         props.navigate("/login");
       }
-
       return response;
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(
+        error?.response?.data || { detail: error.message || "Register error" }
+      );
     }
   }
 );
 
 export const loginUserAsync = createAsyncThunk(
   "user/login",
-  async (props, { rejectWithValue }) => {
+  async (formData, { rejectWithValue }) => {
     try {
-      const response = await loginUser(props.formData);
+      const response = await loginUser(formData);
+
       if (response.access) {
         localStorage.setItem("accessToken", response.access);
 
-        // Запускаем миграцию permissions для существующих пользователей
+        // Миграция permissions — не блокируем логин при её падении
         try {
           await migrateUserPermissions();
         } catch (migrationError) {
           console.error("Migration failed:", migrationError);
-          // Не прерываем логин из-за ошибки миграции
         }
-
-        props.navigate("/crm/");
       }
+
       return response;
     } catch (error) {
-      return rejectWithValue(error);
+      // В реджект кладём только полезный payload с бэка
+      return rejectWithValue(
+        error?.response?.data || { detail: error.message || "Login error" }
+      );
     }
   }
 );
@@ -56,10 +59,11 @@ export const getIndustriesAsync = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await getIndustries();
-
       return response;
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(
+        error?.response?.data || { detail: error.message || "Industries error" }
+      );
     }
   }
 );
@@ -71,7 +75,9 @@ export const getSubscriptionPlansAsync = createAsyncThunk(
       const response = await getSubscriptionPlans();
       return response;
     } catch (error) {
-      return rejectWithValue(error);
+      return rejectWithValue(
+        error?.response?.data || { detail: error.message || "Plans error" }
+      );
     }
   }
 );
@@ -85,7 +91,6 @@ export const getCompany = createAsyncThunk(
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
       });
-      // console.log(data);
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);

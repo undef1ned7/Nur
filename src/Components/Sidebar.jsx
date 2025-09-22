@@ -109,6 +109,7 @@ const HIDE_RULES = [
         "crm/employ",
         "crm/clients",
         "crm/analytics",
+        "/crm/barber/history",
         "crm/kassa",
         "/crm/obzor",
         "/crm/zakaz",
@@ -186,6 +187,18 @@ const HIDE_RULES = [
         "/crm/sklad",
         "/crm/zakaz",
         "/crm/analytics",
+        "/crm/raspisanie",
+      ],
+    },
+  },
+  {
+    when: { sector: "Производство" },
+    hide: {
+      toIncludes: [
+        "/crm/debts",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "/crm/sklad",
         "/crm/raspisanie",
       ],
     },
@@ -304,7 +317,7 @@ const MENU_CONFIG = {
         implemented: true,
       },
       {
-        label: "Объекты",
+        label: "Квартиры",
         to: "/crm/building/objects",
         icon: <FaBuilding className="sidebar__menu-icon" />,
         permission: "can_view_building_objects",
@@ -665,6 +678,15 @@ const MENU_CONFIG = {
         implemented: true,
       },
     ],
+    production: [
+      {
+        label: "Склад",
+        to: "/crm/production/warehouse",
+        icon: <Warehouse className="sidebar__menu-icon" />, // 👥
+        permission: "can_view_products",
+        implemented: true,
+      },
+    ],
 
     // ...внутри MENU_CONFIG.sector
   },
@@ -793,7 +815,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       магазин: "market",
       кафе: "cafe",
       "Цветочный магазин": "market",
-      // производство: "production",
+      производство: "production",
       консалтинг: "consulting",
       склад: "warehouse",
     };
@@ -809,19 +831,32 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   }, [sector, company, hasPermission, tariff]);
 
   // Функция для получения дополнительных услуг
+  // Функция для получения дополнительных услуг
   const getAdditionalServices = useCallback(() => {
-    const additionalItems = MENU_CONFIG.additional.filter((item) =>
+    const groupAllowed = hasPermission("can_view_additional_services");
+
+    // Пункты, разрешённые индивидуальными правами
+    const individuallyAllowed = MENU_CONFIG.additional.filter((item) =>
       hasPermission(item.permission)
     );
 
-    if (additionalItems.length === 0) return null;
+    // Если есть групповое право, но индивидуальных нет — показываем всё (fallback)
+    const children =
+      individuallyAllowed.length > 0
+        ? individuallyAllowed
+        : groupAllowed
+        ? MENU_CONFIG.additional
+        : [];
+
+    // Ничего не показывать только если нет ни группового, ни индивидуальных прав
+    if (!groupAllowed && children.length === 0) return null;
 
     return {
       label: "Доп услуги",
       to: "/crm/additional-services",
       icon: <FaRegClipboard className="sidebar__menu-icon" />,
       implemented: true,
-      children: additionalItems,
+      children,
     };
   }, [hasPermission]);
 

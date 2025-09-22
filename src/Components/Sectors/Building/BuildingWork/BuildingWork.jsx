@@ -16,7 +16,7 @@ import {
 } from "../../../../store/creators/clientCreators";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { createDeal } from "../../../../store/creators/saleThunk";
-
+import "./buildingWork.scss";
 /* ---------- helpers ---------- */
 const toDate10 = (v) => {
   if (!v) return "";
@@ -282,9 +282,7 @@ const AddModal = ({ onClose }) => {
               onChange={handleChange}
             >
               <option value="llc">ООО (llc)</option>
-              <option value="sole_prop">ИП</option>
-              <option value="individual">Физ. лицо</option>
-              <option value="other">Другое</option>
+              <option value="ip">ИП</option>
             </select>
           </div>
 

@@ -98,8 +98,6 @@ const CashboxList = () => {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [name, setName] = useState("");
   const navigate = useNavigate();
 
   const load = async () => {
@@ -132,20 +130,6 @@ const CashboxList = () => {
     );
   }, [rows, q]);
 
-  const onCreate = async () => {
-    const title = (name || "").trim();
-    if (!title) return alert("Введите название кассы");
-    try {
-      await api.post("/construction/cashboxes/", { name: title });
-      setCreateOpen(false);
-      setName("");
-      load();
-    } catch (e) {
-      console.error(e);
-      alert("Не удалось создать кассу");
-    }
-  };
-
   return (
     <div className="kassa">
       <HeaderTabs />
@@ -165,12 +149,6 @@ const CashboxList = () => {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <button
-            className="kassa__btn kassa__btn--primary"
-            onClick={() => setCreateOpen(true)}
-          >
-            Создать кассу
-          </button>
         </div>
       </div>
 
@@ -227,49 +205,6 @@ const CashboxList = () => {
           </tbody>
         </table>
       </div>
-
-      {createOpen && (
-        <div className="kassa-modal">
-          <div
-            className="kassa-modal__overlay"
-            onClick={() => setCreateOpen(false)}
-          />
-          <div
-            className="kassa-modal__card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="kassa-modal__header">
-              <h3 className="kassa-modal__title">Создать кассу</h3>
-              <button
-                className="kassa-modal__close"
-                onClick={() => setCreateOpen(false)}
-                aria-label="Закрыть"
-              >
-                ×
-              </button>
-            </div>
-            <div className="kassa-modal__section">
-              <label className="kassa-modal__label">Название кассы *</label>
-              <input
-                className="kassa-modal__input"
-                type="text"
-                placeholder="Например: касса №1"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="kassa-modal__footer">
-              <button
-                className="kassa__btn kassa__btn--primary"
-                onClick={onCreate}
-              >
-                Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -293,7 +228,7 @@ const CashboxPayment = () => {
   const nightsBetween = (a, b) => {
     if (!a || !b) return 1;
     const ms = new Date(b) - new Date(a);
-    const d = Math.ceil(ms / (24 * 60 * 60 * 1000));
+       const d = Math.ceil(ms / (24 * 60 * 60 * 1000));
     return Math.max(1, d);
   };
 

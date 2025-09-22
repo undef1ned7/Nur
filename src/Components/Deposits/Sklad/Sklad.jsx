@@ -1,42 +1,33 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  SlidersHorizontal,
-  MoreVertical,
-  X,
-  ChevronDown,
-  Plus,
-  Minus,
-} from "lucide-react";
-import "./Sklad.scss";
+import { Minus, MoreVertical, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import "./Sklad.scss";
 
 import {
-  fetchProductsAsync,
+  createBrandAsync,
   createProductAsync,
-  updateProductAsync,
   deleteProductAsync,
   fetchBrandsAsync,
   fetchCategoriesAsync,
-  createBrandAsync,
-  createCategoryAsync,
+  fetchProductsAsync,
+  updateProductAsync,
 } from "../../../store/creators/productCreators";
 import barcodeImage from "./barcode (2).gif";
 
-import { clearProducts, useProducts } from "../../../store/slices/productSlice";
-import BarcodeScanner from "../../pages/Sell/BarcodeScanner";
-import { useUser } from "../../../store/slices/userSlice";
-import AddProductBarcode from "./AddProductBarcode";
-import { useClient } from "../../../store/slices/ClientSlice";
 import {
   createClientAsync,
   fetchClientsAsync,
 } from "../../../store/creators/clientCreators";
+import { createDeal } from "../../../store/creators/saleThunk";
 import {
   addCashFlows,
   getCashBoxes,
   useCash,
 } from "../../../store/slices/cashSlice";
-import { createDeal } from "../../../store/creators/saleThunk";
+import { useClient } from "../../../store/slices/ClientSlice";
+import { clearProducts, useProducts } from "../../../store/slices/productSlice";
+import { useUser } from "../../../store/slices/userSlice";
+import AddProductBarcode from "./AddProductBarcode";
 
 /* ===================== ВСПОМОГАТЕЛЬНЫЕ МОДАЛКИ ===================== */
 
@@ -92,14 +83,18 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
     (state) => state.product
   );
 
+  const { brands, categories } = useProducts();
+
   const [editedItem, setEditedItem] = useState({
     id: item.id || "",
     name: item.name || "",
-    price: item.price || "",
+    barcode: item.barcode || "",
     brand: item.brand || "",
-    article: item.article || "",
-    quantity: item.quantity || "",
     category: item.category || "",
+    client: item.client || "",
+    price: item.price || "",
+    purchase_price: item.purchase_price || "",
+    quantity: item.quantity || "",
   });
 
   const handleChange = (e) => {
@@ -109,21 +104,33 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
       [name]: type === "number" ? (value === "" ? "" : value) : value,
     }));
   };
+  const { list } = useClient();
+  const filterClient1 = list.filter((item) => item.type === "suppliers");
+  const [showInputs, setShowInputs] = useState(false);
+  console.log(item);
 
   const handleSave = async () => {
-    if (
-      !editedItem.name ||
-      editedItem.price === "" ||
-      editedItem.quantity === ""
-    ) {
-      alert("Пожалуйста, заполните поля: Название, Цена, Количество.");
-      return;
-    }
+    // if (
+    //   !editedItem.name ||
+    //   !editedItem.barcode ||
+    //   !editedItem.brand_name ||
+    //   !editedItem.category_name ||
+    //   !editedItem.client ||
+    //   editedItem.price === "" ||
+    //   editedItem.purchase_price === "" ||
+    //   editedItem.quantity === ""
+    // ) {
+    //   alert(
+    //     "Пожалуйста, заполните все обязательные поля: Название, Штрих код, Бренд, Категория, Поставщик, Розничная цена, Закупочная цена, Количество."
+    //   );
+    //   return;
+    // }
 
     try {
       const dataToSave = {
         ...editedItem,
         price: parseFloat(editedItem.price),
+        purchase_price: parseFloat(editedItem.purchase_price),
         quantity: parseInt(editedItem.quantity, 10),
       };
 
@@ -157,8 +164,14 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
     }
   };
 
+  useEffect(() => {
+    dispatch(fetchBrandsAsync());
+    dispatch(fetchCategoriesAsync());
+    dispatch(fetchClientsAsync());
+  }, []);
+
   return (
-    <div className="edit-modal">
+    <div className="edit-modal sklad">
       <div className="edit-modal__overlay" onClick={onClose} />
       <div className="edit-modal__content">
         <div className="edit-modal__header">
@@ -179,6 +192,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           </p>
         )}
 
+        {/* Название */}
         <div className="edit-modal__section">
           <label>Название *</label>
           <input
@@ -190,8 +204,75 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           />
         </div>
 
+        {/* Штрих код */}
         <div className="edit-modal__section">
-          <label>Цена *</label>
+          <label>Штрих код *</label>
+          <input
+            type="text"
+            name="barcode"
+            value={editedItem.barcode}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        {/* Бренд */}
+        <div className="edit-modal__section">
+          <label>Бренд *</label>
+          <select
+            name="brand_name"
+            value={editedItem.brand}
+            onChange={handleChange}
+            required
+          >
+            <option value="">-- Выберите бренд --</option>
+            {brands?.map((brand, idx) => (
+              <option key={brand.id ?? idx} value={brand.name}>
+                {brand.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Категория */}
+        <div className="edit-modal__section">
+          <label>Категория *</label>
+          <select
+            name="category_name"
+            value={editedItem.category}
+            onChange={handleChange}
+            required
+          >
+            <option value="">-- Выберите категорию --</option>
+            {categories?.map((category, idx) => (
+              <option key={category.id ?? idx} value={category.name}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Поставщик */}
+        <div className="edit-modal__section">
+          <label>Поставщик *</label>
+          <select
+            name="client"
+            value={editedItem.client}
+            onChange={handleChange}
+            required
+          >
+            <option value="">-- Выберите поставщика --</option>
+            {filterClient1?.map((client, idx) => (
+              <option key={client.id ?? idx} value={client.id}>
+                {client.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Розничная цена */}
+        <div className="edit-modal__section">
+          <label>Розничная цена *</label>
           <input
             type="number"
             name="price"
@@ -203,6 +284,21 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           />
         </div>
 
+        {/* Закупочная цена */}
+        <div className="edit-modal__section">
+          <label>Закупочная цена *</label>
+          <input
+            type="number"
+            name="purchase_price"
+            value={editedItem.purchase_price}
+            onChange={handleChange}
+            min="0"
+            step="0.01"
+            required
+          />
+        </div>
+
+        {/* Количество */}
         <div className="edit-modal__section">
           <label>Количество *</label>
           <input
@@ -212,16 +308,6 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
             onChange={handleChange}
             min="0"
             required
-          />
-        </div>
-
-        <div className="edit-modal__section">
-          <label>Категория</label>
-          <input
-            type="text"
-            name="category"
-            value={editedItem.category}
-            onChange={handleChange}
           />
         </div>
 
@@ -397,6 +483,7 @@ const AcceptPendingModal = ({ onClose, onChanged }) => {
   const dispatch = useDispatch();
   const { list: products, loading } = useSelector((s) => s.product);
   const { list: cashBoxes } = useCash();
+
   const [selectedCashBox, setSelectedCashBox] = useState("");
 
   useEffect(() => {
@@ -477,7 +564,7 @@ const AcceptPendingModal = ({ onClose, onChanged }) => {
   };
 
   return (
-    <div className="add-modal">
+    <div className="add-modal accept">
       <div className="add-modal__overlay" onClick={onClose} />
       <div className="add-modal__content" role="dialog" aria-modal="true">
         <div className="add-modal__header">
@@ -554,6 +641,146 @@ const AcceptPendingModal = ({ onClose, onChanged }) => {
                           onClick={() => handleAccept(item)}
                         >
                           Принять
+                        </button>
+                        <button
+                          className="add-modal__cancel"
+                          onClick={() => handleReject(item)}
+                        >
+                          Отказать
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="add-modal__footer">
+          <button className="add-modal__cancel" onClick={onClose}>
+            Закрыть
+          </button>
+          <button
+            className="add-modal__save"
+            onClick={() => dispatch(fetchProductsAsync({}))}
+          >
+            Обновить список
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+const AcceptHistoryModal = ({ onClose, onChanged }) => {
+  const dispatch = useDispatch();
+  const { list: products, loading } = useSelector((s) => s.product);
+
+  // Товары, ожидающие отправки (при необходимости поправьте статус на "pending")
+  const pending = useMemo(
+    () =>
+      (products || []).filter(
+        (p) => String(p.status).toLowerCase() === "accepted"
+      ),
+    [products]
+  );
+
+  const refresh = () => {
+    dispatch(fetchProductsAsync({})).finally(() => {
+      onChanged?.();
+    });
+  };
+
+  const calcExpenseAmount = (item) => {
+    const price = Number(item?.purchase_price ?? item?.price ?? 0);
+    const qty = Number(item?.quantity ?? 0);
+    const amt = price * qty;
+    return Math.round(amt * 100) / 100;
+  };
+
+  const handleAccept = async (item) => {
+    try {
+      // Только смена статуса -> history, без кассы/движений денег
+      await dispatch(
+        updateProductAsync({
+          productId: item.id,
+          updatedData: { status: "history" },
+        })
+      ).unwrap();
+
+      refresh();
+    } catch (e) {
+      console.error(e);
+      alert("Не удалось отправить товар");
+    }
+  };
+
+  const handleReject = async (item) => {
+    try {
+      await dispatch(
+        updateProductAsync({
+          productId: item.id,
+          updatedData: { status: "rejected" },
+        })
+      ).unwrap();
+      refresh();
+    } catch (e) {
+      console.error(e);
+      alert("Не удалось отклонить товар");
+    }
+  };
+
+  return (
+    <div className="add-modal accept">
+      <div className="add-modal__overlay" onClick={onClose} />
+      <div className="add-modal__content" role="dialog" aria-modal="true">
+        <div className="add-modal__header">
+          <h3>Отправка товара</h3>
+          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+        </div>
+
+        {loading ? (
+          <div className="add-modal__section">Загрузка…</div>
+        ) : pending.length === 0 ? (
+          <div className="add-modal__section">
+            Нет товаров со статусом pending.
+          </div>
+        ) : (
+          <div
+            className="table-wrapper"
+            style={{ maxHeight: 400, overflow: "auto" }}
+          >
+            <table className="sklad__table">
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>Название</th>
+                  <th>Поставщик</th>
+                  <th>Кол-во</th>
+                  <th>Закуп. цена</th>
+                  <th>Итого (расход)</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map((item, idx) => {
+                  const expense = calcExpenseAmount(item);
+                  return (
+                    <tr key={item.id}>
+                      <td>{idx + 1}</td>
+                      <td>{item.name}</td>
+                      <td>{item.client_name || "—"}</td>
+                      <td>{item.quantity}</td>
+                      <td>{item.purchase_price ?? "—"}</td>
+                      <td>{expense.toFixed(2)}</td>
+                      <td>
+                        <button
+                          className="add-modal__save"
+                          style={{ marginRight: 8 }}
+                          title="Принять товар"
+                          onClick={() => handleAccept(item)}
+                        >
+                          Отправить
                         </button>
                         <button
                           className="add-modal__cancel"
@@ -685,7 +912,7 @@ const AddModal = ({ onClose, onSaveSuccess, cashBoxes, selectCashBox }) => {
       await dispatch(
         addCashFlows({
           ...cashData,
-          amount: product?.purchase_price * product?.quantity,
+          amount: (product?.purchase_price * product?.quantity).toFixed(2),
         })
       ).unwrap();
       if (client !== "") {
@@ -694,7 +921,7 @@ const AddModal = ({ onClose, onSaveSuccess, cashBoxes, selectCashBox }) => {
             clientId: newItemData?.client,
             title: newItemData?.name,
             statusRu: "Продажа",
-            amount: newItemData?.purchase_price,
+            amount: (product?.purchase_price * product?.quantity).toFixed(2),
             // debtMonths: dealStatus === "Долги" ? Number(debtMonths) : undefined,
           })
         ).unwrap();
@@ -941,7 +1168,7 @@ const AddModal = ({ onClose, onSaveSuccess, cashBoxes, selectCashBox }) => {
   }, [newItemData, selectCashBox]);
 
   return (
-    <div className="add-modal">
+    <div className="add-modal wareSklad">
       <div className="add-modal__overlay" onClick={onClose} />
       <div className="add-modal__content">
         <div className="add-modal__header">
@@ -1184,6 +1411,7 @@ export default function () {
   const [showReceiveModal, setShowReceiveModal] = useState(false); // ← НОВОЕ
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectCashBox, setSelectCashBox] = useState("");
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -1324,7 +1552,11 @@ export default function () {
   }, [dispatch]);
 
   const filterProducts = products.filter((item) => item.status === "accepted");
-
+  const filteredHistory = products.filter((item) => item.status === "history");
+  const filterP =
+    company.sector?.name === "Строительная компания"
+      ? filterProducts
+      : products;
   // ★ helpers выбора
   const isSelected = (id) => selectedIds.has(id);
   const toggleRow = (id) => {
@@ -1479,7 +1711,14 @@ export default function () {
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "20px",
+                flexWrap: "wrap",
+              }}
+            >
               {company.sector?.name === "Строительная компания" ? (
                 <>
                   <button
@@ -1489,7 +1728,10 @@ export default function () {
                     <Plus size={16} style={{ marginRight: "4px" }} /> Принять
                     товар
                   </button>
-                  <button className="sklad__add">
+                  <button
+                    onClick={() => setShowHistoryModal(true)}
+                    className="sklad__add"
+                  >
                     <Minus size={16} style={{ marginRight: "4px" }} /> Отправить
                     товар
                   </button>
@@ -1528,13 +1770,13 @@ export default function () {
             </div>
           </div>
 
-          {products.length !== 0 && <SelectionActions pageItems={products} />}
+          {filterP.length !== 0 && <SelectionActions pageItems={filterP} />}
 
           {loading ? (
             <p className="sklad__loading-message">Загрузка товаров...</p>
           ) : error ? (
             <p className="sklad__error-message">Ошибка загрузки:</p>
-          ) : products.length === 0 ? (
+          ) : filterP.length === 0 ? (
             <p className="sklad__no-products-message">Нет доступных товаров.</p>
           ) : (
             <div className="table-wrapper">
@@ -1546,10 +1788,10 @@ export default function () {
                       <input
                         type="checkbox"
                         checked={
-                          products.length > 0 &&
-                          products.every((i) => selectedIds.has(i.id))
+                          filterP.length > 0 &&
+                          filterP.every((i) => selectedIds.has(i.id))
                         }
-                        onChange={() => toggleSelectAllOnPage(products)}
+                        onChange={() => toggleSelectAllOnPage(filterP)}
                       />
                     </th>
                     <th></th>
@@ -1562,7 +1804,7 @@ export default function () {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((item, index) => (
+                  {filterP.map((item, index) => (
                     <tr key={item.id}>
                       <td>
                         {/* ★ чекбокс строки */}
@@ -1654,7 +1896,7 @@ export default function () {
             {/* ★ Действия с выбором для фильтрованных */}
           </div>
 
-          {filterProducts.length !== 0 && (
+          {filteredHistory.length !== 0 && (
             <SelectionActions pageItems={products} />
           )}
 
@@ -1662,7 +1904,7 @@ export default function () {
             <p className="sklad__loading-message">Загрузка товаров...</p>
           ) : error ? (
             <p className="sklad__error-message">Ошибка загрузки</p>
-          ) : filterProducts.length === 0 ? (
+          ) : filteredHistory.length === 0 ? (
             <p className="sklad__no-products-message">Нет доступных товаров.</p>
           ) : (
             <div className="table-wrapper">
@@ -1674,10 +1916,10 @@ export default function () {
                       <input
                         type="checkbox"
                         checked={
-                          filterProducts.length > 0 &&
-                          filterProducts.every((i) => selectedIds.has(i.id))
+                          filteredHistory.length > 0 &&
+                          filteredHistory.every((i) => selectedIds.has(i.id))
                         }
-                        onChange={() => toggleSelectAllOnPage(filterProducts)}
+                        onChange={() => toggleSelectAllOnPage(filteredHistory)}
                       />
                     </th>
                     <th></th>
@@ -1690,7 +1932,7 @@ export default function () {
                   </tr>
                 </thead>
                 <tbody>
-                  {filterProducts.map((item, index) => (
+                  {filteredHistory.map((item, index) => (
                     <tr key={item.id}>
                       <td>
                         <input
@@ -1813,6 +2055,20 @@ export default function () {
       {showReceiveModal && (
         <AcceptPendingModal
           onClose={() => setShowReceiveModal(false)}
+          onChanged={() =>
+            dispatch(
+              fetchProductsAsync({
+                page: currentPage,
+                search: searchTerm,
+                ...currentFilters,
+              })
+            )
+          }
+        />
+      )}
+      {showHistoryModal && (
+        <AcceptHistoryModal
+          onClose={() => setShowHistoryModal(false)}
           onChanged={() =>
             dispatch(
               fetchProductsAsync({

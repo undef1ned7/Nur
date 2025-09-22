@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Provider, useDispatch } from "react-redux";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./App.scss";
 import Login from "./Components/Auth/Login/Login";
 import Register from "./Components/Auth/Register/Register";
@@ -8,9 +8,6 @@ import Department from "./Components/Department/Department";
 import DepartmentAnalyticsChart from "./Components/DepartmentAnalyticsChart/DepartmentAnalyticsChart";
 import DepartmentDetails from "./Components/DepartmentDetails/DepartmentDetails";
 import BrandCategoryPage from "./Components/Deposits/BrandCategoryPage/BrandCategoryPage";
-import ClientDetail from "./Components/Deposits/Clients/ClientDetail";
-import ClientsTable from "./Components/Deposits/Clients/Clients";
-import Employ from "./Components/Deposits/Employ/Employ";
 import Kassa from "./Components/Deposits/Kassa/Kassa";
 import KassWorker from "./Components/Deposits/KassaWorker/Kassa";
 import KassaDet from "./Components/Deposits/KassaWorkerDet/Kassa";
@@ -22,21 +19,30 @@ import Zakaz from "./Components/Deposits/Zakaz/Zakaz";
 import Layout from "./Components/Layout/Layout";
 import Analytics from "./Components/pages/Analytics/Analytics";
 // import History from "./Components/pages/History/History";
+import Contact from "./Components/Contact/Contact";
+import Debts from "./Components/Debts/Debts";
 import Instagram from "./Components/Instagram/Instagram";
+import AdditionalServices from "./Components/pages/AdditionalServices/AdditionalServices";
 import Set from "./Components/pages/Info/Settings/Settings";
 import Landing from "./Components/pages/Landing/Landing";
 import Registration from "./Components/pages/Registration/Registration";
 import Sell from "./Components/pages/Sell/Sell";
 import SellDetail from "./Components/pages/Sell/SellDetail";
+import ApplicationList from "./Components/pages/SubmitApplication/ApplicationList";
 import SubmitApplication from "./Components/pages/SubmitApplication/SubmitApplication";
 import CashReports from "./Components/Sectors/Barber/CashReports/CashReports";
+import BarberClients from "./Components/Sectors/Barber/Clients/Clients";
 import BarberDocuments from "./Components/Sectors/Barber/Documents/Documents";
 import BarberHistory from "./Components/Sectors/Barber/History/History";
 import Masters from "./Components/Sectors/Barber/Masters/Masters";
 import Recorda from "./Components/Sectors/Barber/Recorda/Recorda";
 import BarberServices from "./Components/Sectors/Barber/Services/Services";
+import BuildingWork from "./Components/Sectors/Building/BuildingWork/BuildingWork";
+import Objects from "./Components/Sectors/Building/Objects/Objects";
 import CafeAnalytics from "./Components/Sectors/cafe/Analytics/Analytics";
+import CafeClients from "./Components/Sectors/cafe/Clients/Clients";
 import CafeDocuments from "./Components/Sectors/cafe/Documents/Documents";
+import CafeKassa from "./Components/Sectors/cafe/kassaCafe/kassa";
 import CafeMenu from "./Components/Sectors/cafe/Menu/Menu";
 import CafeOrders from "./Components/Sectors/cafe/Orders/Orders";
 import CafePayroll from "./Components/Sectors/cafe/Payroll/Payroll";
@@ -46,10 +52,19 @@ import CafeReservations from "./Components/Sectors/cafe/Reservations/Reservation
 import CafeStaff from "./Components/Sectors/cafe/Staff/Staff";
 import CafeStock from "./Components/Sectors/cafe/Stock/Stock";
 import CafeTables from "./Components/Sectors/cafe/Tables/Tables";
-import HostelAnalytics from "./Components/Sectors/Hostel/Analytics/Analytics";
+import ConsultingClientRequests from "./Components/Sectors/Consulting/client-requests/client-requests";
+import ConsultingClients from "./Components/Sectors/Consulting/client/client";
+import ConsultingCafeKassa from "./Components/Sectors/Consulting/Kassa/Kassa";
+import ConsultingSalary from "./Components/Sectors/Consulting/salary/salary";
+import ConsultingSale from "./Components/Sectors/Consulting/sale/sale";
+import ConsultingServices from "./Components/Sectors/Consulting/services/services";
+import ConsultingSchoolTeachers from "./Components/Sectors/Consulting/Teachers/Teachers";
+import { AnalyticsPage } from "./Components/Sectors/Hostel/Analytics/AnalyticsPage";
 import HostelBar from "./Components/Sectors/Hostel/Bar/Bar";
 import HostelBookings from "./Components/Sectors/Hostel/Bookings/Bookings";
+import HostelClients from "./Components/Sectors/Hostel/Clients/Clients";
 import HostelDocuments from "./Components/Sectors/Hostel/Documents/Documents";
+import HostelKassa from "./Components/Sectors/Hostel/kassa/kassa";
 import RoomsHalls from "./Components/Sectors/Hostel/RoomsHalls/RoomsHalls";
 import HostelWarehouse from "./Components/Sectors/Hostel/Warehouse/Warehouse";
 import MarketAnalytics from "./Components/Sectors/Market/Analytics/Analytics";
@@ -60,6 +75,8 @@ import MarketClients from "./Components/Sectors/Market/Clients/Clients";
 import MarketDocuments from "./Components/Sectors/Market/Documents/Documents";
 import MarketHistory from "./Components/Sectors/Market/History/History";
 import MarketWarehouse from "./Components/Sectors/Market/Warehouse/Warehouse";
+// import ProductionOrders from "./Components/Sectors/Production/Orders/Orders";
+import ProductionWarehouse from "./Components/Sectors/Production/Warehouse/ProductionWarehouse";
 import SchoolCoursesGroups from "./Components/Sectors/School/CoursesGroups/CoursesGroups";
 import SchoolDocuments from "./Components/Sectors/School/Documents/Documents";
 import SchoolInvoices from "./Components/Sectors/School/Invoices/Invoices";
@@ -68,32 +85,6 @@ import SchoolLessonsRooms from "./Components/Sectors/School/LessonsRooms/Lessons
 import SchoolStudents from "./Components/Sectors/School/Students/Students";
 import SchoolTeachers from "./Components/Sectors/School/Teachers/Teachers";
 import SectorSelect from "./Components/Sectors/SectorSelect";
-import store from "./store";
-import ApplicationList from "./Components/pages/SubmitApplication/ApplicationList";
-import BuildingDocuments from "./Components/Sectors/Building/Documents/Documents";
-import Contact from "./Components/Contact/Contact";
-import AdditionalServices from "./Components/pages/AdditionalServices/AdditionalServices";
-import { useUser } from "./store/slices/userSlice";
-import ProtectedRoute from "./ProtectedRoute";
-import { getCompany } from "./store/creators/userCreators";
-import { Bar } from "react-chartjs-2";
-import BarberClients from "./Components/Sectors/Barber/Clients/Clients";
-import { AnalyticsPage } from "./Components/Sectors/Hostel/Analytics/AnalyticsPage";
-import HostelClients from "./Components/Sectors/Hostel/Clients/Clients";
-import CafeKassa from "./Components/Sectors/cafe/kassaCafe/kassa";
-import CafeClients from "./Components/Sectors/cafe/Clients/Clients";
-import BuildingWork from "./Components/Sectors/Building/BuildingWork/BuildingWork";
-import HostelKassa from "./Components/Sectors/Hostel/kassa/kassa";
-import Objects from "./Components/Sectors/Building/Objects/Objects";
-import Debts from "./Components/Debts/Debts";
-import ProductionOrders from "./Components/Sectors/Production/Orders/Orders";
-import ConsultingClients from "./Components/Sectors/Consulting/client/client";
-import ConsultingClientRequests from "./Components/Sectors/Consulting/client-requests/client-requests";
-import ConsultingCafeKassa from "./Components/Sectors/Consulting/Kassa/Kassa";
-import ConsultingSchoolTeachers from "./Components/Sectors/Consulting/Teachers/Teachers";
-import ConsultingSalary from "./Components/Sectors/Consulting/salary/salary";
-import ConsultingSale from "./Components/Sectors/Consulting/sale/sale";
-import ConsultingServices from "./Components/Sectors/Consulting/services/services";
 import WarehouseAnalytics from "./Components/Sectors/Warehouse/Analytics/Analytics";
 import WarehouseClients from "./Components/Sectors/Warehouse/Clients/Clients";
 import WarehouseDirectories from "./Components/Sectors/Warehouse/Directories/Directories";
@@ -102,6 +93,9 @@ import WarehouseProducts from "./Components/Sectors/Warehouse/Products/Products"
 import WarehouseStocks from "./Components/Sectors/Warehouse/Stocks/Stocks";
 import WarehouseSupply from "./Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "./Components/Sectors/Warehouse/WriteOffs/WriteOffs";
+import ProtectedRoute from "./ProtectedRoute";
+import { getCompany } from "./store/creators/userCreators";
+import { useUser } from "./store/slices/userSlice";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -748,7 +742,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="production/orders"
               element={
                 <ProtectedRoute>
@@ -763,7 +757,7 @@ function App() {
                   <ProductionOrders />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route
               path="consulting/client"
               element={
@@ -881,6 +875,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <WarehouseWriteOffs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="production/warehouse"
+              element={
+                <ProtectedRoute>
+                  <ProductionWarehouse />
                 </ProtectedRoute>
               }
             />

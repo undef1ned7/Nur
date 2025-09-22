@@ -1136,7 +1136,7 @@ export default function Zakaz() {
   };
 
   const isFiltered = searchTerm || Object.keys(currentFilters).length > 0;
-  const productsFilter = products.filter((item) => item.status === "pending");
+  const productsFilter = products;
 
   // const totalPages = ...
   // const currentPageDisplay = currentPage;
@@ -1153,7 +1153,7 @@ export default function Zakaz() {
   };
 
   return (
-    <div className="zakaz">
+    <div className="zakaz purchases">
       <div className="sklad__header">
         <div className="sklad__left">
           <input

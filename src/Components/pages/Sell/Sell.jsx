@@ -1,4 +1,14 @@
-import { Minus, MoreVertical, Plus, Trash, X } from "lucide-react";
+import {
+  Hash,
+  ListOrdered,
+  Minus,
+  MoreVertical,
+  Plus,
+  Tag,
+  Tags,
+  Trash,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 // import "./Sklad.scss";
@@ -52,304 +62,388 @@ async function createDebt(payload) {
 }
 
 const SellModal = ({ onClose, id, selectCashBox }) => {
-  const { list: cashBoxes } = useCash();
-
-  const [cashData, setCashData] = useState({
-    cashbox: "",
-    type: "income",
-    name: "",
-    amount: "",
-  });
-  const [discount, setDiscount] = useState("");
-  const [phone, setPhone] = useState("");
-
-  const { list } = useClient();
-  const [clientId, setClientId] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [activeProductId, setActiveProductId] = useState(null);
   const dispatch = useDispatch();
-  const { creating, createError, brands, categories, barcodeError } =
-    useProducts();
-  const { 0: state, 1: setState } = useState({
+
+  // store hooks
+  const { list: cashBoxes } = useCash();
+  const { list: clients } = useClient();
+  const { company } = useUser();
+  const { cart, loading, barcode, error, start, foundProduct } = useSale();
+
+  // только клиенты типа "client"
+  const filterClient = useMemo(
+    () => clients.filter((c) => c.type === "client"),
+    [clients]
+  );
+
+  // local state
+  const [activeTab, setActiveTab] = useState(
+    company?.sector?.name !== "Магазин" ? 1 : 0
+  );
+  const [isTabSelected, setIsTabSelected] = useState(true);
+  const [clientId, setClientId] = useState(""); // строка, чтобы совпадал тип <select>
+  const [debt, setDebt] = useState("");
+  const [phone, setPhone] = useState("");
+  const [inline, setInline] = useState({ id: null, field: null }); // {id, field: "quantity"|"discount"}
+  const [quantity, setQuantity] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [showCreateClient, setShowCreateClient] = useState(false);
+  const [newClient, setNewClient] = useState({
     full_name: "",
     phone: "",
     email: "",
     date: new Date().toISOString().split("T")[0],
     type: "client",
   });
-  const [showInputs, setShowInputs] = useState(false);
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setState((prev) => ({ ...prev, [name]: value }));
-  };
+  const [cashData, setCashData] = useState({
+    cashbox: "",
+    type: "income",
+    name: "",
+    amount: "",
+  });
 
-  const { cart, loading, barcode, error, start, foundProduct } = useSale();
-  const [activeTab, setActiveTab] = useState(0);
-  const [isTabSelected, setIsTabSelected] = useState(true);
-  const { company } = useUser();
-  const [debt, setDebt] = useState();
-  // const [state, setState] = useState({ barcode: "" });
+  // helpers
+  const run = (thunk) => dispatch(thunk).unwrap();
+
+  // Сравниваем как строки, чтобы исключить рассинхрон типов
+  const pickClient = useMemo(
+    () => filterClient.find((x) => String(x.id) === String(clientId)),
+    [filterClient, clientId]
+  );
+  console.log(pickClient);
+
   const debouncedSearch = useDebounce((value) => {
     dispatch(doSearch({ search: value }));
-  }, 1000);
+  }, 600);
 
-  const onChange = (e) => {
-    debouncedSearch(e.target.value);
+  const onSearch = (e) => debouncedSearch(e.target.value);
+  const onNewClientChange = (e) =>
+    setNewClient((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const saveInline = async (productId) => {
+    const payload = {
+      id,
+      productId,
+      quantity: quantity ? Number(quantity) : 1,
+      discount_total: discount || 0,
+    };
+    await run(manualFilling(payload));
+    await run(startSale());
+    setInline({ id: null, field: null });
+    setQuantity("");
+    setDiscount("");
   };
-  const onSubmit = async (e) => {
+
+  const addOne = async (productId) => {
+    await run(manualFilling({ id, productId }));
+    await run(startSale());
+  };
+
+  const changeQtyOrRemove = async (item) => {
+    if ((item?.quantity ?? 0) > 1) {
+      await run(
+        updateProductInCart({
+          id,
+          productId: item.id,
+          data: { quantity: item.quantity - 1 },
+        })
+      );
+    } else {
+      await run(deleteProductInCart({ id, productId: item.id }));
+    }
+    await run(startSale());
+  };
+
+  const createClient = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(createClientAsync(state)).unwrap();
-      dispatch(fetchClientsAsync());
-      setShowInputs(false);
-    } catch (e) {
-      console.log(e);
+      // создаём клиента и получаем его объект
+      const created = await run(createClientAsync(newClient)); // ожидаем { id, full_name, phone, ... }
+      // обновляем список
+      await dispatch(fetchClientsAsync());
+
+      // авто-выбор и подтяжка телефона
+      if (created?.id != null) {
+        setClientId(String(created.id));
+      }
+      setPhone(created?.phone || newClient.phone || "");
+
+      setShowCreateClient(false);
+    } catch (err) {
+      console.error(err);
+      alert("Не удалось создать клиента");
     }
   };
 
-  const tabs = [
-    {
-      label: "Сканировать",
-      content: <BarcodeScanner id={id} />,
-      option: "scan",
-    },
-    {
-      label: "Вручную",
-      content: (
-        <>
-          <div className="sell__manual">
-            <input
-              type="text"
-              placeholder="Введите название товара"
-              className="add-modal__input"
-              name="search"
-              // onChange={onChange} // твой хендлер поиска
-            />
+  const performCheckout = async (withReceipt) => {
+    if (debt === "debt") {
+      if (!clientId) return alert("Выберите клиента");
+      if (!phone) return alert("Введите номер телефона");
+      await createDebt({
+        name: pickClient?.full_name,
+        phone,
+        amount: start?.total,
+      });
+    }
 
-            <ul className="sell__list">
-              {foundProduct?.results?.map((product) => (
-                <li key={product.id}>
-                  {product.name}{" "}
-                  <div className="sell__list-row">
-                    {activeProductId === product.id ? (
-                      <>
-                        <input
-                          type="number"
-                          value={quantity}
-                          onChange={(e) => setQuantity(e.target.value)}
-                          placeholder="Введите количество"
-                        />
-                        <input
-                          type="number"
-                          value={discount}
-                          onChange={(e) => setDiscount(e.target.value)}
-                          placeholder="Скидка (%)"
-                        />
-                        <button
-                          onClick={async () => {
-                            try {
-                              await dispatch(
-                                manualFilling({
-                                  id,
-                                  productId: product.id,
-                                  quantity: Number(quantity),
-                                  discount_total: discount, // передаём скидку
-                                })
-                              ).unwrap();
-                              await dispatch(startSale()).unwrap();
-                              setActiveProductId(null); // сбрасываем активный товар
-                              setQuantity(""); // очищаем количество
-                              setDiscount(""); // очищаем скидку
-                            } catch (err) {
-                              console.error(
-                                "manualFilling/startSale error:",
-                                err
-                              );
-                            }
-                          }}
-                        >
-                          Сохранить
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => setActiveProductId(product.id)}>
-                          Указать
-                        </button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await dispatch(
-                                manualFilling({ id, productId: product.id })
-                              ).unwrap();
-                              await dispatch(startSale()).unwrap();
-                            } catch (err) {
-                              console.error(
-                                "manualFilling/startSale error:",
-                                err
-                              );
-                            }
-                          }}
-                        >
-                          <Plus size={16} />{" "}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </>
-      ),
-      option: "manually",
-    },
-  ];
-  const products = [
-    { id: 1, name: "Товар1", amount: 2, price: 75 },
-    { id: 2, name: "Товар2", amount: 2, price: 75 },
-    { id: 3, name: "Товар3", amount: 2, price: 75 },
-  ];
+    if (clientId) {
+      await run(
+        createDeal({
+          clientId: clientId, // приводим к числу для API
+          title: pickClient?.full_name,
+          statusRu: "Продажа",
+          amount: start?.total,
+        })
+      );
+    }
 
-  const handleTabClick = (index) => {
-    setActiveTab(index);
-    setIsTabSelected(true); // включаем отображение контента
+    const result = await run(
+      productCheckout({
+        id: start?.id,
+        bool: withReceipt,
+        clientId: clientId,
+      })
+    );
+
+    await run(addCashFlows(cashData));
+
+    if (withReceipt && result?.sale_id) {
+      const pdfBlob = await run(getProductCheckout(result.sale_id));
+      const pdfInvoiceBlob = await run(getProductInvoice(result.sale_id));
+      const dl = (blob, name) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+      dl(pdfBlob, "receipt.pdf");
+      dl(pdfInvoiceBlob, "invoice.pdf");
+    }
+
+    dispatch(historySellProduct());
+    onClose();
   };
 
+  // effects
   useEffect(() => {
     dispatch(doSearch({ search: "" }));
   }, [activeTab, dispatch]);
-  const filterClient = list.filter((item) => item.type === "client");
 
   useEffect(() => {
     dispatch(fetchClientsAsync());
-  }, []);
-  const navigate = useNavigate();
-
-  // console.log(clientId);
-  const client = filterClient.find((item) => item.id === clientId);
-
-  const handlePrintReceipt = async () => {
-    try {
-      if (debt === "debt") {
-        if (clientId === "") return alert("Выберите клиента");
-        if (phone === "") return alert("Введите номер телефона");
-        await createDebt({
-          name: client?.full_name,
-          phone: phone,
-          amount: start?.total,
-        });
-      }
-      if (clientId !== "") {
-        await dispatch(
-          createDeal({
-            clientId: clientId,
-            title: client?.full_name, // заголовок
-            statusRu: "Продажа", // маппинг в kind внутри thunk
-            amount: start?.total,
-          })
-        ).unwrap();
-      }
-      const result = await dispatch(
-        productCheckout({ id: start?.id, bool: true, clientId: clientId })
-      ).unwrap();
-      await dispatch(addCashFlows(cashData)).unwrap();
-
-      if (result?.sale_id) {
-        const pdfBlob = await dispatch(
-          getProductCheckout(result.sale_id)
-        ).unwrap();
-        const pdfInvoiceBlob = await dispatch(
-          getProductInvoice(result.sale_id)
-        ).unwrap();
-
-        dispatch(historySellProduct());
-
-        // navigate(`/crm/clients/${clientId}`);
-
-        // Создаём ссылку и скачиваем файл
-        const url = window.URL.createObjectURL(pdfBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "receipt.pdf";
-        link.click();
-        const url1 = window.URL.createObjectURL(pdfInvoiceBlob);
-        const link1 = document.createElement("a");
-        link1.href = url1;
-        link1.download = "invoice.pdf";
-        link1.click();
-
-        window.URL.revokeObjectURL(url);
-        window.URL.revokeObjectURL(url1);
-      } else {
-        console.error("Не удалось получить sale_id", result);
-      }
-
-      onClose();
-    } catch (err) {
-      alert(err.detail);
-    }
-  };
-
-  const handlePrintInvoice = async () => {
-    try {
-      // const client = filterClient.find((item) => item.id === clientId);
-
-      // потом выполняем checkout
-
-      if (debt === "debt") {
-        if (clientId === "") return alert("Выберите клиента");
-        if (phone === "") return alert("Введите номер телефона");
-        await createDebt({
-          name: client?.full_name,
-          phone: phone,
-          amount: start?.total,
-        });
-      }
-
-      if (clientId !== "") {
-        await dispatch(
-          createDeal({
-            clientId: clientId,
-            title: client?.full_name, // заголовок
-            statusRu: "Продажа", // маппинг в kind внутри thunk
-            amount: start?.total,
-          })
-        ).unwrap();
-      }
-
-      const result = await dispatch(
-        productCheckout({ id: start?.id, bool: false, clientId })
-      ).unwrap();
-
-      // потом сохраняем кэш-флоу
-      await dispatch(addCashFlows(cashData)).unwrap();
-
-      // если есть долг — создаём
-
-      onClose();
-    } catch (err) {
-      alert(err.detail);
-    }
-  };
+    dispatch(getCashBoxes());
+  }, [dispatch]);
 
   useEffect(() => {
-    const client = list.find((item) => item.id === clientId);
-
-    setCashData((prev) => ({
-      ...prev,
+    setCashData((p) => ({
+      ...p,
       cashbox: selectCashBox,
-      name: client ? client.full_name : clientId, // если нашли — берём full_name, иначе показываем clientId
+      name: pickClient ? pickClient.full_name : clientId,
       amount: start?.total,
     }));
-  }, [start, clientId, list, selectCashBox]);
+  }, [start, clientId, pickClient, selectCashBox]);
 
-  useEffect(() => {
-    dispatch(getCashBoxes());
-  }, []);
+  // UI bits
+  const Tabs = ({ children }) => (
+    <>
+      {children.map((tab, i) => (
+        <button
+          key={tab.label}
+          className={`add-modal__button ${
+            activeTab === i && isTabSelected ? "add-modal__button-active" : ""
+          }`}
+          onClick={() => {
+            setActiveTab(i);
+            setIsTabSelected(true);
+          }}
+          type="button"
+        >
+          {tab.label}
+        </button>
+      ))}
+      {isTabSelected && children[activeTab]?.content}
+    </>
+  );
+
+  const ManualList = () => (
+    <div className="sell__manual">
+      <input
+        type="text"
+        placeholder="Введите название товара"
+        className="add-modal__input"
+        name="search"
+        onChange={onSearch}
+      />
+      <ul className="sell__list">
+        {foundProduct?.results?.map((p) => (
+          <li key={p.id}>
+            {p.name}
+            <div className="sell__list-row">
+              {inline.id === p.id && inline.field === "quantity" ? (
+                <>
+                  <input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="Количество"
+                  />
+                  <button type="button" onClick={() => saveInline(p.id)}>
+                    Сохранить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInline({ id: null, field: null })}
+                  >
+                    Отмена
+                  </button>
+                </>
+              ) : inline.id === p.id && inline.field === "discount" ? (
+                <>
+                  <input
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    placeholder="Скидка (%)"
+                  />
+                  <button type="button" onClick={() => saveInline(p.id)}>
+                    Сохранить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInline({ id: null, field: null })}
+                  >
+                    Отмена
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setInline({ id: p.id, field: "discount" })}
+                  >
+                    <Tags />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInline({ id: p.id, field: "quantity" })}
+                  >
+                    <ListOrdered />
+                  </button>
+                  <button type="button" onClick={() => addOne(p.id)}>
+                    <Plus size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const ClientBlock = () => (
+    <div className="add-modal__section">
+      <label>Клиенты *</label>
+      <select
+        className="add-modal__input"
+        value={clientId}
+        onChange={(e) => setClientId(e.target.value)}
+        required
+      >
+        <option value="">-- Выберите клиента --</option>
+        {filterClient.map((c) => (
+          <option key={c.id} value={String(c.id)}>
+            {c.full_name}
+          </option>
+        ))}
+      </select>
+
+      <button
+        type="button"
+        className="create-client"
+        onClick={() => setShowCreateClient((s) => !s)}
+      >
+        {showCreateClient ? "Отменить" : "Создать клиента"}
+      </button>
+
+      {showCreateClient && (
+        <form
+          style={{ display: "flex", flexDirection: "column", rowGap: 10 }}
+          onSubmit={createClient}
+        >
+          <input
+            className="add-modal__input"
+            onChange={onNewClientChange}
+            name="full_name"
+            placeholder="ФИО"
+            value={newClient.full_name}
+          />
+          <input
+            className="add-modal__input"
+            onChange={onNewClientChange}
+            name="phone"
+            placeholder="Телефон"
+            value={newClient.phone}
+          />
+          <input
+            className="add-modal__input"
+            onChange={onNewClientChange}
+            name="email"
+            placeholder="Почта"
+            value={newClient.email}
+          />
+          <button type="submit" className="create-client">
+            Создать
+          </button>
+        </form>
+      )}
+
+      {company?.sector?.name === "Строительная компания" && (
+        <select className="add-modal__input" defaultValue="">
+          <option value="" disabled>
+            -- Выберите тип платежа --
+          </option>
+          <option>Аванс</option>
+          <option>Кредит</option>
+          <option>Полная оплата</option>
+        </select>
+      )}
+    </div>
+  );
+
+  const PaymentBlock = () =>
+    company?.sector?.name === "Магазин" && (
+      <>
+        <div className="add-modal__section">
+          <label>Тип оплаты</label>
+          <select
+            className="add-modal__input"
+            value={debt}
+            onChange={(e) => setDebt(e.target.value)}
+          >
+            <option value="">-- Выберите тип оплаты --</option>
+            <option value="debt">Долг</option>
+          </select>
+        </div>
+
+        {debt === "debt" && (
+          <div className="add-modal__section">
+            <label>Телефон *</label>
+            <input
+              className="add-modal__input"
+              placeholder="Введите номер телефона"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+        )}
+      </>
+    );
 
   return (
-    <div className="add-modal">
+    <div className="add-modal sell">
       <div className="add-modal__overlay" onClick={onClose} />
       <div className="add-modal__content">
         <div className="add-modal__header">
@@ -358,201 +452,76 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
         </div>
 
         {company?.sector?.name !== "Магазин" ? (
-          <>{tabs[1].content}</>
+          <ManualList />
         ) : (
-          <>
-            {tabs.map((tab, index) => {
-              return (
-                <button
-                  className={`add-modal__button  ${
-                    activeTab === index && isTabSelected
-                      ? "add-modal__button-active"
-                      : ""
-                  }`}
-                  key={index}
-                  onClick={() => handleTabClick(index)}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-            {isTabSelected && activeTab !== null && (
-              <div className="add-modal__container">
-                {tabs[activeTab].content}
-              </div>
-            )}
-          </>
+          <Tabs
+            children={[
+              {
+                label: "Сканировать",
+                content: (
+                  <div className="add-modal__container">
+                    <BarcodeScanner id={id} />
+                  </div>
+                ),
+              },
+              {
+                label: "Вручную",
+                content: (
+                  <div className="add-modal__container">
+                    <ManualList />
+                  </div>
+                ),
+              },
+            ]}
+          />
         )}
 
-        {start?.items.length !== 0 && (
+        {!!start?.items?.length && (
           <div className="receipt">
             <h2 className="receipt__title">Приход</h2>
 
-            <div className="add-modal__section">
-              <label>Клиенты *</label>
-              <select
-                name="clientId"
-                className="add-modal__input"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                required
-              >
-                <option>-- Выберите клиента --</option>
-                {filterClient.map((client, idx) => (
-                  <option key={idx} value={String(client.id)}>
-                    {client.full_name}
-                  </option>
-                ))}
-              </select>
+            <ClientBlock />
+            <PaymentBlock />
 
-              <button
-                className="create-client"
-                onClick={() => setShowInputs(!showInputs)}
-              >
-                {showInputs ? "Отменить" : "Создать клиента"}
-              </button>
-              {showInputs && (
-                <form
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    rowGap: "10px",
-                  }}
-                  onSubmit={onSubmit}
-                >
-                  <input
-                    className="add-modal__input"
-                    onChange={handleChange}
-                    type="text"
-                    placeholder="ФИО"
-                    name="full_name"
-                  />
-                  <input
-                    className="add-modal__input"
-                    onChange={handleChange}
-                    type="text"
-                    name="phone"
-                    placeholder="Телефон"
-                  />
-                  <input
-                    className="add-modal__input"
-                    onChange={handleChange}
-                    type="email"
-                    name="email"
-                    placeholder="Почта"
-                  />
-                  <button className="create-client">Создать</button>
-                </form>
-              )}
-              {company.sector?.name === "Строительная компания" && (
-                <select
-                  name="clientId"
-                  className="add-modal__input"
-                  // value={clientId}
-                  // onChange={(e) => setClientId(e.target.value)}
-                  required
-                >
-                  <option>-- Выберите тип платежа --</option>
-                  {/* {filterClient.map((client, idx) => ( */}
-                  <option value={""}>Аванс</option>
-                  <option value={""}>Кредит</option>
-                  <option value={""}>Полная оплата</option>
-                  {/* ))} */}
-                </select>
-              )}
-            </div>
-
-            {company?.sector?.name === "Магазин" && (
-              <div className="add-modal__section">
-                <label>Тип оплаты</label>
-                <select
-                  name="clientId"
-                  className="add-modal__input"
-                  value={debt}
-                  onChange={(e) => setDebt(e.target.value)}
-                  required
-                >
-                  <option value={""}>-- Выберите тип оплаты --</option>
-                  <option value={"debt"}>Долг</option>
-                </select>
-              </div>
-            )}
-
-            {debt === "debt" && (
-              <div className="add-modal__section">
-                <label>Телефон *</label>
-                <input
-                  name="title"
-                  className="add-modal__input"
-                  placeholder="Введите номер телефона"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
-              </div>
-            )}
-
-            {start?.items.map((product, idx) => (
-              <div className="receipt__item" key={idx}>
+            {start.items.map((p, idx) => (
+              <div className="receipt__item" key={p.id ?? idx}>
                 <p className="receipt__item-name">
-                  {idx + 1}. {product.product_name}
+                  {idx + 1}. {p.product_name}
                 </p>
                 <div>
-                  <p>{product.tax_total}</p>
+                  <p>{p.tax_total}</p>
                   <p className="receipt__item-price">
-                    {product.quantity} x {product.unit_price} ≡{" "}
-                    {product.quantity * product.unit_price}
+                    {p.quantity} x {p.unit_price} ≡ {p.quantity * p.unit_price}
                   </p>
-                  <button
-                    onClick={async () => {
-                      try {
-                        if ((product?.quantity ?? 0) > 1) {
-                          await dispatch(
-                            updateProductInCart({
-                              id,
-                              productId: product.id,
-                              data: { quantity: product.quantity - 1 },
-                            })
-                          ).unwrap();
-                        } else {
-                          await dispatch(
-                            deleteProductInCart({
-                              id,
-                              productId: product.id,
-                            })
-                          ).unwrap();
-                        }
-
-                        await dispatch(startSale()).unwrap();
-                      } catch (err) {
-                        console.error(
-                          "updateProductInCart/deleteProductInCart error:",
-                          err
-                        );
-                      }
-                    }}
-                  >
+                  <button type="button" onClick={() => changeQtyOrRemove(p)}>
                     <Minus size={16} />
                   </button>
                 </div>
               </div>
             ))}
+
             <div className="receipt__total">
               <b>ИТОГО</b>
-              <div
-                style={{ gap: "10px", display: "flex", alignItems: "center" }}
-              >
-                <p>Общая скидка {start?.discount_total} </p>
+              <div style={{ gap: 10, display: "flex", alignItems: "center" }}>
+                <p>Общая скидка {start?.discount_total}</p>
                 <p>Налог {start?.tax_total}</p>
                 <b>≡ {start?.total}</b>
               </div>
             </div>
+
             <div className="receipt__row">
-              <button className="receipt__row-btn" onClick={handlePrintReceipt}>
+              <button
+                className="receipt__row-btn"
+                onClick={() => performCheckout(true)}
+                type="button"
+              >
                 Печать чека
               </button>
-
-              <button className="receipt__row-btn" onClick={handlePrintInvoice}>
+              <button
+                className="receipt__row-btn"
+                onClick={() => performCheckout(false)}
+                type="button"
+              >
                 Без чека
               </button>
             </div>
@@ -752,6 +721,7 @@ const SellBuildingModal = ({ onClose }) => {
           amount: amountStr, // строка с 2 знаками после запятой
         })
       ).unwrap();
+      onClose();
 
       // Сбросим поля добавления
       setObjectItemId("");
@@ -784,11 +754,11 @@ const SellBuildingModal = ({ onClose }) => {
   }, [start]);
 
   return (
-    <div className="add-modal">
+    <div className="add-modal sellObject">
       <div className="add-modal__overlay" onClick={onClose} />
       <div className="add-modal__content">
         <div className="add-modal__header">
-          <h3>Продажа объекта</h3>
+          <h3>Продажа квартиры</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
         </div>
 
@@ -1157,7 +1127,7 @@ const SellDetail = ({ onClose, id }) => {
   return (
     <div className="sellDetail add-modal">
       <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content">
+      <div className="add-modal__content" style={{ width: "500px" }}>
         <div className="add-modal__header">
           <h3>Детали продажи</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
@@ -1217,140 +1187,48 @@ const SellDetail = ({ onClose, id }) => {
 const Sell = () => {
   const dispatch = useDispatch();
   const { company } = useUser();
-
-  const {
-    list: products,
-    loading,
-    brands,
-    categories,
-    error,
-    count,
-    next,
-    previous,
-    creating,
-    updating,
-    deleting,
-  } = useSelector((state) => state.product);
-
-  const navigate = useNavigate();
-  const { history, start, historyObjects, historyObjectDetail } = useSale();
   const { list: cashBoxes } = useCash();
+  const { history, start, historyObjects } = useSale();
 
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailSell, setShowDetailSell] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
   const [showSellModal, setShowSellModal] = useState(false);
-  const [selectCashBox, setSelectCashBox] = useState("");
   const [showBuilding, setShowBuilding] = useState(false);
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [currentFilters, setCurrentFilters] = useState({});
-
-  const [showBrandModal, setShowBrandModal] = useState(false);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [barcode, setBarcode] = useState("");
-  const [scannerVisible, setScannerVisible] = useState(false);
-  const [selectValue, setSelectValue] = useState("all");
-  const [activeTab, setActiveTab] = useState(1);
   const [sellId, setSellId] = useState("");
+  const [selectCashBox, setSelectCashBox] = useState("");
   const [clearing, setClearing] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // выбор строк
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const isSelected = (id) => selectedIds.has(id);
+  const toggleRow = (id) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const toggleSelectAllOnPage = (items) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const all = items.length > 0 && items.every((i) => next.has(i.id));
+      items.forEach((i) => (all ? next.delete(i.id) : next.add(i.id)));
+      return next;
+    });
+  const clearSelection = () => setSelectedIds(new Set());
 
   const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
   const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
-
   const isBuildingCompany = sectorName === "строительная компания";
   const isStartPlan = planName === "старт";
 
-  // ★ выбор строк
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const filterField = isBuildingCompany ? historyObjects : history;
 
-  useEffect(() => {
-    const params = { page: currentPage, search: searchTerm, ...currentFilters };
-    dispatch(fetchProductsAsync(params));
-    dispatch(fetchBrandsAsync());
-    dispatch(fetchCategoriesAsync());
-    return () => {
-      dispatch(clearProducts());
-    };
-  }, [
-    dispatch,
-    currentPage,
-    searchTerm,
-    creating,
-    updating,
-    deleting,
-    currentFilters,
-  ]);
-
-  const filterField = isStartPlan
-    ? history
-    : isBuildingCompany
-    ? historyObjects
-    : history;
-
-  const handleEdit = (item) => {
-    setSelectedItem(item);
-    setShowEditModal(true);
-  };
-  const handleAdd = () => {
-    setShowAddModal(true);
-  };
-
-  const handleSaveSuccess = () => {
-    setShowEditModal(false);
-    setShowAddModal(false);
-    alert("Операция с товаром успешно завершена!");
-  };
-
-  const handleDeleteConfirm = () => {
-    setShowEditModal(false);
-    // если удаляли из модалки — снимем выделение
-    if (selectedItem?.id) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(selectedItem.id);
-        return next;
-      });
-    }
-    alert("Товар успешно удален!");
-  };
-
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1);
-  };
-  const handleResetAllFilters = () => {
-    setSearchTerm("");
-    setCurrentFilters({});
-    setCurrentPage(1);
-  };
-  const handleNextPage = () => {
-    if (next) setCurrentPage((prev) => prev + 1);
-  };
-  const handlePreviousPage = () => {
-    if (previous) setCurrentPage((prev) => prev - 1);
-  };
-  const handleApplyFilters = (filters) => {
-    setCurrentFilters(filters);
-    setCurrentPage(1);
-  };
-
-  const debouncedSearch = useDebounce((value) => {
-    dispatch(historySellProduct({ search: value }));
-    dispatch(historySellObjects({ search: value }));
-  }, 1000);
-  const onChange = (e) => {
-    debouncedSearch(e.target.value);
-  };
-
-  const isFiltered = searchTerm || Object.keys(currentFilters).length > 0;
-  const totalPages =
-    count && products.length > 0 ? Math.ceil(count / products.length) : 1;
+  // поиск по истории (дебаунс)
+  const debouncedSearch = useDebounce((v) => {
+    dispatch(historySellProduct({ search: v }));
+    dispatch(historySellObjects({ search: v }));
+  }, 600);
+  const onChange = (e) => debouncedSearch(e.target.value);
 
   useEffect(() => {
     dispatch(historySellProduct({ search: "" }));
@@ -1362,17 +1240,20 @@ const Sell = () => {
   }, [showSellModal, dispatch]);
 
   useEffect(() => {
-    const handleEsc = (event) => {
-      if (event.keyCode === 27) {
-        setShowAddModal(false);
+    const onEsc = (e) => {
+      if (e.key === "Escape") {
         setShowSellModal(false);
-        setShowEditModal(false);
         setShowDetailSell(false);
+        setShowBuilding(false);
       }
     };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
   }, []);
+
+  useEffect(() => {
+    dispatch(getCashBoxes());
+  }, [dispatch]);
 
   const handleSellModal = (id) => {
     setSellId(id);
@@ -1385,42 +1266,13 @@ const Sell = () => {
     canceled: "Отмененный",
   };
 
-  useEffect(() => {
-    dispatch(getCashBoxes());
-  }, []);
-
-  // ★ helpers выбора
-  const isSelected = (id) => selectedIds.has(id);
-  const toggleRow = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-  const toggleSelectAllOnPage = (items) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      const allSelected =
-        items.length > 0 && items.every((i) => next.has(i.id));
-      items.forEach((i) => {
-        allSelected ? next.delete(i.id) : next.add(i.id);
-      });
-      return next;
-    });
-  };
-
-  const clearSelection = () => setSelectedIds(new Set());
-
-  // ★ массовое удаление
+  // массовое удаление выбранных
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (!window.confirm(`Удалить выбранные ${selectedIds.size} запись(и)?`))
       return;
-
     try {
       setBulkDeleting(true);
-      // ⚠️ тут используем тот же endpoint, что и в первом экране
       const res = await fetch(
         "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
         {
@@ -1430,22 +1282,16 @@ const Sell = () => {
             Accept: "application/json",
             Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
           },
+          credentials: "include",
           body: JSON.stringify({
             ids: Array.from(selectedIds),
             allow_paid: false,
           }),
-          credentials: "include",
         }
       );
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
-      }
-
+      if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
       clearSelection();
       alert("Выбранные записи удалены");
-      // при необходимости — обновите историю продаж, если есть соответствующий thunk
       dispatch(historySellProduct({ search: "" }));
       dispatch(historySellObjects({ search: "" }));
     } catch (e) {
@@ -1455,21 +1301,14 @@ const Sell = () => {
     }
   };
 
-  // где у тебя helpers / handlers
+  // очистить ВСЮ историю
   const handleClearAllHistory = async () => {
     if (!window.confirm("Удалить ВСЮ историю? Действие необратимо.")) return;
-
     try {
       setClearing(true);
-
-      // const text = await res.text();
-      // console.warn("require_all fallback:", res.status, text);
-
       const list = Array.isArray(filterField) ? filterField : [];
       const ids = list.map((i) => i.id);
-
       if (ids.length === 0) throw new Error("Нечего удалять");
-
       const res = await fetch(
         "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
         {
@@ -1477,26 +1316,15 @@ const Sell = () => {
           headers: {
             "Content-Type": "application/json",
             Accept: "application/json",
-            authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
           },
           credentials: "include",
-          body: JSON.stringify({
-            ids,
-            allow_paid: false,
-          }),
+          body: JSON.stringify({ ids, allow_paid: false }),
         }
       );
-
-      if (!res.ok) {
-        const t2 = await res.text();
-        throw new Error(t2 || `HTTP ${res.status}`);
-      }
-
-      // очистим локальный выбор и обновим списки
-      setSelectedIds(new Set());
+      if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+      clearSelection();
       alert("История удалена");
-
-      // обнови нужные данные истории
       dispatch(historySellProduct({ search: "" }));
       dispatch(historySellObjects({ search: "" }));
     } catch (e) {
@@ -1506,7 +1334,6 @@ const Sell = () => {
     }
   };
 
-  // ★ общий блок действий для выбора
   const SelectionActions = ({ pageItems }) => {
     const allOnPageChecked =
       pageItems.length > 0 && pageItems.every((i) => selectedIds.has(i.id));
@@ -1516,8 +1343,7 @@ const Sell = () => {
           display: "flex",
           alignItems: "center",
           gap: 12,
-          marginBottom: "10px",
-          marginLeft: "4px",
+          margin: "0 0 10px 4px",
         }}
       >
         <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1528,7 +1354,6 @@ const Sell = () => {
           />
           <span>Все на странице</span>
         </label>
-
         {selectedIds.size > 0 && (
           <>
             <span style={{ opacity: 0.75 }}>Выбрано: {selectedIds.size}</span>
@@ -1545,7 +1370,7 @@ const Sell = () => {
               className="sklad__reset"
               onClick={clearSelection}
               style={{ cursor: "pointer" }}
-              title="Снять весь выбор"
+              title="Снять выбор"
             >
               Сбросить выбор
             </button>
@@ -1561,29 +1386,17 @@ const Sell = () => {
         <div className="sklad__left">
           <input
             type="text"
-            placeholder="Поиск по названию товара"
+            placeholder="Поиск по истории"
             className="sklad__search"
             onChange={onChange}
           />
           <div className="sklad__center">
-            <span>Всего: {count !== null ? count : "-"}</span>
-            <span>Найдено: {history?.length}</span>
-            {isFiltered && (
-              <span
-                className="sklad__reset"
-                onClick={handleResetAllFilters}
-                style={{ cursor: "pointer" }}
-              >
-                Сбросить
-              </span>
-            )}
+            <span>Найдено: {filterField?.length ?? 0}</span>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          {/* ★ заменили "Очистить историю" на управление выбором */}
-
-          {filterField?.length !== 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {!isBuildingCompany && filterField?.length > 0 && (
             <button
               className="barbermasters__btn barbermasters__btn--secondary"
               onClick={handleClearAllHistory}
@@ -1594,40 +1407,13 @@ const Sell = () => {
             </button>
           )}
 
-          {isStartPlan ? (
-            <>
-              <select
-                value={selectCashBox}
-                onChange={(e) => setSelectCashBox(e.target.value)}
-                className="employee__search-wrapper"
-              >
-                <option value="" disabled>
-                  Выберите кассу
-                </option>
-                {cashBoxes?.map((cash) => (
-                  <option key={cash.id} value={cash.id}>
-                    {cash.name ?? cash.department_name}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="sklad__add"
-                onClick={() => setShowSellModal(true)}
-                disabled={!selectCashBox}
-                title={!selectCashBox ? "Сначала выберите кассу" : undefined}
-              >
-                <Plus size={16} style={{ marginRight: "4px" }} /> Продать товар
-              </button>
-            </>
-          ) : isBuildingCompany ? (
-            <>
-              <button
-                className="sklad__add"
-                onClick={() => setShowBuilding(true)}
-              >
-                <Plus size={16} style={{ marginRight: "4px" }} /> Продать товар
-              </button>
-            </>
+          {isBuildingCompany ? (
+            <button
+              className="sklad__add"
+              onClick={() => setShowBuilding(true)}
+            >
+              <Plus size={16} style={{ marginRight: 4 }} /> Продать товар
+            </button>
           ) : (
             <>
               <select
@@ -1638,9 +1424,9 @@ const Sell = () => {
                 <option value="" disabled>
                   Выберите кассу
                 </option>
-                {cashBoxes?.map((cash) => (
-                  <option key={cash.id} value={cash.id}>
-                    {cash.name ?? cash.department_name}
+                {cashBoxes?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name ?? c.department_name}
                   </option>
                 ))}
               </select>
@@ -1650,40 +1436,32 @@ const Sell = () => {
                 disabled={!selectCashBox}
                 title={!selectCashBox ? "Сначала выберите кассу" : undefined}
               >
-                <Plus size={16} style={{ marginRight: "4px" }} /> Продать товар
+                <Plus size={16} style={{ marginRight: 4 }} /> Продать товар
               </button>
             </>
           )}
         </div>
       </div>
 
-      {filterField?.length !== 0 && (
-        <SelectionActions pageItems={filterField ?? []} />
-      )}
+      {!!filterField?.length && <SelectionActions pageItems={filterField} />}
 
-      {loading ? (
-        <p className="sklad__loading-message">Загрузка товаров...</p>
-      ) : error ? (
-        <p className="sklad__error-message">Ошибка загрузки:</p>
-      ) : (filterField?.length ?? 0) === 0 ? (
-        <p className="sklad__no-products-message">Нет доступных товаров.</p>
+      {(filterField?.length ?? 0) === 0 ? (
+        <p className="sklad__no-products-message">Нет записей.</p>
       ) : (
-        <div className="table-wrapper" style={{ marginBottom: "20px" }}>
+        <div className="table-wrapper" style={{ marginBottom: 20 }}>
           <table className="sklad__table">
             <thead>
               <tr>
                 <th>
-                  {/* ★ выбрать всё на текущей странице */}
                   <input
                     type="checkbox"
                     checked={
-                      (filterField?.length ?? 0) > 0 &&
+                      filterField.length > 0 &&
                       filterField.every((i) => selectedIds.has(i.id))
                     }
                     onChange={() => toggleSelectAllOnPage(filterField)}
                   />
                 </th>
-                {/* <th></th> */}
                 <th>№</th>
                 <th>Клиент</th>
                 <th>Цена</th>
@@ -1692,30 +1470,25 @@ const Sell = () => {
               </tr>
             </thead>
             <tbody>
-              {filterField?.map((item, index) => (
+              {filterField.map((item, index) => (
                 <tr
-                  onClick={() => handleSellModal(item.id)}
                   key={item.id}
                   style={{ cursor: "pointer" }}
+                  onClick={() => {
+                    setSellId(item.id);
+                    setShowDetailSell(true);
+                  }}
                 >
                   <td onClick={(e) => e.stopPropagation()}>
-                    {/* ★ чекбокс строки */}
                     <input
                       type="checkbox"
                       checked={isSelected(item.id)}
                       onChange={() => toggleRow(item.id)}
                     />
                   </td>
-                  {/* <td onClick={(e) => e.stopPropagation()}>
-                    <MoreVertical
-                      size={16}
-                      onClick={() => handleEdit(item)}
-                      style={{ cursor: "pointer" }}
-                    />
-                  </td> */}
                   <td>{index + 1}</td>
-                  <td>{item.client_name ? item.client_name : "Нет имени"}</td>
-                  <td>{item.total}</td>
+                  <td>{item.client_name || "Нет имени"}</td>
+                  <td>{item.total ?? item.subtotal}</td>
                   <td>{kindTranslate[item.status] || item.status}</td>
                   <td>{new Date(item.created_at).toLocaleString()}</td>
                 </tr>
@@ -1724,24 +1497,6 @@ const Sell = () => {
           </table>
         </div>
       )}
-
-      <div className="sklad__pagination">
-        <span>
-          {currentPage} из {totalPages}
-        </span>
-        <button
-          onClick={handlePreviousPage}
-          disabled={!previous || loading || creating || updating || deleting}
-        >
-          ←
-        </button>
-        <button
-          onClick={handleNextPage}
-          disabled={!next || loading || creating || updating || deleting}
-        >
-          →
-        </button>
-      </div>
 
       {showSellModal && (
         <SellModal

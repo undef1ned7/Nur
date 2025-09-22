@@ -140,7 +140,9 @@ body {
 .teachers__modal-overlay,
 .leads__modal-overlay,
 .bookings__modalOverlay,
-.barbermasters__overlay {
+.barbermasters__overlay,
+.barberclient__modalOverlay,
+.barberservices__overlay {
   z-index: 10000 !important;
 }
 

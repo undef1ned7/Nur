@@ -16,25 +16,66 @@ const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
 
+  // Нормализация сообщений об ошибке
+  const getErrorMessage = (err) => {
+    if (!err) return "";
+
+    // DRF: detail: "No active account found with the given credentials"
+    if (typeof err.detail === "string") {
+      const txt = err.detail.trim();
+      const low = txt.toLowerCase();
+      if (low.includes("no active account found with the given credentials")) {
+        return "Неверный логин или пароль";
+      }
+      return txt;
+    }
+
+    // DRF: non_field_errors: [...]
+    if (Array.isArray(err.non_field_errors) && err.non_field_errors.length) {
+      const txt = String(err.non_field_errors[0] || "").trim();
+      const low = txt.toLowerCase();
+      if (low.includes("unable to log in") || low.includes("credentials")) {
+        return "Неверный логин или пароль";
+      }
+      return txt;
+    }
+
+    // Ошибки по полям
+    if (Array.isArray(err.email) && err.email.length)
+      return String(err.email[0]);
+    if (Array.isArray(err.password) && err.password.length)
+      return String(err.password[0]);
+
+    // Общие варианты
+    if (typeof err.message === "string") return err.message;
+
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return "Ошибка входа";
+    }
+  };
+
+  const errText = getErrorMessage(error);
+
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    dispatch(loginUserAsync({ formData, navigate }));
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // ← НЕ ДАДИМ БРАУЗЕРУ ПЕРЕЗАГРУЗИТЬ СТРАНИЦУ
+    try {
+      await dispatch(loginUserAsync(formData)).unwrap();
+      navigate("/crm/"); // навигация SPA, без reload
+    } catch (e) {
+      // Ошибка уже попадёт в Redux -> error, и покажется в errText
+      // Можно логировать при необходимости:
+      // console.debug("Login failed:", e);
+    }
   };
 
   const handleLogout = () => dispatch(logoutUser());
-
-  const errText =
-    typeof error === "string"
-      ? error
-      : error?.message ||
-        error?.detail ||
-        (Array.isArray(error?.non_field_errors) && error.non_field_errors[0]) ||
-        (error && JSON.stringify(error));
 
   return (
     <div className="login">
@@ -73,11 +114,12 @@ const Login = () => {
 
           {!!errText && (
             <div className="login__message login__message--error" role="alert">
-              Ошибка входа
+              {errText}
             </div>
           )}
 
-          <form className="login__form" onSubmit={handleSubmit}>
+          {/* ВОЗВРАЩАЕМ ФОРМУ и перехватываем submit */}
+          <form className="login__form" onSubmit={handleSubmit} noValidate>
             <div className="login__field">
               <label className="login__label" htmlFor="email">
                 Email
@@ -92,6 +134,7 @@ const Login = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                aria-invalid={!!errText}
               />
             </div>
 
@@ -110,9 +153,10 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleChange}
                   required
+                  aria-invalid={!!errText}
                 />
                 <button
-                  type="button"
+                  type="button" // ← ВАЖНО: не submit
                   className="login__toggle"
                   onClick={() => setShowPass((s) => !s)}
                   aria-label={showPass ? "Скрыть пароль" : "Показать пароль"}
@@ -122,7 +166,11 @@ const Login = () => {
               </div>
             </div>
 
-            <button className="login__button" disabled={loading}>
+            <button
+              type="submit" // ← ЯВНО submit
+              className="login__button"
+              disabled={loading}
+            >
               {loading ? "Вход..." : "Войти"}
             </button>
           </form>

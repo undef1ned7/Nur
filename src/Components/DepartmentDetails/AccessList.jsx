@@ -116,8 +116,8 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_building_work_process",
     },
     {
-      value: "Объекты",
-      label: "Объекты",
+      value: "Квартиры",
+      label: "Квартиры",
       backendKey: "can_view_building_objects",
     },
   ],
@@ -128,8 +128,8 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_building_work_process",
     },
     {
-      value: "Объекты",
-      label: "Объекты",
+      value: "Квартиры",
+      label: "Квартиры",
       backendKey: "can_view_building_objects",
     },
   ],
@@ -140,8 +140,8 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_building_work_process",
     },
     {
-      value: "Объекты",
-      label: "Объекты",
+      value: "Квартиры",
+      label: "Квартиры",
       backendKey: "can_view_building_objects",
     },
   ],

@@ -1,5 +1,5 @@
+// src/store/slices/userSlice.js
 import { createSlice } from "@reduxjs/toolkit";
-
 import {
   registerUserAsync,
   loginUserAsync,
@@ -12,7 +12,6 @@ import {
   updateUserCompanyName,
 } from "../creators/userCreators";
 import { useSelector } from "react-redux";
-import ApplicationList from "../../Components/pages/SubmitApplication/ApplicationList";
 
 const initialState = {
   currentUser: null,
@@ -48,15 +47,14 @@ const userSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // REGISTER
       .addCase(registerUserAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(registerUserAsync.fulfilled, (state, action) => {
+      .addCase(registerUserAsync.fulfilled, (state) => {
         state.loading = false;
-        // state.currentUser = action.payload;
         state.isAuthenticated = true;
-
         state.error = null;
       })
       .addCase(registerUserAsync.rejected, (state, action) => {
@@ -66,6 +64,7 @@ const userSlice = createSlice({
         state.error = action.payload;
       })
 
+      // LOGIN
       .addCase(loginUserAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -87,8 +86,10 @@ const userSlice = createSlice({
         state.isAuthenticated = false;
         state.accessToken = null;
         localStorage.removeItem("accessToken");
-        state.error = action.payload;
+        state.error = action.payload; // тут уже лежит нормализованный payload (detail/non_field_errors/и т.п.)
       })
+
+      // INDUSTRIES
       .addCase(getIndustriesAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -98,6 +99,8 @@ const userSlice = createSlice({
         state.industries = action.payload;
         state.error = null;
       })
+
+      // PLANS
       .addCase(getSubscriptionPlansAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -107,6 +110,8 @@ const userSlice = createSlice({
         state.subscriptionPlans = action.payload;
         state.error = null;
       })
+
+      // COMPANY
       .addCase(getCompany.pending, (state) => {
         state.companyLoading = true;
       })
@@ -122,6 +127,7 @@ const userSlice = createSlice({
         state.error = payload;
       })
 
+      // APPLICATIONS
       .addCase(submitApplicationAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -146,13 +152,14 @@ const userSlice = createSlice({
         state.loading = false;
         state.error = payload;
       })
+
+      // UPDATE USER DATA (пароль и т.п.)
       .addCase(updateUserData.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(updateUserData.fulfilled, (state, { payload }) => {
+      .addCase(updateUserData.fulfilled, (state) => {
         state.loading = false;
-        // state.applicationList = payload.results;
       })
       .addCase(updateUserData.rejected, (state, { payload }) => {
         state.loading = false;
@@ -164,13 +171,14 @@ const userSlice = createSlice({
           };
         }
       })
+
+      // UPDATE COMPANY NAME
       .addCase(updateUserCompanyName.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(updateUserCompanyName.fulfilled, (state, { payload }) => {
+      .addCase(updateUserCompanyName.fulfilled, (state) => {
         state.loading = false;
-        // state.applicationList = payload.results;
       })
       .addCase(updateUserCompanyName.rejected, (state, { payload }) => {
         state.loading = false;

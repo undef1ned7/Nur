@@ -497,6 +497,14 @@
 .edit-modal__section::-webkit-scrollbar-thumb:hover {
   background: #d1d5db;
 }
+.purchases {
+  .edit-modal__section {
+    overflow: visible !important;
+  }
+  .edit-modal__content {
+    overflow-y: auto;
+  }
+}
 
 /* ====== мобильный bottom-sheet режим ====== */
 @media (max-width: 560px) {
@@ -511,6 +519,19 @@
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
     animation: em-sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) 0.02s both;
+  }
+  .brand {
+    .edit-modal__content {
+      height: 50%;
+      top: 20% !important;
+    }
+  }
+  .purchases {
+    .edit-modal__content {
+      height: 50%;
+      top: 20% !important;
+      overflow-y: scroll;
+    }
   }
 }
 

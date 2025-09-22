@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Modal from "./Modal";
 import Input from "./Input";
+import Modal from "./Modal";
 import Select from "./Select";
 
 const BASE_URL = "https://app.nurcrm.kg/api";
 const AUTH_TOKEN = localStorage.getItem("accessToken");
+
 function getRandomColor() {
   const letters = "0123456789ABCDEF";
   let color = "#";
@@ -19,12 +20,12 @@ const DepartmentCard = ({ department, onClick }) => (
   <div className="departmentCard" onClick={() => onClick(department)}>
     <div
       className="departmentCardHeader"
-      style={{ backgroundColor: department.color }}
+      style={{ backgroundColor: department.color || getRandomColor() }}
     ></div>
     <div className="departmentCardContent">
       <h3>{department.name}</h3>
       <p>
-        {department.employees.length ? department.employees.length : 0}{" "}
+        {department?.employees?.length ? department.employees.length : 0}{" "}
         сотрудников
       </p>
     </div>
@@ -41,6 +42,18 @@ const Department = () => {
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(null);
 
+  // Сначала объявляем employees, чтобы ниже useMemo мог на него ссылаться
+  const [employees, setEmployees] = useState([]);
+
+  const isOwner = (emp) =>
+    emp?.role === "owner" || emp?.role_display === "Владелец";
+
+  // Сотрудники, доступные для выбора (исключаем владельца)
+  const selectableEmployees = useMemo(
+    () => (employees || []).filter((e) => !isOwner(e)),
+    [employees]
+  );
+
   const [departmentForm, setDepartmentForm] = useState({
     name: "",
     employee_ids: [],
@@ -49,8 +62,6 @@ const Department = () => {
     },
   });
 
-  const [employees, setEmployees] = useState([]);
-
   const [departments, setDepartments] = useState([]);
 
   const fetchProfile = async () => {
@@ -58,7 +69,7 @@ const Department = () => {
       const token = localStorage.getItem("accessToken");
       if (!token) return;
 
-      const response = await fetch("https://app.nurcrm.kg/api/users/profile/", {
+      const response = await fetch(`${BASE_URL}/users/profile/`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -101,7 +112,7 @@ const Department = () => {
     } finally {
       setLoading(false);
     }
-  }, [AUTH_TOKEN]);
+  }, []);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -114,7 +125,17 @@ const Department = () => {
     } catch (err) {
       console.error("Ошибка при получении сотрудников:", err);
     }
-  }, [AUTH_TOKEN]);
+  }, []);
+
+  const sanitizeSelectedIds = useCallback(
+    (ids) => {
+      const allowedIdSet = new Set(
+        selectableEmployees.map((e) => String(e.id))
+      );
+      return (ids || []).map(String).filter((id) => allowedIdSet.has(id));
+    },
+    [selectableEmployees]
+  );
 
   useEffect(() => {
     fetchDepartments();
@@ -138,13 +159,18 @@ const Department = () => {
   const handleOpenEditModal = (department) => {
     setEditingDepartment(department);
 
+    const filteredIds = (department.employees || [])
+      .filter((e) => !isOwner(e))
+      .map((e) => String(e.id));
+
     setDepartmentForm({
       name: department.name,
-      employee_ids: department.employee_ids || [],
+      employee_ids: filteredIds,
       cashbox: {
         department: department.cashbox?.department || "",
       },
     });
+
     setIsEditModalOpen(true);
   };
 
@@ -174,9 +200,11 @@ const Department = () => {
     setLoading(true);
     setError(null);
     try {
+      const cleanIds = sanitizeSelectedIds(departmentForm.employee_ids);
+
       const payload = {
         name: departmentForm.name,
-        employee_ids: departmentForm.employee_ids,
+        employees_data: cleanIds.map((id) => ({ id })), // ← только разрешённые
         ...(departmentForm.cashbox.department && {
           cashbox: departmentForm.cashbox,
         }),
@@ -219,9 +247,11 @@ const Department = () => {
         throw new Error("Не выбран отдел для редактирования.");
       }
 
+      const cleanIds = sanitizeSelectedIds(departmentForm.employee_ids);
+
       const payload = {
         name: departmentForm.name,
-        employee_ids: departmentForm.employee_ids,
+        employees_data: cleanIds.map((id) => ({ id })), // ← только разрешённые
         ...(departmentForm.cashbox.department && {
           cashbox: departmentForm.cashbox,
         }),
@@ -386,12 +416,16 @@ const Department = () => {
             onChange={(e) =>
               handleMultiSelectChange(
                 "employee_ids",
-                Array.from(e.target.selectedOptions, (option) => option.value)
+                Array.from(e.target.selectedOptions, (option) =>
+                  String(option.value)
+                )
               )
             }
-            options={employees.map((emp) => ({
-              value: emp.id,
-              label: `${emp.first_name} ${emp.last_name}`,
+            options={selectableEmployees.map((emp) => ({
+              value: String(emp.id),
+              label:
+                `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() ||
+                emp.email,
             }))}
             multiple
           />
@@ -433,12 +467,16 @@ const Department = () => {
             onChange={(e) =>
               handleMultiSelectChange(
                 "employee_ids",
-                Array.from(e.target.selectedOptions, (option) => option.value)
+                Array.from(e.target.selectedOptions, (option) =>
+                  String(option.value)
+                )
               )
             }
-            options={employees.map((emp) => ({
-              value: emp.id,
-              label: emp.email,
+            options={selectableEmployees.map((emp) => ({
+              value: String(emp.id),
+              label:
+                `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() ||
+                emp.email,
             }))}
             multiple
           />

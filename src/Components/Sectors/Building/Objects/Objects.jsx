@@ -104,7 +104,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      onSaveSuccess?.(); // родителю — перезагрузить список
+      onSaveSuccess?.();
       onClose();
     } catch (err) {
       console.error(err);
@@ -123,7 +123,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
       <div className="add-modal__overlay" onClick={onClose} />
       <div className="add-modal__content">
         <div className="add-modal__header">
-          <h3>Добавление объекта</h3>
+          <h3>Добавление квартиры</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
         </div>
 
@@ -302,7 +302,7 @@ const Objects = () => {
 
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           <button className="sklad__add" onClick={() => setShowAdd(true)}>
-            <Plus size={16} style={{ marginRight: "4px" }} /> Добавить объект
+            <Plus size={16} style={{ marginRight: "4px" }} /> Добавить квартиру
           </button>
         </div>
       </div>

@@ -7,12 +7,26 @@
     width: 500px;
   }
 }
+.sellObject {
+  .add-modal__content {
+    width: 550px;
+  }
+}
 
 .sell {
+  .add-modal {
+    height: max-content;
+  }
+  .add-modal__content {
+    width: 550px;
+    overflow-y: auto;
+    height: 80%;
+  }
   &__manual {
     padding: 0 30px;
   }
   &__list {
+    padding: 15px 0;
     list-style: none;
     margin-top: 20px;
     display: flex;

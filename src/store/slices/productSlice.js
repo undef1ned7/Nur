@@ -11,6 +11,10 @@ import {
   sendBarCode,
   createKassa,
   createProductWithBarcode,
+  getItemsMake,
+  createItemMake,
+  consumeItemsMake,
+  setItemMakeQuantity,
 } from "../creators/productCreators";
 import { useSelector } from "react-redux";
 
@@ -21,6 +25,8 @@ const initialState = {
   previous: null,
   loading: false,
   error: null,
+  itemsMake: [],
+  itemsMakeLoading: false,
 
   brands: [],
   brandsLoading: false,
@@ -88,6 +94,56 @@ const productSlice = createSlice({
       .addCase(fetchBrandsAsync.rejected, (state, action) => {
         state.brandsLoading = false;
         state.brandsError = action.payload;
+      })
+
+      .addCase(getItemsMake.pending, (state) => {
+        state.itemsMakeLoading = true;
+        state.error = null;
+      })
+      .addCase(getItemsMake.fulfilled, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.itemsMake = action.payload;
+      })
+      .addCase(getItemsMake.rejected, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(createItemMake.pending, (state) => {
+        state.itemsMakeLoading = true;
+        state.error = null;
+      })
+      .addCase(createItemMake.fulfilled, (state, action) => {
+        state.itemsMakeLoading = false;
+        // state.itemsMake = action.payload;
+      })
+      .addCase(createItemMake.rejected, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(consumeItemsMake.pending, (state) => {
+        state.itemsMakeLoading = true;
+        state.error = null;
+      })
+      .addCase(consumeItemsMake.fulfilled, (state, action) => {
+        state.itemsMakeLoading = false;
+        // state.itemsMake = action.payload;
+      })
+      .addCase(consumeItemsMake.rejected, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(setItemMakeQuantity.pending, (state) => {
+        state.itemsMakeLoading = true;
+        state.error = null;
+      })
+      .addCase(setItemMakeQuantity.fulfilled, (state, action) => {
+        state.itemsMakeLoading = false;
+        // state.itemsMake = action.payload;
+      })
+      .addCase(setItemMakeQuantity.rejected, (state, action) => {
+        state.itemsMakeLoading = false;
+        state.error = action.payload;
       })
 
       // 🆕 FETCH CATEGORIES

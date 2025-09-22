@@ -18,7 +18,7 @@ const BASIC_ACCESS_TYPES = [
   { value: "Долги", label: "Долги", backendKey: "can_view_debts" },
   { value: "Заказы", label: "Заказы", backendKey: "can_view_orders" },
   { value: "Аналитика", label: "Аналитика", backendKey: "can_view_analytics" },
-  { 
+  {
     value: "Аналитика Отделов",
     label: "Аналитика Отделов",
     backendKey: "can_view_department_analytics",
@@ -46,6 +46,7 @@ const BASIC_ACCESS_TYPES = [
 
 // Секторные permissions
 const SECTOR_ACCESS_TYPES = {
+  Магазин: [{ value: "Долги", label: "Долги", backendKey: "can_view_debts" }],
   Барбершоп: [
     {
       value: "Клиенты Барбершопа",
@@ -125,8 +126,8 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_building_work_process",
     },
     {
-      value: "Объекты",
-      label: "Объекты",
+      value: "Квартиры",
+      label: "Квартиры",
       backendKey: "can_view_building_objects",
     },
   ],
@@ -137,8 +138,8 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_building_work_process",
     },
     {
-      value: "Объекты",
-      label: "Объекты",
+      value: "Квартиры",
+      label: "Квартиры",
       backendKey: "can_view_building_objects",
     },
   ],
@@ -149,12 +150,60 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_building_work_process",
     },
     {
-      value: "Объекты",
-      label: "Объекты",
+      value: "Квартиры",
+      label: "Квартиры",
       backendKey: "can_view_building_objects",
     },
   ],
+
+  // 🔹 Новый сектор Consulting
+  Консалтинг: [
+    { value: "Клиенты", label: "Клиенты", backendKey: "can_view_clients" },
+    {
+      value: "Заявки клиентов",
+      label: "Заявки клиентов",
+      backendKey: "can_view_clients",
+    },
+    { value: "Касса", label: "Касса", backendKey: "can_view_cashbox" },
+    {
+      value: "Сотрудники",
+      label: "Сотрудники",
+      backendKey: "can_view_employees",
+    },
+    { value: "Зарплата", label: "Зарплата", backendKey: "can_view_clients" },
+    { value: "Продажи", label: "Продажи", backendKey: "can_view_sale" },
+    { value: "Услуги", label: "Услуги", backendKey: "can_view_clients" },
+  ],
+
+  // 🔹 Новый сектор Warehouse
+  Склад: [
+    { value: "Клиенты", label: "Клиенты", backendKey: "can_view_clients" },
+    {
+      value: "Аналитика",
+      label: "Аналитика",
+      backendKey: "can_view_analytics",
+    },
+    { value: "Товары", label: "Товары", backendKey: "can_view_products" },
+    {
+      value: "Справочники",
+      label: "Справочники",
+      backendKey: "can_view_brand_category",
+    },
+    { value: "Остатки", label: "Остатки", backendKey: "can_view_products" },
+    {
+      value: "Операции (Перемещения)",
+      label: "Операции (Перемещения)",
+      backendKey: "can_view_products",
+    },
+    { value: "Поставки", label: "Поставки", backendKey: "can_view_products" },
+    { value: "Списание", label: "Списание", backendKey: "can_view_products" },
+  ],
 };
+
+// Пользователь — владелец?
+const isOwner = (u) =>
+  (u?.role && String(u.role).toLowerCase() === "owner") ||
+  (u?.role_display && String(u.role_display).toLowerCase() === "владелец");
 
 // Функция для получения всех доступных permissions на основе сектора и тарифа
 const getAllAccessTypes = (sectorName, tariff = null) => {
@@ -168,6 +217,7 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
       "can_view_sale", // Продажа
       "can_view_products", // Склад
       "can_view_cashbox", // Касса
+      "can_view_debts", // Касса
       "can_view_brand_category", // Бренд и категория
       "can_view_settings", // Настройки
       "can_view_analytics", // Аналитика
@@ -334,13 +384,16 @@ const DepartmentDetails = () => {
       }
 
       const data = await response.json();
+
       setDepartment(data);
 
-      const processedEmployees = (data.employees || []).map((employee) => ({
-        ...employee,
-        // предполагается, что флаги доступов на верхнем уровне employee
-        accesses: convertBackendAccessesToLabels(employee),
-      }));
+      const processedEmployees = (data.employees || [])
+        // при желании можно скрыть владельца среди сотрудников отдела вовсе:
+        // .filter((e) => !isOwner(e))
+        .map((employee) => ({
+          ...employee,
+          accesses: convertBackendAccessesToLabels(employee),
+        }));
       setEmployees(processedEmployees);
     } catch (err) {
       console.error("Ошибка при получении данных отдела:", err);
@@ -368,7 +421,9 @@ const DepartmentDetails = () => {
       }
 
       const data = await response.json();
-      setAllAvailableEmployees(data.results || data);
+      const list = data.results || data;
+      // Фильтруем владельцев — их нельзя добавлять
+      setAllAvailableEmployees(list.filter((u) => !isOwner(u)));
     } catch (err) {
       console.error("Ошибка при получении всех сотрудников:", err);
     }
@@ -463,6 +518,16 @@ const DepartmentDetails = () => {
     setLoading(true);
     setError(null);
     try {
+      // Защита на случай, если по какой-то причине в форме оказался владелец
+      const selected = allAvailableEmployees.find(
+        (u) => String(u.id) === String(employeeForm.employee_id)
+      );
+      if (isOwner(selected)) {
+        setError("Нельзя добавлять владельца в отдел.");
+        setLoading(false);
+        return;
+      }
+
       const accessesPayload = convertLabelsToBackendAccesses(
         employeeForm.accesses
       );
@@ -521,8 +586,7 @@ const DepartmentDetails = () => {
         );
       }
 
-      // Дополнительно синхронизируем флаги доступов на самом сотруднике,
-      // т.к. эндпоинт assign-employee может не проставлять отдельные флаги (например, can_view_sale)
+      // Синхронизируем флаги доступов на самом сотруднике
       try {
         await fetch(
           `${BASE_URL}/users/employees/${employeeForm.employee_id}/`,
@@ -536,7 +600,7 @@ const DepartmentDetails = () => {
           }
         );
       } catch (_) {
-        // Мягко игнорируем, список всё равно перезагрузим ниже
+        // игнорируем, всё равно ниже обновим список
       }
 
       await fetchDepartmentDetails();
@@ -760,14 +824,17 @@ const DepartmentDetails = () => {
           <tbody>
             {employees.length > 0 ? (
               employees.map((employee, index) => (
-                <tr disabled={employee.role === "owner"} key={employee.id}>
+                <tr key={employee.id}>
                   {console.log(employee)}
                   <td>{index + 1}</td>
                   <td>
                     {employee.first_name} {employee.last_name}
                   </td>
                   <td>
-                    {profile?.role === "owner" || profile?.role === "admin" ? (
+                    {isOwner(employee) ? (
+                      <span>Владелец</span>
+                    ) : profile?.role === "owner" ||
+                      profile?.role === "admin" ? (
                       <>
                         <AccessList
                           role={employee.role}
@@ -792,19 +859,23 @@ const DepartmentDetails = () => {
                     )}
                   </td>
                   <td className="row-btn">
-                    <button
-                      className="bar__btn bar__btn--secondary"
-                      onClick={() => handleOpenEditEmployeeModal(employee)}
-                    >
-                      Редактировать
-                    </button>
-                    <button
-                      className="bar__btn bar__btn--secondary"
-                      onClick={() => handleRemoveEmployee(employee.id)}
-                      title="Удалить сотрудника из отдела"
-                    >
-                      Удалить
-                    </button>
+                    {!isOwner(employee) && (
+                      <>
+                        <button
+                          className="bar__btn bar__btn--secondary"
+                          onClick={() => handleOpenEditEmployeeModal(employee)}
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          className="bar__btn bar__btn--secondary"
+                          onClick={() => handleRemoveEmployee(employee.id)}
+                          title="Удалить сотрудника из отдела"
+                        >
+                          Удалить
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))
@@ -840,6 +911,7 @@ const DepartmentDetails = () => {
             value={employeeForm.employee_id}
             onChange={handleChange}
             options={allAvailableEmployees
+              .filter((emp) => !isOwner(emp)) // владельцев не показываем
               .filter(
                 (emp) => !employees.some((deptEmp) => deptEmp.id === emp.id)
               )

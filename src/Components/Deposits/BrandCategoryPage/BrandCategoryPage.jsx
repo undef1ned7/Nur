@@ -31,7 +31,7 @@ const TextModal = ({
 }) => {
   const [value, setValue] = useState(initial?.name || "");
   return (
-    <div className="edit-modal">
+    <div className="edit-modal brand">
       <div className="edit-modal__overlay" onClick={onClose} />
       <div className="edit-modal__content">
         <div className="edit-modal__header">

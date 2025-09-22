@@ -1,6 +1,29 @@
+.wareSklad {
+  .add-modal__content {
+    height: 80%;
+    width: 550px;
+    overflow-y: scroll;
+  }
+}
+
 .sklad {
   color: #1a1a1a;
 
+  &__warehouse {
+    .sklad__header {
+      padding: 0;
+    }
+    .add-modal__content {
+      width: 520px;
+      height: 700px;
+      overflow-y: scroll;
+    }
+  }
+  & .raw-modal {
+    .add-modal__content {
+      height: auto;
+    }
+  }
   &__header {
     display: flex;
     justify-content: space-between;
@@ -12,6 +35,7 @@
   &__left {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
@@ -150,7 +174,11 @@
     font-size: 18px;
   }
 }
-
+.accept {
+  .add-modal__content {
+    width: 800px;
+  }
+}
 .edit-modal {
   font-family: sans-serif;
 
@@ -177,6 +205,17 @@
     flex-direction: column;
     overflow-y: auto;
     width: auto !important;
+  }
+  &.sklad {
+    .edit-modal__content {
+      overflow-y: scroll;
+    }
+    .edit-modal__section {
+      overflow: visible !important;
+    }
+    .edit-modal__header {
+      position: static;
+    }
   }
 
   &__header {
@@ -557,6 +596,16 @@
     }
   }
 }
+@media screen and (max-width: 560px) {
+  .edit-modal.sklad {
+    .edit-modal__content {
+      top: 25% !important;
+      height: 60%;
+      width: auto !important;
+      overflow-y: auto;
+    }
+  }
+}
 
 @media screen and (max-width: 480px) {
   .sklad {
@@ -573,6 +622,7 @@
       flex-direction: column;
       gap: 6px;
       width: 100%;
+      // flex-wrap: wrap;
     }
 
     &__search {
