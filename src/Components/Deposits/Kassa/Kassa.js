@@ -48,6 +48,7 @@ const CafeKassa = () => (
     <Route index element={<CashboxList />} />
     <Route path="pay" element={<CashboxPayment />} />
     <Route path="reports" element={<CashboxReports />} />
+    {/* <Route path="reports" element={<CashboxReports />} /> */}
     <Route path=":id" element={<CashboxDetail />} />
   </Routes>
 );
@@ -84,6 +85,7 @@ const HeaderTabs = () => {
         >
           Отчёты
         </Link>
+        {/* <button></button> */}
       </div>
     </div>
   );

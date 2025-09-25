@@ -164,11 +164,12 @@ const HIDE_RULES = [
         "/crm/brand-category",
         "/crm/clients",
         "/crm/sell",
-        "/crm/kassa",
+        // "/crm/kassa",
         "/crm/employ",
         "/crm/sklad",
         "/crm/zakaz",
         "/crm/analytics",
+        "/crm/consulting/kassa",
         "/crm/raspisanie",
       ],
     },
@@ -571,6 +572,13 @@ const MENU_CONFIG = {
 
     consulting: [
       {
+        label: "Аналитика",
+        to: "/crm/consulting/analytics",
+        icon: <FaRegChartBar className="sidebar__menu-icon" />,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
         label: "Клиенты",
         to: "/crm/consulting/client",
         icon: <FaUsers className="sidebar__menu-icon" />,
@@ -617,6 +625,13 @@ const MENU_CONFIG = {
         to: "/crm/consulting/services",
         icon: <FaCogs className="sidebar__menu-icon" />,
         permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Бронирование",
+        to: "/crm/consulting/bookings",
+        icon: <FaRegCalendarAlt className="sidebar__menu-icon" />,
+        permission: "can_view_booking",
         implemented: true,
       },
     ],
@@ -831,24 +846,51 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   }, [sector, company, hasPermission, tariff]);
 
   // Функция для получения дополнительных услуг
-  // Функция для получения дополнительных услуг
   const getAdditionalServices = useCallback(() => {
-    const groupAllowed = hasPermission("can_view_additional_services");
+    // Проверяем доступ пользователю и запреты/разрешения на уровне компании
+    const companyAllows = (perm) => {
+      if (!company) return undefined;
+      if (Object.prototype.hasOwnProperty.call(company, perm)) {
+        return company[perm] === true; // true/false как явная политика компании
+      }
+      return undefined; // нет явной политики на уровне компании
+    };
 
-    // Пункты, разрешённые индивидуальными правами
-    const individuallyAllowed = MENU_CONFIG.additional.filter((item) =>
-      hasPermission(item.permission)
+    const isAllowed = (perm) => {
+      const userOk = hasPermission(perm);
+      const companyOk = companyAllows(perm);
+      if (companyOk === false) return false; // компания явно запретила
+      return userOk || companyOk === true; // разрешено либо пользователю, либо компанией
+    };
+
+    // Доступ к группе
+    const groupAllowed = isAllowed("can_view_additional_services");
+
+    // Фильтруем дочерние пункты по совокупному правилу
+    let children = MENU_CONFIG.additional.filter((item) =>
+      isAllowed(item.permission)
     );
 
-    // Если есть групповое право, но индивидуальных нет — показываем всё (fallback)
-    const children =
-      individuallyAllowed.length > 0
-        ? individuallyAllowed
-        : groupAllowed
-        ? MENU_CONFIG.additional
-        : [];
+    // Если нет ни одного индивидуально доступного, но есть групповое право — показываем все, кроме тех, что компания явно запретила
+    if (children.length === 0 && groupAllowed) {
+      children = MENU_CONFIG.additional.filter((item) => companyAllows(item.permission) !== false);
+    }
 
-    // Ничего не показывать только если нет ни группового, ни индивидуальных прав
+    // Специальный пункт для сектора "Консалтинг": добавить "Склад" в Доп. услуги
+    const sectorName = company?.sector?.name?.toLowerCase?.() || "";
+    if (sectorName === "консалтинг" && isAllowed("can_view_products")) {
+      const stockItem = {
+        label: "Склад",
+        to: "/crm/sklad",
+        icon: <Warehouse className="sidebar__menu-icon" />,
+        permission: "can_view_products",
+        implemented: true,
+      };
+      const exists = children.some((c) => c.to === stockItem.to || c.label === stockItem.label);
+      if (!exists) children.push(stockItem);
+    }
+
+    // Если нет прав ни на группу, ни на дочерние — ничего не показывать
     if (!groupAllowed && children.length === 0) return null;
 
     return {
@@ -858,7 +900,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       implemented: true,
       children,
     };
-  }, [hasPermission]);
+  }, [hasPermission, company]);
 
   // Применение гибких правил скрытия (HIDE_RULES)
   const hiddenByRules = useMemo(() => {

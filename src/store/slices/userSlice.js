@@ -1,5 +1,5 @@
 // src/store/slices/userSlice.js
-import { createSlice } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import {
   registerUserAsync,
   loginUserAsync,
@@ -12,6 +12,7 @@ import {
   updateUserCompanyName,
 } from "../creators/userCreators";
 import { useSelector } from "react-redux";
+import api from "../../api";
 
 const initialState = {
   currentUser: null,
@@ -29,7 +30,20 @@ const initialState = {
   applicationList: [],
   company: null,
   errorChange: null,
+  profile: null,
 };
+
+export const getProfile = createAsyncThunk(
+  "get/profile",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/users/profile/");
+      return data;
+    } catch (e) {
+      return rejectWithValue(e);
+    }
+  }
+);
 
 const userSlice = createSlice({
   name: "user",
@@ -137,6 +151,18 @@ const userSlice = createSlice({
         state.submitApplication = payload;
       })
       .addCase(submitApplicationAsync.rejected, (state, { payload }) => {
+        state.loading = false;
+        state.error = payload;
+      })
+      .addCase(getProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getProfile.fulfilled, (state, { payload }) => {
+        state.loading = false;
+        state.profile = payload;
+      })
+      .addCase(getProfile.rejected, (state, { payload }) => {
         state.loading = false;
         state.error = payload;
       })

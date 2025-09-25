@@ -450,13 +450,14 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
   const [selectedContractorId, setSelectedContractorId] = useState("");
   const [newItemData, setNewItemData] = useState({
     name: "",
-    barcode: "",
-    brand_name: "",
-    category_name: "",
+    // barcode: "",
+    // brand_name: "",
+    // category_name: "",
     price: "",
     quantity: "",
     client: "",
-    purchase_price: "",
+    // purchase_price: "",
+    date: "",
   });
 
   // форма быстрого создания поставщика
@@ -466,6 +467,12 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
     email: "",
     date: new Date().toISOString().split("T")[0],
     type: "suppliers",
+    llc: "",
+    inn: "",
+    okpo: "",
+    score: "",
+    bik: "",
+    address: "",
   });
   const [showInputs, setShowInputs] = useState(false);
   const [dealStatus, setDealStatus] = useState("");
@@ -487,23 +494,24 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
   const handleSubmit = async () => {
     const {
       name,
-      barcode,
-      brand_name,
-      category_name,
+      // barcode,
+      // brand_name,
+      // category_name,
       price,
       quantity,
       client,
-      purchase_price,
+      date,
+      // purchase_price,
     } = newItemData;
 
     if (
       !name ||
-      !barcode ||
+      // !barcode ||
       price === "" ||
-      quantity === "" ||
-      brand_name === "" ||
-      category_name === "" ||
-      purchase_price === ""
+      quantity === ""
+      // brand_name === "" ||
+      // category_name === "" ||
+      // purchase_price === ""
     ) {
       alert("Пожалуйста, заполните все обязательные поля.");
       return;
@@ -511,13 +519,14 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
 
     const payload = {
       name,
-      barcode,
-      brand_name,
-      category_name,
+      // barcode,
+      // brand_name,
+      // category_name,
       price: price.toString(),
       quantity: Number(quantity),
       client,
-      purchase_price,
+      date,
+      // purchase_price,
       status: "pending",
     };
 
@@ -580,7 +589,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
             />
           </div>
 
-          <div className="add-modal__section">
+          {/* <div className="add-modal__section">
             <label>Штрих код *</label>
             <input
               type="text"
@@ -627,7 +636,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
                 </option>
               ))}
             </select>
-          </div>
+          </div> */}
 
           <div className="add-modal__section">
             <label>Поставщик *</label>
@@ -704,16 +713,16 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
           </div>
 
           <div className="add-modal__section">
-            <label>Закупочная цена *</label>
+            <label>Дата *</label>
             <input
-              type="number"
-              name="purchase_price"
-              placeholder="999.99"
+              type="date"
+              name="date"
+              // placeholder="999.99"
               className="add-modal__input"
-              value={newItemData.purchase_price}
+              value={newItemData.date}
               onChange={handleChange}
-              min="0"
-              step="0.01"
+              // min="0"
+              // step="0.01"
               required
             />
           </div>
@@ -771,9 +780,12 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
   }, [barcodeError]);
 
   return (
-    <div className="add-modal">
+    <div className="add-modal zakazS">
       <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content">
+      <div
+        className="add-modal__content"
+        style={showInputs ? { height: "80%" } : { height: "auto" }}
+      >
         <div className="add-modal__header">
           <h3>Добавление товара</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
@@ -823,7 +835,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
               />
             </div>
 
-            <div className="add-modal__section">
+            {/* <div className="add-modal__section">
               <label>Штрих код *</label>
               <input
                 type="text"
@@ -870,7 +882,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
                   </option>
                 ))}
               </select>
-            </div>
+            </div> */}
 
             <div className="add-modal__section">
               <label>Поставщик *</label>
@@ -889,12 +901,14 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
                 ))}
               </select>
 
-              <button
-                className="create-client"
-                onClick={() => setShowInputs(!showInputs)}
-              >
-                {showInputs ? "Отменить" : "Создать поставщика"}
-              </button>
+              {!showInputs && (
+                <button
+                  className="create-client"
+                  onClick={() => setShowInputs(!showInputs)}
+                >
+                  Создать поставщика
+                </button>
+              )}
 
               {showInputs && (
                 <form
@@ -916,6 +930,48 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
                     className="add-modal__input"
                     onChange={onChange}
                     type="text"
+                    name="llc"
+                    placeholder="ОсОО"
+                  />
+                  <input
+                    className="add-modal__input"
+                    onChange={onChange}
+                    type="text"
+                    name="inn"
+                    placeholder="ИНН"
+                  />
+                  <input
+                    className="add-modal__input"
+                    onChange={onChange}
+                    type="text"
+                    name="okpo"
+                    placeholder="ОКПО"
+                  />
+                  <input
+                    className="add-modal__input"
+                    onChange={onChange}
+                    type="text"
+                    name="score"
+                    placeholder="Р/СЧЁТ"
+                  />
+                  <input
+                    className="add-modal__input"
+                    onChange={onChange}
+                    type="text"
+                    name="bik"
+                    placeholder="БИК"
+                  />
+                  <input
+                    className="add-modal__input"
+                    onChange={onChange}
+                    type="text"
+                    name="address"
+                    placeholder="Адрес"
+                  />
+                  <input
+                    className="add-modal__input"
+                    onChange={onChange}
+                    type="text"
                     name="phone"
                     placeholder="Телефон"
                   />
@@ -926,13 +982,22 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
                     name="email"
                     placeholder="Почта"
                   />
-                  <button className="create-client">Создать</button>
+                  <div style={{ display: "flex", columnGap: "10px" }}>
+                    <button
+                      className="create-client"
+                      type="button"
+                      onClick={() => setShowInputs(false)}
+                    >
+                      Отмена
+                    </button>
+                    <button className="create-client">Создать</button>
+                  </div>
                 </form>
               )}
             </div>
 
             <div className="add-modal__section">
-              <label>Розничная цена *</label>
+              <label>Цена *</label>
               <input
                 type="number"
                 name="price"
@@ -947,13 +1012,13 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
             </div>
 
             <div className="add-modal__section">
-              <label>Закупочная цена *</label>
+              <label>Дата *</label>
               <input
-                type="number"
-                name="purchase_price"
+                type="date"
+                name="date"
                 placeholder="999.99"
                 className="add-modal__input"
-                value={newItemData.purchase_price}
+                value={newItemData.date}
                 onChange={handleChange}
                 min="0"
                 step="0.01"

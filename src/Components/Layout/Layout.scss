@@ -142,7 +142,8 @@ body {
 .bookings__modalOverlay,
 .barbermasters__overlay,
 .barberclient__modalOverlay,
-.barberservices__overlay {
+.barberservices__overlay,
+.sale__overlay {
   z-index: 10000 !important;
 }
 

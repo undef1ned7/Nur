@@ -1,4 +1,10 @@
-
+.zakazS {
+  .add-modal__content {
+    height: 80%;
+    overflow-y: auto;
+    width: 400px;
+  }
+}
 .zakaz {
   // font-family: sans-serif;
 
@@ -81,7 +87,8 @@
     font-size: 14px;
     // display: block;
     // overflow-y: auto;
-    th, td {
+    th,
+    td {
       text-align: left;
       padding: 12px 8px;
       border-bottom: 1px solid #eaeaea;

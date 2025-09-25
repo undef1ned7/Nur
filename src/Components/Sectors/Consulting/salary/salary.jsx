@@ -1,520 +1,608 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import "./salary.scss";
-import { FaCalendarAlt, FaMoneyBill, FaSearch, FaTimes } from "react-icons/fa";
+// src/components/Salary/Salary.jsx
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import "./Salary.scss";
+import {
+  FaPlus,
+  FaTimes,
+  FaUserAlt,
+  FaSearch,
+  FaChevronLeft,
+  FaChevronRight,
+} from "react-icons/fa";
+import api from "../../../../api";
 
-/* ===== localStorage keys ===== */
-const LS_EMPLOYEES = "employees_v1";
-const LS_SALES = "sales_v1";
-const LS_PAYOUTS = "payouts_v1";
+/* ===================== API ===================== */
+const EMPLOYEES_LIST_URL = "/users/employees/";
+const SALARIES_URL = "/consalting/salaries/";
 
-/* ===== helpers ===== */
-const safeRead = (key, fallback = []) => {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const val = JSON.parse(raw);
-    return Array.isArray(val) ? val : fallback;
-  } catch {
-    return fallback;
-  }
-};
-const safeWrite = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {/* ignore */}
-};
-const ymd = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
-const monthStart = (date = new Date()) =>
-  ymd(new Date(date.getFullYear(), date.getMonth(), 1));
-const monthEnd = (date = new Date()) =>
-  ymd(new Date(date.getFullYear(), date.getMonth() + 1, 0));
-const money = (v) => (Number(v) || 0).toLocaleString() + " с";
-const num = (v) => {
-  const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
+/* ===================== Consts & helpers ===================== */
+const LIST_PER_PAGE = 12;
+const COMBO_PER_PAGE = 12;
 
-/* ===== normalization ===== */
-const normalizeEmployee = (e = {}) => ({
-  id: e.id,
-  email: e.email ?? "",
-  first_name: e.first_name ?? "",
-  last_name: e.last_name ?? "",
-  commission_percent: Number(e.commission_percent ?? 0) || 0,
-});
-const normalizeSaleLS = (s = {}) => ({
-  id: s.id,
-  employee: s.seller_id ?? null, // id сотрудника (из Sale)
-  employee_name: s.seller_name ?? "",
-  title: s.service_title ?? "",
-  amount: Number(s.service_price ?? 0) || 0,
-  seller_percent: Number(s.seller_percent ?? 0) || 0, // <— процент, зафиксированный при продаже
-  created_at: s.created_at || null,
-});
-const normalizePayout = (p = {}) => ({
-  id: p.id,
-  employee: p.employee ?? null,
-  amount: num(p.amount ?? 0),
-  period_start: p.period_start || null,
-  period_end: p.period_end || null,
-  created_at: p.created_at || null,
-  note: p.note ?? "",
-});
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
 const fullName = (e) =>
   [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim();
 
-/* ===== Component ===== */
-export default function ConsultingSalary() {
-  /* filters */
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(monthEnd());
-  const [q, setQ] = useState(""); // поиск по сотруднику
+const normalizeEmployee = (e = {}) => ({
+  id: e.id,
+  name: fullName(e) || e.email || "—",
+});
 
-  /* data */
-  const [employees, setEmployees] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [payouts, setPayouts] = useState([]);
-
-  /* ui */
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-
-  /* payout modal (индивидуальная) */
-  const [payoutOpen, setPayoutOpen] = useState(false);
-  const [payoutEmpId, setPayoutEmpId] = useState(null);
-  const [payoutAmount, setPayoutAmount] = useState("");
-  const [payoutNote, setPayoutNote] = useState("");
-  const [payoutSaving, setPayoutSaving] = useState(false);
-
-  /* массовая выплата */
-  const [bulkSaving, setBulkSaving] = useState(false);
-
-  const inRange = (dateIso) => {
-    if (!dateIso) return false;
-    const d = ymd(dateIso);
-    return (!from || d >= from) && (!to || d <= to);
-  };
-
-  /* ===== loaders (локальные) ===== */
-  const loadEmployees = useCallback(() => {
-    setEmployees(safeRead(LS_EMPLOYEES).map(normalizeEmployee));
-  }, []);
-
-  const loadSales = useCallback(() => {
-    const list = safeRead(LS_SALES).map(normalizeSaleLS);
-    setSales(list.filter((s) => inRange(s.created_at)));
-  }, [from, to]);
-
-  const loadPayouts = useCallback(() => {
-    const all = safeRead(LS_PAYOUTS).map(normalizePayout);
-    const filtered = all.filter(
-      (p) => p.period_start === from && p.period_end === to
-    );
-    setPayouts(filtered);
-  }, [from, to]);
-
-  const loadAll = useCallback(() => {
-    setLoading(true);
-    setErr("");
+const pickApiError = (e, fb) => {
+  const d = e?.response?.data;
+  if (!d) return fb;
+  if (typeof d === "string") return d;
+  if (typeof d === "object") {
     try {
-      loadEmployees();
-      loadSales();
-      loadPayouts();
-    } catch (e) {
-      console.error(e);
-      setErr("Не удалось загрузить данные по зарплатам.");
+      const k = Object.keys(d)[0];
+      const v = Array.isArray(d[k]) ? d[k][0] : d[k];
+      return String(v || fb);
+    } catch {
+      return fb;
+    }
+  }
+  return fb;
+};
+
+const normStr = (s) => String(s || "").trim();
+const toDecimalString = (s) => {
+  // "12,50" -> "12.50"
+  const raw = String(s || "")
+    .replace(",", ".")
+    .replace(/[^0-9.]/g, "");
+  const [i, f = ""] = raw.split(".");
+  const intPart = (i || "0").replace(/^0+(?=\d)/, "") || "0";
+  const frac = f.replace(/\./g, "");
+  return frac ? `${intPart}.${frac}` : intPart;
+};
+const money = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("ru-RU") : String(v || "—");
+};
+
+/* ===================== Employees combobox (reusable) ===================== */
+const EmployeesCombo = ({
+  value,
+  onChange,
+  error,
+  placeholder = "Сотрудник",
+  clearable = false,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const ref = useRef(null);
+  const inputRef = useRef(null);
+
+  const fetchEmployees = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get(EMPLOYEES_LIST_URL);
+      setEmployees(asArray(res.data).map(normalizeEmployee));
     } finally {
       setLoading(false);
     }
-  }, [loadEmployees, loadSales, loadPayouts]);
+  }, []);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    fetchEmployees();
+  }, [fetchEmployees]);
 
-  /* подписки на изменения */
   useEffect(() => {
-    const onEmp = () => loadEmployees();
-    const onSales = () => loadSales();
-    const onPayouts = () => loadPayouts();
-    window.addEventListener("employees:updated", onEmp);
-    window.addEventListener("sales:updated", onSales);
-    window.addEventListener("payouts:updated", onPayouts);
-    const onStorage = (e) => {
-      if (e.key === LS_EMPLOYEES) onEmp();
-      if (e.key === LS_SALES) onSales();
-      if (e.key === LS_PAYOUTS) onPayouts();
+    if (!open) return;
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
-    window.addEventListener("storage", onStorage);
+    const onEsc = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onEsc);
     return () => {
-      window.removeEventListener("employees:updated", onEmp);
-      window.removeEventListener("sales:updated", onSales);
-      window.removeEventListener("payouts:updated", onPayouts);
-      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
     };
-  }, [loadEmployees, loadSales, loadPayouts]);
+  }, [open]);
 
-  /* индексы */
+  const filtered = useMemo(() => {
+    const t = normStr(q).toLowerCase();
+    if (!t) return employees;
+    return employees.filter((e) => e.name.toLowerCase().includes(t));
+  }, [employees, q]);
+
+  const total = Math.max(1, Math.ceil(filtered.length / COMBO_PER_PAGE));
+  const safe = Math.min(page, total);
+  const rows = filtered.slice(
+    (safe - 1) * COMBO_PER_PAGE,
+    safe * COMBO_PER_PAGE
+  );
+
+  const selectedLabel =
+    employees.find((e) => String(e.id) === String(value))?.name || "";
+
+  return (
+    <div className="salary__combo" ref={ref}>
+      <div className={`salary__comboControl${error ? " is-invalid" : ""}`}>
+        <FaUserAlt className="salary__comboIcon" />
+        <input
+          ref={inputRef}
+          className="salary__comboInput"
+          placeholder={placeholder}
+          value={open ? q : selectedLabel || (value ? String(value) : "")}
+          onFocus={() => {
+            setOpen(true);
+            setTimeout(() => inputRef.current?.select(), 0);
+          }}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setPage(1);
+          }}
+          autoComplete="off"
+        />
+        {clearable && value && (
+          <button
+            type="button"
+            className="salary__comboClear"
+            onClick={() => onChange?.("")}
+            aria-label="Сбросить"
+            title="Сбросить"
+          >
+            ×
+          </button>
+        )}
+        <button
+          type="button"
+          className="salary__comboToggle"
+          onClick={() => {
+            setOpen((o) => !o);
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }}
+          aria-label="Открыть список"
+        >
+          ▾
+        </button>
+      </div>
+
+      {open && (
+        <div className="salary__comboDrop" role="listbox">
+          <div className="salary__comboSearch">
+            <FaSearch className="salary__comboSearchIcon" />
+            <input
+              className="salary__comboSearchInput"
+              placeholder="Поиск сотрудника…"
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setPage(1);
+              }}
+              autoFocus
+            />
+          </div>
+
+          {loading ? (
+            <div className="salary__comboEmpty">Загрузка…</div>
+          ) : rows.length === 0 ? (
+            <div className="salary__comboEmpty">Ничего не найдено</div>
+          ) : (
+            <>
+              <ul className="salary__comboList">
+                {rows.map((e) => (
+                  <li key={e.id}>
+                    <button
+                      type="button"
+                      className={`salary__comboItem ${
+                        String(e.id) === String(value) ? "is-active" : ""
+                      }`}
+                      onClick={() => {
+                        onChange?.(e.id);
+                        setOpen(false);
+                      }}
+                    >
+                      {e.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {filtered.length > COMBO_PER_PAGE && (
+                <div className="salary__comboPager">
+                  <button
+                    type="button"
+                    className="salary__pageBtn"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={safe === 1}
+                  >
+                    <FaChevronLeft /> Назад
+                  </button>
+                  <span className="salary__page">
+                    Стр. {safe} из {total}
+                  </span>
+                  <button
+                    type="button"
+                    className="salary__pageBtn"
+                    onClick={() => setPage((p) => Math.min(total, p + 1))}
+                    disabled={safe === total}
+                  >
+                    Далее <FaChevronRight />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ===================== Main component ===================== */
+const Salary = () => {
+  /* --- фильтр по сотруднику --- */
+  const [filterUser, setFilterUser] = useState("");
+
+  /* --- список --- */
+  const [page, setPage] = useState(1);
+  const [items, setItems] = useState([]);
+  const [count, setCount] = useState(0);
+  const [loadingList, setLoadingList] = useState(false);
+  const [listError, setListError] = useState("");
+
+  /* --- сотрудники для отображения имени --- */
+  const [employees, setEmployees] = useState([]);
   const empById = useMemo(() => {
     const m = new Map();
-    employees.forEach((e) => m.set(String(e.id), e));
+    employees.forEach((e) => m.set(String(e.id), e.name));
     return m;
   }, [employees]);
 
-  /* суммы выплат по сотруднику за период */
-  const paidByEmp = useMemo(() => {
-    const m = new Map();
-    payouts.forEach((p) => {
-      const key = String(p.employee);
-      m.set(key, (m.get(key) || 0) + Number(p.amount || 0));
-    });
-    return m;
-  }, [payouts]);
-
-  /* агрегация по сотрудникам: комиссия из ПРОДАЖ (по seller_percent) */
-  const summaryAll = useMemo(() => {
-    const acc = new Map(); // id -> {emp, revenue, count, percentCurrent, commission, paid, toPay}
-    for (const s of sales) {
-      const id = String(s.employee || "");
-      if (!id) continue;
-      const emp = empById.get(id);
-
-      // текущий процент сотрудника (инфо)
-      const percentCurrent = emp ? Number(emp.commission_percent || 0) : 0;
-
-      // процент, который применяем к продаже (зафиксированный в чеке)
-      const percentForSale =
-        s.seller_percent != null ? Number(s.seller_percent) : percentCurrent;
-
-      const row = acc.get(id) || {
-        emp,
-        revenue: 0,
-        count: 0,
-        percentCurrent,
-        commission: 0,
-        paid: 0,
-        toPay: 0,
-      };
-      row.revenue += Number(s.amount || 0);
-      row.count += 1;
-      row.commission += Number(s.amount || 0) * (Number(percentForSale) / 100);
-      acc.set(id, row);
-    }
-
-    for (const [id, row] of acc) {
-      row.commission = Math.round(row.commission * 100) / 100;
-      row.paid = Math.round((paidByEmp.get(id) || 0) * 100) / 100;
-      row.toPay = Math.max(0, Math.round((row.commission - row.paid) * 100) / 100);
-    }
-
-    return Array.from(acc.values()).sort(
-      (a, b) => b.toPay - a.toPay || b.revenue - a.revenue
-    );
-  }, [sales, empById, paidByEmp]);
-
-  /* фильтр по сотруднику */
-  const summary = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return summaryAll;
-    return summaryAll.filter((r) =>
-      [fullName(r.emp), r.emp?.email]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(t))
-    );
-  }, [summaryAll, q]);
-
-  const totalToPay = useMemo(
-    () => summaryAll.reduce((s, r) => s + (Number(r.toPay) || 0), 0),
-    [summaryAll]
-  );
-
-  /* выплаты (локально) */
-  const openPayout = (empId, defaultAmount) => {
-    setPayoutEmpId(empId);
-    setPayoutAmount(String((Number(defaultAmount) || 0).toFixed(2)));
-    setPayoutNote("");
-    setPayoutOpen(true);
-  };
-
-  const submitPayout = (e) => {
-    e?.preventDefault?.();
-    if (!payoutEmpId || payoutSaving) return;
-    const amountNum = num(payoutAmount);
-    if (!(amountNum > 0)) return alert("Введите сумму выплаты больше 0.");
-
-    if (!window.confirm("Оплатить? Нажмите «OK», если уверены.")) return;
-
-    setPayoutSaving(true);
+  const fetchEmployees = useCallback(async () => {
     try {
-      const all = safeRead(LS_PAYOUTS);
-      const payout = {
-        id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
-        employee: payoutEmpId,
-        amount: Math.round(amountNum * 100) / 100,
-        period_start: from,
-        period_end: to,
-        created_at: new Date().toISOString(),
-        note: payoutNote || "",
-      };
-      const next = [payout, ...all];
-      safeWrite(LS_PAYOUTS, next);
-      setPayouts((prev) => [normalizePayout(payout), ...prev]);
-      window.dispatchEvent(new Event("payouts:updated"));
-      setPayoutOpen(false);
-    } catch (e2) {
-      console.error(e2);
-      alert("Не удалось провести выплату.");
+      const res = await api.get(EMPLOYEES_LIST_URL);
+      setEmployees(asArray(res.data).map(normalizeEmployee));
     } finally {
-      setPayoutSaving(false);
+      /* ничего не логируем */
     }
-  };
+  }, []);
 
-  const submitBulkPayouts = () => {
-    if (!totalToPay) return;
-    if (!window.confirm(`Оплатить всем сотрудникам «К выплате» на сумму ${money(totalToPay)}?`))
-      return;
-
-    setBulkSaving(true);
+  const fetchSalaries = useCallback(async (pageNum = 1, userId = "") => {
+    setLoadingList(true);
+    setListError("");
     try {
-      const all = safeRead(LS_PAYOUTS);
-      const toAdd = [];
-      for (const r of summaryAll) {
-        const empId = r.emp?.id;
-        const amount = Math.round((Number(r.toPay) || 0) * 100) / 100;
-        if (!empId || !(amount > 0)) continue;
-        toAdd.push({
-          id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + empId,
-          employee: empId,
-          amount,
-          period_start: from,
-          period_end: to,
-          created_at: new Date().toISOString(),
-          note: "Массовая выплата",
-        });
-      }
-      if (toAdd.length) {
-        const next = [...toAdd, ...all];
-        safeWrite(LS_PAYOUTS, next);
-        setPayouts((prev) => [...toAdd.map(normalizePayout), ...prev]);
-        window.dispatchEvent(new Event("payouts:updated"));
-      }
+      const { data } = await api.get(SALARIES_URL, {
+        params: {
+          page: pageNum,
+          page_size: LIST_PER_PAGE,
+          user: userId || undefined, // фильтр по сотруднику, если выбран
+        },
+      });
+      const rows = asArray(data);
+      setItems(rows);
+      setCount(typeof data?.count === "number" ? data.count : rows.length);
+      setPage(pageNum);
+    } catch (err) {
+      setListError(pickApiError(err, "Не удалось загрузить начисления."));
     } finally {
-      setBulkSaving(false);
+      setLoadingList(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
+
+  useEffect(() => {
+    // при смене фильтра — на первую страницу
+    fetchSalaries(1, filterUser);
+  }, [fetchSalaries, filterUser]);
+
+  const totalPages = Math.max(1, Math.ceil(count / LIST_PER_PAGE));
+
+  /* --- создание --- */
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [form, setForm] = useState({
+    user: "",
+    amount: "",
+    percent: "",
+    description: "",
+  });
+  const [errs, setErrs] = useState({});
+
+  const validate = (f) => {
+    const e = {};
+    if (!normStr(f.user)) e.user = "Выберите сотрудника.";
+    const amt = toDecimalString(f.amount);
+    if (!amt || Number.isNaN(Number(amt)))
+      e.amount = "Сумма должна быть числом.";
+    const pct = normStr(f.percent);
+    if (!pct) e.percent = "Процент обязателен.";
+    if (pct.length < 1 || pct.length > 255)
+      e.percent = "Длина процента 1–255 символов.";
+    return e;
+  };
+
+  const submit = async (ev) => {
+    ev.preventDefault();
+    setNotice("");
+    const v = validate(form);
+    setErrs(v);
+    if (Object.keys(v).length) return;
+
+    const payload = {
+      user: String(form.user),
+      amount: toDecimalString(form.amount),
+      percent: normStr(form.percent),
+      description: normStr(form.description) || "",
+    };
+
+    setSaving(true);
+    try {
+      await api.post(SALARIES_URL, payload);
+      setOpen(false);
+      setForm({ user: "", amount: "", percent: "", description: "" });
+      setNotice("Начисление создано.");
+      fetchSalaries(1, filterUser); // перечитать список с текущим фильтром
+    } catch (err) {
+      setErrs((p) => ({
+        ...p,
+        __top: pickApiError(err, "Не удалось создать начисление."),
+      }));
+    } finally {
+      setSaving(false);
     }
   };
 
+  /* ===================== Render ===================== */
   return (
-    <section className="salary">
-      <header className="salary__header">
-        <div>
-          <h2 className="salary__title">Зарплаты (проценты с продаж)</h2>
-          <p className="salary__subtitle">Комиссии сотрудников за выбранный период</p>
+    <div className="salary">
+      <div className="salary__header">
+        <div className="salary__titleWrap">
+          <h2 className="salary__title">Зарплата</h2>
+          <div className="salary__subtitle">
+            {loadingList
+              ? "Загрузка…"
+              : `${count} начислений${
+                  count > LIST_PER_PAGE ? ` · стр. ${page}/${totalPages}` : ""
+                }`}
+          </div>
         </div>
 
-        <div className="salary__toolbar">
-          <div className="salary__datePicker">
-            <FaCalendarAlt className="salary__mutedIcon" />
-            <input
-              type="date"
-              className="salary__input"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
-            <span className="salary__dash">—</span>
-            <input
-              type="date"
-              className="salary__input"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
-          </div>
-
-          <div className="salary__search">
-            <FaSearch className="salary__mutedIcon" />
-            <input
-              className="salary__input"
-              placeholder="Поиск по сотруднику…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
-
-          <button className="salary__btn" onClick={loadAll} title="Обновить данные">
-            Обновить
+        <div className="salary__actions">
+          {/* Фильтр по сотруднику */}
+          <EmployeesCombo
+            value={filterUser}
+            onChange={setFilterUser}
+            placeholder="Все сотрудники"
+            clearable
+          />
+          <button
+            className="salary__btn salary__btn--primary"
+            type="button"
+            onClick={() => {
+              setErrs({});
+              setOpen(true);
+            }}
+          >
+            <FaPlus />{" "}
+            <span className="salary__btnText">Добавить начисление</span>
           </button>
         </div>
-      </header>
+      </div>
 
-      {loading && <div className="salary__alert">Загрузка…</div>}
-      {!!err && <div className="salary__alert">{err}</div>}
+      {!!notice && (
+        <div className="salary__alert salary__alert--success">{notice}</div>
+      )}
+      {!!listError && <div className="salary__alert">{listError}</div>}
 
-      {!loading && (
-        <>
-          {/* Карточки сотрудников */}
-          <div className="salary__cards">
-            {summary.length ? (
-              summary.map((r) => {
-                const emp = r.emp || {};
-                const initials =
-                  (fullName(emp) || emp.email || "•").trim().charAt(0).toUpperCase();
-                return (
-                  <div className="salary__card" key={emp.id || Math.random()}>
-                    <div className="salary__cardHead">
-                      <div className="salary__avatar" aria-hidden>
-                        {initials}
-                      </div>
-                      <div>
-                        <div className="salary__empName">
-                          {fullName(emp) || emp.email || "—"}
-                        </div>
-                        <div className="salary__empMeta">
-                          {r.count} продаж • {money(r.revenue)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="salary__stats">
-                      <div className="salary__stat">
-                        <span>Текущий %</span>
-                        <b>{r.percentCurrent}%</b>
-                      </div>
-                      <div className="salary__stat">
-                        <span>Комиссия (из продаж)</span>
-                        <b>{money(r.commission)}</b>
-                      </div>
-                      <div className="salary__stat">
-                        <span>Выплачено</span>
-                        <b>{money(r.paid)}</b>
-                      </div>
-                      <div className={`salary__stat ${r.toPay ? "is-due" : ""}`}>
-                        <span>К выплате</span>
-                        <b>{money(r.toPay)}</b>
-                      </div>
-                    </div>
-
-                    <div className="salary__cardActions">
-                      <button
-                        className="salary__btn salary__btn--success"
-                        onClick={() => openPayout(emp.id, r.toPay)}
-                        disabled={!r.toPay}
-                        title="Оформить выплату"
-                      >
-                        <FaMoneyBill /> Выплатить
-                      </button>
-                    </div>
+      {/* ===== List ===== */}
+      <div className="salary__list" aria-live="polite">
+        {loadingList ? (
+          <div className="salary__alert">Загрузка…</div>
+        ) : items.length === 0 ? (
+          <div className="salary__alert">Нет записей.</div>
+        ) : (
+          items.map((it) => {
+            const empName = empById.get(String(it.user)) || String(it.user);
+            return (
+              <article
+                key={it.id || `${it.user}-${it.amount}-${it.percent}`}
+                className="salary__card"
+              >
+                <div className="salary__info">
+                  <h3 className="salary__name" title={empName}>
+                    <FaUserAlt /> {empName}
+                  </h3>
+                  <div className="salary__meta">
+                    <span className="salary__badge">
+                      Процент: <b>{String(it.percent || "")}</b>
+                    </span>
+                    <span className="salary__price">
+                      Сумма: <b>{money(it.amount)}</b>
+                    </span>
                   </div>
-                );
-              })
-            ) : (
-              <div className="salary__emptyCards">Нет данных за период</div>
-            )}
-          </div>
+                  {it.description && (
+                    <p className="salary__desc">{it.description}</p>
+                  )}
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
 
-          {/* Итоговая панель */}
-          <div className="salary__footer">
-            <div className="salary__footerText">
-              К выплате всего: <strong>{money(totalToPay)}</strong>
-            </div>
-            <button
-              className="salary__btn salary__btn--success"
-              onClick={submitBulkPayouts}
-              disabled={!totalToPay || bulkSaving}
-              title="Оплатить всем"
-            >
-              {bulkSaving ? "Оплата…" : "Оплатить"}
-            </button>
-          </div>
-        </>
+      {/* ===== Pager ===== */}
+      {count > LIST_PER_PAGE && (
+        <div className="salary__pager">
+          <button
+            className="salary__pageBtn"
+            onClick={() => fetchSalaries(Math.max(1, page - 1), filterUser)}
+            disabled={page <= 1}
+            type="button"
+          >
+            <FaChevronLeft /> Пред
+          </button>
+          <span className="salary__page">
+            Стр. {page} из {totalPages}
+          </span>
+          <button
+            className="salary__pageBtn"
+            onClick={() =>
+              fetchSalaries(Math.min(totalPages, page + 1), filterUser)
+            }
+            disabled={page >= totalPages}
+            type="button"
+          >
+            След <FaChevronRight />
+          </button>
+        </div>
       )}
 
-      {/* ===== payout modal ===== */}
-      {payoutOpen && (
+      {/* ===== Modal (create) ===== */}
+      {open && (
         <div
           className="salary__overlay"
           role="dialog"
           aria-modal="true"
-          onClick={() => !payoutSaving && setPayoutOpen(false)}
+          onClick={() => !saving && setOpen(false)}
         >
           <div className="salary__modal" onClick={(e) => e.stopPropagation()}>
             <div className="salary__modalHeader">
-              <h3 className="salary__modalTitle">Выплата сотруднику</h3>
+              <h3 className="salary__modalTitle">Новое начисление</h3>
               <button
                 className="salary__iconBtn"
-                onClick={() => !payoutSaving && setPayoutOpen(false)}
+                onClick={() => !saving && setOpen(false)}
                 aria-label="Закрыть"
               >
                 <FaTimes />
               </button>
             </div>
 
-            <form className="salary__form" onSubmit={submitPayout} noValidate>
-              <div className="salary__formGrid">
-                <div className="salary__field">
-                  <label className="salary__label">Сотрудник</label>
+            {!!errs.__top && (
+              <div className="salary__alert salary__alert--inModal">
+                {errs.__top}
+              </div>
+            )}
+
+            <form className="salary__form" onSubmit={submit} noValidate>
+              <div className="salary__grid">
+                <div
+                  className={`salary__field ${
+                    errs.user ? "salary__field--invalid" : ""
+                  }`}
+                >
+                  <label className="salary__label">
+                    Сотрудник <span className="salary__req">*</span>
+                  </label>
+                  <EmployeesCombo
+                    value={form.user}
+                    onChange={(id) => {
+                      setForm((s) => ({ ...s, user: id }));
+                      if (errs.user)
+                        setErrs((p) => ({ ...p, user: undefined }));
+                    }}
+                    placeholder="Сотрудник"
+                    error={!!errs.user}
+                  />
+                  {errs.user && (
+                    <div className="salary__error">{errs.user}</div>
+                  )}
+                </div>
+
+                <div
+                  className={`salary__field ${
+                    errs.amount ? "salary__field--invalid" : ""
+                  }`}
+                >
+                  <label className="salary__label">
+                    Сумма <span className="salary__req">*</span>
+                  </label>
                   <input
-                    className="salary__input"
-                    value={
-                      fullName(empById.get(String(payoutEmpId))) ||
-                      empById.get(String(payoutEmpId))?.email ||
-                      "—"
+                    className={`salary__input ${
+                      errs.amount ? "salary__input--invalid" : ""
+                    }`}
+                    inputMode="decimal"
+                    placeholder="Например: 40000 или 40000.50"
+                    value={form.amount}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, amount: e.target.value }))
                     }
-                    readOnly
                   />
+                  {errs.amount && (
+                    <div className="salary__error">{errs.amount}</div>
+                  )}
                 </div>
-                <div className="salary__field">
-                  <label className="salary__label">Период</label>
-                  <div className="salary__period">
-                    <input className="salary__input" value={from} readOnly />
-                    <span>—</span>
-                    <input className="salary__input" value={to} readOnly />
-                  </div>
-                </div>
-                <div className="salary__field">
-                  <label className="salary__label">Сумма, с</label>
+
+                <div
+                  className={`salary__field ${
+                    errs.percent ? "salary__field--invalid" : ""
+                  }`}
+                >
+                  <label className="salary__label">
+                    Процент <span className="salary__req">*</span>
+                  </label>
                   <input
-                    className="salary__input"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={payoutAmount}
-                    onChange={(e) => setPayoutAmount(e.target.value)}
-                    required
+                    className={`salary__input ${
+                      errs.percent ? "salary__input--invalid" : ""
+                    }`}
+                    placeholder="Например: 10"
+                    value={form.percent}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, percent: e.target.value }))
+                    }
                   />
+                  {errs.percent && (
+                    <div className="salary__error">{errs.percent}</div>
+                  )}
                 </div>
-                <div className="salary__field salary__field--full">
-                  <label className="salary__label">Заметка</label>
+
+                <div className="salary__field salary__field--wide">
+                  <label className="salary__label">Описание</label>
                   <textarea
-                    className="salary__input"
-                    rows={3}
-                    placeholder="Комментарий (необязательно)"
-                    value={payoutNote}
-                    onChange={(e) => setPayoutNote(e.target.value)}
+                    rows={4}
+                    className="salary__textarea"
+                    placeholder="Короткое пояснение… (необязательно)"
+                    value={form.description}
+                    onChange={(e) =>
+                      setForm((s) => ({ ...s, description: e.target.value }))
+                    }
+                    maxLength={1000}
                   />
                 </div>
               </div>
 
-              <div className="salary__formActions">
+              <div className="salary__footer">
+                <div className="salary__spacer" />
                 <button
                   type="button"
-                  className="salary__btn"
-                  onClick={() => setPayoutOpen(false)}
-                  disabled={payoutSaving}
+                  className="salary__btn salary__btn--secondary"
+                  onClick={() => setOpen(false)}
+                  disabled={saving}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="salary__btn salary__btn--success"
-                  disabled={payoutSaving}
+                  className="salary__btn salary__btn--primary"
+                  disabled={saving}
                 >
-                  {payoutSaving ? "Проведение…" : "Провести выплату"}
+                  {saving ? "Сохранение…" : "Добавить"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
-}
+};
+
+export default Salary;

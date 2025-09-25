@@ -1,13 +1,81 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { submitAdditionalServicesRequest } from "../../../api/additionalServices";
 import "./SocialModal.scss";
-import { FaInstagram, FaTelegram, FaWhatsapp } from "react-icons/fa";
+import {
+  FaInstagram,
+  FaTelegram,
+  FaWhatsapp,
+  FaWarehouse,
+} from "react-icons/fa";
+import { MdDocumentScanner } from "react-icons/md";
 
 const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
   const { company } = useSelector((state) => state.user);
+
+  const isConsulting = useMemo(() => {
+    const name = (company?.name || "").toLowerCase();
+    const sector = company?.sector?.name || company?.industry?.name || "";
+    return name === "consulting" || sector === "Консалтинг";
+  }, [company]);
+
+  // Карта всех поддерживаемых сервисов
+  const serviceMap = useMemo(
+    () => ({
+      whatsapp: {
+        title: "WhatsApp",
+        description:
+          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+        icon: <FaWhatsapp />,
+      },
+      telegram: {
+        title: "Telegram",
+        description:
+          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+        icon: <FaTelegram />,
+      },
+      instagram: {
+        title: "Instagram",
+        description:
+          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+        icon: <FaInstagram />,
+      },
+      documents: {
+        title: "Документы",
+        description:
+          "Создание и хранение договоров, счётов и актов. Шаблоны, статусы и быстрые отправки клиентам.",
+        icon: <MdDocumentScanner />,
+      },
+      warehouse: {
+        title: "Склад",
+        description:
+          "Учет услуг/материалов для консалтинга: приход/расход, остатки, партии и связь с продажами.",
+        icon: <FaWarehouse />,
+        // доступен только в консалтинге
+        requiresConsulting: true,
+      },
+    }),
+    []
+  );
+
+  const socialInfo = (selectedSocial && serviceMap[selectedSocial]) || {
+    title: "Сервис",
+    description: "Описание услуги",
+    icon: "🔗",
+  };
+
+  const submitDisabled =
+    isSubmitting ||
+    !company ||
+    (socialInfo?.requiresConsulting && !isConsulting);
+
+  const submitDisabledReason = !company
+    ? "Компания не найдена"
+    : socialInfo?.requiresConsulting && !isConsulting
+    ? "Склад доступен только для сферы «Консалтинг»"
+    : null;
 
   const handleSubmit = async () => {
     if (!company) {
@@ -18,31 +86,42 @@ const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
       return;
     }
 
+    if (socialInfo?.requiresConsulting && !isConsulting) {
+      setSubmitStatus({
+        type: "error",
+        message: "Склад доступен только для сферы «Консалтинг».",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitStatus(null);
 
     try {
+      const serviceTitle = socialInfo.title || selectedSocial;
+
       const requestData = {
-        company: company.name,
-        text: `Новая заявка на подключение услуги ${selectedSocial}`,
+        company: company.name, // при необходимости замените на company.id
+        service: selectedSocial, // сохраняем id сервиса как поле
+        text: `Новая заявка на подключение услуги: ${serviceTitle}`,
         status: "new",
       };
 
       await submitAdditionalServicesRequest(requestData);
+
       setSubmitStatus({
         type: "success",
         message: "Заявка успешно отправлена!",
       });
 
-      // Закрываем модалку через 2 секунды после успешной отправки
       setTimeout(() => {
         onClose();
         setSubmitStatus(null);
-      }, 2000);
+      }, 1500);
     } catch (error) {
       setSubmitStatus({
         type: "error",
-        message: error.message || "Ошибка при отправке заявки",
+        message: error?.message || "Ошибка при отправке заявки",
       });
     } finally {
       setIsSubmitting(false);
@@ -50,40 +129,6 @@ const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
   };
 
   if (!isOpen) return null;
-
-  const getSocialInfo = (social) => {
-    switch (social) {
-      case "whatsapp":
-        return {
-          title: "WhatsApp",
-          description:
-            "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-          icon: <FaWhatsapp />,
-        };
-      case "telegram":
-        return {
-          title: "Telegram",
-          description:
-            "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-          icon: <FaTelegram />,
-        };
-      case "instagram":
-        return {
-          title: "Instagram",
-          description:
-            "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-          icon: <FaInstagram />,
-        };
-      default:
-        return {
-          title: "Социальная сеть",
-          description: "Описание услуги",
-          icon: "🔗",
-        };
-    }
-  };
-
-  const socialInfo = getSocialInfo(selectedSocial);
 
   return (
     <div className="social-modal-overlay" onClick={onClose}>
@@ -97,11 +142,15 @@ const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
 
         <div className="social-modal-header">
           <div className="social-modal-icon">{socialInfo.icon}</div>
-          <h2>Заявка на подключение {socialInfo.title}</h2>
+          <h2>Заявка на подключение: {socialInfo.title}</h2>
         </div>
 
         <div className="social-modal-body">
           <p className="social-modal-description">{socialInfo.description}</p>
+
+          {submitDisabledReason && (
+            <div className="social-modal-hint">{submitDisabledReason}</div>
+          )}
 
           {submitStatus && (
             <div
@@ -123,7 +172,8 @@ const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
           <button
             className="social-modal-button social-modal-button--submit"
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={submitDisabled}
+            title={submitDisabledReason || ""}
           >
             {isSubmitting ? (
               <>

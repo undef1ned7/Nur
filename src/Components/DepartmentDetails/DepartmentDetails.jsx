@@ -159,6 +159,7 @@ const SECTOR_ACCESS_TYPES = {
   // 🔹 Новый сектор Consulting
   Консалтинг: [
     { value: "Клиенты", label: "Клиенты", backendKey: "can_view_clients" },
+    // { value: "Клиенты", label: "Клиенты", backendKey: "can_view_clients" },
     {
       value: "Заявки клиентов",
       label: "Заявки клиентов",

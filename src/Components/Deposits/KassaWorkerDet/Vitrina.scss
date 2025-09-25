@@ -1,4 +1,3 @@
-
 .vitrina {
   // font-family: "Inter", sans-serif;
   padding: 16px;
@@ -560,223 +559,306 @@
 
 // --- Стили для встроенных Input и Select ---
 .form-group {
-    margin-bottom: 15px; // Отступ между полями
-    label {
-        display: block; // Метка на отдельной строке
-        margin-bottom: 5px;
-        font-weight: 500;
-        color: #333;
-    }
+  margin-bottom: 15px; // Отступ между полями
+  label {
+    display: block; // Метка на отдельной строке
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #333;
+  }
 }
 
 .form-input,
 .form-select {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    font-size: 14px;
-    box-sizing: border-box; // Учитываем padding и border в общей ширине
-    
-    &:focus {
-        outline: none;
-        border-color: #007bff; // Цвет рамки при фокусе
-        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-    }
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+  box-sizing: border-box; // Учитываем padding и border в общей ширине
+
+  &:focus {
+    outline: none;
+    border-color: #007bff; // Цвет рамки при фокусе
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  }
 }
 
 .form-select {
-    appearance: none; // Убираем стандартные стили для select
-    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292%22%20height%3D%22292%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4L146.7%20209.7L6%2069.4%20146.7%200.7L287%2069.4z%22%2F%3E%3C%2Fsvg%3E'); // Стрелка для select
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 12px;
-    padding-right: 30px; // Отступ для стрелки
+  appearance: none; // Убираем стандартные стили для select
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292%22%20height%3D%22292%22%3E%3Cpath%20fill%3D%22%23666%22%20d%3D%22M287%2069.4L146.7%20209.7L6%2069.4%20146.7%200.7L287%2069.4z%22%2F%3E%3C%2Fsvg%3E"); // Стрелка для select
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  padding-right: 30px; // Отступ для стрелки
 }
-
 
 // --- Стили для встроенного Modal (если они не глобальные) ---
 .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
 .modal-content {
-    background-color: white;
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    position: relative;
-    width: 90%;
-    max-width: 500px;
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  position: relative;
+  width: 90%;
+  max-width: 500px;
 }
 
 .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 
-    h3 {
-        margin: 0;
-        font-size: 20px;
-        color: #333;
-    }
+  h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+  }
 
-    .modal-close-icon {
-        cursor: pointer;
-        color: #666;
-        &:hover {
-            color: #333;
-        }
+  .modal-close-icon {
+    cursor: pointer;
+    color: #666;
+    &:hover {
+      color: #333;
     }
+  }
 }
 
 // Переименованные классы для формы и кнопок внутри модального окна
-.kass-worker-form { /* Этот класс уже был, он будет применяться к форме внутри модалки */
-    padding: 20px 0 0 0; // Учитываем внутренний padding модалки
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+.kass-worker-form {
+  /* Этот класс уже был, он будет применяться к форме внутри модалки */
+  padding: 20px 0 0 0; // Учитываем внутренний padding модалки
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
 }
 
-.kass-worker-modal-actions { /* Этот класс уже был */
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 20px;
+.kass-worker-modal-actions {
+  /* Этот класс уже был */
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
 
-    .kass-worker-cancel-button { /* Этот класс уже был */
-        background-color: #f0f0f0;
-        color: #333;
-        border: 1px solid #ddd;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
+  .kass-worker-cancel-button {
+    /* Этот класс уже был */
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
 
-        &:hover {
-            background-color: #e0e0e0;
-        }
+    &:hover {
+      background-color: #e0e0e0;
+    }
+  }
+
+  .kass-worker-submit-button {
+    /* Этот класс уже был */
+    background-color: #28a745;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+
+    &:hover {
+      background-color: #218838;
     }
 
-    .kass-worker-submit-button { /* Этот класс уже был */
-        background-color: #28a745;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-
-        &:hover {
-            background-color: #218838;
-        }
-
-        &:disabled {
-            background-color: #e0e0e0;
-            cursor: not-allowed;
-        }
+    &:disabled {
+      background-color: #e0e0e0;
+      cursor: not-allowed;
     }
+  }
 }
 
 /* Filter Modal specific styles (из вашего оригинального кода Kassa.scss) - можно их перенести в KassWorker.scss если хотите, 
    но в целом они относятся к Filter Modal, который у вас пока в Kassa.jsx */
-.vitrina__overlay { // ...
+.vitrina__overlay {
+  // ...
 }
-.vitrina__filter-modal { // ...
+.vitrina__filter-modal {
+  // ...
 }
 // ... и все остальные vitrina__ классы для фильтров
 
-
-
-
-
 // Modal buttons
 .vitrina__button {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.2s ease, color 0.2s ease;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease, color 0.2s ease;
 
-    &--save {
-        background-color: #007bff;
-        color: white;
+  &--save {
+    background-color: #007bff;
+    color: white;
 
-        &:hover {
-            background-color: #0056b3;
-        }
+    &:hover {
+      background-color: #0056b3;
     }
+  }
 
-    &--cancel {
-        background-color: #f0f0f0;
-        color: #333;
+  &--cancel {
+    background-color: #f0f0f0;
+    color: #333;
 
-        &:hover {
-            background-color: #e0e0e0;
-        }
+    &:hover {
+      background-color: #e0e0e0;
     }
+  }
 
-    &--reset {
-        background-color: #dc3545; // Red for delete/reset
-        color: white;
+  &--reset {
+    background-color: #dc3545; // Red for delete/reset
+    color: white;
 
-        &:hover {
-            background-color: #c82333;
-        }
+    &:hover {
+      background-color: #c82333;
     }
+  }
 }
 
 // Overlay for modals
 .vitrina__overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
 // Base modal styles
 .vitrina__modal {
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding: 25px;
-    max-width: 500px;
-    width: 90%;
-    position: relative;
-    z-index: 1001; // Above overlay
-    animation: fadeInScale 0.3s ease-out;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 25px;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+  z-index: 1001; // Above overlay
+  animation: fadeInScale 0.3s ease-out;
 }
 
 @keyframes fadeInScale {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .vitrina__modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
+
+  h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+  }
+
+  .vitrina__close-icon {
+    cursor: pointer;
+    color: #888;
+    &:hover {
+      color: #333;
+    }
+  }
+}
+
+.vitrina__modal-section {
+  margin-bottom: 15px;
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  .vitrina__modal-input {
+    width: calc(100% - 20px); // Adjust for padding
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+
+    &:focus {
+      border-color: #007bff;
+    }
+
+    &[readOnly] {
+      background-color: #f0f0f0;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.vitrina__modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+  margin-top: 20px;
+}
+
+// Filter Modal specific styles (can also use .vitrina__modal for base)
+.vitrina__filter-modal {
+  position: fixed; // Fixed position to appear over content
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 25px;
+  max-width: 400px;
+  width: 90%;
+  z-index: 1001;
+  animation: fadeInScale 0.3s ease-out;
+
+  .vitrina__filter-content {
+    // No specific styling needed beyond what's defined in vitrina__modal-section
+  }
+
+  .vitrina__filter-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -785,154 +867,72 @@
     padding-bottom: 15px;
 
     h3 {
-        margin: 0;
-        font-size: 18px;
-        color: #333;
+      margin: 0;
+      font-size: 18px;
+      color: #333;
     }
 
     .vitrina__close-icon {
-        cursor: pointer;
-        color: #888;
-        &:hover {
-            color: #333;
-        }
+      cursor: pointer;
+      color: #888;
+      &:hover {
+        color: #333;
+      }
     }
-}
+  }
 
-.vitrina__modal-section {
+  .vitrina__filter-section {
     margin-bottom: 15px;
 
     label {
-        display: block;
-        font-size: 13px;
-        color: #666;
-        margin-bottom: 5px;
-        font-weight: 500;
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 5px;
+      font-weight: 500;
     }
+  }
 
-    .vitrina__modal-input {
-        width: calc(100% - 20px); // Adjust for padding
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        font-size: 14px;
-        outline: none;
-        transition: border-color 0.2s ease;
-
-        &:focus {
-            border-color: #007bff;
-        }
-
-        &[readOnly] {
-            background-color: #f0f0f0;
-            cursor: not-allowed;
-        }
-    }
-}
-
-.vitrina__modal-footer {
+  .vitrina__dropdown {
     display: flex;
-    justify-content: flex-end;
-    gap: 10px;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #f8f8f8;
+
+    span {
+      font-size: 14px;
+      color: #333;
+    }
+  }
+
+  .vitrina__filter-footer {
     padding-top: 15px;
     border-top: 1px solid #eee;
     margin-top: 20px;
-}
+    text-align: center;
+  }
 
-// Filter Modal specific styles (can also use .vitrina__modal for base)
-.vitrina__filter-modal {
-    position: fixed; // Fixed position to appear over content
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding: 25px;
-    max-width: 400px;
-    width: 90%;
-    z-index: 1001;
-    animation: fadeInScale 0.3s ease-out;
+  .vitrina__reset {
+    background-color: #f0f0f0;
+    color: #333;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
 
-    .vitrina__filter-content {
-        // No specific styling needed beyond what's defined in vitrina__modal-section
+    &--full {
+      width: 100%;
     }
 
-    .vitrina__filter-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 15px;
-
-        h3 {
-            margin: 0;
-            font-size: 18px;
-            color: #333;
-        }
-
-        .vitrina__close-icon {
-            cursor: pointer;
-            color: #888;
-            &:hover {
-                color: #333;
-            }
-        }
+    &:hover {
+      background-color: #e0e0e0;
     }
-
-    .vitrina__filter-section {
-        margin-bottom: 15px;
-
-        label {
-            display: block;
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 5px;
-            font-weight: 500;
-        }
-    }
-
-    .vitrina__dropdown {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        cursor: pointer;
-        background-color: #f8f8f8;
-
-        span {
-            font-size: 14px;
-            color: #333;
-        }
-    }
-
-    .vitrina__filter-footer {
-        padding-top: 15px;
-        border-top: 1px solid #eee;
-        margin-top: 20px;
-        text-align: center;
-    }
-
-    .vitrina__reset {
-        background-color: #f0f0f0;
-        color: #333;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        transition: background-color 0.2s ease;
-
-        &--full {
-            width: 100%;
-        }
-
-        &:hover {
-            background-color: #e0e0e0;
-        }
-    }
+  }
 }

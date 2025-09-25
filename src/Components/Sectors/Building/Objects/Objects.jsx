@@ -222,56 +222,32 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
 
 /* ============================ Главный список ============================ */
 
+const errorText = (e) =>
+  typeof e === "string"
+    ? e
+    : e?.detail || e?.message || (e ? JSON.stringify(e) : "");
+
 const Objects = () => {
-  // const [items, setItems] = useState([]);
-  const [count, setCount] = useState(null);
-  // const [loading, setLoading] = useState(false);
-  // const [error, setError] = useState("");
-  const { objects: items, error, loading } = useSale();
+  const { objects: rawItems, error: rawError, loading } = useSale();
   const dispatch = useDispatch();
+
+  const items = Array.isArray(rawItems) ? rawItems : [];
+  const err = errorText(rawError);
+  console.log(err);
 
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
-  // const load = async () => {
-  //   setError("");
-  //   setLoading(true);
-  //   try {
-  //     const data = await httpJson(API_URL, { method: "GET" });
-  //     const list = listFrom(data);
-  //     setItems(list);
-  //     setCount(
-  //       typeof data?.count === "number"
-  //         ? data.count
-  //         : Array.isArray(list)
-  //         ? list.length
-  //         : 0
-  //     );
-  //   } catch (err) {
-  //     console.error(err);
-  //     setError(
-  //       err?.data
-  //         ? JSON.stringify(err.data)
-  //         : err?.message || "Не удалось загрузить список"
-  //     );
-  //     setItems([]);
-  //     setCount(0);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
   useEffect(() => {
     dispatch(getObjects());
-  }, []);
+  }, [dispatch]);
 
-  // Простейшая локальная фильтрация по наименованию/описанию
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
     if (!s) return items;
     return items.filter((it) => {
-      const name = String(it.name || "").toLowerCase();
-      const desc = String(it.description || "").toLowerCase();
+      const name = String(it?.name ?? "").toLowerCase();
+      const desc = String(it?.description ?? "").toLowerCase();
       return name.includes(s) || desc.includes(s);
     });
   }, [items, search]);
@@ -288,7 +264,7 @@ const Objects = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="sklad__center">
-            <span>Всего: {count ?? "-"}</span>
+            <span>Всего: {items.length}</span>
             <span>Найдено: {filtered.length}</span>
             <button
               className="sklad__reset"
@@ -307,7 +283,7 @@ const Objects = () => {
         </div>
       </div>
 
-      {error && <p className="sklad__error-message">Ошибка: {error}</p>}
+      {err && <p className="sklad__error-message">Ошибка: {err}</p>}
 
       {loading ? (
         <p className="sklad__loading-message">Загрузка...</p>
@@ -341,12 +317,12 @@ const Objects = () => {
                   </td>
                   <td>{index + 1}</td>
                   <td>
-                    <strong>{item.name}</strong>
+                    <strong>{item?.name ?? "-"}</strong>
                   </td>
-                  <td>{item.description ?? "-"}</td>
-                  <td>{item.price}</td>
-                  <td>{item.quantity}</td>
-                  <td>{item.date ?? "-"}</td>
+                  <td>{item?.description ?? "-"}</td>
+                  <td>{item?.price ?? "-"}</td>
+                  <td>{item?.quantity ?? 0}</td>
+                  <td>{item?.date ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -359,7 +335,7 @@ const Objects = () => {
           onClose={() => setShowAdd(false)}
           onSaveSuccess={() => {
             setShowAdd(false);
-            dispatch(getObjects()); // перезагружаем список после успешного создания
+            dispatch(getObjects());
           }}
         />
       )}

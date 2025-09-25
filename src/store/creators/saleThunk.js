@@ -12,25 +12,19 @@ const plainAxiosError = (error) => ({
 });
 
 // ===== Helpers для сделок =====
+// ===== Helpers для сделок =====
 const ruStatusToKind = (ru) => {
-  switch (String(ru).trim()) {
-    case "Продажа":
-      return "sale";
-    case "Долги":
-      return "debt";
-    case "Аванс":
-      return "amount";
-    case "Предоплата":
-      return "prepayment";
-    default:
-      return "sale";
-  }
+  const s = String(ru).trim();
+  if (s === "Долги" || s === "Предоплата") return "debt";
+  return "sale";
 };
 
 const toDecimalString = (n) => {
   const num = Number(n || 0);
   return num.toFixed(2);
 };
+
+const hasPositiveNumber = (v) => Number.isFinite(Number(v)) && Number(v) > 0;
 
 // ===== POS продажи (товары) =====
 export const startSale = createAsyncThunk(
@@ -288,22 +282,32 @@ export const objectCartAddItem = createAsyncThunk(
 export const createDeal = createAsyncThunk(
   "deals/create",
   async (
-    { clientId, title, statusRu, amount, debtMonths },
+    { clientId, title, statusRu, amount, debtMonths, prepayment }, // prepayment и debtMonths могут приходить вместе
     { rejectWithValue }
   ) => {
     try {
       const kind = ruStatusToKind(statusRu);
+
+      // Базовый payload
       const payload = {
         title: String(title || "").trim(),
-        kind, // enum: amount | sale | debt | prepayment
-        amount: toDecimalString(amount),
+        kind, // enum: sale | debt | prepayment
+        amount: toDecimalString(amount), // общая сумма сделки
         note: "",
         client: clientId,
       };
-      // добавляем срок долга только для kind === 'debt'
-      if (kind === "debt" && Number(debtMonths) > 0) {
-        payload.debt_months = Number(debtMonths);
+
+      // Если это "Долги" ИЛИ "Предоплата", на клиенте мы уже передали kind="debt"
+      if (kind === "debt") {
+        if (hasPositiveNumber(debtMonths)) {
+          payload.debt_months = Number(debtMonths);
+        }
+        // Если пришла предоплата (значит выбран режим "Предоплата")
+        if (hasPositiveNumber(prepayment)) {
+          payload.prepayment = toDecimalString(prepayment);
+        }
       }
+
       const { data } = await api.post(
         `/main/clients/${clientId}/deals/`,
         payload

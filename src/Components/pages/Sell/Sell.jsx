@@ -413,8 +413,10 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
     </div>
   );
 
-  const PaymentBlock = () =>
-    company?.sector?.name === "Магазин" && (
+  // ✅ стало
+  const paymentBlock = useMemo(() => {
+    if (company?.sector?.name !== "Магазин") return null;
+    return (
       <>
         <div className="add-modal__section">
           <label>Тип оплаты</label>
@@ -441,6 +443,7 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
         )}
       </>
     );
+  }, [company?.sector?.name, debt, phone]);
 
   return (
     <div className="add-modal sell">
@@ -481,7 +484,7 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
             <h2 className="receipt__title">Приход</h2>
 
             <ClientBlock />
-            <PaymentBlock />
+            {paymentBlock}
 
             {start.items.map((p, idx) => (
               <div className="receipt__item" key={p.id ?? idx}>
@@ -543,7 +546,7 @@ const STATUSES = [
 ];
 
 // Для select сделки
-const DEAL_STATUS_RU = ["Продажа", "Долги", "Аванс", "Предоплата"];
+export const DEAL_STATUS_RU = ["Продажа", "Долги", "Предоплата"];
 
 const SellBuildingModal = ({ onClose }) => {
   const dispatch = useDispatch();
@@ -560,6 +563,7 @@ const SellBuildingModal = ({ onClose }) => {
   // 2) Касса
   const { list: cashBoxes } = useCash();
   const [cashboxId, setCashboxId] = useState("");
+  const [prepayment, setPrepayment] = useState("");
 
   // 3) Добавление товара
   const [objectItemId, setObjectItemId] = useState("");
@@ -702,13 +706,29 @@ const SellBuildingModal = ({ onClose }) => {
       const amountStr = amountNum.toFixed(2);
 
       // 2) Создаём сделку «под капотом»
-      await dispatch(
+      // await dispatch(
+      //   createDeal({
+      //     clientId: cartSeed.client,
+      //     title: dealStatus, // заголовок
+      //     statusRu: dealStatus, // маппинг в kind внутри thunk
+      //     amount: amountNum,
+      //     debtMonths: dealStatus === "Долги" ? Number(debtMonths) : undefined,
+      //   })
+      // ).unwrap();
+      const result = await dispatch(
         createDeal({
           clientId: cartSeed.client,
           title: dealStatus, // заголовок
           statusRu: dealStatus, // маппинг в kind внутри thunk
           amount: amountNum,
-          debtMonths: dealStatus === "Долги" ? Number(debtMonths) : undefined,
+          // prepayment только при "Предоплата"
+          prepayment:
+            dealStatus === "Предоплата" ? Number(prepayment) : undefined,
+          // debtMonths и для "Долги", и для "Предоплата"
+          debtMonths:
+            dealStatus === "Долги" || dealStatus === "Предоплата"
+              ? Number(debtMonths)
+              : undefined,
         })
       ).unwrap();
 
@@ -718,7 +738,7 @@ const SellBuildingModal = ({ onClose }) => {
           cashbox: cashboxId, // выбранная касса
           type: "income",
           name: clientFullName || String(cartSeed.client),
-          amount: amountStr, // строка с 2 знаками после запятой
+          amount: dealStatus === "Предоплата" ? result.prepayment : amountStr,
         })
       ).unwrap();
       onClose();
@@ -954,6 +974,35 @@ const SellBuildingModal = ({ onClose }) => {
                   placeholder="Например, 6"
                 />
               </div>
+            )}
+
+            {dealStatus === "Предоплата" && (
+              <>
+                <div className="sale__field sale__field--full">
+                  <label className="sale__label">Предоплата</label>
+                  <input
+                    className="sale__input"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={prepayment}
+                    onChange={(e) => setPrepayment(e.target.value)}
+                    placeholder="Сумма предоплаты"
+                  />
+                </div>
+                <div className="sale__field sale__field--full">
+                  <label className="sale__label">Срок долга (месяцев)</label>
+                  <input
+                    className="sale__input"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={debtMonths}
+                    onChange={(e) => setDebtMonths(e.target.value)}
+                    placeholder="Например, 6"
+                  />
+                </div>
+              </>
             )}
 
             <div style={{ display: "grid", gap: 8 }}>

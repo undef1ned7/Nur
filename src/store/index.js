@@ -13,6 +13,7 @@ import instagramReducer from "./slices/InstagramSlice";
 import cashReducer from "./slices/cashSlice";
 import jobsReducer from "./slices/jobsSlice";
 import uiReducer from "./slices/uiSlice";
+import consultingReducer from "./slices/consultingSlice";
 const store = configureStore({
   reducer: {
     user: userReducer,
@@ -29,6 +30,7 @@ const store = configureStore({
     cash: cashReducer,
     jobs: jobsReducer,
     ui: uiReducer,
+    consulting: consultingReducer,
   },
 });
 

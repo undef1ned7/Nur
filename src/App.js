@@ -55,7 +55,7 @@ import CafeTables from "./Components/Sectors/cafe/Tables/Tables";
 import ConsultingClientRequests from "./Components/Sectors/Consulting/client-requests/client-requests";
 import ConsultingClients from "./Components/Sectors/Consulting/client/client";
 import ConsultingCafeKassa from "./Components/Sectors/Consulting/Kassa/Kassa";
-import ConsultingSalary from "./Components/Sectors/Consulting/salary/salary";
+import ConsultingSalary from "./Components/Sectors/Consulting/salary/Salary";
 import ConsultingSale from "./Components/Sectors/Consulting/sale/sale";
 import ConsultingServices from "./Components/Sectors/Consulting/services/services";
 import ConsultingSchoolTeachers from "./Components/Sectors/Consulting/Teachers/Teachers";
@@ -96,6 +96,8 @@ import WarehouseWriteOffs from "./Components/Sectors/Warehouse/WriteOffs/WriteOf
 import ProtectedRoute from "./ProtectedRoute";
 import { getCompany } from "./store/creators/userCreators";
 import { useUser } from "./store/slices/userSlice";
+import ConsultingReports from "./Components/Sectors/Consulting/Kassa/Reports/Reports";
+import ConsultingBookings from "./Components/Sectors/Consulting/Bookings/Bookings";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -323,7 +325,7 @@ function App() {
               path="analytics"
               element={
                 <ProtectedRoute>
-                  <Analytics />
+                  <CashReports />
                 </ProtectedRoute>
               }
             />
@@ -787,6 +789,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ConsultingSchoolTeachers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/analytics"
+              element={
+                <ProtectedRoute>
+                  <ConsultingReports />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="consulting/bookings"
+              element={
+                <ProtectedRoute>
+                  <ConsultingBookings />
                 </ProtectedRoute>
               }
             />

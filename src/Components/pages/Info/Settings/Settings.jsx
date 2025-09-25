@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./Settings.scss";
 import Tabs from "../Tabs/Tabs";
 import General from "../pages/General/General";
@@ -6,7 +6,11 @@ import Security from "../pages/Security/Security";
 import Users from "../pages/Users/Users";
 import Funnels from "../pages/Funnels/Funnels";
 import Company from "../pages/Company/Company";
-import { logoutUser, useUser } from "../../../../store/slices/userSlice";
+import {
+  getProfile,
+  logoutUser,
+  useUser,
+} from "../../../../store/slices/userSlice";
 import { useDispatch } from "react-redux";
 import {
   updateUserCompanyName,
@@ -17,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 const Settings = () => {
   const { tariff, errorChange: error } = useUser();
   const [activeTab, setActiveTab] = useState("Общие");
+  const { company, profile } = useUser();
   const [formData, setFormData] = useState({
     // companyName: "",
     current_password: "",
@@ -26,7 +31,16 @@ const Settings = () => {
   console.log(error);
 
   const [state, setState] = useState({
-    name: "",
+    name: company?.name || "",
+  });
+
+  const [companyDetails, setCompanyDetails] = useState({
+    llc: company?.llc || "",
+    inn: company?.inn || "",
+    okpo: company?.okpo || "",
+    score: company?.score || "",
+    bik: company?.bik || "",
+    address: company?.address || "",
   });
   const [showPassword, setShowPassword] = useState({
     current: false,
@@ -55,6 +69,18 @@ const Settings = () => {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const onCompanyDetailsChange = (e) => {
+    const { name, value } = e.target;
+    setCompanyDetails((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleCompanyDetailsSubmit = async (e) => {
+    e.preventDefault();
   };
 
   const handleSubmit = async (e) => {
@@ -87,6 +113,10 @@ const Settings = () => {
         return <General />;
     }
   };
+
+  useEffect(() => {
+    dispatch(getProfile());
+  }, []);
 
   const navigate = useNavigate();
 
@@ -126,59 +156,134 @@ const Settings = () => {
       </div>
 
       <div className="settings__content">
-        <div className="settings__section">
-          <h2 className="settings__section-title">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M20 7L10 17L5 12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Основная информация
-          </h2>
-          <div className="settings__form-group">
-            <label className="settings__label" htmlFor="companyName">
-              Название компании
-            </label>
-            <div className="settings__input-wrapper">
-              <input
-                id="companyName"
-                name="name"
-                type="text"
-                className="settings__input"
-                placeholder="Введите название компании"
-                value={state.name}
-                onChange={onChange}
-              />
-              <div className="settings__input-icon">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M20 7L10 17L5 12"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+        {profile?.role == "owner" && (
+          <div className="settings__section">
+            <h2 className="settings__section-title">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M20 7L10 17L5 12"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Основная информация
+            </h2>
+            <div className="settings__form-group">
+              <label className="settings__label" htmlFor="companyName">
+                Название компании
+              </label>
+              <div className="settings__input-wrapper">
+                <input
+                  id="companyName"
+                  name="name"
+                  type="text"
+                  className="settings__input"
+                  placeholder="Введите название компании"
+                  value={state.name}
+                  onChange={onChange}
+                />
+                <div className="settings__input-icon">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M20 7L10 17L5 12"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
               </div>
             </div>
+
+            <form onSubmit={handleCompanyDetailsSubmit}>
+              {[
+                {
+                  id: "llc",
+                  label: "Название ООО",
+                  value: companyDetails.llc,
+                  placeholder: "Введите название ООО",
+                },
+                {
+                  id: "inn",
+                  label: "ИНН",
+                  value: companyDetails.inn,
+                  placeholder: "Введите ИНН",
+                },
+                {
+                  id: "okpo",
+                  label: "ОКПО",
+                  value: companyDetails.okpo,
+                  placeholder: "Введите ОКПО",
+                },
+                {
+                  id: "score",
+                  label: "Расчетный счет",
+                  value: companyDetails.score,
+                  placeholder: "Введите расчетный счет",
+                },
+                {
+                  id: "bik",
+                  label: "БИК",
+                  value: companyDetails.bik,
+                  placeholder: "Введите БИК",
+                },
+                {
+                  id: "address",
+                  label: "Адрес",
+                  value: companyDetails.address,
+                  placeholder: "Введите адрес",
+                },
+              ].map((field) => (
+                <div
+                  key={field.id}
+                  className="settings__form-group"
+                  style={{ marginTop: "15px" }}
+                >
+                  <label className="settings__label" htmlFor={field.id}>
+                    {field.label}
+                  </label>
+                  <div className="settings__input-wrapper">
+                    <input
+                      id={field.id}
+                      name={field.id}
+                      type="text"
+                      className="settings__input"
+                      placeholder={field.placeholder}
+                      value={field.value}
+                      onChange={onCompanyDetailsChange}
+                    />
+                  </div>
+                </div>
+              ))}
+              <div
+                className="settings__form-group"
+                style={{ marginTop: "20px" }}
+              >
+                <button
+                  type="submit"
+                  className="settings__btn settings__btn--primary"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </form>
           </div>
-        </div>
+        )}
 
         <div className="settings__section">
           <h2 className="settings__section-title">

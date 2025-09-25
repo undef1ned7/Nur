@@ -1,57 +1,38 @@
 // src/components/Clients/Clients.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import "./client.scss";
-import api from "../../../../api";
+import { useDispatch } from "react-redux";
 import {
-  getAll,
-  createClient,
-  updateClient,
-  removeClient,
-} from "./clientStore";
+  fetchClientsAsync,
+  createClientAsync,
+  updateClientAsync,
+  deleteClientAsync,
+} from "../../../../store/creators/clientCreators";
+import { useClient } from "../../../../store/slices/ClientSlice";
+import { useNavigate } from "react-router-dom";
 
 const fmtMoney = (v) => (Number(v) || 0).toLocaleString() + " с";
 
 export default function ConsultingClients() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [q, setQ] = useState("");
+  const dispatch = useDispatch();
+  // ожидаем, что слайс уже кладёт results в list
+  const { list: rows = [], loading = false, error: err = "" } = useClient();
 
+  const [q, setQ] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editId, setEditId] = useState(null);
 
   const [confirmId, setConfirmId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
-  const load = async () => {
-    try {
-      setLoading(true);
-      setErr("");
-      const list = await getAll();
-      setRows(
-        list
-          .slice()
-          .sort(
-            (a, b) =>
-              new Date(b.updated_at || b.created_at || 0) -
-              new Date(a.updated_at || a.created_at || 0)
-          )
-      );
-    } catch (e) {
-      console.error(e);
-      setErr("Не удалось загрузить клиентов (локально).");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    load();
-  }, []);
+    // при желании сюда можно передать параметры пагинации/поиска
+    dispatch(fetchClientsAsync());
+  }, [dispatch]);
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    let base = rows.slice();
+    let base = (rows || []).slice();
     if (t) {
       base = base.filter((r) =>
         [r.full_name, r.phone, r.seller, r.service]
@@ -81,23 +62,25 @@ export default function ConsultingClients() {
     const idStr = String(id);
     setDeletingId(idStr);
     try {
-      await removeClient(id);
-      setRows((prev) => prev.filter((c) => String(c.id) !== idStr));
+      await dispatch(deleteClientAsync(id)).unwrap();
+      // редьюсер должен убрать клиента из state.list; если нет — можно рефетчнуть:
+      // await dispatch(fetchClientsAsync());
     } catch (e) {
       console.error(e);
-      setErr("Не удалось удалить клиента (локально).");
+      // тут можно показать тост/ошибку
     } finally {
       setDeletingId(null);
       setConfirmId(null);
     }
   };
+  const navigate = useNavigate();
 
   return (
     <section className="clients">
       <header className="clients__header">
         <div>
           <h2 className="clients__title">Клиенты</h2>
-          <p className="clients__subtitle">Локальный справочник (без бэка)</p>
+          <p className="clients__subtitle">Справочник (сервер)</p>
         </div>
 
         <div className="clients__actions">
@@ -123,7 +106,7 @@ export default function ConsultingClients() {
         </div>
       </header>
 
-      {err && <div className="clients__error">{err}</div>}
+      {!!err && <div className="clients__error">{String(err)}</div>}
 
       <div className="clients__tableWrap">
         <table className="clients__table">
@@ -150,7 +133,10 @@ export default function ConsultingClients() {
                 const isConfirm = String(c.id) === String(confirmId);
                 const isDeleting = String(c.id) === String(deletingId);
                 return (
-                  <tr key={c.id}>
+                  <tr
+                    key={c.id}
+                    onClick={() => navigate(`/crm/clients/${c.id}`)}
+                  >
                     <td className="clients__ellipsis" title={c.full_name}>
                       {c.full_name || "—"}
                     </td>
@@ -163,7 +149,10 @@ export default function ConsultingClients() {
                       {c.service || "—"}
                     </td>
                     <td>{fmtMoney(c.price)}</td>
-                    <td className="clients__rowActions">
+                    <td
+                      className="clients__rowActions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {isConfirm ? (
                         <>
                           <span
@@ -219,22 +208,17 @@ export default function ConsultingClients() {
       </div>
 
       {isFormOpen && (
-        <ClientForm
-          id={editId}
-          onClose={() => setIsFormOpen(false)}
-          afterSave={load}
-          rows={rows}
-        />
+        <ClientForm id={editId} onClose={() => setIsFormOpen(false)} />
       )}
     </section>
   );
 }
 
-/* ===== форма клиента =====
- * Создание: только Имя и Телефон
- * Редактирование: полный набор полей
- */
-const ClientForm = ({ id, onClose, afterSave, rows }) => {
+/* ===== форма клиента ===== */
+const ClientForm = ({ id, onClose }) => {
+  const dispatch = useDispatch();
+  const { list: rows = [] } = useClient();
+
   const editing = !!id;
   const current = editing
     ? rows.find((c) => String(c.id) === String(id))
@@ -244,7 +228,7 @@ const ClientForm = ({ id, onClose, afterSave, rows }) => {
   const [full_name, setFullName] = useState(current?.full_name || "");
   const [phone, setPhone] = useState(current?.phone || "");
 
-  // расширенные (показываем только в режиме редактирования)
+  // расширенные (только при редактировании)
   const [date, setDate] = useState(current?.date || "");
   const [seller, setSeller] = useState(current?.seller || "");
   const [service, setService] = useState(current?.service || "");
@@ -265,38 +249,43 @@ const ClientForm = ({ id, onClose, afterSave, rows }) => {
     e.preventDefault();
     setErr("");
 
-    const name = full_name.trim();
+    const name = String(full_name || "").trim();
     if (!name) return setErr("Введите имя клиента.");
     if (name.length < 2 || name.length > 120)
       return setErr("Имя: 2–120 символов.");
 
     const dtoCreate = {
       full_name: name,
-      phone: (phone || "").trim(),
-      // остальные поля при создании НЕ требуются
+      phone: String(phone || "").trim(),
     };
 
     const dtoEdit = {
       full_name: name,
-      phone: (phone || "").trim(),
-      date: (date || "").trim(),
-      seller: (seller || "").trim(),
-      service: (service || "").trim(),
+      phone: String(phone || "").trim(),
+      date: String(date || "").trim() || null,
+      seller: String(seller || "").trim() || null,
+      service: String(service || "").trim() || null,
       price: price === "" ? 0 : Number(String(price).replace(",", ".")) || 0,
     };
 
     setSaving(true);
     try {
       if (editing) {
-        await updateClient(current.id, dtoEdit);
+        await dispatch(
+          updateClientAsync({ clientId: current.id, updatedData: dtoEdit })
+        ).unwrap();
       } else {
-        await createClient(dtoCreate);
+        await dispatch(createClientAsync(dtoCreate)).unwrap();
       }
-      await afterSave?.();
       onClose();
+      // при необходимости можно рефетчить:
+      // await dispatch(fetchClientsAsync());
     } catch (e2) {
       console.error(e2);
-      setErr("Не удалось сохранить клиента (локально).");
+      setErr(
+        (typeof e2 === "string" ? e2 : e2?.detail) ||
+          "Не удалось сохранить клиента."
+      );
     } finally {
       setSaving(false);
     }
@@ -332,7 +321,6 @@ const ClientForm = ({ id, onClose, afterSave, rows }) => {
 
         <form className="clients__form" onSubmit={submit}>
           <div className="clients__formGrid">
-            {/* всегда видимые поля */}
             <div className="clients__field">
               <label className="clients__label">Имя *</label>
               <input
@@ -354,7 +342,6 @@ const ClientForm = ({ id, onClose, afterSave, rows }) => {
               />
             </div>
 
-            {/* расширенные — только при редактировании */}
             {editing && (
               <>
                 <div className="clients__field">

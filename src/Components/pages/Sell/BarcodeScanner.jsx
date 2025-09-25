@@ -42,13 +42,12 @@ const BarcodeScanner = ({ id }) => {
 
   return (
     <div>
-      <p>
-        {barcodeError?.message && (
-          <p style={{ color: "red", marginLeft: "30px" }}>
-            {barcodeError.message}
-          </p>
-        )}
-      </p>
+      {barcodeError?.message && (
+        <p style={{ color: "red", marginLeft: "30px" }}>
+          {barcodeError.message}
+        </p>
+      )}
+      {/* </p> */}
     </div>
   );
 };

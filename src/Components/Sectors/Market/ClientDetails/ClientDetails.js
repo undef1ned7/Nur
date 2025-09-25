@@ -262,6 +262,13 @@ const DebtModal = ({ id, onClose, onChanged }) => {
   const firstDueDate =
     dealDetail?.first_due_date ?? installments[0]?.due_date ?? null;
 
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      amount: dealDetail?.debt_amount,
+    }))
+  }, [dealDetail])
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -327,6 +334,14 @@ const DebtModal = ({ id, onClose, onChanged }) => {
           )}
         </div>
 
+          {
+            dealDetail?.prepayment !== '0.00' && (
+              <div className="row">
+                <div className="label">Предоплата</div>
+                <div className="value">{dealDetail?.prepayment ?? "—"}</div>
+              </div>
+            )
+          }
         <div className="row">
           <div className="label">Ежемесячный платёж</div>
           <div className="value">{monthly}</div>
@@ -905,13 +920,21 @@ export default function MarketClientDetails() {
       return;
     }
   };
+  console.log(company);
+
   // ================================================================
 
   return (
     <div className="client-details">
       <div className="details-top">
         <button
-          onClick={() => navigate("/crm/clients")}
+          onClick={() =>
+            navigate(
+              company.sector.name === "Консалтинг"
+                ? "/crm/consulting/client"
+                : "/crm/clients"
+            )
+          }
           className="btn btn--ghost"
         >
           ← Назад
@@ -1099,7 +1122,11 @@ export default function MarketClientDetails() {
             <span className="deal-budget">
               {Number(deal.amount || 0).toFixed(2)}
             </span>
-            <span className="deal-status">{kindLabel(deal.kind)}</span>
+            <span className="deal-status">
+              {deal.kind === "debt" && Number(deal.prepayment || 0) !== 0
+                ? "Предоплата"
+                : kindLabel(deal.kind)}
+            </span>
             <span className="deal-tasks">Нет задач</span>
             <div onClick={(e) => e.stopPropagation()}>
               <button

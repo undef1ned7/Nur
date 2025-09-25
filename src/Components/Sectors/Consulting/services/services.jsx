@@ -1,69 +1,30 @@
 // src/components/consalting/services/services.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { FaEdit, FaPlus, FaSearch, FaTimes, FaTrash } from "react-icons/fa";
+import { useDispatch } from "react-redux";
+import {
+  createConsultingService,
+  deleteConsultingService,
+  editConsultingService,
+  getConsultingServices,
+} from "../../../../store/creators/consultingThunk";
+import { useConsulting } from "../../../../store/slices/consultingSlice";
 import "./services.scss";
-import api from "../../../../api";
-import { FaPlus, FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
 
-/* ====== ЛОКАЛЬНОЕ ХРАНИЛИЩЕ (без бэка) ====== */
-const LS_KEY = "services_v1";
+export default function ConsultingServices({
+  loading = false,
+  error = "",
+  disabled = false,
+}) {
+  const dispatch = useDispatch();
+  const {
+    services: rows,
+    loading: loadingFromSlice,
+    error: errorFromSlice,
+  } = useConsulting();
 
-/** безопасный парсер */
-function readLS() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-function writeLS(rows) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(rows || []));
-  } catch {
-    /* ignore */
-  }
-}
-
-/* ===== helpers ===== */
-const clean = (s) =>
-  String(s || "")
-    .replace(/\s+/g, " ")
-    .trim();
-const num = (v) => {
-  const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-const money = (v) => (Number(v) || 0).toLocaleString() + " с";
-
-/* нормализация (на случай старых данных) */
-const normalize = (s = {}) => ({
-  id: s.id || (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now())),
-  title: s.title ?? "",
-  price: num(s.price ?? 0),
-  description: s.description ?? "",
-  created_at: s.created_at || new Date().toISOString(),
-  updated_at: s.updated_at || new Date().toISOString(),
-});
-
-/* ===== подготовка начального состояния из LS (чтобы не затирать пустотой) ===== */
-function initRows() {
-  const initial = readLS().map(normalize);
-  initial.sort(
-    (a, b) =>
-      new Date(b.updated_at || b.created_at || 0) -
-      new Date(a.updated_at || a.created_at || 0)
-  );
-  return initial;
-}
-
-/* ===== Component ===== */
-export default function ConsultingServices() {
-  // ВАЖНО: читаем из LS сразу здесь, а не в эффекте
-  const [rows, setRows] = useState(initRows);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const effLoading = loading || loadingFromSlice;
+  const effError = error || errorFromSlice;
 
   /* поиск */
   const [q, setQ] = useState("");
@@ -72,47 +33,42 @@ export default function ConsultingServices() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createSaving, setCreateSaving] = useState(false);
   const [createErr, setCreateErr] = useState("");
-  const emptyCreate = { title: "", price: "", description: "" };
+  const emptyCreate = { name: "", price: "", description: "" };
   const [createForm, setCreateForm] = useState(emptyCreate);
 
   /* редактирование */
   const [editOpen, setEditOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editErr, setEditErr] = useState("");
-  const emptyEdit = { id: null, title: "", price: "", description: "" };
+  const emptyEdit = { id: null, name: "", price: "", description: "" };
   const [editForm, setEditForm] = useState(emptyEdit);
 
   /* удаление */
   const [deletingIds, setDeletingIds] = useState(new Set());
 
-  /* автосохранение в localStorage при изменении rows */
-  useEffect(() => {
-    writeLS(rows);
-  }, [rows]);
+  /* helpers */
+  const clean = (s) =>
+    String(s || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const num = (v) => {
+    const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const money = (v) => (Number(v) || 0).toLocaleString() + " с";
 
-  /* подхватываем изменения из других вкладок */
+  /* загрузка услуг */
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === LS_KEY) {
-        try {
-          setRows(initRows());
-        } catch (e2) {
-          console.error(e2);
-          setErr("Не удалось обновить данные из localStorage.");
-        }
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+    dispatch(getConsultingServices());
+  }, [dispatch]);
 
   /* фильтр */
   const filtered = useMemo(() => {
     const text = q.trim().toLowerCase();
-    let base = rows.slice();
+    let base = (rows || []).slice();
     if (text) {
       base = base.filter((r) =>
-        [r.title, r.description].some((v) =>
+        [r.title ?? r.name, r.description].some((v) =>
           String(v || "")
             .toLowerCase()
             .includes(text)
@@ -126,9 +82,9 @@ export default function ConsultingServices() {
     );
   }, [rows, q]);
 
-  /* ВАЛИДАЦИЯ */
+  /* валидация */
   const validate = (f, setErrState) => {
-    const title = clean(f.title);
+    const title = clean(f.name);
     const price = num(f.price);
     if (!title) return setErrState("Укажите название услуги."), false;
     if (title.length < 2 || title.length > 120)
@@ -146,44 +102,53 @@ export default function ConsultingServices() {
     if (createSaving) return;
 
     const dto = {
-      id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
-      title: clean(createForm.title),
+      // Бэк ожидает name? В earlier-коде ты маппил на title.
+      // Отправим оба, а на UI валидируем по title:
+      // title: clean(createForm.name),
+      name: clean(createForm.name),
       price: num(createForm.price),
       description: createForm.description || "",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     };
     if (!validate(dto, setCreateErr)) return;
 
     setCreateSaving(true);
     try {
-      setRows((prev) => [dto, ...prev]);
+      await dispatch(createConsultingService(dto)).unwrap();
       setCreateOpen(false);
       setCreateForm(emptyCreate);
+      dispatch(getConsultingServices());
+      // либо доверяем редьюсеру, либо рефетчим:
+      // dispatch(getConsultingServices());
+    } catch (err) {
+      setCreateErr(
+        (typeof err === "string" ? err : err?.detail) ||
+          "Не удалось создать услугу. Попробуйте ещё раз."
+      );
     } finally {
       setCreateSaving(false);
     }
   };
 
-  /* РЕДАКТИРОВАНИЕ */
+  /* ОТКРЫТЬ РЕДАКТИРОВАНИЕ */
   const openEdit = (s) => {
     setEditForm({
       id: s.id,
-      title: s.title || "",
-      price: String(s.price || ""),
-      description: s.description || "",
+      name: s.title ?? s.name ?? "",
+      price: String(s.price ?? ""),
+      description: s.description ?? "",
     });
     setEditErr("");
     setEditOpen(true);
   };
 
+  /* РЕДАКТИРОВАНИЕ */
   const submitEdit = async (e) => {
     e.preventDefault();
     if (!editForm.id || editSaving) return;
 
     const dto = {
-      id: editForm.id,
-      title: clean(editForm.title),
+      // title: clean(editForm.name),
+      name: clean(editForm.name), // на всякий случай
       price: num(editForm.price),
       description: editForm.description || "",
     };
@@ -191,24 +156,36 @@ export default function ConsultingServices() {
 
     setEditSaving(true);
     try {
-      const updated_at = new Date().toISOString();
-      setRows((prev) =>
-        prev.map((r) => (r.id === dto.id ? { ...r, ...dto, updated_at } : r))
-      );
+      await dispatch(
+        editConsultingService({ id: editForm.id, data: dto })
+      ).unwrap();
       setEditOpen(false);
       setEditForm(emptyEdit);
+      dispatch(getConsultingServices());
+    } catch (err) {
+      setEditErr(
+        (typeof err === "string" ? err : err?.detail) ||
+          "Не удалось сохранить изменения. Попробуйте ещё раз."
+      );
     } finally {
       setEditSaving(false);
     }
   };
 
   /* УДАЛЕНИЕ */
-  const removeService = (s) => {
+  const removeService = async (s) => {
     if (!s?.id) return;
-    if (!window.confirm(`Удалить услугу «${s.title || "—"}»?`)) return;
+    if (!window.confirm(`Удалить услугу «${s.title ?? s.name ?? "—"}»?`))
+      return;
     setDeletingIds((prev) => new Set(prev).add(s.id));
     try {
-      setRows((prev) => prev.filter((r) => r.id !== s.id));
+      await dispatch(deleteConsultingService(s.id)).unwrap();
+      dispatch(getConsultingServices());
+    } catch (err) {
+      alert(
+        (typeof err === "string" ? err : err?.detail) ||
+          "Не удалось удалить услугу."
+      );
     } finally {
       setDeletingIds((prev) => {
         const next = new Set(prev);
@@ -223,9 +200,7 @@ export default function ConsultingServices() {
       <header className="services__header">
         <div>
           <h2 className="services__title">Услуги</h2>
-          <p className="services__subtitle">
-            Локальный справочник услуг (без бэка)
-          </p>
+          <p className="services__subtitle">Справочник услуг (сервер)</p>
         </div>
 
         <div className="services__toolbar">
@@ -237,22 +212,24 @@ export default function ConsultingServices() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               aria-label="Поиск услуг"
+              disabled={disabled}
             />
           </div>
 
           <button
             className="services__btn services__btn--primary"
             onClick={() => setCreateOpen(true)}
+            disabled={disabled}
           >
             <FaPlus /> Добавить услугу
           </button>
         </div>
       </header>
 
-      {loading && <div className="services__alert">Загрузка…</div>}
-      {!!err && <div className="services__alert">{err}</div>}
+      {effLoading && <div className="services__alert">Загрузка…</div>}
+      {!!effError && <div className="services__alert">{String(effError)}</div>}
 
-      {!loading && (
+      {!effLoading && (
         <div className="services__tableWrap">
           <table className="services__table">
             <thead>
@@ -267,8 +244,11 @@ export default function ConsultingServices() {
               {filtered.length ? (
                 filtered.map((s) => (
                   <tr key={s.id}>
-                    <td className="services__ellipsis" title={s.title}>
-                      {s.title || "—"}
+                    <td
+                      className="services__ellipsis"
+                      title={s.title ?? s.name}
+                    >
+                      {s.title ?? s.name ?? "—"}
                     </td>
                     <td>{money(s.price)}</td>
                     <td className="services__ellipsis" title={s.description}>
@@ -279,13 +259,14 @@ export default function ConsultingServices() {
                         className="services__btn services__btn--secondary"
                         onClick={() => openEdit(s)}
                         title="Изменить"
+                        disabled={disabled}
                       >
                         <FaEdit /> Изм.
                       </button>
                       <button
                         className="services__btn services__btn--danger"
                         onClick={() => removeService(s)}
-                        disabled={deletingIds.has(s.id)}
+                        disabled={disabled || deletingIds.has(s.id)}
                         title="Удалить"
                       >
                         <FaTrash />{" "}
@@ -334,12 +315,13 @@ export default function ConsultingServices() {
                   <label className="services__label">Название *</label>
                   <input
                     className="services__input"
-                    value={createForm.title}
+                    value={createForm.name}
                     onChange={(e) =>
-                      setCreateForm((p) => ({ ...p, title: e.target.value }))
+                      setCreateForm((p) => ({ ...p, name: e.target.value }))
                     }
                     maxLength={120}
                     required
+                    disabled={createSaving || disabled}
                   />
                 </div>
 
@@ -355,6 +337,7 @@ export default function ConsultingServices() {
                       setCreateForm((p) => ({ ...p, price: e.target.value }))
                     }
                     required
+                    disabled={createSaving || disabled}
                   />
                 </div>
 
@@ -372,6 +355,7 @@ export default function ConsultingServices() {
                         description: e.target.value,
                       }))
                     }
+                    disabled={createSaving || disabled}
                   />
                 </div>
               </div>
@@ -388,7 +372,7 @@ export default function ConsultingServices() {
                 <button
                   type="submit"
                   className="services__btn services__btn--primary"
-                  disabled={createSaving}
+                  disabled={createSaving || disabled}
                 >
                   {createSaving ? "Сохранение…" : "Создать"}
                 </button>
@@ -398,7 +382,7 @@ export default function ConsultingServices() {
         </div>
       )}
 
-      {/* ====== EDIT MODАЛ ====== */}
+      {/* ====== EDIT MODAL ====== */}
       {editOpen && (
         <div
           className="services__overlay"
@@ -426,12 +410,13 @@ export default function ConsultingServices() {
                   <label className="services__label">Название *</label>
                   <input
                     className="services__input"
-                    value={editForm.title}
+                    value={editForm.name}
                     onChange={(e) =>
-                      setEditForm((p) => ({ ...p, title: e.target.value }))
+                      setEditForm((p) => ({ ...p, name: e.target.value }))
                     }
                     maxLength={120}
                     required
+                    disabled={editSaving || disabled}
                   />
                 </div>
 
@@ -447,6 +432,7 @@ export default function ConsultingServices() {
                       setEditForm((p) => ({ ...p, price: e.target.value }))
                     }
                     required
+                    disabled={editSaving || disabled}
                   />
                 </div>
 
@@ -464,6 +450,7 @@ export default function ConsultingServices() {
                         description: e.target.value,
                       }))
                     }
+                    disabled={editSaving || disabled}
                   />
                 </div>
               </div>
@@ -480,7 +467,7 @@ export default function ConsultingServices() {
                 <button
                   type="submit"
                   className="services__btn services__btn--primary"
-                  disabled={editSaving}
+                  disabled={editSaving || disabled}
                 >
                   {editSaving ? "Сохранение…" : "Сохранить"}
                 </button>

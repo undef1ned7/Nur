@@ -1,8 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useSelector } from "react-redux";
 import SocialModal from "./SocialModal";
 import "./AdditionalServices.scss";
-import { FaInstagram, FaTelegram, FaWhatsapp } from "react-icons/fa";
+import {
+  FaInstagram,
+  FaTelegram,
+  FaWhatsapp,
+  FaWarehouse,
+} from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
 
 const AdditionalServices = () => {
@@ -20,36 +25,57 @@ const AdditionalServices = () => {
     setSelectedSocial(null);
   };
 
-  const socialNetworks = [
-    {
-      id: "whatsapp",
-      name: "WhatsApp",
-      icon: <FaWhatsapp />,
-      description:
-        "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-    },
-    {
-      id: "telegram",
-      name: "Telegram",
-      icon: <FaTelegram />,
-      description:
-        "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-    },
-    {
-      id: "instagram",
-      name: "Instagram",
-      icon: <FaInstagram />,
-      description:
-        "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-    },
-    {
-      id: "Documents",
-      name: "Документы",
-      icon: <MdDocumentScanner />,
-      description:
-        "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
-    },
-  ];
+  // Покажем "Склад" только для консалтинга
+  const isConsulting = useMemo(() => {
+    const name = (company?.name || "").toLowerCase();
+    const sector = company?.sector?.name || company?.industry?.name || "";
+    return name === "consulting" || sector === "Консалтинг";
+  }, [company]);
+
+  const socialNetworks = useMemo(() => {
+    const base = [
+      {
+        id: "whatsapp",
+        name: "WhatsApp",
+        icon: <FaWhatsapp />,
+        description:
+          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+      },
+      {
+        id: "telegram",
+        name: "Telegram",
+        icon: <FaTelegram />,
+        description:
+          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+      },
+      {
+        id: "instagram",
+        name: "Instagram",
+        icon: <FaInstagram />,
+        description:
+          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+      },
+      {
+        id: "documents",
+        name: "Документы",
+        icon: <MdDocumentScanner />,
+        description:
+          "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+      },
+    ];
+
+    if (isConsulting) {
+      base.push({
+        id: "warehouse",
+        name: "Склад",
+        icon: <FaWarehouse />,
+        description:
+          "Учет услуг и материалов для консалтинга: приход/расход, партии, остатки и связь с продажами.",
+      });
+    }
+
+    return base;
+  }, [isConsulting]);
 
   return (
     <div className="additional-services">
@@ -92,7 +118,7 @@ const AdditionalServices = () => {
       <SocialModal
         isOpen={isModalOpen}
         onClose={closeModal}
-        selectedSocial={selectedSocial}
+        selectedSocial={selectedSocial} // сюда прилетит 'warehouse' при клике по "Склад"
       />
     </div>
   );

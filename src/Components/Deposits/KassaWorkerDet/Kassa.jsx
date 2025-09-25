@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -229,7 +229,15 @@ const KassaDet = () => {
     <div className="vitrina">
       <div className="vitrina__header">
         <div className="vitrina__tabs">
+          <Link
+            style={{ textDecoration: "none", cursor: "pointer" }}
+            className="vitrina__tab"
+            to={"/crm/kassa/"}
+          >
+            ← Назад
+          </Link>
           <span
+            style={{ cursor: "pointer" }}
             className={`vitrina__tab ${
               activeFlowType === "expense" ? "vitrina__tab--active" : ""
             }`}
@@ -238,6 +246,7 @@ const KassaDet = () => {
             Расход
           </span>
           <span
+            style={{ cursor: "pointer" }}
             className={`vitrina__tab ${
               activeFlowType === "income" ? "vitrina__tab--active" : ""
             }`}
@@ -246,6 +255,7 @@ const KassaDet = () => {
             Приход
           </span>
           <span
+            style={{ cursor: "pointer" }}
             className={`vitrina__tab ${
               activeFlowType === "all" ? "vitrina__tab--active" : ""
             }`}
@@ -253,6 +263,9 @@ const KassaDet = () => {
           >
             Все
           </span>
+          <button style={{ cursor: "pointer" }} className="vitrina__tab">
+            Запросы
+          </button>
         </div>
         <br />
         <button
