@@ -1,0 +1,270 @@
+:root {
+  /* только цвета */
+  --primary:#f7d74f;
+  --primary-dark:#d4b800;
+  --text:#0f172a;
+  --muted:#6b7280;
+  --border:#e5e7eb;
+  --surface:#fff;
+}
+
+.barberservices,
+.barberservices * { box-sizing: border-box; }
+
+.barberservices {
+  --radius:14px;
+  --shadow:0 10px 30px rgba(2,6,23,.10);
+  --hpad:20px;
+
+  background:var(--surface);
+  border-radius:var(--radius);
+  box-shadow:0 4px 16px rgba(0,0,0,.05);
+  padding:24px;
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+}
+
+/* =========== Header =========== */
+.barberservices__header{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:12px;
+  align-items:end;
+}
+.barberservices__titleWrap{display:grid;gap:4px}
+.barberservices__title{margin:0;font-weight:800;font-size:20px;color:var(--text)}
+.barberservices__subtitle{font-size:13px;color:var(--muted)}
+
+/* Actions как адаптивная сетка */
+.barberservices__actions{
+  display:grid;
+  grid-template-columns:minmax(260px,1fr) minmax(140px,220px) 44px;
+  gap:10px;
+  align-items:center;
+}
+
+/* =========== Search =========== */
+.barberservices__search{ position:relative; width:100%; }
+.barberservices__searchInput{
+  width:100%;
+  height:44px;
+  padding:10px 12px 10px 36px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  font-size:14px;
+  background:#fff;
+}
+.barberservices__searchInput:focus{ outline:none; border-color:var(--primary); }
+.barberservices__searchInput::placeholder{ color:var(--muted); opacity:.9; }
+.barberservices__searchIcon{
+  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+  font-size:14px; color:var(--muted);
+}
+
+/* =========== Select =========== */
+.barberservices__filter{ display:flex; align-items:center; }
+.barberservices__select{
+  appearance:none;
+  width:100%;
+  height:44px;
+  padding:10px 36px 10px 12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:#fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%230f172a' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
+    no-repeat right 10px center/12px 8px;
+  font-size:14px; color:var(--text);
+  cursor:pointer;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.barberservices__select:focus{ outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(247,215,79,.25); }
+
+/* =========== Buttons =========== */
+.barberservices__btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px; border-radius:12px; border:1px solid transparent;
+  background:#fff; color:var(--text); font-weight:700; font-size:14px;
+  cursor:pointer; transition:.18s;
+}
+.barberservices__btn svg{ width:18px; height:18px; }
+.barberservices__btn:active{ transform:translateY(1px); }
+.barberservices__btn--icon{ width:44px; height:44px; padding:0; display:grid; place-items:center; }
+.barberservices__btn--primary{ background:var(--primary); color:#111; }
+.barberservices__btn--primary:hover{ background:var(--primary-dark); }
+.barberservices__btn--secondary{ border:1px solid var(--border); }
+.barberservices__btn--secondary:hover{ background:#f9fafb; }
+.barberservices__btn--danger{ border:1px solid #ef4444; color:#ef4444; }
+.barberservices__btn--danger:hover{ background:rgba(239,68,68,.06); }
+.barberservices__btnText{ display:inline; }
+
+/* =========== Alerts / Skeleton =========== */
+.barberservices__alert{
+  padding:10px 12px; border-radius:12px;
+  border:1px solid rgba(231,76,60,.35); background:rgba(231,76,60,.12);
+  color:#e74c3c;
+}
+.barberservices__alert--inModal{ margin:12px var(--hpad) 0; }
+
+.barberservices__skeletonList{ display:grid; gap:10px; }
+.barberservices__skeletonCard{
+  height:62px; border:1px solid var(--border); border-radius:12px;
+  background:linear-gradient(90deg,#f8fafc,#eef2f7,#f8fafc);
+  background-size:200% 100%; animation:shimmer 1.4s infinite;
+}
+@keyframes shimmer{ 0%{background-position:0 0} 100%{background-position:-200% 0} }
+
+/* =========== List & Cards =========== */
+.barberservices__list{
+  display:grid; gap:10px;
+}
+.barberservices__card{
+  display:flex; align-items:center; gap:12px;
+  padding:14px; border:1px solid var(--border); border-radius:12px;
+  background:#fafafa; transition:background .18s;
+}
+.barberservices__card:hover{ background:#f1f5f9; }
+
+.barberservices__info{ display:grid; gap:6px; min-width:0; }
+.barberservices__name{ margin:0; font-size:16px; font-weight:800; color:var(--text); }
+.barberservices__meta{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.barberservices__price{ font-weight:700; color:var(--text); }
+
+.barberservices__cardActions{
+  margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;
+}
+
+/* Badge */
+.barberservices__badge{
+  padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700;
+  border:1px solid transparent; white-space:nowrap;
+}
+.barberservices__badge--active{ background:rgba(39,174,96,.15); color:#27ae60; border-color:rgba(39,174,96,.35); }
+.barberservices__badge--inactive{ background:rgba(149,165,166,.15); color:#7f8c8d; border-color:rgba(149,165,166,.35); }
+
+/* =========== Overlay & Modal (по центру) =========== */
+.barberservices__overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.55);
+  backdrop-filter: saturate(140%) blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 70;
+  min-height: 100dvh; /* корректный vh на мобильных */
+}
+.barberservices__modal{
+  position: relative;
+  width: min(520px, 96vw);
+  max-height: min(92dvh, 680px);
+  margin: 0;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+/* =========== Modal header / form / footer =========== */
+.barberservices__modalHeader{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px var(--hpad); border-bottom:1px solid var(--border);
+}
+.barberservices__modalTitle{ margin:0; font-size:18px; font-weight:900; }
+.barberservices__iconBtn{ background:none; border:0; color:var(--muted); font-size:18px; cursor:pointer; }
+.barberservices__iconBtn:hover{ color:var(--text); }
+
+.barberservices__form{ display:grid; grid-template-rows:1fr auto; min-height:0; }
+.barberservices__grid{
+  padding:16px var(--hpad); overflow:auto; min-height:0;
+  display:grid; grid-template-columns:1fr 1fr; gap:14px;
+}
+.barberservices__field{ display:grid; gap:6px; }
+.barberservices__field--switch{ grid-column:1/-1; display:flex; align-items:center; justify-content:space-between; padding-right:2px; }
+.barberservices__label{ font-size:14px; font-weight:700; color:var(--muted); }
+.barberservices__req{ color:#ef4444; }
+.barberservices__input{
+  width:100%; height:44px;
+  border:1px solid var(--border); border-radius:10px;
+  padding:0 12px; font-size:14px; background:#fff;
+}
+.barberservices__input:focus{ outline:none; border-color:var(--primary); }
+.barberservices__input::placeholder{ color:var(--muted); opacity:.85; }
+.barberservices__field--invalid .barberservices__label{ color:#dc2626; }
+.barberservices__input--invalid{ border-color:#dc2626; }
+
+/* Switch */
+.barberservices__switch{ position:relative; width:44px; height:24px; display:inline-block; }
+.barberservices__switch input{ display:none; }
+.barberservices__slider{
+  position:absolute; inset:0; border-radius:999px; background:#d1d5db; transition:.22s;
+}
+.barberservices__slider::before{
+  content:""; position:absolute; left:4px; top:4px; width:16px; height:16px;
+  border-radius:50%; background:#fff; transition:.22s;
+}
+.barberservices__switch input:checked + .barberservices__slider{ background:var(--primary); }
+.barberservices__switch input:checked + .barberservices__slider::before{ transform:translateX(20px); }
+
+/* Footer */
+.barberservices__footer{
+  border-top:1px solid var(--border);
+  padding:12px var(--hpad);
+  display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap;
+  background:#fff;
+}
+.barberservices__spacer{ flex:1 1 auto; }
+.barberservices__footerRight{ display:flex; gap:10px; flex-wrap:wrap; }
+
+/* Confirm delete */
+.barberservices__confirm{ display:flex; gap:12px; align-items:center; margin-right:auto; }
+.barberservices__confirmText{ color:#7f1d1d; font-weight:700; }
+.barberservices__confirmActions{ display:flex; gap:8px; }
+
+/* Pager */
+.barberservices__pager{ display:flex; gap:10px; align-items:center; justify-content:center; margin-top:10px; flex-wrap:wrap; }
+.barberservices__pageList{ display:flex; gap:6px; list-style:none; margin:0; padding:0; }
+.barberservices__pageBtn{ border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; }
+.barberservices__pageBtn:hover{ background:#f9fafb; }
+.barberservices__pageBtn.is-active{ background:var(--primary); border-color:var(--primary); color:#111; }
+.barberservices__pageBtn:disabled{ opacity:.6; cursor:default; }
+.barberservices__dots{ color:var(--muted); align-self:flex-end; padding-bottom:2px; }
+
+/* =========== Responsive =========== */
+@media (min-width: 721px){
+  .barberservices__header{ grid-template-columns:1fr auto; }
+}
+
+@media (max-width: 720px){
+  .barberservices{ padding:16px; border-radius:12px; }
+  .barberservices__title{ font-size:18px; }
+
+  .barberservices__actions{ grid-template-columns:1fr; }
+  .barberservices__search{ grid-column:1 / -1; }
+  .barberservices__filter{ grid-column:1 / 2; }
+  .barberservices__btn--icon{ justify-self:end; }
+}
+
+@media (max-width: 420px){
+  .barberservices__actions{
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+  .barberservices__search{ grid-column:1/-1; }
+  .barberservices__filter{ display:grid; grid-template-columns:1fr auto; gap:8px; }
+  .barberservices__btn--icon{ grid-column:2; }
+}
+
+@media (max-width:320px){
+  .barberservices{ padding:12px; gap:14px; }
+  .barberservices__input{ font-size:13px; padding:0 10px; }
+  .barberservices__footer .barberservices__btn{ flex:1 1 100%; }
+}
+
+/* reduce motion */
+@media (prefers-reduced-motion:reduce){
+  .barberservices__btn{ transition:none !important; }
+}

@@ -1,0 +1,248 @@
+.container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  // background-color: #f0f2f5; // Light background
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+
+  .searchBar {
+    display: flex;
+    align-items: center;
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 5px 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    input {
+      border: none;
+      outline: none;
+      padding: 8px;
+      font-size: 16px;
+      width: 300px;
+    }
+
+    .filterButton {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 5px;
+      margin-left: 10px;
+      color: #888; // Grey icon
+      font-size: 18px; // Adjust icon size
+    }
+  }
+
+  .addDepartmentButton {
+    background-color: #f7d74f; // Yellow button
+    color: #333; // Dark text
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+
+    &:hover {
+      background-color: darken(#f7d74f, 10%);
+    }
+  }
+}
+
+.departmentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 2fr));
+  gap: 20px;
+  flex-grow: 0.8;
+}
+
+.departmentCard {
+  background-color: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 110px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .departmentCardHeader {
+    height: 10px; // Thin colored bar
+    // Background color set by JS
+    width: 90%;
+    border-bottom-left-radius: 30px;
+    border-bottom-right-radius: 30px;
+    margin: 0 auto;
+  }
+
+  .departmentCardContent {
+    padding: 15px;
+
+    h3 {
+      margin: 0 0 5px 0;
+      font-size: 18px;
+      color: #333;
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: #777;
+    }
+  }
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 30px;
+  padding: 15px 0;
+  color: #777;
+  font-size: 14px;
+
+  .pagination {
+    display: flex;
+    gap: 10px;
+
+    .arrow {
+      cursor: pointer;
+      padding: 5px;
+      &:hover {
+        color: #333;
+      }
+    }
+  }
+}
+
+// Modal Styling (to be in a separate Modal.module.scss for better organization)
+// For now, including here for completeness
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+
+  h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 24px;
+  }
+
+  .closeButton {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #aaa;
+
+    &:hover {
+      color: #666;
+    }
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 25px;
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .cancelButton {
+      background-color: #eee;
+      color: #555;
+      &:hover {
+        background-color: #ddd;
+      }
+    }
+
+    .submitButton {
+      background-color: #f7d74f; // Yellow
+      color: #333;
+      font-weight: bold;
+      &:hover {
+        background-color: darken(#f7d74f, 10%);
+      }
+    }
+  }
+}
+
+// Form component styling (Input, Select) - better in their own .module.scss files
+.formGroup {
+  margin-bottom: 15px;
+
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+    font-size: 14px;
+  }
+
+  input[type="text"],
+  select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    box-sizing: border-box; // Include padding and border in the element's total width and height
+
+    &:focus {
+      outline: none;
+      border-color: #f7d74f;
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.2); // Light yellow shadow
+    }
+  }
+
+  select[multiple] {
+    height: 100px; // Make multi-select larger
+  }
+}

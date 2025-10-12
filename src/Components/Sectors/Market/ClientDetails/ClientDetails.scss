@@ -1,0 +1,409 @@
+/* src/components/ClientDetails/ClientDetails.module.scss */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap");
+
+/* ===== Theme tokens ===== */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* оплаченные строки — зачёркнуты и приглушены */
+.schedule__row--paid td {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* кнопку оплаты для оплаченных платежей делаем неактивной (если всё же рендерите) */
+.schedule__btn--paid {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.schedule__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.schedule__table th,
+.schedule__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee;
+}
+.schedule__table thead th {
+  border-bottom: 1px solid #ddd;
+}
+.schedule__hint {
+  margin-top: 6px;
+  color: #666;
+  font-size: 12px;
+}
+
+.clientModal {
+  height: 600px;
+  overflow-y: auto;
+  width: auto !important;
+}
+
+/* ===== Global utilities (string classNames in JSX) ===== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.2s ease, background 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  &:hover {
+    background: #f9fafb;
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
+.btn--yellow {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #111;
+  &:hover {
+    background: var(--primary-dark);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--primary-dark);
+    outline-offset: 2px;
+  }
+}
+
+.btn--red {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
+  &:hover {
+    background: #fecaca;
+  }
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  &:hover {
+    background: #f9fafb;
+  }
+}
+
+.primary {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #111;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 800;
+  &:hover {
+    background: var(--primary-dark);
+  }
+}
+
+.alert {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+
+  &--error {
+    color: #b91c1c;
+    background: #fee2e2;
+    border-color: #fecaca;
+  }
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.modal {
+  width: 520px;
+  max-width: 95%;
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+
+  > span {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  input,
+  select {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+    color: var(--text);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
+  }
+}
+
+/* обязательные поля и подсказки */
+.req {
+  color: #ef4444;
+  font-weight: 800;
+  margin-left: 2px;
+}
+.hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* подсветка invalid */
+.field input:invalid,
+.field select:invalid {
+  border-color: #fca5a5;
+}
+
+/* ===== Client details page ===== */
+.client-details {
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  display: grid;
+  gap: 20px;
+}
+
+.details-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0 16px;
+}
+
+.content-wrapper {
+  display: grid;
+  gap: 16px;
+}
+
+.rows {
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  gap: 12px;
+  align-items: center;
+
+  .label {
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .value {
+    color: var(--text);
+    font-weight: 700;
+  }
+  .edit-btn {
+    /* кнопке уже заданы .btn стили через :global */
+  }
+}
+
+/* totals */
+.debts-wrapper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.debts {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fafafa;
+  padding: 14px;
+  display: grid;
+  gap: 4px;
+
+  &-title {
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  &-amount {
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  &.debts--red {
+    background: #fff1f2;
+    border-color: #fecdd3;
+  }
+  &.debts--green {
+    background: #ecfdf5;
+    border-color: #bbf7d0;
+  }
+  &.debts--orange {
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+}
+
+/* deals list */
+.deals-list {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+
+  > h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+  }
+}
+
+.deal-item {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 1fr 1fr;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  align-items: center;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    background: #f8fafc;
+  }
+  &:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
+.debt__input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.deal-name {
+  font-weight: 700;
+  color: var(--text);
+}
+.deal-budget {
+  font-weight: 700;
+  color: #111;
+}
+.deal-status {
+  font-weight: 700;
+  color: #334155;
+}
+.deal-tasks {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* responsive */
+@media (max-width: 820px) {
+  .row {
+    grid-template-columns: 140px 1fr;
+    .edit-btn {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+
+  .deal-item {
+    grid-template-columns: 1.2fr 0.8fr;
+    .deal-status,
+    .deal-tasks {
+      display: none;
+    }
+  }
+}

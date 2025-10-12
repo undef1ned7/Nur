@@ -1,0 +1,229 @@
+/* src/components/Categories/Categories.module.scss */
+
+/* Montserrat */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap");
+
+:root {
+  --primary: #ffd600;
+  --primary-600: #ffcf33;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+  --radius: 12px;
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+
+.cats {
+  font-family: "Montserrat", sans-serif;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+/* Header */
+.cats__header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  gap: 16px;
+}
+.cats__tabs {
+  display: flex;
+  gap: 20px;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 8px;
+}
+.cats__tab {
+  background: none;
+  border: none;
+  padding: 10px 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #444;
+  cursor: pointer;
+  position: relative;
+}
+.cats__tab--active {
+  font-weight: 700;
+  color: #000;
+}
+.cats__tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 2px;
+}
+
+.cats__title {
+  margin: 0;
+  align-self: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cats__controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.cats__add {
+  background: var(--primary);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.cats__add:hover { background: var(--primary-600); }
+
+.cats__search {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 180px;
+}
+
+/* Error */
+.cats__error {
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+/* Table */
+.cats__tableWrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+.cats__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+
+  th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+  th { background: #fafafa; font-weight: 700; }
+}
+.cats__thActions { width: 56px; }
+.cats__actionsCell { text-align: right; }
+.cats__dots {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.cats__empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 18px 0;
+}
+
+/* Modal */
+.cats__modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+.cats__modal {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  width: 360px;
+  max-width: 92%;
+  box-shadow: var(--shadow);
+}
+.cats__modalTitle {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+.cats__input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+.cats__modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.cats__primary {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+.cats__secondary {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #eee;
+  cursor: pointer;
+}
+.cats__danger {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  cursor: pointer;
+}
+
+/* Responsive (mobile table -> cards) */
+@media (max-width: 768px) {
+  .cats__header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .cats__controls {
+    justify-content: stretch;
+  }
+  .cats__controls > * { flex: 1; }
+
+  .cats__table,
+  .cats__table thead,
+  .cats__table tbody,
+  .cats__table th,
+  .cats__table td,
+  .cats__table tr {
+    display: block;
+    width: 100%;
+  }
+  .cats__table thead { display: none; }
+
+  .cats__table tr {
+    margin-bottom: 12px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 10px;
+    background: #fff;
+  }
+
+  .cats__table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+  }
+
+  .cats__table td:nth-of-type(1)::before { content: "№"; font-weight: 700; color: #666; }
+  .cats__table td:nth-of-type(2)::before { content: "Название"; font-weight: 700; color: #666; }
+}

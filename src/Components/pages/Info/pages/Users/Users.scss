@@ -1,0 +1,381 @@
+.users {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  font-family: 'Roboto', sans-serif;
+  color: #1c2526;
+  padding: 24px;
+  background: #f8f9fb;
+
+  &__sidebar {
+    background: #fff;
+    border: 2px solid #2196f3;
+    border-radius: 8px;
+    padding: 20px;
+    width: 220px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    flex-shrink: 0;
+
+    &-title {
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: #1c2526;
+    }
+
+    &-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    &-item {
+      padding: 10px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 8px;
+      font-size: 14px;
+      transition: background 0.3s, color 0.3s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      &:hover {
+        background: #f5f5f5;
+      }
+
+      &--active {
+        background: #ffd600;
+        font-weight: 600;
+        color: #1c2526;
+      }
+    }
+  }
+
+  &__arrow {
+    font-size: 20px;
+    color: #1c2526;
+    transition: color 0.3s;
+
+    .users__sidebar-item--active & {
+      color: #1c2526;
+    }
+  }
+
+  &__content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    flex: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow-x: auto;
+  }
+
+  &__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 16px;
+  }
+
+  &__search {
+    padding: 10px 12px;
+    width: 250px;
+    border-radius: 6px;
+    border: 1px solid #dcdcdc;
+    font-size: 14px;
+    background: #fdfdfd;
+    transition: border-color 0.3s;
+
+    &:focus {
+      border-color: #ffd600;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(255, 214, 0, 0.2);
+    }
+  }
+
+  &__add-button {
+    background: #ffd600;
+    border: none;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #1c2526;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #e6c200;
+    }
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px; /* Минимальная ширина таблицы для предотвращения сжатия */
+
+    th {
+      text-align: left;
+      padding: 12px 8px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #888;
+      border-bottom: 1px solid #eee;
+    }
+
+    td {
+      padding: 12px 8px;
+      font-size: 14px;
+      border-bottom: 1px solid #eee;
+    }
+  }
+
+  &__name-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+  }
+
+  &__status {
+    background-color: #00c853;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-block;
+  }
+
+  @media screen and (max-width: 992px) {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+
+    &__sidebar {
+      width: 100%;
+      max-width: none;
+      padding: 16px;
+    }
+
+    &__content {
+      padding: 16px;
+    }
+
+    &__top {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    &__search {
+      width: 100%;
+      max-width: none;
+    }
+
+    &__add-button {
+      width: 100%;
+      padding: 10px;
+    }
+
+    &__table {
+      display: block;
+      min-width: 0; /* Убираем минимальную ширину для карточного вида */
+
+      tbody,
+      tr {
+        display: block;
+      }
+
+      tr {
+        border-bottom: 1px solid #eee;
+        padding: 12px 0;
+        margin-bottom: 12px;
+      }
+
+      th {
+        display: none;
+      }
+
+      td {
+        display: block;
+        padding: 8px 0;
+        font-size: 13px;
+        border-bottom: none;
+        position: relative;
+
+        &:before {
+          content: attr(data-label);
+          font-weight: 600;
+          display: block;
+          color: #888;
+          font-size: 12px;
+          margin-bottom: 4px;
+        }
+      }
+
+      &__name-cell {
+        gap: 8px;
+
+        img {
+          width: 28px;
+          height: 28px;
+        }
+      }
+
+      &__status {
+        padding: 3px 10px;
+        font-size: 12px;
+      }
+    }
+  }
+
+  @media screen and (max-width: 768px) {
+    gap: 12px;
+    padding: 12px;
+
+    &__sidebar {
+      padding: 12px;
+
+      &-title {
+        font-size: 15px;
+        margin-bottom: 12px;
+      }
+
+      &-item {
+        padding: 8px 12px;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+    }
+
+    &__arrow {
+      font-size: 18px;
+    }
+
+    &__content {
+      padding: 12px;
+    }
+
+    &__top {
+      margin-bottom: 12px;
+    }
+
+    &__search {
+      padding: 8px;
+      font-size: 13px;
+    }
+
+    &__add-button {
+      padding: 8px;
+      font-size: 13px;
+    }
+
+    &__table {
+      tr {
+        padding: 10px 0;
+        margin-bottom: 10px;
+      }
+
+      td {
+        font-size: 12px;
+
+        &:before {
+          font-size: 11px;
+        }
+      }
+
+      &__name-cell {
+        img {
+          width: 26px;
+          height: 26px;
+        }
+      }
+
+      &__status {
+        padding: 2px 8px;
+        font-size: 11px;
+      }
+    }
+  }
+
+  @media screen and (max-width: 576px) {
+    gap: 10px;
+    padding: 10px;
+
+    &__sidebar {
+      padding: 10px;
+      border-width: 1px;
+
+      &-title {
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+
+      &-item {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+    }
+
+    &__arrow {
+      font-size: 16px;
+    }
+
+    &__content {
+      padding: 10px;
+    }
+
+    &__top {
+      margin-bottom: 10px;
+    }
+
+    &__search {
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    &__add-button {
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    &__table {
+      tr {
+        padding: 8px 0;
+        margin-bottom: 8px;
+      }
+
+      td {
+        padding: 6px 0;
+        font-size: 11px;
+
+        &:before {
+          font-size: 10px;
+        }
+      }
+
+      &__name-cell {
+        gap: 6px;
+
+        img {
+          width: 24px;
+          height: 24px;
+        }
+      }
+
+      &__status {
+        padding: 2px 6px;
+        font-size: 10px;
+      }
+    }
+  }
+}

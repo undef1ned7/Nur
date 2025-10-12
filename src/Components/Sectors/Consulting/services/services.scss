@@ -1,0 +1,97 @@
+.services {
+  --radius: 12px;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+  --muted: #6b7280;
+  --text: #0f172a;
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --shadow: 0 4px 16px rgba(0,0,0,.06);
+
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin: 16px;
+  max-width: 1200px;
+
+  &__header {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  }
+  &__title { font-size: 20px; font-weight: 800; margin: 0; color: var(--text); }
+  &__subtitle { margin: 4px 0 0; color: var(--muted); }
+
+  &__toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  &__search { position: relative; }
+  &__mutedIcon {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--muted);
+  }
+  &__input {
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    font-size: 14px; background: #fff; color: var(--text);
+    &::placeholder { color: #9ca3af; }
+    &:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(247,215,79,.25); }
+  }
+  &__search .services__input { padding-left: 34px; width: 280px; }
+
+  &__btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer;
+    transition: .15s ease-in-out;
+    &:hover { background: #f9fafb; }
+    &--primary { background: var(--primary); border-color: var(--primary); color: #111; &:hover { background: var(--primary-dark); } }
+    &--secondary { background: #fff; }
+    &--danger { background: #fee2e2; border-color: #fecaca; color: #991b1b; &:hover { background: #fecaca; } }
+  }
+
+  &__tableWrap { margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; overflow: auto; }
+  &__table {
+    width: 100%; border-collapse: collapse; background: #fff;
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    thead th { background: #fafafa; font-weight: 800; }
+    tbody tr:hover { background: #f9fafb; }
+  }
+  &__rowActions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  &__ellipsis { max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &__empty { text-align: center; color: var(--muted); padding: 14px 0; }
+  &__alert { margin-top: 10px; padding: 8px 10px; border: 1px solid #fde68a; background: #fffbeb; border-radius: 8px; color: #92400e; }
+
+  /* ===== Modals ===== */
+  &__overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.45);
+    display: grid; place-items: center; z-index: 70; padding: 12px;
+    backdrop-filter: blur(2px);
+  }
+  &__modal {
+    background: #fff; border: 1px solid var(--border); border-radius: 16px;
+    width: min(720px, calc(100vw - 24px)); max-height: 90vh; overflow: auto;
+    padding: 16px; box-shadow: 0 24px 64px rgba(0,0,0,.18), 0 4px 16px rgba(0,0,0,.08);
+  }
+  &__modalHeader {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    position: sticky; top: 0; background: #fff; padding-bottom: 8px; margin-bottom: 12px; box-shadow: 0 1px 0 0 var(--border);
+  }
+  &__modalTitle { font-size: 18px; font-weight: 800; }
+  &__iconBtn {
+    background: transparent; border: 1px solid var(--border); border-radius: 10px; width: 34px; height: 34px;
+    display: grid; place-items: center; cursor: pointer; color: #475569;
+    &:hover { background: #f3f4f6; border-color: #cbd5e1; color: #0f172a; }
+  }
+
+  &__form { display: grid; gap: 14px; }
+  &__formGrid { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  &__field { display: grid; gap: 6px; }
+  &__field--full { grid-column: 1 / -1; }
+  &__label { font-weight: 600; }
+  &__formActions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+
+  @media (max-width: 640px) {
+    &__search .services__input { width: 100%; }
+    &__formGrid { grid-template-columns: 1fr; }
+    &__ellipsis { max-width: 220px; }
+  }
+}

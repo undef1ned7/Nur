@@ -1,0 +1,183 @@
+/* BEM: .sklad-clients — использует только переменные из :root */
+.sklad-clients, .sklad-clients * { box-sizing: border-box; }
+
+.sklad-clients {
+  --radius: 14px;
+  --shadow: 0 10px 30px rgba(2,6,23,.12);
+  --space: 12px;
+  color: var(--text, #0f172a);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space);
+  /* ВКЛЮЧАЕМ КОНТЕЙНЕРНЫЕ ЗАПРОСЫ: адаптация теперь
+     зависит от ширины ЭТОГО блока, а не всего вьюпорта */
+  container-type: inline-size;
+}
+
+/* header */
+.sklad-clients__header{
+  display:grid;
+  grid-template-columns: 1fr auto; /* заголовок | действия */
+  gap: 10px;
+  align-items:end;
+}
+.sklad-clients__titleWrap{display:grid;gap:4px}
+.sklad-clients__title{
+  margin:0;font-weight:800;font-size:20px;
+  color:var(--text,#0f172a);display:inline-flex;gap:8px;align-items:center
+}
+.sklad-clients__subtitle{font-size:13px;color:var(--muted,#6b7280)}
+
+/* ===== Адаптивная панель действий (поиск + кнопка) ===== */
+.sklad-clients__actions{
+  display:grid;
+  grid-template-columns: 1fr auto; /* Поиск тянется, кнопка справа */
+  gap:10px; align-items:center;
+}
+.sklad-clients__search{ position:relative; min-width: 260px; }
+.sklad-clients__actions .sklad-clients__btn--primary{ justify-self:end }
+
+/* Поиск — компактный */
+.sklad-clients__searchInput{
+  width:100%;
+  padding:9px 12px;
+  border:1px solid var(--border,#e5e7eb);
+  border-radius:10px;
+  font-size:14px;
+  background:#fff;
+}
+.sklad-clients__searchInput:focus{outline:none;border-color:var(--primary,#f7d74f)}
+.sklad-clients__searchInput::placeholder{color:var(--muted,#6b7280);opacity:.9}
+
+/* Кнопки */
+.sklad-clients__btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 13px;border-radius:10px;border:1px solid transparent;
+  background:#fff;color:var(--text,#0f172a);
+  font-weight:700;font-size:14px;cursor:pointer;transition:.18s;
+}
+.sklad-clients__btn:active{transform:translateY(1px)}
+.sklad-clients__btn--primary{background:var(--primary,#f7d74f);color:#111}
+.sklad-clients__btn--primary:hover{background:var(--primary-dark,#d4b800)}
+.sklad-clients__btn--secondary{border:1px solid var(--border,#e5e7eb)}
+.sklad-clients__btn--secondary:hover{background:#f9fafb}
+.sklad-clients__btnText{display:inline}
+
+/* ===== Таблица с аккуратным скроллом на узких экранах ===== */
+.sklad-clients-table__wrap{
+  border:1px solid var(--border,#e5e7eb);
+  border-radius:12px;
+  overflow:auto;                 /* скролл по X при узких контейнерах */
+  background:#fff;
+}
+.sklad-clients-table{min-width: 640px;} /* было 720 — стало более «сжатым» */
+.sklad-clients-table__head,
+.sklad-clients-table__row{
+  display:grid; align-items:center;
+  grid-template-columns:1.4fr 1fr 1.2fr 130px;
+}
+.sklad-clients-table__head{background:rgba(0,0,0,.03);font-weight:700}
+.sklad-clients-table__col{padding:10px 12px;border-bottom:1px solid var(--border,#e5e7eb)}
+.sklad-clients-table__row:last-child .sklad-clients-table__col{border-bottom:none}
+.sklad-clients-table__col--actions{text-align:right}
+
+/* пусто */
+.sklad-clients__empty{
+  text-align:center;color:var(--muted,#6b7280);padding:14px;
+  border:1px dashed var(--border,#e5e7eb);border-radius:12px;background:#fff;
+}
+
+/* пагинация — чуть компактнее */
+.sklad-clients__pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:6px;flex-wrap:wrap}
+.sklad-clients__pageList{display:flex;gap:6px;list-style:none;margin:0;padding:0}
+.sklad-clients__pageBtn{border:1px solid var(--border,#e5e7eb);background:#fff;padding:7px 11px;border-radius:10px;cursor:pointer}
+.sklad-clients__pageBtn:hover{background:#f9fafb}
+.sklad-clients__pageBtn.is-active{background:var(--primary,#f7d74f);border-color:var(--primary,#f7d74f);color:#111}
+.sklad-clients__pageBtn:disabled{opacity:.6;cursor:default}
+
+/* ===== Модалка: всегда по центру, скролл внутри ===== */
+.sklad-clients__overlay{
+  position:fixed; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+  background:rgba(15,23,42,.55);
+  backdrop-filter:saturate(140%) blur(2px);
+  z-index:70;
+}
+.sklad-clients__modal{
+  width:min(560px,96vw);
+  max-height:min(92dvh,680px);   /* dvh — надёжное центрирование на моб. */
+  background:#fff;
+  border:1px solid var(--border,#e5e7eb);
+  border-radius:var(--radius,14px);
+  box-shadow:var(--shadow,0 10px 30px rgba(2,6,23,.12));
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sklad-clients__modalHeader{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 18px;border-bottom:1px solid var(--border,#e5e7eb)
+}
+.sklad-clients__modalTitle{margin:0;font-size:18px;font-weight:900}
+.sklad-clients__iconBtn{background:none;border:0;color:var(--muted,#6b7280);font-size:18px;cursor:pointer}
+.sklad-clients__iconBtn:hover{color:var(--text,#0f172a)}
+
+.sklad-clients__form{display:flex;flex-direction:column;min-height:0}
+.sklad-clients__grid{
+  padding:14px 18px; overflow:auto; min-height:0;
+  display:grid; grid-template-columns:1fr 1fr; gap:12px;
+}
+.sklad-clients__field{display:grid;gap:6px}
+.sklad-clients__field--full{grid-column:1 / -1}
+.sklad-clients__label{font-size:14px;font-weight:700;color:var(--muted,#6b7280)}
+.sklad-clients__req{color:#ef4444}
+.sklad-clients__input{
+  width:100%; border:1px solid var(--border,#e5e7eb); border-radius:10px;
+  padding:10px 12px; font-size:14px; background:#fff;
+}
+.sklad-clients__input:focus{outline:none;border-color:var(--primary,#f7d74f)}
+.sklad-clients__input::placeholder{color:var(--muted,#6b7280);opacity:.85}
+.sklad-clients__field--invalid .sklad-clients__label{color:#dc2626}
+.sklad-clients__input--invalid{border-color:#dc2626}
+.sklad-clients__alert{
+  padding:9px 12px;border-radius:10px;
+  border:1px solid rgba(231,76,60,.35);
+  background:rgba(231,76,60,.12);color:#e74c3c;
+}
+.sklad-clients__alert--inModal{margin-top:4px}
+
+.sklad-clients__footer{
+  border-top:1px solid var(--border,#e5e7eb);
+  padding:10px 18px;display:flex;gap:10px;align-items:center;
+  justify-content:flex-end;flex-wrap:wrap;background:#fff;
+}
+.sklad-clients__spacer{flex:1 1 auto}
+.sklad-clients__footerRight{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ========= АДАПТАЦИЯ ЧЕРЕЗ CONTAINER QUERIES =========
+   Ломаемся в колонку ТОЛЬКО когда сам блок узкий.          */
+
+/* при ширине контейнера < 900px — действия в 2 строки */
+@container (max-width: 900px){
+  .sklad-clients__header{grid-template-columns:1fr}
+  .sklad-clients__actions{
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+  }
+  .sklad-clients__actions .sklad-clients__btn--primary{ justify-self:start }
+}
+
+/* при ширине контейнера < 640px — кнопка на всю ширину,
+   ещё чуть компактнее таблица и шрифты */
+@container (max-width: 640px){
+  .sklad-clients__title{font-size:18px}
+  .sklad-clients__actions .sklad-clients__btn{ width:100%; justify-content:center }
+  .sklad-clients-table{min-width: 560px}
+  .sklad-clients-table__col{padding:8px 10px}
+}
+
+/* при очень узких контейнерах — сверхкомпактный режим */
+@container (max-width: 420px){
+  .sklad-clients{--space:10px}
+  .sklad-clients__searchInput{padding:8px 10px}
+  .sklad-clients__btn{padding:8px 10px;border-radius:8px}
+}

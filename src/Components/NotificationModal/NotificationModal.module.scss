@@ -1,0 +1,145 @@
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 320px;
+  max-width: 100%;
+  background-color: #2c2c2c;
+  color: #fff;
+  padding: 20px;
+  z-index: 10000;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+
+  @media (max-width: 480px) {
+    width: 90%;
+    padding: 16px;
+  }
+
+  @media (max-width: 360px) {
+    width: 95%;
+    padding: 14px;
+  }
+
+  @media (max-width: 320px) {
+    width: 100%;
+    padding: 12px;
+  }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+
+  h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+
+    @media (max-width: 360px) {
+      font-size: 16px;
+    }
+
+    @media (max-width: 320px) {
+      font-size: 15px;
+    }
+  }
+
+  .close {
+    cursor: pointer;
+    color: #aaa;
+    transition: color 0.2s;
+
+    &:hover {
+      color: #fff;
+    }
+
+    @media (max-width: 320px) {
+      svg {
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  @media (max-height: 500px) {
+    gap: 8px;
+  }
+}
+
+.item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background-color: #3a3a3a;
+  border-radius: 8px;
+  padding: 12px;
+
+  &:hover {
+    background-color: #4a4a4a;
+  }
+
+  @media (max-width: 360px) {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  @media (max-width: 320px) {
+    padding: 8px;
+    gap: 8px;
+  }
+}
+
+.icon {
+  font-size: 24px;
+
+  @media (max-width: 320px) {
+    font-size: 20px;
+  }
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+
+  @media (max-width: 360px) {
+    font-size: 13px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 12px;
+  }
+}
+
+.count {
+  font-size: 12px;
+  color: #bbb;
+
+  @media (max-width: 360px) {
+    font-size: 11px;
+  }
+
+  @media (max-width: 320px) {
+    font-size: 10px;
+  }
+}

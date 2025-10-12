@@ -1,0 +1,198 @@
+.pending-page {
+  padding: 20px;
+  // max-width: 1200px;
+  // margin: 0 auto;
+  background-color: #fff;
+
+  &__header {
+    margin-bottom: 20px;
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #000;
+      margin: 0;
+    }
+  }
+
+  &__loading {
+    text-align: center;
+    padding: 40px;
+    font-size: 16px;
+    color: #000;
+  }
+
+  &__empty {
+    text-align: center;
+    padding: 40px;
+    font-size: 16px;
+    color: #000;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #ffd600;
+  }
+
+  &__content {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid #ffd600;
+  }
+
+  &__footer {
+    margin-top: 20px;
+    padding: 15px 0;
+    border-top: 1px solid #ffd600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  &__button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    min-width: 120px;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &--accept {
+      background-color: #ffd600;
+      color: #000;
+      border: 1px solid #ffd600;
+
+      &:hover:not(:disabled) {
+        background-color: #e6c200;
+        border-color: #e6c200;
+      }
+    }
+
+    &--reject {
+      background-color: #000;
+      color: #fff;
+      border: 1px solid #000;
+
+      &:hover:not(:disabled) {
+        background-color: #333;
+        border-color: #333;
+      }
+    }
+
+    &--refresh {
+      background-color: #ffd600;
+      color: #000;
+      border: 1px solid #ffd600;
+
+      &:hover:not(:disabled) {
+        background-color: #e6c200;
+        border-color: #e6c200;
+      }
+    }
+  }
+}
+
+// Стили для таблицы (используем существующие стили)
+.table-wrapper {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  // border: 1px solid #ffd600;
+}
+
+.sklad__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th {
+    // background-color: #ffd600;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    color: #000;
+    // border-bottom: 2px solid #000;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 12px 8px;
+    // border-bottom: 1px solid #ffd600;
+    vertical-align: middle;
+    color: #000;
+  }
+
+  tr:hover {
+    background-color: #fff;
+    border: 1px solid #ffd600;
+  }
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+}
+
+// Адаптивность
+@media (max-width: 768px) {
+  .pending-page {
+    padding: 10px;
+
+    &__header h1 {
+      font-size: 20px;
+    }
+
+    &__footer {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__button {
+      min-width: auto;
+      // width: 100%;
+      margin-bottom: 5px;
+    }
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  .sklad__table {
+    min-width: 600px;
+    font-size: 12px;
+
+    th,
+    td {
+      padding: 8px 4px;
+    }
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .pending-page {
+    padding: 10px;
+
+    &__header h1 {
+      font-size: 20px;
+    }
+  }
+
+  .pending-page__footer div {
+    flex-direction: column;
+    button {
+      width: 100%;
+    }
+  }
+}

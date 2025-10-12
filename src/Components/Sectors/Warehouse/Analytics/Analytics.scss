@@ -1,0 +1,74 @@
+:root{
+  --primary:#f7d74f;
+  --primary-dark:#d4b800;
+  --text:#0f172a;
+  --muted:#6b7280;
+  --border:#e5e7eb;
+  --surface:#ffffff;
+}
+
+.analytics, .analytics * { box-sizing: border-box; }
+.analytics{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+  color:var(--text);
+  display:flex;flex-direction:column;gap:12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* header */
+.analytics__header{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px}
+.analytics__title{margin:0;font-size:18px;font-weight:900}
+.analytics__seg{display:flex;gap:6px}
+.analytics__segBtn{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer;font-weight:800}
+.analytics__segBtn.is-active{background:var(--primary);border-color:var(--primary);color:#111}
+
+/* tabs (top) */
+.analytics__tabs{display:flex;gap:8px;flex-wrap:wrap}
+.analytics__tabs--top{position:sticky;top:8px;z-index:1;padding:6px;background:#fff;border:1px solid var(--border);border-radius:12px}
+.analytics__tab{padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;font-weight:800;cursor:pointer}
+.analytics__tab.is-active{background:var(--primary);border-color:var(--primary);color:#111}
+
+/* KPI */
+.analytics__kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.analytics__kpi{border:1px solid var(--border);border-radius:12px;background:#fff;padding:10px;display:grid;gap:6px}
+.analytics__kpiTop{display:flex;justify-content:space-between;align-items:center}
+.analytics__kpiLabel{font-size:12px;color:var(--muted);font-weight:800}
+.analytics__kpiValue{font-size:22px;font-weight:900}
+.analytics__kpiNote{font-size:12px;color:var(--muted)}
+.analytics__delta{padding:2px 8px;border-radius:999px;border:1px solid var(--border);font-size:12px;font-weight:800;background:#fff}
+.analytics__delta--up{color:#166534;background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.35)}
+.analytics__delta--down{color:#991b1b;background:rgba(153,27,27,.08);border-color:rgba(153,27,27,.35)}
+.analytics__delta--flat{color:#334155;background:rgba(51,65,85,.08);border-color:rgba(51,65,85,.35)}
+.analytics__delta--none{color:#6b7280}
+
+/* grid */
+.analytics__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px}
+.analytics__card{border:1px solid var(--border);background:#fff;border-radius:12px;padding:10px;display:grid;gap:8px}
+.analytics__card--span2{grid-column:span 2}
+@media (max-width:760px){ .analytics__card--span2{grid-column:span 1}}
+.analytics__cardTitle{font-weight:900;margin-bottom:2px}
+
+/* summary list — компактнее */
+.analytics__statList{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.analytics__statList li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;border-bottom:1px dashed var(--border);padding:4px 0}
+.analytics__statList span{color:var(--muted)}
+.analytics__statList b{font-weight:900;color:var(--text);white-space:nowrap}
+
+/* table */
+.analytics-table{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff}
+.analytics-table__head,.analytics-table__row{display:grid;align-items:center} /* ширина приходит инлайном */
+.analytics-table__head{background:rgba(0,0,0,.03);font-weight:900}
+.analytics-table__col{padding:8px 10px;border-bottom:1px solid var(--border)}
+.analytics-table__col.is-num{text-align:right}
+.analytics-table__row:nth-child(even) .analytics-table__col{background:#fcfcfd}
+.analytics-table__row:last-child .analytics-table__col{border-bottom:none}
+.analytics-table__empty{padding:10px;text-align:center;color:var(--muted)}
+
+/* pager */
+.analytics__pager{display:flex;justify-content:center;margin-top:8px}
+.analytics__pageList{display:flex;gap:6px;list-style:none;margin:0;padding:0}
+.analytics__pageBtn{border:1px solid var(--border);background:#fff;padding:6px 10px;border-radius:10px;cursor:pointer}
+.analytics__pageBtn.is-active{background:var(--primary);border-color:var(--primary);color:#111}

@@ -1,0 +1,211 @@
+.create {
+  text-align: center;
+  padding: 20px;
+  background-color: #f9f9f9;
+  max-width: 400px;
+  margin: 50px auto;
+  border-radius: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+
+  &__title {
+    font-size: 24px;
+    color: #000;
+    margin-bottom: 20px;
+    font-weight: 600;
+  }
+
+  &__input {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    margin: 10px auto;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+    background-color: #fff;
+    color: #000;
+
+    &:focus {
+      outline: none;
+      border-color: #ffd700;
+    }
+  }
+
+  &__button {
+    display: block;
+    width: 100%;
+    max-width: 300px;
+    margin: 20px auto;
+    padding: 10px;
+    background-color: #ffd700;
+    border: none;
+    border-radius: 5px;
+    color: #000;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #e6c200;
+    }
+
+    &:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.success {
+  padding: 30px;
+  background-color: #fff;
+  border-radius: 15px;
+  width: 400px;
+  margin: 50px auto;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+
+  &__content {
+    margin-bottom: 20px;
+  }
+
+  &__title {
+    font-weight: bold;
+    font-size: 22px;
+    color: #000;
+    margin: 10px 0;
+    line-height: 1.5;
+  }
+
+  &__text {
+    font-size: 15px;
+    color: #000;
+    margin: 10px 0;
+    line-height: 1.5;
+  }
+
+  &__check {
+    font-size: 30px;
+    color: #28a745;
+    display: block;
+    margin: 10px 0;
+  }
+
+  &__button {
+    width: 100%;
+    max-width: 300px;
+    padding: 10px;
+    background-color: #ffd700;
+    border: none;
+    border-radius: 5px;
+    color: #000;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #e6c200;
+    }
+
+    &:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .create {
+    padding: 15px;
+    max-width: 90%;
+    margin: 30px auto;
+
+    &__title {
+      font-size: 20px;
+      margin-bottom: 15px;
+    }
+
+    &__input {
+      max-width: 100%;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    &__button {
+      max-width: 100%;
+      padding: 8px;
+      font-size: 14px;
+    }
+  }
+
+  .success {
+    width: 90%;
+    padding: 20px;
+    margin: 30px auto;
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__text {
+      font-size: 13px;
+    }
+
+    &__check {
+      font-size: 24px;
+    }
+
+    &__button {
+      max-width: 100%;
+      padding: 8px;
+      font-size: 14px;
+    }
+  }
+}
+
+@media screen and (max-width: 320px) {
+  .create {
+    padding: 10px;
+    margin: 20px auto;
+
+    &__title {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+
+    &__input {
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    &__button {
+      padding: 6px;
+      font-size: 12px;
+    }
+  }
+
+  .success {
+    padding: 15px;
+    margin: 20px auto;
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__text {
+      font-size: 12px;
+    }
+
+    &__check {
+      font-size: 20px;
+    }
+
+    &__button {
+      padding: 6px;
+      font-size: 12px;
+    }
+  }
+}

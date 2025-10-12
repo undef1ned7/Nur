@@ -1,0 +1,184 @@
+
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  &__left {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+
+  &__title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1C2526;
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  &__notification {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+
+    .material-icons {
+      font-size: 24px;
+      color: #1C2526;
+      transition: color 0.3s;
+    }
+
+    &:hover .material-icons {
+      color: #FFC107;
+    }
+
+    &-count {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      background-color: #FFC107;
+      color: #1C2526;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 50%;
+      padding: 2px 6px;
+      line-height: 1;
+    }
+  }
+
+  &__profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    @media (max-width: 768px) {
+      display: none;
+    }
+  }
+
+  &__avatar {
+    width: 32px;
+    height: 32px;
+    background-color: #F5F5F5;
+    color: #1C2526;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+
+  &__username {
+    font-size: 14px;
+    color: #1C2526;
+    font-weight: 500;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__burger {
+    display: none;
+    cursor: pointer;
+    color: #1C2526;
+
+    @media (max-width: 768px) {
+      display: flex;
+      align-items: center;
+    }
+
+    svg {
+      width: 24px;
+      height: 24px;
+      transition: color 0.3s;
+
+      &:hover {
+        color: #FFC107;
+      }
+    }
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .header {
+    padding: 15px;
+
+    &__title {
+      font-size: 24px;
+    }
+
+    &__right {
+      gap: 15px;
+    }
+
+    &__notification {
+      .material-icons {
+        font-size: 20px;
+      }
+
+      &-count {
+        font-size: 10px;
+        padding: 1px 5px;
+        top: -4px;
+        right: -4px;
+      }
+    }
+
+    &__burger {
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+  }
+}
+
+@media screen and (max-width: 320px) {
+  .header {
+    padding: 10px;
+
+    &__title {
+      font-size: 20px;
+    }
+
+    &__right {
+      gap: 10px;
+    }
+
+    &__notification {
+      .material-icons {
+        font-size: 18px;
+      }
+
+      &-count {
+        font-size: 9px;
+        padding: 1px 4px;
+        top: -3px;
+        right: -3px;
+      }
+    }
+
+    &__burger {
+      svg {
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+}

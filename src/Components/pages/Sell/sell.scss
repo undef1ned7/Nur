@@ -1,0 +1,144 @@
+.sellDetail {
+  &__title {
+    margin-top: 50px;
+    margin-bottom: 30px;
+  }
+  &__items {
+    width: 500px;
+  }
+}
+.sellObject {
+  .add-modal__content {
+    width: 550px;
+  }
+}
+.receipt__add {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  column-gap: 10px;
+  justify-content: center;
+  padding: 8px 0;
+  margin-bottom: 10px;
+}
+
+.receipt__services {
+  display: flex;
+  align-items: center;
+  column-gap: 10px;
+  justify-content: space-between;
+  .one {
+    width: 60%;
+  }
+  .two {
+    width: 25%;
+  }
+  .reBtn {
+    width: 15%;
+    margin: 0 !important;
+    padding: 2px 0 !important;
+  }
+}
+.receipt__discount {
+  margin-bottom: 15px;
+}
+
+.sell__empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sell__badge--danger {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  background: #ffebee; /* мягкий красный фон */
+  color: #c62828; /* тёмно-красный текст */
+  border: 1px solid #ffcdd2;
+}
+.sell__hint {
+  opacity: 0.75;
+}
+
+.sell {
+  .add-modal {
+    height: max-content;
+  }
+  .add-modal__content {
+    width: 550px;
+    overflow-y: auto;
+    height: 80%;
+  }
+  &__manual {
+    padding: 0 30px;
+  }
+  &__list {
+    padding: 15px 0;
+    list-style: none;
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    row-gap: 10px;
+    height: 200px;
+    overflow-y: scroll;
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      column-gap: 20px;
+    }
+    button {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+    &-row {
+      display: flex;
+      align-items: center;
+      column-gap: 20px;
+      input {
+        outline: none;
+        padding: 3px;
+        border: none;
+        border-bottom: 1px solid #000;
+      }
+    }
+  }
+}
+
+@media screen and (max-width: 500px) {
+  .sell__list-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 15px;
+  }
+  .sell__list {
+    li {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  }
+  .receipt__item {
+    flex-wrap: wrap;
+    justify-content: center !important;
+    div {
+      flex-wrap: wrap;
+    }
+  }
+  .receipt__total {
+    flex-wrap: wrap;
+    row-gap: 15px;
+    div {
+      flex-wrap: wrap;
+    }
+  }
+  .receipt__row {
+    flex-wrap: wrap;
+    row-gap: 15px;
+    button {
+      width: 100%;
+    }
+  }
+}

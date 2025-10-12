@@ -1,0 +1,230 @@
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+.history {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  &__title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+  &__subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  &__filters {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  &__filter {
+    display: grid;
+    gap: 6px;
+  }
+  &__filterLabel {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  &__input {
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  /* Кнопки */
+  &__btn {
+    align-self: end;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    border: 1px solid transparent;
+    background: #fff;
+    color: var(--text);
+    &:active {
+      transform: translateY(1px);
+    }
+  }
+  &__btn--primary {
+    background: var(--primary);
+    color: #111;
+    &:hover {
+      background: var(--primary-dark);
+    }
+  }
+  &__btn--secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    &:hover {
+      background: #f9fafb;
+    }
+  }
+
+  &__error {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 8px 10px;
+    border-radius: 8px;
+  }
+
+  /* Таблица */
+  &__tableWrap {
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fafafa;
+  }
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    thead th {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+    tfoot td {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+  }
+  &__empty {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 12px 4px;
+    text-align: center;
+  }
+
+  /* ellipsis helper (локально к странице) */
+  :global(.ellipsis) {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Модалка */
+  &__modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+  &__modal {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 20px;
+    width: 900px;
+    max-width: 95%;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    display: grid;
+    gap: 16px;
+  }
+  &__modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  &__modalTitle {
+    font-size: 18px;
+    font-weight: 700;
+  }
+  &__iconBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  &__modalFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* Метаданные (только 3 поля) */
+  &__meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fafafa;
+    > div {
+      font-size: 14px;
+      color: var(--text);
+    }
+  }
+
+  /* Скелетоны */
+  &__skeletonRow {
+    display: grid;
+    gap: 10px;
+  }
+  &__skeleton {
+    height: 72px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%);
+    background-size: 400% 100%;
+    animation: histShimmer 1.1s infinite;
+  }
+  @keyframes histShimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: 0 0;
+    }
+  }
+}
