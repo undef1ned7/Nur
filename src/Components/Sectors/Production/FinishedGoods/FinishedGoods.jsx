@@ -61,7 +61,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   // Категории/бренды из product slice
   const { categories, brands } = useProducts();
 
-  // Сырьё: product.itemsMake
+  // Сырьё
   const materials = useSelector((s) => s.product?.itemsMake ?? []);
   const materialsLoading =
     useSelector(
@@ -82,7 +82,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     brand_name: "",
     category_name: "",
     price: "",
-    quantity: "",
+    quantity: "", // ВАЖНО: храним как строку для удобного двустороннего биндинга
     client: "",
     purchase_price: "",
   });
@@ -111,7 +111,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     address: "",
   });
 
-  // Рецепт: [{ materialId, quantity? }] — quantity только для UI
+  // Рецепт: [{ materialId, quantity }]
   const [recipeItems, setRecipeItems] = useState([]);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [materialQuery, setMaterialQuery] = useState("");
@@ -149,6 +149,13 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   // Хэндлеры
   const onProductChange = (e) => {
     const { name, value, type } = e.target;
+
+    // quantity и price удобно хранить строкой (пустое значение тоже валидно)
+    if (name === "quantity" || name === "price" || name === "purchase_price") {
+      setProduct((prev) => ({ ...prev, [name]: value }));
+      return;
+    }
+
     setProduct((prev) => ({
       ...prev,
       [name]: type === "number" ? (value === "" ? "" : Number(value)) : value,
@@ -183,7 +190,9 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         prev.filter((it) => String(it.materialId) !== key)
       );
     } else {
-      setRecipeItems((prev) => [...prev, { materialId, quantity: "1" }]);
+      // НОВОЕ: при добавлении сразу ставим количество как у товара
+      const syncedQty = String(product.quantity ?? "");
+      setRecipeItems((prev) => [...prev, { materialId, quantity: syncedQty }]);
     }
   };
 
@@ -203,6 +212,14 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     );
   };
 
+  // НОВОЕ: авто-синхронизация количества сырья при изменении количества товара
+  useEffect(() => {
+    const syncedQty = String(product.quantity ?? "");
+    setRecipeItems((prev) =>
+      prev.map((it) => ({ ...it, quantity: syncedQty }))
+    );
+  }, [product.quantity]);
+
   // валидатор товара
   const validateProduct = () => {
     const required = [
@@ -211,9 +228,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       ["brand_name", "Бренд"],
       ["category_name", "Категория"],
       ["price", "Розничная цена"],
-      // ["purchase_price", "Закупочная цена"],
       ["quantity", "Количество"],
-      // ["client", "Поставщик"],
     ];
     const missed = required.filter(
       ([k]) => product[k] === "" || product[k] === null
@@ -231,6 +246,9 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     if (!validateProduct()) return;
 
     // рецепт для списания: [{id, qty_per_unit}]
+    // ВАЖНО: сейчас quantity у сырья = общему количеству товара,
+    // если нужно списывать на весь объём, можно интерпретировать как "на 1 ед."
+    // и умножать на units (ниже уже есть логика units).
     const recipe = recipeItems
       .map((it) => ({
         id: String(it.materialId),
@@ -246,21 +264,20 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
     setCreating(true);
     try {
-      // 1) списание сырья
+      // списание сырья
       if (recipe.length && units > 0) {
         await dispatch(consumeItemsMake({ recipe, units })).unwrap();
       }
 
-      // 2) создание товара
+      // создание товара
       const payload = {
         name: product.name,
         barcode: product.barcode,
         brand_name: product.brand_name,
         category_name: product.category_name,
-        price: Number(product.price),
-        quantity: Number(product.quantity),
+        price: Number(product.price || 0),
+        quantity: Number(product.quantity || 0),
         client: product.client, // id поставщика
-        // purchase_price: Number(product.purchase_price),
         item_make,
       };
 
@@ -341,11 +358,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             required
           >
             <option value="">-- Выберите бренд --</option>
-            {brands.map((b) => (
-              <option key={b.id} value={b.name}>
-                {b.name}
-              </option>
-            ))}
+            {categories &&
+              brands?.map((b) => (
+                <option key={b.id} value={b.name}>
+                  {b.name}
+                </option>
+              ))}
           </select>
         </div>
 
@@ -359,7 +377,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             required
           >
             <option value="">-- Выберите категорию --</option>
-            {categories.map((c) => (
+            {categories?.map((c) => (
               <option key={c.id} value={c.name}>
                 {c.name}
               </option>
@@ -494,21 +512,6 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           />
         </div>
 
-        {/* <div className="add-modal__section">
-          <label>Закупочная цена *</label>
-          <input
-            type="number"
-            name="purchase_price"
-            className="add-modal__input"
-            placeholder="80"
-            value={product.purchase_price}
-            onChange={onProductChange}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div> */}
-
         <div className="add-modal__section">
           <label>Количество *</label>
           <input
@@ -534,7 +537,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               gap: 12,
             }}
           >
-            <label>Состав (сырьё) — на 1 ед. готового товара</label>
+            <label>Состав (сырьё)</label>
             <button
               type="button"
               className="create-client"
@@ -615,7 +618,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                     </p>
                     <TextField
                       size="small"
-                      placeholder="Кол-во на 1 ед. (не обязательно)"
+                      placeholder="Кол-во"
                       type="number"
                       inputProps={{ step: "0.0001", min: "0" }}
                       disabled={!checked}
@@ -672,7 +675,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                     </div>
                     <TextField
                       size="small"
-                      placeholder="Кол-во на 1 ед. (не обязательно)"
+                      placeholder="Кол-во"
                       type="number"
                       inputProps={{ step: "0.0001", min: "0" }}
                       value={it.quantity}

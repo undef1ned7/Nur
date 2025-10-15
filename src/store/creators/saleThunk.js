@@ -67,6 +67,7 @@ export const manualFilling = createAsyncThunk(
     }
   }
 );
+
 export const updateManualFilling = createAsyncThunk(
   "sale/updateManualFilling",
   async ({ id, productId, discount_total, quantity }, { rejectWithValue }) => {

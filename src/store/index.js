@@ -17,6 +17,7 @@ import consultingReducer from "./slices/consultingSlice";
 import transferReducer from "./slices/transferSlice";
 import acceptanceReducer from "./slices/acceptanceSlice";
 import returnReducer from "./slices/returnSlice";
+import agentReducer from "./slices/agentSlice";
 
 const store = configureStore({
   reducer: {
@@ -38,6 +39,7 @@ const store = configureStore({
     transfer: transferReducer,
     acceptance: acceptanceReducer,
     return: returnReducer,
+    agent: agentReducer,
   },
 });
 

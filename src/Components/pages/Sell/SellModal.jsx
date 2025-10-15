@@ -466,7 +466,7 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
         }
 
         if (clientId) {
-          console.log(debt);
+          // console.log(debt);
 
           await dispatch(
             createDeal({

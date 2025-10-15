@@ -11,6 +11,7 @@ import api from "../../../../api";
 import Reports from "../Reports/Reports";
 import { getAll as getAllClients } from "../Clients/clientStore";
 import "./kassa.scss";
+import Pending from "../../../pages/Pending/Pending";
 
 /* ──────────────────────────────── Базовый путь */
 const BASE = "/crm/hostel/kassa";
@@ -52,11 +53,12 @@ const Kassa = () => (
     <Route path="pay" element={<CashboxPayment />} />
     <Route path="reports" element={<CashboxReports />} />
     <Route path=":id" element={<CashboxDetail />} />
+    <Route path="requests" element={<Pending />} />
   </Routes>
 );
 
 /* Верхние вкладки */
-const HeaderTabs = () => {
+export const HeaderTabs = () => {
   const { pathname } = useLocation();
 
   // точные проверки активной вкладки под BASE
@@ -65,6 +67,7 @@ const HeaderTabs = () => {
   const isList = isPath(BASE);
   const isReports = isPath(`${BASE}/reports`);
   const isPay = isPath(`${BASE}/pay`);
+  const isRequest = isPath(`${BASE}/requests`);
 
   return (
     <div className="kassa__header">
@@ -86,6 +89,12 @@ const HeaderTabs = () => {
           to={`${BASE}/reports`}
         >
           Отчёты
+        </Link>
+        <Link
+          className={`kassa__tab ${isRequest ? "kassa__tab--active" : ""}`}
+          to={`${BASE}/requests`}
+        >
+          Запросы
         </Link>
       </div>
     </div>
@@ -228,7 +237,7 @@ const CashboxPayment = () => {
   const nightsBetween = (a, b) => {
     if (!a || !b) return 1;
     const ms = new Date(b) - new Date(a);
-       const d = Math.ceil(ms / (24 * 60 * 60 * 1000));
+    const d = Math.ceil(ms / (24 * 60 * 60 * 1000));
     return Math.max(1, d);
   };
 
@@ -537,6 +546,7 @@ const CashboxDetail = () => {
   const [openOp, setOpenOp] = useState(null); // хранит объект операции
   const [opLoading, setOpLoading] = useState(false);
   const [opDetail, setOpDetail] = useState(null);
+  const [onlyApproved, setOnlyApproved] = useState(false);
 
   // справочник клиентов
   const [clientsMap, setClientsMap] = useState({});
@@ -605,11 +615,23 @@ const CashboxDetail = () => {
         } catch {}
       }
 
+      // внутри load(), где формируешь mapped
       const mapped = (flows || []).map((x, i) => {
         const amt = Number(x.amount ?? x.sum ?? x.value ?? x.total ?? 0) || 0;
         let type = String(x.type ?? x.kind ?? x.direction ?? "").toLowerCase();
         if (type !== "income" && type !== "expense")
           type = amt >= 0 ? "income" : "expense";
+
+        // универсально нормализуем статус в boolean
+        const normStatus = (() => {
+          const v = x.status;
+          if (typeof v === "boolean") return v;
+          if (typeof v === "number") return v === 1;
+          if (typeof v === "string")
+            return v.toLowerCase() === "true" || v === "1" || v === "approved";
+          return false;
+        })();
+
         return {
           id: x.id || x.uuid || `${i}`,
           type,
@@ -632,6 +654,7 @@ const CashboxDetail = () => {
           client_phone: x.client_phone ?? null,
           purpose: x.purpose ?? x.description ?? x.note ?? "",
           cashbox_name: x.cashbox_name ?? null,
+          status: normStatus, // <<<<<<<<<< добавили
           _raw: x,
         };
       });
@@ -667,11 +690,18 @@ const CashboxDetail = () => {
         : tab === "expense"
         ? ops.filter((o) => o.type === "expense")
         : ops;
+
+    // фильтр по датам
     base = base.filter((o) => inRange(o.created_at));
+
+    // новый фильтр по статусу
+
+    base = base.filter((o) => o.status === true);
+
     return [...base].sort(
       (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
     );
-  }, [ops, tab, dateFrom, dateTo]);
+  }, [ops, tab, dateFrom, dateTo, onlyApproved]); // <<<<<< добавили onlyApproved
 
   const resetDates = () => {
     setDateFrom("");

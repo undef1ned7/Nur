@@ -35,6 +35,9 @@ import { useTransfer } from "../../../../store/slices/transferSlice";
 import SellModal from "../../../pages/Sell/SellModal";
 import { useSale } from "../../../../store/slices/saleSlice";
 import { startSale } from "../../../../store/creators/saleThunk";
+import SellStart from "./SellStart/SellStart";
+import { startSaleInAgent } from "../../../../store/creators/agentCreators";
+import { useAgent } from "../../../../store/slices/agentSlice";
 
 const PendingModal = ({ onClose, onChanged }) => {
   const dispatch = useDispatch();
@@ -391,12 +394,14 @@ const ProductionAgents = () => {
     agentProductsLoading,
     agentProductsError,
   } = useProducts();
+  const { start: startInAgent } = useAgent();
   // const {}
   const { list: cashBoxes } = useCash();
   const { list } = useTransfer();
 
   const [cashboxId, setCashboxId] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [showStart, setShowStart] = useState(false);
 
   // состояние для редактирования
   const [showEdit, setShowEdit] = useState(false);
@@ -573,226 +578,200 @@ const ProductionAgents = () => {
           )}
         </div>
       </div> */}
-      <div className="sklad__warehouse" style={{ marginTop: "15px" }}>
-        <div className="sklad__header">
-          <div
-            className="sklad__left"
-            style={{
-              display: "flex",
-              gap: 12,
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Поиск по названию товара"
-              className="sklad__search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
 
-            {/* Новый блок фильтра по дате */}
+      {startInAgent && showStart ? (
+        <SellStart show={showStart} setShow={setShowStart} />
+      ) : (
+        <div className="sklad__warehouse" style={{ marginTop: "15px" }}>
+          <div className="sklad__header">
+            <div
+              className="sklad__left"
+              style={{
+                display: "flex",
+                gap: 12,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Поиск по названию товара"
+                className="sklad__search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <label style={{ opacity: 0.7 }}>От</label>
+                <input
+                  type="date"
+                  className="employee__search-wrapper"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+                <label style={{ opacity: 0.7 }}>До</label>
+                <input
+                  type="date"
+                  className="employee__search-wrapper"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="sklad__add"
+                  style={{ padding: "6px 10px" }}
+                  onClick={resetFilters}
+                >
+                  Сбросить
+                </button>
+              </div>
+            </div>
+
             <div
               style={{
                 display: "flex",
-                gap: 8,
                 alignItems: "center",
-                flexWrap: "wrap",
+                gap: 20,
+                flexWrap: "wrap-reverse",
+                justifyContent: "end",
               }}
             >
-              <label style={{ opacity: 0.7 }}>От</label>
-              <input
-                type="date"
-                className="employee__search-wrapper"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-              <label style={{ opacity: 0.7 }}>До</label>
-              <input
-                type="date"
-                className="employee__search-wrapper"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
+              {profile?.role !== "owner" ? (
+                <button
+                  className="btn edit-btn"
+                  onClick={() => setShowPendingModal(true)}
+                >
+                  <Plus size={16} style={{ marginRight: 4 }} />
+                  Мои передачи
+                </button>
+              ) : (
+                <button
+                  className="btn edit-btn"
+                  onClick={() => setShowPendingModal(true)}
+                >
+                  <Plus size={16} style={{ marginRight: 4 }} />
+                  Все передачи
+                </button>
+              )}
+
               <button
-                type="button"
                 className="sklad__add"
-                style={{ padding: "6px 10px" }}
-                onClick={resetFilters}
+                onClick={() => {
+                  dispatch(startSaleInAgent());
+                  setShowStart(true);
+                }}
               >
-                Сбросить
+                <Plus size={16} style={{ marginRight: 4 }} />
+                Продажа товара
               </button>
             </div>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 20,
-              flexWrap: "wrap-reverse",
-              justifyContent: "end",
-            }}
-          >
-            {profile?.role !== "owner" ? (
-              <button
-                className="btn edit-btn"
-                onClick={() => setShowPendingModal(true)}
-              >
-                <Plus size={16} style={{ marginRight: 4 }} />
-                Мои передачи
-              </button>
-            ) : (
-              <button
-                className="btn edit-btn"
-                onClick={() => setShowPendingModal(true)}
-              >
-                <Plus size={16} style={{ marginRight: 4 }} />
-                Все передачи
-              </button>
-            )}
-
-            <button
-              className="sklad__add"
-              onClick={() => setShowSellModal(true)}
-              disabled={!selectCashBox}
-              title={!selectCashBox ? "Сначала выберите кассу" : undefined}
-            >
-              <Plus size={16} style={{ marginRight: 4 }} />
-              Продажа товара
-            </button>
-            <select
-              value={selectCashBox}
-              onChange={(e) => setSelectCashBox(e.target.value)}
-              className="employee__search-wrapper"
-            >
-              <option value="">Выберите кассу</option>
-              {cashBoxes?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name ?? c.department_name}
-                </option>
-              ))}
-            </select>
+          <div style={{ margin: "8px 0", opacity: 0.8 }}>
+            Найдено: {viewProducts?.length}
+            {viewProducts?.length ? ` из ${viewProducts?.length}` : ""}
           </div>
-        </div>
 
-        <div style={{ margin: "8px 0", opacity: 0.8 }}>
-          Найдено: {viewProducts?.length}
-          {viewProducts?.length ? ` из ${viewProducts?.length}` : ""}
-        </div>
-
-        {(profile?.role === "owner" ? loading : agentProductsLoading) ? (
-          <p className="sklad__loading-message">Загрузка товаров...</p>
-        ) : (profile?.role === "owner" ? error : agentProductsError) ? (
-          <p className="sklad__error-message">Ошибка загрузки</p>
-        ) : viewProducts?.length === 0 ? (
-          <p className="sklad__no-products-message">Нет доступных товаров.</p>
-        ) : (
-          <div className="table-wrapper">
-            <table className="sklad__table">
-              <thead>
-                <tr>
-                  <th>
-                    <input type="checkbox" />
-                  </th>
-                  {/* <th></th> */}
-                  <th>№</th>
-                  <th>Название</th>
-                  {/* <th>Поставщик</th> */}
-                  {profile?.role === "owner" && <th>Агент</th>}
-                  {/* <th>Цена</th> */}
-                  <th>Дата</th>
-                  <th>
-                    {profile?.role !== "owner"
-                      ? "На руках"
-                      : "Количество / У агентов"}
-                  </th>
-                  {/* <th>Категория</th> */}
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {viewProducts?.map((item, idx) => (
-                  <tr key={item.id || item.product}>
-                    {/* {console.log(viewProducts)} */}
-                    <td>
+          {(profile?.role === "owner" ? loading : agentProductsLoading) ? (
+            <p className="sklad__loading-message">Загрузка товаров...</p>
+          ) : (profile?.role === "owner" ? error : agentProductsError) ? (
+            <p className="sklad__error-message">Ошибка загрузки</p>
+          ) : viewProducts?.length === 0 ? (
+            <p className="sklad__no-products-message">Нет доступных товаров.</p>
+          ) : (
+            <div className="table-wrapper">
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>
                       <input type="checkbox" />
-                    </td>
-                    {/* <td>
-                   
-                      <button
-                        type="button"
-                        title="Редактировать"
-                        // onClick={() => openEdit(item)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <MoreVertical size={16} />
-                      </button>
-                    </td> */}
-                    <td>{idx + 1}</td>
-                    <td>
-                      <strong>{item.product_name || item.name}</strong>
-                    </td>
-                    {/* <td>{item.client_name || "-"}</td> */}
-                    {profile?.role === "owner" && <td>{item.agent_name}</td>}
-                    {/* <td>{item.price}</td> */}
-                    <td>
-                      {profile?.role === "owner"
-                        ? new Date(item.created_at).toLocaleString()
-                        : "—"}
-                    </td>
-                    <td>
-                      {profile?.role !== "owner" ? (
-                        item.qty_on_hand > 0 ? (
-                          <span className="sell__badge--success">
-                            {item.qty_on_hand}
-                          </span>
-                        ) : (
-                          <span className="sell__badge--danger">
-                            Нет на руках
-                          </span>
-                        )
-                      ) : (
-                        <div>
-                          <div>На складе: {item.quantity}</div>
-                          {item.qty_on_agent > 0 && (
-                            <div style={{ fontSize: "12px", color: "#28a745" }}>
-                              У агентов: {item.qty_on_agent}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    {/* <td>{item.category || item.category_name || "-"}</td> */}
-                    <td>
-                      {profile?.role !== "owner" && (
-                        <button
-                          className="btn edit-btn"
-                          onClick={() => handleOpen3(item)}
-                          disabled={!item.qty_on_hand || item.qty_on_hand <= 0}
-                          title={
-                            !item.qty_on_hand || item.qty_on_hand <= 0
-                              ? "Нет товара для возврата"
-                              : "Вернуть товар"
-                          }
-                        >
-                          Вернуть
-                        </button>
-                      )}
-                    </td>
+                    </th>
+                    <th>№</th>
+                    <th>Название</th>
+                    {profile?.role === "owner" && <th>Агент</th>}
+                    <th>Дата</th>
+                    <th>
+                      {profile?.role !== "owner"
+                        ? "На руках"
+                        : "Количество / У агентов"}
+                    </th>
+                    <th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {viewProducts?.map((item, idx) => (
+                    <tr key={item.id || item.product}>
+                      <td>
+                        <input type="checkbox" />
+                      </td>
+                      <td>{idx + 1}</td>
+                      <td>
+                        <strong>{item.product_name || item.name}</strong>
+                      </td>
+                      {profile?.role === "owner" && <td>{item.agent_name}</td>}
+                      <td>
+                        {profile?.role === "owner"
+                          ? new Date(item.created_at).toLocaleString()
+                          : "—"}
+                      </td>
+                      <td>
+                        {profile?.role !== "owner" ? (
+                          item.qty_on_hand > 0 ? (
+                            <span className="sell__badge--success">
+                              {item.qty_on_hand}
+                            </span>
+                          ) : (
+                            <span className="sell__badge--danger">
+                              Нет на руках
+                            </span>
+                          )
+                        ) : (
+                          <div>
+                            <div>На складе: {item.quantity}</div>
+                            {item.qty_on_agent > 0 && (
+                              <div
+                                style={{ fontSize: "12px", color: "#28a745" }}
+                              >
+                                У агентов: {item.qty_on_agent}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {profile?.role !== "owner" && (
+                          <button
+                            className="btn edit-btn"
+                            onClick={() => handleOpen3(item)}
+                            disabled={
+                              !item.qty_on_hand || item.qty_on_hand <= 0
+                            }
+                            title={
+                              !item.qty_on_hand || item.qty_on_hand <= 0
+                                ? "Нет товара для возврата"
+                                : "Вернуть товар"
+                            }
+                          >
+                            Вернуть
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {showPendingModal && (
         <PendingModal
           onClose={() => setShowPendingModal(false)}

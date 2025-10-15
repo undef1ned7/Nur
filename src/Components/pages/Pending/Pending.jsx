@@ -7,8 +7,11 @@ import {
   useCash,
 } from "../../../store/slices/cashSlice";
 import "./Pending.scss";
+import { useLocation } from "react-router-dom";
+import { HeaderTabs } from "../../Sectors/Hostel/kassa/kassa";
 
 const Pending = () => {
+  const location = useLocation();
   const dispatch = useDispatch();
   const { cashFlows } = useCash();
   const { loading } = useSelector((s) => s.product);
@@ -150,6 +153,7 @@ const Pending = () => {
 
   return (
     <div className="pending-page">
+      {location.pathname === "/crm/hostel/kassa/requests" && <HeaderTabs />}
       <div className="pending-page__header">
         <h1>
           В ожидании {selected.size > 0 ? `— выбрано: ${selected.size}` : ""}

@@ -9,10 +9,9 @@ import {
 import api from "../../../../api";
 import {
   getAll as getAllClients,
-  createClient, // мини-добавление клиента
+  createClient,
 } from "../Clients/clientStore";
-import "./bookings.scss";
-// import { Sell } from "@mui/icons-material";
+import "./Bookings.scss";
 import Sell from "../../../pages/Sell/Sell";
 
 /* ===== helpers ===== */
@@ -24,6 +23,23 @@ const toApiDatetime = (local) =>
   !local ? "" : local.length === 16 ? `${local}:00` : local;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+/* Вспомогательные форматтеры */
+const pad2 = (n) => String(n).padStart(2, "0");
+const hhmm = (ms) => {
+  const d = new Date(ms);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+const fmtHuman = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)} ${pad2(
+    d.getHours()
+  )}:${pad2(d.getMinutes())}`;
+};
+
+/* Ночи для показов суммы */
 const countNights = (startIso, endIso) => {
   if (!startIso || !endIso) return 1;
   const a = new Date(startIso).getTime();
@@ -34,20 +50,21 @@ const countNights = (startIso, endIso) => {
 };
 const fmtMoney = (v) => (Number(v) || 0).toLocaleString() + " с";
 
-/* ===== calendar utils ===== */
-const addDays = (iso, n) => {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+/* ===== Local date utils (без UTC-сдвигов) ===== */
+const ymdLocal = (d) => {
+  const dd = d instanceof Date ? d : new Date(d);
+  const y = dd.getFullYear();
+  const m = String(dd.getMonth() + 1).padStart(2, "0");
+  const day = String(dd.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 };
-const eachDateExclusiveEnd = (startISODate, endISODate) => {
-  const res = [];
-  let cur = startISODate;
-  while (cur < endISODate) {
-    res.push(cur);
-    cur = addDays(cur, 1);
-  }
-  return res;
+const dateFromYMDLocal = (key) => {
+  const [y, m, d] = key.split("-").map((n) => parseInt(n, 10));
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+};
+const dmNoYear = (key) => {
+  const d = dateFromYMDLocal(key);
+  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}`;
 };
 const startOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const startOfCalendarGrid = (d) => {
@@ -62,8 +79,77 @@ const todayStart = () => {
   d.setHours(0, 0, 0, 0);
   return d;
 };
+const floorDay = (ms) => {
+  const d = new Date(ms);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+};
+const combineDateTime = (dateKey, hhmmStr) => `${dateKey}T${hhmmStr}`;
 
-/* ===== normalizers ===== */
+/* Разбиение брони по дням */
+const splitBookingByDaysLocal = (startIso, endIso) => {
+  const map = new Map();
+  if (!startIso || !endIso) return map;
+  const A = new Date(startIso).getTime();
+  const B = new Date(endIso).getTime();
+  if (!(A < B)) return map;
+
+  let dayStart = floorDay(A);
+  while (dayStart < B) {
+    const dayEnd = dayStart + DAY_MS;
+    const s = Math.max(A, dayStart);
+    const e = Math.min(B, dayEnd);
+    if (s < e) {
+      const key = ymdLocal(new Date(dayStart));
+      const arr = map.get(key) || [];
+      arr.push([s, e]);
+      map.set(key, arr);
+    }
+    dayStart = dayEnd;
+  }
+  return map;
+};
+
+/* Построение карты сегментов для подкраски */
+const buildDailySegmentsMap = (items) => {
+  const dayIntervals = new Map();
+  items.forEach((b) => {
+    const m = splitBookingByDaysLocal(b.start_time, b.end_time);
+    m.forEach((arr, key) => {
+      const cur = dayIntervals.get(key) || [];
+      dayIntervals.set(key, cur.concat(arr));
+    });
+  });
+
+  const res = new Map();
+  dayIntervals.forEach((intervals, key) => {
+    const sorted = intervals.slice().sort((a, b) => a[0] - b[0]);
+
+    const segments = sorted.map(([s, e]) => {
+      const ds = floorDay(s);
+      const leftPct = Math.max(0, Math.min(100, ((s - ds) / DAY_MS) * 100));
+      const rightPct = Math.max(
+        0,
+        Math.min(100, (((ds + DAY_MS) - e) / DAY_MS) * 100)
+      );
+      return { leftPct, rightPct, from: s, to: e };
+    });
+
+    const isFull = segments.some(
+      (seg) => Math.abs(seg.leftPct) < 0.1 && Math.abs(seg.rightPct) < 0.1
+    );
+
+    res.set(key, { intervals: sorted, segments, isFull });
+  });
+
+  return res;
+};
+
+/* Оверлап */
+const intervalsOverlap = (aStart, aEnd, bStart, bEnd) =>
+  new Date(aStart) < new Date(bEnd) && new Date(bStart) < new Date(aEnd);
+
+/* ===== нормализация ===== */
 const normalizeBooking = (b) => ({
   id: b.id,
   hotel: b.hotel ?? null,
@@ -100,17 +186,27 @@ const normalizeBed = (b) => ({
   description: b.description ?? "",
 });
 
+/* ===== валидация/санитайзеры клиента ===== */
+const PHONE_RE = /^\+\d{10,15}$/; // + и 10-15 цифр
+const sanitizePhoneInput = (raw) => {
+  const digits = String(raw || "").replace(/\D/g, "");
+  return digits.length ? `+${digits}` : "";
+};
+const isValidPhone = (p) => PHONE_RE.test(p || "");
+const isValidName = (n) => {
+  const s = (n || "").trim();
+  if (s.length < 2) return false;
+  return !/[0-9]/.test(s); // цифры запрещены
+};
+
 const Bookings = () => {
-  const [items, setItems] = useState([]); // все брони (только API)
+  const [items, setItems] = useState([]);
   const [hotels, setHotels] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [beds, setBeds] = useState([]);
 
-  // клиенты
   const [clients, setClients] = useState([]);
   const [clientQuery, setClientQuery] = useState("");
-
-  // мини-добавление клиента
   const [showClientAdd, setShowClientAdd] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
@@ -123,7 +219,11 @@ const Bookings = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  // главный селект типа
+  // панель под календарём
+  const [calInfo, setCalInfo] = useState(null); // {dateKey,label,isBusy,intervals:[{from,to}]}
+  const [pickStartTime, setPickStartTime] = useState("12:00");
+  const [pickEndTime, setPickEndTime] = useState("12:00");
+
   const OBJECT_TYPES = { HOTEL: "hotel", ROOM: "room", BED: "bed" };
   const [objectType, setObjectType] = useState(OBJECT_TYPES.HOTEL);
 
@@ -135,10 +235,10 @@ const Bookings = () => {
     start_time: "",
     end_time: "",
     purpose: "",
-    client: null, // ОБЯЗАТЕЛЬНО
+    client: null, // не обязателен
   });
 
-  /* ===== load ===== */
+  /* ===== загрузка ===== */
   const loadAll = async () => {
     try {
       setLoading(true);
@@ -187,10 +287,8 @@ const Bookings = () => {
   useEffect(() => {
     loadAll();
     refreshClients();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // слушаем оплаты из «Кассы» — после них перечитываем список
   useEffect(() => {
     const onRefresh = () => loadAll();
     window.addEventListener("bookings:refresh", onRefresh);
@@ -214,7 +312,7 @@ const Bookings = () => {
   const bedCapacityById = (id) =>
     Number(beds.find((b) => String(b.id) === String(id))?.capacity || 0);
 
-  /* ===== open modals ===== */
+  /* ===== модалки ===== */
   const openCreate = () => {
     setEditingId(null);
     setObjectType(OBJECT_TYPES.HOTEL);
@@ -230,17 +328,16 @@ const Bookings = () => {
     });
     setClientQuery("");
     setShowClientAdd(false);
+    setCalInfo(null);
+    setPickStartTime("12:00");
+    setPickEndTime("12:00");
     refreshClients();
     setModalOpen(true);
   };
 
   const openEdit = (b) => {
     setEditingId(b.id);
-    const type = b.bed
-      ? OBJECT_TYPES.BED
-      : b.room
-      ? OBJECT_TYPES.ROOM
-      : OBJECT_TYPES.HOTEL;
+    const type = b.bed ? OBJECT_TYPES.BED : b.room ? OBJECT_TYPES.ROOM : OBJECT_TYPES.HOTEL;
     setObjectType(type);
 
     setForm({
@@ -253,25 +350,27 @@ const Bookings = () => {
       purpose: b.purpose ?? "",
       client: b.client ?? null,
     });
+    setPickStartTime((b.start_time || "").slice(11,16) || "12:00");
+    setPickEndTime((b.end_time || "").slice(11,16) || "12:00");
     setClientQuery("");
     setShowClientAdd(false);
+    setCalInfo(null);
     refreshClients();
     setModalOpen(true);
   };
 
-  /* ===== client list ===== */
-  // clientQuery уже объявлен выше
+  /* ===== клиенты (до 50, но контейнер на 3 строки с прокруткой) ===== */
   const clientList = useMemo(() => {
     const t = clientQuery.trim().toLowerCase();
     const base = clients || [];
-    if (!t) return base.slice(0, 50);
-    return base
-      .filter((c) =>
-        [c.full_name, c.phone]
-          .map((x) => String(x || "").toLowerCase())
-          .some((v) => v.includes(t))
-      )
-      .slice(0, 50);
+    const list = !t
+      ? base
+      : base.filter((c) =>
+          [c.full_name, c.phone]
+            .map((x) => String(x || "").toLowerCase())
+            .some((v) => v.includes(t))
+        );
+    return list.slice(0, 50);
   }, [clients, clientQuery]);
 
   const selectedClientName = useMemo(() => {
@@ -280,7 +379,7 @@ const Bookings = () => {
     return c?.full_name || "";
   }, [form.client, clients]);
 
-  /* ===== occupancy ===== */
+  /* ===== занятость ===== */
   const relevantItems = useMemo(() => {
     if (!form.hotel && !form.room && !form.bed) return [];
     return items
@@ -293,76 +392,104 @@ const Bookings = () => {
       );
   }, [items, form.hotel, form.room, form.bed, editingId]);
 
-  const occupancyMap = useMemo(() => {
-    const map = new Map(); // YYYY-MM-DD -> count (или суммарное qty)
-    relevantItems.forEach((b) => {
-      const s = (b.start_time || "").slice(0, 10);
-      const e = (b.end_time || "").slice(0, 10);
-      if (!s || !e) return;
-      const inc = b.bed ? Number(b.qty ?? 1) || 1 : 1;
-      eachDateExclusiveEnd(s, e).forEach((d) => {
-        map.set(d, (map.get(d) || 0) + inc);
-      });
-    });
-    return map;
-  }, [relevantItems]);
+  const daySegments = useMemo(
+    () => buildDailySegmentsMap(relevantItems),
+    [relevantItems]
+  );
 
-  /* ===== live conflict check ===== */
-  const tripDates = useMemo(() => {
-    const sDate = (form.start_time || "").slice(0, 10);
-    const eDate = (form.end_time || "").slice(0, 10);
-    if (!sDate || !eDate) return [];
-    return eachDateExclusiveEnd(sDate, eDate);
+  const selectedSegments = useMemo(() => {
+    if (!form.start_time || !form.end_time) return new Map();
+    const m = splitBookingByDaysLocal(form.start_time, form.end_time);
+    const res = new Map();
+    m.forEach((arr, key) => {
+      const segs = arr.map(([s, e]) => {
+        const ds = floorDay(s);
+        const leftPct = Math.max(0, Math.min(100, ((s - ds) / DAY_MS) * 100));
+        const rightPct = Math.max(
+          0,
+          Math.min(100, (((ds + DAY_MS) - e) / DAY_MS) * 100)
+        );
+        return { leftPct, rightPct, from: s, to: e };
+      });
+      res.set(key, segs);
+    });
+    return res;
   }, [form.start_time, form.end_time]);
 
+  // Почасовая доступность для коек
   const bedMinAvailable = useMemo(() => {
-    if (!form.bed || tripDates.length === 0) return null;
+    if (!form.bed || !form.start_time || !form.end_time) return null;
     const cap = bedCapacityById(form.bed);
     if (!cap) return 0;
-    let minLeft = Infinity;
-    for (const d of tripDates) {
-      const used = occupancyMap.get(d) || 0;
-      const left = Math.max(0, cap - used);
-      if (left < minLeft) minLeft = left;
-    }
-    return Number.isFinite(minLeft) ? minLeft : 0;
-  }, [form.bed, tripDates, occupancyMap, beds]);
 
+    const start = new Date(form.start_time).getTime();
+    const end = new Date(form.end_time).getTime();
+    let minLeft = cap;
+
+    for (let t = start; t < end; t += HOUR_MS) {
+      const slotStart = t;
+      const slotEnd = Math.min(end, t + HOUR_MS);
+      let used = 0;
+      relevantItems.forEach((b) => {
+        if (!b.bed) return;
+        const bs = new Date(b.start_time).getTime();
+        const be = new Date(b.end_time).getTime();
+        if (slotStart < be && bs < slotEnd) {
+          used += Math.max(1, Number(b.qty || 1));
+        }
+      });
+      minLeft = Math.min(minLeft, Math.max(0, cap - used));
+      if (minLeft === 0) break;
+    }
+    return minLeft;
+  }, [form.bed, form.start_time, form.end_time, relevantItems, beds]);
+
+  // Конфликт
   const hasConflict = useMemo(() => {
-    if (!(form.hotel || form.room || form.bed)) return false;
+    if (!(form.start_time && form.end_time && (form.hotel || form.room || form.bed)))
+      return false;
+
     if (form.bed) {
-      const need = Math.max(1, Number(form.qty || 1));
       const cap = bedCapacityById(form.bed);
       if (!cap) return true;
-      for (const d of tripDates) {
-        const used = occupancyMap.get(d) || 0;
+      const need = Math.max(1, Number(form.qty || 1));
+
+      const start = new Date(form.start_time).getTime();
+      const end = new Date(form.end_time).getTime();
+
+      for (let t = start; t < end; t += HOUR_MS) {
+        const slotStart = t;
+        const slotEnd = Math.min(end, t + HOUR_MS);
+        let used = 0;
+        relevantItems.forEach((b) => {
+          if (!b.bed) return;
+          const bs = new Date(b.start_time).getTime();
+          const be = new Date(b.end_time).getTime();
+          if (slotStart < be && bs < slotEnd) {
+            used += Math.max(1, Number(b.qty || 1));
+          }
+        });
         if (used + need > cap) return true;
       }
       return false;
     }
-    for (const d of tripDates) {
-      if ((occupancyMap.get(d) || 0) >= 1) return true;
-    }
-    return false;
+
+    return relevantItems.some((b) =>
+      intervalsOverlap(form.start_time, form.end_time, b.start_time, b.end_time)
+    );
   }, [
-    tripDates,
-    occupancyMap,
+    form.start_time,
+    form.end_time,
     form.hotel,
     form.room,
     form.bed,
     form.qty,
-    beds,
+    relevantItems,
   ]);
-
-  const calFullThreshold = useMemo(() => {
-    if (form.bed) return Math.max(1, bedCapacityById(form.bed));
-    return 1;
-  }, [form.bed, beds]);
 
   /* ===== список ===== */
   const filtered = useMemo(() => {
     const now0 = todayStart().getTime();
-    // скрываем оплаченные/завершённые и уже прошедшие
     const activeOnly = items.filter((b) => {
       const st = (b.status || "").toLowerCase();
       if (["paid", "completed", "завершено", "оплачен"].includes(st))
@@ -381,30 +508,32 @@ const Bookings = () => {
         b.hotel ? hotelName(b.hotel) : "",
         b.room ? roomName(b.room) : "",
         b.bed ? bedName(b.bed) : "",
-      ].some((v) =>
-        String(v || "")
-          .toLowerCase()
-          .includes(t)
-      )
+      ].some((v) => String(v || "").toLowerCase().includes(t))
     );
   }, [q, items, hotels, rooms, beds]);
 
   const sorted = useMemo(
-    () =>
-      [...filtered].sort((a, b) =>
-        (b.start_time || "").localeCompare(a.start_time || "")
-      ),
+    () => [...filtered].sort((a, b) => (b.start_time || "").localeCompare(a.start_time || "")),
     [filtered]
   );
 
-  /* ===== мини-добавление клиента ===== */
+  /* ===== создание клиента (жёсткая валидация) ===== */
+  const canSaveClient =
+    isValidName(newClientName) && isValidPhone(newClientPhone);
+
   const onCreateClientInline = async () => {
     const name = (newClientName || "").trim();
-    const phone = (newClientPhone || "").trim();
-    if (!name) {
-      alert("Введите имя клиента");
+    const phone = sanitizePhoneInput(newClientPhone);
+
+    if (!isValidName(name)) {
+      alert("Имя нужно без цифр, минимум 2 символа.");
       return;
     }
+    if (!isValidPhone(phone)) {
+      alert("Телефон в формате + и 10–15 цифр. Пример: +996221000953");
+      return;
+    }
+
     try {
       const created = await createClient({ name, phone });
       await refreshClients();
@@ -418,7 +547,7 @@ const Bookings = () => {
     }
   };
 
-  const [activeTab, setActiveTab] = useState(1);
+  const [activeTab, setActiveTab] = useState(0);
 
   const tabs = [
     {
@@ -449,8 +578,6 @@ const Bookings = () => {
               </button>
             </div>
           </header>
-
-          {error && <div className="bookings__empty">{error}</div>}
           {loading ? (
             <div className="bookings__empty">Загрузка…</div>
           ) : (
@@ -469,7 +596,7 @@ const Bookings = () => {
                   Number(b.total) || nights * price * (b.bed ? qty : 1) || 0;
 
                 const label = b.hotel
-                  ? `Гостиница: ${hotelName(b.hotel)}`
+                  ? `Комната: ${hotelName(b.hotel)}`
                   : b.room
                   ? `Зал: ${roomName(b.room)}`
                   : `Койко-место: ${bedName(b.bed)}`;
@@ -479,23 +606,11 @@ const Bookings = () => {
                     <div>
                       <div className="bookings__name">{label}</div>
                       <div className="bookings__meta">
-                        <span className="bookings__badge">
-                          Начало: {toLocalInput(b.start_time)}
-                        </span>
-                        <span className="bookings__badge">
-                          Конец: {toLocalInput(b.end_time)}
-                        </span>
-                        {b.purpose && (
-                          <span className="bookings__badge">
-                            Цель: {b.purpose}
-                          </span>
-                        )}
-                        {b.bed && (
-                          <span className="bookings__badge">Мест: {qty}</span>
-                        )}
-                        <span className="bookings__badge">
-                          Сумма: {fmtMoney(totalShow)}
-                        </span>
+                        <span className="bookings__badge">Начало: {toLocalInput(b.start_time)}</span>
+                        <span className="bookings__badge">Конец: {toLocalInput(b.end_time)}</span>
+                        {b.purpose && <span className="bookings__badge">Цель: {b.purpose}</span>}
+                        {b.bed && <span className="bookings__badge">Мест: {qty}</span>}
+                        <span className="bookings__badge">Сумма: {fmtMoney(totalShow)}</span>
                       </div>
                     </div>
 
@@ -507,7 +622,6 @@ const Bookings = () => {
                       >
                         Изменить
                       </button>
-                      {/* Кнопку «Оплатить» убрали — оплата только через Кассу */}
                     </div>
                   </div>
                 );
@@ -520,57 +634,43 @@ const Bookings = () => {
         </>
       ),
     },
-    {
-      label: "Продажи",
-      content: <Sell />,
-    },
+    { label: "Продажа", content: <Sell /> },
   ];
 
   return (
     <section className="bookings">
-      {
-        <div className="vitrina__header" style={{ marginBottom: "15px" }}>
-          <div className="vitrina__tabs">
-            {tabs.map((tab, index) => {
-              return (
-                <span
-                  className={`vitrina__tab ${
-                    index === activeTab && "vitrina__tab--active"
-                  }`}
-                  onClick={() => setActiveTab(index)}
-                >
-                  {tab.label}
-                </span>
-                // <button onClick={() => setActiveTab(index)}>{tab.label}</button>
-              );
-            })}
-          </div>
+      <div className="vitrina__header" style={{ marginBottom: "15px" }}>
+        <div className="vitrina__tabs">
+          {tabs.map((tab, index) => (
+            <span
+              key={tab.label}
+              className={`vitrina__tab ${index === activeTab ? "vitrina__tab--active" : ""}`}
+              onClick={() => setActiveTab(index)}
+            >
+              {tab.label}
+            </span>
+          ))}
         </div>
-      }
+      </div>
+
+      {error && <div className="bookings__empty">{error}</div>}
       {tabs[activeTab].content}
 
       {modalOpen && (
-        <div
-          className="bookings__modalOverlay"
-          onClick={() => setModalOpen(false)}
-        >
+        <div className="bookings__modalOverlay" onClick={() => setModalOpen(false)}>
           <div className="bookings__modal" onClick={(e) => e.stopPropagation()}>
             <div className="bookings__modalHeader">
               <div className="bookings__modalTitle">
                 {editingId == null ? "Новая бронь" : "Изменить бронь"}
               </div>
-              <button
-                className="bookings__iconBtn"
-                onClick={() => setModalOpen(false)}
-              >
+              <button className="bookings__iconBtn" onClick={() => setModalOpen(false)}>
                 <FaTimes />
               </button>
             </div>
 
             {hasConflict && (
               <div className="bookings__conflict">
-                Выбранные даты заняты или недостаточно мест. Поменяйте
-                диапазон/количество.
+                Выбранные даты заняты или недостаточно мест.
               </div>
             )}
 
@@ -592,10 +692,7 @@ const Bookings = () => {
                         hotel: v === OBJECT_TYPES.HOTEL ? f.hotel : null,
                         room: v === OBJECT_TYPES.ROOM ? f.room : null,
                         bed: v === OBJECT_TYPES.BED ? f.bed : null,
-                        qty:
-                          v === OBJECT_TYPES.BED
-                            ? Math.max(1, Number(f.qty || 1))
-                            : 1,
+                        qty: v === OBJECT_TYPES.BED ? Math.max(1, Number(f.qty || 1)) : 1,
                       }));
                     }}
                   >
@@ -613,29 +710,16 @@ const Bookings = () => {
                       <select
                         className="bookings__input"
                         value={form.hotel ?? ""}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            hotel: e.target.value || null,
-                          }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, hotel: e.target.value || null }))}
                         required
                       >
                         <option value="">— не выбрано —</option>
                         {hotels.map((h) => (
-                          <option key={h.id} value={h.id}>
-                            {h.name}
-                          </option>
+                          <option key={h.id} value={h.id}>{h.name}</option>
                         ))}
                       </select>
                       {form.hotel && (
-                        <button
-                          type="button"
-                          className="bookings__miniBtn"
-                          onClick={() =>
-                            setForm((f) => ({ ...f, hotel: null }))
-                          }
-                        >
+                        <button type="button" className="bookings__miniBtn" onClick={() => setForm((f) => ({ ...f, hotel: null }))}>
                           Очистить
                         </button>
                       )}
@@ -651,27 +735,16 @@ const Bookings = () => {
                       <select
                         className="bookings__input"
                         value={form.room ?? ""}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            room: e.target.value || null,
-                          }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, room: e.target.value || null }))}
                         required
                       >
                         <option value="">— не выбрано —</option>
                         {rooms.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
-                          </option>
+                          <option key={r.id} value={r.id}>{r.name}</option>
                         ))}
                       </select>
                       {form.room && (
-                        <button
-                          type="button"
-                          className="bookings__miniBtn"
-                          onClick={() => setForm((f) => ({ ...f, room: null }))}
-                        >
+                        <button type="button" className="bookings__miniBtn" onClick={() => setForm((f) => ({ ...f, room: null }))}>
                           Очистить
                         </button>
                       )}
@@ -689,28 +762,20 @@ const Bookings = () => {
                           className="bookings__input"
                           value={form.bed ?? ""}
                           onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              bed: e.target.value || null,
-                              qty: 1,
-                            }))
+                            setForm((f) => ({ ...f, bed: e.target.value || null, qty: 1 }))
                           }
                           required
                         >
                           <option value="">— не выбрано —</option>
                           {beds.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.name}
-                            </option>
+                            <option key={b.id} value={b.id}>{b.name}</option>
                           ))}
                         </select>
                         {form.bed && (
                           <button
                             type="button"
                             className="bookings__miniBtn"
-                            onClick={() =>
-                              setForm((f) => ({ ...f, bed: null, qty: 1 }))
-                            }
+                            onClick={() => setForm((f) => ({ ...f, bed: null, qty: 1 }))}
                           >
                             Очистить
                           </button>
@@ -725,103 +790,40 @@ const Bookings = () => {
                       <input
                         type="number"
                         min={1}
-                        max={Math.max(
-                          1,
-                          bedMinAvailable ?? bedCapacityById(form.bed)
-                        )}
+                        max={Math.max(1, bedMinAvailable ?? bedCapacityById(form.bed))}
                         className="bookings__input"
                         value={form.qty}
                         onChange={(e) =>
-                          setForm({
-                            ...form,
-                            qty: Math.max(1, Number(e.target.value) || 1),
-                          })
+                          setForm({ ...form, qty: Math.max(1, Number(e.target.value) || 1) })
                         }
                         required
                       />
                       {form.bed && (
-                        <div
-                          className="bookings__hint"
-                          style={{ marginTop: 4 }}
-                        >
+                        <div className="bookings__hint" style={{ marginTop: 4 }}>
                           {bedMinAvailable == null
                             ? `Доступно мест: ${bedCapacityById(form.bed)}`
-                            : `Осталось мест (мин. по диапазону): ${bedMinAvailable} из ${bedCapacityById(
-                                form.bed
-                              )}`}
+                            : `Осталось мест (мин. по диапазону): ${bedMinAvailable} из ${bedCapacityById(form.bed)}`}
                         </div>
                       )}
                     </div>
                   </>
                 )}
 
-                {/* ==== Период ==== */}
-                <div className="bookings__field bookings__field--range">
-                  <label className="bookings__label">
-                    Период <span className="bookings__req">*</span>
-                  </label>
-                  <div className="bookings__rangeInputs">
-                    <input
-                      type="datetime-local"
-                      className="bookings__input bookings__input--compact"
-                      value={form.start_time}
-                      max={form.end_time || undefined}
-                      onChange={(e) => {
-                        const st = e.target.value;
-                        setForm((f) => {
-                          let en = f.end_time;
-                          if (en && st && new Date(st) > new Date(en)) en = st;
-                          return { ...f, start_time: st, end_time: en };
-                        });
-                      }}
-                      required
-                    />
-                    <span className="bookings__rangeDash">—</span>
-                    <input
-                      type="datetime-local"
-                      className="bookings__input bookings__input--compact"
-                      value={form.end_time}
-                      min={form.start_time || undefined}
-                      onChange={(e) => {
-                        const en = e.target.value;
-                        setForm((f) => {
-                          let st = f.start_time;
-                          if (st && en && new Date(en) < new Date(st)) st = en;
-                          return { ...f, start_time: st, end_time: en };
-                        });
-                      }}
-                      required
-                    />
-                  </div>
-                </div>
-
                 {/* ==== Назначение ==== */}
-                <div
-                  className="bookings__field"
-                  style={{ gridColumn: "1 / -1" }}
-                >
-                  <label className="bookings__label">
-                    Назначение (purpose)
-                  </label>
+                <div className="bookings__field" style={{ gridColumn: "1 / -1" }}>
+                  <label className="bookings__label">Назначение (purpose)</label>
                   <input
                     className="bookings__input"
                     maxLength={255}
                     placeholder="Например: командировка / конференция / встреча"
                     value={form.purpose}
-                    onChange={(e) =>
-                      setForm({ ...form, purpose: e.target.value })
-                    }
+                    onChange={(e) => setForm({ ...form, purpose: e.target.value })}
                   />
                 </div>
 
-                {/* ==== Клиент ==== */}
-                <div
-                  className="bookings__field"
-                  style={{ gridColumn: "1 / -1" }}
-                >
-                  <label className="bookings__label">
-                    Клиент <span className="bookings__req">*</span>
-                  </label>
+                {/* ==== Клиент (скролл на 3 строки) ==== */}
+                <div className="bookings__field" style={{ gridColumn: "1 / -1" }}>
+                  <label className="bookings__label">Клиент (необязательно)</label>
                   <div className="bookings__clientPicker">
                     <div className="bookings__row">
                       <input
@@ -834,9 +836,7 @@ const Bookings = () => {
                         <button
                           type="button"
                           className="bookings__miniBtn"
-                          onClick={() =>
-                            setForm((f) => ({ ...f, client: null }))
-                          }
+                          onClick={() => setForm((f) => ({ ...f, client: null }))}
                           title="Сбросить выбранного клиента"
                         >
                           Сбросить
@@ -860,20 +860,12 @@ const Bookings = () => {
                             key={c.id}
                             type="button"
                             className={`bookings__clientItem ${
-                              form.client === c.id
-                                ? "bookings__clientItem--active"
-                                : ""
+                              form.client === c.id ? "bookings__clientItem--active" : ""
                             }`}
-                            onClick={() =>
-                              setForm((f) => ({ ...f, client: c.id }))
-                            }
+                            onClick={() => setForm((f) => ({ ...f, client: c.id }))}
                           >
-                            <span className="bookings__clientName">
-                              {c.full_name || "Без имени"}
-                            </span>
-                            <span className="bookings__clientPhone">
-                              {c.phone || ""}
-                            </span>
+                            <span className="bookings__clientName">{c.full_name || "Без имени"}</span>
+                            <span className="bookings__clientPhone">{c.phone || ""}</span>
                           </button>
                         ))}
                       </div>
@@ -881,28 +873,30 @@ const Bookings = () => {
 
                     {showClientAdd && (
                       <div style={{ marginTop: 8 }}>
-                        <div
-                          className="bookings__row"
-                          style={{ gap: 8, flexWrap: "wrap" }}
-                        >
+                        <div className="bookings__row" style={{ gap: 8, flexWrap: "wrap" }}>
                           <input
                             className="bookings__input"
                             placeholder="Имя клиента *"
                             value={newClientName}
-                            onChange={(e) => setNewClientName(e.target.value)}
-                            style={{ minWidth: 220 }}
+                            onChange={(e) => setNewClientName(e.target.value.replace(/\d+/g, ""))}
+                            title="Минимум 2 символа, цифры запрещены"
+                            minLength={2}
                           />
                           <input
                             className="bookings__input"
-                            placeholder="Телефон (например, +996700000000)"
+                            placeholder="Телефон в формате +996221000953 *"
                             value={newClientPhone}
-                            onChange={(e) => setNewClientPhone(e.target.value)}
-                            style={{ minWidth: 220 }}
+                            onChange={(e) => setNewClientPhone(sanitizePhoneInput(e.target.value))}
+                            inputMode="tel"
+                            pattern="^\+\d{10,15}$"
+                            title="Начинается с +, далее 10–15 цифр. Пример: +996221000953"
                           />
                           <button
                             type="button"
                             className="bookings__miniBtn"
                             onClick={onCreateClientInline}
+                            disabled={!canSaveClient}
+                            title={!canSaveClient ? "Заполните корректно имя и телефон" : "Сохранить клиента"}
                           >
                             Сохранить
                           </button>
@@ -929,24 +923,128 @@ const Bookings = () => {
                   </div>
                 </div>
 
+                {/* ==== Календарь выбора периода ==== */}
                 {(form.hotel || form.room || form.bed) && (
-                  <div
-                    className="bookings__calendarWrap"
-                    style={{ gridColumn: "1 / -1" }}
-                  >
+                  <div className="bookings__calendarWrap" style={{ gridColumn: "1 / -1" }}>
                     <AvailabilityCalendar
-                      occupancyMap={occupancyMap}
-                      fullThreshold={calFullThreshold}
+                      daySegments={daySegments}
+                      selectedSegments={selectedSegments}
+                      focusDateKey={calInfo?.dateKey || null}
+                      onDayClick={(dateKey) => {
+                        const entry = daySegments.get(dateKey);
+                        const isBusy = !!(entry && entry.intervals.length);
+                        const list = entry
+                          ? entry.intervals.map(([s, e]) => ({ from: hhmm(s), to: hhmm(e) }))
+                          : [];
+                        setCalInfo({
+                          dateKey,
+                          label: dmNoYear(dateKey), // только ДД.ММ
+                          isBusy,
+                          intervals: list,
+                        });
+
+                        const stD = (form.start_time || "").slice(0, 10);
+                        const enD = (form.end_time || "").slice(0, 10);
+                        setPickStartTime(stD === dateKey ? (form.start_time || "").slice(11,16) : pickStartTime);
+                        setPickEndTime(enD === dateKey ? (form.end_time || "").slice(11,16) : pickEndTime);
+                      }}
                     />
+
+                    {(form.start_time || form.end_time) && (
+                      <div className="bookings__hint">
+                        Выбрано:&nbsp;<b>Начало: {fmtHuman(form.start_time)}</b>&nbsp;•&nbsp;
+                        <b>Конец: {fmtHuman(form.end_time)}</b>
+                      </div>
+                    )}
+
+                    {calInfo && (
+                      <div className="bookings__calInfo">
+                        <div className="bookings__calInfoTitle">
+                          {calInfo.label}: {calInfo.isBusy ? "занято" : "свободно"}
+                        </div>
+                        <div className="bookings__calInfoList">
+                          {calInfo.intervals.length === 0 && <span>свободно весь день</span>}
+                          {calInfo.intervals.map((it, i) => (
+                            <span key={i}>{i + 1}) {it.from} — {it.to}</span>
+                          ))}
+                        </div>
+
+                        <div className="bookings__timeRows">
+                          <div className="bookings__timeRow">
+                            <label>Начало</label>
+                            <input
+                              type="time"
+                              className="bookings__timeInput"
+                              value={pickStartTime}
+                              onChange={(e) => setPickStartTime(e.target.value || "00:00")}
+                            />
+                            <button
+                              type="button"
+                              className="bookings__miniBtn"
+                              onClick={() => {
+                                const dt = combineDateTime(calInfo.dateKey, pickStartTime);
+                                setForm((f) => {
+                                  let end = f.end_time;
+                                  if (end && new Date(end) < new Date(dt)) end = dt;
+                                  return { ...f, start_time: dt, end_time: end };
+                                });
+                              }}
+                            >
+                              Поставить как начало
+                            </button>
+                          </div>
+
+                          <div className="bookings__timeRow">
+                            <label>Конец</label>
+                            <input
+                              type="time"
+                              className="bookings__timeInput"
+                              value={pickEndTime}
+                              onChange={(e) => setPickEndTime(e.target.value || "00:00")}
+                            />
+                            <button
+                              type="button"
+                              className="bookings__miniBtn"
+                              onClick={() => {
+                                const dt = combineDateTime(calInfo.dateKey, pickEndTime);
+                                setForm((f) => {
+                                  let start = f.start_time;
+                                  if (start && new Date(dt) < new Date(start)) start = dt;
+                                  return { ...f, start_time: start, end_time: dt };
+                                });
+                              }}
+                            >
+                              Поставить как конец
+                            </button>
+                          </div>
+                        </div>
+
+                        <button className="bookings__miniBtn" onClick={() => setCalInfo(null)}>
+                          Закрыть
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="bookings__formHint">
-                Красным — полностью занято для выбранного объекта.
+                Клик по дню показывает занятость и позволяет задать время начала/конца.
+                Частичные дни подсвечиваются только по занятым часам.
               </div>
 
               <div className="bookings__formActions">
+                {editingId != null && (
+                  <button
+                    type="button"
+                    className="bookings__btn bookings__btn--danger"
+                    onClick={onDelete}
+                    disabled={saving}
+                    title="Удалить бронь"
+                  >
+                    Удалить
+                  </button>
+                )}
                 <button
                   type="button"
                   className="bookings__btn bookings__btn--secondary"
@@ -961,14 +1059,14 @@ const Bookings = () => {
                   disabled={
                     saving ||
                     hasConflict ||
-                    (form.end_time &&
-                      form.start_time &&
-                      new Date(form.end_time) < new Date(form.start_time))
+                    !form.start_time ||
+                    !form.end_time ||
+                    (form.end_time && form.start_time && new Date(form.end_time) < new Date(form.start_time))
                   }
                   title={
-                    form.end_time &&
-                    form.start_time &&
-                    new Date(form.end_time) < new Date(form.start_time)
+                    !form.start_time || !form.end_time
+                      ? "Выберите даты на календаре"
+                      : new Date(form.end_time) < new Date(form.start_time)
                       ? "Дата окончания раньше даты начала"
                       : hasConflict
                       ? "Недостаточно мест / даты заняты"
@@ -985,7 +1083,7 @@ const Bookings = () => {
     </section>
   );
 
-  /* ===== submit из модалки создания/редактирования ===== */
+  /* ===== submit ===== */
   async function onSubmit(e) {
     e.preventDefault();
 
@@ -1002,21 +1100,15 @@ const Bookings = () => {
       return;
     }
     if (!form.start_time || !form.end_time) {
-      setError("Укажите даты");
+      setError("Выберите период на календаре");
       return;
     }
     if (new Date(form.end_time) < new Date(form.start_time)) {
       setError("Дата окончания не может быть раньше даты начала");
       return;
     }
-    if (!form.client) {
-      setError("Выберите клиента");
-      return;
-    }
     if (hasConflict) {
-      setError(
-        "Выбранные даты заняты или недостаточно мест. Измените диапазон/количество."
-      );
+      setError("Выбранные даты заняты или недостаточно мест. Измените диапазон/количество.");
       return;
     }
 
@@ -1024,7 +1116,7 @@ const Bookings = () => {
       start_time: toApiDatetime(form.start_time),
       end_time: toApiDatetime(form.end_time),
       purpose: (form.purpose || "").trim(),
-      client: form.client,
+      client: form.client || null,
     };
 
     try {
@@ -1035,10 +1127,7 @@ const Bookings = () => {
         hotel: objectType === OBJECT_TYPES.HOTEL ? form.hotel : null,
         room: objectType === OBJECT_TYPES.ROOM ? form.room : null,
         bed: objectType === OBJECT_TYPES.BED ? form.bed : null,
-        qty:
-          objectType === OBJECT_TYPES.BED
-            ? Math.max(1, Number(form.qty || 1))
-            : 1,
+        qty: objectType === OBJECT_TYPES.BED ? Math.max(1, Number(form.qty || 1)) : 1,
         ...payloadCommon,
       };
 
@@ -1048,25 +1137,16 @@ const Bookings = () => {
         saved = normalizeBooking({ ...data });
         setItems((prev) => [saved, ...prev]);
       } else {
-        const { data } = await api.put(
-          `/booking/bookings/${editingId}/`,
-          payloadApi
-        );
+        const { data } = await api.put(`/booking/bookings/${editingId}/`, payloadApi);
         saved = normalizeBooking({ ...data });
         setItems((prev) => prev.map((x) => (x.id === editingId ? saved : x)));
       }
 
-      // уведомим Клиентов
-      try {
-        window.dispatchEvent(
-          new CustomEvent("clients:booking-saved", {
-            detail: { booking: saved },
-          })
-        );
-      } catch {}
+      try { window.dispatchEvent(new CustomEvent("clients:booking-saved", { detail: { booking: saved } })); } catch {}
 
       setModalOpen(false);
       setEditingId(null);
+      setCalInfo(null);
       setForm({
         hotel: null,
         room: null,
@@ -1084,10 +1164,30 @@ const Bookings = () => {
       setSaving(false);
     }
   }
+
+  /* ===== delete ===== */
+  async function onDelete() {
+    if (editingId == null) return;
+    if (!window.confirm("Удалить эту бронь безвозвратно?")) return;
+    try {
+      setSaving(true);
+      await api.delete(`/booking/bookings/${editingId}/`);
+      setItems((prev) => prev.filter((x) => x.id !== editingId));
+      try { window.dispatchEvent(new CustomEvent("bookings:refresh")); } catch {}
+      setModalOpen(false);
+      setEditingId(null);
+      setCalInfo(null);
+    } catch (e) {
+      console.error(e);
+      setError("Не удалось удалить бронь");
+    } finally {
+      setSaving(false);
+    }
+  }
 };
 
 /* ===== Календарь ===== */
-const AvailabilityCalendar = ({ occupancyMap, fullThreshold = 1 }) => {
+const AvailabilityCalendar = ({ daySegments, selectedSegments, focusDateKey, onDayClick }) => {
   const [month, setMonth] = useState(() => new Date());
 
   const gridDays = useMemo(() => {
@@ -1106,10 +1206,8 @@ const AvailabilityCalendar = ({ occupancyMap, fullThreshold = 1 }) => {
     [month]
   );
 
-  const ymd = (d) => d.toISOString().slice(0, 10);
-  const isFull = (date) => (occupancyMap.get(ymd(date)) || 0) >= fullThreshold;
-  const isToday = (d) => ymd(d) === ymd(new Date());
   const inMonth = (d) => d.getMonth() === month.getMonth();
+  const isToday = (d) => d.toDateString() === new Date().toDateString();
 
   return (
     <div className="bookings__calendar">
@@ -1143,32 +1241,66 @@ const AvailabilityCalendar = ({ occupancyMap, fullThreshold = 1 }) => {
 
       <div className="bookings__calWeekdays">
         {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((w) => (
-          <div key={w} className="bookings__calWd">
-            {w}
-          </div>
+          <div key={w} className="bookings__calWd">{w}</div>
         ))}
       </div>
 
       <div className="bookings__calGrid">
         {gridDays.map((d) => {
+          const key = ymdLocal(d);
+          const entry = daySegments.get(key);
+          const has = !!entry;
+          const isFull = has && entry.isFull;
+          const selSegs = selectedSegments?.get(key) || [];
+
           const classes = [
             "bookings__calDay",
-            !inMonth(d) ? "bookings__calDay--dim" : "",
-            isFull(d) ? "bookings__calDay--full" : "",
-            isToday(d) ? "bookings__calDay--today" : "",
+            !inMonth(d) && "bookings__calDay--dim",
+            isToday(d) && "bookings__calDay--today",
+            isFull && "bookings__calDay--full",
+            focusDateKey === key && "bookings__calDay--focus",
           ]
             .filter(Boolean)
             .join(" ");
+
+          const tip =
+            has && entry.intervals.length
+              ? `Занято: ${entry.intervals.map(([s, e]) => `${hhmm(s)}–${hhmm(e)}`).join(", ")}`
+              : undefined;
+
           return (
-            <div key={d.toISOString()} className={classes}>
-              {d.getDate()}
+            <div
+              key={key}
+              className={classes}
+              title={tip}
+              onClick={() => onDayClick && onDayClick(key)}
+            >
+              {/* выбранные сегменты (жёлтые) */}
+              {selSegs.map((seg, i) => (
+                <span
+                  key={`sel-${i}`}
+                  className="bookings__calSel"
+                  style={{ left: `${seg.leftPct}%`, right: `${seg.rightPct}%` }}
+                />
+              ))}
+              {/* занятые сегменты (красные) */}
+              {has &&
+                !isFull &&
+                entry.segments.map((seg, i) => (
+                  <span
+                    key={`busy-${i}`}
+                    className="bookings__calCover"
+                    style={{ left: `${seg.leftPct}%`, right: `${seg.rightPct}%` }}
+                  />
+                ))}
+              <span className="bookings__calNum">{d.getDate()}</span>
             </div>
           );
         })}
       </div>
 
       <div className="bookings__calLegend">
-        <span className="bookings__calBadge" /> — занято
+        <span className="bookings__calBadge" /> — занято (частично/полностью). Выбранная бронь подсвечивается жёлтым.
       </div>
     </div>
   );

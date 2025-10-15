@@ -272,7 +272,6 @@ const KassaDet = () => {
               className={`vitrina__tab ${
                 activeFlowType === "pending" ? "vitrina__tab--active" : ""
               }`}
-              // className="vitrina__tab"
             >
               Запросы
             </button>
