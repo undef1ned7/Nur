@@ -59,6 +59,8 @@ const mockCartItems = [
 ];
 
 const CartItem = ({ item, onUpdateQuantity, onRemoveItem }) => {
+  console.log(item);
+
   const [quantity, setQuantity] = useState(item.quantity);
 
   const handleQuantityChange = (newQuantity) => {
@@ -74,10 +76,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem }) => {
   return (
     <div className="cart-item">
       <div className="item-image">
-        <img src={item.product.image} alt={item.product.name} />
-        <button className="favorite-btn">
-          <Heart size={16} />
-        </button>
+        <img src={item.product?.images[0]} alt={item.product.name} />
       </div>
 
       <div className="item-details">
@@ -86,10 +85,10 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem }) => {
         <div className="item-price">
           {item.product.price.toLocaleString()} KGS
         </div>
-        <div className="item-rating">
+        {/* <div className="item-rating">
           <Star size={14} fill="#FFD700" />
           <span>{item.product.rating}</span>
-        </div>
+        </div> */}
 
         <div className="item-actions">
           <div className="quantity-controls">
@@ -115,11 +114,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem }) => {
         </div>
 
         <div className="item-info">
-          <p className="store">
-            Магазин: <span className="store-name">{item.store}</span>
-          </p>
-          <p className="delivery">Доставка: Нет</p>
-          <p className="total">obshiy: {item.total.toLocaleString()}.00</p>
+          <p className="total">Общий: {item.total.toLocaleString()}.00</p>
         </div>
       </div>
     </div>
@@ -134,30 +129,60 @@ const ClientSelector = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  console.log(clients);
 
-  const filteredClients = (clients || []).filter(
-    (client) =>
-      client.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.phone?.includes(searchQuery)
-  );
+  // Универсальные хелперы под разные схемы клиента
+  const getClientName = (c) =>
+    (c?.name && String(c.name)) ||
+    (c?.full_name && String(c.full_name)) ||
+    [c?.first_name, c?.last_name].filter(Boolean).join(" ") ||
+    c?.username ||
+    "";
+
+  const normalize = (s) =>
+    String(s ?? "")
+      .toLowerCase()
+      .trim();
+  const normalizePhone = (s) => String(s ?? "").replace(/\D/g, "");
+
+  // Клиенты могут быть массивом или { results: [...] }
+  const list = Array.isArray(clients?.results)
+    ? clients.results
+    : clients || [];
+
+  const filteredClients = (list || []).filter((client) => {
+    const q = normalize(searchQuery);
+    const qPhone = normalizePhone(searchQuery);
+    const name = normalize(getClientName(client));
+    const phone = normalizePhone(client?.phone);
+
+    // Ищем либо по имени/фамилии, либо по телефону
+    return (
+      (q && name.includes(q)) ||
+      (qPhone && phone.includes(qPhone)) ||
+      (!q && !qPhone)
+    );
+  });
 
   return (
     <div className="client-selector">
       <label className="selector-label">Выберите клиента</label>
       <div className="selector-dropdown">
-        <button className="selector-trigger" onClick={() => setIsOpen(!isOpen)}>
+        <button
+          className="selector-trigger"
+          onClick={() => setIsOpen((v) => !v)}
+        >
           <div className="selected-client">
+            <User size={20} />
             {selectedClient ? (
               <>
-                <User size={20} />
-                <span>{selectedClient.name}</span>
-                <span className="client-phone">{selectedClient.phone}</span>
+                <span>{getClientName(selectedClient)}</span>
+                {selectedClient?.phone && (
+                  <span className="client-phone">{selectedClient.phone}</span>
+                )}
               </>
             ) : (
-              <>
-                <User size={20} />
-                <span>Выберите клиента</span>
-              </>
+              <span>Выберите клиента</span>
             )}
           </div>
           <ChevronDown
@@ -172,7 +197,7 @@ const ClientSelector = ({
               <Search size={16} />
               <input
                 type="text"
-                placeholder="Поиск клиента..."
+                placeholder="Поиск по имени или телефону…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -184,24 +209,38 @@ const ClientSelector = ({
               ) : filteredClients.length === 0 ? (
                 <div className="no-clients">Клиенты не найдены</div>
               ) : (
-                filteredClients.map((client) => (
-                  <button
-                    key={client.id}
-                    className={`client-option ${
-                      selectedClient?.id === client.id ? "selected" : ""
-                    }`}
-                    onClick={() => {
-                      onClientSelect(client);
-                      setIsOpen(false);
-                      setSearchQuery("");
-                    }}
-                  >
-                    <div className="client-info">
-                      <span className="client-name">{client.name}</span>
-                      <span className="client-phone">{client.phone}</span>
-                    </div>
-                  </button>
-                ))
+                filteredClients.map((client) => {
+                  const name = getClientName(client);
+                  return (
+                    <button
+                      key={client?.id ?? `${name}-${client?.phone ?? ""}`}
+                      className={`client-option ${
+                        selectedClient?.id && client?.id
+                          ? selectedClient.id === client.id
+                            ? "selected"
+                            : ""
+                          : getClientName(selectedClient) === name &&
+                            selectedClient?.phone === client?.phone
+                          ? "selected"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        onClientSelect(client);
+                        setIsOpen(false);
+                        setSearchQuery("");
+                      }}
+                    >
+                      <div className="client-info">
+                        <span className="client-name">
+                          {name || "Без имени"}
+                        </span>
+                        {client?.phone && (
+                          <span className="client-phone">{client.phone}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
               )}
             </div>
           </div>
@@ -231,9 +270,9 @@ const OrderSummary = ({ selectedClient }) => {
         <div className="summary-row">
           <span>Стоимость: {subtotal.toLocaleString()}.00 KGS</span>
         </div>
-        <div className="summary-row discount">
+        {/* <div className="summary-row discount">
           <span>Скидка: - {discount.toLocaleString()}.00 KGS</span>
-        </div>
+        </div> */}
       </div>
 
       <div className="summary-divider"></div>
@@ -247,7 +286,7 @@ const OrderSummary = ({ selectedClient }) => {
         disabled={!selectedClient || (cartItems || []).length === 0}
       >
         <ShoppingCart size={20} />
-        Купить ({totalQuantity})
+        Оформить ({totalQuantity})
       </button>
     </div>
   );
@@ -255,7 +294,8 @@ const OrderSummary = ({ selectedClient }) => {
 
 const Cart = () => {
   const dispatch = useDispatch();
-  const { clients, loading: clientsLoading } = useClient();
+  const { list: clients, loading: clientsLoading } = useClient();
+  console.log(clients);
 
   // Redux селекторы
   const cartItems = useSelector(selectCartItems);

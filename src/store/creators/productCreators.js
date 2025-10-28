@@ -19,6 +19,8 @@ import {
   deleteCategory as deleteCategoryApi,
   fetchAgentProductsApi, // GET /main/agents/me/products/
   fetchProductHistoryApi, // GET /main/warehouse/history/
+  getProductByBarcodeApi, // GET /main/products/barcode/{barcode}/
+  addProductToWarehouseApi, // POST /main/products/add-to-warehouse/
 } from "../../api/products";
 
 /* =================================================================== */
@@ -369,6 +371,30 @@ export const fetchProductHistoryAsync = createAsyncThunk(
   async (params = {}, { rejectWithValue }) => {
     try {
       return await fetchProductHistoryApi(params);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
+// Получение товара по штрих-коду
+export const getProductByBarcodeAsync = createAsyncThunk(
+  "products/getByBarcode",
+  async (barcode, { rejectWithValue }) => {
+    try {
+      return await getProductByBarcodeApi(barcode);
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
+// Добавление товара в склад с количеством
+export const addProductToWarehouseAsync = createAsyncThunk(
+  "products/addToWarehouse",
+  async (productData, { rejectWithValue }) => {
+    try {
+      return await addProductToWarehouseApi(productData);
     } catch (error) {
       return rejectWithValue(error?.response?.data || error?.message);
     }

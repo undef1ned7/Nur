@@ -834,7 +834,9 @@ const AddModal = ({ onClose, onSaveSuccess, cashBoxes, selectCashBox }) => {
   const { creating, createError, brands, categories, barcodeError } =
     useProducts();
   const { company } = useUser();
-  const [activeTab, setActiveTab] = useState(null);
+  const [activeTab, setActiveTab] = useState(0);
+  console.log(activeTab);
+
   const [isTabSelected, setIsTabSelected] = useState(false);
 
   const [newItemData, setNewItemData] = useState({

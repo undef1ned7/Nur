@@ -155,3 +155,43 @@ export const fetchProductHistoryApi = async (params = {}) => {
     }
   }
 };
+
+// Получение товара по штрих-коду
+export const getProductByBarcodeApi = async (barcode) => {
+  try {
+    const response = await api.get(`main/products/global-barcode/${barcode}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Product By Barcode Error Data:", error.response.data);
+      console.error(
+        "Get Product By Barcode Error Status:",
+        error.response.status
+      );
+      return Promise.reject(error.response.data);
+    }
+  }
+};
+
+// Добавление товара в склад с количеством
+export const addProductToWarehouseApi = async (productData) => {
+  try {
+    const response = await api.post(
+      "main/products/add-to-warehouse/",
+      productData
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error(
+        "Add Product To Warehouse Error Data:",
+        error.response.data
+      );
+      console.error(
+        "Add Product To Warehouse Error Status:",
+        error.response.status
+      );
+      return Promise.reject(error.response.data);
+    }
+  }
+};

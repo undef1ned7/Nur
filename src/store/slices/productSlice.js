@@ -18,6 +18,8 @@ import {
   updateItemsMake,
   deleteItemsMake,
   fetchAgentProductsAsync,
+  getProductByBarcodeAsync,
+  addProductToWarehouseAsync,
 } from "../creators/productCreators";
 import { useSelector } from "react-redux";
 
@@ -55,6 +57,15 @@ const initialState = {
   deleting: false,
   deleteError: null,
   barcodeError: null,
+
+  // Barcode scanning
+  scannedProduct: null,
+  scanningProduct: false,
+  scanProductError: null,
+
+  // Warehouse operations
+  addingToWarehouse: false,
+  addToWarehouseError: null,
 };
 
 const productSlice = createSlice({
@@ -68,6 +79,10 @@ const productSlice = createSlice({
       state.previous = null;
       state.loading = false;
       state.error = null;
+    },
+    clearScannedProduct: (state) => {
+      state.scannedProduct = null;
+      state.scanProductError = null;
     },
   },
   extraReducers: (builder) => {
@@ -310,10 +325,41 @@ const productSlice = createSlice({
       .addCase(fetchAgentProductsAsync.rejected, (state, action) => {
         state.agentProductsLoading = false;
         state.agentProductsError = action.payload;
+      })
+
+      // Получение товара по штрих-коду
+      .addCase(getProductByBarcodeAsync.pending, (state) => {
+        state.scanningProduct = true;
+        state.scanProductError = null;
+        state.scannedProduct = null;
+      })
+      .addCase(getProductByBarcodeAsync.fulfilled, (state, action) => {
+        state.scanningProduct = false;
+        state.scannedProduct = action.payload;
+      })
+      .addCase(getProductByBarcodeAsync.rejected, (state, action) => {
+        state.scanningProduct = false;
+        state.scanProductError = action.payload;
+        state.scannedProduct = null;
+      })
+
+      // Добавление товара в склад
+      .addCase(addProductToWarehouseAsync.pending, (state) => {
+        state.addingToWarehouse = true;
+        state.addToWarehouseError = null;
+      })
+      .addCase(addProductToWarehouseAsync.fulfilled, (state, action) => {
+        state.addingToWarehouse = false;
+        // Очищаем отсканированный товар после успешного добавления
+        state.scannedProduct = null;
+      })
+      .addCase(addProductToWarehouseAsync.rejected, (state, action) => {
+        state.addingToWarehouse = false;
+        state.addToWarehouseError = action.payload;
       });
   },
 });
 
 export const useProducts = () => useSelector((state) => state.product);
-export const { clearProducts } = productSlice.actions;
+export const { clearProducts, clearScannedProduct } = productSlice.actions;
 export default productSlice.reducer;
