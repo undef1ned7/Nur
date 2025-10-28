@@ -102,6 +102,8 @@ import ConsultingAnalytics from "./Components/Sectors/Consulting/Analytics/Analy
 import ProductionAgents from "./Components/Sectors/Production/ProductionAgents/ProductionAgents";
 import BarberSklad from "./Components/Sectors/Barber/Sklad/Sklad";
 import Pending from "./Components/pages/Pending/Pending";
+import PiloramaWarehouse from "./Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
+import ProductionCatalog from "./Components/Sectors/Production/Catalog/ProductionCatalog";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -921,6 +923,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProductionAgents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="production/catalog"
+              element={
+                <ProtectedRoute>
+                  <ProductionCatalog />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="pilorama/warehouse"
+              element={
+                <ProtectedRoute>
+                  <PiloramaWarehouse />
                 </ProtectedRoute>
               }
             />

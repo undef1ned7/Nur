@@ -18,6 +18,10 @@ import transferReducer from "./slices/transferSlice";
 import acceptanceReducer from "./slices/acceptanceSlice";
 import returnReducer from "./slices/returnSlice";
 import agentReducer from "./slices/agentSlice";
+import agentCartReducer from "./slices/agentCartSlice";
+import catalogReducer from "./slices/catalogSlice";
+import cartReducer from "./slices/cartSlice";
+import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
   reducer: {
@@ -40,7 +44,20 @@ const store = configureStore({
     acceptance: acceptanceReducer,
     return: returnReducer,
     agent: agentReducer,
+    agentCart: agentCartReducer,
+    catalog: catalogReducer,
+    cart: cartReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        // игнорим только нужные action.type, чтобы не отключать проверку глобально
+        ignoredActions: [
+          "products/getProductInvoice/fulfilled",
+          "products/getProductCheckout/fulfilled",
+        ],
+      },
+    }),
 });
 
 export * from "./slices/uiSlice";

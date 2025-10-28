@@ -1,7 +1,9 @@
 import {
+  Boxes,
   Instagram,
   InstagramIcon,
   Landmark,
+  Layers,
   ScaleIcon,
   Users,
   Warehouse,
@@ -215,6 +217,20 @@ const HIDE_RULES = [
         "/crm/zakaz",
         "/crm/sklad",
         "/crm/raspisanie",
+      ],
+    },
+  },
+  {
+    when: { sector: "Пилорама" },
+    hide: {
+      toIncludes: [
+        "/crm/debts",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "/crm/sklad",
+        "/crm/sell",
+        "/crm/raspisanie",
+        "/crm/brand-category",
       ],
     },
   },
@@ -729,6 +745,29 @@ const MENU_CONFIG = {
         permission: "can_view_agent",
         implemented: true,
       },
+      {
+        label: "Каталог",
+        to: "/crm/production/catalog",
+        icon: <Layers className="sidebar__menu-icon" />,
+        permission: "can_view_agent",
+        implemented: true,
+      },
+    ],
+    pilorama: [
+      {
+        label: "Склад",
+        to: "/crm/pilorama/warehouse",
+        icon: <Warehouse className="sidebar__menu-icon" />, // 👥
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Водители",
+        to: "/crm/production/agents",
+        icon: <BsFileEarmarkPerson className="sidebar__menu-icon" />,
+        permission: "can_view_agent",
+        implemented: true,
+      },
     ],
 
     // ...внутри MENU_CONFIG.sector
@@ -861,6 +900,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       производство: "production",
       консалтинг: "consulting",
       склад: "warehouse",
+      пилорама: "pilorama",
     };
 
     const configKey = sectorMapping[sectorKey] || sectorKey;

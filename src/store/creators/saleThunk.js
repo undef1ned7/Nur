@@ -218,10 +218,9 @@ export const getProductCheckout = createAsyncThunk(
   "products/getProductCheckout",
   async (id, { rejectWithValue }) => {
     try {
-      const { data } = await api.get(
-        `/main/api/main/pos/sales/${id}/receipt/`,
-        { responseType: "blob" }
-      );
+      const { data } = await api.get(`/main/pos/sales/${id}/receipt/`, {
+        responseType: "blob",
+      });
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);

@@ -100,6 +100,7 @@ const CashboxList = () => {
   const [err, setErr] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
+  const [checked, setChecked] = useState(false);
   const navigate = useNavigate();
 
   const load = async () => {
@@ -136,7 +137,10 @@ const CashboxList = () => {
     const title = (name || "").trim();
     if (!title) return alert("Введите название кассы");
     try {
-      await api.post("/construction/cashboxes/", { name: title });
+      await api.post("/construction/cashboxes/", {
+        name: title,
+        is_consumption: checked,
+      });
       setCreateOpen(false);
       setName("");
       load();
@@ -165,12 +169,22 @@ const CashboxList = () => {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          {company?.subscription_plan.name === "Старт" && (
+          {/* {console.log(filtered)} */}
+          {company?.subscription_plan?.name === "Старт" &&
+            (filtered?.length ?? 0) === 0 && (
+              <button
+                className="kassa__btn kassa__btn--primary"
+                onClick={() => setCreateOpen(true)}
+              >
+                Создать кассу
+              </button>
+            )}
+          {company?.subscription_plan?.name !== "Старт" && (
             <button
               className="kassa__btn kassa__btn--primary"
               onClick={() => setCreateOpen(true)}
             >
-              Создать кассу
+              Создать кассу для прочьих расходов
             </button>
           )}
         </div>
@@ -259,6 +273,19 @@ const CashboxList = () => {
                 placeholder="Например: касса №1"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            {/* {console.log(checked)} */}
+            <div className="kassa-modal__section" style={{ display: "flex" }}>
+              <label className="kassa-modal__label">Прочие расходы *</label>
+              <input
+                className="kassa-modal__input"
+                type="checkbox"
+                placeholder="Например: касса №1"
+                style={{ width: "max-content" }}
+                value={checked}
+                onChange={(e) => setChecked(!checked)}
                 required
               />
             </div>

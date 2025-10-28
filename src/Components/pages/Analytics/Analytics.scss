@@ -845,6 +845,133 @@
   width: 100%;
 }
 
+/* ===== consumption (прочие расходы) ===== */
+.analytics-consumption {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 2px solid var(--c-border);
+
+  &__header {
+    @extend .card-like;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #fff7bf 0%, #fffef2 100%);
+    border-color: #ffe470;
+  }
+
+  &__title {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    font-weight: 900;
+    color: #000;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    &::before {
+      content: "💰";
+      font-size: 20px;
+    }
+  }
+
+  &__subtitle {
+    margin: 0;
+    color: var(--c-muted);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__kpis {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  &__kpi {
+    @extend .card-like;
+    padding: 14px 16px;
+    position: relative;
+    background: linear-gradient(135deg, #fffef2 0%, #fff7bf 100%);
+    border-color: #ffe470;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #ffd600 0%, #ffed4e 100%);
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
+    }
+  }
+
+  &__kpi-label {
+    color: var(--c-muted);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  &__kpi-value {
+    margin-top: 6px;
+    font-size: 26px;
+    font-weight: 900;
+    color: #000;
+  }
+
+  &__grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &__card {
+    @extend .card-like;
+    padding: 12px;
+    background: linear-gradient(135deg, #fffef2 0%, #ffffff 100%);
+    border-color: #ffe470;
+  }
+
+  &__card-title {
+    font-weight: 900;
+    margin-bottom: 8px;
+    color: #000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    &::before {
+      content: "📊";
+      font-size: 16px;
+    }
+  }
+
+  @media (max-width: 992px) {
+    &__kpis {
+      grid-template-columns: 1fr 1fr;
+    }
+    &__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    &__kpis {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 480px) {
+    &__title {
+      font-size: 20px;
+    }
+    &__kpi-value {
+      font-size: 24px;
+    }
+  }
+}
+
 /* тонкие скроллбары */
 .analytics-sales__table-wrap,
 .analytics-sales__card--scroll,

@@ -18,6 +18,7 @@ import {
 import { useClient } from "../../../../store/slices/ClientSlice";
 import "./ClientDetails.scss";
 import { useUser } from "../../../../store/slices/userSlice";
+import { addCashFlows, useCash } from "../../../../store/slices/cashSlice";
 
 /* ===== helpers ===== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -151,6 +152,7 @@ function formatDateDDMMYYYY(input) {
 const DebtModal = ({ id, onClose, onChanged }) => {
   const dispatch = useDispatch();
   const { dealDetail } = useClient();
+  const { list: cashBoxes } = useCash();
   const { id: clientId } = useParams();
 
   const [state, setState] = useState({
@@ -259,6 +261,17 @@ const DebtModal = ({ id, onClose, onChanged }) => {
       ? dealDetail.installments
       : [];
   }, [dealDetail]);
+  const [selectCashBox, setSelectCashBox] = useState("");
+  const [cashData, setCashData] = useState({
+    cashbox: "",
+    type: "income",
+    name: "",
+    amount: "",
+  });
+  const onCashChange = (e) => {
+    const { name, value } = e.target;
+    setCashData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const firstDueDate =
     dealDetail?.first_due_date ?? installments[0]?.due_date ?? null;
@@ -361,6 +374,21 @@ const DebtModal = ({ id, onClose, onChanged }) => {
         {/* ===== График платежей (с сервера) ===== */}
         {installments.length > 0 && (
           <section className="schedule">
+            <select
+              value={cashData.cashbox}
+              name="cashbox"
+              onChange={onCashChange}
+              className="employee__search-wrapper"
+            >
+              <option value="" disabled>
+                Выберите кассу
+              </option>
+              {cashBoxes?.map((cash) => (
+                <option key={cash.id} value={cash.id}>
+                  {cash.name ?? cash.department_name}
+                </option>
+              ))}
+            </select>
             <div className="row3">
               <div className="label">График платежей</div>
               <div className="value" aria-live="polite">
@@ -418,6 +446,13 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                     installment_number: p.number,
                                     date: toYYYYMMDD(new Date()),
                                   });
+                                  dispatch(
+                                    addCashFlows({
+                                      ...cashData,
+                                      amount: p.amount,
+                                      name: `оплата долга №${p.number}`,
+                                    })
+                                  );
                                 }}
                               >
                                 Оплатить

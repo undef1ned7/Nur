@@ -91,6 +91,45 @@
       color: #a8a8a8;
     }
   }
+  &__agent {
+    .sell__header-input {
+      margin: 10px 0;
+      width: 100%;
+      padding: 8px 13px;
+      outline: none;
+    }
+    label {
+      margin: 10px 0 5px;
+      display: block;
+      font-family: Montserrat;
+      font-weight: 300;
+      font-style: Light;
+      font-size: 12px;
+      leading-trim: NONE;
+      line-height: 100%;
+      letter-spacing: -2%;
+      color: #a8a8a8;
+    }
+  }
+  &__custom-item {
+    .sell__header-input {
+      width: 100%;
+      padding: 8px 13px;
+      outline: none;
+    }
+    label {
+      margin: 10px 0 5px;
+      display: block;
+      font-family: Montserrat;
+      font-weight: 300;
+      font-style: Light;
+      font-size: 12px;
+      leading-trim: NONE;
+      line-height: 100%;
+      letter-spacing: -2%;
+      color: #a8a8a8;
+    }
+  }
   &__debt {
     width: 379px;
     &-amount {
@@ -468,7 +507,7 @@
     height: max-content;
   }
   .add-modal__content {
-    width: 550px;
+    width: 800px;
     overflow-y: auto;
     height: 80%;
   }

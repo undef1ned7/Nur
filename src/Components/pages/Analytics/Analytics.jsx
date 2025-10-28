@@ -470,6 +470,50 @@ const Analytics = () => {
       .slice(0, 10);
   }, [flowsFiltered]);
 
+  // Прочие расходы - кассы с is_consumption: true
+  const consumptionBoxes = useMemo(() => {
+    return boxes.filter((box) => box.is_consumption === true);
+  }, [boxes]);
+
+  const consumptionFlows = useMemo(() => {
+    if (!consumptionBoxes.length) return [];
+    const consumptionBoxIds = consumptionBoxes.map((box) => box.id || box.uuid);
+    return flowsFiltered.filter((flow) =>
+      consumptionBoxIds.includes(flow.cashboxId)
+    );
+  }, [flowsFiltered, consumptionBoxes]);
+
+  const consumptionTotals = useMemo(() => {
+    let income = 0,
+      expense = 0;
+    for (const f of consumptionFlows) {
+      if (f.type === "income") income += f.amount;
+      else expense += f.amount;
+    }
+    return { income, expense, net: income - expense };
+  }, [consumptionFlows]);
+
+  const consumptionByBox = useMemo(() => {
+    const map = new Map();
+    for (const f of consumptionFlows) {
+      const id = f.cashboxId || "—";
+      const name = f.cashboxName || "—";
+      const cur = map.get(id) || { name, income: 0, expense: 0 };
+      if (f.type === "income") cur.income += f.amount;
+      else cur.expense += f.amount;
+      map.set(id, cur);
+    }
+    const rows = Array.from(map.entries()).map(([id, v]) => ({
+      id,
+      name: v.name,
+      income: v.income,
+      expense: v.expense,
+      net: v.income - v.expense,
+    }));
+    rows.sort((a, b) => b.expense - a.expense);
+    return rows;
+  }, [consumptionFlows]);
+
   /* ====================== UI ====================== */
   const TABS = [
     { key: "sales", label: "Продажи" },
@@ -1188,6 +1232,131 @@ const Analytics = () => {
           {cashLoading && (
             <div className="analytics__loading">Обновляем операции…</div>
           )}
+        </section>
+      )}
+
+      {/* ---------------- CONSUMPTION (Прочие расходы) ---------------- */}
+      {activeTab === "cashbox" && consumptionBoxes.length > 0 && (
+        <section
+          id="panel-consumption"
+          className="analytics-consumption"
+          role="tabpanel"
+        >
+          <div className="analytics-consumption__header">
+            <h3 className="analytics-consumption__title">Прочие расходы</h3>
+            <p className="analytics-consumption__subtitle">
+              Кассы с пометкой "потребление" (is_consumption: true)
+            </p>
+          </div>
+
+          <div className="analytics-consumption__kpis">
+            <div className="analytics-consumption__kpi">
+              <div className="analytics-consumption__kpi-label">Приход</div>
+              <div className="analytics-consumption__kpi-value">
+                {nfMoney.format(consumptionTotals.income)}
+              </div>
+            </div>
+            <div className="analytics-consumption__kpi">
+              <div className="analytics-consumption__kpi-label">Расход</div>
+              <div className="analytics-consumption__kpi-value">
+                {nfMoney.format(consumptionTotals.expense)}
+              </div>
+            </div>
+            <div className="analytics-consumption__kpi">
+              <div className="analytics-consumption__kpi-label">Сальдо</div>
+              <div className="analytics-consumption__kpi-value">
+                {nfMoney.format(consumptionTotals.net)}
+              </div>
+            </div>
+          </div>
+
+          <div className="analytics-consumption__grid">
+            <div className="analytics-consumption__card">
+              <div className="analytics-consumption__card-title">
+                Срез по кассам потребления
+              </div>
+              <div
+                className="analytics-sales__table-wrap"
+                role="region"
+                aria-label="Срез по кассам потребления"
+              >
+                <table className="analytics-sales__table">
+                  <thead>
+                    <tr>
+                      <th>Касса</th>
+                      <th>Приход</th>
+                      <th>Расход</th>
+                      <th>Сальдо</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {consumptionByBox.length ? (
+                      consumptionByBox.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.name}</td>
+                          <td>{nfMoney.format(r.income)}</td>
+                          <td>{nfMoney.format(r.expense)}</td>
+                          <td>{nfMoney.format(r.net)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4}>Нет данных</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="analytics-consumption__card">
+              <div className="analytics-consumption__card-title">
+                Последние операции потребления
+              </div>
+              <div
+                className="analytics-sales__table-wrap"
+                role="region"
+                aria-label="Последние операции потребления"
+              >
+                <table className="analytics-sales__table">
+                  <thead>
+                    <tr>
+                      <th>Тип</th>
+                      <th>Статья</th>
+                      <th>Сумма</th>
+                      <th>Касса</th>
+                      <th>Дата</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {consumptionFlows.length ? (
+                      consumptionFlows
+                        .slice()
+                        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+                        .slice(0, 20)
+                        .map((f, i) => (
+                          <tr key={f.id ?? i}>
+                            <td>{f.type === "income" ? "Приход" : "Расход"}</td>
+                            <td>{f.title}</td>
+                            <td>{nfMoney.format(f.amount)}</td>
+                            <td>{f.cashboxName || "—"}</td>
+                            <td>
+                              {f.created_at
+                                ? new Date(f.created_at).toLocaleString()
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5}>Нет операций</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </section>
       )}
 

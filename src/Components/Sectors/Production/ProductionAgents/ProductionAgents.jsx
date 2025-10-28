@@ -38,6 +38,129 @@ import { startSale } from "../../../../store/creators/saleThunk";
 import SellStart from "./SellStart/SellStart";
 import { startSaleInAgent } from "../../../../store/creators/agentCreators";
 import { useAgent } from "../../../../store/slices/agentSlice";
+import api from "../../../../api";
+import AddCashFlowsModal from "../../../Deposits/Kassa/AddCashFlowsModal/AddCashFlowsModal";
+import {
+  historySellProduct,
+  historySellProductDetail,
+  getProductCheckout,
+  getProductInvoice,
+} from "../../../../store/creators/saleThunk";
+
+// Компонент для детального просмотра продажи
+const SaleDetailModal = ({ onClose, saleId }) => {
+  const dispatch = useDispatch();
+  const { historyDetail: saleDetail } = useSale();
+  const { company } = useUser();
+
+  useEffect(() => {
+    if (saleId) {
+      dispatch(historySellProductDetail(saleId));
+    }
+  }, [saleId, dispatch]);
+
+  const kindTranslate = {
+    new: "Новый",
+    paid: "Оплаченный",
+    canceled: "Отмененный",
+  };
+
+  const handlePrintReceipt = async () => {
+    try {
+      const pdfBlob = await dispatch(
+        getProductCheckout(saleDetail?.id)
+      ).unwrap();
+      const url = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "receipt.pdf";
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.detail);
+    }
+  };
+
+  const handlePrintInvoice = async () => {
+    try {
+      const pdfInvoiceBlob = await dispatch(
+        getProductInvoice(saleDetail?.id)
+      ).unwrap();
+      const url1 = window.URL.createObjectURL(pdfInvoiceBlob);
+      const link1 = document.createElement("a");
+      link1.href = url1;
+      link1.download = "invoice.pdf";
+      link1.click();
+      window.URL.revokeObjectURL(url1);
+    } catch (err) {
+      alert(err.detail);
+    }
+  };
+
+  return (
+    <div className="sellDetail add-modal">
+      <div className="add-modal__overlay" onClick={onClose} />
+      <div className="add-modal__content" style={{ width: "500px" }}>
+        <div className="add-modal__header">
+          <h3>Детали продажи</h3>
+          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+        </div>
+        <div className="sellDetail__content">
+          <div className="sell__box">
+            <p className="receipt__title">
+              Клиент: {saleDetail?.client_name || "—"}
+            </p>
+            <p className="receipt__title">
+              Статус:{" "}
+              {kindTranslate[saleDetail?.status] || saleDetail?.status || "—"}
+            </p>
+            <p className="receipt__title">
+              Дата:{" "}
+              {saleDetail?.created_at
+                ? new Date(saleDetail.created_at).toLocaleString()
+                : "—"}
+            </p>
+          </div>
+          <div className="receipt">
+            {saleDetail?.items?.map((product, idx) => (
+              <div className="receipt__item" key={idx}>
+                <p className="receipt__item-name">
+                  {idx + 1}.{" "}
+                  {product.product_name || product.object_name || "—"}
+                </p>
+                <div>
+                  <p>{product.tax_total || 0}</p>
+                  <p className="receipt__item-price">
+                    {product.quantity || 0} x {product.unit_price || 0} ≡{" "}
+                    {(product.quantity || 0) * (product.unit_price || 0)}
+                  </p>
+                </div>
+              </div>
+            ))}
+            <div className="receipt__total">
+              <b>ИТОГО</b>
+              <div
+                style={{ gap: "10px", display: "flex", alignItems: "center" }}
+              >
+                <p>Общая скидка {saleDetail?.discount_total || 0}</p>
+                <p>Налог {saleDetail?.tax_total || 0}</p>
+                <b>≡ {saleDetail?.total || 0}</b>
+              </div>
+            </div>
+            <div className="receipt__row">
+              <button className="receipt__row-btn" onClick={handlePrintReceipt}>
+                Чек
+              </button>
+              <button className="receipt__row-btn" onClick={handlePrintInvoice}>
+                Накладной
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const PendingModal = ({ onClose, onChanged }) => {
   const dispatch = useDispatch();
@@ -397,7 +520,13 @@ const ProductionAgents = () => {
   const { start: startInAgent } = useAgent();
   // const {}
   const { list: cashBoxes } = useCash();
-  const { list } = useTransfer();
+  const [agents, setAgents] = useState([]);
+  const [showAddCashboxModal, setShowAddCashboxModal] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const [salesHistory, setSalesHistory] = useState([]);
+  const [salesHistoryLoading, setSalesHistoryLoading] = useState(false);
+  const [showSaleDetail, setShowSaleDetail] = useState(false);
+  const [selectedSaleId, setSelectedSaleId] = useState(null);
 
   const [cashboxId, setCashboxId] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -473,6 +602,7 @@ const ProductionAgents = () => {
     setShowTransferProductModal(true);
     setItemId1(item);
   };
+  const { company } = useUser();
   const handleOpen2 = (item) => {
     setShowAcceptProductModal(true);
     setItemId2(item);
@@ -511,6 +641,42 @@ const ProductionAgents = () => {
     if (showSellModal) dispatch(startSale());
   }, [showSellModal, dispatch]);
 
+  useEffect(() => {
+    api
+      .get("/main/owners/agents/products/")
+      .then(({ data }) => {
+        setAgents(data);
+      })
+      .catch((e) => console.log(e));
+  }, []);
+
+  // Функция для загрузки истории продаж
+  const loadSalesHistory = async () => {
+    setSalesHistoryLoading(true);
+    try {
+      const result = await dispatch(historySellProduct({})).unwrap();
+      setSalesHistory(result);
+    } catch (error) {
+      console.error("Ошибка загрузки истории продаж:", error);
+    } finally {
+      setSalesHistoryLoading(false);
+    }
+  };
+
+  // Загружаем историю продаж при переключении на второй таб
+  useEffect(() => {
+    if (activeTab === 1 && company.sector.name === "Пилорама") {
+      loadSalesHistory();
+    }
+  }, [activeTab, company.sector.name]);
+
+  // Функция для открытия детального просмотра продажи
+  const handleShowSaleDetail = (saleId) => {
+    setSelectedSaleId(saleId);
+    setShowSaleDetail(true);
+    dispatch(historySellProductDetail(saleId));
+  };
+
   // Фильтрация по названию, категории и ДАТЕ created_at
   const viewProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -518,7 +684,22 @@ const ProductionAgents = () => {
     const to = dateTo ? toEndOfDay(dateTo) : null;
 
     // Выбираем источник данных в зависимости от роли
-    const dataSource = profile?.role === "owner" ? list : agentProducts;
+    let dataSource;
+    if (profile?.role === "owner") {
+      // Для владельца используем данные агентов
+      dataSource = agents.flatMap((agentData) =>
+        agentData.products.map((product) => ({
+          ...product,
+          agent_first_name: agentData.agent.first_name,
+          agent_last_name: agentData.agent.last_name,
+          agent_track_number: agentData.agent.track_number,
+          created_at: product.last_movement_at,
+        }))
+      );
+    } else {
+      // Для агента используем agentProducts
+      dataSource = agentProducts;
+    }
 
     let filteredProducts = (dataSource || []).filter((p) => {
       const okName =
@@ -554,7 +735,7 @@ const ProductionAgents = () => {
       return new Date(b.created_at) - new Date(a.created_at);
     });
   }, [
-    list,
+    agents,
     agentProducts,
     search,
     categoryFilter,
@@ -562,214 +743,339 @@ const ProductionAgents = () => {
     dateTo,
     profile?.role,
   ]);
+
+  const kindTranslate = {
+    new: "Новый",
+    paid: "Оплаченный",
+    canceled: "Отмененный",
+  };
   return (
     <div>
-      {/* <div className="vitrina__header" style={{ margin: "15px 0" }}>
-        <div className="vitrina__tabs">
-          {activeTab === 0 && (
+      {/* Табы для сектора Пилорама */}
+      {company.sector.name === "Пилорама" && (
+        <div className="vitrina__header" style={{ margin: "15px 0" }}>
+          <div className="vitrina__tabs">
             <span
-              key={index}
-              onClick={() => setShowPendingModal(true)}
-              className={`vitrina__tab`}
-              style={{ cursor: "pointer" }}
+              className={`vitrina__tab ${activeTab === 0 ? "active" : ""}`}
+              onClick={() => setActiveTab(0)}
+              style={{
+                cursor: "pointer",
+                padding: "8px 16px",
+                border: "1px solid #ddd",
+                borderRadius: "4px 4px 0 0",
+                backgroundColor: activeTab === 0 ? "#ffd400" : "transparent",
+                color: activeTab === 0 ? "#000" : "#333",
+                marginRight: "4px",
+              }}
             >
-              Запросы
+              Товары агентов
             </span>
-          )}
+            <span
+              className={`vitrina__tab ${activeTab === 1 ? "active" : ""}`}
+              onClick={() => setActiveTab(1)}
+              style={{
+                cursor: "pointer",
+                padding: "8px 16px",
+                border: "1px solid #ddd",
+                borderRadius: "4px 4px 0 0",
+                backgroundColor: activeTab === 1 ? "#ffd400" : "transparent",
+                color: activeTab === 1 ? "#000" : "#333",
+              }}
+            >
+              История продаж
+            </span>
+          </div>
         </div>
-      </div> */}
+      )}
 
       {startInAgent && showStart ? (
         <SellStart show={showStart} setShow={setShowStart} />
       ) : (
-        <div className="sklad__warehouse" style={{ marginTop: "15px" }}>
-          <div className="sklad__header">
-            <div
-              className="sklad__left"
-              style={{
-                display: "flex",
-                gap: 12,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <input
-                type="text"
-                placeholder="Поиск по названию товара"
-                className="sklad__search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                }}
-              >
-                <label style={{ opacity: 0.7 }}>От</label>
-                <input
-                  type="date"
-                  className="employee__search-wrapper"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-                <label style={{ opacity: 0.7 }}>До</label>
-                <input
-                  type="date"
-                  className="employee__search-wrapper"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="sklad__add"
-                  style={{ padding: "6px 10px" }}
-                  onClick={resetFilters}
+        <>
+          {/* Первый таб - Товары агентов */}
+          {(!company.sector.name === "Пилорама" || activeTab === 0) && (
+            <div className="sklad__warehouse" style={{ marginTop: "15px" }}>
+              <div className="sklad__header">
+                <div
+                  className="sklad__left"
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
                 >
-                  Сбросить
-                </button>
+                  <input
+                    type="text"
+                    placeholder="Поиск по названию товара"
+                    className="sklad__search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <label style={{ opacity: 0.7 }}>От</label>
+                    <input
+                      type="date"
+                      className="employee__search-wrapper"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                    <label style={{ opacity: 0.7 }}>До</label>
+                    <input
+                      type="date"
+                      className="employee__search-wrapper"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="sklad__add"
+                      style={{ padding: "6px 10px" }}
+                      onClick={resetFilters}
+                    >
+                      Сбросить
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 20,
+                    flexWrap: "wrap-reverse",
+                    justifyContent: "end",
+                  }}
+                >
+                  {profile?.role !== "owner" ? (
+                    <button
+                      className="btn edit-btn"
+                      onClick={() => setShowPendingModal(true)}
+                    >
+                      <Plus size={16} style={{ marginRight: 4 }} />
+                      Мои передачи
+                    </button>
+                  ) : (
+                    <button
+                      className="btn edit-btn"
+                      onClick={() => setShowPendingModal(true)}
+                    >
+                      <Plus size={16} style={{ marginRight: 4 }} />
+                      Все передачи
+                    </button>
+                  )}
+
+                  {company.sector.name === "Пилорама" && (
+                    <button
+                      className="sklad__add"
+                      onClick={() => setShowAddCashboxModal(true)}
+                    >
+                      Прочие расходы
+                    </button>
+                  )}
+
+                  <button
+                    className="sklad__add"
+                    onClick={() => {
+                      dispatch(startSaleInAgent());
+                      setShowStart(true);
+                    }}
+                  >
+                    <Plus size={16} style={{ marginRight: 4 }} />
+                    Продажа товара
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 20,
-                flexWrap: "wrap-reverse",
-                justifyContent: "end",
-              }}
-            >
-              {profile?.role !== "owner" ? (
-                <button
-                  className="btn edit-btn"
-                  onClick={() => setShowPendingModal(true)}
-                >
-                  <Plus size={16} style={{ marginRight: 4 }} />
-                  Мои передачи
-                </button>
+              <div style={{ margin: "8px 0", opacity: 0.8 }}>
+                Найдено: {viewProducts?.length}
+                {viewProducts?.length ? ` из ${viewProducts?.length}` : ""}
+              </div>
+
+              {(profile?.role === "owner" ? loading : agentProductsLoading) ? (
+                <p className="sklad__loading-message">Загрузка товаров...</p>
+              ) : (profile?.role === "owner" ? error : agentProductsError) ? (
+                <p className="sklad__error-message">Ошибка загрузки</p>
+              ) : viewProducts?.length === 0 ? (
+                <p className="sklad__no-products-message">
+                  Нет доступных товаров.
+                </p>
               ) : (
-                <button
-                  className="btn edit-btn"
-                  onClick={() => setShowPendingModal(true)}
-                >
-                  <Plus size={16} style={{ marginRight: 4 }} />
-                  Все передачи
-                </button>
-              )}
-
-              <button
-                className="sklad__add"
-                onClick={() => {
-                  dispatch(startSaleInAgent());
-                  setShowStart(true);
-                }}
-              >
-                <Plus size={16} style={{ marginRight: 4 }} />
-                Продажа товара
-              </button>
-            </div>
-          </div>
-
-          <div style={{ margin: "8px 0", opacity: 0.8 }}>
-            Найдено: {viewProducts?.length}
-            {viewProducts?.length ? ` из ${viewProducts?.length}` : ""}
-          </div>
-
-          {(profile?.role === "owner" ? loading : agentProductsLoading) ? (
-            <p className="sklad__loading-message">Загрузка товаров...</p>
-          ) : (profile?.role === "owner" ? error : agentProductsError) ? (
-            <p className="sklad__error-message">Ошибка загрузки</p>
-          ) : viewProducts?.length === 0 ? (
-            <p className="sklad__no-products-message">Нет доступных товаров.</p>
-          ) : (
-            <div className="table-wrapper">
-              <table className="sklad__table">
-                <thead>
-                  <tr>
-                    <th>
-                      <input type="checkbox" />
-                    </th>
-                    <th>№</th>
-                    <th>Название</th>
-                    {profile?.role === "owner" && <th>Агент</th>}
-                    <th>Дата</th>
-                    <th>
-                      {profile?.role !== "owner"
-                        ? "На руках"
-                        : "Количество / У агентов"}
-                    </th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {viewProducts?.map((item, idx) => (
-                    <tr key={item.id || item.product}>
-                      <td>
-                        <input type="checkbox" />
-                      </td>
-                      <td>{idx + 1}</td>
-                      <td>
-                        <strong>{item.product_name || item.name}</strong>
-                      </td>
-                      {profile?.role === "owner" && <td>{item.agent_name}</td>}
-                      <td>
-                        {profile?.role === "owner"
-                          ? new Date(item.created_at).toLocaleString()
-                          : "—"}
-                      </td>
-                      <td>
-                        {profile?.role !== "owner" ? (
-                          item.qty_on_hand > 0 ? (
-                            <span className="sell__badge--success">
-                              {item.qty_on_hand}
-                            </span>
-                          ) : (
-                            <span className="sell__badge--danger">
-                              Нет на руках
-                            </span>
-                          )
-                        ) : (
-                          <div>
-                            <div>На складе: {item.quantity}</div>
-                            {item.qty_on_agent > 0 && (
-                              <div
-                                style={{ fontSize: "12px", color: "#28a745" }}
-                              >
-                                У агентов: {item.qty_on_agent}
+                <div className="table-wrapper">
+                  <table className="sklad__table">
+                    <thead>
+                      <tr>
+                        <th>
+                          <input type="checkbox" />
+                        </th>
+                        <th>№</th>
+                        <th>Название</th>
+                        {profile?.role === "owner" && <th>Агент</th>}
+                        <th>Дата</th>
+                        <th>
+                          {profile?.role !== "owner"
+                            ? "На руках"
+                            : "Количество / У агентов"}
+                        </th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewProducts?.map((item, idx) => (
+                        <tr key={item.id || item.product}>
+                          <td>
+                            <input type="checkbox" />
+                          </td>
+                          <td>{idx + 1}</td>
+                          <td>
+                            <strong>{item.product_name || item.name}</strong>
+                          </td>
+                          {profile?.role === "owner" && (
+                            <td>{`${item.agent_last_name} ${
+                              item.agent_first_name
+                            } ${
+                              company.sector.name === "Пилорама"
+                                ? `/ номер машины: ${item.agent_track_number}`
+                                : ""
+                            }`}</td>
+                          )}
+                          <td>
+                            {profile?.role === "owner"
+                              ? new Date(item.created_at).toLocaleString()
+                              : "—"}
+                          </td>
+                          <td>
+                            {profile?.role !== "owner" ? (
+                              item.qty_on_hand > 0 ? (
+                                <span className="sell__badge--success">
+                                  {item.qty_on_hand}
+                                </span>
+                              ) : (
+                                <span className="sell__badge--danger">
+                                  Нет на руках
+                                </span>
+                              )
+                            ) : (
+                              <div>
+                                <div>У агента: {item.qty_on_hand}</div>
+                                {item.subreals && item.subreals.length > 0 && (
+                                  <div
+                                    style={{ fontSize: "12px", color: "#666" }}
+                                  >
+                                    Передач: {item.subreals.length}
+                                  </div>
+                                )}
                               </div>
                             )}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        {profile?.role !== "owner" && (
-                          <button
-                            className="btn edit-btn"
-                            onClick={() => handleOpen3(item)}
-                            disabled={
-                              !item.qty_on_hand || item.qty_on_hand <= 0
-                            }
-                            title={
-                              !item.qty_on_hand || item.qty_on_hand <= 0
-                                ? "Нет товара для возврата"
-                                : "Вернуть товар"
-                            }
-                          >
-                            Вернуть
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </td>
+                          <td>
+                            {profile?.role !== "owner" && (
+                              <button
+                                className="btn edit-btn"
+                                onClick={() => handleOpen3(item)}
+                                disabled={
+                                  !item.qty_on_hand || item.qty_on_hand <= 0
+                                }
+                                title={
+                                  !item.qty_on_hand || item.qty_on_hand <= 0
+                                    ? "Нет товара для возврата"
+                                    : "Вернуть товар"
+                                }
+                              >
+                                Вернуть
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
-        </div>
+
+          {/* Второй таб - История продаж */}
+          {company.sector.name === "Пилорама" && activeTab === 1 && (
+            <div className="sklad__warehouse" style={{ marginTop: "15px" }}>
+              <div className="sklad__header">
+                <h3>История продаж</h3>
+                <button
+                  className="sklad__add"
+                  onClick={loadSalesHistory}
+                  disabled={salesHistoryLoading}
+                >
+                  {salesHistoryLoading ? "Загрузка..." : "Обновить"}
+                </button>
+              </div>
+
+              {salesHistoryLoading ? (
+                <p className="sklad__loading-message">
+                  Загрузка истории продаж...
+                </p>
+              ) : salesHistory.length === 0 ? (
+                <p className="sklad__no-products-message">
+                  Нет данных о продажах.
+                </p>
+              ) : (
+                <div className="table-wrapper">
+                  <table className="sklad__table">
+                    <thead>
+                      <tr>
+                        <th>№</th>
+                        <th>Дата</th>
+                        <th>Клиент</th>
+                        <th>Сумма</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salesHistory.map((sale, idx) => (
+                        <tr key={sale.id || idx}>
+                          <td>{idx + 1}</td>
+                          <td>
+                            {sale.created_at
+                              ? new Date(sale.created_at).toLocaleString()
+                              : "—"}
+                          </td>
+                          <td>{sale.client_name || "—"}</td>
+                          <td>{sale.total || 0}</td>
+                          <td>
+                            <span
+                              className={`sell__badge--${
+                                kindTranslate[sale.status] || sale.status
+                              }`}
+                            >
+                              {kindTranslate[sale.status] || sale.status}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              className="btn edit-btn"
+                              onClick={() => handleShowSaleDetail(sale.id)}
+                              style={{ padding: "4px 8px", fontSize: "12px" }}
+                            >
+                              Детали
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {showPendingModal && (
@@ -802,6 +1108,20 @@ const ProductionAgents = () => {
           id={start?.id}
           selectCashBox={selectCashBox}
           onClose={() => setShowSellModal(false)}
+        />
+      )}
+      {showAddCashboxModal && (
+        <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />
+      )}
+
+      {/* Модал детального просмотра продажи */}
+      {showSaleDetail && (
+        <SaleDetailModal
+          onClose={() => {
+            setShowSaleDetail(false);
+            setSelectedSaleId(null);
+          }}
+          saleId={selectedSaleId}
         />
       )}
     </div>

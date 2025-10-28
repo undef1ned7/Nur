@@ -59,7 +59,6 @@ import { createDeal } from "../../../../store/creators/saleThunk";
    ============================================================ */
 const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   const dispatch = useDispatch();
-  const { company } = useUser();
 
   // Категории/бренды из product slice
   const { categories, brands } = useProducts();
@@ -236,7 +235,6 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       ["category_name", "Категория"],
       ["price", "Розничная цена"],
       ["quantity", "Количество"],
-      ["purchase_price", "Закупочная цена"],
     ];
     const missed = required.filter(
       ([k]) => product[k] === "" || product[k] === null
@@ -277,27 +275,30 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         await dispatch(consumeItemsMake({ recipe, units })).unwrap();
       }
 
-      const result = await dispatch(
-        createDeal({
-          clientId: product.client,
-          title: dealStatus, // заголовок
-          statusRu: dealStatus, // маппинг в kind внутри thunk
-          amount: product.price * product.quantity,
-          // prepayment только при "Предоплата"
-          prepayment:
-            dealStatus === "Предоплата" ? Number(prepayment) : undefined,
-          // debtMonths и для "Долги", и для "Предоплата"
-          debtMonths:
-            dealStatus === "Долги" || dealStatus === "Предоплата"
-              ? Number(debtMonths)
-              : undefined,
-        })
-      ).unwrap();
+      if (product.client) {
+        const result = await dispatch(
+          createDeal({
+            clientId: product.client,
+            title: dealStatus, // заголовок
+            statusRu: dealStatus, // маппинг в kind внутри thunk
+            amount: product.price * product.quantity,
+            // prepayment только при "Предоплата"
+            prepayment:
+              dealStatus === "Предоплата" ? Number(prepayment) : undefined,
+            // debtMonths и для "Долги", и для "Предоплата"
+            debtMonths:
+              dealStatus === "Долги" || dealStatus === "Предоплата"
+                ? Number(debtMonths)
+                : undefined,
+          })
+        ).unwrap();
+        return;
+      }
 
       await dispatch(
         addCashFlows({
           ...cashData,
-          amount: (product?.purchase_price * product?.quantity).toFixed(2),
+          amount: (product?.price * product?.quantity).toFixed(2),
         })
       ).unwrap();
 
@@ -308,9 +309,9 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         brand_name: product.brand_name,
         category_name: product.category_name,
         price: Number(product.price || 0),
+        purchase_price: Number(product.purchase_price || 0),
         quantity: Number(product.quantity || 0),
         client: product.client, // id поставщика
-        purchase_price: product.purchase_price,
         item_make,
       };
 
@@ -606,6 +607,20 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             required
           />
         </div>
+
+        <div className="add-modal__section">
+          <label>Количество *</label>
+          <input
+            type="number"
+            name="quantity"
+            className="add-modal__input"
+            placeholder="100"
+            value={product.quantity}
+            onChange={onProductChange}
+            min="0"
+            required
+          />
+        </div>
         <div className="add-modal__section">
           <label>Закупочная цена *</label>
           <input
@@ -621,200 +636,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           />
         </div>
 
-        <div className="add-modal__section">
-          <label>Количество *</label>
-          <input
-            type="number"
-            name="quantity"
-            className="add-modal__input"
-            placeholder="100"
-            value={product.quantity}
-            onChange={onProductChange}
-            min="0"
-            required
-          />
-        </div>
-
         {/* Состав (сырьё) */}
-        <div className="add-modal__section">
-          <div
-            className="select-materials__head"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <label>Состав (сырьё)</label>
-            <button
-              type="button"
-              className="create-client"
-              onClick={() => setMaterialsOpen((prev) => !prev)}
-              disabled={materialsLoading}
-            >
-              {materialsOpen
-                ? "Скрыть список"
-                : materialsLoading
-                ? "Загрузка…"
-                : "+ Добавить сырьё"}
-            </button>
-          </div>
-
-          {materialsOpen && (
-            <div
-              className="select-materials__head-search"
-              style={{ marginTop: 8 }}
-            >
-              <input
-                className="add-modal__input"
-                name="materialQuery"
-                placeholder="Поиск сырья"
-                value={materialQuery}
-                onChange={(e) => setMaterialQuery(e.target.value)}
-              />
-            </div>
-          )}
-
-          {materialsOpen && (
-            <div
-              className="select-materials__check active"
-              style={{
-                marginTop: 8,
-                position: "relative",
-                maxHeight: 260,
-                overflow: "auto",
-                border: "1px solid var(--border,#333)",
-                borderRadius: 8,
-                padding: 8,
-              }}
-            >
-              {filteredMaterials?.map((m) => {
-                const checked = recipeMap.has(String(m.id));
-                const qty = recipeMap.get(String(m.id)) ?? "";
-
-                return (
-                  <div
-                    key={m.id}
-                    className="select-materials__item"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "auto 1fr 160px",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 4px",
-                    }}
-                  >
-                    <Checkbox
-                      icon={<CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />}
-                      checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
-                      checked={checked}
-                      onChange={() => toggleRecipeItem(m.id)}
-                      sx={{
-                        color: "#000",
-                        "&.Mui-checked": { color: "#f9cf00" },
-                      }}
-                    />
-                    <p
-                      title={m.name ?? m.title ?? `#${m.id}`}
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {m.name ?? m.title ?? `#${m.id}`}
-                    </p>
-                    <TextField
-                      size="small"
-                      placeholder="Кол-во"
-                      type="number"
-                      inputProps={{ step: "0.0001", min: "0" }}
-                      disabled={!checked}
-                      value={qty}
-                      onChange={(e) => changeRecipeQty(m.id, e.target.value)}
-                    />
-                  </div>
-                );
-              })}
-
-              {(!filteredMaterials || filteredMaterials.length === 0) &&
-                !materialsLoading && (
-                  <div style={{ padding: 8, opacity: 0.7 }}>
-                    Ничего не найдено…
-                  </div>
-                )}
-            </div>
-          )}
-
-          {recipeItems.length > 0 && (
-            <div
-              className="select-materials__selected"
-              style={{ marginTop: 10 }}
-            >
-              {recipeItems.map((it) => {
-                const mat = (Array.isArray(materials) ? materials : []).find(
-                  (m) => String(m.id) === String(it.materialId)
-                );
-                return (
-                  <div
-                    key={it.materialId}
-                    className="select-materials__selected-item"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 160px 40px",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 0",
-                      borderBottom: "1px dashed var(--border,#444)",
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
-                      <Checkbox
-                        checked
-                        onChange={() => removeRecipeItem(it.materialId)}
-                        sx={{
-                          color: "#000",
-                          "&.Mui-checked": { color: "#f9cf00" },
-                        }}
-                      />
-                      <p>{mat?.name ?? mat?.title ?? `ID ${it.materialId}`}</p>
-                    </div>
-                    <TextField
-                      size="small"
-                      placeholder="Кол-во"
-                      type="number"
-                      inputProps={{ step: "0.0001", min: "0" }}
-                      value={it.quantity}
-                      onChange={(e) =>
-                        changeRecipeQty(it.materialId, e.target.value)
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="select-materials__remove"
-                      onClick={() => removeRecipeItem(it.materialId)}
-                      aria-label="Удалить"
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        border: "1px solid var(--border,#444)",
-                        background: "transparent",
-                        color: "inherit",
-                        cursor: "pointer",
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
         {/* Кнопки */}
         <div className="add-modal__footer">
@@ -1094,6 +916,7 @@ const TransferProductModal = ({
   const { employees } = useDepartments();
   const { creating, createError } = useSelector((state) => state.transfer);
   const { list: products } = useProducts();
+  const { company } = useUser();
 
   const [state, setState] = useState({
     agent: "",
@@ -1221,6 +1044,7 @@ const TransferProductModal = ({
       const items = selectedProducts.map((product) => ({
         product: product.id,
         qty_transferred: Number(product.qty_transferred),
+        is_sawmill: company.sector.name === "Пилорама",
       }));
 
       await dispatch(
@@ -1830,20 +1654,21 @@ const safeDate = (s) => {
   return isNaN(d.getTime()) ? null : d;
 };
 
-const FinishedGoods = ({ products, onChanged }) => {
+const PiloramaWarehouse = ({ onChanged }) => {
   const dispatch = useDispatch();
-  const { categories, loading, error } = useProducts();
+  const { categories, loading, list: products, error } = useProducts();
   const { list: cashBoxes } = useCash();
 
   const [cashboxId, setCashboxId] = useState("");
   const [showAdd, setShowAdd] = useState(false);
-  const [selectCashBox, setSelectCashBox] = useState("");
 
   // состояние для редактирования
   const [showEdit, setShowEdit] = useState(false);
   const [showMarriageModal, setShowMarriageModal] = useState(false);
   const [showTransferProductModal, setShowTransferProductModal] =
     useState(false);
+  const [selectCashBox, setSelectCashBox] = useState("");
+
   const [showAddProductModal, setShowAddProductModal] = useState(false);
 
   const [showAcceptProductModal, setShowAcceptProductModal] = useState(false);
@@ -1866,6 +1691,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     dispatch(getCashBoxes());
     dispatch(getItemsMake()); // сырьё для модалки
     dispatch(fetchBrandsAsync());
+    dispatch(fetchProductsAsync());
     // чтобы EditModal сразу имел список поставщиков:
     dispatch(fetchClientsAsync());
   }, [dispatch]);
@@ -2001,19 +1827,10 @@ const FinishedGoods = ({ products, onChanged }) => {
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 20,
-            flexWrap: "wrap-reverse",
-            justifyContent: "end",
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <button
             className="sklad__add"
             onClick={() => setShowAdd(true)}
-            // onClick={handleAdd}
             disabled={!selectCashBox}
             title={!selectCashBox ? "Сначала выберите кассу" : undefined}
           >
@@ -2167,7 +1984,7 @@ const FinishedGoods = ({ products, onChanged }) => {
         <AddModal
           onClose={() => setShowAdd(false)}
           onSaveSuccess={onSaveSuccess}
-          selectCashBox={cashboxId}
+          selectCashBox={selectCashBox}
         />
       )}
 
@@ -2221,4 +2038,4 @@ const FinishedGoods = ({ products, onChanged }) => {
   );
 };
 
-export default FinishedGoods;
+export default PiloramaWarehouse;

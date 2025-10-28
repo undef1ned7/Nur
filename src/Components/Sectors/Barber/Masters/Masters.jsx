@@ -292,7 +292,14 @@ const Masters = () => {
   const [empFieldErrors, setEmpFieldErrors] = useState({});
   const [empDeletingIds, setEmpDeletingIds] = useState(new Set());
   const [empToDelete, setEmpToDelete] = useState(null);
-  const emptyEmp = { email: "", first_name: "", last_name: "", roleChoice: "" };
+  const emptyEmp = {
+    email: "",
+    first_name: "",
+    last_name: "",
+    roleChoice: "",
+    track_number: "",
+    phone_number: "",
+  };
   const [empForm, setEmpForm] = useState(emptyEmp);
   const [editingEmpId, setEditingEmpId] = useState(null);
 
@@ -931,6 +938,8 @@ const Masters = () => {
       email,
       first_name: empForm.first_name.trim(),
       last_name: empForm.last_name.trim(),
+      phone_number: empForm.phone_number.trim(),
+      track_number: empForm.track_number.trim(),
     };
     if (empForm.roleChoice.startsWith("sys:"))
       payload.role = empForm.roleChoice.slice(4);
@@ -986,6 +995,8 @@ const Masters = () => {
       email: normalizeEmail(empForm.email),
       first_name: empForm.first_name.trim(),
       last_name: empForm.last_name.trim(),
+      phone_number: empForm.phone_number.trim(),
+      track_number: empForm.track_number.trim(),
       role: null,
       custom_role: null,
     };
@@ -997,7 +1008,7 @@ const Masters = () => {
     setEmpSaving(true);
     setEmpAlerts([]);
     try {
-      await api.put(EMPLOYEE_ITEM_URL(editingEmpId), payload);
+      await api.patch(EMPLOYEE_ITEM_URL(editingEmpId), payload);
       await fetchEmployees();
       setEmpEditOpen(false);
       setEditingEmpId(null);
@@ -1587,6 +1598,66 @@ const Masters = () => {
                     required
                   />
                 </label>
+                {company.sector.name === "Пилорама" && (
+                  <>
+                    <label
+                      className={`barbermasters__field ${
+                        empFieldErrors.track_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
+                      <span className="barbermasters__label">
+                        Номер машины <b className="barbermasters__req">*</b>
+                      </span>
+                      <input
+                        name="last_name"
+                        className={`barbermasters__input ${
+                          empFieldErrors.track_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
+                        placeholder="Номер машины"
+                        value={empForm.track_number}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            track_number: e.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </label>
+                    <label
+                      className={`barbermasters__field barbermasters__field--full ${
+                        empFieldErrors.phone_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
+                      <span className="barbermasters__label">
+                        Номер телефона <b className="barbermasters__req">*</b>
+                      </span>
+                      <input
+                        name="last_name"
+                        className={`barbermasters__input ${
+                          empFieldErrors.phone_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
+                        placeholder="Номер телефона"
+                        value={empForm.phone_number}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            phone_number: e.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </label>
+                  </>
+                )}
 
                 <div
                   className={`barbermasters__field barbermasters__field--full ${
@@ -1760,6 +1831,66 @@ const Masters = () => {
                     required
                   />
                 </label>
+                {company.sector.name === "Пилорама" && (
+                  <>
+                    <label
+                      className={`barbermasters__field ${
+                        empFieldErrors.track_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
+                      <span className="barbermasters__label">
+                        Номер машины <b className="barbermasters__req">*</b>
+                      </span>
+                      <input
+                        name="last_name"
+                        className={`barbermasters__input ${
+                          empFieldErrors.track_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
+                        placeholder="Номер машины"
+                        value={empForm.track_number}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            track_number: e.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </label>
+                    <label
+                      className={`barbermasters__field ${
+                        empFieldErrors.phone_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
+                      <span className="barbermasters__label">
+                        Номер телефона <b className="barbermasters__req">*</b>
+                      </span>
+                      <input
+                        name="last_name"
+                        className={`barbermasters__input ${
+                          empFieldErrors.phone_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
+                        placeholder="Номер телефона"
+                        value={empForm.phone_number}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            phone_number: e.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </label>
+                  </>
+                )}
 
                 <div
                   className={`barbermasters__field barbermasters__field--full ${
