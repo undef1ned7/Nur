@@ -1,0 +1,314 @@
+.departments {
+  font-family: 'Roboto', sans-serif;
+  color: #1c2526;
+
+  &__table {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+    color: #888;
+  }
+
+  &__add {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 10px;
+    color: #1c2526;
+    transition: color 0.3s;
+
+    &:hover {
+      color: #ffd600;
+    }
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    div {
+      flex: 1;
+    }
+  }
+
+  &__actions {
+    position: relative;
+
+    button {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0 10px;
+      color: #1c2526;
+      transition: color 0.3s;
+
+      &:hover {
+        color: #ffd600;
+      }
+    }
+  }
+
+  &__dropdown {
+    position: absolute;
+    right: 0;
+    top: 28px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    z-index: 100;
+
+    div {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+
+      &:hover {
+        background: #f6f6f6;
+      }
+    }
+  }
+
+  &__modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+
+    &-content {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1c2526;
+        margin: 0;
+      }
+
+      input,
+      textarea {
+        border: 1px solid #c6eccf;
+        border-radius: 6px;
+        padding: 10px;
+        font-size: 14px;
+        background: #fdfdfd;
+        transition: border-color 0.3s;
+
+        &:focus {
+          border-color: #ffd600;
+          outline: none;
+        }
+      }
+
+      textarea {
+        height: 80px;
+        resize: none;
+      }
+    }
+
+    &-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 12px;
+
+      .create {
+        background: #ffd600;
+        border: none;
+        padding: 10px 16px;
+        font-weight: 600;
+        font-size: 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #1c2526;
+        transition: background-color 0.3s;
+
+        &:hover {
+          background-color: #e6c200;
+        }
+      }
+
+      .cancel {
+        background: #f1f1f1;
+        border: none;
+        padding: 10px 16px;
+        font-weight: 600;
+        font-size: 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #1c2526;
+        transition: background-color 0.3s;
+
+        &:hover {
+          background-color: #e0e0e0;
+        }
+      }
+    }
+  }
+
+  @media screen and (max-width: 480px) {
+    &__table {
+      padding: 15px;
+    }
+
+    &__header {
+      font-size: 13px;
+      padding: 8px 0;
+    }
+
+    &__add {
+      font-size: 20px;
+      padding: 0 8px;
+    }
+
+    &__row {
+      padding: 12px 0;
+      font-size: 13px;
+    }
+
+    &__actions {
+      button {
+        font-size: 18px;
+        padding: 0 8px;
+      }
+    }
+
+    &__dropdown {
+      top: 24px;
+
+      div {
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+    }
+
+    &__modal {
+      &-content {
+        padding: 20px;
+        width: 90%;
+      }
+
+      h3 {
+        font-size: 16px;
+      }
+
+      input,
+      textarea {
+        padding: 8px;
+        font-size: 13px;
+      }
+
+      textarea {
+        height: 70px;
+      }
+
+      &-actions {
+        .create,
+        .cancel {
+          padding: 8px 12px;
+          font-size: 13px;
+        }
+      }
+    }
+  }
+
+  @media screen and (max-width: 320px) {
+    &__table {
+      padding: 12px;
+    }
+
+    &__header {
+      font-size: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    &__add {
+      font-size: 18px;
+      padding: 0 6px;
+    }
+
+    &__row {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 10px 0;
+      font-size: 12px;
+      gap: 8px;
+    }
+
+    &__actions {
+      button {
+        font-size: 16px;
+        padding: 0 6px;
+      }
+    }
+
+    &__dropdown {
+      top: 20px;
+
+      div {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+    }
+
+    &__modal {
+      &-content {
+        padding: 15px;
+        width: 95%;
+      }
+
+      h3 {
+        font-size: 14px;
+      }
+
+      input,
+      textarea {
+        padding: 6px;
+        font-size: 12px;
+      }
+
+      textarea {
+        height: 60px;
+      }
+
+      &-actions {
+        .create,
+        .cancel {
+          padding: 6px 10px;
+          font-size: 12px;
+        }
+      }
+    }
+  }
+}

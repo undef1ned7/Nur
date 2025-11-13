@@ -1,0 +1,2106 @@
+/*
+  FinishedGoods — чистая адаптивная стилизация
+  -------------------------------------------------
+  - Без дубликатов и битых кусков
+  - Три брейкпоинта: 1200px, 1024px, 768px, 480px
+  - Поддержка мобильных карточек (если добавите разметку .sklad__mobile-cards)
+*/
+
+:root {
+  --fg-border: #e9ecef;
+  --fg-border-soft: #ddd;
+  --fg-bg: #ffffff;
+  --fg-bg-alt: #f8f9fa;
+  --fg-text: #333;
+  --fg-text-dim: #666;
+  --fg-accent: #f9cf00; /* брендовый жёлтый */
+  --fg-accent-darker: #e6b800;
+  --fg-success: #28a745;
+  --fg-success-darker: #218838;
+  --fg-muted: #6c757d;
+  --fg-muted-darker: #5a6268;
+  --fg-danger: #dc3545;
+}
+
+/* ============ Контейнер страницы ============ */
+.sklad__warehouse {
+  padding: 20px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 1200px) {
+  .sklad__warehouse {
+    padding: 15px;
+  }
+}
+@media (max-width: 768px) {
+  .sklad__warehouse {
+    padding: 10px;
+  }
+}
+@media (max-width: 480px) {
+  .sklad__warehouse {
+    padding: 6px;
+  }
+}
+
+/* ============ Хедер с фильтрами ============ */
+.sklad__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1024px) {
+  .sklad__header {
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sklad__header {
+    gap: 10px;
+  }
+}
+
+.sklad__left {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1;
+}
+
+@media (max-width: 1024px) {
+  .sklad__left {
+    width: 100%;
+  }
+}
+@media (max-width: 768px) {
+  .sklad__left {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+}
+
+/* ============ Инпуты и селекты ============ */
+.sklad__search,
+.employee__search-wrapper,
+.add-modal__section input,
+.add-modal__section select {
+  min-width: 150px;
+  padding: 8px 12px;
+  border: 1px solid var(--fg-border-soft);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--fg-bg);
+}
+
+.sklad__search {
+  min-width: 220px;
+}
+
+@media (max-width: 768px) {
+  .sklad__search,
+  .employee__search-wrapper {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ============ Фильтр по дате ============ */
+.sklad__date-filter {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sklad__date-filter label {
+  opacity: 0.7;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.sklad__date-filter input[type="date"] {
+  min-width: 140px;
+}
+
+@media (max-width: 768px) {
+  .sklad__date-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sklad__date-filter input[type="date"] {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* ============ Кнопки общего вида ============ */
+.btn {
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sklad__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--fg-accent);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+.sklad__add:hover {
+  background: var(--fg-accent-darker);
+}
+
+@media (max-width: 768px) {
+  .sklad__add {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* В таблице действия */
+.edit-btn {
+  background: var(--fg-accent);
+  color: #000;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.edit-btn:hover {
+  background: var(--fg-accent-darker);
+}
+
+/* ============ Таблица ============ */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.sklad__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--fg-bg);
+  min-width: 880px; /* для горизонтального скролла на узких экранах */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+}
+
+.sklad__table th {
+  background: var(--fg-bg-alt);
+  padding: 12px 10px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--fg-text);
+  border-bottom: 2px solid var(--fg-border);
+  white-space: nowrap;
+}
+
+.sklad__table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--fg-border);
+  vertical-align: middle;
+  color: var(--fg-text);
+}
+.sklad__table tr:hover {
+  background: var(--fg-bg-alt);
+}
+
+/* чекбоксы в таблице */
+.sklad__table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+@media (max-width: 768px) {
+  .sklad__table input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* кнопка-иконка редактирования */
+.sklad__table button[title="Редактировать"] {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+.sklad__table button[title="Редактировать"]:hover {
+  background: var(--fg-bg-alt);
+}
+
+/* бейджи */
+.sell__badge--danger {
+  background: var(--fg-danger);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* компактнее на узких */
+@media (max-width: 768px) {
+  .sklad__table {
+    min-width: 640px;
+    font-size: 14px;
+  }
+  .sklad__table th,
+  .sklad__table td {
+    padding: 10px 8px;
+  }
+}
+@media (max-width: 480px) {
+  .sklad__table {
+    min-width: 520px;
+    font-size: 12px;
+  }
+  .sklad__table th,
+  .sklad__table td {
+    padding: 8px 6px;
+  }
+}
+
+/* ============ Сообщения состояний ============ */
+.sklad__loading-message,
+.sklad__error-message,
+.sklad__no-products-message {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 16px;
+  color: var(--fg-text-dim);
+}
+@media (max-width: 768px) {
+  .sklad__loading-message,
+  .sklad__error-message,
+  .sklad__no-products-message {
+    padding: 28px 14px;
+    font-size: 14px;
+  }
+}
+
+/* ============ Модалки (общие) ============ */
+.add-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.add-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+.add-modal__content {
+  position: relative;
+  background: var(--fg-bg);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.add-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--fg-border);
+}
+.add-modal__header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg-text);
+}
+.add-modal__close-icon {
+  cursor: pointer;
+}
+
+.add-modal__section {
+  padding: 14px 20px;
+}
+.add-modal__section label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--fg-text);
+  font-size: 14px;
+}
+.add-modal__section input,
+.add-modal__section select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--fg-border-soft);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+.add-modal__section input:focus,
+.add-modal__section select:focus {
+  outline: none;
+  border-color: var(--fg-accent);
+}
+
+.add-modal__footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--fg-border);
+  justify-content: flex-end;
+}
+.add-modal__footer .add-modal__save {
+  background: var(--fg-success);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+}
+.add-modal__footer .add-modal__save:hover {
+  background: var(--fg-success-darker);
+}
+.add-modal__footer .add-modal__cancel {
+  background: var(--fg-muted);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+}
+.add-modal__footer .add-modal__cancel:hover {
+  background: var(--fg-muted-darker);
+}
+
+.add-modal__error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 10px 20px;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .add-modal {
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+  .add-modal__content {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 10px;
+  }
+  .add-modal__header h3 {
+    font-size: 16px;
+  }
+}
+
+/* ============ Блок выбора сырья (в AddModal) ============ */
+.select-materials__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.select-materials__head-search {
+  margin-top: 8px;
+}
+.select-materials__check {
+  margin-top: 8px;
+  position: relative;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--fg-border-soft);
+  border-radius: 8px;
+  padding: 8px;
+}
+.select-materials__item {
+  display: grid;
+  grid-template-columns: auto 1fr 160px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+}
+.select-materials__selected {
+  margin-top: 12px;
+}
+.select-materials__selected-item {
+  display: grid;
+  grid-template-columns: 1fr 160px 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--fg-border);
+}
+
+/* на очень узких экранах уменьшаем последнюю колонку */
+@media (max-width: 420px) {
+  .select-materials__item {
+    grid-template-columns: auto 1fr 120px;
+  }
+  .select-materials__selected-item {
+    grid-template-columns: 1fr 120px 40px;
+  }
+}
+
+/* ============ Мобильные карточки (альтернатива таблице) ============ */
+.sklad__mobile-cards {
+  display: none;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  /* Скрываем таблицу и показываем карточки, если разметка карточек присутствует */
+  .table-wrapper {
+    display: none;
+  }
+  .sklad__mobile-cards {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.sklad__card {
+  background: var(--fg-bg);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.sklad__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 14px;
+  background: var(--fg-bg-alt);
+  border-bottom: 1px solid var(--fg-border);
+}
+.sklad__card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.sklad__card-title strong {
+  font-size: 16px;
+  color: var(--fg-text);
+  line-height: 1.3;
+}
+.sklad__card-number {
+  background: var(--fg-accent);
+  color: #000;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.sklad__card-edit {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.sklad__card-edit:hover {
+  background: var(--fg-bg);
+}
+
+.sklad__card-content {
+  padding: 14px;
+}
+.sklad__card-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--fg-bg-alt);
+}
+.sklad__card-row:last-child {
+  border-bottom: none;
+}
+.sklad__card-row span:first-child {
+  color: var(--fg-text-dim);
+  font-weight: 600;
+}
+.sklad__card-row span:last-child {
+  color: var(--fg-text);
+  text-align: right;
+}
+
+.sklad__card-actions {
+  padding: 12px 14px;
+  background: var(--fg-bg-alt);
+  border-top: 1px solid var(--fg-border);
+  display: grid;
+  gap: 8px;
+}
+.sklad__card-actions .btn {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ============ Утилиты ============ */
+.hide-mobile {
+  display: initial !important;
+}
+.show-mobile {
+  display: none !important;
+}
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+  .show-mobile {
+    display: initial !important;
+  }
+}
+
+/* Уважение системных предпочтений по анимациям */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+// /* ============================================================
+//    Адаптивные стили для FinishedGoods
+//    ============================================================ */
+
+// .sklad__warehouse {
+//   padding: 20px;
+//   max-width: 100%;
+//   overflow-x: auto;
+
+//   @media (max-width: 1200px) {
+//     padding: 15px;
+//   }
+
+//   @media (max-width: 768px) {
+//     padding: 10px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивный заголовок с фильтрами
+//    ============================================================ */
+// .sklad__header {
+//   display: flex;
+//   justify-content: space-between;
+//   align-items: flex-start;
+//   gap: 20px;
+//   margin-bottom: 20px;
+//   flex-wrap: wrap;
+
+//   @media (max-width: 1024px) {
+//     flex-direction: column;
+//     gap: 15px;
+//   }
+
+//   @media (max-width: 768px) {
+//     gap: 10px;
+//   }
+// }
+
+// .sklad__left {
+//   display: flex;
+//   gap: 12px;
+//   flex-wrap: wrap; FinishedGoods
+//    ============================================================ */
+//   flex: 1;
+
+//   @media (max-width: 1024px) {
+//     width: 100%;
+//     justify-content: flex-start;
+//   }
+
+//   @media (max-width: 768px) {
+//     flex-direction: column;
+//     align-items: stretch;
+//     gap: 8px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные поля поиска и фильтров
+//    ============================================================ */
+// .sklad__search {
+//   min-width: 200px;
+// .sklad__warehouse {
+//   border: 1px solid #ddd;
+//   border-radius: 4px;
+//   font-size: 14px;
+
+//   @media (max-width: 768px) {
+//     min-width: 100%;
+//     width: 100%;
+//   }
+// }
+
+// .employee__search-wrapper {
+//   min-width: 150px;
+//   padding: 8px 12px;
+//   border: 1px solid #ddd;
+//   border-radius: 4px;
+//   font-size: 14px;
+
+//   @media (max-width: 768px) {
+//     min-width: 100%;
+//     width: 100%;
+//   }
+// }
+
+// /* Фильтр по дате */
+// .sklad__date-filter {
+//   display: flex;
+//   gap: 8px;
+//   align-items: center;
+//   flex-wrap: wrap;
+
+//   @media (max-width: 768px) {
+//     flex-direction: column;
+//     align-items: stretch;
+//     gap: 8px;
+//   }
+
+//   label {
+//     opacity: 0.7;
+//     font-size: 14px;
+//     white-space: nowrap;
+
+//     @media (max-width: 768px) {
+//       text-align: center;
+//     }
+//   }
+
+//   input[type="date"] {
+//     min-width: 120px;
+
+//     @media (max-width: 768px) {
+//       width: 100%;
+//       min-width: auto;
+//     }
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивная кнопка добавления
+//    ============================================================ */
+// .sklad__add {
+//   display: flex;
+//   align-items: center;
+//   gap: 4px;
+//   padding: 8px 16px;0%;
+//   overflow-x: auto;
+
+//   border: none;
+//   border-radius: 4px;
+//   @media (max-width: 1200px) {
+//   font-size: 14px;
+//   font-weight: 500;
+//   white-space: nowrap;
+
+//   &:hover {
+//     background: #e6b800;
+//   }
+
+//   @media (max-width: 1024px) {
+//     align-self: flex-start;
+//   }
+
+//   @media (max-width: 768px) {
+//     width: 100%;
+//     justify-content: center;
+//     padding: 12px 16px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивная таблица
+//    ============================================================ */
+// .table-wrapper {
+//   overflow-x: auto;
+//   @media (max-width: 768px) {
+//   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+//   @media (max-width: 768px) {
+//     border-radius: 4px;
+//   }
+// }
+
+// .sklad__table {
+//   width: 100%;
+//   border-collapse: collapse;
+//   background: white;
+//   min-width: 800px; /* Минимальная ширина для горизонтального скролла */
+
+//   @media (max-width: 768px) {
+//     min-width: 600px;
+//     font-size: 14px;
+//   }
+
+//   @media (max-width: 480px) {
+//     min-width: 500px;
+//     font-size: 12px;
+//   }
+
+//   th {
+//     background: #f8f9fa;
+//     padding: 12px 8px;
+//     text-align: left;
+//     font-weight: 600;
+//     color: #333;
+//     border-bottom: 2px solid #e9ecef;
+//     white-space: nowrap;
+
+//     @media (max-width: 768px) {
+//       padding: 8px 6px;
+//     }
+
+//     @media (max-width: 480px) {
+//       padding: 6px 4px;
+//     }
+//   }
+
+//   td {
+//     padding: 12px 8px;
+//     border-bottom: 1px solid #e9ecef;
+//     vertical-align: middle;
+
+//     @media (max-width: 768px) {
+//       padding: 8px 6px;
+//     }
+
+//     @media (max-width: 480px) {
+//       padding: 6px 4px;
+//     }
+//   }
+
+//   tr:hover {
+//     background: #f8f9fa;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные кнопки действий в таблице
+//    ============================================================ */
+// .sklad__table .btn {
+//   padding: 4px 8px;
+//   font-size: 12px;
+//   margin: 2px;
+//   white-space: nowrap;
+
+//   @media (max-width: 768px) {
+//     padding: 3px 6px;
+//     font-size: 11px;
+//     margin: 1px;
+//   }
+
+//   @media (max-width: 480px) {
+//     padding: 2px 4px;
+//     font-size: 10px;
+//   }
+// }
+
+// /* Группировка кнопок действий */
+// .sklad__actions {
+//   display: flex;
+//   flex-wrap: wrap;
+//   gap: 4px;
+//   align-items: center;
+
+//   @media (max-width: 768px) {
+//     flex-direction: column;
+//     gap: 2px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные модальные окна
+//    ============================================================ */
+// .add-modal {
+//   position: fixed;
+//   top: 0;
+//   left: 0;
+//   right: 0;
+//   bottom: 0;
+//   z-index: 1000;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   padding: 20px;
+
+//   @media (max-width: 768px) {
+//     padding: 10px;
+//     align-items: flex-start;
+//     padding-top: 20px;
+//   }
+// }
+
+// .add-modal__content {
+//   background: white;
+//   border-radius: 8px;
+//   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+//   max-width: 500px;
+//   width: 100%;
+//   max-height: 90vh;
+//   overflow-y: auto;
+
+//   @media (max-width: 768px) {
+//     max-width: 100%;
+//     max-height: 95vh;
+//     border-radius: 4px;
+//   }
+// }
+
+// .add-modal__header {
+//   display: flex;
+//   justify-content: space-between;
+//   align-items: center;
+//   padding: 20px;
+//   border-bottom: 1px solid #e9ecef;
+
+//   @media (max-width: 768px) {
+//     padding: 15px;
+//   }
+
+//   h3 {
+//     margin: 0;
+//     font-size: 18px;
+//     font-weight: 600;
+
+//     @media (max-width: 768px) {
+//       font-size: 16px;
+//     }
+//   }
+// }
+
+// .add-modal__close-icon {
+//   cursor: pointer;
+//   padding: 4px;
+//   border-radius: 4px;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #f8f9fa;
+//   }
+// }
+
+// .add-modal__section {
+//   padding: 15px 20px;
+
+//   @media (max-width: 768px) {
+//     padding: 12px 15px;
+//   }
+
+//   label {
+//     display: block;
+//     margin-bottom: 5px;
+//     font-weight: 500;
+//     color: #333;
+//     font-size: 14px;
+//   }
+
+//   input, select {
+//     width: 100%;
+//     padding: 8px 12px;
+//     border: 1px solid #ddd;
+//     border-radius: 4px;
+//     font-size: 14px;
+//     transition: border-color 0.2s;
+
+//     &:focus {
+//       outline: none;
+//       border-color: #f9cf00;
+//     }
+
+//     @media (max-width: 768px) {
+//       padding: 10px 12px;
+//     }
+//   }
+// }
+
+// /* Кнопка "Максимум" в TransferProductModal */
+// .add-modal__max-button {
+//   padding: 8px 12px;
+//   background: #f9cf00;
+//   border: none;
+//   border-radius: 4px;
+//   cursor: pointer;
+//   font-size: 12px;
+//   white-space: nowrap;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #e6b800;
+//   }
+
+//   @media (max-width: 768px) {
+//     padding: 10px 12px;
+//     font-size: 14px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные сообщения
+//    ============================================================ */
+// .sklad__loading-message,
+// .sklad__error-message,
+// .sklad__no-products-message {
+//   text-align: center;
+//   padding: 40px 20px;
+//   font-size: 16px;
+//   color: #666;
+
+//   @media (max-width: 768px) {
+//     padding: 30px 15px;
+//     font-size: 14px;
+//   }
+// }
+
+// .add-modal__error-message {
+//   background: #f8d7da;
+//   color: #721c24;
+//   padding: 10px 15px;
+//   border-radius: 4px;
+//   margin: 10px 20px;
+//   font-size: 14px;
+
+//   @media (max-width: 768px) {
+//     margin: 10px 15px;
+//     font-size: 13px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные кнопки в модалках
+//    ============================================================ */
+// .add-modal__footer {
+//   display: flex;
+//   gap: 10px;
+//   padding: 20px;
+//   border-top: 1px solid #e9ecef;
+//   justify-content: flex-end;
+
+//   @media (max-width: 768px) {
+//     padding: 15px;
+//     flex-direction: column;
+//   }
+
+//   button {
+//     padding: 10px 20px;
+//     border: none;
+//     border-radius: 4px;
+//     cursor: pointer;
+//     font-size: 14px;
+//     font-weight: 500;
+//     transition: all 0.2s;
+
+//     @media (max-width: 768px) {
+//       width: 100%;
+//       padding: 12px 20px;
+//     }
+
+//     &.add-modal__save {
+//       background: #28a745;
+//       color: white;
+
+//       &:hover {
+//         background: #218838;
+//       }
+//     }
+
+//     &.add-modal__cancel {
+//       background: #6c757d;
+//       color: white;
+
+//       &:hover {
+//         background: #5a6268;
+//       }
+//     }
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные бейджи статуса
+//    ============================================================ */
+// .sell__badge--danger {
+//   background: #dc3545;
+//   color: white;
+//   padding: 2px 6px;
+//   border-radius: 3px;
+//   font-size: 11px;
+//   font-weight: 500;
+
+//   @media (max-width: 768px) {
+//     font-size: 10px;
+//     padding: 1px 4px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные иконки
+//    ============================================================ */
+// .sklad__table button[title="Редактировать"] {
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   width: 32px;
+//   height: 32px;
+//   border-radius: 4px;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #f8f9fa;
+//   }
+
+//   @media (max-width: 768px) {
+//     width: 28px;
+//     height: 28px;
+//   }
+// /* ============================================================
+
+// /* ============================================================
+//    Адаптивные чекбоксы
+//    ============================================================ */
+// .sklad__table input[type="checkbox"] {
+//   width: 16px;
+//   height: 16px;ex-start;
+//   gap: 20px;
+
+//   @media (max-width: 768px) {
+//     width: 14px;
+//     height: 14px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные подсказки
+//    ============================================================ */
+// .sklad__table small {
+//   display: block;rap: wrap;
+
+//   margin-top: 5px;
+//   font-size: 12px;
+//   line-height: 1.3;
+
+//   @media (max-width: 768px) {
+//     font-size: 11px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные состояния загрузки
+//    ============================================================ */
+// .btn:disabled {
+//   opacity: 0.6;
+//   cursor: not-allowed;
+// }
+
+// /* ============================================================
+//    Адаптивные отступы и размеры
+//    ============================================================ */
+// @media (max-width: 480px) {
+//   .sklad__warehouse {
+//     padding: 5px;
+//   }
+
+//   .sklad__header {
+//     margin-bottom: 15px;
+//   }
+
+//   .sklad__table {
+//     th, td {
+//       padding: 4px 2px;
+//     }
+//   }
+
+//   .add-modal__content {
+//     margin: 0;
+//     border-radius: 0;
+//     max-height: 100vh;
+//   }
+//   }
+
+// /* ============================================================
+//    Мобильные карточки
+//    ============================================================ */
+// .sklad__mobile-cards {
+//   display: none;
+//   gap: 15px;
+//   padding: 0;
+
+//   @media (max-width: 768px) {
+//     display: flex;
+//     flex-direction: column;
+//   }
+// }
+
+// .sklad__card {
+//   background: white;
+//   border-radius: 8px;
+//   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+//   overflow: hidden;
+//   transition: box-shadow 0.2s;
+
+//   &:hover {
+//     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+//   }
+// }
+
+// .sklad__card-header {
+//   display: flex;
+//   justify-content: space-between;
+//   align-items: flex-start;
+//   padding: 15px;
+//   background: #f8f9fa;
+//   border-bottom: 1px solid #e9ecef;
+// }
+
+// .sklad__card-title {
+//   display: flex;
+//   align-items: center;
+//   gap: 10px;
+//   flex: 1;
+
+//   strong {
+//     font-size: 16px;
+//     color: #333;
+//     line-height: 1.3;
+//   }
+// }
+
+// .sklad__card-edit {
+//   background: transparent;
+//   border: none;
+//   padding: 4px;
+//   cursor: pointer;
+//   border-radius: 4px;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #e9ecef;
+//   }
+// }
+
+// .sklad__card-number {
+//   background: #f9cf00;
+//   color: #000;
+//   padding: 4px 8px;
+//   border-radius: 4px;
+//   font-size: 12px;
+//   font-weight: 600;
+// }
+
+// .sklad__card-content {
+//   padding: 15px;
+// }
+
+// .sklad__card-row {
+// .sklad__left {
+//   display: flex;
+//   gap: 12px;
+//   padding: 8px 0;
+//   border-bottom: 1px solid #f8f9fa;
+
+//   &:last-child {
+//     border-bottom: none;
+//   }
+
+//   span:first-child {
+//     color: #666;
+//     font-size: 14px;
+//     font-weight: 500;
+//   }
+
+//   span:last-child {
+//     color: #333;
+//     font-size: 14px;
+//     text-align: right;
+//   } wrap; FinishedGoods
+//    ============================================================ */
+
+// .sklad__card-actions {
+
+//   flex-direction: column;
+//   @media (max-width: 1024px) {
+//   padding: 15px;
+//   background: #f8f9fa;
+//   border-top: 1px solid #e9ecef;
+
+//   .btn {
+//     width: 100%;
+//     padding: 10px;
+//     font-size: 14px;
+//     font-weight: 500;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные утилиты
+//    ============================================================ */
+// @media (max-width: 768px) {
+//   .hide-mobile {
+//     display: none !important;
+//   }
+// }
+
+// @media (min-width: 769px) {
+//   .show-mobile {
+//     display: none !important;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные анимации
+//    ============================================================ */
+// @media (prefers-reduced-motion: reduce) {
+//   * {
+//     animation-duration: 0.01ms !important;
+//     animation-iteration-count: 1 !important;
+//     transition-duration: 0.01ms !important;
+//   }
+
+//   @media (max-width: 480px) {
+//     min-width: 500px;
+//     font-size: 12px;
+//   }
+
+//   th {
+//     background: #f8f9fa;
+//     padding: 12px 8px;
+//     text-align: left;
+//     font-weight: 600;
+//     color: #333;
+//     border-bottom: 2px solid #e9ecef;
+//     white-space: nowrap;
+
+//     @media (max-width: 768px) {
+//       padding: 8px 6px;
+//     }
+
+//     @media (max-width: 480px) {
+//       padding: 6px 4px;
+//     }
+//   }
+
+//   td {
+//     padding: 12px 8px;
+//     border-bottom: 1px solid #e9ecef;
+//     vertical-align: middle;
+
+//     @media (max-width: 768px) {
+//       padding: 8px 6px;
+//     }
+
+//     @media (max-width: 480px) {
+//       padding: 6px 4px;
+//     }
+//   }
+
+//   tr:hover {
+//     background: #f8f9fa;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные кнопки действий в таблице
+//    ============================================================ */
+// .sklad__table .btn {
+//   padding: 4px 8px;
+//   font-size: 12px;
+//   margin: 2px;
+//   white-space: nowrap;
+
+//   @media (max-width: 768px) {
+//     padding: 3px 6px;
+//     font-size: 11px;
+//     margin: 1px;
+//   }
+
+//   @media (max-width: 480px) {
+//     padding: 2px 4px;
+//     font-size: 10px;
+//   }
+// }
+
+// /* Группировка кнопок действий */
+// .sklad__actions {
+//   @media (max-width: 768px) {
+//   flex-wrap: wrap;
+//   gap: 4px;
+//   align-items: center;
+
+//   @media (max-width: 768px) {
+//     flex-direction: column;
+//     gap: 2px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные модальные окна
+//    ============================================================ */
+// .add-modal {
+//   position: fixed;
+//   top: 0;
+//   left: 0;
+//   right: 0;
+//   bottom: 0;
+//   z-index: 1000;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   padding: 20px;
+
+//   @media (max-width: 768px) {
+//     padding: 10px;
+//     align-items: flex-start;
+//     padding-top: 20px;
+//   }
+// }
+
+// .add-modal__content {
+//   background: white;
+//   border-radius: 8px;
+//   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+//   max-width: 500px;
+//   width: 100%;
+//   max-height: 90vh;
+//   overflow-y: auto;
+
+//   @media (max-width: 768px) {
+//     max-width: 100%;
+//     max-height: 95vh;
+//     border-radius: 4px;
+//   }
+// }
+
+// .add-modal__header {
+// .sklad__left {
+//   display: flex;
+//   gap: 12px;
+//   padding: 20px;
+//   border-bottom: 1px solid #e9ecef;
+
+//   @media (max-width: 768px) {
+//     padding: 15px;
+//   }
+
+//   h3 {
+//     margin: 0;
+//     font-size: 18px;
+//     font-weight: 600;
+
+//     @media (max-width: 768px) {
+//       font-size: 16px;
+//     }
+//   }
+// }
+
+// .add-modal__close-icon {
+//   cursor: pointer;
+//   padding: 4px;
+//   border-radius: 4px;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #f8f9fa;
+//   }
+// }
+
+// .add-modal__section {
+//   padding: 15px 20px;
+
+//   @media (max-width: 768px) {
+//     padding: 12px 15px;
+//   }
+
+//   label {
+//     display: block;
+//     margin-bottom: 5px;
+//     font-weight: 500;
+//     color: #333;
+//     font-size: 14px;
+//   }
+
+//   input, select {
+//     width: 100%;
+//     padding: 8px 12px;
+//     border: 1px solid #ddd;
+//     border-radius: 4px;
+//     font-size: 14px;
+//     transition: border-color 0.2s;
+
+//     &:focus {
+//       outline: none;
+//       border-color: #f9cf00;
+//     }
+
+//     @media (max-width: 768px) {
+//       padding: 10px 12px;
+//     }
+//   }
+// }
+
+// /* Кнопка "Максимум" в TransferProductModal */
+// .add-modal__max-button {
+//   padding: 8px 12px;
+//   background: #f9cf00;
+//   border: none;
+//   border-radius: 4px;
+//   cursor: pointer;
+//   font-size: 12px;
+//   white-space: nowrap;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #e6b800;
+//   }
+
+//   @media (max-width: 768px) {
+//     padding: 10px 12px;
+//     font-size: 14px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные сообщения
+//    ============================================================ */
+// .sklad__loading-message,
+// .sklad__error-message,
+// .sklad__no-products-message {
+//   text-align: center;
+//   padding: 40px 20px;
+//   font-size: 16px;
+//   color: #666;
+
+//   @media (max-width: 768px) {
+//     padding: 30px 15px;
+//     font-size: 14px;
+//   }
+// }
+
+// .add-modal__error-message {
+//   background: #f8d7da;
+//   color: #721c24;
+//   padding: 10px 15px;
+//   border-radius: 4px;
+//   margin: 10px 20px;
+//   font-size: 14px;
+
+//   @media (max-width: 768px) {
+//     margin: 10px 15px;
+//     font-size: 13px;
+//   } wrap;__filters {  gap: 8px;
+//   align-items: center;.sklad__actions {  gap: 12px;
+
+// /* ============================================================
+//    Адаптивные кнопки в модалках
+//    ============================================================ */
+// .add-modal__footer {
+
+//   gap: 10px;
+//   padding: 20px;
+//   border-top: 1px solid #e9ecef;
+//   justify-content: flex-end;
+
+//   @media (max-width: 768px) {
+//     padding: 15px;
+//     flex-direction: column;
+//   }
+
+//   button {
+//     padding: 10px 20px;
+//     border: none;
+//     border-radius: 4px;
+//     cursor: pointer;
+//     font-size: 14px;
+//     font-weight: 500;
+//     transition: all 0.2s;
+
+//     @media (max-width: 768px) {
+//       width: 100%;
+//       padding: 12px 20px;
+//     }
+
+//     &.add-modal__save {
+//       background: #28a745;
+//       color: white;
+
+//       &:hover {
+//         background: #218838;
+//       }
+//     }
+
+//     &.add-modal__cancel {
+//       background: #6c757d;
+//       color: white;
+
+//       &:hover {
+//         background: #5a6268;
+//       }
+//     }
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные бейджи статуса
+//    ============================================================ */
+// .sell__badge--danger {
+//   background: #dc3545;
+//   color: white;
+//   padding: 2px 6px;
+//   border-radius: 3px;
+//   font-size: 11px;
+//   font-weight: 500;
+
+//   @media (max-width: 768px) {
+//     font-size: 10px;
+//     padding: 1px 4px;
+//   }
+//     justify-content: flex-start;
+
+// /* ============================================================
+//    Адаптивные иконки
+//    ============================================================ */
+// .sklad__table button[title="Редактировать"] {
+
+//     flex-direction: column;
+//   justify-content: center;
+//   width: 32px;
+//   height: 32px;
+//   border-radius: 4px;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #f8f9fa;
+//   }
+
+//   @media (max-width: 768px) {
+//     width: 28px;
+//     height: 28px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные чекбоксы
+//    ============================================================ */
+// .sklad__table input[type="checkbox"] {
+//   width: 16px;
+//   height: 16px;
+//   cursor: pointer;
+
+//   @media (max-width: 768px) {
+//     width: 14px;
+//     height: 14px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные подсказки
+//    ============================================================ */
+// .sklad__table small {
+//   display: block;
+//   opacity: 0.7;
+//   margin-top: 5px;
+//   font-size: 12px;
+//   line-height: 1.3;
+
+//   @media (max-width: 768px) {
+//     font-size: 11px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные состояния загрузки
+//    ============================================================ */
+// .btn:disabled {
+//   opacity: 0.6;
+//   cursor: not-allowed;
+// }
+
+// /* ============================================================
+//    Адаптивные отступы и размеры
+//    ============================================================ */
+// @media (max-width: 480px) {
+//   .sklad__warehouse {
+//     padding: 5px;
+//   }
+
+//   .sklad__header {
+//     margin-bottom: 15px;
+//   }
+
+//   .sklad__table {
+//     th, td {
+//       padding: 4px 2px;
+//     }
+//   }
+
+//   .add-modal__content {
+//     margin: 0;
+//     border-radius: 0;
+//     max-height: 100vh;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные утилиты
+//    ============================================================ */
+// @media (max-width: 768px) {
+//   .hide-mobile {
+//     display: none !important;
+//   }
+// }
+
+// @media (min-width: 769px) {
+//   .show-mobile {
+//     display: none !important;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные анимации
+//    ============================================================ */
+// @media (prefers-reduced-motion: reduce) {
+//   * {
+//     animation-duration: 0.01ms !important;
+//     animation-iteration-count: 1 !important;
+//     transition-duration: 0.01ms !important;
+//   }
+
+//   @media (max-width: 480px) {
+//     min-width: 500px;
+//     font-size: 12px;
+//   }
+
+//   th {
+//     background: #f8f9fa;
+//     padding: 12px 8px;
+//     text-align: left;
+//     font-weight: 600;
+//     color: #333;
+//     border-bottom: 2px solid #e9ecef;
+//     white-space: nowrap;
+
+//     @media (max-width: 768px) {
+//       padding: 8px 6px;
+//     }
+
+//     @media (max-width: 480px) {
+//       padding: 6px 4px;
+//     }
+//   }
+
+//   td {
+//     padding: 12px 8px;
+//     border-bottom: 1px solid #e9ecef;
+//     vertical-align: middle;
+
+//     @media (max-width: 768px) {
+//       padding: 8px 6px;
+//     }
+
+//     @media (max-width: 480px) {
+//       padding: 6px 4px;
+//     }
+//   }
+
+//   tr:hover {
+//     background: #f8f9fa;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные кнопки действий в таблице
+//    ============================================================ */
+// .sklad__table .btn {
+//   padding: 4px 8px;
+//   font-size: 12px;
+//   margin: 2px;
+//   white-space: nowrap;
+
+//   @media (max-width: 768px) {
+//     padding: 3px 6px;
+//     font-size: 11px;
+//     margin: 1px;
+//   }
+
+//   @media (max-width: 480px) {
+//     padding: 2px 4px;
+//     font-size: 10px;
+//   }
+// }
+
+// /* Группировка кнопок действий */
+// .sklad__table td:last-child {  flex-direction: column;
+//   gap: 16px;.sklad__toolbar {  gap: 12px;.sklad__filters {  gap: 8px;
+//   flex-wrap: wrap;
+//   gap: 4px;
+//   align-items: center;
+
+//   @media (max-width: 768px) {
+//     flex-direction: column;
+//     gap: 2px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные модальные окна
+//    ============================================================ */
+// .add-modal {
+//   position: fixed;
+//   top: 0;
+//   left: 0;
+//   right: 0;
+//   bottom: 0;
+//   z-index: 1000;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   padding: 20px;
+
+//   @media (max-width: 768px) {
+//     padding: 10px;
+//     align-items: flex-start;
+//     padding-top: 20px;
+//   }
+// }
+
+// .add-modal__content {
+//   background: white;
+//   border-radius: 8px;
+//   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+//   max-width: 500px;
+//   width: 100%;
+//   max-height: 90vh;
+//   overflow-y: auto;
+
+//   @media (max-width: 768px) {
+//     max-width: 100%;
+//     max-height: 95vh;
+//     border-radius: 4px;
+//   }
+// .add-modal__header {  padding: 20px;
+
+// .add-modal__header {
+//   @media (max-width: 768px) {
+//     padding: 15px;
+//   }
+//   padding: 20px;
+//   border-bottom: 1px solid #e9ecef;
+
+//   @media (max-width: 768px) {
+//     padding: 15px;
+//   }
+
+//   h3 {
+//     margin: 0;
+//     font-size: 18px;
+//     font-weight: 600;
+
+//     @media (max-width: 768px) {
+//       font-size: 16px;
+//     }
+//   }
+// }
+
+// .add-modal__close-icon {
+//   cursor: pointer;
+//   padding: 4px;
+//   border-radius: 4px;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #f8f9fa;
+//   }
+// }
+
+// .add-modal__section {
+//   padding: 15px 20px;
+
+//   @media (max-width: 768px) {
+//     padding: 12px 15px;
+//   }
+
+//   label {
+//     display: block;
+//     margin-bottom: 5px;
+//     font-weight: 500;
+//     color: #333;
+//     font-size: 14px;
+//   }
+
+//   input, select {
+//     width: 100%;
+//     padding: 8px 12px;
+//     border: 1px solid #ddd;
+//     border-radius: 4px;
+//     font-size: 14px;
+//     transition: border-color 0.2s;
+
+//     &:focus {
+//       outline: none;
+//       border-color: #f9cf00;
+//     }
+
+//     @media (max-width: 768px) {
+//       padding: 10px 12px;
+//     }
+//   }
+// }
+
+// /* Кнопка "Максимум" в TransferProductModal */
+// .add-modal__max-button {
+//   padding: 8px 12px;
+//   background: #f9cf00;
+//   border: none;
+//   border-radius: 4px;
+//   cursor: pointer;
+//   font-size: 12px;
+//   white-space: nowrap;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #e6b800;
+//   }
+
+//   @media (max-width: 768px) {
+//     padding: 10px 12px;
+//     font-size: 14px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные сообщения
+//    ============================================================ */
+// .sklad__loading-message,
+// .sklad__error-message,
+// .sklad__no-products-message {
+//   text-align: center;
+//   padding: 40px 20px;
+//   font-size: 16px;
+//   color: #666;
+
+//   @media (max-width: 768px) {
+//     padding: 30px 15px;
+//     font-size: 14px;
+//   }
+// }
+
+// .add-modal__error-message {
+//   background: #f8d7da;
+//   color: #721c24;
+//   padding: 10px 15px;
+//   border-radius: 4px;
+//   margin: 10px 20px;
+//   font-size: 14px;
+
+//   @media (max-width: 768px) {
+//     margin: 10px 15px;
+//     font-size: 13px;
+//   }order-top: 1px solid #e9ecef;
+//   justify-content: flex-end;
+
+// /* ============================================================
+//    Адаптивные кнопки в модалках
+//    ============================================================ */
+// .add-modal__footer {
+
+//   gap: 10px;
+//   padding: 20px;
+//   border-top: 1px solid #e9ecef;
+//   justify-content: flex-end;
+
+//   @media (max-width: 768px) {
+//     padding: 15px;
+//     flex-direction: column;
+//   }
+
+//   button {
+//     padding: 10px 20px;
+//     border: none;
+//     border-radius: 4px;
+//     cursor: pointer;
+//     font-size: 14px;
+//     font-weight: 500;
+//     transition: all 0.2s;
+
+//     @media (max-width: 768px) {
+//       width: 100%;
+//       padding: 12px 20px;
+//     }
+
+//     &.add-modal__save {
+//       background: #28a745;
+//       color: white;
+
+//       &:hover {
+//         background: #218838;
+//       }
+//     }
+
+//     &.add-modal__cancel {
+//       background: #6c757d;
+//       color: white;
+
+//       &:hover {
+//         background: #5a6268;
+//       }
+//     }
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные бейджи статуса
+//    ============================================================ */
+// .sell__badge--danger {
+//   background: #dc3545;
+//   color: white;
+//   padding: 2px 6px;
+//   border-radius: 3px;
+//   font-size: 11px;
+//   font-weight: 500;
+
+//   @media (max-width: 768px) {
+//     font-size: 10px;
+//     padding: 1px 4px;
+//   }:hover {
+//     background: #f8f9fa;
+
+// /* ============================================================
+//    Адаптивные иконки
+//    ============================================================ */
+// .sklad__table button[title="Редактировать"] {
+//   }
+// }
+//   justify-content: center;
+//   width: 32px;
+//   height: 32px;
+//   border-radius: 4px;
+//   transition: background-color 0.2s;
+
+//   &:hover {
+//     background: #f8f9fa;
+//   }
+
+//   @media (max-width: 768px) {
+//     width: 28px;
+//     height: 28px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные чекбоксы
+//    ============================================================ */
+// .sklad__table input[type="checkbox"] {
+//   width: 16px;
+//   height: 16px;
+//   cursor: pointer;
+
+//   @media (max-width: 768px) {
+//     width: 14px;
+//     height: 14px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные подсказки
+//    ============================================================ */
+// .sklad__table small {
+//   display: block;
+//   opacity: 0.7;
+//   margin-top: 5px;
+//   font-size: 12px;
+//   line-height: 1.3;
+
+//   @media (max-width: 768px) {
+//     font-size: 11px;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные состояния загрузки
+//    ============================================================ */
+// .btn:disabled {
+//   opacity: 0.6;
+//   cursor: not-allowed;
+// }
+
+// /* ============================================================
+//    Адаптивные отступы и размеры
+//    ============================================================ */
+// @media (max-width: 480px) {
+//   .sklad__warehouse {
+//     padding: 5px;
+//   }
+
+//   .sklad__header {
+//     margin-bottom: 15px;
+//   }
+
+//   .sklad__table {
+//     th, td {
+//       padding: 4px 2px;
+//     }
+//   }
+
+//   .add-modal__content {
+//     margin: 0;
+//     border-radius: 0;
+//     max-height: 100vh;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные утилиты
+//    ============================================================ */
+// @media (max-width: 768px) {
+//   .hide-mobile {
+//     display: none !important;
+//   }
+// }
+
+// @media (min-width: 769px) {
+//   .show-mobile {
+//     display: none !important;
+//   }
+// }
+
+// /* ============================================================
+//    Адаптивные анимации
+//    ============================================================ */
+// @media (prefers-reduced-motion: reduce) {
+//   * {
+//     animation-duration: 0.01ms !important;
+//     animation-iteration-count: 1 !important;
+//     transition-duration: 0.01ms !important;
+//   }
+// }

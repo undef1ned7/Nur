@@ -1,0 +1,490 @@
+.App {
+  display: flex;
+  position: relative;
+  transition: transform 0.3s ease-in-out;
+  min-height: 100vh;
+
+  &--sidebar-open {
+    transform: translateX(60%);
+
+    @media (min-width: 769px) {
+      transform: translateX(0);
+    }
+  }
+}
+body {
+  position: relative;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+.announcement {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  padding: 10px 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  max-width: 90vw;
+  overflow: hidden;
+
+  &__content {
+    margin: 10px 0;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  span {
+    display: block;
+    width: 6px;
+    height: 80px;
+    border-radius: 38px;
+    background-color: #fce000;
+    margin-right: 20px;
+    flex-shrink: 0;
+  }
+
+  &__close {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+}
+
+.App,
+#root,
+body {
+  // height: auto;
+}
+.content_background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+  overflow: hidden;
+}
+.content {
+  width: 100%;
+  min-height: 100vh;
+  padding: 0 20px 20px 20px;
+  transition: transform 0.3s ease-in-out;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-size: cover;
+  flex: 1;
+
+  @media (min-width: 769px) {
+    margin-left: 250px;
+  }
+
+  .content_image1 {
+    position: absolute;
+    top: 0;
+    left: 10%;
+    z-index: -1;
+  }
+
+  .content_image2 {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: -1;
+  }
+
+  .content_image3 {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    z-index: -1;
+  }
+  // .content_image4 {
+  //   position: absolute;
+  //   top: 0;
+  //   left: 0;
+  //   width: 100%;
+  //   height: 100%;
+  //   object-fit: cover;
+  //   z-index: -1;
+  //   opacity: 0.1;
+  // }
+}
+
+.menu__modal-overlay,
+.orders__modal-overlay,
+.purchasing__modal-overlay,
+.reservations__modal-overlay,
+.staff__modal-overlay,
+.stock__modal-overlay,
+.tables__modal-overlay,
+.docs__modalOverlay,
+.students__modal-overlay,
+.cg__modal-overlay,
+.lr__modal-overlay,
+.teachers__modal-overlay,
+.leads__modal-overlay,
+.bookings__modalOverlay,
+.barbermasters__overlay,
+.barberclient__modalOverlay,
+.barberservices__overlay,
+.sale__overlay,
+.clients__modalOverlay {
+  z-index: 10000 !important;
+}
+
+.app-ky {
+  .header {
+    border-radius: 0 0 10px 10px;
+    border: none !important;
+    background-color: #ffffff66 !important;
+  }
+  .obzor__panel,
+  .obzor__card,
+  .vitrina__search-wrapper,
+  .vitrina__table thead,
+  .vitrina__table tbody,
+  .zakaz__search-wrapper,
+  .sklad__table,
+  .table-wrapper,
+  .fc .fc-view-harness,
+  .tabs,
+  .tabs__item--active,
+  .settings__content,
+  .general__left,
+  .general__right,
+  .security__box,
+  .users,
+  .funnels-page__stage,
+  .analytics,
+  .filterSection,
+  .dataSection,
+  .funnels-page__sidebar,
+  .noDataMessage,
+  .chartCard,
+  .add-modal__content,
+  .vitrina__modal,
+  .departmentCard,
+  .modalContent,
+  .services,
+  .modal,
+  .services .header,
+  .docs,
+  .card,
+  .docs__list,
+  .docs__viewer,
+  .docs__modal,
+  .panel,
+  .rh,
+  .rh__modal,
+  .bookings,
+  .bookings__card,
+  .bookings__modal,
+  .bar,
+  .bar__modal,
+  .bar__item,
+  .bar__table,
+  .students,
+  .students__card,
+  .students__modal,
+  .cg,
+  .cg__courseItem,
+  .cg__groupBtn,
+  .cg__panel,
+  .cg__memberItem,
+  .cg__modal,
+  .lr,
+  .lr__search-input,
+  .lr__card,
+  .lr__modal,
+  .teachers,
+  .teachers__card,
+  .teachers__modal,
+  .leads,
+  .leads__card,
+  .leads__modal,
+  .inv,
+  .inv__kpiCard,
+  .inv__card,
+  .history,
+  .analytics__card,
+  .analytics__panel,
+  .menu,
+  .menu__card,
+  .orders,
+  .orders__card,
+  .orders__modal,
+  .payroll,
+  .payroll__card,
+  .purchasing,
+  .purchasing__card,
+  .purchasing__modal,
+  .reports,
+  .reports__controls,
+  .reports__kpi,
+  .reports__chartCard,
+  .reservations,
+  .reservations__card,
+  .reservations__modal,
+  .staff,
+  .staff__card,
+  .staff__modal,
+  .stock,
+  .stock__card,
+  .stock__modal,
+  .tables,
+  .tables__card,
+  .tables__modal,
+  .menu__modal,
+  .zakaz__table,
+  .additional-services__header,
+  .additional-services__wrapper,
+  .bar__tableWrap,
+  .deals-list,
+  .deal-item,
+  .client-details .row,
+  .clients,
+  .tableContainer,
+  .settings,
+  .settings__header,
+  .settings__footer,
+  .settings__section {
+    border-radius: 10px;
+    background: #ffffff66 !important;
+  }
+
+  .vitrina__search,
+  .summaryCard,
+  .company,
+  .zakaz__search,
+  .sklad__search,
+  .employee__search-wrapper,
+  .general__menu-item,
+  .general__input,
+  .general__select,
+  .users__content,
+  .ordersByStatusCard,
+  .users__sidebar,
+  .funnels-page__content,
+  .docs__card,
+  .searchInput,
+  .employee__search-input,
+  .modalHeader,
+  .formActions,
+  .report,
+  .reports__legend {
+    background-color: transparent !important;
+  }
+  .fc-theme-standard th,
+  .employeeTable th,
+  .employeeTable td,
+  .docs__tabs,
+  .edit-modal__content,
+  .bar__table thead tr,
+  .bar__table thead,
+  .bar__table tbody,
+  .bar__table tfoot,
+  .bar__pickerHead,
+  .bar__list,
+  .table__body,
+  .analytics__panel .analytics__head,
+  .table__head,
+  .additional-services__social-card,
+  .social-modal-content,
+  .debts {
+    background: #ffffff66 !important;
+  }
+  .company__input,
+  .selectInput,
+  .dateInput,
+  .add-modal__content select,
+  .add-modal__input,
+  .vitrina__modal-input,
+  .accessButton,
+  .formGroup select,
+  .edit-modal__section input,
+  .field input,
+  .docs__input,
+  .field select,
+  .searchInput,
+  .input,
+  .docs__searchInput,
+  .docs__select,
+  .textarea,
+  .rh__searchInput,
+  .rh__input,
+  .bookings__searchInput,
+  .bookings__input,
+  .students__search-input,
+  .students__input,
+  .students__textarea,
+  .bar__searchInput,
+  .cg__search-input,
+  .cg__input,
+  .lr__input,
+  .teachers__search-input,
+  .teachers__input,
+  .leads__input,
+  .leads__textarea,
+  .leads__search-input,
+  .inv__search-input,
+  .inv__input,
+  .history__input,
+  .analytics__select,
+  .menu__search-input,
+  .orders__input,
+  .orders__textarea,
+  .orders__search-input,
+  .payroll__search-input,
+  .payroll__input,
+  .payroll__textarea,
+  .purchasing__search-input,
+  .purchasing__input,
+  .purchasing__textarea,
+  .reports__select,
+  .reservations__input,
+  .reservations__textarea,
+  .reservations__search-input,
+  .staff__search-input,
+  .staff__input,
+  .staff__textarea,
+  .stock__search-input,
+  .stock__input,
+  .stock__textarea,
+  .tables__input,
+  .tables__textarea,
+  .tables__search-input,
+  .menu__input,
+  .menu__textarea,
+  .search,
+  .date,
+  .settings__input {
+    &::placeholder {
+      color: #fff !important;
+    }
+    // color: #fff !important;
+    border: 1px solid #fff !important;
+    background-color: transparent !important;
+  }
+  .accessButton,
+  .btn,
+  .chip {
+    background-color: #ffffff66 !important;
+    color: #fff !important;
+  }
+  .students__label,
+  .purchasing__label,
+  .reservations__label,
+  .staff__label,
+  .stock__label,
+  .tables__label,
+  .menu__label,
+  .orders__label,
+  .rh__label {
+    color: #fff !important;
+  }
+}
+.bookings__input {
+  width: 100%;
+}
+
+// Добавляем стили для улучшения скроллинга
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+/* Предотвращаем горизонтальный скролл */
+* {
+  max-width: 100%;
+}
+
+// Улучшаем поведение на мобильных устройствах
+@media (max-width: 768px) {
+  .content {
+    padding: 0 15px 15px 15px;
+  }
+
+  .layout-wrapper {
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  .content_background {
+    background-attachment: scroll;
+  }
+
+  .App {
+    &--sidebar-open {
+      transform: translateX(60%);
+    }
+  }
+
+  .announcement {
+    right: 10px;
+    left: 10px;
+    max-width: calc(100vw - 20px);
+
+    &__content {
+      font-size: 14px;
+      line-height: 1.4;
+    }
+  }
+}
+
+/* Улучшения для очень маленьких экранов */
+@media (max-width: 480px) {
+  .content {
+    padding: 0 10px 10px 10px;
+  }
+
+  .announcement {
+    right: 5px;
+    left: 5px;
+    max-width: calc(100vw - 10px);
+    padding: 8px 15px;
+
+    &__content {
+      font-size: 13px;
+      line-height: 1.3;
+    }
+  }
+}
+
+// Улучшаем поведение на планшетах
+@media (min-width: 769px) and (max-width: 1024px) {
+  .content {
+    padding: 0 18px 18px 18px;
+  }
+
+  .sidebar {
+    width: 250px;
+  }
+}
+
+// Улучшаем поведение на больших экранах
+@media (min-width: 1025px) {
+  .content {
+    padding: 0 20px 20px 20px;
+  }
+
+  .sidebar {
+    width: 250px;
+  }
+}

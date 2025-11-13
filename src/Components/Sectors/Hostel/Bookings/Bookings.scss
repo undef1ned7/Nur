@@ -1,0 +1,585 @@
+/* только цвета — глобально */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap");
+.bookings__modalOverlay {
+  .bookings__modal {
+    overflow-y: scroll;
+  }
+  .bookings__calendar {
+    display: block;
+  }
+}
+
+/* весь остальной дизайн — локально в блоке */
+.bookings {
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  &__title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+  &__subtitle {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* Поиск */
+  &__search {
+    position: relative;
+  }
+  &__searchInput {
+    width: 300px;
+    padding: 10px 12px 10px 32px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+  &__searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* Кнопки */
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    border: 1px solid transparent;
+    &:active {
+      transform: translateY(1px);
+    }
+    &--primary {
+      background: var(--primary);
+      color: #111;
+      &:hover {
+        background: var(--primary-dark);
+      }
+    }
+    &--secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      &:hover {
+        background: #f9fafb;
+      }
+    }
+    &--danger {
+      background: #fee2e2;
+      border: 1px solid #fecaca;
+      color: #7f1d1d;
+      &:hover {
+        background: #fecaca;
+      }
+    }
+  }
+
+  /* ===== Список ===== */
+  &__list {
+    display: grid;
+    gap: 10px;
+  }
+  &__card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fafafa;
+    transition: background 0.2s;
+    &:hover {
+      background: #f1f5f9;
+    }
+  }
+  &__name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  &__meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  &__badge {
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  &__right {
+    display: flex;
+    gap: 8px;
+  }
+
+  &__empty {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 12px 4px;
+    text-align: center;
+  }
+
+  /* ===== уведомления ===== */
+  &__conflict {
+    margin: 10px 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #fee2e2;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 13px;
+  }
+
+  /* ===== Модалка ===== */
+  &__modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 12px;
+  }
+  &__modal {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    width: 760px;
+    max-width: 96vw;
+    max-height: 90vh;
+    overflow: auto;
+    padding: 16px;
+  }
+  &__modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  &__modalTitle {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  &__iconBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+  /* ===== Форма ===== */
+  &__form {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  &__formGrid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 1fr 1fr;
+  }
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  &__label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  &__req {
+    color: #ef4444;
+  }
+  &__input {
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  &__row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  &__miniBtn {
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    cursor: pointer;
+    transition: 0.2s;
+    &:hover {
+      background: #f9fafb;
+    }
+  }
+
+  &__formHint {
+    font-size: 12px;
+    color: var(--muted);
+    grid-column: 1 / -1;
+  }
+  &__formActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* ===== Клиент ===== */
+  &__clientPicker {
+    display: grid;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  &__clientList {
+    margin-top: 6px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    height: 132px; /* ровно ~3 строки */
+    overflow-y: auto; /* скролл всегда при >3 эл. */
+  }
+  &__clientItem {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 12px;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    &:last-child {
+      border-bottom: 0;
+    }
+    &:hover {
+      background: #f9fafb;
+    }
+    &--active {
+      background: #fff7cc;
+    }
+  }
+  &__clientName {
+    font-weight: 600;
+    color: var(--text);
+  }
+  &__clientPhone {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  &__hint {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+
+  /* ===== Календарь ===== */
+  &__calendarWrap {
+    display: block;
+    width: 100%;
+  }
+  &__calendar {
+    margin-top: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+  &__calHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  &__calTitle {
+    font-weight: 700;
+    text-transform: capitalize;
+    color: var(--text);
+  }
+  &__calNav {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    cursor: pointer;
+  }
+  &__calWeekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    margin-bottom: 6px;
+  }
+  &__calWd {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  &__calGrid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+
+  &__calDay {
+    position: relative;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    background: #fafafa;
+    color: var(--text);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  &__calDay--dim {
+    opacity: 0.5;
+  }
+  &__calDay--today {
+    outline: 2px solid var(--primary);
+  }
+  &__calDay--focus {
+    box-shadow: 0 0 0 2px var(--primary) inset;
+  }
+  &__calDay--full {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #b91c1c;
+  }
+
+  /* цифра дня поверх заливок */
+  &__calNum {
+    position: relative;
+    z-index: 2;
+    font-weight: 700;
+    color: var(--text);
+    text-shadow: 0 1px 0 #fff;
+  }
+
+  /* занятые отрезки */
+  &__calCover {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(254, 226, 226, 0.9);
+    border-left: 1px solid #fecaca;
+    border-right: 1px solid #fecaca;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* выбранные отрезки */
+  &__calSel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(247, 215, 79, 0.45);
+    border-left: 1px solid var(--primary-dark);
+    border-right: 1px solid var(--primary-dark);
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: multiply;
+  }
+
+  &__calLegend {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  &__calBadge {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+  }
+
+  /* Панель инфо дня */
+  &__calInfo {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: #0f172a;
+    display: grid;
+    gap: 10px;
+  }
+  &__calInfoTitle {
+    font-weight: 700;
+  }
+  &__calInfoList {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  &__timeRows {
+    display: grid;
+    gap: 8px;
+  }
+  &__timeRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  &__timeInput {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--text);
+    background: #fff;
+  }
+
+  /* скроллбары */
+  & * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  & *::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+  }
+  & *::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  & *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* мобильная адаптация */
+  @media (max-width: 640px) {
+    &__modal {
+      padding: 12px;
+    }
+    &__calDay {
+      height: 28px;
+      font-size: 12px;
+    }
+    &__formGrid {
+      grid-template-columns: 1fr;
+    }
+    &__searchInput {
+      width: 220px;
+    }
+  }
+  @media (max-width: 360px) {
+    padding: 16px;
+    &__searchInput {
+      width: 100%;
+    }
+    &__title {
+      font-size: 18px;
+    }
+    &__btn {
+      padding: 9px 12px;
+    }
+  }
+}
+
+/* компактные модификаторы */
+.bookings__field--range {
+  grid-column: 1 / -1;
+}
+.bookings__rangeInputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.bookings__input--compact {
+  width: 260px;
+}
+.bookings__rangeDash {
+  user-select: none;
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .bookings__input--compact {
+    width: 100%;
+  }
+  .bookings__rangeInputs {
+    gap: 6px;
+  }
+}

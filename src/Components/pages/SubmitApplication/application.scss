@@ -1,0 +1,355 @@
+
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
+
+/* фон «горы» */
+$mountains: url("https://moya-planeta.ru/upload/images/xl/ca/64/ca64cb328dff0ae52ee12bcec69c060120e08c3e.jpg");
+
+/* брейкпоинты */
+$bp-xl: 1280px;
+$bp-lg: 1100px;
+$bp-md: 980px;   /* уже был у тебя — ключевой */
+$bp-sm: 640px;
+$bp-xs: 400px;
+$bp-xxs: 320px;
+
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --ink: #0f172a;
+  --muted: #6b7280;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --radius: 14px;
+  --shadow: 0 10px 30px rgba(2, 6, 23, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+.application {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(380px, 35vw, 520px);
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+
+  /* общий фон */
+  background:
+    linear-gradient(0deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35)),
+    $mountains center/cover no-repeat fixed;
+
+  /* лёгкая вуаль */
+  &::after {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(1000px 600px at 15% 40%, rgba(0,0,0,0.45), transparent 50%),
+      radial-gradient(1000px 600px at 95% 40%, rgba(255,255,255,0.18), transparent 50%);
+    pointer-events: none;
+  }
+
+  /* ЛЕВАЯ ЧАСТЬ — слоган */
+  &__left {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    padding: clamp(20px, 6vw, 64px);
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    color: #fff;
+  }
+
+  &__slogan {
+    font-weight: 800;
+    font-size: clamp(28px, 3.6vw + 10px, 56px);
+    line-height: 1.08;
+    text-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    margin: 0;
+    max-width: 16ch;
+  }
+
+  &__subtitle {
+    margin: 4px 0 0;
+    color: #e5e7eb;
+    font-size: clamp(14px, 0.8vw + 12px, 16px);
+    max-width: 48ch;
+    text-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  /* ПРАВАЯ ЧАСТЬ — форма */
+  &__right {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: clamp(20px, 3vw, 40px);
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  &__container {
+    width: 100%;
+    max-width: 720px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: clamp(22px, 3.2vw, 34px);
+  }
+
+  &__title {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0 0 16px;
+  }
+
+  &__message {
+    font-size: 14px;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    &--success { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
+    &--error   { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+  }
+
+  &__form  { display: grid; gap: 14px; }
+  &__field { display: grid; gap: 8px; }
+
+  &__label {
+    font-size: 13px;
+    color: #334155;
+    font-weight: 600;
+  }
+
+  &__input,
+  &__textarea {
+    width: 100%;
+    padding: 12px 12px;
+    font-size: 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    outline: none;
+    background: #fff;
+    transition: box-shadow 0.2s, border-color 0.2s;
+
+    &::placeholder { color: #94a3b8; }
+
+    &:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(247, 215, 79, 0.28);
+    }
+  }
+
+  &__textarea { resize: vertical; min-height: 120px; }
+
+  &__button {
+    margin-top: 6px;
+    background: var(--primary);
+    color: #111827;
+    font-size: 15px;
+    font-weight: 800;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.05s ease, box-shadow 0.2s ease, background 0.2s ease;
+    box-shadow: 0 10px 20px rgba(247, 215, 79, 0.35);
+
+    &:hover  { background: var(--primary-dark); }
+    &:active { transform: translateY(1px); box-shadow: 0 6px 12px rgba(247, 215, 79, 0.35); }
+    &:disabled { opacity: 0.7; cursor: not-allowed; }
+  }
+
+  /* =======================================================
+     А Д А П Т А Ц И Я
+     ======================================================= */
+
+  /* Чуть просторнее на очень широких экранах */
+  @media (min-width: $bp-xl) {
+    grid-template-columns: minmax(0, 1fr) clamp(480px, 32vw, 560px);
+  }
+
+  /* Переход к одной колонке — как у тебя, оставляю */
+  @media (max-width: $bp-md) {
+    grid-template-columns: 1fr;
+    align-content: center;
+    row-gap: clamp(14px, 3.5vh, 24px);
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+
+    &__left {
+      min-height: 36vh;
+      padding: 24px;
+      display: grid;
+      place-items: center start;
+    }
+
+    &__slogan { font-size: clamp(26px, 7vw, 40px); }
+    &__right  { padding-top: 10px; }
+    &__container { margin: 0 auto; }
+  }
+
+  /* Низкая высота окна — уменьшаем «воздух», чтобы всё попадало в первый экран */
+  @media (max-height: 740px) and (min-width: $bp-md) {
+    &__left     { padding-top: 24px; padding-bottom: 24px; }
+    &__subtitle { font-size: clamp(13px, 1.4vh, 15px); }
+    &__right    { padding: 18px; }
+    &__container{ padding: 18px; }
+  }
+
+  /* Планшеты: немного плотнее тексты и поля */
+  @media (max-width: $bp-sm) {
+    &__title   { font-size: 22px; }
+    &__label   { font-size: 12.5px; }
+    &__input,
+    &__textarea { font-size: 14px; padding: 11px 12px; }
+    &__button  { font-size: 14.5px; padding: 11px 12px; }
+  }
+
+  /* Очень узкие экраны: скругления/паддинги компактнее, контейнер без «лишних» полей */
+  @media (max-width: $bp-xs) {
+    &__container { border-radius: 12px; padding: 16px; }
+    &__title     { font-size: 20px; margin-bottom: 12px; }
+    &__button    { width: 100%; }
+  }
+
+  /* Минимальная ширина 320px — всё читабельно и ничего не «ломает» */
+  @media (max-width: $bp-xxs) {
+    &__slogan    { font-size: 26px; }
+    &__subtitle  { font-size: 13px; }
+    &__input,
+    &__textarea  { font-size: 13.5px; padding: 10px 11px; }
+    &__label     { font-size: 12px; }
+    &__container { padding: 14px; border-radius: 10px; }
+  }
+}
+
+/* ===== СПИСОК ЗАЯВОК (BEM .applications) ===== */
+.applications {
+  &__container {
+    max-width: 1140px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #ccc;
+  }
+
+  &__status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    b { margin-right: 0; }
+
+    &-select {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #fff;
+      cursor: pointer;
+      padding: 8px 10px;
+      outline: none;
+
+      &:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.28);
+      }
+    }
+  }
+
+  &__button {
+    background: #ffc107;
+    color: #1c2526;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover { background: #ffb300; }
+  }
+
+  &__filter {
+    select {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #fff;
+      cursor: pointer;
+      outline: none;
+
+      &:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.28);
+      }
+    }
+  }
+
+  /* ===== адаптация списка ===== */
+
+  /* планшеты — допускаем переносы и «воздух» */
+  @media (max-width: 900px) {
+    &__item {
+      flex-wrap: wrap;
+      padding: 12px 0;
+      row-gap: 10px;
+    }
+  }
+
+  /* телефоны — превращаем строку в карточку */
+  @media (max-width: 640px) {
+    &__item {
+      border: 1px solid #e8eaee;
+      border-radius: 12px;
+      padding: 14px;
+      background: #fff;
+      box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+      margin-bottom: 12px;
+    }
+
+    &__status {
+      width: 100%;
+      justify-content: space-between;
+      gap: 8px;
+
+      b { font-weight: 700; }
+      &-select { flex: 0 0 auto; }
+    }
+
+    &__button {
+      width: 100%;
+      text-align: center;
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 10px;
+    }
+  }
+
+  /* очень узкие — шрифты чуть компактнее */
+  @media (max-width: 360px) {
+    &__button { font-size: 14px; padding: 11px; }
+    &__status &-select { padding: 7px 9px; }
+  }
+}
+
+/* Chrome autofill */
+input:-webkit-autofill,
+textarea:-webkit-autofill {
+  box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: #111827;
+}

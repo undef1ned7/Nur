@@ -1,0 +1,147 @@
+.instagram {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  font-family: ui-sans-serif, system-ui;
+}
+.panel {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.toolbar {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.row1 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: end;
+  flex-wrap: wrap;
+}
+.input {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 8px 10px;
+  outline: none;
+}
+.btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.btn.secondary {
+  background: #0ea5e9;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.list1 {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+  height: 60vh;
+}
+.thread {
+  text-align: left;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.thread.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) inset;
+}
+.t-title {
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+.t-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.t-time {
+  color: #64748b;
+  font-size: 12px;
+}
+.badge {
+  background: #ef4444;
+  color: white;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+.status {
+  color: #64748b;
+  font-size: 12px;
+}
+.messages {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  height: 60vh;
+}
+.bubble {
+  max-width: 70%;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: white;
+}
+.bubble.me {
+  margin-left: auto;
+  background: #e0f2fe;
+  border-color: #bae6fd;
+}
+.meta {
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.composer {
+  border-top: 1px solid #e2e8f0;
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+@media screen and (max-width: 1200px) {
+  .instagram {
+    flex-direction: column;
+  }
+  .panel:first-child {
+    height: 400px;
+    overflow-y: scroll;
+  }
+  .list1 {
+    height: 200px;
+  }
+  // .panel:last-child {
+  //   height: 700px;
+  // }
+}

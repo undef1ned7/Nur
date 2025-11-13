@@ -1,0 +1,234 @@
+/* src/components/Auth/Login.scss */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
+
+/* === фон (можете подменить ссылку) === */
+$mountains: url("https://e-cis.info/upload/iblock/4b4/n0n59zv1k5pgk7cc7ai3829cuh1w5rhe.png");
+
+/* палитра — можно держать в :root, остальное локально */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --ink: #0f172a;
+  --surface: #ffffff;
+  --border: #e5e7eb;
+}
+
+/* локальные токены (не выносить в :root, чтобы не «утекали» в другие SCSS) */
+$radius: 14px;
+$shadow: 0 10px 30px rgba(2, 6, 23, 0.12);
+
+* { box-sizing: border-box; }
+
+.login {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: 1fr minmax(380px, 520px);
+  column-gap: clamp(16px, 4vw, 48px);
+
+  /* единый фон */
+  background:
+    linear-gradient(0deg, rgba(0,0,0,0.28), rgba(0,0,0,0.28)),
+    $mountains center/cover no-repeat fixed;
+
+  font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+
+  /* лёгкая вуаль поверх фона */
+  &::after {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(1000px 600px at 15% 40%, rgba(0,0,0,0.45), transparent 50%),
+      radial-gradient(1000px 600px at 95% 40%, rgba(255,255,255,0.18), transparent 50%);
+    pointer-events: none;
+  }
+
+  /* центрируем содержимое по вертикали, когда есть запас высоты */
+  align-content: center;
+  row-gap: 0;
+
+  /* ===== левая половина (слоган) ===== */
+  &__left {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    padding-left: clamp(12px, 4vw, 56px);
+    padding-right: clamp(12px, 3.6vw, 40px);
+  }
+
+  &__slogan {
+    color: #fff;
+    font-weight: 800;
+    /* ⬆️ Чуть увеличил базовый размер */
+    font-size: clamp(30px, 4.2vw + 12px, 62px);
+    line-height: 1.08;
+    text-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    max-width: 14ch;
+    margin: 0;
+  }
+
+  /* ===== правая половина (карточка) ===== */
+  &__right {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: clamp(20px, 3.2vw, 40px);
+  }
+
+  &__card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: $radius;
+    box-shadow: $shadow;
+    padding: clamp(22px, 3.2vw, 34px);
+    text-align: left;
+    margin-right: clamp(8px, 1.2vw, 18px);
+  }
+
+  &__title {
+    font-size: clamp(24px, 2.6vw, 32px);
+    font-weight: 800;
+    color: var(--ink);
+    margin: 2px 0 16px;
+    letter-spacing: 0.2px;
+  }
+
+  &__message {
+    font-size: 14px;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    &--success { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
+    &--error   { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+  }
+
+  &__logout-button {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid #d1fae5;
+    color: #065f46;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    &:hover { background: #d1fae5; }
+  }
+
+  &__form  { display: grid; gap: 14px; }
+  &__field { display: grid; gap: 8px; }
+
+  &__label { font-size: 13px; color: #334155; font-weight: 600; }
+  &__password { position: relative; display: grid; }
+
+  &__input {
+    width: 100%;
+    padding: 12px 12px;
+    font-size: 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    outline: none;
+    background: #fff;
+    transition: box-shadow 0.2s, border-color 0.2s;
+
+    &:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(247, 215, 79, 0.28);
+    }
+
+    &--password { padding-right: 86px; }
+    &::placeholder { color: #94a3b8; }
+  }
+
+  &__toggle {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    &:hover { background: #f8fafc; }
+  }
+
+  &__button {
+    margin-top: 4px;
+    background: var(--primary);
+    color: #111827;
+    font-size: 15px;
+    font-weight: 800;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform .05s ease, box-shadow .2s ease, background .2s ease;
+    box-shadow: 0 10px 20px rgba(247, 215, 79, 0.35);
+
+    &:hover  { background: var(--primary-dark); }
+    &:active { transform: translateY(1px); box-shadow: 0 6px 12px rgba(247, 215, 79, 0.35); }
+    &:disabled { opacity: .7; cursor: not-allowed; }
+  }
+
+  /* ===================== АДАПТАЦИЯ ===================== */
+
+  /* 1) Узкая ширина/стек */
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+    align-content: center;
+    justify-items: center;
+    row-gap: clamp(14px, 3.5vh, 24px);
+    padding: clamp(12px, 3vw, 20px);
+
+    &__left {
+      padding: 0;
+      min-height: auto;
+      display: grid;
+      place-items: center;
+    }
+
+    /* ⬆️ увеличил на узких экранах */
+    &__slogan {
+      text-align: center;
+      max-width: 16ch;
+      font-size: clamp(30px, 10.5vw, 48px);
+      line-height: 1.1;
+    }
+
+    &__right   { padding: 0; }
+    &__card    { margin: 0; width: min(560px, 100%); }
+  }
+
+  /* 2) Низкая высота окна */
+  @media (max-height: 740px) {
+    align-content: center;
+    row-gap: clamp(10px, 2.5vh, 18px);
+
+    /* ⬆️ немного крупнее при низкой высоте */
+    &__slogan { font-size: clamp(28px, 6.2vh, 46px); }
+    &__right  { padding: clamp(12px, 2vh, 24px); }
+    &__card   { padding: clamp(18px, 2.6vh, 28px); }
+  }
+
+  /* 3) Совсем маленькие устройства */
+  @media (max-width: 360px) {
+    &__card   { border-radius: 10px; }
+    &__button { padding: 11px 12px; font-size: 14px; }
+    /* ⬆️ минимальный размер тоже поднят */
+    &__slogan { font-size: clamp(28px, 12vw, 36px); }
+  }
+}
+
+/* автозаполнение Chrome */
+input:-webkit-autofill {
+  box-shadow: 0 0 0 1000px #fff inset;
+  -webkit-text-fill-color: #111827;
+}

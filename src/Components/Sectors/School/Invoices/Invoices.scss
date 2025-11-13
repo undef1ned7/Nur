@@ -1,0 +1,605 @@
+
+// /* src/components/Education/Invoices.scss */
+// /* В :root — только палитра */
+// :root{
+//   --primary:#f7d74f;
+//   --primary-dark:#d4b800;
+//   --text:#0f172a;
+//   --muted:#6b7280;
+//   --border:#e5e7eb;
+//   --surface:#ffffff;
+// }
+
+// /* Локальные переменные — только внутри блока */
+// .school-invoices{
+//   --radius:12px;
+//   --shadow:0 4px 16px rgba(0,0,0,.05);
+
+//   background:var(--surface);
+//   border-radius:var(--radius);
+//   box-shadow:var(--shadow);
+//   padding:24px;
+//   display:flex;
+//   flex-direction:column;
+//   gap:20px;
+
+//   /* чтобы внутренние списки могли скроллиться */
+//   min-height:0;
+//   overflow:hidden;
+// }
+
+// /* header */
+// .school-invoices__header{
+//   display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px;
+// }
+// .school-invoices__title{ margin:0; font-weight:700; font-size:20px; color:var(--text); }
+// .school-invoices__subtitle{ margin:0; color:var(--muted); font-size:13px; }
+
+// /* toolbar */
+// .school-invoices__toolbar{
+//   display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center;
+// }
+// @media (max-width:920px){ .school-invoices__toolbar{ grid-template-columns:1fr; } }
+
+// .school-invoices__filters{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+// .school-invoices__right{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+
+// /* inputs + search */
+// .school-invoices__input{
+//   padding:10px 12px; border-radius:10px; border:1px solid var(--border);
+//   font-size:14px; background:#fff; min-width:120px; font-family:inherit;
+// }
+// .school-invoices__input:focus{ outline:none; border-color:var(--primary); }
+
+// .school-invoices__search{ position:relative; width:100%; min-width:220px; }
+// .school-invoices__search-input{
+//   width:100%; padding:10px 12px 10px 32px; border-radius:10px; border:1px solid var(--border);
+//   font-size:14px; font-family:inherit;
+// }
+// .school-invoices__search-input:focus{ outline:none; border-color:var(--primary); }
+// .school-invoices__search-icon{
+//   position:absolute; left:10px; top:50%; transform:translateY(-50%);
+//   color:var(--muted); font-size:14px; pointer-events:none;
+// }
+
+// /* ===== списки с прокруткой ===== */
+// .school-invoices__list{
+//   display:grid;
+//   gap:10px;
+
+//   overflow:auto;
+//   -webkit-overflow-scrolling:touch;
+//   min-height:0;
+
+//   max-height:calc(100vh - 340px);
+//   padding-right:2px;
+// }
+
+// /* тонкие скроллбары */
+// .school-invoices__list{
+//   scrollbar-width:thin;
+//   scrollbar-color:rgba(0,0,0,.25) transparent;
+// }
+// .school-invoices__list::-webkit-scrollbar{ width:8px; height:8px; }
+// .school-invoices__list::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.25); border-radius:8px; }
+// .school-invoices__list::-webkit-scrollbar-thumb:hover{ background:rgba(0,0,0,.35); }
+
+// /* карточки */
+// .school-invoices__card{
+//   display:flex; justify-content:space-between; align-items:stretch;
+//   padding:14px; border:1px solid var(--border); border-radius:var(--radius);
+//   background:#fafafa; transition:background .2s;
+// }
+// .school-invoices__card:hover{ background:#f1f5f9; }
+// .school-invoices__card-left{ display:flex; gap:12px; align-items:flex-start; }
+
+// .school-invoices__avatar{
+//   min-width:40px; height:40px; border-radius:50%;
+//   background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+//   color:#fff; font-weight:700; font-size:14px; display:grid; place-items:center; box-shadow:var(--shadow);
+// }
+
+// .school-invoices__name-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+// .school-invoices__name{ font-size:16px; font-weight:600; margin:0; }
+// .school-invoices__muted{ color:var(--muted); font-weight:500; }
+// .school-invoices__meta{ display:flex; gap:8px; flex-wrap:wrap; word-break:break-word; }
+
+// /* кнопки */
+// .school-invoices__btn{
+//   display:inline-flex; align-items:center; gap:6px;
+//   padding:10px 14px; border-radius:10px; font-size:14px; font-weight:600;
+//   cursor:pointer; transition:.2s; border:1px solid transparent; white-space:nowrap;
+//   background:transparent; color:var(--text);
+// }
+// .school-invoices__btn:hover{ filter:brightness(.98); }
+// .school-invoices__btn:active{ transform:translateY(1px); }
+// .school-invoices__btn--secondary{ background:#fff; border:1px solid var(--border); }
+// .school-invoices__btn--secondary:hover{ background:#f9fafb; }
+// .school-invoices__btnText{ display:inline; }
+
+// /* alerts/empty */
+// .school-invoices__alert{
+//   padding:10px 12px; border-radius:10px; font-size:14px;
+//   background:rgba(231,76,60,.12); color:#e74c3c; border:1px solid rgba(231,76,60,.35);
+// }
+// .school-invoices__empty{
+//   padding:12px 14px; border:1px dashed var(--border); border-radius:10px;
+//   color:var(--muted); background:#fafafa;
+// }
+
+// /* KPI */
+// .school-invoices__kpis{
+//   display:grid; grid-template-columns:repeat(3,minmax(200px,1fr)); gap:10px;
+//   min-height:0;
+// }
+// .school-invoices__kpiCard{
+//   display:flex; gap:12px; align-items:center; padding:14px; border:1px solid var(--border);
+//   border-radius:var(--radius); background:#fafafa;
+// }
+// .school-invoices__kpiIcon{
+//   width:42px; height:42px; border-radius:50%;
+//   background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+//   display:grid; place-items:center; color:#fff; font-weight:700; box-shadow:var(--shadow);
+// }
+// .school-invoices__kpiBody{ display:flex; flex-direction:column; gap:2px; }
+// .school-invoices__kpiLabel{ font-size:13px; color:var(--muted); }
+// .school-invoices__kpiValue{ font-size:18px; font-weight:700; color:var(--text); }
+
+// /* секции + прогресс-бары */
+// .school-invoices__sectionTitle{ font-size:16px; font-weight:700; color:var(--text); margin:6px 0 2px; }
+// .school-invoices__chip{
+//   display:inline-flex; align-items:center; gap:6px;
+//   padding:4px 8px; border-radius:999px; font-size:12px; font-weight:600;
+//   color:var(--text); background:#fff; border:1px solid var(--border);
+// }
+// .school-invoices__bar{ margin-top:8px; width:100%; height:8px; background:#eef2f7; border-radius:999px; overflow:hidden; border:1px solid var(--border); }
+// .school-invoices__barFill{ height:100%; background:linear-gradient(90deg,var(--primary),var(--primary-dark)); }
+
+// /* responsive */
+// @media (max-width:900px){
+//   .school-invoices{ padding:20px; }
+//   .school-invoices__kpis{ grid-template-columns:repeat(2,minmax(160px,1fr)); }
+// }
+// @media (max-width:560px){
+//   .school-invoices__title{ font-size:18px; }
+//   .school-invoices__kpis{ grid-template-columns:1fr; }
+//   .school-invoices__filters{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+//   .school-invoices__input{ min-width:unset; width:100%; }
+//   .school-invoices__right{ grid-template-columns:1fr; }
+//   .school-invoices__btnText{ display:none; }
+//   .school-invoices__avatar{ min-width:36px; height:36px; font-size:13px; }
+//   .school-invoices__list{ max-height:calc(100vh - 300px); }
+// }
+// @media (max-width:360px){
+//   .school-invoices{ padding:16px; }
+//   .school-invoices__header{ gap:10px; }
+//   .school-invoices__filters{ grid-template-columns:1fr; }
+//   .school-invoices__search-input{ font-size:13px; }
+//   .school-invoices__input{ font-size:13px; padding:9px 10px; }
+//   .school-invoices__btn{ padding:9px 10px; font-size:13px; }
+//   .school-invoices__name{ font-size:15px; }
+//   .school-invoices__list{ max-height:calc(100vh - 280px); }
+// }
+// @media (max-width:320px){
+//   .school-invoices{ padding:12px; }
+//   .school-invoices__toolbar{ gap:8px; }
+//   .school-invoices__card{ padding:12px; border-radius:10px; }
+//   .school-invoices__list{ max-height:calc(100vh - 270px); }
+// }
+
+
+
+/* =========================
+   PALETTE (global only)
+   ========================= */
+:root{
+  --primary:#f7d74f;
+  --primary-dark:#d4b800;
+  --text:#0f172a;
+  --muted:#6b7280;
+  --border:#e5e7eb;
+  --surface:#ffffff;
+}
+
+/* =========================
+   HOST: .school-tabs
+   ========================= */
+.school-tabs{
+  --radius:12px;
+  --shadow:0 4px 16px rgba(0,0,0,.05);
+
+  background:var(--surface);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+  color:var(--text);
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+.school-tabs__bar{ display:flex; flex-wrap:wrap; gap:8px; }
+.school-tabs__btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 14px; border-radius:10px;
+  border:1px solid var(--border); background:#fff; color:var(--text);
+  font-weight:700; cursor:pointer; transition:background .2s, transform .1s;
+}
+.school-tabs__btn:hover{ background:#f9fafb; }
+.school-tabs__btn:active{ transform:translateY(1px); }
+.school-tabs__btn.is-active{
+  border-color:var(--primary-dark);
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  color:#000;
+}
+.school-tabs__panel{ display:block; }
+
+/* ========== generic inputs (локально) ========== */
+.school-tabs input[type="text"],
+.school-tabs input[type="number"],
+.school-tabs input[type="date"],
+.school-tabs select{
+  padding:10px 12px; border-radius:10px; border:1px solid var(--border);
+  background:#fff; color:var(--text); font:inherit; font-size:14px;
+}
+.school-tabs input:focus,
+.school-tabs select:focus{ outline:none; border-color:var(--primary); }
+
+/* =================================================================
+   ВКЛАДКА 1: СЧЕТА/АНАЛИТИКА УЧЕБЫ — твой исходный стиль (без изменений)
+   ================================================================= */
+.school-invoices{
+  --radius:12px;
+  --shadow:0 4px 16px rgba(0,0,0,.05);
+
+  background:var(--surface);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+
+  min-height:0;
+  overflow:hidden;
+}
+
+.school-invoices__header{
+  display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px;
+}
+.school-invoices__title{ margin:0; font-weight:700; font-size:20px; color:var(--text); }
+.school-invoices__subtitle{ margin:0; color:var(--muted); font-size:13px; }
+
+.school-invoices__toolbar{
+  display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center;
+}
+@media (max-width:920px){ .school-invoices__toolbar{ grid-template-columns:1fr; } }
+
+.school-invoices__filters{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.school-invoices__right{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+
+.school-invoices__input{
+  padding:10px 12px; border-radius:10px; border:1px solid var(--border);
+  font-size:14px; background:#fff; min-width:120px; font-family:inherit;
+}
+.school-invoices__input:focus{ outline:none; border-color:var(--primary); }
+
+.school-invoices__search{ position:relative; width:100%; min-width:220px; }
+.school-invoices__search-input{
+  width:100%; padding:10px 12px 10px 32px; border-radius:10px; border:1px solid var(--border);
+  font-size:14px; font-family:inherit;
+}
+.school-invoices__search-input:focus{ outline:none; border-color:var(--primary); }
+.school-invoices__search-icon{
+  position:absolute; left:10px; top:50%; transform:translateY(-50%);
+  color:var(--muted); font-size:14px; pointer-events:none;
+}
+
+.school-invoices__list{
+  display:grid; gap:10px;
+  overflow:auto; -webkit-overflow-scrolling:touch; min-height:0;
+  max-height:calc(100vh - 340px); padding-right:2px;
+}
+.school-invoices__list{ scrollbar-width:thin; scrollbar-color:rgba(0,0,0,.25) transparent; }
+.school-invoices__list::-webkit-scrollbar{ width:8px; height:8px; }
+.school-invoices__list::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.25); border-radius:8px; }
+.school-invoices__list::-webkit-scrollbar-thumb:hover{ background:rgba(0,0,0,.35); }
+
+.school-invoices__card{
+  display:flex; justify-content:space-between; align-items:stretch;
+  padding:14px; border:1px solid var(--border); border-radius:var(--radius);
+  background:#fafafa; transition:background .2s;
+}
+.school-invoices__card:hover{ background:#f1f5f9; }
+.school-invoices__card-left{ display:flex; gap:12px; align-items:flex-start; }
+
+.school-invoices__avatar{
+  min-width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  color:#fff; font-weight:700; font-size:14px; display:grid; place-items:center; box-shadow:var(--shadow);
+}
+
+.school-invoices__name-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.school-invoices__name{ font-size:16px; font-weight:600; margin:0; }
+.school-invoices__muted{ color:var(--muted); font-weight:500; }
+.school-invoices__meta{ display:flex; gap:8px; flex-wrap:wrap; word-break:break-word; }
+
+.school-invoices__btn{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:10px 14px; border-radius:10px; font-size:14px; font-weight:600;
+  cursor:pointer; transition:.2s; border:1px solid transparent; white-space:nowrap;
+  background:transparent; color:var(--text);
+}
+.school-invoices__btn:hover{ filter:brightness(.98); }
+.school-invoices__btn:active{ transform:translateY(1px); }
+.school-invoices__btn--secondary{ background:#fff; border:1px solid var(--border); }
+.school-invoices__btn--secondary:hover{ background:#f9fafb; }
+.school-invoices__btnText{ display:inline; }
+
+.school-invoices__alert{
+  padding:10px 12px; border-radius:10px; font-size:14px;
+  background:rgba(231,76,60,.12); color:#e74c3c; border:1px solid rgba(231,76,60,.35);
+}
+.school-invoices__empty{
+  padding:12px 14px; border:1px dashed var(--border); border-radius:10px;
+  color:var(--muted); background:#fafafa;
+}
+
+.school-invoices__kpis{
+  display:grid; grid-template-columns:repeat(3,minmax(200px,1fr)); gap:10px;
+  min-height:0;
+}
+.school-invoices__kpiCard{
+  display:flex; gap:12px; align-items:center; padding:14px; border:1px solid var(--border);
+  border-radius:var(--radius); background:#fafafa;
+}
+.school-invoices__kpiIcon{
+  width:42px; height:42px; border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  display:grid; place-items:center; color:#fff; font-weight:700; box-shadow:var(--shadow);
+}
+.school-invoices__kpiBody{ display:flex; flex-direction:column; gap:2px; }
+.school-invoices__kpiLabel{ font-size:13px; color:var(--muted); }
+.school-invoices__kpiValue{ font-size:18px; font-weight:700; color:var(--text); }
+
+.school-invoices__sectionTitle{ font-size:16px; font-weight:700; color:var(--text); margin:6px 0 2px; }
+.school-invoices__chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 8px; border-radius:999px; font-size:12px; font-weight:600;
+  color:var(--text); background:#fff; border:1px solid var(--border);
+}
+.school-invoices__bar{ margin-top:8px; width:100%; height:8px; background:#eef2f7; border-radius:999px; overflow:hidden; border:1px solid var(--border); }
+.school-invoices__barFill{ height:100%; background:linear-gradient(90deg,var(--primary),var(--primary-dark)); }
+
+@media (max-width:900px){
+  .school-invoices{ padding:20px; }
+  .school-invoices__kpis{ grid-template-columns:repeat(2,minmax(160px,1fr)); }
+}
+@media (max-width:560px){
+  .school-invoices__title{ font-size:18px; }
+  .school-invoices__kpis{ grid-template-columns:1fr; }
+  .school-invoices__filters{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .school-invoices__input{ min-width:unset; width:100%; }
+  .school-invoices__right{ grid-template-columns:1fr; }
+  .school-invoices__btnText{ display:none; }
+  .school-invoices__avatar{ min-width:36px; height:36px; font-size:13px; }
+  .school-invoices__list{ max-height:calc(100vh - 300px); }
+}
+@media (max-width:360px){
+  .school-invoices{ padding:16px; }
+  .school-invoices__header{ gap:10px; }
+  .school-invoices__filters{ grid-template-columns:1fr; }
+  .school-invoices__search-input{ font-size:13px; }
+  .school-invoices__input{ font-size:13px; padding:9px 10px; }
+  .school-invoices__btn{ padding:9px 10px; font-size:13px; }
+  .school-invoices__name{ font-size:15px; }
+  .school-invoices__list{ max-height:calc(100vh - 280px); }
+}
+@media (max-width:320px){
+  .school-invoices{ padding:12px; }
+  .school-invoices__toolbar{ gap:8px; }
+  .school-invoices__card{ padding:12px; border-radius:10px; }
+  .school-invoices__list{ max-height:calc(100vh - 270px); }
+}
+
+/* =========================================================
+   ВКЛАДКА 2: КАССА (school-cbox)
+   ========================================================= */
+.school-cbox{
+  --radius:12px;
+  --shadow:0 4px 16px rgba(0,0,0,.05);
+
+  background:var(--surface);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+  display:flex; flex-direction:column; gap:12px;
+  color:var(--text);
+}
+
+.school-cbox__subtabs,
+.school-cbox__tabs{ display:flex; flex-wrap:wrap; gap:8px; }
+.school-cbox__subtab,
+.school-cbox__tab{
+  padding:8px 12px; border-radius:999px; border:1px solid var(--border);
+  background:#fff; cursor:pointer; font-weight:700; color:var(--text);
+}
+.school-cbox__subtab.is-active,
+.school-cbox__tab.is-active{
+  background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+  color:#000;
+}
+
+.school-cbox__toolbar{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.school-cbox__toolbar-side{ display:flex; gap:10px; align-items:center; }
+.school-cbox__total{ color:var(--muted); }
+.school-cbox__controls{ display:flex; gap:8px; flex-wrap:wrap; }
+.school-cbox__search{ min-width:220px; }
+
+.school-cbox__btn{
+  padding:10px 14px; border-radius:10px; border:1px solid var(--border);
+  background:#fff; cursor:pointer; font-weight:700;
+}
+.school-cbox__btn:hover{ background:#f9fafb; }
+
+.school-cbox__table-wrap{ overflow:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:10px; background:#fff; }
+.school-cbox__table{ width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
+.school-cbox__table th,
+.school-cbox__table td{ padding:10px 12px; border-bottom:1px solid var(--border); text-align:left; }
+.school-cbox__row.--soft{ background:#fffef5; }
+.school-cbox__muted{ color:var(--muted); }
+.school-cbox__error{ color:#b91c1c; }
+
+.school-cbox__seg{ display:flex; gap:6px; align-items:center; }
+.school-cbox__seg-btn{
+  padding:8px 10px; border-radius:999px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:700;
+}
+.school-cbox__seg-btn.is-active{ background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#000; }
+.school-cbox__seg-grow{ flex:1; }
+
+/* modal */
+.school-cbox-modal__overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000;
+}
+.school-cbox-modal__content{
+  position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
+  max-width:560px; width:calc(100% - 32px); z-index:1001;
+  background:#fff; border-radius:12px; box-shadow:var(--shadow); border:1px solid var(--border);
+}
+.school-cbox-modal__header{
+  display:flex; justify-content:space-between; align-items:center; padding:14px; border-bottom:1px solid var(--border);
+}
+.school-cbox-modal__title{ margin:0; font-size:16px; font-weight:700; }
+.school-cbox-modal__close{ border:0; background:transparent; font-size:20px; line-height:1; cursor:pointer; }
+.school-cbox-modal__section{ padding:14px; display:grid; gap:6px; }
+.school-cbox-modal__label{ color:var(--muted); font-size:13px; }
+.school-cbox-modal__input{ width:100%; }
+.school-cbox-modal__footer{ padding:14px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; }
+
+/* =========================================================
+   ВКЛАДКА 3: АНАЛИТИКА (school-anal)
+   ========================================================= */
+.school-anal{
+  --radius:12px;
+  --shadow:0 4px 16px rgba(0,0,0,.05);
+
+  background:var(--surface);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+  display:flex; flex-direction:column; gap:12px;
+  color:var(--text);
+}
+
+/* tabs */
+.school-anal__tabs{ display:flex; flex-wrap:wrap; gap:8px; }
+.school-anal__tab{
+  padding:8px 12px; border-radius:999px; border:1px solid var(--border);
+  background:#fff; color:var(--text); font-weight:700; cursor:pointer;
+}
+.school-anal__tab.is-active{ background:linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#000; }
+
+/* controls */
+.school-anal__controls{ display:grid; grid-template-columns:1fr; gap:10px; }
+.school-anal__presets{ display:flex; flex-wrap:wrap; gap:8px; }
+.school-anal__presets button{
+  padding:8px 10px; border-radius:999px; border:1px solid var(--border);
+  background:#fff; color:var(--text); font-weight:600; cursor:pointer;
+}
+.school-anal__range{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.school-anal__label{ display:flex; gap:6px; align-items:center; color:var(--muted); font-size:13px; }
+.school-anal__input{ min-width:160px; }
+
+.school-anal__seg{ display:inline-flex; gap:4px; padding:4px; background:#fafafa; border:1px solid var(--border); border-radius:999px; }
+.school-anal__seg button{
+  padding:8px 10px; border-radius:999px; border:0; background:transparent; cursor:pointer; font-weight:700; color:var(--text);
+}
+.school-anal__seg button.is-active{ background:#fff; border:1px solid var(--border); }
+
+/* KPI */
+.school-anal__kpis{ display:grid; grid-template-columns:repeat(3,minmax(200px,1fr)); gap:10px; }
+.school-anal__kpi{
+  display:flex; flex-direction:column; gap:4px; padding:14px; border:1px solid var(--border);
+  border-radius:var(--radius); background:#fafafa;
+}
+.school-anal__kpi-label{ color:var(--muted); font-size:13px; }
+.school-anal__kpi-value{ font-size:18px; font-weight:700; color:var(--text); }
+
+/* cards + grid */
+.school-anal__grid{ display:grid; grid-template-columns:repeat(3,minmax(220px,1fr)); gap:10px; }
+.school-anal__card{ padding:14px; border:1px solid var(--border); border-radius:var(--radius); background:#fafafa; }
+.school-anal__card-title{ font-weight:700; margin-bottom:8px; }
+
+/* sparkline */
+.school-anal__sparkline{ width:100%; height:auto; display:block; }
+.school-anal__sparkline-empty{ color:var(--muted); }
+
+/* bars */
+.school-anal__bars{ display:grid; gap:8px; list-style:none; padding:0; margin:0; }
+.school-anal__bar{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+.school-anal__bar-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.school-anal__bar-track{ height:8px; border-radius:999px; border:1px solid var(--border); background:#eef2f7; overflow:hidden; }
+.school-anal__bar-fill{ display:block; height:100%; background:linear-gradient(90deg,var(--primary),var(--primary-dark)); }
+.school-anal__bar-value{ white-space:nowrap; }
+
+/* tables */
+.school-anal__table-wrap{ overflow:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border); border-radius:10px; background:#fff; }
+.school-anal__table{ width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
+.school-anal__table th,
+.school-anal__table td{ padding:10px 12px; border-bottom:1px solid var(--border); }
+.school-anal__table thead th{ position:sticky; top:0; background:#fff; z-index:1; text-align:left; font-weight:700; }
+
+/* misc states */
+.school-anal__legend{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; color:var(--muted); font-size:12px; }
+.school-anal__legend-item{ padding:4px 8px; border:1px dashed var(--border); border-radius:999px; }
+.school-anal__abc{ display:flex; gap:8px; margin-bottom:8px; }
+.school-anal__abc-badge{ padding:6px 10px; border-radius:999px; font-weight:700; background:#fff; border:1px solid var(--border); }
+.school-anal__abc-badge--a{ background:linear-gradient(135deg,var(--primary),var(--primary-dark)); }
+.school-anal__abc-badge--b{ background:#ffeaa7; }
+.school-anal__abc-badge--c{ background:#f1f5f9; }
+
+.school-anal__empty,
+.school-anal__note{ color:var(--muted); padding:8px 10px; }
+.school-anal__error{ color:#b91c1c; padding:8px 10px; border:1px solid rgba(185,28,28,.25); background:rgba(185,28,28,.06); border-radius:10px; }
+.school-anal__loading{ margin-top:8px; color:var(--muted); }
+.school-anal__muted{ color:var(--muted); }
+
+.school-anal__card--scroll{ max-height:calc(100vh - 340px); overflow:auto; }
+
+/* thin scrollbars for inner scroll areas */
+.school-anal__table-wrap,
+.school-anal__card--scroll{
+  scrollbar-width:thin; scrollbar-color:rgba(0,0,0,.25) transparent;
+}
+.school-anal__table-wrap::-webkit-scrollbar,
+.school-anal__card--scroll::-webkit-scrollbar{ width:8px; height:8px; }
+.school-anal__table-wrap::-webkit-scrollbar-thumb,
+.school-anal__card--scroll::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.25); border-radius:8px; }
+
+/* =========================
+   RESPONSIVE (общий)
+   ========================= */
+@media (max-width:900px){
+  .school-tabs{ padding:20px; }
+  .school-anal__kpis{ grid-template-columns:repeat(2,minmax(160px,1fr)); }
+  .school-anal__grid{ grid-template-columns:repeat(2,minmax(200px,1fr)); }
+}
+@media (max-width:560px){
+  .school-anal__kpis{ grid-template-columns:1fr; }
+  .school-anal__grid{ grid-template-columns:1fr; }
+  .school-anal__input{ min-width:unset; width:100%; }
+  .school-cbox__search{ min-width:unset; width:100%; }
+}
+@media (max-width:360px){
+  .school-tabs{ padding:16px; }
+  .school-anal__card--scroll{ max-height:calc(100vh - 280px); }
+}
+@media (max-width:320px){
+  .school-tabs{ padding:12px; }
+  .school-anal__tabs,
+  .school-cbox__subtabs{ gap:6px; }
+  .school-anal__tab,
+  .school-cbox__subtab{ padding:7px 10px; font-size:13px; }
+}

@@ -1,0 +1,474 @@
+// /* src/components/Education/LessonsRooms.scss */
+// /* В :root — только цвета */
+// :root {
+//   --primary: #f7d74f;
+//   --primary-dark: #d4b800;
+//   --text: #0f172a;
+//   --muted: #6b7280;
+//   --border: #e5e7eb;
+//   --surface: #ffffff;
+//   --radius: 12px;
+//   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+// }
+
+// /* ===== BEM block ===== */
+// .Schoollessons,
+// .Schoollessons * { box-sizing: border-box; }
+
+// .Schoollessons {
+//   position: relative;
+//   z-index: 1;            /* чтобы модалка всегда поверх фона */
+//   background: var(--surface);
+//   border-radius: var(--radius);
+//   padding: 24px;
+//   box-shadow: var(--shadow);
+//   display: flex;
+//   flex-direction: column;
+//   gap: 20px;
+//   min-height: 0;
+//   overflow: hidden;
+// }
+
+// /* Header */
+// .Schoollessons__header {
+//   display: grid;
+//   /* место под поиск, две даты и кнопку */
+//   grid-template-columns: 1fr minmax(280px,420px) 160px 160px auto;
+//   grid-template-areas: "title search . . btn";
+//   align-items: end;
+//   gap: 12px;
+// }
+// .Schoollessons__titleWrap { grid-area: title; }
+// .Schoollessons__title { margin: 0; font-size: 22px; font-weight: 800; color: var(--text); }
+// .Schoollessons__subtitle { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+// .Schoollessons__search { grid-area: search; position: relative; }
+// .Schoollessons__searchInput {
+//   width: 100%;
+//   padding: 10px 12px 10px 34px;
+//   border: 1px solid var(--border);
+//   border-radius: 12px;
+//   font-size: 14px;
+// }
+// .Schoollessons__searchInput:focus { outline: none; border-color: var(--primary); }
+// .Schoollessons__searchIcon {
+//   position: absolute; left: 10px; top: 50%;
+//   transform: translateY(-50%);
+//   color: var(--muted);
+//   font-size: 14px;
+//   pointer-events: none;
+// }
+
+// /* === DATE FILTERS === */
+// .Schoollessons__dateFilter {
+//   width: 100%;
+//   padding: 10px 12px;
+//   border: 1px solid var(--border);
+//   border-radius: 12px;
+//   font-size: 14px;
+//   background: #fff;
+//   font-family: inherit;
+//   /* чтобы высота совпадала со строкой поиска */
+//   line-height: 1.2;
+// }
+// .Schoollessons__dateFilter:focus { outline: none; border-color: var(--primary); }
+
+// /* разместить 2 инпута дат в «свободные» колонки шапки */
+// .Schoollessons__dateFilter:nth-of-type(1) { /* излишек безопасности: ничего не ломает */
+//   /* авто-плейсинг поставит в 3-ю колонку */
+// }
+// .Schoollessons__dateFilter:nth-of-type(2) {
+//   /* авто-плейсинг поставит в 4-ю колонку */
+// }
+
+// .Schoollessons__createBtn { grid-area: btn; justify-self: end; }
+
+// /* Tablet */
+// @media (max-width: 960px) {
+//   .Schoollessons__header {
+//     /* на планшете кнопка остаётся справа, остальное в две строки */
+//     grid-template-columns: 1fr 1fr auto;
+//     grid-template-areas:
+//       "title title btn"
+//       "search search btn";
+//   }
+//   /* даты уходят на новую строку под поиском и тянутся на всю ширину */
+//   .Schoollessons__dateFilter { grid-column: 1 / span 2; }
+//   .Schoollessons__dateFilter + .Schoollessons__dateFilter { grid-column: 1 / span 2; }
+// }
+// /* Mobile */
+// @media (max-width: 640px) {
+//   .Schoollessons__header {
+//     grid-template-areas:
+//       "title"
+//       "search"
+//       "btn";
+//     grid-template-columns: 1fr;
+//   }
+//   .Schoollessons__createBtn { justify-self: stretch; width: 100%; }
+//   .Schoollessons__dateFilter { grid-column: 1 / -1; width: 100%; }
+// }
+
+// /* Buttons */
+// .Schoollessons__btn {
+//   display: inline-flex; align-items: center; gap: 8px;
+//   padding: 10px 14px; border-radius: 12px; font-size: 14px; font-weight: 700;
+//   border: 1px solid transparent; cursor: pointer; transition: .15s ease; white-space: nowrap;
+// }
+// .Schoollessons__btn:active { transform: translateY(1px); }
+// .Schoollessons__btn--primary { background: var(--primary); color: #111; }
+// .Schoollessons__btn--primary:hover { background: var(--primary-dark); }
+// .Schoollessons__btn--secondary { background: #f9fafb; border: 1px solid var(--border); color: var(--text); }
+// .Schoollessons__btn--danger { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
+// .Schoollessons__btn--danger:hover { background: rgba(239,68,68,.06); }
+
+// /* Alerts */
+// .Schoollessons__alert {
+//   padding: 10px 12px; border-radius: 12px;
+//   background: rgba(231,76,60,.12); color: #e74c3c; border: 1px solid rgba(231,76,60,.35);
+//   font-size: 14px;
+// }
+
+// /* List (внутренний скролл) */
+// .Schoollessons__list {
+//   display: grid; gap: 12px;
+//   flex: 1 1 auto; min-height: 0; overflow: auto; padding-right: 2px;
+//   max-height: calc(100vh - 260px);
+// }
+
+// /* Card */
+// .Schoollessons__card {
+//   display: flex; justify-content: space-between; align-items: stretch; gap: 12px;
+//   padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: #f8fafc;
+// }
+// .Schoollessons__cardLeft { display: flex; gap: 12px; align-items: flex-start; }
+// .Schoollessons__avatar {
+//   min-width: 40px; height: 40px; border-radius: 50%;
+//   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+//   color: #fff; font-weight: 800; font-size: 14px; display: grid; place-items: center; box-shadow: var(--shadow);
+// }
+// .Schoollessons__content { display: flex; flex-direction: column; gap: 6px; }
+// .Schoollessons__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+// .Schoollessons__name { margin: 0; font-size: 16px; font-weight: 700; }
+// .Schoollessons__time {
+//   display: inline-flex; align-items: center; gap: 6px;
+//   padding: 6px 10px; font-size: 12px; border-radius: 999px;
+//   background: #eef2ff; color: #1e293b;
+// }
+// .Schoollessons__meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+// .Schoollessons__muted { color: var(--muted); font-size: 13px; }
+// .Schoollessons__rowActions { display: flex; gap: 8px; align-items: center; }
+
+// /* Attendance */
+// .Schoollessons__att summary { cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+// .Schoollessons__attList {
+//   list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px;
+//   max-height: 240px; overflow: auto; padding-right: 2px;
+// }
+// .Schoollessons__attItem { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 8px 10px; }
+// .Schoollessons__attLabel { display: flex; gap: 8px; align-items: center; }
+
+// /* Modal (по центру, поверх всего) */
+// .Schoollessons__modalOverlay {
+//   position: fixed; inset: 0;
+//   background: rgba(0,0,0,.5);
+//   display: flex; align-items: center; justify-content: center;
+//   z-index: 9999;      /* поверх всего */
+//   overflow: auto;
+// }
+// .Schoollessons__modal {
+//   background: var(--surface); border-radius: 14px; padding: 20px;
+//   width: 100%; max-width: 720px; box-shadow: var(--shadow);
+//   animation: sl-fade .18s ease; max-height: 90vh; overflow: auto;
+// }
+// @keyframes sl-fade { from { opacity:0; transform: translateY(-8px);} to {opacity:1; transform:none;} }
+// .Schoollessons__modalHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+// .Schoollessons__modalTitle { margin: 0; font-size: 18px; font-weight: 800; }
+// .Schoollessons__iconBtn { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--muted); padding: 6px; border-radius: 8px; }
+// .Schoollessons__iconBtn:hover { color: var(--text); background: #f3f4f6; }
+
+// /* Form */
+// .Schoollessons__form { display: flex; flex-direction: column; gap: 16px; }
+// .Schoollessons__formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+// @media (max-width: 720px) { .Schoollessons__formGrid { grid-template-columns: 1fr; } }
+// .Schoollessons__field { display: flex; flex-direction: column; gap: 6px; }
+// .Schoollessons__label { font-size: 14px; font-weight: 700; color: var(--muted); }
+// .Schoollessons__req { color: #ef4444; }
+// .Schoollessons__input { padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: #fff; font-family: inherit; }
+// .Schoollessons__input:focus { outline: none; border-color: var(--primary); }
+
+// .Schoollessons__formActions { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+// .Schoollessons__actionsSpacer { flex: 1 1 auto; }
+// .Schoollessons__actionsRight { display: flex; gap: 10px; }
+
+// .Schoollessons__hint {
+//   margin-top: 8px; font-size: 13px; color: #8a6d1a;
+//   background: #fff8db; border: 1px solid #f6e58d; border-radius: 10px; padding: 8px 10px;
+// }
+
+// /* Тонкие скроллбары */
+// .Schoollessons__list,
+// .Schoollessons__attList,
+// .Schoollessons__modal {
+//   scrollbar-width: thin;
+//   scrollbar-color: rgba(0,0,0,.25) transparent;
+// }
+// .Schoollessons__list::-webkit-scrollbar,
+// .Schoollessons__attList::-webkit-scrollbar,
+// .Schoollessons__modal::-webkit-scrollbar { width: 8px; height: 8px; }
+// .Schoollessons__list::-webkit-scrollbar-thumb,
+// .Schoollessons__attList::-webkit-scrollbar-thumb,
+// .Schoollessons__modal::-webkit-scrollbar-thumb {
+//   background: rgba(0,0,0,.25); border-radius: 8px;
+// }
+// .Schoollessons__list::-webkit-scrollbar-thumb:hover,
+// .Schoollessons__attList::-webkit-scrollbar-thumb:hover,
+// .Schoollessons__modal::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.35); }
+
+
+
+/* src/components/Education/LessonsRooms.scss */
+/* В :root — только цвета */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+/* ===== BEM block ===== */
+.Schoollessons,
+.Schoollessons * { box-sizing: border-box; }
+
+.Schoollessons {
+  /* локальные токены блока */
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Header */
+.Schoollessons__header {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px,420px) 160px 160px auto;
+  grid-template-areas: "title search . . btn";
+  align-items: end;
+  gap: 12px;
+}
+.Schoollessons__titleWrap { grid-area: title; }
+.Schoollessons__title { margin: 0; font-size: 22px; font-weight: 800; color: var(--text); }
+.Schoollessons__subtitle { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+.Schoollessons__search { grid-area: search; position: relative; }
+.Schoollessons__searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 34px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  background: #fff;
+}
+.Schoollessons__searchInput:focus { outline: none; border-color: var(--primary); }
+.Schoollessons__searchIcon {
+  position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.Schoollessons__dateFilter {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  background: #fff;
+  font-family: inherit;
+  line-height: 1.2;
+}
+.Schoollessons__dateFilter:focus { outline: none; border-color: var(--primary); }
+
+.Schoollessons__createBtn { grid-area: btn; justify-self: end; }
+
+/* Tablet */
+@media (max-width: 960px) {
+  .Schoollessons__header {
+    grid-template-columns: 1fr 1fr auto;
+    grid-template-areas:
+      "title title btn"
+      "search search btn";
+  }
+  .Schoollessons__dateFilter { grid-column: 1 / span 2; }
+  .Schoollessons__dateFilter + .Schoollessons__dateFilter { grid-column: 1 / span 2; }
+}
+/* Mobile */
+@media (max-width: 640px) {
+  .Schoollessons__header {
+    grid-template-areas:
+      "title"
+      "search"
+      "btn";
+    grid-template-columns: 1fr;
+  }
+  .Schoollessons__createBtn { justify-self: stretch; width: 100%; }
+  .Schoollessons__dateFilter { grid-column: 1 / -1; width: 100%; }
+}
+
+/* Buttons */
+.Schoollessons__btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: 12px; font-size: 14px; font-weight: 700;
+  border: 1px solid transparent; cursor: pointer; transition: .15s ease; white-space: nowrap;
+}
+.Schoollessons__btn:active { transform: translateY(1px); }
+.Schoollessons__btn--primary { background: var(--primary); color: #111; }
+.Schoollessons__btn--primary:hover { background: var(--primary-dark); }
+.Schoollessons__btn--secondary { background: #f9fafb; border: 1px solid var(--border); color: var(--text); }
+.Schoollessons__btn--danger { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
+.Schoollessons__btn--danger:hover { background: rgba(239,68,68,.06); }
+
+/* Alerts */
+.Schoollessons__alert {
+  padding: 10px 12px; border-radius: 12px;
+  background: rgba(231,76,60,.12); color: #e74c3c; border: 1px solid rgba(231,76,60,.35);
+  font-size: 14px;
+}
+
+/* List */
+.Schoollessons__list {
+  display: grid; gap: 12px;
+  flex: 1 1 auto; min-height: 0; overflow: auto; padding-right: 2px;
+  max-height: calc(100vh - 260px);
+}
+
+/* Card */
+.Schoollessons__card {
+  display: flex; justify-content: space-between; align-items: stretch; gap: 12px;
+  padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: #f8fafc;
+}
+.Schoollessons__cardLeft { display: flex; gap: 12px; align-items: flex-start; }
+.Schoollessons__avatar {
+  min-width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff; font-weight: 800; font-size: 14px; display: grid; place-items: center; box-shadow: var(--shadow);
+}
+.Schoollessons__content { display: flex; flex-direction: column; gap: 6px; }
+.Schoollessons__row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.Schoollessons__name { margin: 0; font-size: 16px; font-weight: 700; }
+.Schoollessons__time {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; font-size: 12px; border-radius: 999px;
+  background: #eef2ff; color: #1e293b;
+}
+.Schoollessons__meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+.Schoollessons__muted { color: var(--muted); font-size: 13px; }
+.Schoollessons__rowActions { display: flex; gap: 8px; align-items: center; }
+
+/* Attendance */
+.Schoollessons__att summary { cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+.Schoollessons__attList {
+  list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px;
+  max-height: 240px; overflow: auto; padding-right: 2px;
+}
+.Schoollessons__attItem { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 8px 10px; }
+.Schoollessons__attLabel { display: flex; gap: 8px; align-items: center; }
+
+/* Pagination */
+.Schoollessons__pagination {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px;
+}
+.Schoollessons__pageBtn {
+  min-width: 34px; height: 34px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--border); background: #fff;
+  cursor: pointer; font-size: 14px; line-height: 1;
+}
+.Schoollessons__pageBtn[disabled] { opacity: .5; cursor: default; }
+.Schoollessons__pageBtn--active { background: var(--primary); border-color: var(--primary-dark); font-weight: 700; }
+.Schoollessons__dots { padding: 0 4px; color: var(--muted); }
+.Schoollessons__pageInfo { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+/* Modal (overlay общая) */
+.Schoollessons__modalOverlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  overflow: auto;
+}
+
+/* Edit/Create modal */
+.Schoollessons__modal {
+  background: var(--surface); border-radius: 14px; padding: 20px;
+  width: 100%; max-width: 720px; box-shadow: var(--shadow);
+  animation: sl-fade .18s ease; max-height: 90vh; overflow: auto;
+}
+@keyframes sl-fade { from { opacity:0; transform: translateY(-8px);} to {opacity:1; transform:none;} }
+.Schoollessons__modalHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.Schoollessons__modalTitle { margin: 0; font-size: 18px; font-weight: 800; }
+.Schoollessons__iconBtn { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--muted); padding: 6px; border-radius: 8px; }
+.Schoollessons__iconBtn:hover { color: var(--text); background: #f3f4f6; }
+
+/* Form */
+.Schoollessons__form { display: flex; flex-direction: column; gap: 16px; }
+.Schoollessons__formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { .Schoollessons__formGrid { grid-template-columns: 1fr; } }
+.Schoollessons__field { display: flex; flex-direction: column; gap: 6px; }
+.Schoollessons__label { font-size: 14px; font-weight: 700; color: var(--muted); }
+.Schoollessons__req { color: #ef4444; }
+.Schoollessons__input { padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: #fff; font-family: inherit; }
+.Schoollessons__input:focus { outline: none; border-color: var(--primary); }
+
+.Schoollessons__formActions { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.Schoollessons__actionsSpacer { flex: 1 1 auto; }
+.Schoollessons__actionsRight { display: flex; gap: 10px; }
+
+.Schoollessons__hint {
+  margin-top: 8px; font-size: 13px; color: #8a6d1a;
+  background: #fff8db; border: 1px solid #f6e58d; border-radius: 10px; padding: 8px 10px;
+}
+
+/* Confirm modal (удаление) */
+.Schoollessons__confirm {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(0,0,0,.18);
+  width: min(440px, calc(100vw - 32px));
+  padding: 16px;
+  animation: sl-fade .18s ease;
+}
+.Schoollessons__confirmTitle { font-size: 18px; font-weight: 800; margin: 0 0 8px; color: var(--text); }
+.Schoollessons__confirmText { font-size: 14px; color: var(--text); margin: 0 0 14px; }
+.Schoollessons__confirmActions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* Тонкие скроллбары */
+.Schoollessons__list,
+.Schoollessons__attList,
+.Schoollessons__modal {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,.25) transparent;
+}
+.Schoollessons__list::-webkit-scrollbar,
+.Schoollessons__attList::-webkit-scrollbar,
+.Schoollessons__modal::-webkit-scrollbar { width: 8px; height: 8px; }
+.Schoollessons__list::-webkit-scrollbar-thumb,
+.Schoollessons__attList::-webkit-scrollbar-thumb,
+.Schoollessons__modal::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,.25); border-radius: 8px;
+}
+.Schoollessons__list::-webkit-scrollbar-thumb:hover,
+.Schoollessons__attList::-webkit-scrollbar-thumb:hover,
+.Schoollessons__modal::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.35); }

@@ -1,0 +1,73 @@
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(1200px 800px at 70% -10%, rgba(255,255,255,0.06), transparent),
+              linear-gradient(180deg, rgba(255,255,255,0.02), transparent 40%);
+
+  &__card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: var(--shadow-2);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: fade .2s ease;
+  }
+
+  &__icon {
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    border-radius: 12px; background: rgba(99,102,241,.15); color: #6366f1;
+    font-size: 18px;
+  }
+
+  &__title { margin: 4px 0 8px; font-size: 20px; font-weight: 800; color: var(--text); }
+
+  &__label { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  &__input {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 14px;
+    &:focus { outline: none; border-color: var(--primary); }
+  }
+
+  &__pwdWrap { position: relative; display: flex; align-items: center; }
+  &__toggle {
+    position: absolute; right: 8px;
+    font-size: 12px; color: var(--muted);
+    background: transparent; padding: 4px 6px; border-radius: 6px;
+    &:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  }
+
+  &__btn {
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 800;
+    &:hover { background: var(--primary-600); }
+    &:disabled { opacity: .7; }
+  }
+
+  &__error {
+    margin-top: 4px;
+    background: rgba(231,76,60,.12);
+    color: #e74c3c;
+    border: 1px solid rgba(231,76,60,.35);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
+@keyframes fade { from { opacity: 0; transform: translateY(-6px);} to {opacity: 1; transform: translateY(0);} }

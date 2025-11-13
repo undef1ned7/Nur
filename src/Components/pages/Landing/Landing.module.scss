@@ -1,0 +1,387 @@
+$black: #0c0c0c;
+$gold: #ffd700;
+$darkGold: #b8860b;
+$white: #ffffff;
+$gray: #cccccc;
+$lightGray: #eeeeee; // Добавим для текста
+$darkGray: #333333; // Добавим для границ/фонов
+
+.landing {
+  font-family: "Inter", sans-serif; // Изменим шрифт на Inter для современного вида
+  background-color: $black;
+  color: $white;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh; // Гарантируем, что страница занимает всю высоту
+  display: flex;
+  flex-direction: column;
+  align-items: center; // Центрируем содержимое по горизонтали
+  background-image: url("../../Photo/background.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+
+  @media (max-width: 768px) {
+    padding: 20px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 15px;
+  }
+}
+
+.header {
+  width: 100%; // Шапка на всю ширину
+  max-width: 1200px; // Ограничим максимальную ширину контента
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 60px;
+  animation: fadeIn 1.2s ease-out;
+  padding-bottom: 20px; // Отступ снизу для красоты
+  border-bottom: 1px solid rgba($gold, 0.1); // Деликатная золотая линия
+
+  @media (max-width: 768px) {
+    margin-bottom: 40px;
+  }
+  .language-switcher {
+    width: 200px;
+  }
+}
+
+.logoBox {
+  display: flex;
+  justify-content: space-between; // Распределяем лого и кнопки по краям
+  align-items: center;
+  width: 100%;
+  padding: 10px 0; // Отступы внутри logoBox
+
+  @media (max-width: 600px) {
+    flex-direction: column; // На мобильных устройствах лого и кнопки друг под другом
+    gap: 20px;
+  }
+}
+
+.logoText img {
+  width: 180px; // Немного увеличим логотип
+
+  @media (max-width: 768px) {
+    width: 150px;
+  }
+
+  @media (max-width: 480px) {
+    width: 120px;
+  }
+}
+
+.slogan {
+  font-style: italic;
+  margin-top: 20px; // Увеличим отступ
+  color: $gray;
+  text-align: center;
+  font-size: 18px; // Увеличим размер слогана
+  letter-spacing: 0.5px; // Добавим немного межбуквенного интервала
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 14px;
+  }
+}
+
+.authButtons {
+  display: flex;
+  gap: 15px; // Отступ между кнопками
+
+  @media (max-width: 480px) {
+    flex-direction: column; // Кнопки друг под другом на очень маленьких экранах
+    width: 100%; // Кнопки на всю ширину
+  }
+}
+
+// Базовый стиль для кнопок
+.buttonPrimary,
+.buttonSecondary {
+  padding: 12px 25px;
+  border-radius: 8px; // Более мягкие углы
+  font-weight: 600; // Немного жирнее шрифт
+  text-decoration: none;
+  transition: all 0.3s ease;
+  font-size: 16px;
+  text-align: center; // Выравнивание текста
+  cursor: pointer;
+
+  @media (max-width: 480px) {
+    width: 100%; // Кнопки на всю ширину на мобильных
+    padding: 10px 20px;
+    font-size: 15px;
+  }
+}
+
+// Стиль для основной кнопки (Регистрация)
+.buttonPrimary {
+  background-color: $gold;
+  color: $black; // Черный текст на золотом фоне
+  border: 2px solid $gold;
+  box-shadow: 0 4px 15px rgba($gold, 0.4); // Золотая тень
+
+  &:hover {
+    background-color: darken($gold, 5%); // Немного темнее при наведении
+    box-shadow: 0 6px 20px rgba($gold, 0.6); // Усилим тень
+    transform: translateY(-2px); // Небольшой подъем
+  }
+}
+
+// Стиль для второстепенной кнопки (Вход)
+.buttonSecondary {
+  background-color: transparent;
+  color: $gold;
+  border: 2px solid $gold;
+  box-shadow: 0 2px 10px rgba($gold, 0.2); // Менее выраженная тень
+
+  &:hover {
+    background-color: rgba($gold, 0.1); // Легкий золотой фон при наведении
+    color: $white; // Белый текст при наведении
+    box-shadow: 0 4px 15px rgba($gold, 0.4);
+    transform: translateY(-2px);
+  }
+}
+
+.about,
+.pricing,
+.contact,
+.features {
+  width: 100%;
+  max-width: 1000px; // Ограничим ширину секций
+  margin-bottom: 80px; // Увеличим отступы между секциями
+  animation: fadeInUp 0.9s ease;
+  padding: 0 20px; // Добавим горизонтальный padding для секций
+
+  @media (max-width: 768px) {
+    margin-bottom: 60px;
+  }
+
+  h2 {
+    font-size: 32px; // Увеличим заголовки
+    color: $gold;
+    margin-bottom: 20px; // Увеличим отступ
+    text-align: center; // Центрируем заголовки
+    position: relative;
+    padding-bottom: 10px; // Отступ для подчеркивания
+
+    &::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px; // Короткое золотое подчеркивание
+      height: 3px;
+      background-color: $gold;
+      border-radius: 2px;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 28px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 24px;
+    }
+  }
+
+  p,
+  li {
+    font-size: 17px; // Немного увеличим размер текста
+    color: $lightGray; // Более светлый серый для лучшей читаемости
+    line-height: 1.6; // Улучшим межстрочный интервал
+
+    @media (max-width: 768px) {
+      font-size: 16px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 15px;
+    }
+  }
+}
+
+.features ul {
+  padding-left: 0; // Уберем стандартный padding
+  list-style: none;
+  display: grid; // Используем Grid для лучшего расположения
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(280px, 1fr)
+  ); // Адаптивная сетка
+  gap: 20px; // Отступ между элементами
+
+  li {
+    background-color: $darkGray; // Темный фон для каждого пункта
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center; // Выравнивание иконки и текста
+    gap: 10px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  li::before {
+    content: ""; // Уберем стандартный "✓"
+    // Вместо этого можно использовать иконки из React-icons, если хотите
+  }
+}
+
+.pricing .plans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px; // Увеличим отступ между планами
+  margin-top: 30px;
+  justify-content: center;
+}
+
+.plan {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  padding: 30px; // Увеличим padding
+  border-radius: 15px;
+  width: 300px; // Немного увеличим ширину плана
+  text-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; // Распределяем содержимое по высоте
+
+  h3 {
+    font-size: 24px; // Увеличим заголовок плана
+    color: $gold;
+    margin-bottom: 10px;
+  }
+
+  p {
+    font-size: 15px;
+    color: #bbb;
+    margin-bottom: 20px;
+    flex-grow: 1; // Позволяет параграфу занимать доступное пространство
+  }
+
+  .price {
+    font-weight: bold;
+    font-size: 28px; // Увеличим размер цены
+    color: $gold;
+    margin-top: 15px; // Отступ сверху
+  }
+
+  &:hover {
+    transform: translateY(-8px); // Больший эффект при наведении
+    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+    border-color: $gold; // Золотая рамка при наведении
+  }
+
+  @media (max-width: 768px) {
+    width: 280px;
+  }
+
+  @media (max-width: 650px) {
+    width: 100%; // Планы на всю ширину на мобильных
+  }
+}
+
+.highlight {
+  border: 3px solid $gold; // Более толстая рамка
+  background: radial-gradient(circle at top left, #2a2a2a, #1a1a1a);
+  box-shadow: 0 10px 30px rgba($gold, 0.5); // Более выраженная тень для выделенного
+  transform: translateY(-10px); // Больший подъем для выделенного
+
+  &:hover {
+    transform: translateY(-12px); // Еще больший подъем при наведении
+    box-shadow: 0 12px 35px rgba($gold, 0.7);
+  }
+}
+
+.contact {
+  text-align: center; // Центрируем контакты
+
+  a {
+    color: $gold;
+    text-decoration: none;
+    font-weight: 500; // Немного жирнее
+    transition: color 0.3s ease;
+
+    &:hover {
+      color: $white; // Белый цвет при наведении
+      text-decoration: underline;
+    }
+  }
+
+  p {
+    margin-bottom: 10px; // Отступ между строками контактов
+  }
+}
+
+.footer {
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  margin-top: 60px; // Увеличим отступ
+  padding-top: 20px;
+  border-top: 1px solid rgba($white, 0.05); // Деликатная линия сверху
+  width: 100%;
+  max-width: 1000px;
+}
+
+.patternTopRight {
+  position: absolute;
+  top: -60px; // Сдвинем чуть выше
+  right: -60px; // Сдвинем чуть правее
+  width: 200px; // Увеличим размер узора
+  height: 200px;
+  background: url("https://placehold.co/200x200/FFD700/0c0c0c?text=PATTERN")
+    no-repeat center; // Используем placeholder
+  background-size: contain;
+  opacity: 0.08; // Сделаем его менее заметным
+  pointer-events: none;
+  filter: blur(1px); // Добавим легкое размытие
+
+  @media (max-width: 768px) {
+    width: 150px;
+    height: 150px;
+    top: -40px;
+    right: -40px;
+  }
+
+  @media (max-width: 480px) {
+    display: none; // Скрываем на мобильных
+  }
+}
+
+/* Анимации */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

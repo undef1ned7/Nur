@@ -1,0 +1,782 @@
+
+// /* Только цвета в :root */
+// :root {
+//   --primary: #f7d74f;
+//   --primary-dark: #d4b800;
+//   --text: #0f172a;
+//   --muted: #6b7280;
+//   --border: #e5e7eb;
+//   --surface: #ffffff;
+// }
+
+// /* Локальные токены компонента */
+// .Schoolcourses {
+//   --radius: 12px;
+//   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+//   background: var(--surface);
+//   border-radius: var(--radius);
+//   box-shadow: var(--shadow);
+//   padding: 24px;
+//   display: flex;
+//   flex-direction: column;
+//   gap: 20px;
+
+//   /* для правильных внутренних скроллов */
+//   min-height: 0;
+//   overflow: hidden;
+
+//   /* Header */
+//   &__header {
+//     display: flex;
+//     justify-content: space-between;
+//     align-items: center;
+//     gap: 12px;
+//     flex-wrap: wrap;
+//   }
+//   &__title {
+//     font-size: 20px;
+//     font-weight: 700;
+//     color: var(--text);
+//     margin: 0;
+//   }
+
+//   /* Toolbar */
+//   &__toolbar {
+//     display: grid;
+//     grid-template-columns: 1fr auto;
+//     gap: 10px;
+//     align-items: center;
+//     width: 100%;
+//   }
+//   &__search {
+//     position: relative;
+//     width: 100%;
+//   }
+//   &__searchInput {
+//     width: 100%;
+//     padding: 10px 12px 10px 32px;
+//     border-radius: 10px;
+//     border: 1px solid var(--border);
+//     font-size: 14px;
+//   }
+//   &__searchInput:focus {
+//     outline: none;
+//     border-color: var(--primary);
+//   }
+//   &__searchIcon {
+//     position: absolute;
+//     left: 10px;
+//     top: 50%;
+//     transform: translateY(-50%);
+//     font-size: 14px;
+//     color: var(--muted);
+//     pointer-events: none;
+//   }
+//   &__toolbarActions {
+//     display: inline-flex;
+//     gap: 8px;
+//     justify-self: end;
+//   }
+
+//   /* Buttons */
+//   &__btn {
+//     display: inline-flex;
+//     align-items: center;
+//     gap: 6px;
+//     padding: 10px 14px;
+//     border-radius: 10px;
+//     font-size: 14px;
+//     font-weight: 600;
+//     cursor: pointer;
+//     transition: 0.2s;
+//     border: 1px solid transparent;
+//     white-space: nowrap;
+
+//     &:active { transform: translateY(1px); }
+
+//     &--primary {
+//       background: var(--primary);
+//       color: #111;
+//       &:hover { background: var(--primary-dark); }
+//     }
+//     &--secondary {
+//       background: transparent;
+//       border: 1px solid var(--border);
+//       color: var(--text);
+//       &:hover { background: #f9fafb; }
+//     }
+//   }
+
+//   /* Alerts */
+//   &__alert {
+//     padding: 10px 12px;
+//     border-radius: 10px;
+//     font-size: 14px;
+//     background: rgba(231, 76, 60, 0.12);
+//     color: #e74c3c;
+//     border: 1px solid rgba(231, 76, 60, 0.35);
+//   }
+
+//   /* Columns */
+//   &__columns {
+//     display: grid;
+//     grid-template-columns: 1.2fr 0.8fr;
+//     gap: 16px;
+//     min-height: 0;
+//   }
+//   &__left,
+//   &__right {
+//     min-width: 0;
+//     min-height: 0;
+//     display: flex;
+//     flex-direction: column;
+//   }
+
+//   /* Courses left */
+//   &__courseList {
+//     list-style: none;
+//     margin: 0;
+//     padding: 0;
+//     display: grid;
+//     gap: 12px;
+
+//     /* внутренний скролл колонки */
+//     overflow: auto;
+//     max-height: calc(100vh - 260px);
+//   }
+//   &__courseItem {
+//     border: 1px solid var(--border);
+//     border-radius: var(--radius);
+//     background: #fafafa;
+//     padding: 12px;
+//   }
+//   &__courseHead {
+//     display: grid;
+//     grid-template-columns: 1fr auto;
+//     align-items: center;
+//     gap: 8px;
+//     margin-bottom: 8px;
+//   }
+//   &__courseName { font-weight: 700; }
+//   &__courseRight { display: inline-flex; gap: 10px; align-items: center; }
+//   &__coursePrice { color: var(--muted); }
+//   &__miniActions { display: inline-flex; gap: 6px; }
+
+//   /* groups list */
+//   &__groupList { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+//   &__groupBtn {
+//     width: 100%;
+//     text-align: left;
+//     display: flex;
+//     justify-content: space-between;
+//     align-items: center;
+//     gap: 8px;
+//     padding: 10px 12px;
+//     border-radius: 10px;
+//     border: 1px solid var(--border);
+//     background: #fff;
+//     cursor: pointer;
+//   }
+//   &__groupBtn:hover { background: #f3f4f6; }
+//   &__badge {
+//     background: #fff1a7;
+//     border: 1px solid #f0d75b;
+//     border-radius: 999px;
+//     padding: 2px 8px;
+//     font-size: 12px;
+//     font-weight: 700;
+//   }
+//   &__muted { color: var(--muted); font-size: 13px; }
+
+//   /* Details right */
+//   &__panel {
+//     border: 1px solid var(--border);
+//     border-radius: var(--radius);
+//     background: #fafafa;
+//     padding: 12px;
+//     display: flex;
+//     flex-direction: column;
+//     gap: 10px;
+//     min-height: 0;
+//   }
+//   &__panelTitle { margin: 0; }
+//   &__panelSub { margin: 4px 0 0; color: var(--muted); }
+//   &__panelActions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+//   &__panelBody {
+//     overflow: auto;
+//     max-height: calc(100vh - 320px);
+//   }
+//   &__panelCaption { margin: 0 0 8px; }
+//   &__members { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+//   &__memberItem {
+//     display: flex;
+//     justify-content: space-between;
+//     align-items: center;
+//     border: 1px solid var(--border);
+//     border-radius: 10px;
+//     background: #fff;
+//     padding: 8px 10px;
+//   }
+//   &__memberName { font-weight: 600; }
+//   &__memberMeta { color: var(--muted); font-size: 13px; }
+
+//   &__placeholder {
+//     border: 1px dashed var(--border);
+//     border-radius: 10px;
+//     padding: 16px;
+//     color: var(--muted);
+//     text-align: center;
+//   }
+
+//   /* ===== MODAL (стабильно по центру) ===== */
+//   &__modalOverlay {
+//     position: fixed;
+//     inset: 0;
+//     z-index: 1000;
+//     background: rgba(0, 0, 0, 0.55);
+
+//     display: flex;
+//     align-items: center;
+//     justify-content: center;
+
+//     width: 100vw;
+//     height: 100vh;
+//     height: 100dvh;
+
+//     padding: 16px;
+//     overflow: auto;
+//   }
+//   &__modal {
+//     margin: 0;
+//     background: #fff;
+//     border-radius: var(--radius);
+//     box-shadow: 0 10px 40px rgba(0,0,0,.18);
+
+//     width: min(640px, calc(100vw - 32px));
+//     max-height: min(92dvh, 720px);
+//     overflow: auto;
+
+//     animation: sc-fade .18s ease;
+//   }
+//   @keyframes sc-fade {
+//     from { opacity: 0; transform: translateY(-8px); }
+//     to   { opacity: 1; transform: translateY(0); }
+//   }
+
+//   &__modalHeader {
+//     display: flex; justify-content: space-between; align-items: center;
+//     padding: 16px; border-bottom: 1px solid var(--border);
+//   }
+//   &__modalTitle { font-size: 18px; font-weight: 700; margin: 0; }
+//   &__iconBtn {
+//     background: none; border: none; cursor: pointer;
+//     font-size: 18px; color: var(--muted); padding: 6px; border-radius: 8px;
+//   }
+//   &__iconBtn:hover { color: var(--text); background: #f3f4f6; }
+
+//   /* Form */
+//   &__form { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+//   &__formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+//   &__field { display: flex; flex-direction: column; gap: 6px; }
+//   &__label { font-size: 14px; font-weight: 600; color: var(--muted); }
+//   &__req { color: #ef4444; }
+//   &__input {
+//     padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+//     font-size: 14px; background: #fff; font-family: inherit;
+//   }
+//   &__input:focus { outline: none; border-color: var(--primary); }
+
+//   &__formActions {
+//     display: flex; align-items: center; gap: 10px;
+//     justify-content: flex-end; padding: 0 16px 16px;
+//   }
+//   &__actionsSpacer { flex: 1 1 auto; }
+//   &__actionsRight { display: flex; gap: 10px; }
+
+//   /* Тонкие скроллбары */
+//   &__courseList,
+//   &__panelBody,
+//   &__modal {
+//     scrollbar-width: thin;
+//     scrollbar-color: rgba(0,0,0,.25) transparent;
+//   }
+//   &__courseList::-webkit-scrollbar,
+//   &__panelBody::-webkit-scrollbar,
+//   &__modal::-webkit-scrollbar { width: 8px; height: 8px; }
+//   &__courseList::-webkit-scrollbar-thumb,
+//   &__panelBody::-webkit-scrollbar-thumb,
+//   &__modal::-webkit-scrollbar-thumb {
+//     background: rgba(0,0,0,.25);
+//     border-radius: 8px;
+//   }
+//   &__courseList::-webkit-scrollbar-thumb:hover,
+//   &__panelBody::-webkit-scrollbar-thumb:hover,
+//   &__modal::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.35); }
+// }
+
+// /* ===== Responsive ===== */
+// @media (max-width: 920px) {
+//   .Schoolcourses__columns { grid-template-columns: 1fr; }
+// }
+// @media (max-width: 760px) {
+//   .Schoolcourses {
+//     padding: 16px;
+//     border-radius: 10px;
+//     gap: 16px;
+
+//     &__toolbar { grid-template-columns: 1fr; }
+//     &__toolbarActions { justify-self: stretch; }
+//     &__btn { width: 100%; justify-content: center; }
+
+//     &__courseList { max-height: calc(100vh - 220px); }
+//     &__panelBody  { max-height: calc(100vh - 280px); }
+//   }
+// }
+// @media (max-width: 380px) {
+//   .Schoolcourses {
+//     padding: 14px;
+//     &__title { font-size: 18px; }
+//     &__btn { font-size: 13px; min-height: 40px; }
+//     &__searchInput { font-size: 13.5px; padding: 9px 10px 9px 30px; }
+//   }
+// }
+// @media (max-width: 320px) {
+//   .Schoolcourses {
+//     padding: 12px;
+//     &__title { font-size: 16px; }
+//     &__btn { font-size: 12.8px; padding: 9px 10px; min-height: 40px; }
+//     &__label { font-size: 13px; }
+//     &__input { font-size: 13px; padding: 8px 9px; }
+//   }
+// }
+
+
+/* Только цвета в :root */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+/* Локальные токены компонента */
+.Schoolcourses {
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  /* для правильных внутренних скроллов */
+  min-height: 0;
+  overflow: hidden;
+
+  /* Header */
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  &__title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+
+  /* Toolbar */
+  &__toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+  }
+  &__search {
+    position: relative;
+    width: 100%;
+  }
+  &__searchInput {
+    width: 100%;
+    padding: 10px 12px 10px 32px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    background: #fff;
+  }
+  &__searchInput:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  &__searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  &__toolbarActions {
+    display: inline-flex;
+    gap: 8px;
+    justify-self: end;
+  }
+
+  /* Buttons */
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    border: 1px solid transparent;
+    white-space: nowrap;
+
+    &:active { transform: translateY(1px); }
+
+    &--primary {
+      background: var(--primary);
+      color: #111;
+      &:hover { background: var(--primary-dark); }
+    }
+    &--secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      &:hover { background: #f9fafb; }
+    }
+    /* ДОБАВЛЕНО: ghost и danger используются в JSX */
+    &--ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 8px;
+      border-radius: 8px;
+      &:hover { background: #f3f4f6; color: var(--text); }
+    }
+    &--danger {
+      background: #ef4444;
+      color: #fff;
+      &:hover { background: #dc2626; }
+    }
+  }
+
+  /* Alerts */
+  &__alert {
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.35);
+
+    &--inModal { margin: 0 16px; }
+  }
+
+  /* Columns */
+  &__columns {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 16px;
+    min-height: 0;
+  }
+  &__left,
+  &__right {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Courses left */
+  &__courseList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+
+    /* внутренний скролл колонки */
+    overflow: auto;
+    max-height: calc(100vh - 260px);
+  }
+  &__courseItem {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fafafa;
+    padding: 12px;
+  }
+  &__courseHead {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  &__courseName { font-weight: 700; }
+  &__courseRight { display: inline-flex; gap: 10px; align-items: center; }
+  &__coursePrice { color: var(--muted); }
+  &__miniActions { display: inline-flex; gap: 6px; }
+
+  /* groups list */
+  &__groupList { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  &__groupItem { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  &__groupBtn {
+    flex: 1 1 auto;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+  }
+  &__groupBtn:hover { background: #f3f4f6; }
+  &__groupActions { display: inline-flex; gap: 6px; align-items: center; }
+  &__badge {
+    background: #fff1a7;
+    border: 1px solid #f0d75b;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  &__muted { color: var(--muted); font-size: 13px; }
+
+  /* Details right */
+  &__panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fafafa;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+  &__panelHead { display: flex; flex-direction: column; gap: 4px; }
+  &__panelTitle { margin: 0; }
+  &__panelSub { margin: 0; color: var(--muted); }
+  &__panelActions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  &__panelBody {
+    overflow: auto;
+    max-height: calc(100vh - 320px);
+  }
+  &__panelCaption { margin: 0 0 8px; }
+  &__members { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  &__memberItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    padding: 8px 10px;
+  }
+  &__memberName { font-weight: 600; }
+  &__memberMeta { color: var(--muted); font-size: 13px; }
+
+  &__placeholder {
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* ===== Pagination (для курсов и участников) ===== */
+  &__pagination {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+
+    &--tight { margin-top: 6px; gap: 4px; }
+  }
+  &__pageBtn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+  }
+  &__pageBtn[disabled] { opacity: 0.5; cursor: default; }
+  &__pageBtn--active {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+    font-weight: 700;
+  }
+  &__dots { padding: 0 4px; color: var(--muted); }
+  &__pageInfo { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+  /* ===== MODAL (по центру) ===== */
+  &__modalOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.55);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+
+    padding: 16px;
+    overflow: auto;
+  }
+  &__modal {
+    margin: 0;
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: 0 10px 40px rgba(0,0,0,.18);
+
+    width: min(640px, calc(100vw - 32px));
+    max-height: min(92dvh, 720px);
+    overflow: auto;
+
+    animation: sc-fade .18s ease;
+  }
+  @keyframes sc-fade {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  &__modalHeader {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px; border-bottom: 1px solid var(--border);
+  }
+  &__modalTitle { font-size: 18px; font-weight: 700; margin: 0; }
+  &__iconBtn {
+    background: none; border: none; cursor: pointer;
+    font-size: 18px; color: var(--muted); padding: 6px; border-radius: 8px;
+  }
+  &__iconBtn:hover { color: var(--text); background: #f3f4f6; }
+
+  /* Form */
+  &__form { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  &__formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  &__field { display: flex; flex-direction: column; gap: 6px; }
+  &__label { font-size: 14px; font-weight: 600; color: var(--muted); }
+  &__req { color: #ef4444; }
+  &__input {
+    padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; background: #fff; font-family: inherit;
+  }
+  &__input:focus { outline: none; border-color: var(--primary); }
+
+  &__formActions {
+    display: flex; align-items: center; gap: 10px;
+    justify-content: flex-end; padding: 0 16px 16px;
+  }
+  &__actionsSpacer { flex: 1 1 auto; }
+  &__actionsRight { display: flex; gap: 10px; }
+
+  /* ===== Confirm (Да/Нет) ===== */
+  &__confirm {
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: 0 10px 40px rgba(0,0,0,.18);
+    width: min(440px, calc(100vw - 32px));
+    padding: 16px;
+    animation: sc-fade .18s ease;
+  }
+  &__confirmTitle {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: var(--text);
+  }
+  &__confirmText {
+    font-size: 14px;
+    color: var(--text);
+    margin: 0 0 14px;
+  }
+  &__confirmActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* Тонкие скроллбары */
+  &__courseList,
+  &__panelBody,
+  &__modal {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0,0,0,.25) transparent;
+  }
+  &__courseList::-webkit-scrollbar,
+  &__panelBody::-webkit-scrollbar,
+  &__modal::-webkit-scrollbar { width: 8px; height: 8px; }
+  &__courseList::-webkit-scrollbar-thumb,
+  &__panelBody::-webkit-scrollbar-thumb,
+  &__modal::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,.25);
+    border-radius: 8px;
+  }
+  &__courseList::-webkit-scrollbar-thumb:hover,
+  &__panelBody::-webkit-scrollbar-thumb:hover,
+  &__modal::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.35); }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 920px) {
+  .Schoolcourses__columns { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .Schoolcourses {
+    padding: 16px;
+    border-radius: 10px;
+    gap: 16px;
+
+    &__toolbar { grid-template-columns: 1fr; }
+    &__toolbarActions { justify-self: stretch; }
+    &__btn { width: 100%; justify-content: center; }
+
+    &__courseList { max-height: calc(100vh - 220px); }
+    &__panelBody  { max-height: calc(100vh - 280px); }
+  }
+}
+@media (max-width: 380px) {
+  .Schoolcourses {
+    padding: 14px;
+    &__title { font-size: 18px; }
+    &__btn { font-size: 13px; min-height: 40px; }
+    &__searchInput { font-size: 13.5px; padding: 9px 10px 9px 30px; }
+  }
+}
+@media (max-width: 320px) {
+  .Schoolcourses {
+    padding: 12px;
+    &__title { font-size: 16px; }
+    &__btn { font-size: 12.8px; padding: 9px 10px; min-height: 40px; }
+    &__label { font-size: 13px; }
+    &__input { font-size: 13px; padding: 8px 9px; }
+  }
+}

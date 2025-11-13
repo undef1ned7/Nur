@@ -1,0 +1,527 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap");
+
+/* стабильный скролл и высота вьюпорта на мобильных */
+html {
+  scrollbar-gutter: initial !important;
+}
+
+body {
+  min-height: 100dvh;
+  background: #f6f7fb;
+}
+
+/* В :root — только цвета */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+}
+
+/* Блок .clients изолирован */
+.clients {
+  --radius: 12px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--text);
+
+  /* аккуратный контейнер страницы */
+  margin: 16px;
+  max-width: 1200px;
+  align-self: center;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  &__title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* поиск */
+  &__search {
+    position: relative;
+  }
+
+  &__searchInput {
+    width: 300px;
+    padding: 10px 12px 10px 32px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  &__searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* кнопки */
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    border: 1px solid transparent;
+    background: #fff;
+    color: var(--text);
+
+    &:active {
+      transform: translateY(1px);
+    }
+
+    &--primary {
+      background: var(--primary);
+      color: #111;
+
+      &:hover {
+        background: var(--primary-dark);
+      }
+    }
+
+    &--secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+
+      &:hover {
+        background: #f9fafb;
+      }
+    }
+  }
+
+  /* таблица */
+  &__tableWrap {
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    thead th {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--text);
+      background: #fafafa;
+    }
+
+    tbody tr:hover {
+      background: #f9fafb;
+    }
+  }
+
+  &__rowActions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  &__empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 14px 0;
+  }
+
+  &__error {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 8px 10px;
+    border-radius: 8px;
+  }
+
+  &__ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 260px;
+  }
+
+  /* ===== Модалки: ВСЕГДА ПО ЦЕНТРУ + «воздух» ===== */
+  &__modalOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* центрирование */
+    z-index: 70;
+    padding: 12px;
+    /* внешний отступ на мобильных */
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: cl-overlay-in 0.18s ease-out both;
+    overscroll-behavior: contain;
+    /* не тянем страницу за модалку */
+  }
+
+  &__modal,
+  &__modalWide {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
+    width: min(720px, calc(100vw - 24px));
+    /* влезает на телефонах */
+    max-height: min(90vh, 760px);
+    overflow: auto;
+    padding: 20px;
+    /* внутренний «воздух» */
+    -webkit-overflow-scrolling: touch;
+    animation: cl-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) 0.04s both;
+    
+  }
+
+  &__modalWide {
+    width: min(980px, calc(100vw - 24px));
+    max-height: min(92vh, 820px);
+  }
+
+  &__modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 0 0 var(--border);
+  }
+
+  &__modalFooter {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-top: 10px;
+    margin-top: 12px;
+    box-shadow: 0 -1px 0 0 var(--border);
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
+    gap: 10px;
+  }
+
+  &__modalTitle {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  &__iconBtn {
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 18px;
+    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    color: #475569;
+
+    &:hover {
+      background: #f3f4f6;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+  }
+
+  /* форма */
+  &__form {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+
+  &__formGrid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__label {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__input {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
+  }
+
+  &__formActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* карточка */
+  &__cardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-top: 4px;
+  }
+
+  &__profile {
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+  }
+
+  &__stats {
+    display: flex;
+    gap: 12px;
+  }
+
+  &__statBox {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    text-align: center;
+    min-width: 100px;
+    background: #fafafa;
+  }
+
+  &__statVal {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  &__statLabel {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__tab {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+
+    &--active {
+      background: var(--primary);
+      border-color: var(--primary-dark);
+    }
+  }
+
+  &__profileBody {
+    display: grid;
+    gap: 12px;
+  }
+
+  &__notes {
+    display: grid;
+    gap: 6px;
+  }
+
+  &__noteArea {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    background: #fafafa;
+    min-height: 52px;
+  }
+
+  &__muted {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* ===== Адаптация ===== */
+
+  @media (max-width: 1000px) {
+    max-width: 100% !important;
+
+    .clients__table th,
+    .clients__table td {
+      padding: 6px 8px;
+      flex-wrap: nowrap;
+    }
+  }
+
+  @media (max-width: 860px) {
+
+    &__rowActions>.clients__btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+  }
+
+  @media (max-width: 768px) {
+    &__searchInput {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 640px) {
+    &__formGrid {
+      grid-template-columns: 1fr;
+    }
+
+    &__ellipsis {
+      max-width: 180px;
+    }
+
+    &__modalFooter {
+      justify-content: stretch;
+    }
+
+    &__modalFooter .clients__btn {
+      width: 100%;
+    }
+  }
+
+  /* ВАЖНО: на узких — тоже центр, без «шторки» */
+  @media (max-width: 480px) {
+
+    &__modal,
+    &__modalWide {
+      position: static;
+      /* никаких bottom/fixed */
+      transform: none;
+      width: calc(100vw - 24px);
+      /* вписываемся в экран */
+      max-height: 90vh;
+      padding: 16px;
+    }
+
+    &__formActions>.clients__btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  /* уверенная работа до 320px */
+  @media (max-width: 360px) {
+    padding: 16px;
+    margin: 8px;
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__btn {
+      padding: 9px 12px;
+    }
+
+    &__input {
+      padding: 9px 10px;
+    }
+
+    &__ellipsis {
+      max-width: 140px;
+    }
+  }
+}
+
+/* когда модалка открыта — держим вертикальный скролл стабильным */
+body.modal-open {
+  overflow-y: scroll;
+}
+
+/* анимации */
+@keyframes cl-overlay-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cl-pop-in {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

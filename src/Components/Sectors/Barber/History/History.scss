@@ -1,0 +1,116 @@
+/* src/components/Education/History.scss */
+:root{
+  --bh-primary:#f7d74f;
+  --bh-text:#0f172a;
+  --bh-muted:#6b7280;
+  --bh-border:#e5e7eb;
+  --bh-surface:#ffffff;
+
+  --bh-danger:#e74c3c;
+  --bh-danger-bg:rgba(231,76,60,.12);
+  --bh-danger-br:rgba(231,76,60,.35);
+}
+
+.barberhistory, .barberhistory *{ box-sizing:border-box; }
+
+.barberhistory{
+  background:var(--bh-surface);
+  border-radius:14px;
+  box-shadow:0 4px 16px rgba(0,0,0,.05);
+  padding:20px;
+  display:grid;
+  gap:14px;
+  color:var(--bh-text);
+}
+
+/* header */
+.barberhistory__header{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:12px;
+  align-items:end;
+}
+.barberhistory__titleWrap{ display:grid; gap:4px; }
+.barberhistory__title{ margin:0; font-size:20px; font-weight:900; color:var(--bh-text); }
+.barberhistory__subtitle{ color:var(--bh-muted); font-size:13px; }
+
+/* filters */
+.barberhistory__filters{ display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
+.barberhistory__field{ display:grid; gap:6px; }
+.barberhistory__label{ font-size:13px; color:var(--bh-muted); font-weight:700; }
+.barberhistory__input{
+  height:40px; min-width:160px;
+  border:1px solid var(--bh-border); border-radius:12px;
+  background:#fff; color:var(--bh-text);
+  padding:0 12px; font-size:14px;
+}
+.barberhistory__input:focus{ outline:none; border-color:var(--bh-primary); }
+.barberhistory__field--invalid .barberhistory__input{ border-color:#dc2626; }
+.barberhistory__btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:40px; padding:0 14px; border-radius:12px;
+  border:1px solid var(--bh-border); background:#fff; color:var(--bh-text);
+  font-weight:700; cursor:pointer; transition:.18s;
+}
+.barberhistory__btn:hover{ background:#f9fafb; }
+.barberhistory__btn:active{ transform:translateY(1px); }
+
+/* list */
+.barberhistory__list{
+  display:grid; gap:10px;
+  max-height: clamp(360px, 64dvh, 720px);
+  overflow:auto; padding-right:6px;
+}
+.barberhistory__list::-webkit-scrollbar{ width:8px; height:8px; }
+.barberhistory__list::-webkit-scrollbar-thumb{ background:#e2e8f0; border-radius:8px; }
+
+/* card */
+.barberhistory__card{
+  border:1px solid var(--bh-border);
+  background:#fafafa;
+  border-radius:12px;
+  padding:14px;
+}
+.barberhistory__card:hover{ background:#f1f5f9; }
+.barberhistory__cardHead{
+  display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;
+}
+.barberhistory__name{ margin:0; font-size:16px; font-weight:800; color:var(--bh-text); }
+.barberhistory__status{
+  font-size:12px; color:#111; background:var(--bh-primary);
+  padding:4px 8px; border-radius:999px; font-weight:800;
+}
+
+.barberhistory__meta{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.barberhistory__meta .bh-item{ color:var(--bh-muted); font-size:13px; white-space:nowrap; }
+.barberhistory__meta .bh-item + .bh-item::before{ content:"•"; margin:0 6px; color:var(--bh-muted); }
+
+/* alerts */
+.barberhistory__alert{
+  padding:10px 12px; border-radius:12px;
+  border:1px solid var(--bh-danger-br); background:var(--bh-danger-bg); color:var(--bh-danger);
+}
+
+/* pager */
+.barberhistory__pager{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:6px; }
+.barberhistory__pageBtn{
+  border:1px solid var(--bh-border); background:#fff; color:var(--bh-text);
+  padding:8px 12px; border-radius:10px; cursor:pointer;
+}
+.barberhistory__pageBtn:hover{ background:#f9fafb; }
+.barberhistory__pageBtn:disabled{ opacity:.6; cursor:default; }
+.barberhistory__pageInfo{ color:var(--bh-muted); }
+
+/* responsive */
+@media (max-width: 760px){
+  .barberhistory{ padding:16px; }
+  .barberhistory__header{ grid-template-columns:1fr; }
+  .barberhistory__title{ font-size:18px; }
+  .barberhistory__filters{ gap:8px; }
+  .barberhistory__input{ min-width:140px; }
+}
+@media (max-width: 380px){
+  .barberhistory{ padding:14px; }
+  .barberhistory__input{ min-width:0; width:100%; }
+  .barberhistory__filters{ width:100%; }
+}

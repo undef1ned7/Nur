@@ -1,0 +1,45 @@
+.language-switcher {
+  margin-top: 10px !important;
+  margin: 0 auto;
+  height: 20%;
+  width: 80%;
+  margin-bottom: 20px;
+}
+
+.selected-lang {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  border-radius: 15px;
+  background: #ffd600;
+  color: #000;
+  gap: 7.5px;
+  transition: 0.3s;
+  padding: 7.5px;
+  cursor: pointer;
+  justify-content: space-between;
+  &.open {
+    border-radius: 15px 15px 0 0 !important;
+  }
+  img {
+    width: 21px;
+    height: 21px;
+  }
+
+  .lang_icon {
+    margin-left: 3px;
+  }
+}
+
+.dropdown {
+  background: #ffd600;
+  padding: 7.5px;
+  border-radius: 0 0 15px 15px;
+
+  &-item {
+    display: flex;
+    align-items: center;
+    column-gap: 20px;
+    color: #000;
+  }
+}

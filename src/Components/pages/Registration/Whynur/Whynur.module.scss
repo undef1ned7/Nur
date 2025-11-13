@@ -1,0 +1,270 @@
+.whynur {
+  text-align: center;
+  padding: 20px;
+  min-height: 400px;
+  position: relative;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  font-family: sans-serif;
+  max-width: 500px;
+  margin: 50px auto;
+  background-color: #fff;
+
+  &__title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #000;
+  }
+
+  &__subtitle {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+
+  &__options {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  &__option {
+    display: flex;
+    align-items: center;
+    margin: 8px 0;
+    font-size: 14px;
+    width: 300px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+    cursor: pointer;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #f0f0f0;
+    }
+
+    input {
+      margin-right: 10px;
+    }
+  }
+
+  &__select {
+    width: 300px;
+    padding: 10px;
+    margin: 8px 0;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background-color: #f9f9f9;
+    font-size: 14px;
+    color: #000;
+
+    &:focus {
+      outline: none;
+      border-color: #ffd900;
+    }
+  }
+
+  &__navigation {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  &__navPrev {
+    font-size: 20px;
+    color: #333;
+    cursor: pointer;
+    transition: color 0.3s;
+
+    &:hover {
+      color: #ffd900;
+    }
+  }
+
+  &__navText {
+    font-size: 14px;
+    color: #333;
+  }
+
+  &__nextButton {
+    background-color: #ffd900;
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background-color: #ffe34d;
+    }
+
+    &:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+  }
+
+  &__modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+
+    &__content {
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  &__successContent {
+    margin: 20px 0;
+  }
+
+  &__successText {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.5;
+  }
+
+  &__successCheck {
+    font-size: 24px;
+    color: #28a745;
+    display: block;
+    margin: 10px 0;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .whynur {
+    padding: 15px;
+    max-width: 90%;
+    margin: 30px auto;
+
+    &__title {
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+
+    &__subtitle {
+      font-size: 13px;
+      margin-bottom: 15px;
+    }
+
+    &__option {
+      width: 100%;
+      padding: 8px;
+      font-size: 13px;
+    }
+
+    &__select {
+      width: 100%;
+      padding: 8px;
+      font-size: 13px;
+    }
+
+    &__navigation {
+      gap: 15px;
+      margin-top: 15px;
+    }
+
+    &__navPrev {
+      font-size: 18px;
+    }
+
+    &__navText {
+      font-size: 13px;
+    }
+
+    &__nextButton {
+      padding: 8px 15px;
+      font-size: 13px;
+    }
+
+    &__modal__content {
+      padding: 20px;
+      max-width: 90%;
+    }
+
+    &__successText {
+      font-size: 13px;
+    }
+
+    &__successCheck {
+      font-size: 20px;
+    }
+  }
+}
+
+@media screen and (max-width: 320px) {
+  .whynur {
+    padding: 10px;
+    margin: 20px auto;
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__subtitle {
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    &__option {
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    &__select {
+      padding: 6px;
+      font-size: 12px;
+    }
+
+    &__navigation {
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    &__navPrev {
+      font-size: 16px;
+    }
+
+    &__navText {
+      font-size: 12px;
+    }
+
+    &__nextButton {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    &__modal__content {
+      padding: 15px;
+    }
+
+    &__successText {
+      font-size: 12px;
+    }
+
+    &__successCheck {
+      font-size: 18px;
+    }
+  }
+}

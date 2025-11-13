@@ -1,0 +1,586 @@
+/**
+ * Конфигурация меню на основе backend permissions
+ * Каждый пункт меню привязан к конкретному permission из backend
+ */
+import { menuIcons } from "./menuIcons";
+
+export const MENU_CONFIG = {
+  // Основные разделы (базовые permissions)
+  basic: [
+    {
+      label: "Обзор",
+      to: "/crm/obzor",
+      icon: menuIcons.clipboard,
+      permission: "can_view_dashboard",
+      implemented: true,
+    },
+    {
+      label: "Закупки",
+      to: "/crm/zakaz",
+      icon: menuIcons.listAlt,
+      permission: "can_view_orders",
+      implemented: true,
+    },
+    {
+      label: "Продажа",
+      to: "/crm/sell",
+      icon: menuIcons.scale,
+      permission: "can_view_sale",
+      implemented: true,
+    },
+    {
+      label: "Аналитика",
+      to: "/crm/analytics",
+      icon: menuIcons.chartBar,
+      permission: "can_view_analytics",
+      implemented: true,
+    },
+    {
+      label: "Склад",
+      to: "/crm/sklad",
+      icon: menuIcons.warehouse,
+      permission: "can_view_products",
+      implemented: true,
+    },
+    {
+      label: "Касса",
+      to: "/crm/kassa",
+      icon: menuIcons.landmark,
+      permission: "can_view_cashbox",
+      implemented: true,
+    },
+    {
+      label: "Сотрудники",
+      to: "/crm/employ",
+      icon: menuIcons.user,
+      permission: "can_view_employees",
+      implemented: true,
+    },
+    {
+      label: "Бронирование",
+      to: "/crm/raspisanie",
+      icon: menuIcons.calendar,
+      permission: "can_view_booking",
+      implemented: true,
+    },
+    {
+      label: "Клиенты",
+      to: "/crm/clients",
+      icon: menuIcons.filePerson,
+      permission: "can_view_clients",
+      implemented: true,
+    },
+    {
+      label: "Отделы",
+      to: "/crm/departments",
+      icon: menuIcons.users,
+      permission: "can_view_departments",
+      implemented: true,
+    },
+    {
+      label: "Долги",
+      to: "/crm/debts",
+      icon: menuIcons.users,
+      permission: "can_view_debts",
+      implemented: true,
+    },
+    {
+      label: "Бренд,Категория",
+      to: "/crm/brand-category",
+      icon: menuIcons.instagram,
+      permission: "can_view_brand_category",
+      implemented: true,
+    },
+    {
+      label: "Настройки",
+      to: "/crm/set",
+      icon: menuIcons.cog,
+      permission: "can_view_settings",
+      implemented: true,
+    },
+  ],
+
+  // Секторные разделы (permissions с префиксами)
+  sector: {
+    // Строительная сфера
+    building: [
+      {
+        label: "Процесс работы",
+        to: "/crm/building/work",
+        icon: menuIcons.listCheck,
+        permission: "can_view_building_work_process",
+        implemented: true,
+      },
+      {
+        label: "Квартиры",
+        to: "/crm/building/objects",
+        icon: menuIcons.building,
+        permission: "can_view_building_objects",
+        implemented: true,
+      },
+    ],
+
+    // Барбершоп
+    barber: [
+      {
+        label: "Клиенты",
+        to: "/crm/barber/clients",
+        icon: menuIcons.filePerson,
+        permission: "can_view_barber_clients",
+        implemented: true,
+      },
+      {
+        label: "Услуги",
+        to: "/crm/barber/services",
+        icon: menuIcons.tags,
+        permission: "can_view_barber_services",
+        implemented: true,
+      },
+      {
+        label: "Склад",
+        to: "/crm/barber/warehouse",
+        icon: menuIcons.warehouse,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Сотрудники",
+        to: "/crm/barber/masters",
+        icon: menuIcons.user,
+        permission: "can_view_employees",
+        implemented: true,
+      },
+      {
+        label: "История",
+        to: "/crm/barber/history",
+        icon: menuIcons.clipboard,
+        permission: "can_view_barber_history",
+        implemented: true,
+      },
+      {
+        label: "Записи",
+        to: "/crm/barber/records",
+        icon: menuIcons.calendar,
+        permission: "can_view_barber_records",
+        implemented: true,
+      },
+      {
+        label: "Аналитика",
+        to: "/crm/barber/cash-reports",
+        icon: menuIcons.chartBar,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+    ],
+
+    // Гостиница
+    hostel: [
+      {
+        label: "Комнаты",
+        to: "/crm/hostel/rooms",
+        icon: menuIcons.listAlt,
+        permission: "can_view_hostel_rooms",
+        implemented: true,
+      },
+      {
+        label: "Бронирования",
+        to: "/crm/hostel/bookings",
+        icon: menuIcons.calendar,
+        permission: "can_view_hostel_booking",
+        implemented: true,
+      },
+      {
+        label: "Бар",
+        to: "/crm/hostel/bar",
+        icon: menuIcons.clipboard,
+        permission: "can_view_booking",
+        implemented: true,
+      },
+      {
+        label: "Клиенты",
+        to: "/crm/hostel/clients",
+        icon: menuIcons.filePerson,
+        permission: "can_view_hostel_clients",
+        implemented: true,
+      },
+      {
+        label: "Аналитика",
+        to: "/crm/hostel/analytics",
+        icon: menuIcons.chartBar,
+        permission: "can_view_hostel_analytics",
+        implemented: true,
+      },
+      {
+        label: "Касса",
+        to: "/crm/hostel/kassa",
+        icon: menuIcons.landmark,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+    ],
+
+    // Школа
+    school: [
+      {
+        label: "Ученики",
+        to: "/crm/school/students",
+        icon: menuIcons.filePerson,
+        permission: "can_view_school_students",
+        implemented: true,
+      },
+      {
+        label: "Направления",
+        to: "/crm/school/groups",
+        icon: menuIcons.listAlt,
+        permission: "can_view_school_groups",
+        implemented: true,
+      },
+      {
+        label: "Уроки",
+        to: "/crm/school/lessons",
+        icon: menuIcons.calendar,
+        permission: "can_view_school_lessons",
+        implemented: true,
+      },
+      {
+        label: "Сотрудники",
+        to: "/crm/school/teachers",
+        icon: menuIcons.user,
+        permission: "can_view_school_teachers",
+        implemented: true,
+      },
+      {
+        label: "Заявки",
+        to: "/crm/school/leads",
+        icon: menuIcons.comments,
+        permission: "can_view_school_leads",
+        implemented: true,
+      },
+      {
+        label: "Аналитика",
+        to: "/crm/school/invoices",
+        icon: menuIcons.clipboard,
+        permission: "can_view_school_invoices",
+        implemented: true,
+      },
+    ],
+
+    // Магазин
+    market: [
+      {
+        label: "Бар",
+        to: "/crm/market/bar",
+        icon: menuIcons.listAlt,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "История",
+        to: "/crm/market/history",
+        icon: menuIcons.clipboard,
+        permission: "can_view_orders",
+        implemented: true,
+      },
+      {
+        label: "Аналитика",
+        to: "/crm/market/analytics",
+        icon: menuIcons.chartBar,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+    ],
+
+    // Кафе
+    cafe: [
+      {
+        label: "Аналитика выплат",
+        to: "/crm/cafe/analytics",
+        icon: menuIcons.barChart3,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Меню",
+        to: "/crm/cafe/menu",
+        icon: menuIcons.bookOpenText,
+        permission: "can_view_cafe_menu",
+        implemented: true,
+      },
+      {
+        label: "Заказы",
+        to: "/crm/cafe/orders",
+        icon: menuIcons.receiptText,
+        permission: "can_view_cafe_orders",
+        implemented: true,
+      },
+      {
+        label: "Кухня",
+        to: "/crm/cafe/cook",
+        icon: menuIcons.chefHat,
+        permission: "can_view_cafe_cook",
+        implemented: true,
+      },
+      {
+        label: "Зарплата",
+        to: "/crm/cafe/payroll",
+        icon: menuIcons.badgeDollarSign,
+        permission: "can_view_employees",
+        implemented: true,
+      },
+      {
+        label: "Закупки",
+        to: "/crm/cafe/purchasing",
+        icon: menuIcons.shoppingCart,
+        permission: "can_view_cafe_purchasing",
+        implemented: true,
+      },
+      {
+        label: "Отчёты",
+        to: "/crm/cafe/reports",
+        icon: menuIcons.fileBarChart,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Бронь",
+        to: "/crm/cafe/reservations",
+        icon: menuIcons.calendarCheck2,
+        permission: "can_view_cafe_booking",
+        implemented: true,
+      },
+      {
+        label: "Гости",
+        to: "/crm/cafe/clients",
+        icon: menuIcons.users,
+        permission: "can_view_cafe_clients",
+        implemented: true,
+      },
+      {
+        label: "Склад",
+        to: "/crm/cafe/stock",
+        icon: menuIcons.boxes,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Инвентаризация",
+        to: "/crm/cafe/inventory",
+        icon: menuIcons.clipboardCheck,
+        permission: "can_view_cafe_inventory",
+        implemented: true,
+      },
+      {
+        label: "Столы",
+        to: "/crm/cafe/tables",
+        icon: menuIcons.table2,
+        permission: "can_view_cafe_tables",
+        implemented: true,
+      },
+      {
+        label: "Касса",
+        to: "/crm/cafe/kassa",
+        icon: menuIcons.wallet,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+    ],
+
+    consulting: [
+      {
+        label: "Аналитика",
+        to: "/crm/consulting/analytics",
+        icon: menuIcons.chartBar,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Клиенты",
+        to: "/crm/consulting/client",
+        icon: menuIcons.users,
+        permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Запросы клиентов",
+        to: "/crm/consulting/client-requests",
+        icon: menuIcons.clipboardList,
+        permission: "can_view_client_requests",
+        implemented: true,
+      },
+      {
+        label: "Касса",
+        to: "/crm/consulting/kassa",
+        icon: menuIcons.cashRegister,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+      {
+        label: "Сотрудники",
+        to: "/crm/consulting/teachers",
+        icon: menuIcons.chalkboard,
+        permission: "can_view_employees",
+        implemented: true,
+      },
+      {
+        label: "Зарплата",
+        to: "/crm/consulting/salary",
+        icon: menuIcons.moneyBill,
+        permission: "can_view_salary",
+        implemented: true,
+      },
+      {
+        label: "Продажи",
+        to: "/crm/consulting/sale",
+        icon: menuIcons.shoppingCart,
+        permission: "can_view_sale",
+        implemented: true,
+      },
+      {
+        label: "Услуги",
+        to: "/crm/consulting/services",
+        icon: menuIcons.cogs,
+        permission: "can_view_services",
+        implemented: true,
+      },
+      {
+        label: "Бронирование",
+        to: "/crm/consulting/bookings",
+        icon: menuIcons.calendar,
+        permission: "can_view_booking",
+        implemented: true,
+      },
+    ],
+
+    warehouse: [
+      {
+        label: "Клиенты",
+        to: "/crm/warehouse/clients",
+        icon: menuIcons.users,
+        permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Аналитика",
+        to: "/crm/warehouse/analytics",
+        icon: menuIcons.chartLine,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Товары",
+        to: "/crm/warehouse/products",
+        icon: menuIcons.boxOpen,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Справочники",
+        to: "/crm/warehouse/directories",
+        icon: menuIcons.tags,
+        permission: "can_view_brand_category",
+        implemented: true,
+      },
+      {
+        label: "Остатки",
+        to: "/crm/warehouse/stocks",
+        icon: menuIcons.warehouse,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Операции (Перемещения)",
+        to: "/crm/warehouse/movements",
+        icon: menuIcons.exchangeAlt,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Поставки",
+        to: "/crm/warehouse/supply",
+        icon: menuIcons.truckLoading,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Списание",
+        to: "/crm/warehouse/write_offs",
+        icon: menuIcons.trashAlt,
+        permission: "can_view_products",
+        implemented: true,
+      },
+    ],
+
+    production: [
+      {
+        label: "Склад",
+        to: "/crm/production/warehouse",
+        icon: menuIcons.warehouse,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Агенты",
+        to: "/crm/production/agents",
+        icon: menuIcons.filePerson,
+        permission: "can_view_agent",
+        implemented: true,
+      },
+      {
+        label: "Каталог",
+        to: "/crm/production/catalog",
+        icon: menuIcons.layers,
+        permission: "can_view_catalog",
+        implemented: true,
+      },
+    ],
+
+    pilorama: [
+      {
+        label: "Склад",
+        to: "/crm/pilorama/warehouse",
+        icon: menuIcons.warehouse,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Водители",
+        to: "/crm/production/agents",
+        icon: menuIcons.filePerson,
+        permission: "can_view_agent",
+        implemented: true,
+      },
+    ],
+  },
+
+  // Дополнительные услуги
+  additional: [
+    {
+      label: "WhatsApp",
+      to: "/crm/",
+      icon: menuIcons.comments,
+      permission: "can_view_whatsapp",
+      implemented: true,
+    },
+    {
+      label: "Instagram",
+      to: "/crm/instagram",
+      icon: menuIcons.instagramIcon,
+      permission: "can_view_instagram",
+      implemented: true,
+    },
+    {
+      label: "Telegram",
+      to: "/crm/",
+      icon: menuIcons.comments,
+      permission: "can_view_telegram",
+      implemented: true,
+    },
+    {
+      label: "Документы",
+      to: "/crm/documents",
+      icon: menuIcons.documentScanner,
+      permission: "can_view_documents",
+      implemented: true,
+    },
+  ],
+};
