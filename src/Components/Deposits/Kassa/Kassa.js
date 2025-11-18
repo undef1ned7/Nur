@@ -170,22 +170,24 @@ const CashboxList = () => {
             />
           </div>
           {/* {console.log(filtered)} */}
-          {company?.subscription_plan?.name === "Старт" &&
-            (filtered?.length ?? 0) === 0 && (
-              <button
-                className="kassa__btn kassa__btn--primary"
-                onClick={() => setCreateOpen(true)}
-              >
-                Создать кассу
-              </button>
-            )}
-          {company?.subscription_plan?.name !== "Старт" && (
-            <button
-              className="kassa__btn kassa__btn--primary"
-              onClick={() => setCreateOpen(true)}
-            >
-              Создать кассу для прочьих расходов
-            </button>
+          {(filtered?.length ?? 0) === 0 && (
+            <>
+              {company?.subscription_plan?.name === "Старт" ? (
+                <button
+                  className="kassa__btn kassa__btn--primary"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Создать кассу
+                </button>
+              ) : (
+                <button
+                  className="kassa__btn kassa__btn--primary"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Создать кассу для прочьих расходов
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -369,6 +371,16 @@ const CashboxPayment = () => {
     loadAll();
   }, []);
 
+  // Всегда выбираем первую кассу по индексу
+  useEffect(() => {
+    if (boxes.length > 0) {
+      const firstBoxId = boxes[0]?.id || boxes[0]?.uuid || "";
+      if (firstBoxId && firstBoxId !== boxId) {
+        setBoxId(firstBoxId);
+      }
+    }
+  }, [boxes, boxId]);
+
   const tablesMap = useMemo(
     () => new Map(tables.map((t) => [t.id, t])),
     [tables]
@@ -527,18 +539,11 @@ const CashboxPayment = () => {
         </div>
 
         <div className="kassa__controls">
-          <select
-            className="kassa__input"
-            value={boxId}
-            onChange={(e) => setBoxId(e.target.value)}
-            title="Касса для приёма оплаты"
-          >
-            {boxes.map((b) => (
-              <option key={b.id || b.uuid} value={b.id || b.uuid}>
-                {b.department_name || b.name || "Касса"}
-              </option>
-            ))}
-          </select>
+          {!boxId && boxes.length === 0 && (
+            <span className="kassa__alert" style={{ color: "#d32f2f" }}>
+              Создайте кассу в разделе «Кассы», чтобы принимать оплату.
+            </span>
+          )}
         </div>
       </div>
 

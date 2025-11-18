@@ -43,6 +43,17 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   const validateWriteoff = () => {
     if (!item?.id) return "Нет выбранного товара";
     if (!q) return "Введите количество";
@@ -61,7 +72,14 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     if (!Number.isInteger(q)) return "Количество должно быть целым числом";
     if (q > stockQty)
       return `Нельзя вернуть больше, чем в наличии (${stockQty})`;
-    if (!selectCashBox) return "Выберите кассу для прихода";
+    // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
+    // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
+    if (Array.isArray(cashBoxes) && cashBoxes.length > 0 && !selectCashBox) {
+      return "Касса не выбрана. Создайте кассу в разделе «Кассы».";
+    }
+    if (Array.isArray(cashBoxes) && cashBoxes.length === 0) {
+      return "Нет доступных касс. Создайте кассу в разделе «Кассы».";
+    }
     if (unitCost < 0) return "Себестоимость указана неверно";
     return "";
   };
@@ -98,6 +116,13 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
       setError(err);
       return;
     }
+
+    // Дополнительная проверка кассы перед выполнением операции
+    if (!selectCashBox) {
+      setError("Касса не выбрана. Создайте кассу в разделе «Кассы».");
+      return;
+    }
+
     setError("");
 
     const confirmMsg = `Подтвердите возврат товара:
@@ -169,20 +194,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
             step={1}
           />
 
-          {/* касса нужна для операции "Возврат" */}
-          <select
-            style={{ marginTop: 15, width: "100%" }}
-            value={selectCashBox}
-            onChange={(e) => setSelectCashBox(e.target.value)}
-            className="debt__input"
-          >
-            <option value="">Выберите кассу (для прихода при возврате)</option>
-            {cashBoxes?.map((cash) => (
-              <option key={cash.id} value={cash.id}>
-                {cash.name ?? cash.department_name}
-              </option>
-            ))}
-          </select>
+          {/* касса автоматически выбирается - скрыто от пользователя */}
 
           <div style={{ marginTop: 12 }}>
             Сумма : <b>{isFinite(expense) ? expense : 0}</b>

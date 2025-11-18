@@ -144,7 +144,8 @@ body {
 .barberclient__modalOverlay,
 .barberservices__overlay,
 .sale__overlay,
-.clients__modalOverlay {
+.clients__modalOverlay,
+.branch__modal-overlay {
   z-index: 10000 !important;
 }
 

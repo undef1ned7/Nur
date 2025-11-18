@@ -147,6 +147,17 @@ export default function Sklad() {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   // Обработка ESC для закрытия модалок
   useEffect(() => {
     const handleEsc = (event) => {

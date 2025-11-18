@@ -8,7 +8,7 @@ import { menuIcons } from "../config/menuIcons";
 /**
  * Хук для сборки финального списка пунктов меню
  */
-export const useMenuItems = (company, sector, tariff) => {
+export const useMenuItems = (company, sector, tariff, profile = null) => {
   const { hasPermission, isAllowed } = useMenuPermissions();
 
   /**
@@ -182,6 +182,18 @@ export const useMenuItems = (company, sector, tariff) => {
         return false;
       }
 
+      // Скрываем "Филиалы" для пользователей-филиалов
+      // Если у пользователя есть branch_ids, это означает, что он является филиалом
+      if (item.label === "Филиалы") {
+        const isBranchUser =
+          profile?.branch_ids &&
+          Array.isArray(profile.branch_ids) &&
+          profile.branch_ids.length > 0;
+        if (isBranchUser) {
+          return false;
+        }
+      }
+
       // Гибкие правила скрытия
       if (hiddenByRules.labels.has(item.label)) {
         return false;
@@ -198,7 +210,13 @@ export const useMenuItems = (company, sector, tariff) => {
     });
 
     return filteredItems;
-  }, [hasPermission, getSectorMenuItems, getAdditionalServices, hiddenByRules]);
+  }, [
+    hasPermission,
+    getSectorMenuItems,
+    getAdditionalServices,
+    hiddenByRules,
+    profile,
+  ]);
 
   return menuItems;
 };

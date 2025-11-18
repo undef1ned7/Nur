@@ -2,6 +2,13 @@
  * Правила скрытия пунктов меню в зависимости от тарифа и сектора
  */
 export const HIDE_RULES = [
+  // Всегда скрываем "Отделы"
+  {
+    when: {}, // Пустое условие означает "всегда"
+    hide: {
+      labels: ["Отделы"],
+    },
+  },
   {
     when: { tariff: "Старт" },
     hide: {
@@ -114,7 +121,7 @@ export const HIDE_RULES = [
   {
     when: { sector: "Строительная компания" },
     hide: {
-      toIncludes: ["/crm/debts", "/crm/obzor"],
+      toIncludes: ["/crm/debts", "/crm/obzor", "/crm/branch"],
     },
   },
   {

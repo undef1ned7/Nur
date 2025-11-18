@@ -141,8 +141,20 @@ const AddProductBarcode = ({
       // Сохраняем имя товара для модалки успеха перед очисткой
       const productName = scannedProduct?.name || "Неизвестный товар";
 
-      // Сбрасываем количество после успешного добавления
+      // Очищаем все поля формы после успешного добавления
       setQuantity(1);
+      setState({
+        quantity: "1",
+        price: "",
+        purchase_price: "",
+      });
+      setBarcodeScan("");
+      setCashData((prev) => ({
+        ...prev,
+        name: "",
+        amount: "",
+      }));
+
       dispatch(fetchProductsAsync());
       // Очищаем отсканированный товар
       dispatch(clearScannedProduct());
@@ -176,6 +188,17 @@ const AddProductBarcode = ({
   const handleCancel = () => {
     dispatch(clearScannedProduct());
     setQuantity(1);
+    setState({
+      quantity: "1",
+      price: "",
+      purchase_price: "",
+    });
+    setBarcodeScan("");
+    setCashData((prev) => ({
+      ...prev,
+      name: "",
+      amount: "",
+    }));
   };
 
   return (

@@ -18,7 +18,11 @@ import {
 import { useClient } from "../../../../store/slices/ClientSlice";
 import "./ClientDetails.scss";
 import { useUser } from "../../../../store/slices/userSlice";
-import { addCashFlows, useCash } from "../../../../store/slices/cashSlice";
+import {
+  addCashFlows,
+  useCash,
+  getCashBoxes,
+} from "../../../../store/slices/cashSlice";
 
 /* ===== helpers ===== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -160,11 +164,30 @@ const DebtModal = ({ id, onClose, onChanged }) => {
     debt_months: "",
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [selectCashBox, setSelectCashBox] = useState("");
+  const [cashData, setCashData] = useState({
+    cashbox: "",
+    type: "income",
+    name: "",
+    amount: "",
+  });
 
   // грузим детали сделки
   useEffect(() => {
     dispatch(getClientDealDetail({ clientId, dealId: id }));
+    dispatch(getCashBoxes());
   }, [id, dispatch]);
+
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !cashData.cashbox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setCashData((prev) => ({ ...prev, cashbox: firstCashBoxId }));
+      }
+    }
+  }, [cashBoxes, cashData.cashbox]);
 
   // когда детали приехали — заполняем форму из СЕРВЕРА
   useEffect(() => {
@@ -261,13 +284,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
       ? dealDetail.installments
       : [];
   }, [dealDetail]);
-  const [selectCashBox, setSelectCashBox] = useState("");
-  const [cashData, setCashData] = useState({
-    cashbox: "",
-    type: "income",
-    name: "",
-    amount: "",
-  });
+
   const onCashChange = (e) => {
     const { name, value } = e.target;
     setCashData((prev) => ({ ...prev, [name]: value }));
@@ -374,21 +391,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
         {/* ===== График платежей (с сервера) ===== */}
         {installments.length > 0 && (
           <section className="schedule">
-            <select
-              value={cashData.cashbox}
-              name="cashbox"
-              onChange={onCashChange}
-              className="employee__search-wrapper"
-            >
-              <option value="" disabled>
-                Выберите кассу
-              </option>
-              {cashBoxes?.map((cash) => (
-                <option key={cash.id} value={cash.id}>
-                  {cash.name ?? cash.department_name}
-                </option>
-              ))}
-            </select>
             <div className="row3">
               <div className="label">График платежей</div>
               <div className="value" aria-live="polite">

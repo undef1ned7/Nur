@@ -23,6 +23,17 @@ const AddCashFlowsModal = ({ onClose }) => {
     dispatch(getCashBoxes());
   }, []);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !newCashbox.cashbox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setNewCashbox((prev) => ({ ...prev, cashbox: firstCashBoxId }));
+      }
+    }
+  }, [cashBoxes, newCashbox.cashbox]);
+
   const handleAddCashbox = async () => {
     try {
       dispatch(addCashFlows(newCashbox));
@@ -75,24 +86,25 @@ const AddCashFlowsModal = ({ onClose }) => {
         </div>
         <div className="vitrina__modal-section">
           <label>Касса</label>
-          <select
-            style={{ marginTop: 14, width: "100%" }}
-            className="debt__input"
-            name="cashbox"
-            value={newCashbox.cashbox}
-            onChange={(e) =>
-              setNewCashbox({ ...newCashbox, cashbox: e.target.value })
-            }
-          >
-            <option value="" disabled>
-              Выберите кассу
-            </option>
-            {cashBoxes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name ?? c.department_name}
-              </option>
-            ))}
-          </select>
+          {newCashbox.cashbox && cashBoxes && cashBoxes.length > 0 ? (
+            <span
+              className="debt__input"
+              style={{ padding: "8px", display: "block" }}
+            >
+              Касса:{" "}
+              {cashBoxes.find((c) => c.id === newCashbox.cashbox)?.name ||
+                cashBoxes.find((c) => c.id === newCashbox.cashbox)
+                  ?.department_name ||
+                "Касса"}
+            </span>
+          ) : (
+            <span
+              className="debt__input"
+              style={{ padding: "8px", display: "block", color: "#999" }}
+            >
+              Нет доступных касс
+            </span>
+          )}
         </div>
 
         <div className="vitrina__modal-footer">

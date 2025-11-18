@@ -23,10 +23,12 @@ export const getCashBoxes = createAsyncThunk(
 
 export const getCashFlows = createAsyncThunk(
   "cash/getFlows",
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const { data: response } = await api.get("/construction/cashflows/");
-      return response.results;
+      const { data: response } = await api.get("/construction/cashflows/", {
+        params,
+      });
+      return response.results || response || [];
     } catch (e) {
       return rejectWithValue(e.response?.data || e.message);
     }

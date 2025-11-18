@@ -16,7 +16,9 @@ import {
   fetchBrandsAsync,
   fetchCategoriesAsync,
 } from "../../../store/creators/productCreators";
+import { fetchBranchesAsync } from "../../../store/creators/branchCreators";
 import { useSale } from "../../../store/slices/saleSlice";
+import { useUser } from "../../../store/slices/userSlice";
 
 import "./Analytics.scss";
 
@@ -174,15 +176,25 @@ const Analytics = () => {
     loading: productsLoading,
   } = useSelector((s) => s.product);
 
+  // из branchSlice
+  const { list: branches = [], loading: branchesLoading } = useSelector(
+    (s) => s.branches
+  );
+
+  // из userSlice
+  const { profile } = useUser();
+
   /* ---------- controls ---------- */
+  // По умолчанию показываем текущий месяц (с 1 числа)
   const [startDate, setStartDate] = useState(() => {
     const n = new Date();
-    return `${n.getFullYear()}-01-01`;
+    const firstDayOfMonth = new Date(n.getFullYear(), n.getMonth(), 1);
+    return firstDayOfMonth.toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
-  const [granularity, setGranularity] = useState("month"); // day | month | year
+  const [granularity, setGranularity] = useState("day"); // day | month | year
   const [activeTab, setActiveTab] = useState("cashbox"); // sales | inventory | taxonomy | cashbox
   const [searchQuery, setSearchQuery] = useState(""); // Поиск в таблицах
   const [showFilters, setShowFilters] = useState(false); // Показать/скрыть фильтры
@@ -193,7 +205,36 @@ const Analytics = () => {
     dispatch(fetchProductsAsync({ page: 1, page_size: 1000 }));
     dispatch(fetchBrandsAsync());
     dispatch(fetchCategoriesAsync());
+    dispatch(fetchBranchesAsync());
   }, [dispatch]);
+
+  /* ---------- Автоматический сброс статистики первого числа месяца ---------- */
+  useEffect(() => {
+    const now = new Date();
+    const today = now.getDate();
+
+    // Если сегодня первое число месяца, сбрасываем на текущий месяц
+    if (today === 1) {
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      // Проверяем, не установлены ли уже даты на текущий месяц
+      const currentStart = parseISO(startDate);
+      const currentEnd = parseISO(endDate);
+
+      if (
+        !currentStart ||
+        !currentEnd ||
+        currentStart.getTime() !== firstDayOfMonth.getTime() ||
+        currentEnd.getTime() !== lastDayOfMonth.getTime()
+      ) {
+        setStartDate(firstDayOfMonth.toISOString().slice(0, 10));
+        setEndDate(lastDayOfMonth.toISOString().slice(0, 10));
+        setGranularity("day");
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Выполняется только при монтировании компонента
 
   /* ---------- formatters ---------- */
   const lan =
@@ -243,6 +284,7 @@ const Analytics = () => {
   const quickPreset = (preset) => {
     const now = new Date();
     if (preset === "thisMonth") {
+      // Текущий месяц с 1 числа
       const sd = new Date(now.getFullYear(), now.getMonth(), 1);
       const ed = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       setStartDate(sd.toISOString().slice(0, 10));
@@ -250,6 +292,7 @@ const Analytics = () => {
       setGranularity("day");
     }
     if (preset === "lastMonth") {
+      // Прошлый месяц (с 1 по последнее число)
       const sd = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const ed = new Date(now.getFullYear(), now.getMonth(), 0);
       setStartDate(sd.toISOString().slice(0, 10));
@@ -257,14 +300,25 @@ const Analytics = () => {
       setGranularity("day");
     }
     if (preset === "ytd") {
+      // С начала года до сегодня
       const sd = new Date(now.getFullYear(), 0, 1);
       setStartDate(sd.toISOString().slice(0, 10));
       setEndDate(now.toISOString().slice(0, 10));
       setGranularity("month");
     }
     if (preset === "thisYear") {
+      // Весь текущий год
       const sd = new Date(now.getFullYear(), 0, 1);
       const ed = new Date(now.getFullYear(), 11, 31);
+      setStartDate(sd.toISOString().slice(0, 10));
+      setEndDate(ed.toISOString().slice(0, 10));
+      setGranularity("month");
+    }
+    if (preset === "lastYear") {
+      // Прошлый год (с 1 января по 31 декабря)
+      const lastYear = now.getFullYear() - 1;
+      const sd = new Date(lastYear, 0, 1);
+      const ed = new Date(lastYear, 11, 31);
       setStartDate(sd.toISOString().slice(0, 10));
       setEndDate(ed.toISOString().slice(0, 10));
       setGranularity("month");
@@ -437,7 +491,17 @@ const Analytics = () => {
         const res = await api.get("/construction/cashboxes/", {
           params: { page_size: 1000 },
         });
-        if (!cancelled) setBoxes(listFrom(res));
+        if (!cancelled) {
+          const boxesList = listFrom(res);
+          setBoxes(boxesList);
+          // Автоматически выбираем первую кассу по индексу
+          if (boxesList.length > 0) {
+            const firstBoxId = boxesList[0]?.id || boxesList[0]?.uuid || "";
+            if (firstBoxId) {
+              setBoxId(firstBoxId);
+            }
+          }
+        }
       } catch (e) {
         if (!cancelled) setBoxes([]);
       }
@@ -446,6 +510,16 @@ const Analytics = () => {
       cancelled = true;
     };
   }, []);
+
+  // Всегда выбираем первую кассу по индексу при изменении списка касс
+  useEffect(() => {
+    if (boxes.length > 0 && (!boxId || boxId === "all")) {
+      const firstBoxId = boxes[0]?.id || boxes[0]?.uuid || "";
+      if (firstBoxId) {
+        setBoxId(firstBoxId);
+      }
+    }
+  }, [boxes]);
 
   /* ---------- Refresh handler (moved after loadFlows definition) ---------- */
   const handleRefresh = () => {
@@ -729,47 +803,110 @@ const Analytics = () => {
       .slice(0, 50);
   }, [flowsFiltered, searchQuery]);
 
+  /* ====================== BRANCHES ANALYTICS ====================== */
+  // Аналитика по филиалам
+  const branchAnalytics = useMemo(() => {
+    if (!branches.length) return [];
+
+    return branches.map((branch) => {
+      const branchId = branch.id || branch.uuid;
+
+      // Продажи по филиалу
+      const branchSales = salesFiltered.filter(
+        (sale) => sale.branch === branchId || sale.branch_id === branchId
+      );
+      const branchSalesRevenue = branchSales.reduce(
+        (acc, r) => acc + num(r?.total),
+        0
+      );
+
+      // Касса по филиалу
+      // Находим кассы, принадлежащие филиалу
+      const branchBoxes = boxes.filter((b) => {
+        const boxBranchId = b.branch || b.branch_id || b.branch_uuid;
+        return (
+          boxBranchId === branchId ||
+          boxBranchId === branch?.id ||
+          boxBranchId === branch?.uuid
+        );
+      });
+      const branchBoxIds = branchBoxes
+        .map((b) => b.id || b.uuid)
+        .filter(Boolean);
+
+      // Фильтруем потоки по кассам филиала
+      const branchFlows = flowsFiltered.filter((flow) => {
+        if (!flow.cashboxId) return false;
+        return branchBoxIds.includes(flow.cashboxId);
+      });
+      const branchCashIncome = branchFlows
+        .filter((f) => f.type === "income")
+        .reduce((acc, f) => acc + num(f.amount), 0);
+      const branchCashExpense = branchFlows
+        .filter((f) => f.type === "expense")
+        .reduce((acc, f) => acc + num(f.amount), 0);
+
+      // Склад по филиалу
+      const branchProducts = products.filter(
+        (p) => p.branch === branchId || p.branch_id === branchId
+      );
+      const branchStockValue = branchProducts.reduce(
+        (acc, p) => acc + num(p?.price) * num(p?.quantity),
+        0
+      );
+
+      return {
+        id: branchId,
+        name: branch.name || branch.department_name || "Филиал",
+        sales: {
+          count: branchSales.length,
+          revenue: branchSalesRevenue,
+        },
+        cashbox: {
+          income: branchCashIncome,
+          expense: branchCashExpense,
+          net: branchCashIncome - branchCashExpense,
+        },
+        warehouse: {
+          productsCount: branchProducts.length,
+          stockValue: branchStockValue,
+        },
+      };
+    });
+  }, [branches, salesFiltered, flowsFiltered, boxes, products]);
+
   /* ====================== UI ====================== */
+  // Проверяем, является ли пользователь филиалом
+  // Если у пользователя есть branch_ids, это означает, что он является филиалом
+  const isBranchUser =
+    profile?.branch_ids &&
+    Array.isArray(profile.branch_ids) &&
+    profile.branch_ids.length > 0;
+
   const TABS = [
     { key: "sales", label: "Продажи" },
     { key: "inventory", label: "Склад" },
     // { key: "taxonomy", label: "Бренды/Категории" },
     { key: "cashbox", label: "Касса" },
+    // Показываем вкладку "Филиалы" только если есть филиалы И пользователь НЕ является филиалом
+    ...(branches.length > 0 && !isBranchUser
+      ? [{ key: "branches", label: "Филиалы" }]
+      : []),
   ];
 
   return (
     <div className="analytics">
       {/* Header with actions */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: "1.5rem" }}>Аналитика</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div className="analytics__header">
+        <h2 className="analytics__title">Аналитика</h2>
+        <div className="analytics__actions">
           <button
             onClick={handleRefresh}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 16px",
-              background: "var(--c-accent, #f9cf00)",
-              border: "none",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 14,
-              fontWeight: 500,
-            }}
+            className="analytics__refresh-btn"
             title="Обновить данные"
           >
             <RefreshCw size={16} />
-            Обновить
+            <span className="analytics__refresh-text">Обновить</span>
           </button>
         </div>
       </div>
@@ -817,6 +954,9 @@ const Analytics = () => {
               </button>
               <button onClick={() => quickPreset("ytd")}>Год-к-дате</button>
               <button onClick={() => quickPreset("thisYear")}>Весь год</button>
+              <button onClick={() => quickPreset("lastYear")}>
+                Прошлый год
+              </button>
             </div>
             <div className="analytics-sales__range">
               <label className="analytics-sales__label">
@@ -826,6 +966,7 @@ const Analytics = () => {
                   className="analytics-sales__input"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
+                  max={endDate}
                 />
               </label>
               <label className="analytics-sales__label">
@@ -835,6 +976,8 @@ const Analytics = () => {
                   className="analytics-sales__input"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  max={new Date().toISOString().slice(0, 10)}
                 />
               </label>
 
@@ -1359,6 +1502,9 @@ const Analytics = () => {
               </button>
               <button onClick={() => quickPreset("ytd")}>Год-к-дате</button>
               <button onClick={() => quickPreset("thisYear")}>Весь год</button>
+              <button onClick={() => quickPreset("lastYear")}>
+                Прошлый год
+              </button>
             </div>
             <div className="analytics-cashbox__range">
               <label className="analytics-cashbox__label">
@@ -1368,6 +1514,7 @@ const Analytics = () => {
                   className="analytics-cashbox__input"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
+                  max={endDate}
                 />
               </label>
               <label className="analytics-cashbox__label">
@@ -1377,6 +1524,8 @@ const Analytics = () => {
                   className="analytics-cashbox__input"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  max={new Date().toISOString().slice(0, 10)}
                 />
               </label>
 
@@ -1403,24 +1552,6 @@ const Analytics = () => {
                 >
                   Годы
                 </button>
-              </div>
-
-              <div className="analytics-cashbox__select">
-                <label className="analytics-cashbox__label">
-                  Касса
-                  <select
-                    className="analytics-cashbox__input"
-                    value={boxId}
-                    onChange={(e) => setBoxId(e.target.value)}
-                  >
-                    <option value="all">Все кассы</option>
-                    {boxes.map((b) => (
-                      <option key={b.id || b.uuid} value={b.id || b.uuid}>
-                        {b.department_name || b.name || b.id || b.uuid}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
             </div>
           </div>
@@ -1829,6 +1960,224 @@ const Analytics = () => {
               </div>
             </div>
           </div>
+        </section>
+      )}
+
+      {/* ---------------- BRANCHES ---------------- */}
+      {activeTab === "branches" && branches.length > 0 && !isBranchUser && (
+        <section
+          id="panel-branches"
+          className="analytics-branches"
+          role="tabpanel"
+        >
+          <div className="analytics-branches__header">
+            <h3 className="analytics-branches__title">Аналитика по филиалам</h3>
+            <p className="analytics-branches__subtitle">
+              Статистика по всем филиалам за выбранный период
+            </p>
+          </div>
+
+          {branchesLoading ? (
+            <div className="analytics-branches__loading">
+              Загрузка данных о филиалах…
+            </div>
+          ) : branchAnalytics.length === 0 ? (
+            <div className="analytics-branches__empty">
+              Нет данных по филиалам
+            </div>
+          ) : (
+            <div className="analytics-branches__grid">
+              {branchAnalytics.map((branch) => (
+                <div key={branch.id} className="analytics-branches__card">
+                  <div className="analytics-branches__card-header">
+                    <h4 className="analytics-branches__card-title">
+                      {branch.name}
+                    </h4>
+                  </div>
+
+                  <div className="analytics-branches__kpis">
+                    <div className="analytics-branches__kpi">
+                      <div className="analytics-branches__kpi-label">
+                        Продажи
+                      </div>
+                      <div className="analytics-branches__kpi-value">
+                        {nfInt.format(branch.sales.count)}
+                      </div>
+                      <div className="analytics-branches__kpi-subvalue">
+                        {nfMoney.format(branch.sales.revenue)}
+                      </div>
+                    </div>
+
+                    <div className="analytics-branches__kpi">
+                      <div className="analytics-branches__kpi-label">
+                        Приход
+                      </div>
+                      <div className="analytics-branches__kpi-value">
+                        {nfMoney.format(branch.cashbox.income)}
+                      </div>
+                    </div>
+
+                    <div className="analytics-branches__kpi">
+                      <div className="analytics-branches__kpi-label">
+                        Расход
+                      </div>
+                      <div className="analytics-branches__kpi-value">
+                        {nfMoney.format(branch.cashbox.expense)}
+                      </div>
+                    </div>
+
+                    <div className="analytics-branches__kpi">
+                      <div className="analytics-branches__kpi-label">
+                        Сальдо
+                      </div>
+                      <div
+                        className="analytics-branches__kpi-value"
+                        style={{
+                          color:
+                            branch.cashbox.net >= 0 ? "#28a745" : "#dc3545",
+                        }}
+                      >
+                        {nfMoney.format(branch.cashbox.net)}
+                      </div>
+                    </div>
+
+                    <div className="analytics-branches__kpi">
+                      <div className="analytics-branches__kpi-label">
+                        Товаров на складе
+                      </div>
+                      <div className="analytics-branches__kpi-value">
+                        {nfInt.format(branch.warehouse.productsCount)}
+                      </div>
+                      <div className="analytics-branches__kpi-subvalue">
+                        {nfMoney.format(branch.warehouse.stockValue)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Сводная таблица по филиалам */}
+          {branchAnalytics.length > 0 && (
+            <div className="analytics-branches__table-card">
+              <div className="analytics-branches__card-title">
+                Сводная таблица по филиалам
+              </div>
+              <div
+                className="analytics-sales__table-wrap"
+                role="region"
+                aria-label="Сводная таблица филиалов"
+              >
+                <table className="analytics-sales__table">
+                  <thead>
+                    <tr>
+                      <th>Филиал</th>
+                      <th>Продажи (кол-во)</th>
+                      <th>Выручка</th>
+                      <th>Приход</th>
+                      <th>Расход</th>
+                      <th>Сальдо</th>
+                      <th>Товаров</th>
+                      <th>Стоимость склада</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {branchAnalytics.map((branch) => (
+                      <tr key={branch.id}>
+                        <td style={{ fontWeight: "600" }}>{branch.name}</td>
+                        <td>{nfInt.format(branch.sales.count)}</td>
+                        <td>{nfMoney.format(branch.sales.revenue)}</td>
+                        <td>{nfMoney.format(branch.cashbox.income)}</td>
+                        <td>{nfMoney.format(branch.cashbox.expense)}</td>
+                        <td
+                          style={{
+                            color:
+                              branch.cashbox.net >= 0 ? "#28a745" : "#dc3545",
+                            fontWeight: "600",
+                          }}
+                        >
+                          {nfMoney.format(branch.cashbox.net)}
+                        </td>
+                        <td>{nfInt.format(branch.warehouse.productsCount)}</td>
+                        <td>{nfMoney.format(branch.warehouse.stockValue)}</td>
+                      </tr>
+                    ))}
+                    {/* Итоговая строка */}
+                    <tr style={{ fontWeight: "600", background: "#f8f9fa" }}>
+                      <td>Итого</td>
+                      <td>
+                        {nfInt.format(
+                          branchAnalytics.reduce(
+                            (acc, b) => acc + b.sales.count,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td>
+                        {nfMoney.format(
+                          branchAnalytics.reduce(
+                            (acc, b) => acc + b.sales.revenue,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td>
+                        {nfMoney.format(
+                          branchAnalytics.reduce(
+                            (acc, b) => acc + b.cashbox.income,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td>
+                        {nfMoney.format(
+                          branchAnalytics.reduce(
+                            (acc, b) => acc + b.cashbox.expense,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          color:
+                            branchAnalytics.reduce(
+                              (acc, b) => acc + b.cashbox.net,
+                              0
+                            ) >= 0
+                              ? "#28a745"
+                              : "#dc3545",
+                        }}
+                      >
+                        {nfMoney.format(
+                          branchAnalytics.reduce(
+                            (acc, b) => acc + b.cashbox.net,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td>
+                        {nfInt.format(
+                          branchAnalytics.reduce(
+                            (acc, b) => acc + b.warehouse.productsCount,
+                            0
+                          )
+                        )}
+                      </td>
+                      <td>
+                        {nfMoney.format(
+                          branchAnalytics.reduce(
+                            (acc, b) => acc + b.warehouse.stockValue,
+                            0
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

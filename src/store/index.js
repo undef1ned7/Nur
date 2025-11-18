@@ -22,6 +22,7 @@ import agentCartReducer from "./slices/agentCartSlice";
 import catalogReducer from "./slices/catalogSlice";
 import cartReducer from "./slices/cartSlice";
 import cafeOrdersReducer from "./slices/cafeOrdersSlice";
+import branchReducer from "./slices/branchSlice";
 import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
@@ -49,6 +50,7 @@ const store = configureStore({
     catalog: catalogReducer,
     cart: cartReducer,
     cafeOrders: cafeOrdersReducer,
+    branches: branchReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

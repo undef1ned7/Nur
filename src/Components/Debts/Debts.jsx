@@ -238,6 +238,17 @@ const Debts = () => {
     dispatch(getCashBoxes());
   }, []);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !cashbox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setCashbox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, cashbox]);
+
   /* filter */
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -313,7 +324,8 @@ const Debts = () => {
     const current = items.find((x) => x.id === payId);
     if (!current) return setPayErr("Запись не найдена");
 
-    if (!cashbox) return setPayErr("Выберите кассу");
+    if (!cashbox)
+      return setPayErr("Касса не выбрана. Создайте кассу в разделе «Кассы».");
 
     // «долг» показываем по balance если есть, иначе по amount
     const baseDebt = num(
@@ -436,18 +448,6 @@ const Debts = () => {
             onChange={(e) => setDateTo(e.target.value)}
             title="Дата до (по дате создания)"
           />
-          <select
-            value={cashbox}
-            onChange={(e) => setCashbox(e.target.value)}
-            className="sell__header-input"
-          >
-            <option value="">Выберите кассу</option>
-            {cashBoxes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name ?? c.department_name}
-              </option>
-            ))}
-          </select>
         </div>
 
         <button

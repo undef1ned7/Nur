@@ -106,6 +106,8 @@ import PiloramaWarehouse from "./Components/Sectors/Pilorama/PiloramaWarehouse/P
 import ProductionCatalog from "./Components/Sectors/Production/Catalog/ProductionCatalog";
 import Cook from "./Components/Sectors/cafe/Cook/Cook";
 import CafeInventory from "./Components/Sectors/cafe/Inventory/CafeInventory";
+import Branch from "./Components/pages/Branch/Branch";
+import BranchDetails from "./Components/pages/Branch/BranchDetails";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -351,6 +353,31 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DepartmentDetails />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="branch"
+              element={
+                <ProtectedRoute>
+                  <Branch />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="building/objects"
+              element={
+                <ProtectedRoute>
+                  <Branch />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="branch/:id"
+              element={
+                <ProtectedRoute>
+                  <BranchDetails />
                 </ProtectedRoute>
               }
             />

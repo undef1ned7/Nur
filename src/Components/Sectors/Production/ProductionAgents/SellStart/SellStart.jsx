@@ -771,6 +771,18 @@ const SellStart = ({ show, setShow }) => {
     }
   }, [dispatch, isPilorama]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+        setCashData((prev) => ({ ...prev, cashbox: firstCashBoxId }));
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   useEffect(() => {
     api
       .get("/main/owners/agents/products/")
@@ -925,11 +937,12 @@ const SellStart = ({ show, setShow }) => {
   // === Checkout + МГНОВЕННАЯ ПЕЧАТЬ В ПРИНТЕР ===
   const performCheckout = async (withReceipt) => {
     try {
+      // Дополнительная проверка кассы перед выполнением операции
       if (!cashData.cashbox) {
         setAlert({
           open: true,
           type: "error",
-          message: "Выберите кассу для проведения операции",
+          message: "Касса не выбрана. Создайте кассу в разделе «Кассы».",
         });
         return;
       }
@@ -1132,22 +1145,6 @@ const SellStart = ({ show, setShow }) => {
               </svg>
             </span>
           </button>
-          <select
-            value={selectCashBox}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSelectCashBox(v);
-              setCashData((prev) => ({ ...prev, cashbox: v }));
-            }}
-            className="sell__header-input"
-          >
-            <option value="">Выберите кассу</option>
-            {cashBoxes?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name ?? c.department_name}
-              </option>
-            ))}
-          </select>
         </div>
 
         <div className="sell__header-left">

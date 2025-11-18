@@ -223,6 +223,17 @@ export default function ConsultingSale({
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !cashboxId) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setCashboxId(String(firstCashBoxId));
+      }
+    }
+  }, [cashBoxes, cashboxId]);
+
   return (
     <section className="sale">
       <header className="sale__header">
@@ -424,20 +435,6 @@ export default function ConsultingSale({
 
                 <div className="sale__field sale__field--full">
                   <label className="sale__label">Касса *</label>
-                  <select
-                    className="sale__input"
-                    value={cashboxId}
-                    onChange={(e) => setCashboxId(e.target.value)}
-                    required
-                    disabled={disabled}
-                  >
-                    <option value="">-- Выберите кассу --</option>
-                    {cashBoxes.map((box) => (
-                      <option key={box.id} value={String(box.id)}>
-                        {box.name ?? box.department_name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 {/* Инлайн форма клиента */}

@@ -62,27 +62,7 @@ const SkladHeader = ({
           </>
         ) : (
           <>
-            <select
-              value={selectCashBox}
-              onChange={(e) => onSelectCashBox(e.target.value)}
-              className="employee__search-wrapper"
-            >
-              <option value="" disabled>
-                Выберите кассу
-              </option>
-              {cashBoxes?.map((cash) => (
-                <option key={cash.id} value={cash.id}>
-                  {cash.name ?? cash.department_name}
-                </option>
-              ))}
-            </select>
-
-            <button
-              className="sklad__add"
-              onClick={onAdd}
-              disabled={!selectCashBox}
-              title={!selectCashBox ? "Сначала выберите кассу" : undefined}
-            >
+            <button className="sklad__add" onClick={onAdd}>
               <Plus size={16} style={{ marginRight: "4px" }} /> Добавить товар
             </button>
           </>

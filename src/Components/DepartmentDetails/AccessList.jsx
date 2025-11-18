@@ -1,11 +1,14 @@
 // AccessList.jsx
-import { useEffect, useState } from "react";
-import { FaCheckCircle, FaRegCircle } from "react-icons/fa";
+import { useEffect, useState, useMemo } from "react";
+import { FaCheckCircle, FaRegCircle, FaSearch, FaTimes } from "react-icons/fa";
+import { MENU_CONFIG } from "../Sidebar/config/menuConfig";
+import { HIDE_RULES } from "../Sidebar/config/hideRules";
 
 // Базовые permissions (общие для всех секторов)
 const BASIC_ACCESS_TYPES = [
   { value: "Касса", label: "Касса", backendKey: "can_view_cashbox" },
   { value: "Отделы", label: "Отделы", backendKey: "can_view_departments" },
+  { value: "Филиалы", label: "Филиалы", backendKey: "can_view_branch" },
   { value: "Долги", label: "Долги", backendKey: "can_view_debts" },
   { value: "Заказы", label: "Заказы", backendKey: "can_view_orders" },
   { value: "Аналитика", label: "Аналитика", backendKey: "can_view_analytics" },
@@ -176,8 +179,14 @@ const SECTOR_ACCESS_TYPES = {
 };
 
 // Функция для получения всех доступных permissions на основе сектора
-const getAllAccessTypes = (sectorName) => {
+const getAllAccessTypes = (sectorName, tariff = null) => {
   const basicAccess = [...BASIC_ACCESS_TYPES];
+
+  // Для тарифа "Старт" возвращаем только базовые доступы
+  if (tariff === "Старт") {
+    return basicAccess;
+  }
+
   const sectorAccess = SECTOR_ACCESS_TYPES[sectorName] || [];
   return [...basicAccess, ...sectorAccess];
 };
@@ -194,29 +203,129 @@ const AccessList = ({
   sectorName,
   profile,
   tariff,
+  company, // Добавляем company для использования в логике меню
+  isModalMode = false, // Новый проп для режима модального окна
 }) => {
-  // console.log(employeeAccesses, "employeeAccesses in AccessList");
-  console.log("AccessList - Tariff:", tariff);
+  const [isOpen, setIsOpen] = useState(isModalMode); // В модальном режиме сразу открыт
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedAccess, setSelectedAccess] = useState(() => {
-    const availableAccessTypes = (() => {
-      if (!sectorName) return ALL_ACCESS_TYPES;
+  // Получаем доступы, которые реально показываются в сайдбаре
+  const sidebarAccessTypes = useMemo(() => {
+    // Вычисляем скрытые элементы на основе правил (как в useMenuItems)
+    const hiddenByRules = (() => {
+      const result = { labels: new Set(), toIncludes: [] };
 
-      // Для тарифа "Старт" всегда показываем только базовые permissions
-      if (tariff === "Старт") {
-        return getAllAccessTypes(sectorName, tariff);
-      }
+      HIDE_RULES.forEach((rule) => {
+        const { when = {}, hide = {} } = rule;
+        const sectorOk = !when.sector || when.sector === sectorName;
+        const tariffOk = !when.tariff || when.tariff === tariff;
+        const tariffInOk =
+          !when.tariffIn || (tariff && when.tariffIn.includes(tariff));
+        const tariffNotInOk =
+          !when.tariffNotIn || (tariff && !when.tariffNotIn.includes(tariff));
 
-      const allTypes = getAllAccessTypes(sectorName, tariff);
+        if (sectorOk && tariffOk && tariffInOk && tariffNotInOk) {
+          (hide.labels || []).forEach((l) => result.labels.add(l));
+          (hide.toIncludes || []).forEach((p) => result.toIncludes.push(p));
+        }
+      });
 
-      // Если пользователь не владелец, показываем только базовые permissions
-      if (profile?.role_display !== "Владелец") {
-        return ALL_ACCESS_TYPES;
-      }
-
-      return allTypes;
+      return result;
     })();
+
+    // Получаем базовые пункты меню
+    const basicItems = MENU_CONFIG.basic.filter((item) => {
+      if (!item.implemented) return false;
+      if (hiddenByRules.labels.has(item.label)) return false;
+      if (
+        hiddenByRules.toIncludes.length > 0 &&
+        typeof item.to === "string" &&
+        hiddenByRules.toIncludes.some((p) => item.to.includes(p))
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    // Получаем секторные пункты меню
+    let sectorItems = [];
+    if (sectorName && company?.sector?.name && tariff !== "Старт") {
+      const sectorNameLower = company.sector.name.toLowerCase();
+      const sectorKey = sectorNameLower.replace(/\s+/g, "_");
+
+      const sectorMapping = {
+        строительная_компания: "building",
+        ремонтные_и_отделочные_работы: "building",
+        архитектура_и_дизайн: "building",
+        барбершоп: "barber",
+        гостиница: "hostel",
+        школа: "school",
+        магазин: "market",
+        кафе: "cafe",
+        "Цветочный магазин": "market",
+        производство: "production",
+        консалтинг: "consulting",
+        склад: "warehouse",
+        пилорама: "pilorama",
+      };
+
+      const configKey = sectorMapping[sectorKey] || sectorKey;
+      const sectorConfig = MENU_CONFIG.sector[configKey] || [];
+
+      sectorItems = sectorConfig.filter((item) => {
+        if (!item.implemented) return false;
+        if (hiddenByRules.labels.has(item.label)) return false;
+        if (
+          hiddenByRules.toIncludes.length > 0 &&
+          typeof item.to === "string" &&
+          hiddenByRules.toIncludes.some((p) => item.to.includes(p))
+        ) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    // Собираем все permissions из меню
+    const allMenuPermissions = new Set();
+    [...basicItems, ...sectorItems].forEach((item) => {
+      if (item.permission) {
+        allMenuPermissions.add(item.permission);
+      }
+      // Обрабатываем children для дополнительных услуг
+      if (item.children && Array.isArray(item.children)) {
+        item.children.forEach((child) => {
+          if (child.permission) {
+            allMenuPermissions.add(child.permission);
+          }
+        });
+      }
+    });
+
+    // Маппим permissions обратно в доступы из BASIC_ACCESS_TYPES и SECTOR_ACCESS_TYPES
+    const result = [];
+
+    // Базовые доступы
+    BASIC_ACCESS_TYPES.forEach((accessType) => {
+      if (allMenuPermissions.has(accessType.backendKey)) {
+        result.push(accessType);
+      }
+    });
+
+    // Секторные доступы
+    const sectorAccess = SECTOR_ACCESS_TYPES[sectorName] || [];
+    sectorAccess.forEach((accessType) => {
+      if (allMenuPermissions.has(accessType.backendKey)) {
+        result.push(accessType);
+      }
+    });
+
+    return result;
+  }, [sectorName, tariff, company]);
+
+  const [selectedAccess, setSelectedAccess] = useState(() => {
+    // Используем доступы из сайдбара
+    const availableAccessTypes = sidebarAccessTypes;
 
     const initialAccess = {};
     availableAccessTypes.forEach((accessType) => {
@@ -233,23 +342,8 @@ const AccessList = ({
   }, [selectedAccess]);
 
   useEffect(() => {
-    const availableAccessTypes = (() => {
-      if (!sectorName) return ALL_ACCESS_TYPES;
-
-      // Для тарифа "Старт" всегда показываем только базовые permissions
-      if (tariff === "Старт") {
-        return getAllAccessTypes(sectorName, tariff);
-      }
-
-      const allTypes = getAllAccessTypes(sectorName, tariff);
-
-      // Если пользователь не владелец, показываем только базовые permissions
-      if (profile?.role_display !== "Владелец") {
-        return ALL_ACCESS_TYPES;
-      }
-
-      return allTypes;
-    })();
+    // Используем доступы из сайдбара
+    const availableAccessTypes = sidebarAccessTypes;
 
     const newAccessState = {};
     availableAccessTypes.forEach((accessType) => {
@@ -258,7 +352,7 @@ const AccessList = ({
       );
     });
     setSelectedAccess(newAccessState);
-  }, [employeeAccesses, sectorName, profile?.role_display, tariff]);
+  }, [employeeAccesses, sidebarAccessTypes]);
 
   const toggleAccess = (backendKey) => {
     setSelectedAccess((prev) => ({
@@ -267,35 +361,396 @@ const AccessList = ({
     }));
   };
 
+  // Используем доступы из сайдбара
+  const availableAccessTypes = sidebarAccessTypes;
+
+  // Разделяем на базовые и секторные
+  const basicAccessTypes = useMemo(() => {
+    return availableAccessTypes.filter((type) =>
+      BASIC_ACCESS_TYPES.some((basic) => basic.backendKey === type.backendKey)
+    );
+  }, [availableAccessTypes]);
+
+  const sectorAccessTypes = useMemo(() => {
+    return availableAccessTypes.filter(
+      (type) =>
+        !BASIC_ACCESS_TYPES.some(
+          (basic) => basic.backendKey === type.backendKey
+        )
+    );
+  }, [availableAccessTypes]);
+
+  // Фильтрация по поисковому запросу
+  const filteredBasic = useMemo(() => {
+    if (!searchQuery.trim()) return basicAccessTypes;
+    const query = searchQuery.toLowerCase();
+    return basicAccessTypes.filter((type) =>
+      type.label.toLowerCase().includes(query)
+    );
+  }, [basicAccessTypes, searchQuery]);
+
+  const filteredSector = useMemo(() => {
+    if (!searchQuery.trim()) return sectorAccessTypes;
+    const query = searchQuery.toLowerCase();
+    return sectorAccessTypes.filter((type) =>
+      type.label.toLowerCase().includes(query)
+    );
+  }, [sectorAccessTypes, searchQuery]);
+
   const handleSave = () => {
-    const availableAccessTypes = (() => {
-      if (!sectorName) return ALL_ACCESS_TYPES;
-
-      // Для тарифа "Старт" всегда показываем только базовые permissions
-      if (tariff === "Старт") {
-        return getAllAccessTypes(sectorName, tariff);
-      }
-
-      const allTypes = getAllAccessTypes(sectorName, tariff);
-
-      // Если пользователь не владелец, показываем только базовые permissions
-      if (profile?.role_display !== "Владелец") {
-        return ALL_ACCESS_TYPES;
-      }
-
-      return allTypes;
-    })();
-
     const payloadForBackend = {};
-    availableAccessTypes.forEach((accessType) => {
+    // Сохраняем только те доступы, которые есть в сайдбаре
+    sidebarAccessTypes.forEach((accessType) => {
       payloadForBackend[accessType.backendKey] =
         !!selectedAccess[accessType.backendKey];
     });
 
     onSaveAccesses(payloadForBackend);
-    setIsOpen(false);
+    if (!isModalMode) {
+      setIsOpen(false);
+    }
   };
 
+  const handleSelectAll = (types, select = true) => {
+    const newAccess = { ...selectedAccess };
+    types.forEach((type) => {
+      newAccess[type.backendKey] = select;
+    });
+    setSelectedAccess(newAccess);
+  };
+
+  // Если режим модального окна, рендерим полную версию
+  if (isModalMode) {
+    return (
+      <div className="access-list-modal">
+        {/* Поиск */}
+        <div
+          style={{
+            position: "relative",
+            marginBottom: "20px",
+          }}
+        >
+          <FaSearch
+            style={{
+              position: "absolute",
+              left: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#999",
+              fontSize: "14px",
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Поиск доступов..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px 12px 10px 36px",
+              border: "1px solid #ddd",
+              borderRadius: "6px",
+              fontSize: "14px",
+              outline: "none",
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#999",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <FaTimes size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Базовые доступы */}
+        {filteredBasic.length > 0 && (
+          <div style={{ marginBottom: "24px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+                paddingBottom: "8px",
+                borderBottom: "2px solid #e0e0e0",
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#333",
+                }}
+              >
+                Базовые доступы
+              </h4>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => handleSelectAll(filteredBasic, true)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Выбрать все
+                </button>
+                <button
+                  onClick={() => handleSelectAll(filteredBasic, false)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Снять все
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "8px",
+                maxHeight: "300px",
+                overflowY: "auto",
+                padding: "8px",
+                background: "#f9f9f9",
+                borderRadius: "6px",
+              }}
+            >
+              {filteredBasic.map((accessType) => (
+                <label
+                  key={accessType.backendKey}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderRadius: "4px",
+                    background: selectedAccess[accessType.backendKey]
+                      ? "#e8f5e9"
+                      : "white",
+                    border: `1px solid ${
+                      selectedAccess[accessType.backendKey] ? "#4caf50" : "#ddd"
+                    }`,
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "#f5f5f5";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "white";
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!selectedAccess[accessType.backendKey]}
+                    onChange={() => toggleAccess(accessType.backendKey)}
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      color: "#333",
+                      userSelect: "none",
+                    }}
+                  >
+                    {accessType.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Секторные доступы */}
+        {filteredSector.length > 0 && (
+          <div style={{ marginBottom: "24px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+                paddingBottom: "8px",
+                borderBottom: "2px solid #e0e0e0",
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#333",
+                }}
+              >
+                Секторные доступы
+              </h4>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => handleSelectAll(filteredSector, true)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Выбрать все
+                </button>
+                <button
+                  onClick={() => handleSelectAll(filteredSector, false)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Снять все
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "8px",
+                maxHeight: "300px",
+                overflowY: "auto",
+                padding: "8px",
+                background: "#f9f9f9",
+                borderRadius: "6px",
+              }}
+            >
+              {filteredSector.map((accessType) => (
+                <label
+                  key={accessType.backendKey}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderRadius: "4px",
+                    background: selectedAccess[accessType.backendKey]
+                      ? "#e3f2fd"
+                      : "white",
+                    border: `1px solid ${
+                      selectedAccess[accessType.backendKey] ? "#2196f3" : "#ddd"
+                    }`,
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "#f5f5f5";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "white";
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!selectedAccess[accessType.backendKey]}
+                    onChange={() => toggleAccess(accessType.backendKey)}
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      color: "#333",
+                      userSelect: "none",
+                    }}
+                  >
+                    {accessType.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Кнопка сохранения */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "12px",
+            marginTop: "24px",
+            paddingTop: "16px",
+            borderTop: "1px solid #e0e0e0",
+          }}
+        >
+          <button
+            onClick={handleSave}
+            style={{
+              padding: "10px 24px",
+              borderRadius: "6px",
+              border: "none",
+              backgroundColor: "#007bff",
+              color: "white",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: "600",
+              transition: "background-color 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#0056b3";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#007bff";
+            }}
+          >
+            Сохранить доступы
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Старый режим (для использования в таблице)
   return (
     <div className={"accessList"} style={{ position: "relative" }}>
       <button

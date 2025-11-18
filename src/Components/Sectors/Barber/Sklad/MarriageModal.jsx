@@ -45,6 +45,17 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   const validate = () => {
     if (!q) return "Введите количество брака";
     if (q <= 0) return "Количество должно быть больше 0";
@@ -53,7 +64,14 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     }
     if (q > stockQty)
       return `Нельзя списать больше, чем в наличии (${stockQty})`;
-    if (!selectCashBox) return "Выберите кассу";
+    // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
+    // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
+    if (Array.isArray(cashBoxes) && cashBoxes.length > 0 && !selectCashBox) {
+      return "Касса не выбрана. Создайте кассу в разделе «Кассы».";
+    }
+    if (Array.isArray(cashBoxes) && cashBoxes.length === 0) {
+      return "Нет доступных касс. Создайте кассу в разделе «Кассы».";
+    }
     if (unitCost < 0) return "Себестоимость указана неверно";
     return "";
   };
@@ -65,6 +83,13 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
       setError(err);
       return;
     }
+
+    // Дополнительная проверка кассы перед выполнением операции
+    if (!selectCashBox) {
+      setError("Касса не выбрана. Создайте кассу в разделе «Кассы».");
+      return;
+    }
+
     setError("");
 
     try {
@@ -125,21 +150,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
             step={1}
           />
 
-          <select
-            style={{ marginTop: 15, width: "100%" }}
-            value={selectCashBox}
-            onChange={(e) => setSelectCashBox(e.target.value)}
-            className="debt__input"
-          >
-            <option value="" disabled>
-              Выберите кассу
-            </option>
-            {cashBoxes?.map((cash) => (
-              <option key={cash.id} value={cash.id}>
-                {cash.name ?? cash.department_name}
-              </option>
-            ))}
-          </select>
+          {/* касса автоматически выбирается - скрыто от пользователя */}
 
           <div style={{ marginTop: 12 }}>
             К списанию: <b>{isFinite(expense) ? expense : 0}</b>
@@ -166,7 +177,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
             }}
             className="btn edit-btn"
             type="submit"
-            disabled={!defectiveQty || !selectCashBox || !!validate()}
+            disabled={!defectiveQty || !!validate()}
           >
             Отправить
           </button>

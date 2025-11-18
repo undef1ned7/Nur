@@ -107,6 +107,17 @@ export default function EditModal({
   useEffect(() => {
     getCashBoxes();
   }, []);
+
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectedCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectedCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectedCashBox]);
   return (
     <div className="edit-modal sklad">
       <div className="edit-modal__overlay" onClick={onClose} />
@@ -237,22 +248,7 @@ export default function EditModal({
         </div>
 
         {/* касса */}
-        <div className="edit-modal__section">
-          <label>Выберите кассу *</label>
-          <select
-            name="cashbox"
-            value={selectedCashBox}
-            onChange={(e) => setSelectedCashBox(e.target.value)}
-            required
-          >
-            <option value="">-- Выберите кассу --</option>
-            {cashBoxes?.map((client, idx) => (
-              <option key={client.id ?? idx} value={client.id}>
-                {client.department_name ?? client.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* касса автоматически выбирается - скрыто от пользователя */}
 
         {/* Количество */}
         <div className="edit-modal__section">

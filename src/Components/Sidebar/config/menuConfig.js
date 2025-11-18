@@ -71,6 +71,13 @@ export const MENU_CONFIG = {
       implemented: true,
     },
     {
+      label: "Филиалы",
+      to: "/crm/branch",
+      icon: menuIcons.store,
+      permission: "can_view_branch",
+      implemented: true,
+    },
+    {
       label: "Отделы",
       to: "/crm/departments",
       icon: menuIcons.users,
@@ -104,6 +111,13 @@ export const MENU_CONFIG = {
   sector: {
     // Строительная сфера
     building: [
+      {
+        label: "Объекты",
+        to: "/crm/building/objects",
+        icon: menuIcons.store,
+        permission: "can_view_branch",
+        implemented: true,
+      },
       {
         label: "Процесс работы",
         to: "/crm/building/work",

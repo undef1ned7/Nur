@@ -110,6 +110,17 @@ const SellBuildingModal = ({ onClose }) => {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !cashboxId) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setCashboxId(String(firstCashBoxId));
+      }
+    }
+  }, [cashBoxes, cashboxId]);
+
   // Подгрузка объектов, когда корзина создана
   useEffect(() => {
     if (start?.id) {
@@ -120,9 +131,12 @@ const SellBuildingModal = ({ onClose }) => {
   // Шаги
   const step = useMemo(() => {
     if (!start?.id) return 1;
-    if (!cashboxId) return 2;
+    // Не блокируем шаг 2, если кассы еще загружаются
+    if (Array.isArray(cashBoxes) && cashBoxes.length > 0 && !cashboxId)
+      return 2;
+    if (!cashboxId && (!cashBoxes || cashBoxes.length === 0)) return 2;
     return 3;
-  }, [start?.id, cashboxId]);
+  }, [start?.id, cashboxId, cashBoxes]);
 
   const canCreateCart =
     Boolean(cartSeed.client) &&
@@ -156,8 +170,9 @@ const SellBuildingModal = ({ onClose }) => {
       alert("Сначала создайте корзину");
       return;
     }
+    // Дополнительная проверка кассы перед выполнением операции
     if (!cashboxId) {
-      alert("Выберите кассу перед добавлением товара");
+      alert("Касса не выбрана. Создайте кассу в разделе «Кассы».");
       return;
     }
     if (!objectItemId || !quantity || !unitPrice) {
@@ -406,28 +421,7 @@ const SellBuildingModal = ({ onClose }) => {
           </div>
         )}
 
-        {/* Шаг 2 — выбор кассы */}
-        {start?.id && !cashboxId && (
-          <div
-            className="add-modal__section"
-            style={{ display: "grid", gap: 12 }}
-          >
-            <h4>Шаг 2. Выберите кассу</h4>
-            <select
-              className="add-modal__input"
-              value={cashboxId}
-              onChange={(e) => setCashboxId(e.target.value)}
-              required
-            >
-              <option value="">-- Выберите кассу --</option>
-              {cashBoxes.map((box) => (
-                <option key={box.id} value={String(box.id)}>
-                  {box.name ?? box.department_name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Шаг 2 — касса автоматически выбирается - скрыто от пользователя */}
 
         {/* Шаг 3 — выбор товара и добавление в корзину */}
         {start?.id && cashboxId && (

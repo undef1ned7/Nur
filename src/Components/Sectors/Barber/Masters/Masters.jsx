@@ -1,8 +1,17 @@
 // src/components/Education/Masters.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaCheck, FaCopy, FaEdit, FaPlus, FaSearch, FaTimes, FaTrash } from "react-icons/fa";
+import {
+  FaCheck,
+  FaCopy,
+  FaEdit,
+  FaPlus,
+  FaSearch,
+  FaTimes,
+  FaTrash,
+} from "react-icons/fa";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
+import AccessList from "../../../DepartmentDetails/AccessList";
 import "./Masters.scss";
 
 /* ===================== API endpoints ===================== */
@@ -18,8 +27,12 @@ const ROLE_ITEM_URL = (id) => `/users/roles/custom/${id}/`;
 const SYSTEM_ROLES = ["owner", "admin"];
 const PAGE_SIZE = 12;
 
-const asArray = (d) => (Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : []);
-const normalizeEmail = (s) => String(s || "").trim().toLowerCase();
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
+const normalizeEmail = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase();
 const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const normalizeEmployee = (e = {}) => ({
@@ -30,17 +43,28 @@ const normalizeEmployee = (e = {}) => ({
   role: e.role ?? null,
   custom_role: e.custom_role ?? null,
   role_display: e.role_display ?? "",
+  branches: Array.isArray(e.branches) ? e.branches : e.branch ? [e.branch] : [],
+  branch: e.branch ?? null, // сохраняем для обратной совместимости
 });
-const fullName = (e) => [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim();
+const fullName = (e) =>
+  [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim();
 
-const ruLabelSys = (c) => (c === "owner" ? "Владелец" : c === "admin" ? "Администратор" : c || "");
+const ruLabelSys = (c) =>
+  c === "owner" ? "Владелец" : c === "admin" ? "Администратор" : c || "";
 const sysCodeFromName = (n) => {
-  const l = String(n || "").trim().toLowerCase();
-  if (["admin", "administrator", "админ", "администратор"].includes(l)) return "admin";
+  const l = String(n || "")
+    .trim()
+    .toLowerCase();
+  if (["admin", "administrator", "админ", "администратор"].includes(l))
+    return "admin";
   if (["owner", "владелец"].includes(l)) return "owner";
   return null;
 };
-const normalizeRoleName = (s) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+const normalizeRoleName = (s) =>
+  String(s || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 
 const pickApiError = (e, fb) => {
   const d = e?.response?.data;
@@ -59,7 +83,14 @@ const pickApiError = (e, fb) => {
 };
 
 /* ===================== Reusable searchable select ===================== */
-const RoleSelect = ({ options, value, onChange, placeholder, className = "", hideCurrentLabelInMenu = false }) => {
+const RoleSelect = ({
+  options,
+  value,
+  onChange,
+  placeholder,
+  className = "",
+  hideCurrentLabelInMenu = false,
+}) => {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const refWrap = useRef(null);
@@ -72,8 +103,11 @@ const RoleSelect = ({ options, value, onChange, placeholder, className = "", hid
 
   const filtered = useMemo(() => {
     const txt = q.trim().toLowerCase();
-    let list = !txt ? options : options.filter((o) => o.label.toLowerCase().includes(txt));
-    if (hideCurrentLabelInMenu) list = list.filter((o) => o.label !== placeholder);
+    let list = !txt
+      ? options
+      : options.filter((o) => o.label.toLowerCase().includes(txt));
+    if (hideCurrentLabelInMenu)
+      list = list.filter((o) => o.label !== placeholder);
     return list;
   }, [options, q, hideCurrentLabelInMenu, placeholder]);
 
@@ -93,7 +127,10 @@ const RoleSelect = ({ options, value, onChange, placeholder, className = "", hid
   }, [open]);
 
   return (
-    <div className={`barbermasters__select ${open ? "is-open" : ""} ${className}`} ref={refWrap}>
+    <div
+      className={`barbermasters__select ${open ? "is-open" : ""} ${className}`}
+      ref={refWrap}
+    >
       <button
         type="button"
         className="barbermasters__selectControl"
@@ -101,7 +138,11 @@ const RoleSelect = ({ options, value, onChange, placeholder, className = "", hid
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className={`barbermasters__selectValue ${value ? "" : "is-placeholder"}`}>
+        <span
+          className={`barbermasters__selectValue ${
+            value ? "" : "is-placeholder"
+          }`}
+        >
           {value ? labelByKey.get(value) || placeholder : placeholder}
         </span>
         <span className="barbermasters__selectCaret" aria-hidden />
@@ -122,13 +163,17 @@ const RoleSelect = ({ options, value, onChange, placeholder, className = "", hid
 
           <div className="barbermasters__selectList" tabIndex={-1}>
             {filtered.length === 0 ? (
-              <div className="barbermasters__selectEmpty">Ничего не найдено</div>
+              <div className="barbermasters__selectEmpty">
+                Ничего не найдено
+              </div>
             ) : (
               filtered.map((o) => (
                 <button
                   key={o.key}
                   type="button"
-                  className={`barbermasters__selectItem ${o.key === value ? "is-active" : ""}`}
+                  className={`barbermasters__selectItem ${
+                    o.key === value ? "is-active" : ""
+                  }`}
                   onClick={() => {
                     onChange(o.key);
                     setOpen(false);
@@ -147,12 +192,13 @@ const RoleSelect = ({ options, value, onChange, placeholder, className = "", hid
 
 /* ===================== Main component ===================== */
 const Masters = () => {
-  const { company } = useUser();
+  const { company, tariff, profile } = useUser();
 
   const [tab, setTab] = useState("masters");
 
   const [employees, setEmployees] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pageNotice, setPageNotice] = useState("");
@@ -195,6 +241,7 @@ const Masters = () => {
     roleChoice: "",
     track_number: "",
     phone_number: "",
+    branch: "",
   };
   const [empForm, setEmpForm] = useState(emptyEmp);
   const [editingEmpId, setEditingEmpId] = useState(null);
@@ -203,6 +250,11 @@ const Masters = () => {
   const [openLogin, setOpenLogin] = useState(false);
   const [employData, setEmployData] = useState(null);
   const [copied, setCopied] = useState(null);
+
+  // доступы сотрудника
+  const [accessModalOpen, setAccessModalOpen] = useState(false);
+  const [accessModalEmployee, setAccessModalEmployee] = useState(null);
+  const [accessModalAccesses, setAccessModalAccesses] = useState([]);
 
   const copyToClipboard = async (text, key) => {
     if (!text) return;
@@ -223,19 +275,30 @@ const Masters = () => {
     setRoles(asArray(res.data).map((r) => ({ id: r.id, name: r.name || "" })));
   }, []);
 
+  const fetchBranches = useCallback(async () => {
+    try {
+      const res = await api.get("/users/branches/");
+      const branchesList = asArray(res.data);
+      setBranches(branchesList);
+    } catch (err) {
+      console.error("Ошибка загрузки филиалов:", err);
+      // Не критично, если филиалы не загрузились
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         setError("");
-        await Promise.all([fetchEmployees(), fetchRoles()]);
+        await Promise.all([fetchEmployees(), fetchRoles(), fetchBranches()]);
       } catch {
         setError("Не удалось загрузить данные.");
       } finally {
         setLoading(false);
       }
     })();
-  }, [fetchEmployees, fetchRoles]);
+  }, [fetchEmployees, fetchRoles, fetchBranches]);
 
   /* ========= Derived ========= */
   const roleById = useMemo(() => {
@@ -245,7 +308,10 @@ const Masters = () => {
   }, [roles]);
 
   const roleOptions = useMemo(() => {
-    const sys = SYSTEM_ROLES.map((code) => ({ key: `sys:${code}`, label: ruLabelSys(code) }));
+    const sys = SYSTEM_ROLES.map((code) => ({
+      key: `sys:${code}`,
+      label: ruLabelSys(code),
+    }));
     const cus = roles
       .filter((r) => !sysCodeFromName(r.name))
       .map((r) => ({ key: `cus:${r.id}`, label: String(r.name || "").trim() }));
@@ -262,7 +328,11 @@ const Masters = () => {
   }, [roles]);
 
   const roleFilterOptions = useMemo(
-    () => [{ key: "ALL", label: "Все роли" }, ...roleOptions, { key: "NONE", label: "Без роли" }],
+    () => [
+      { key: "ALL", label: "Все роли" },
+      ...roleOptions,
+      { key: "NONE", label: "Без роли" },
+    ],
     [roleOptions]
   );
 
@@ -274,31 +344,43 @@ const Masters = () => {
       base = base.filter((u) => !u.role && !u.custom_role);
     } else if (filterRole !== "ALL") {
       base = base.filter((u) => {
-        if (filterRole.startsWith("sys:")) return u.role === filterRole.slice(4);
-        if (filterRole.startsWith("cus:")) return String(u.custom_role) === filterRole.slice(4);
+        if (filterRole.startsWith("sys:"))
+          return u.role === filterRole.slice(4);
+        if (filterRole.startsWith("cus:"))
+          return String(u.custom_role) === filterRole.slice(4);
         return true;
       });
     }
 
     if (!t) return base;
     return base.filter((e) =>
-      [fullName(e), e.email, e.role_display, ruLabelSys(e.role)].filter(Boolean).some((v) => String(v).toLowerCase().includes(t))
+      [fullName(e), e.email, e.role_display, ruLabelSys(e.role)]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(t))
     );
   }, [employees, q, filterRole]);
 
   const rolesForList = useMemo(() => {
-    const sys = SYSTEM_ROLES.map((code) => ({ id: `sys:${code}`, name: ruLabelSys(code), _sys: true }));
+    const sys = SYSTEM_ROLES.map((code) => ({
+      id: `sys:${code}`,
+      name: ruLabelSys(code),
+      _sys: true,
+    }));
     const seen = new Set();
     const dedup = [];
     for (const r of roles) {
       if (sysCodeFromName(r.name)) continue;
-      const k = String(r.name || "").trim().toLowerCase();
+      const k = String(r.name || "")
+        .trim()
+        .toLowerCase();
       if (!seen.has(k)) {
         seen.add(k);
         dedup.push({ id: r.id, name: r.name || "", _sys: false });
       }
     }
-    const base = [...sys, ...dedup].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    const base = [...sys, ...dedup].sort((a, b) =>
+      a.name.localeCompare(b.name, "ru")
+    );
     const t = q.trim().toLowerCase();
     if (!t) return base;
     return base.filter((r) => (r.name || "").toLowerCase().includes(t));
@@ -309,12 +391,24 @@ const Masters = () => {
     setPageRole(1);
   }, [q, tab, filteredEmployees.length, rolesForList.length, filterRole]);
 
-  const totalPagesEmp = Math.max(1, Math.ceil(filteredEmployees.length / PAGE_SIZE));
-  const totalPagesRole = Math.max(1, Math.ceil(rolesForList.length / PAGE_SIZE));
+  const totalPagesEmp = Math.max(
+    1,
+    Math.ceil(filteredEmployees.length / PAGE_SIZE)
+  );
+  const totalPagesRole = Math.max(
+    1,
+    Math.ceil(rolesForList.length / PAGE_SIZE)
+  );
   const pageSafeEmp = Math.min(pageEmp, totalPagesEmp);
   const pageSafeRole = Math.min(pageRole, totalPagesRole);
-  const empRows = filteredEmployees.slice((pageSafeEmp - 1) * PAGE_SIZE, pageSafeEmp * PAGE_SIZE);
-  const roleRows = rolesForList.slice((pageSafeRole - 1) * PAGE_SIZE, pageSafeRole * PAGE_SIZE);
+  const empRows = filteredEmployees.slice(
+    (pageSafeEmp - 1) * PAGE_SIZE,
+    pageSafeEmp * PAGE_SIZE
+  );
+  const roleRows = rolesForList.slice(
+    (pageSafeRole - 1) * PAGE_SIZE,
+    pageSafeRole * PAGE_SIZE
+  );
 
   /* ========= Validation ========= */
   const focusFirstInvalid = (errs) => {
@@ -337,7 +431,9 @@ const Masters = () => {
       errs.email = true;
       alerts.push("Email указан неверно.");
     } else {
-      const exists = employees.some((u) => normalizeEmail(u.email) === email && (!isEdit || u.id !== editId));
+      const exists = employees.some(
+        (u) => normalizeEmail(u.email) === email && (!isEdit || u.id !== editId)
+      );
       if (exists) {
         errs.email = true;
         alerts.push("Сотрудник с таким Email уже существует.");
@@ -371,8 +467,11 @@ const Masters = () => {
     e.preventDefault();
     const name = roleCreateName.trim();
     if (!name) return setRoleCreateErr("Укажите название роли.");
-    if (sysCodeFromName(name)) return setRoleCreateErr("Это имя занято системной ролью.");
-    const dup = roles.some((r) => normalizeRoleName(r.name) === normalizeRoleName(name));
+    if (sysCodeFromName(name))
+      return setRoleCreateErr("Это имя занято системной ролью.");
+    const dup = roles.some(
+      (r) => normalizeRoleName(r.name) === normalizeRoleName(name)
+    );
     if (dup) return setRoleCreateErr("Роль с таким названием уже существует.");
 
     setRoleCreateSaving(true);
@@ -402,8 +501,13 @@ const Masters = () => {
     if (!roleEditId) return;
     const name = roleEditName.trim();
     if (!name) return setRoleEditErr("Укажите название роли.");
-    if (sysCodeFromName(name)) return setRoleEditErr("Это имя зарезервировано системной ролью.");
-    const dup = roles.some((r) => r.id !== roleEditId && normalizeRoleName(r.name) === normalizeRoleName(name));
+    if (sysCodeFromName(name))
+      return setRoleEditErr("Это имя зарезервировано системной ролью.");
+    const dup = roles.some(
+      (r) =>
+        r.id !== roleEditId &&
+        normalizeRoleName(r.name) === normalizeRoleName(name)
+    );
     if (dup) return setRoleEditErr("Роль с таким названием уже существует.");
 
     setRoleEditSaving(true);
@@ -449,6 +553,12 @@ const Masters = () => {
     setEmpCreateOpen(true);
   };
 
+  // Проверка, нужно ли показывать выбор филиала
+  const showBranchSelect = useMemo(() => {
+    const tariffLower = String(tariff || "").toLowerCase();
+    return tariffLower !== "старт" && tariffLower !== "start";
+  }, [tariff]);
+
   const submitEmployeeCreate = async (e) => {
     e.preventDefault();
     const { errs, alerts } = validateEmployee(empForm, false, null);
@@ -466,8 +576,13 @@ const Masters = () => {
       phone_number: empForm.phone_number.trim(),
       track_number: empForm.track_number.trim(),
     };
-    if (empForm.roleChoice.startsWith("sys:")) payload.role = empForm.roleChoice.slice(4);
-    else if (empForm.roleChoice.startsWith("cus:")) payload.custom_role = empForm.roleChoice.slice(4);
+    if (empForm.roleChoice.startsWith("sys:"))
+      payload.role = empForm.roleChoice.slice(4);
+    else if (empForm.roleChoice.startsWith("cus:"))
+      payload.custom_role = empForm.roleChoice.slice(4);
+    if (showBranchSelect && empForm.branch) {
+      payload.branches = [empForm.branch];
+    }
 
     setEmpSaving(true);
     setEmpAlerts([]);
@@ -487,7 +602,16 @@ const Masters = () => {
   };
 
   const openEmpEdit = (u) => {
-    const roleChoice = u.role ? `sys:${u.role}` : u.custom_role ? `cus:${u.custom_role}` : "";
+    const roleChoice = u.role
+      ? `sys:${u.role}`
+      : u.custom_role
+      ? `cus:${u.custom_role}`
+      : "";
+    // Берем первый филиал из массива branches или используем branch
+    const branchValue =
+      Array.isArray(u.branches) && u.branches.length > 0
+        ? u.branches[0]
+        : u.branch || "";
     setEditingEmpId(u.id);
     setEmpForm({
       email: u.email || "",
@@ -496,6 +620,7 @@ const Masters = () => {
       roleChoice,
       track_number: u.track_number || "",
       phone_number: u.phone_number || "",
+      branch: branchValue,
     });
     setEmpAlerts([]);
     setEmpFieldErrors({});
@@ -521,8 +646,13 @@ const Masters = () => {
       role: null,
       custom_role: null,
     };
-    if (empForm.roleChoice.startsWith("sys:")) payload.role = empForm.roleChoice.slice(4);
-    else if (empForm.roleChoice.startsWith("cus:")) payload.custom_role = empForm.roleChoice.slice(4);
+    if (empForm.roleChoice.startsWith("sys:"))
+      payload.role = empForm.roleChoice.slice(4);
+    else if (empForm.roleChoice.startsWith("cus:"))
+      payload.custom_role = empForm.roleChoice.slice(4);
+    if (showBranchSelect && empForm.branch) {
+      payload.branches = [empForm.branch];
+    }
 
     setEmpSaving(true);
     setEmpAlerts([]);
@@ -560,16 +690,349 @@ const Masters = () => {
     }
   };
 
+  /* ========= Employee Access Management ========= */
+  // Конвертация backend доступов в массив labels (как в DepartmentDetails)
+  const convertBackendAccessesToLabels = useCallback(
+    (employee) => {
+      const labelsArray = [];
+      // Используем те же константы, что и в DepartmentDetails
+      const BASIC_ACCESS_TYPES = [
+        { value: "Касса", label: "Касса", backendKey: "can_view_cashbox" },
+        {
+          value: "Отделы",
+          label: "Отделы",
+          backendKey: "can_view_departments",
+        },
+        { value: "Филиалы", label: "Филиалы", backendKey: "can_view_branch" },
+        { value: "Долги", label: "Долги", backendKey: "can_view_debts" },
+        { value: "Заказы", label: "Заказы", backendKey: "can_view_orders" },
+        {
+          value: "Аналитика",
+          label: "Аналитика",
+          backendKey: "can_view_analytics",
+        },
+        {
+          value: "Аналитика Отделов",
+          label: "Аналитика Отделов",
+          backendKey: "can_view_department_analytics",
+        },
+        { value: "Склад", label: "Склад", backendKey: "can_view_products" },
+        { value: "Продажа", label: "Продажа", backendKey: "can_view_sale" },
+        {
+          value: "Бронирование",
+          label: "Бронирование",
+          backendKey: "can_view_booking",
+        },
+        { value: "Клиенты", label: "Клиенты", backendKey: "can_view_clients" },
+        {
+          value: "Бренд,Категория",
+          label: "Бренд,Категория",
+          backendKey: "can_view_brand_category",
+        },
+        {
+          value: "Сотрудники",
+          label: "Сотрудники",
+          backendKey: "can_view_employees",
+        },
+        {
+          value: "Настройки",
+          label: "Настройки",
+          backendKey: "can_view_settings",
+        },
+      ];
+
+      const SECTOR_ACCESS_TYPES = {
+        Барбершоп: [
+          {
+            value: "Клиенты Барбершопа",
+            label: "Клиенты Барбершопа",
+            backendKey: "can_view_barber_clients",
+          },
+          {
+            value: "Услуги",
+            label: "Услуги",
+            backendKey: "can_view_barber_services",
+          },
+          {
+            value: "История",
+            label: "История",
+            backendKey: "can_view_barber_history",
+          },
+          {
+            value: "Записи",
+            label: "Записи",
+            backendKey: "can_view_barber_records",
+          },
+        ],
+        Гостиница: [
+          {
+            value: "Комнаты",
+            label: "Комнаты",
+            backendKey: "can_view_hostel_rooms",
+          },
+          {
+            value: "Бронирования",
+            label: "Бронирования",
+            backendKey: "can_view_hostel_booking",
+          },
+          {
+            value: "Клиенты Гостиницы",
+            label: "Клиенты Гостиницы",
+            backendKey: "can_view_hostel_clients",
+          },
+          {
+            value: "Аналитика Гостиницы",
+            label: "Аналитика Гостиницы",
+            backendKey: "can_view_hostel_analytics",
+          },
+        ],
+        Школа: [
+          {
+            value: "Ученики",
+            label: "Ученики",
+            backendKey: "can_view_school_students",
+          },
+          {
+            value: "Группы",
+            label: "Группы",
+            backendKey: "can_view_school_groups",
+          },
+          {
+            value: "Уроки",
+            label: "Уроки",
+            backendKey: "can_view_school_lessons",
+          },
+          {
+            value: "Учителя",
+            label: "Учителя",
+            backendKey: "can_view_school_teachers",
+          },
+          { value: "Лиды", label: "Лиды", backendKey: "can_view_school_leads" },
+          {
+            value: "Счета",
+            label: "Счета",
+            backendKey: "can_view_school_invoices",
+          },
+        ],
+        Кафе: [
+          { value: "Меню", label: "Меню", backendKey: "can_view_cafe_menu" },
+          {
+            value: "Заказы Кафе",
+            label: "Заказы Кафе",
+            backendKey: "can_view_cafe_orders",
+          },
+          {
+            value: "Закупки",
+            label: "Закупки",
+            backendKey: "can_view_cafe_purchasing",
+          },
+          {
+            value: "Бронь",
+            label: "Бронь",
+            backendKey: "can_view_cafe_booking",
+          },
+          {
+            value: "Клиенты Кафе",
+            label: "Клиенты Кафе",
+            backendKey: "can_view_cafe_clients",
+          },
+          {
+            value: "Столы",
+            label: "Столы",
+            backendKey: "can_view_cafe_tables",
+          },
+          { value: "Кухня", label: "Кухня", backendKey: "can_view_cafe_cook" },
+          {
+            value: "Инвентаризация",
+            label: "Инвентаризация",
+            backendKey: "can_view_cafe_inventory",
+          },
+        ],
+        "Строительная компания": [
+          {
+            value: "Процесс работы",
+            label: "Процесс работы",
+            backendKey: "can_view_building_work_process",
+          },
+          {
+            value: "Квартиры",
+            label: "Квартиры",
+            backendKey: "can_view_building_objects",
+          },
+        ],
+        "Ремонтные и отделочные работы": [
+          {
+            value: "Процесс работы",
+            label: "Процесс работы",
+            backendKey: "can_view_building_work_process",
+          },
+          {
+            value: "Квартиры",
+            label: "Квартиры",
+            backendKey: "can_view_building_objects",
+          },
+        ],
+        "Архитектура и дизайн": [
+          {
+            value: "Процесс работы",
+            label: "Процесс работы",
+            backendKey: "can_view_building_work_process",
+          },
+          {
+            value: "Квартиры",
+            label: "Квартиры",
+            backendKey: "can_view_building_objects",
+          },
+        ],
+        Консалтинг: [
+          {
+            value: "Клиенты",
+            label: "Клиенты",
+            backendKey: "can_view_clients",
+          },
+          {
+            value: "Запросы клиентов",
+            label: "Запросы клиентов",
+            backendKey: "can_view_client_requests",
+          },
+          { value: "Касса", label: "Касса", backendKey: "can_view_cashbox" },
+          {
+            value: "Сотрудники",
+            label: "Сотрудники",
+            backendKey: "can_view_employees",
+          },
+          {
+            value: "Зарплата",
+            label: "Зарплата",
+            backendKey: "can_view_salary",
+          },
+          { value: "Продажи", label: "Продажи", backendKey: "can_view_sale" },
+          { value: "Услуги", label: "Услуги", backendKey: "can_view_services" },
+        ],
+        Склад: [
+          {
+            value: "Клиенты",
+            label: "Клиенты",
+            backendKey: "can_view_clients",
+          },
+          {
+            value: "Аналитика",
+            label: "Аналитика",
+            backendKey: "can_view_analytics",
+          },
+          { value: "Товары", label: "Товары", backendKey: "can_view_products" },
+          {
+            value: "Справочники",
+            label: "Справочники",
+            backendKey: "can_view_brand_category",
+          },
+          {
+            value: "Остатки",
+            label: "Остатки",
+            backendKey: "can_view_products",
+          },
+          {
+            value: "Операции (Перемещения)",
+            label: "Операции (Перемещения)",
+            backendKey: "can_view_products",
+          },
+          {
+            value: "Поставки",
+            label: "Поставки",
+            backendKey: "can_view_products",
+          },
+          {
+            value: "Списание",
+            label: "Списание",
+            backendKey: "can_view_products",
+          },
+        ],
+        Производство: [
+          { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
+          {
+            value: "Каталог",
+            label: "Каталог",
+            backendKey: "can_view_catalog",
+          },
+        ],
+      };
+
+      const getAllAccessTypes = (sectorName) => {
+        const basicAccess = [...BASIC_ACCESS_TYPES];
+        const sectorAccess = SECTOR_ACCESS_TYPES[sectorName] || [];
+        return [...basicAccess, ...sectorAccess];
+      };
+
+      const availableAccessTypes = company?.sector?.name
+        ? getAllAccessTypes(company.sector.name)
+        : BASIC_ACCESS_TYPES;
+
+      availableAccessTypes.forEach((type) => {
+        if (employee && employee[type.backendKey] === true) {
+          labelsArray.push(type.value);
+        }
+      });
+      return labelsArray;
+    },
+    [company?.sector?.name]
+  );
+
+  const openAccessModal = async (employee) => {
+    try {
+      // Загружаем полные данные сотрудника с доступами
+      const res = await api.get(EMPLOYEE_ITEM_URL(employee.id));
+      // Используем данные напрямую, без normalizeEmployee, чтобы сохранить все поля доступа
+      const fullEmployee = res.data;
+      const accesses = convertBackendAccessesToLabels(fullEmployee);
+      setAccessModalEmployee(fullEmployee);
+      setAccessModalAccesses(accesses);
+      setAccessModalOpen(true);
+    } catch (err) {
+      console.error("Ошибка при открытии модального окна доступов:", err);
+      setPageNotice(
+        pickApiError(err, "Не удалось загрузить доступы сотрудника.")
+      );
+    }
+  };
+
+  const handleSaveEmployeeAccesses = async (newAccessesPayload) => {
+    if (!accessModalEmployee) return;
+    setEmpSaving(true);
+    setPageNotice("");
+    try {
+      await api.patch(
+        EMPLOYEE_ITEM_URL(accessModalEmployee.id),
+        newAccessesPayload
+      );
+      await fetchEmployees();
+      setAccessModalOpen(false);
+      setAccessModalEmployee(null);
+      setAccessModalAccesses([]);
+    } catch (err) {
+      setPageNotice(
+        pickApiError(err, "Не удалось обновить доступы сотрудника.")
+      );
+    } finally {
+      setEmpSaving(false);
+    }
+  };
+
   /* ========= Small pager ========= */
   const Pager = ({ page, total, onChange }) => {
     if (total <= 1) return null;
     const onPrev = () => onChange(Math.max(1, page - 1));
     const onNext = () => onChange(Math.min(total, page + 1));
     const pages = new Set([1, page - 1, page, page + 1, total]);
-    const list = [...pages].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+    const list = [...pages]
+      .filter((n) => n >= 1 && n <= total)
+      .sort((a, b) => a - b);
     return (
       <nav className="barbermasters__pager" aria-label="Пагинация">
-        <button className="barbermasters__pageBtn" onClick={onPrev} disabled={page === 1}>
+        <button
+          className="barbermasters__pageBtn"
+          onClick={onPrev}
+          disabled={page === 1}
+        >
           Назад
         </button>
         <ul className="barbermasters__pageList">
@@ -581,7 +1044,9 @@ const Masters = () => {
                 {gap && <li className="barbermasters__dots">…</li>}
                 <li>
                   <button
-                    className={`barbermasters__pageBtn ${n === page ? "is-active" : ""}`}
+                    className={`barbermasters__pageBtn ${
+                      n === page ? "is-active" : ""
+                    }`}
                     aria-current={n === page ? "page" : undefined}
                     onClick={() => onChange(n)}
                   >
@@ -592,7 +1057,11 @@ const Masters = () => {
             );
           })}
         </ul>
-        <button className="barbermasters__pageBtn" onClick={onNext} disabled={page === total}>
+        <button
+          className="barbermasters__pageBtn"
+          onClick={onNext}
+          disabled={page === total}
+        >
           Далее
         </button>
       </nav>
@@ -609,9 +1078,15 @@ const Masters = () => {
             {loading
               ? "Загрузка…"
               : tab === "roles"
-              ? `${rolesForList.length} ролей${rolesForList.length > PAGE_SIZE ? ` · стр. ${pageSafeRole}/${totalPagesRole}` : ""}`
+              ? `${rolesForList.length} ролей${
+                  rolesForList.length > PAGE_SIZE
+                    ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
+                    : ""
+                }`
               : `${filteredEmployees.length} записей${
-                  filteredEmployees.length > PAGE_SIZE ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}` : ""
+                  filteredEmployees.length > PAGE_SIZE
+                    ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
+                    : ""
                 }`}
           </span>
         </div>
@@ -620,14 +1095,18 @@ const Masters = () => {
           <div className="barbermasters__tabs">
             <button
               type="button"
-              className={`barbermasters__btn barbermasters__btn--secondary ${tab === "roles" ? "is-active" : ""}`}
+              className={`barbermasters__btn barbermasters__btn--secondary ${
+                tab === "roles" ? "is-active" : ""
+              }`}
               onClick={() => setTab("roles")}
             >
               Роли
             </button>
             <button
               type="button"
-              className={`barbermasters__btn barbermasters__btn--secondary ${tab === "masters" ? "is-active" : ""}`}
+              className={`barbermasters__btn barbermasters__btn--secondary ${
+                tab === "masters" ? "is-active" : ""
+              }`}
               onClick={() => setTab("masters")}
             >
               Сотрудники
@@ -649,7 +1128,9 @@ const Masters = () => {
             <FaSearch className="barbermasters__searchIcon" />
             <input
               className="barbermasters__searchInput"
-              placeholder={tab === "roles" ? "Поиск ролей…" : "Поиск по сотрудникам"}
+              placeholder={
+                tab === "roles" ? "Поиск ролей…" : "Поиск по сотрудникам"
+              }
               value={q}
               onChange={(e) => setQ(e.target.value)}
               aria-label="Поиск"
@@ -657,11 +1138,19 @@ const Masters = () => {
           </div>
 
           {tab === "roles" ? (
-            <button type="button" className="barbermasters__btn barbermasters__btn--primary" onClick={() => setRoleCreateOpen(true)}>
+            <button
+              type="button"
+              className="barbermasters__btn barbermasters__btn--primary"
+              onClick={() => setRoleCreateOpen(true)}
+            >
               <FaPlus />
             </button>
           ) : (
-            <button type="button" className="barbermasters__btn barbermasters__btn--primary" onClick={openEmpCreate}>
+            <button
+              type="button"
+              className="barbermasters__btn barbermasters__btn--primary"
+              onClick={openEmpCreate}
+            >
               <FaPlus />
             </button>
           )}
@@ -678,10 +1167,14 @@ const Masters = () => {
             {roleRows.map((r) => (
               <article key={r.id} className="barbermasters__card">
                 <div className="barbermasters__cardLeft">
-                  <div className="barbermasters__avatar">{(r.name || "•").trim().charAt(0).toUpperCase()}</div>
+                  <div className="barbermasters__avatar">
+                    {(r.name || "•").trim().charAt(0).toUpperCase()}
+                  </div>
                   <div>
                     <div className="barbermasters__nameRow">
-                      <h4 className="barbermasters__name">{r.name || "Без названия"}</h4>
+                      <h4 className="barbermasters__name">
+                        {r.name || "Без названия"}
+                      </h4>
                     </div>
                     {r._sys && (
                       <div className="barbermasters__meta">
@@ -696,9 +1189,16 @@ const Masters = () => {
                     className="barbermasters__btn barbermasters__btn--secondary"
                     onClick={() => openRoleEdit(r)}
                     disabled={r._sys}
-                    title={r._sys ? "Системные роли нельзя изменять" : "Редактировать"}
+                    title={
+                      r._sys
+                        ? "Системные роли нельзя изменять"
+                        : "Редактировать"
+                    }
                   >
-                    <FaEdit /> <span className="barbermasters__btnText">Редактировать</span>
+                    <FaEdit />{" "}
+                    <span className="barbermasters__btnText">
+                      Редактировать
+                    </span>
                   </button>
                   <button
                     className="barbermasters__btn barbermasters__btn--danger"
@@ -706,15 +1206,26 @@ const Masters = () => {
                     disabled={r._sys || roleDeletingIds.has(r.id)}
                     title={r._sys ? "Системные роли нельзя удалять" : "Удалить"}
                   >
-                    <FaTrash /> <span className="barbermasters__btnText">{roleDeletingIds.has(r.id) ? "Удаление…" : "Удалить"}</span>
+                    <FaTrash />{" "}
+                    <span className="barbermasters__btnText">
+                      {roleDeletingIds.has(r.id) ? "Удаление…" : "Удалить"}
+                    </span>
                   </button>
                 </div>
               </article>
             ))}
-            {rolesForList.length === 0 && <div className="barbermasters__alert">Пока нет ролей.</div>}
+            {rolesForList.length === 0 && (
+              <div className="barbermasters__alert">Пока нет ролей.</div>
+            )}
           </div>
 
-          {rolesForList.length > PAGE_SIZE && <Pager page={pageSafeRole} total={totalPagesRole} onChange={setPageRole} />}
+          {rolesForList.length > PAGE_SIZE && (
+            <Pager
+              page={pageSafeRole}
+              total={totalPagesRole}
+              onChange={setPageRole}
+            />
+          )}
         </>
       )}
 
@@ -722,7 +1233,11 @@ const Masters = () => {
         <>
           <div className="barbermasters__list">
             {empRows.map((u) => {
-              const initial = (fullName(u) || u.email || "•").trim().charAt(0).toUpperCase() || "•";
+              const initial =
+                (fullName(u) || u.email || "•")
+                  .trim()
+                  .charAt(0)
+                  .toUpperCase() || "•";
               const roleLabel = u.role
                 ? ruLabelSys(u.role)
                 : roles.length
@@ -734,7 +1249,9 @@ const Masters = () => {
                     <div className="barbermasters__avatar">{initial}</div>
                     <div>
                       <div className="barbermasters__nameRow">
-                        <h4 className="barbermasters__name">{fullName(u) || "Без имени"}</h4>
+                        <h4 className="barbermasters__name">
+                          {fullName(u) || "Без имени"}
+                        </h4>
                       </div>
                       <div className="barbermasters__meta">
                         <span className="bm-item">{u.email || "—"}</span>
@@ -749,7 +1266,18 @@ const Masters = () => {
                       onClick={() => openEmpEdit(u)}
                       title="Редактировать сотрудника"
                     >
-                      <FaEdit /> <span className="barbermasters__btnText">Редактировать</span>
+                      <FaEdit />{" "}
+                      <span className="barbermasters__btnText">
+                        Редактировать
+                      </span>
+                    </button>
+                    <button
+                      className="barbermasters__btn barbermasters__btn--secondary"
+                      onClick={() => openAccessModal(u)}
+                      title="Управление доступами"
+                      disabled={u.role === "owner"}
+                    >
+                      <span className="barbermasters__btnText">Доступы</span>
                     </button>
                     <button
                       className="barbermasters__btn barbermasters__btn--danger"
@@ -757,32 +1285,59 @@ const Masters = () => {
                       disabled={empDeletingIds.has(u.id)}
                       title="Удалить сотрудника"
                     >
-                      <FaTrash /> <span className="barbermasters__btnText">{empDeletingIds.has(u.id) ? "Удаление…" : "Удалить"}</span>
+                      <FaTrash />{" "}
+                      <span className="barbermasters__btnText">
+                        {empDeletingIds.has(u.id) ? "Удаление…" : "Удалить"}
+                      </span>
                     </button>
                   </div>
                 </article>
               );
             })}
-            {filteredEmployees.length === 0 && employees.length > 0 && <div className="barbermasters__alert">Ничего не найдено.</div>}
-            {!loading && employees.length === 0 && <div className="barbermasters__alert">Пока нет сотрудников.</div>}
+            {filteredEmployees.length === 0 && employees.length > 0 && (
+              <div className="barbermasters__alert">Ничего не найдено.</div>
+            )}
+            {!loading && employees.length === 0 && (
+              <div className="barbermasters__alert">Пока нет сотрудников.</div>
+            )}
           </div>
 
-          {filteredEmployees.length > PAGE_SIZE && <Pager page={pageSafeEmp} total={totalPagesEmp} onChange={setPageEmp} />}
+          {filteredEmployees.length > PAGE_SIZE && (
+            <Pager
+              page={pageSafeEmp}
+              total={totalPagesEmp}
+              onChange={setPageEmp}
+            />
+          )}
         </>
       )}
 
       {/* ===== Roles: create ===== */}
       {roleCreateOpen && (
-        <div className="barbermasters__overlay" onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}>
-          <div className="barbermasters__modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="barbermasters__overlay"
+          onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
+        >
+          <div
+            className="barbermasters__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="barbermasters__modalHeader">
               <h3 className="barbermasters__modalTitle">Новая роль</h3>
-              <button className="barbermasters__iconBtn" onClick={() => !roleCreateSaving && setRoleCreateOpen(false)} aria-label="Закрыть">
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
+                aria-label="Закрыть"
+              >
                 <FaTimes />
               </button>
             </div>
 
-            <form className="barbermasters__form" onSubmit={submitRoleCreate} noValidate>
+            <form
+              className="barbermasters__form"
+              onSubmit={submitRoleCreate}
+              noValidate
+            >
               <div className="barbermasters__grid">
                 <label className="barbermasters__field barbermasters__field--full">
                   <span className="barbermasters__label">
@@ -798,7 +1353,11 @@ const Masters = () => {
                 </label>
               </div>
 
-              {!!roleCreateErr && <div className="barbermasters__alert barbermasters__alert--inModal">{roleCreateErr}</div>}
+              {!!roleCreateErr && (
+                <div className="barbermasters__alert barbermasters__alert--inModal">
+                  {roleCreateErr}
+                </div>
+              )}
 
               <div className="barbermasters__footer">
                 <span className="barbermasters__spacer" />
@@ -811,7 +1370,11 @@ const Masters = () => {
                   >
                     Отмена
                   </button>
-                  <button type="submit" className="barbermasters__btn barbermasters__btn--primary" disabled={roleCreateSaving}>
+                  <button
+                    type="submit"
+                    className="barbermasters__btn barbermasters__btn--primary"
+                    disabled={roleCreateSaving}
+                  >
                     {roleCreateSaving ? "Сохранение…" : "Создать роль"}
                   </button>
                 </div>
@@ -823,18 +1386,36 @@ const Masters = () => {
 
       {/* ===== Roles: edit ===== */}
       {roleEditOpen && (
-        <div className="barbermasters__overlay" onClick={() => !roleEditSaving && setRoleEditOpen(false)}>
-          <div className="barbermasters__modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="barbermasters__overlay"
+          onClick={() => !roleEditSaving && setRoleEditOpen(false)}
+        >
+          <div
+            className="barbermasters__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="barbermasters__modalHeader">
               <h3 className="barbermasters__modalTitle">Изменить роль</h3>
-              <button className="barbermasters__iconBtn" onClick={() => !roleEditSaving && setRoleEditOpen(false)} aria-label="Закрыть">
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => !roleEditSaving && setRoleEditOpen(false)}
+                aria-label="Закрыть"
+              >
                 <FaTimes />
               </button>
             </div>
 
-            {!!roleEditErr && <div className="barbermasters__alert barbermasters__alert--inModal">{roleEditErr}</div>}
+            {!!roleEditErr && (
+              <div className="barbermasters__alert barbermasters__alert--inModal">
+                {roleEditErr}
+              </div>
+            )}
 
-            <form className="barbermasters__form" onSubmit={submitRoleEdit} noValidate>
+            <form
+              className="barbermasters__form"
+              onSubmit={submitRoleEdit}
+              noValidate
+            >
               <div className="barbermasters__grid">
                 <label className="barbermasters__field barbermasters__field--full">
                   <span className="barbermasters__label">
@@ -861,7 +1442,11 @@ const Masters = () => {
                   >
                     Отмена
                   </button>
-                  <button type="submit" className="barbermasters__btn barbermasters__btn--primary" disabled={roleEditSaving}>
+                  <button
+                    type="submit"
+                    className="barbermasters__btn barbermasters__btn--primary"
+                    disabled={roleEditSaving}
+                  >
                     {roleEditSaving ? "Сохранение…" : "Сохранить изменения"}
                   </button>
                 </div>
@@ -873,137 +1458,21 @@ const Masters = () => {
 
       {/* ===== Employees: create ===== */}
       {empCreateOpen && (
-        <div className="barbermasters__overlay" onClick={() => !empSaving && setEmpCreateOpen(false)}>
-          <div className="barbermasters__modal barbermasters__modal--taller" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="barbermasters__overlay"
+          onClick={() => !empSaving && setEmpCreateOpen(false)}
+        >
+          <div
+            className="barbermasters__modal barbermasters__modal--taller"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="barbermasters__modalHeader">
               <h3 className="barbermasters__modalTitle">Новый сотрудник</h3>
-              <button className="barbermasters__iconBtn" onClick={() => !empSaving && setEmpCreateOpen(false)} aria-label="Закрыть">
-                <FaTimes />
-              </button>
-            </div>
-
-            {empAlerts.length > 0 && (
-              <div className="barbermasters__alert barbermasters__alert--inModal">
-                {empAlerts.length === 1 ? empAlerts[0] : (
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {empAlerts.map((m, i) => <li key={i}>{m}</li>)}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <form className="barbermasters__form" onSubmit={submitEmployeeCreate} noValidate>
-              <div className="barbermasters__grid">
-                <label className={`barbermasters__field ${empFieldErrors.email ? "barbermasters__field--invalid" : ""}`}>
-                  <span className="barbermasters__label">
-                    Email <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="email"
-                    type="email"
-                    className={`barbermasters__input ${empFieldErrors.email ? "barbermasters__input--invalid" : ""}`}
-                    placeholder="user@mail.com"
-                    value={empForm.email}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, email: e.target.value }))}
-                    required
-                  />
-                </label>
-
-                <label className={`barbermasters__field ${empFieldErrors.first_name ? "barbermasters__field--invalid" : ""}`}>
-                  <span className="barbermasters__label">
-                    Имя <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="first_name"
-                    className={`barbermasters__input ${empFieldErrors.first_name ? "barbermasters__input--invalid" : ""}`}
-                    placeholder="Имя"
-                    value={empForm.first_name}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, first_name: e.target.value }))}
-                    required
-                  />
-                </label>
-
-                <label className={`barbermasters__field ${empFieldErrors.last_name ? "barbermasters__field--invalid" : ""}`}>
-                  <span className="barbermasters__label">
-                    Фамилия <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="last_name"
-                    className={`barbermasters__input ${empFieldErrors.last_name ? "barbermasters__input--invalid" : ""}`}
-                    placeholder="Фамилия"
-                    value={empForm.last_name}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, last_name: e.target.value }))}
-                    required
-                  />
-                </label>
-
-                {company?.sector?.name === "Пилорама" && (
-                  <>
-                    <label className={`barbermasters__field ${empFieldErrors.track_number ? "barbermasters__field--invalid" : ""}`}>
-                      <span className="barbermasters__label">
-                        Номер машины <b className="barbermasters__req">*</b>
-                      </span>
-                      <input
-                        className={`barbermasters__input ${empFieldErrors.track_number ? "barbermasters__input--invalid" : ""}`}
-                        placeholder="Номер машины"
-                        value={empForm.track_number}
-                        onChange={(e) => setEmpForm((p) => ({ ...p, track_number: e.target.value }))}
-                        required
-                      />
-                    </label>
-                    <label className={`barbermasters__field barbermasters__field--full ${empFieldErrors.phone_number ? "barbermasters__field--invalid" : ""}`}>
-                      <span className="barbermasters__label">
-                        Номер телефона <b className="barbermasters__req">*</b>
-                      </span>
-                      <input
-                        className={`barbermasters__input ${empFieldErrors.phone_number ? "barbermasters__input--invalid" : ""}`}
-                        placeholder="Номер телефона"
-                        value={empForm.phone_number}
-                        onChange={(e) => setEmpForm((p) => ({ ...p, phone_number: e.target.value }))}
-                        required
-                      />
-                    </label>
-                  </>
-                )}
-
-                <div className={`barbermasters__field barbermasters__field--full ${empFieldErrors.roleChoice ? "barbermasters__field--invalid" : ""}`}>
-                  <span className="barbermasters__label">
-                    Роль <b className="barbermasters__req">*</b>
-                  </span>
-                  <RoleSelect
-                    options={roleOptions}
-                    value={empForm.roleChoice}
-                    onChange={(key) => setEmpForm((p) => ({ ...p, roleChoice: key }))}
-                    placeholder="Выберите роль"
-                    className="barbermasters__roleSelect"
-                  />
-                  <input name="roleChoice" value={empForm.roleChoice} hidden readOnly />
-                </div>
-              </div>
-
-              <div className="barbermasters__footer">
-                <span className="barbermasters__spacer" />
-                <div className="barbermasters__footerRight">
-                  <button type="button" className="barbermasters__btn barbermasters__btn--secondary" onClick={() => setEmpCreateOpen(false)} disabled={empSaving}>
-                    Отмена
-                  </button>
-                  <button type="submit" className="barbermasters__btn barbermasters__btn--primary" disabled={empSaving}>
-                    {empSaving ? "Сохранение…" : "Создать сотрудника"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Employees: edit ===== */}
-      {empEditOpen && (
-        <div className="barbermasters__overlay" onClick={() => !empSaving && setEmpEditOpen(false)}>
-          <div className="barbermasters__modal barbermasters__modal--taller" onClick={(e) => e.stopPropagation()}>
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">Редактировать сотрудника</h3>
-              <button className="barbermasters__iconBtn" onClick={() => !empSaving && setEmpEditOpen(false)} aria-label="Закрыть">
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => !empSaving && setEmpCreateOpen(false)}
+                aria-label="Закрыть"
+              >
                 <FaTimes />
               </button>
             </div>
@@ -1022,102 +1491,478 @@ const Masters = () => {
               </div>
             )}
 
-            <form className="barbermasters__form" onSubmit={submitEmployeeEdit} noValidate>
+            <form
+              className="barbermasters__form"
+              onSubmit={submitEmployeeCreate}
+              noValidate
+            >
               <div className="barbermasters__grid">
-                <label className={`barbermasters__field ${empFieldErrors.email ? "barbermasters__field--invalid" : ""}`}>
+                <label
+                  className={`barbermasters__field ${
+                    empFieldErrors.email ? "barbermasters__field--invalid" : ""
+                  }`}
+                >
                   <span className="barbermasters__label">
                     Email <b className="barbermasters__req">*</b>
                   </span>
                   <input
                     name="email"
                     type="email"
-                    className={`barbermasters__input ${empFieldErrors.email ? "barbermasters__input--invalid" : ""}`}
+                    className={`barbermasters__input ${
+                      empFieldErrors.email
+                        ? "barbermasters__input--invalid"
+                        : ""
+                    }`}
                     placeholder="user@mail.com"
                     value={empForm.email}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, email: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, email: e.target.value }))
+                    }
                     required
                   />
                 </label>
 
-                <label className={`barbermasters__field ${empFieldErrors.first_name ? "barbermasters__field--invalid" : ""}`}>
+                <label
+                  className={`barbermasters__field ${
+                    empFieldErrors.first_name
+                      ? "barbermasters__field--invalid"
+                      : ""
+                  }`}
+                >
                   <span className="barbermasters__label">
                     Имя <b className="barbermasters__req">*</b>
                   </span>
                   <input
                     name="first_name"
-                    className={`barbermasters__input ${empFieldErrors.first_name ? "barbermasters__input--invalid" : ""}`}
+                    className={`barbermasters__input ${
+                      empFieldErrors.first_name
+                        ? "barbermasters__input--invalid"
+                        : ""
+                    }`}
                     placeholder="Имя"
                     value={empForm.first_name}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, first_name: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, first_name: e.target.value }))
+                    }
                     required
                   />
                 </label>
 
-                <label className={`barbermasters__field ${empFieldErrors.last_name ? "barbermasters__field--invalid" : ""}`}>
+                <label
+                  className={`barbermasters__field ${
+                    empFieldErrors.last_name
+                      ? "barbermasters__field--invalid"
+                      : ""
+                  }`}
+                >
                   <span className="barbermasters__label">
                     Фамилия <b className="barbermasters__req">*</b>
                   </span>
                   <input
                     name="last_name"
-                    className={`barbermasters__input ${empFieldErrors.last_name ? "barbermasters__input--invalid" : ""}`}
+                    className={`barbermasters__input ${
+                      empFieldErrors.last_name
+                        ? "barbermasters__input--invalid"
+                        : ""
+                    }`}
                     placeholder="Фамилия"
                     value={empForm.last_name}
-                    onChange={(e) => setEmpForm((p) => ({ ...p, last_name: e.target.value }))}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, last_name: e.target.value }))
+                    }
                     required
                   />
                 </label>
 
                 {company?.sector?.name === "Пилорама" && (
                   <>
-                    <label className={`barbermasters__field ${empFieldErrors.track_number ? "barbermasters__field--invalid" : ""}`}>
+                    <label
+                      className={`barbermasters__field ${
+                        empFieldErrors.track_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
                       <span className="barbermasters__label">
                         Номер машины <b className="barbermasters__req">*</b>
                       </span>
                       <input
-                        className={`barbermasters__input ${empFieldErrors.track_number ? "barbermasters__input--invalid" : ""}`}
+                        className={`barbermasters__input ${
+                          empFieldErrors.track_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
                         placeholder="Номер машины"
                         value={empForm.track_number}
-                        onChange={(e) => setEmpForm((p) => ({ ...p, track_number: e.target.value }))}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            track_number: e.target.value,
+                          }))
+                        }
                         required
                       />
                     </label>
-                    <label className={`barbermasters__field ${empFieldErrors.phone_number ? "barbermasters__field--invalid" : ""}`}>
+                    <label
+                      className={`barbermasters__field barbermasters__field--full ${
+                        empFieldErrors.phone_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
                       <span className="barbermasters__label">
                         Номер телефона <b className="barbermasters__req">*</b>
                       </span>
                       <input
-                        className={`barbermasters__input ${empFieldErrors.phone_number ? "barbermasters__input--invalid" : ""}`}
+                        className={`barbermasters__input ${
+                          empFieldErrors.phone_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
                         placeholder="Номер телефона"
                         value={empForm.phone_number}
-                        onChange={(e) => setEmpForm((p) => ({ ...p, phone_number: e.target.value }))}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            phone_number: e.target.value,
+                          }))
+                        }
                         required
                       />
                     </label>
                   </>
                 )}
 
-                <div className={`barbermasters__field barbermasters__field--full ${empFieldErrors.roleChoice ? "barbermasters__field--invalid" : ""}`}>
+                <div
+                  className={`barbermasters__field barbermasters__field--full ${
+                    empFieldErrors.roleChoice
+                      ? "barbermasters__field--invalid"
+                      : ""
+                  }`}
+                >
                   <span className="barbermasters__label">
                     Роль <b className="barbermasters__req">*</b>
                   </span>
                   <RoleSelect
                     options={roleOptions}
                     value={empForm.roleChoice}
-                    onChange={(key) => setEmpForm((p) => ({ ...p, roleChoice: key }))}
+                    onChange={(key) =>
+                      setEmpForm((p) => ({ ...p, roleChoice: key }))
+                    }
                     placeholder="Выберите роль"
                     className="barbermasters__roleSelect"
                   />
-                  <input name="roleChoice" value={empForm.roleChoice} hidden readOnly />
+                  <input
+                    name="roleChoice"
+                    value={empForm.roleChoice}
+                    hidden
+                    readOnly
+                  />
                 </div>
+
+                {showBranchSelect && (
+                  <div
+                    className={`barbermasters__field barbermasters__field--full ${
+                      empFieldErrors.branch
+                        ? "barbermasters__field--invalid"
+                        : ""
+                    }`}
+                  >
+                    <span className="barbermasters__label">Филиал</span>
+                    <RoleSelect
+                      options={[
+                        { key: "", label: "Не выбран" },
+                        ...branches.map((b) => ({
+                          key: b.id,
+                          label: b.name || "Без названия",
+                        })),
+                      ]}
+                      value={empForm.branch || ""}
+                      onChange={(key) =>
+                        setEmpForm((p) => ({ ...p, branch: key }))
+                      }
+                      placeholder="Выберите филиал"
+                      className="barbermasters__roleSelect"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="barbermasters__footer">
                 <span className="barbermasters__spacer" />
                 <div className="barbermasters__footerRight">
-                  <button type="button" className="barbermasters__btn barbermasters__btn--secondary" onClick={() => setEmpEditOpen(false)} disabled={empSaving}>
+                  <button
+                    type="button"
+                    className="barbermasters__btn barbermasters__btn--secondary"
+                    onClick={() => setEmpCreateOpen(false)}
+                    disabled={empSaving}
+                  >
                     Отмена
                   </button>
-                  <button type="submit" className="barbermasters__btn barbermasters__btn--primary" disabled={empSaving}>
+                  <button
+                    type="submit"
+                    className="barbermasters__btn barbermasters__btn--primary"
+                    disabled={empSaving}
+                  >
+                    {empSaving ? "Сохранение…" : "Создать сотрудника"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Employees: edit ===== */}
+      {empEditOpen && (
+        <div
+          className="barbermasters__overlay"
+          onClick={() => !empSaving && setEmpEditOpen(false)}
+        >
+          <div
+            className="barbermasters__modal barbermasters__modal--taller"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="barbermasters__modalHeader">
+              <h3 className="barbermasters__modalTitle">
+                Редактировать сотрудника
+              </h3>
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => !empSaving && setEmpEditOpen(false)}
+                aria-label="Закрыть"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            {empAlerts.length > 0 && (
+              <div className="barbermasters__alert barbermasters__alert--inModal">
+                {empAlerts.length === 1 ? (
+                  empAlerts[0]
+                ) : (
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {empAlerts.map((m, i) => (
+                      <li key={i}>{m}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <form
+              className="barbermasters__form"
+              onSubmit={submitEmployeeEdit}
+              noValidate
+            >
+              <div className="barbermasters__grid">
+                <label
+                  className={`barbermasters__field ${
+                    empFieldErrors.email ? "barbermasters__field--invalid" : ""
+                  }`}
+                >
+                  <span className="barbermasters__label">
+                    Email <b className="barbermasters__req">*</b>
+                  </span>
+                  <input
+                    name="email"
+                    type="email"
+                    className={`barbermasters__input ${
+                      empFieldErrors.email
+                        ? "barbermasters__input--invalid"
+                        : ""
+                    }`}
+                    placeholder="user@mail.com"
+                    value={empForm.email}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, email: e.target.value }))
+                    }
+                    required
+                  />
+                </label>
+
+                <label
+                  className={`barbermasters__field ${
+                    empFieldErrors.first_name
+                      ? "barbermasters__field--invalid"
+                      : ""
+                  }`}
+                >
+                  <span className="barbermasters__label">
+                    Имя <b className="barbermasters__req">*</b>
+                  </span>
+                  <input
+                    name="first_name"
+                    className={`barbermasters__input ${
+                      empFieldErrors.first_name
+                        ? "barbermasters__input--invalid"
+                        : ""
+                    }`}
+                    placeholder="Имя"
+                    value={empForm.first_name}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, first_name: e.target.value }))
+                    }
+                    required
+                  />
+                </label>
+
+                <label
+                  className={`barbermasters__field ${
+                    empFieldErrors.last_name
+                      ? "barbermasters__field--invalid"
+                      : ""
+                  }`}
+                >
+                  <span className="barbermasters__label">
+                    Фамилия <b className="barbermasters__req">*</b>
+                  </span>
+                  <input
+                    name="last_name"
+                    className={`barbermasters__input ${
+                      empFieldErrors.last_name
+                        ? "barbermasters__input--invalid"
+                        : ""
+                    }`}
+                    placeholder="Фамилия"
+                    value={empForm.last_name}
+                    onChange={(e) =>
+                      setEmpForm((p) => ({ ...p, last_name: e.target.value }))
+                    }
+                    required
+                  />
+                </label>
+
+                {company?.sector?.name === "Пилорама" && (
+                  <>
+                    <label
+                      className={`barbermasters__field ${
+                        empFieldErrors.track_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
+                      <span className="barbermasters__label">
+                        Номер машины <b className="barbermasters__req">*</b>
+                      </span>
+                      <input
+                        className={`barbermasters__input ${
+                          empFieldErrors.track_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
+                        placeholder="Номер машины"
+                        value={empForm.track_number}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            track_number: e.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </label>
+                    <label
+                      className={`barbermasters__field ${
+                        empFieldErrors.phone_number
+                          ? "barbermasters__field--invalid"
+                          : ""
+                      }`}
+                    >
+                      <span className="barbermasters__label">
+                        Номер телефона <b className="barbermasters__req">*</b>
+                      </span>
+                      <input
+                        className={`barbermasters__input ${
+                          empFieldErrors.phone_number
+                            ? "barbermasters__input--invalid"
+                            : ""
+                        }`}
+                        placeholder="Номер телефона"
+                        value={empForm.phone_number}
+                        onChange={(e) =>
+                          setEmpForm((p) => ({
+                            ...p,
+                            phone_number: e.target.value,
+                          }))
+                        }
+                        required
+                      />
+                    </label>
+                  </>
+                )}
+
+                <div
+                  className={`barbermasters__field barbermasters__field--full ${
+                    empFieldErrors.roleChoice
+                      ? "barbermasters__field--invalid"
+                      : ""
+                  }`}
+                >
+                  <span className="barbermasters__label">
+                    Роль <b className="barbermasters__req">*</b>
+                  </span>
+                  <RoleSelect
+                    options={roleOptions}
+                    value={empForm.roleChoice}
+                    onChange={(key) =>
+                      setEmpForm((p) => ({ ...p, roleChoice: key }))
+                    }
+                    placeholder="Выберите роль"
+                    className="barbermasters__roleSelect"
+                  />
+                  <input
+                    name="roleChoice"
+                    value={empForm.roleChoice}
+                    hidden
+                    readOnly
+                  />
+                </div>
+
+                {showBranchSelect && (
+                  <div
+                    className={`barbermasters__field barbermasters__field--full ${
+                      empFieldErrors.branch
+                        ? "barbermasters__field--invalid"
+                        : ""
+                    }`}
+                  >
+                    <span className="barbermasters__label">Филиал</span>
+                    <RoleSelect
+                      options={[
+                        { key: "", label: "Не выбран" },
+                        ...branches.map((b) => ({
+                          key: b.id,
+                          label: b.name || "Без названия",
+                        })),
+                      ]}
+                      value={empForm.branch || ""}
+                      onChange={(key) =>
+                        setEmpForm((p) => ({ ...p, branch: key }))
+                      }
+                      placeholder="Выберите филиал"
+                      className="barbermasters__roleSelect"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="barbermasters__footer">
+                <span className="barbermasters__spacer" />
+                <div className="barbermasters__footerRight">
+                  <button
+                    type="button"
+                    className="barbermasters__btn barbermasters__btn--secondary"
+                    onClick={() => setEmpEditOpen(false)}
+                    disabled={empSaving}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="barbermasters__btn barbermasters__btn--primary"
+                    disabled={empSaving}
+                  >
                     {empSaving ? "Сохранение…" : "Сохранить изменения"}
                   </button>
                 </div>
@@ -1129,11 +1974,21 @@ const Masters = () => {
 
       {/* ===== New employee credentials ===== */}
       {openLogin && (
-        <div className="barbermasters__overlay" onClick={() => setOpenLogin(false)}>
-          <div className="barbermasters__modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="barbermasters__overlay"
+          onClick={() => setOpenLogin(false)}
+        >
+          <div
+            className="barbermasters__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="barbermasters__modalHeader">
               <h3 className="barbermasters__modalTitle">Логин сотрудника</h3>
-              <button className="barbermasters__iconBtn" onClick={() => setOpenLogin(false)} aria-label="Закрыть">
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => setOpenLogin(false)}
+                aria-label="Закрыть"
+              >
                 <FaTimes />
               </button>
             </div>
@@ -1142,7 +1997,9 @@ const Masters = () => {
                 Логин: <b>{employData?.email}</b>
                 <button
                   className="barbermasters__iconBtn barbermasters__copyBtn"
-                  onClick={() => copyToClipboard(employData?.email || "", "email")}
+                  onClick={() =>
+                    copyToClipboard(employData?.email || "", "email")
+                  }
                   aria-label="Скопировать логин"
                   title={copied === "email" ? "Скопировано!" : "Скопировать"}
                 >
@@ -1154,7 +2011,12 @@ const Masters = () => {
                 Пароль: <b>{employData?.generated_password}</b>
                 <button
                   className="barbermasters__iconBtn barbermasters__copyBtn"
-                  onClick={() => copyToClipboard(employData?.generated_password || "", "password")}
+                  onClick={() =>
+                    copyToClipboard(
+                      employData?.generated_password || "",
+                      "password"
+                    )
+                  }
                   aria-label="Скопировать пароль"
                   title={copied === "password" ? "Скопировано!" : "Скопировать"}
                 >
@@ -1168,21 +2030,35 @@ const Masters = () => {
 
       {/* ===== Delete role ===== */}
       {roleToDelete && (
-        <div className="barbermasters__overlay" onClick={() => setRoleToDelete(null)}>
-          <div className="barbermasters__modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="barbermasters__overlay"
+          onClick={() => setRoleToDelete(null)}
+        >
+          <div
+            className="barbermasters__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="barbermasters__modalHeader">
               <h3 className="barbermasters__modalTitle">Удалить роль</h3>
-              <button className="barbermasters__iconBtn" onClick={() => setRoleToDelete(null)} aria-label="Закрыть">
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => setRoleToDelete(null)}
+                aria-label="Закрыть"
+              >
                 <FaTimes />
               </button>
             </div>
             <div className="barbermasters__content">
-              Вы действительно хотите удалить роль «{roleToDelete.name || "—"}»? Действие необратимо.
+              Вы действительно хотите удалить роль «{roleToDelete.name || "—"}»?
+              Действие необратимо.
             </div>
             <div className="barbermasters__footer">
               <span className="barbermasters__spacer" />
               <div className="barbermasters__footerRight">
-                <button className="barbermasters__btn barbermasters__btn--secondary" onClick={() => setRoleToDelete(null)}>
+                <button
+                  className="barbermasters__btn barbermasters__btn--secondary"
+                  onClick={() => setRoleToDelete(null)}
+                >
                   Отмена
                 </button>
                 <button
@@ -1190,7 +2066,9 @@ const Masters = () => {
                   onClick={doRemoveRole}
                   disabled={roleDeletingIds.has(roleToDelete.id)}
                 >
-                  {roleDeletingIds.has(roleToDelete.id) ? "Удаление…" : "Удалить"}
+                  {roleDeletingIds.has(roleToDelete.id)
+                    ? "Удаление…"
+                    : "Удалить"}
                 </button>
               </div>
             </div>
@@ -1200,21 +2078,35 @@ const Masters = () => {
 
       {/* ===== Delete employee ===== */}
       {empToDelete && (
-        <div className="barbermasters__overlay" onClick={() => setEmpToDelete(null)}>
-          <div className="barbermasters__modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="barbermasters__overlay"
+          onClick={() => setEmpToDelete(null)}
+        >
+          <div
+            className="barbermasters__modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="barbermasters__modalHeader">
               <h3 className="barbermasters__modalTitle">Удалить сотрудника</h3>
-              <button className="barbermasters__iconBtn" onClick={() => setEmpToDelete(null)} aria-label="Закрыть">
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => setEmpToDelete(null)}
+                aria-label="Закрыть"
+              >
                 <FaTimes />
               </button>
             </div>
             <div className="barbermasters__content">
-              Удалить «{fullName(empToDelete) || empToDelete.email || "—"}»? Действие необратимо.
+              Удалить «{fullName(empToDelete) || empToDelete.email || "—"}»?
+              Действие необратимо.
             </div>
             <div className="barbermasters__footer">
               <span className="barbermasters__spacer" />
               <div className="barbermasters__footerRight">
-                <button className="barbermasters__btn barbermasters__btn--secondary" onClick={() => setEmpToDelete(null)}>
+                <button
+                  className="barbermasters__btn barbermasters__btn--secondary"
+                  onClick={() => setEmpToDelete(null)}
+                >
                   Отмена
                 </button>
                 <button
@@ -1225,6 +2117,79 @@ const Masters = () => {
                   {empDeletingIds.has(empToDelete.id) ? "Удаление…" : "Удалить"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Employee Access Modal ===== */}
+      {accessModalOpen && accessModalEmployee && (
+        <div
+          className="barbermasters__overlay"
+          onClick={() => !empSaving && setAccessModalOpen(false)}
+          style={{ zIndex: 1000 }}
+        >
+          <div
+            className="barbermasters__modal barbermasters__modal--taller"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              zIndex: 1001,
+              maxWidth: "800px",
+              width: "90%",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              className="barbermasters__modalHeader"
+              style={{
+                borderBottom: "1px solid #e0e0e0",
+                paddingBottom: "16px",
+                marginBottom: "0",
+              }}
+            >
+              <h3
+                className="barbermasters__modalTitle"
+                style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}
+              >
+                Управление доступами:{" "}
+                {accessModalEmployee.first_name && accessModalEmployee.last_name
+                  ? `${accessModalEmployee.first_name} ${accessModalEmployee.last_name}`
+                  : accessModalEmployee.email || "Сотрудник"}
+              </h3>
+              <button
+                className="barbermasters__iconBtn"
+                onClick={() => !empSaving && setAccessModalOpen(false)}
+                aria-label="Закрыть"
+                style={{
+                  position: "absolute",
+                  top: "16px",
+                  right: "16px",
+                }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div
+              className="barbermasters__form"
+              style={{
+                padding: "24px",
+                maxHeight: "70vh",
+                overflowY: "auto",
+              }}
+            >
+              <AccessList
+                employeeAccesses={accessModalAccesses}
+                onSaveAccesses={handleSaveEmployeeAccesses}
+                role={accessModalEmployee.role}
+                sectorName={company?.sector?.name}
+                profile={profile}
+                tariff={tariff || company?.subscription_plan?.name}
+                company={company}
+                isModalMode={true}
+              />
             </div>
           </div>
         </div>

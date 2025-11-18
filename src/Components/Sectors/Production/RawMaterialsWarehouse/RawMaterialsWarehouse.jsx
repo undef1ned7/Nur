@@ -353,6 +353,17 @@ const RawMaterialsWarehouse = () => {
     dispatch(getItemsMake());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   const refresh = () => {
     dispatch(getItemsMake());
   };
@@ -440,26 +451,7 @@ const RawMaterialsWarehouse = () => {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <select
-            value={selectCashBox}
-            onChange={(e) => setSelectCashBox(e.target.value)}
-            className="employee__search-wrapper"
-          >
-            <option value="" disabled>
-              Выберите кассу
-            </option>
-            {cashBoxes?.map((cash) => (
-              <option key={cash.id} value={cash.id}>
-                {cash.name ?? cash.department_name}
-              </option>
-            ))}
-          </select>
-          <button
-            className="sklad__add"
-            onClick={() => setShowAddModal(true)}
-            disabled={!selectCashBox}
-            title={!selectCashBox ? "Сначала выберите кассу" : undefined}
-          >
+          <button className="sklad__add" onClick={() => setShowAddModal(true)}>
             <Plus size={16} style={{ marginRight: 4 }} /> Добавить товар
           </button>
         </div>

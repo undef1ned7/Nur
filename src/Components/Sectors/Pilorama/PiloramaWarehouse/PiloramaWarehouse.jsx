@@ -1704,6 +1704,17 @@ const PiloramaWarehouse = ({ onChanged }) => {
     dispatch(fetchClientsAsync());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   const onSaveSuccess = () => {
     setShowAdd(false);
     dispatch(fetchProductsAsync());
@@ -1836,12 +1847,7 @@ const PiloramaWarehouse = ({ onChanged }) => {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <button
-            className="sklad__add"
-            onClick={() => setShowAdd(true)}
-            disabled={!selectCashBox}
-            title={!selectCashBox ? "Сначала выберите кассу" : undefined}
-          >
+          <button className="sklad__add" onClick={() => setShowAdd(true)}>
             <Plus size={16} style={{ marginRight: 4 }} />
             Добавить товар
           </button>
@@ -1852,20 +1858,6 @@ const PiloramaWarehouse = ({ onChanged }) => {
             <Plus size={16} style={{ marginRight: 4 }} />
             Передать товар
           </button>
-          <select
-            value={selectCashBox}
-            onChange={(e) => setSelectCashBox(e.target.value)}
-            className="employee__search-wrapper"
-          >
-            <option value="" disabled>
-              Выберите кассу
-            </option>
-            {cashBoxes?.map((cash) => (
-              <option key={cash.id} value={cash.id}>
-                {cash.name ?? cash.department_name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

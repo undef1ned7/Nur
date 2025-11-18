@@ -27,7 +27,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const currentSector = sector || company?.sector?.name;
 
   // Используем хук для сборки меню
-  const menuItems = useMenuItems(company, currentSector, currentTariff);
+  const menuItems = useMenuItems(
+    company,
+    currentSector,
+    currentTariff,
+    profile
+  );
 
   // Обработка клика вне dropdown
   const dropdownRef = useRef(null);

@@ -48,6 +48,17 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   const validate = () => {
     if (!itemId) return "Нет выбранного товара.";
     if (!q) return "Введите количество";
@@ -55,7 +66,14 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
     if (!Number.isInteger(q)) return "Количество должно быть целым числом";
     // if (!pp || pp <= 0) return "Введите корректную закупочную цену";
     if (!rp || rp <= 0) return "Введите корректную цену";
-    if (!selectCashBox) return "Выберите кассу для списания закупки";
+    // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
+    // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
+    if (Array.isArray(cashBoxes) && cashBoxes.length > 0 && !selectCashBox) {
+      return "Касса не выбрана. Создайте кассу в разделе «Кассы».";
+    }
+    if (Array.isArray(cashBoxes) && cashBoxes.length === 0) {
+      return "Нет доступных касс. Создайте кассу в разделе «Кассы».";
+    }
     return "";
   };
 
@@ -64,6 +82,12 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
     const err = validate();
     if (err) {
       setError(err);
+      return;
+    }
+
+    // Дополнительная проверка кассы перед выполнением операции
+    if (!selectCashBox) {
+      setError("Касса не выбрана. Создайте кассу в разделе «Кассы».");
       return;
     }
     setError("");
@@ -157,24 +181,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
             disabled={!itemId}
           />
 
-          <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
-            Касса
-          </label>
-
-          <select
-            style={{ width: "100%" }}
-            value={selectCashBox}
-            onChange={(e) => setSelectCashBox(e.target.value)}
-            className="debt__input"
-            disabled={!itemId}
-          >
-            <option value="">Выберите кассу (для списания закупки)</option>
-            {cashBoxes?.map((cash) => (
-              <option key={cash.id} value={cash.id}>
-                {cash.name ?? cash.department_name}
-              </option>
-            ))}
-          </select>
+          {/* касса автоматически выбирается - скрыто от пользователя */}
 
           <div style={{ marginTop: 12 }}>
             Итог к списанию: <b>{Number.isFinite(expense) ? expense : 0}</b>

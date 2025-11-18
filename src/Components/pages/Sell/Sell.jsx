@@ -127,6 +127,17 @@ const Sell = () => {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
   const handleSellModal = (id) => {
     setSellId(id);
     setShowDetailSell(true);
@@ -415,25 +426,9 @@ const Sell = () => {
             </button>
           ) : (
             <>
-              <select
-                value={selectCashBox}
-                onChange={(e) => setSelectCashBox(e.target.value)}
-                className="employee__search-wrapper"
-              >
-                <option value="" disabled>
-                  Выберите кассу
-                </option>
-                {cashBoxes?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name ?? c.department_name}
-                  </option>
-                ))}
-              </select>
               <button
                 className="sklad__add"
                 onClick={() => setShowSellModal(true)}
-                disabled={!selectCashBox}
-                title={!selectCashBox ? "Сначала выберите кассу" : undefined}
               >
                 <Plus size={16} style={{ marginRight: 4 }} /> Продать товар
               </button>

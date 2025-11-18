@@ -22,6 +22,7 @@ import {
   Wallet,
   Warehouse,
   ReceiptText,
+  Store,
 } from "lucide-react";
 import { BsFileEarmarkPerson, BsListCheck } from "react-icons/bs";
 import {
@@ -71,6 +72,7 @@ export const menuIcons = {
   users: () => createIcon(Users),
   instagram: () => createIcon(Instagram),
   cog: () => createIcon(FaCog),
+  store: () => createIcon(Store),
 
   // Секторные иконки
   listCheck: () => createIcon(BsListCheck),

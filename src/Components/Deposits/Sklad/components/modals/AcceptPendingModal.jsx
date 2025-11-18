@@ -23,6 +23,17 @@ const AcceptPendingModal = ({ onClose, onChanged }) => {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectedCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectedCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectedCashBox]);
+
   const pending = useMemo(
     () =>
       (products || []).filter(
@@ -44,11 +55,10 @@ const AcceptPendingModal = ({ onClose, onChanged }) => {
     return Math.round(amt * 100) / 100;
   };
 
-  const acceptDisabled = !selectedCashBox;
-
   const handleAccept = async (item) => {
+    // Дополнительная проверка кассы перед выполнением операции
     if (!selectedCashBox) {
-      alert("Сначала выберите кассу вверху модалки.");
+      alert("Касса не выбрана. Создайте кассу в разделе «Кассы».");
       return;
     }
     try {
@@ -109,23 +119,24 @@ const AcceptPendingModal = ({ onClose, onChanged }) => {
 
         <div className="add-modal__section">
           <label>Касса (обязательно для принятия)</label>
-          <select
-            className="add-modal__input"
-            value={selectedCashBox}
-            onChange={(e) => setSelectedCashBox(e.target.value)}
-          >
-            <option value="">-- выберите кассу --</option>
-            {cashBoxes?.map((cash) => (
-              <option key={cash.id} value={cash.id}>
-                {cash.name ?? cash.department_name}
-              </option>
-            ))}
-          </select>
-          {!selectedCashBox && (
-            <div className="hint">
-              Для кнопки «Принять» нужно выбрать кассу. «Отказать» можно без
-              выбора кассы.
-            </div>
+          {selectedCashBox && cashBoxes && cashBoxes.length > 0 ? (
+            <span
+              className="add-modal__input"
+              style={{ padding: "8px", display: "block" }}
+            >
+              Касса:{" "}
+              {cashBoxes.find((cash) => cash.id === selectedCashBox)?.name ||
+                cashBoxes.find((cash) => cash.id === selectedCashBox)
+                  ?.department_name ||
+                "Касса"}
+            </span>
+          ) : (
+            <span
+              className="add-modal__input"
+              style={{ padding: "8px", display: "block", color: "#999" }}
+            >
+              Нет доступных касс
+            </span>
           )}
         </div>
 
@@ -167,12 +178,6 @@ const AcceptPendingModal = ({ onClose, onChanged }) => {
                         <button
                           className="add-modal__save"
                           style={{ marginRight: 8 }}
-                          disabled={acceptDisabled}
-                          title={
-                            acceptDisabled
-                              ? "Выберите кассу выше"
-                              : "Принять товар"
-                          }
                           onClick={() => handleAccept(item)}
                         >
                           Принять

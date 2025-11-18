@@ -12,7 +12,11 @@ import {
   createClientAsync,
   fetchClientsAsync,
 } from "../../../../../store/creators/clientCreators";
-import { addCashFlows } from "../../../../../store/slices/cashSlice";
+import {
+  addCashFlows,
+  getCashBoxes,
+  useCash,
+} from "../../../../../store/slices/cashSlice";
 import { createDeal } from "../../../../../store/creators/saleThunk";
 import AddProductBarcode from "../../AddProductBarcode";
 import { createProductAsync } from "../../../../../store/creators/productCreators";
@@ -20,8 +24,8 @@ import { createProductAsync } from "../../../../../store/creators/productCreator
 const AddModal = ({
   onClose,
   onSaveSuccess,
-  cashBoxes,
-  selectCashBox,
+  cashBoxes: externalCashBoxes,
+  selectCashBox: externalSelectCashBox,
   onShowSuccessAlert,
   onShowErrorAlert,
 }) => {
@@ -30,8 +34,15 @@ const AddModal = ({
   const { creating, createError, brands, categories, barcodeError } =
     useProducts();
   const { company } = useUser();
+  const { list: internalCashBoxes } = useCash();
+
+  // Используем внешние кассы, если переданы, иначе внутренние
+  const cashBoxes = externalCashBoxes || internalCashBoxes;
+  const [selectCashBox, setSelectCashBox] = useState(
+    externalSelectCashBox || ""
+  );
   const [activeTab, setActiveTab] = useState(0);
-  const [isTabSelected, setIsTabSelected] = useState(false);
+  const [isTabSelected, setIsTabSelected] = useState(true); // Автоматически открываем первую вкладку (сканирование)
 
   const [newItemData, setNewItemData] = useState({
     name: "",
@@ -166,7 +177,7 @@ const AddModal = ({
           onClose={onClose}
           onShowSuccessAlert={onShowSuccessAlert}
           onShowErrorAlert={onShowErrorAlert}
-          selectCashBox={selectCashBox}
+          selectCashBox={selectCashBox || externalSelectCashBox}
         />
       ),
       option: "scan",
@@ -418,7 +429,21 @@ const AddModal = ({
 
   useEffect(() => {
     dispatch(fetchClientsAsync());
-  }, [dispatch]);
+    if (!externalCashBoxes) {
+      dispatch(getCashBoxes());
+    }
+  }, [dispatch, externalCashBoxes]);
+
+  // Автоматически выбираем первую кассу по индексу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
 
   useEffect(() => {
     if (barcodeError) {
