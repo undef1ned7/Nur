@@ -22,6 +22,7 @@ import Suppliers from "../../Contact/Suppliers/Suppliers";
 import ContactClient from "../../Contact/ContactClient/ContactClient";
 import Implementers from "../../Contact/Implementers/Implementers";
 import { useUser } from "../../../store/slices/userSlice";
+import Debtors from "../../Contact/Debtors/Debtors";
 
 /* ---------- EditModal ---------- */
 const EditModal = ({ client, onClose }) => {
@@ -158,6 +159,10 @@ export default function ClientsTable() {
             content: <Implementers />,
           },
         ]),
+        {
+          label: 'Должники',
+          content: <Debtors />,
+        }
   ];
 
   const navigate = useNavigate();
