@@ -2,18 +2,16 @@ import React, { useState, useMemo } from "react";
 import { useSelector } from "react-redux";
 import SocialModal from "./SocialModal";
 import "./AdditionalServices.scss";
-import {
-  FaInstagram,
-  FaTelegram,
-  FaWhatsapp,
-  FaWarehouse,
-} from "react-icons/fa";
+import { FaInstagram, FaTelegram, FaWhatsapp } from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
+import { useMenuPermissions } from "../../Sidebar/hooks/useMenuPermissions";
+import { getAdditionalServicesForPage } from "../../Sidebar/config/additionalServicesConfig";
 
 const AdditionalServices = () => {
   const [selectedSocial, setSelectedSocial] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { company } = useSelector((state) => state.user);
+  const { company, tariff, sector } = useSelector((state) => state.user);
+  const { hasPermission, isAllowed } = useMenuPermissions();
 
   const handleSocialClick = (social) => {
     setSelectedSocial(social);
@@ -25,15 +23,9 @@ const AdditionalServices = () => {
     setSelectedSocial(null);
   };
 
-  // Покажем "Склад" только для консалтинга
-  const isConsulting = useMemo(() => {
-    const name = (company?.name || "").toLowerCase();
-    const sector = company?.sector?.name || company?.industry?.name || "";
-    return name === "consulting" || sector === "Консалтинг";
-  }, [company]);
-
-  const socialNetworks = useMemo(() => {
-    const base = [
+  // Базовые социальные сети (всегда показываются)
+  const baseSocialNetworks = useMemo(
+    () => [
       {
         id: "whatsapp",
         name: "WhatsApp",
@@ -62,20 +54,40 @@ const AdditionalServices = () => {
         description:
           "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
       },
-    ];
+    ],
+    []
+  );
 
-    if (isConsulting) {
-      base.push({
-        id: "warehouse",
-        name: "Склад",
-        icon: <FaWarehouse />,
-        description:
-          "Учет услуг и материалов для консалтинга: приход/расход, партии, остатки и связь с продажами.",
+  // Получаем динамические услуги из конфигурации
+  const dynamicServices = useMemo(
+    () =>
+      getAdditionalServicesForPage({
+        hasPermission,
+        isAllowed,
+        company,
+        tariff: tariff || company?.subscription_plan?.name || "Старт",
+        sector: sector || company?.sector?.name,
+      }),
+    [hasPermission, isAllowed, company, tariff, sector]
+  );
+
+  // Объединяем базовые и динамические услуги
+  const socialNetworks = useMemo(() => {
+    const result = [...baseSocialNetworks];
+
+    // Добавляем динамические услуги, преобразуя их в нужный формат
+    dynamicServices.forEach((service) => {
+      const IconComponent = service.icon;
+      result.push({
+        id: service.id,
+        name: service.name,
+        icon: <IconComponent />,
+        description: service.description,
       });
-    }
+    });
 
-    return base;
-  }, [isConsulting]);
+    return result;
+  }, [baseSocialNetworks, dynamicServices]);
 
   return (
     <div className="additional-services">

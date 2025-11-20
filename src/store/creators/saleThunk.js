@@ -213,12 +213,21 @@ export const historySellObjectDetail = createAsyncThunk(
 
 export const productCheckout = createAsyncThunk(
   "products/productCheckout",
-  async ({ id, bool, clientId }, { rejectWithValue }) => {
+  async (
+    { id, bool, clientId, payment_method, cash_received },
+    { rejectWithValue }
+  ) => {
     try {
-      const { data } = await api.post(`main/pos/sales/${id}/checkout/`, {
+      const payload = {
         print_receipt: bool,
-        client_id: clientId,
-      });
+        ...(clientId && { client_id: clientId }),
+        ...(payment_method && { payment_method }),
+        ...(cash_received && { cash_received }),
+      };
+      const { data } = await api.post(
+        `main/pos/sales/${id}/checkout/`,
+        payload
+      );
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);

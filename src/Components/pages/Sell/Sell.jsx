@@ -350,24 +350,29 @@ const Sell = () => {
                 {history.map((item, idx) => {
                   return (
                     <tr
+                      key={item.id}
                       onClick={() => {
                         setSellId(item.id);
                         setShowDetailSell(true);
                       }}
                     >
-                      <td onClick={(e) => e.stopPropagation()}>
+                      <td onClick={(e) => e.stopPropagation()} data-label="">
                         <input
                           type="checkbox"
                           checked={isSelected(item.id)}
                           onChange={() => toggleRow(item.id)}
                         />
                       </td>
-                      <td>{idx + 1}</td>
-                      <td>{item.client_name || "-"}</td>
-                      <td>{item.total}</td>
-                      <td>{kindTranslate[item.status] || item.status}</td>
-                      <td>{new Date(item.created_at).toLocaleString()}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Клиент">{item.client_name || "-"}</td>
+                      <td data-label="Цена">{item.total}</td>
+                      <td data-label="Статус">
+                        {kindTranslate[item.status] || item.status}
+                      </td>
+                      <td data-label="Дата">
+                        {new Date(item.created_at).toLocaleString()}
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()} data-label="">
                         {company.sector.name === "Магазин" && (
                           <button
                             className="sell__table-refund"

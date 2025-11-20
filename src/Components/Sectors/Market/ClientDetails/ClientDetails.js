@@ -23,6 +23,7 @@ import {
   useCash,
   getCashBoxes,
 } from "../../../../store/slices/cashSlice";
+import AlertModal from "../../../common/AlertModal/AlertModal";
 
 /* ===== helpers ===== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -162,6 +163,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
   const [state, setState] = useState({
     amount: "",
     debt_months: "",
+    first_due_date: "",
   });
   const [isEditing, setIsEditing] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
@@ -170,6 +172,16 @@ const DebtModal = ({ id, onClose, onChanged }) => {
     type: "income",
     name: "",
     amount: "",
+  });
+  const [alert, setAlert] = useState({
+    open: false,
+    type: "error",
+    message: "",
+  });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    message: "",
+    onConfirm: null,
   });
 
   // грузим детали сделки
@@ -197,6 +209,9 @@ const DebtModal = ({ id, onClose, onChanged }) => {
         amount: dealDetail.amount != null ? String(dealDetail.amount) : "",
         debt_months:
           dealDetail.debt_months != null ? String(dealDetail.debt_months) : "",
+        first_due_date: dealDetail.first_due_date
+          ? toYYYYMMDD(dealDetail.first_due_date)
+          : "",
       });
     }
   }, [dealDetail]);
@@ -217,6 +232,9 @@ const DebtModal = ({ id, onClose, onChanged }) => {
           data: {
             amount: Number.isFinite(amount) ? amount : 0,
             debt_months: Number.isFinite(months) ? months : 0,
+            ...(state.first_due_date
+              ? { first_due_date: toYYYYMMDD(state.first_due_date) }
+              : {}),
           },
           clientId,
         })
@@ -256,14 +274,21 @@ const DebtModal = ({ id, onClose, onChanged }) => {
   };
 
   const onDeleteDebts = async (id) => {
-    if (!window.confirm(`Удалить сделку?`)) return;
-    try {
-      await dispatch(deleteDebt(id)).unwrap();
-      onClose();
-      onChanged?.();
-    } catch (e) {
-      console.log(e);
-    }
+    setConfirmDialog({
+      open: true,
+      message: "Удалить сделку?",
+      onConfirm: async () => {
+        try {
+          await dispatch(deleteDebt(id)).unwrap();
+          onClose();
+          onChanged?.();
+          setConfirmDialog({ open: false, message: "", onConfirm: null });
+        } catch (e) {
+          console.log(e);
+          setConfirmDialog({ open: false, message: "", onConfirm: null });
+        }
+      },
+    });
   };
 
   // источники значений (форма/сервер)
@@ -284,6 +309,9 @@ const DebtModal = ({ id, onClose, onChanged }) => {
       ? dealDetail.installments
       : [];
   }, [dealDetail]);
+
+  // Состояние для хранения введенных сумм оплаты для каждого платежа
+  const [paymentAmounts, setPaymentAmounts] = useState({});
 
   const onCashChange = (e) => {
     const { name, value } = e.target;
@@ -365,6 +393,28 @@ const DebtModal = ({ id, onClose, onChanged }) => {
           )}
         </div>
 
+        <div className="row">
+          <label className="label" htmlFor="first_due_date">
+            Дата первого платежа
+          </label>
+          {isEditing ? (
+            <input
+              id="first_due_date"
+              type="date"
+              className="debt__input"
+              name="first_due_date"
+              value={state.first_due_date}
+              onChange={onChange}
+            />
+          ) : (
+            <div className="value">
+              {dealDetail?.first_due_date
+                ? formatDateDDMMYYYY(dealDetail.first_due_date)
+                : "—"}
+            </div>
+          )}
+        </div>
+
         {dealDetail?.prepayment !== "0.00" && (
           <div className="row">
             <div className="label">Предоплата</div>
@@ -402,6 +452,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                       <th style={{ textAlign: "right" }}>Сумма</th>
                       <th style={{ textAlign: "right" }}>Остаток</th>
                       <th style={{ textAlign: "right" }}>Оплачен</th>
+                      <th style={{ textAlign: "right" }}>Сумма оплаты</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -419,12 +470,67 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                           <td style={{ textAlign: "left" }}>
                             {formatDateDDMMYYYY(p.due_date)}
                           </td>
+
                           <td style={{ textAlign: "right" }}>{p.amount}</td>
+
                           <td style={{ textAlign: "right" }}>
                             {p.balance_after}
                           </td>
                           <td style={{ textAlign: "right" }}>
                             {p.paid_on ? formatDateDDMMYYYY(p.paid_on) : "—"}
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            {paid ? (
+                              <span title="Платёж уже проведён">—</span>
+                            ) : (
+                              <>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={
+                                    paymentAmounts[p.number] !== undefined
+                                      ? paymentAmounts[p.number]
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPaymentAmounts((prev) => ({
+                                      ...prev,
+                                      [p.number]: value,
+                                    }));
+                                  }}
+                                  placeholder={
+                                    p.paid_amount
+                                      ? `${(
+                                          Number(p.amount) -
+                                          Number(p.paid_amount || 0)
+                                        ).toFixed(2)} (остаток)`
+                                      : `${p.amount} (полная сумма)`
+                                  }
+                                  style={{
+                                    width: "120px",
+                                    padding: "4px 8px",
+                                    border: "1px solid #ddd",
+                                    borderRadius: "4px",
+                                    textAlign: "right",
+                                    fontSize: "14px",
+                                  }}
+                                />
+                                {p.paid_amount && Number(p.paid_amount) > 0 && (
+                                  <div
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#666",
+                                      marginTop: "2px",
+                                    }}
+                                  >
+                                    Уже оплачено:{" "}
+                                    {Number(p.paid_amount).toFixed(2)}
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </td>
                           <td style={{ textAlign: "right" }}>
                             {paid ? (
@@ -442,22 +548,113 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                   cursor: "pointer",
                                 }}
                                 onClick={() => {
-                                  if (!window.confirm(`Подтверждаете оплату`))
-                                    return;
-                                  onPayDeal({
-                                    installment_number: p.number,
-                                    date: toYYYYMMDD(new Date()),
-                                  });
-                                  dispatch(
-                                    addCashFlows({
-                                      ...cashData,
-                                      amount: p.amount,
-                                      name: `оплата долга №${p.number}`,
-                                      source_cashbox_flow_id: p.number,
-                                      source_business_operation_id:
-                                        "Оплата долга",
-                                    })
+                                  // Получаем введенную сумму или используем полную сумму взноса
+                                  const userEnteredAmount =
+                                    paymentAmounts[p.number] !== undefined &&
+                                    paymentAmounts[p.number] !== ""
+                                      ? Number(paymentAmounts[p.number])
+                                      : null;
+
+                                  const fullAmount = Number(p.amount);
+                                  const alreadyPaid = Number(
+                                    p.paid_amount || 0
                                   );
+                                  const remaining = fullAmount - alreadyPaid;
+
+                                  // Проверяем, есть ли что оплачивать
+                                  if (remaining <= 0) {
+                                    setAlert({
+                                      open: true,
+                                      type: "error",
+                                      message: "Взнос уже полностью оплачен",
+                                    });
+                                    return;
+                                  }
+
+                                  // Определяем сумму платежа
+                                  let paymentAmount;
+                                  let shouldSendAmount = false;
+
+                                  if (userEnteredAmount !== null) {
+                                    // Пользователь ввел сумму
+                                    if (
+                                      !Number.isFinite(userEnteredAmount) ||
+                                      userEnteredAmount <= 0
+                                    ) {
+                                      setAlert({
+                                        open: true,
+                                        type: "error",
+                                        message:
+                                          "Введите корректную сумму оплаты",
+                                      });
+                                      return;
+                                    }
+                                    if (userEnteredAmount > remaining) {
+                                      setAlert({
+                                        open: true,
+                                        type: "error",
+                                        message: `Сумма оплаты не может превышать остаток (${remaining.toFixed(
+                                          2
+                                        )} сом)`,
+                                      });
+                                      return;
+                                    }
+                                    paymentAmount = userEnteredAmount;
+                                    // Если сумма меньше остатка - это частичная оплата, передаем amount
+                                    // Если сумма равна остатку - можно не передавать, система возьмет остаток
+                                    shouldSendAmount =
+                                      paymentAmount < remaining;
+                                  } else {
+                                    // Пользователь не ввел сумму - используем остаток (полная оплата)
+                                    paymentAmount = remaining;
+                                    // Не передаем amount - система сама возьмет остаток
+                                    shouldSendAmount = false;
+                                  }
+
+                                  // Показываем модальное окно подтверждения
+                                  setConfirmDialog({
+                                    open: true,
+                                    message: `Подтверждаете оплату ${paymentAmount.toFixed(
+                                      2
+                                    )} сом?`,
+                                    onConfirm: () => {
+                                      // Формируем данные для API
+                                      const paymentData = {
+                                        installment_number: p.number,
+                                        date: toYYYYMMDD(new Date()),
+                                      };
+
+                                      // Передаем amount только для частичных платежей
+                                      if (shouldSendAmount) {
+                                        paymentData.amount =
+                                          paymentAmount.toFixed(2);
+                                      }
+
+                                      onPayDeal(paymentData);
+                                      dispatch(
+                                        addCashFlows({
+                                          ...cashData,
+                                          amount: paymentAmount.toFixed(2),
+                                          name: `оплата долга №${p.number}`,
+                                          source_cashbox_flow_id: p.number,
+                                          source_business_operation_id:
+                                            "Оплата долга",
+                                        })
+                                      );
+                                      // Очищаем введенную сумму после оплаты
+                                      setPaymentAmounts((prev) => {
+                                        const next = { ...prev };
+                                        delete next[p.number];
+                                        return next;
+                                      });
+                                      // Закрываем диалог подтверждения
+                                      setConfirmDialog({
+                                        open: false,
+                                        message: "",
+                                        onConfirm: null,
+                                      });
+                                    },
+                                  });
                                 }}
                               >
                                 Оплатить
@@ -525,6 +722,9 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                     dealDetail?.debt_months != null
                       ? String(dealDetail.debt_months)
                       : "",
+                  first_due_date: dealDetail?.first_due_date
+                    ? toYYYYMMDD(dealDetail.first_due_date)
+                    : "",
                 });
                 setIsEditing(false);
               }}
@@ -533,6 +733,28 @@ const DebtModal = ({ id, onClose, onChanged }) => {
             </button>
           </div>
         )}
+
+        <AlertModal
+          open={alert.open}
+          type={alert.type}
+          message={alert.message}
+          okText="Ok"
+          onClose={() => setAlert((a) => ({ ...a, open: false }))}
+        />
+        <AlertModal
+          open={confirmDialog.open}
+          type="info"
+          message={confirmDialog.message}
+          okText="Подтвердить"
+          onClose={() =>
+            setConfirmDialog({ open: false, message: "", onConfirm: null })
+          }
+          onConfirm={() => {
+            if (confirmDialog.onConfirm) {
+              confirmDialog.onConfirm();
+            }
+          }}
+        />
       </div>
     </div>
   );
@@ -565,6 +787,7 @@ export default function MarketClientDetails() {
   const [dealBudget, setDealBudget] = useState("");
   const [dealStatus, setDealStatus] = useState("Продажа");
   const [dealDebtMonths, setDealDebtMonths] = useState(""); // срок долга (мес.)
+  const [dealFirstDueDate, setDealFirstDueDate] = useState(""); // дата первого платежа
 
   // client edit fields
   const [editFio, setEditFio] = useState("");
@@ -584,6 +807,16 @@ export default function MarketClientDetails() {
   const [reconciliationData, setReconciliationData] = useState(null);
   const [reconciliationLoading, setReconciliationLoading] = useState(false);
   const [reconciliationErr, setReconciliationErr] = useState("");
+  const [alert, setAlert] = useState({
+    open: false,
+    type: "error",
+    message: "",
+  });
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    message: "",
+    onConfirm: null,
+  });
   const dispatch = useDispatch();
 
   // ====== НОВОЕ: состояние фильтра дат ======
@@ -675,6 +908,9 @@ export default function MarketClientDetails() {
         ? String(deal.debt_months)
         : ""
     );
+    setDealFirstDueDate(
+      deal?.first_due_date ? toYYYYMMDD(deal.first_due_date) : ""
+    );
     setIsDealFormOpen(true);
     loadDeals(client.id);
   };
@@ -691,7 +927,7 @@ export default function MarketClientDetails() {
   /* ===== API: Deals ===== */
   const createDealApi = async (
     clientId,
-    { title, statusRu, amount, debt_months }
+    { title, statusRu, amount, debt_months, first_due_date }
   ) => {
     const payload = {
       title: String(title || "").trim(),
@@ -702,6 +938,11 @@ export default function MarketClientDetails() {
       ...(ruStatusToKind(statusRu) === "debt" && Number(debt_months) > 0
         ? { debt_months: parseInt(debt_months, 10) }
         : {}),
+      ...(ruStatusToKind(statusRu) === "debt" &&
+      first_due_date &&
+      toYYYYMMDD(first_due_date)
+        ? { first_due_date: toYYYYMMDD(first_due_date) }
+        : {}),
     };
     const res = await api.post(`/main/clients/${clientId}/deals/`, payload);
     return normalizeDealFromApi(res);
@@ -709,7 +950,7 @@ export default function MarketClientDetails() {
 
   const updateDealApi = async (
     dealId,
-    { clientId, title, statusRu, amount, debt_months }
+    { clientId, title, statusRu, amount, debt_months, first_due_date }
   ) => {
     const payload = {
       title: String(title || "").trim(),
@@ -719,6 +960,11 @@ export default function MarketClientDetails() {
       client: clientId,
       ...(ruStatusToKind(statusRu) === "debt" && Number(debt_months) > 0
         ? { debt_months: parseInt(debt_months, 10) }
+        : {}),
+      ...(ruStatusToKind(statusRu) === "debt" &&
+      first_due_date &&
+      toYYYYMMDD(first_due_date)
+        ? { first_due_date: toYYYYMMDD(first_due_date) }
         : {}),
     };
     const res = await api.patch(
@@ -875,11 +1121,13 @@ export default function MarketClientDetails() {
   const handleDealSave = async () => {
     if (!client?.id) return;
     if (!canSaveDeal) {
-      alert(
-        isDebtSelected
+      setAlert({
+        open: true,
+        type: "error",
+        message: isDebtSelected
           ? "Заполните название, сумму и срок долга (в месяцах)"
-          : "Заполните название и корректную сумму"
-      );
+          : "Заполните название и корректную сумму",
+      });
       return;
     }
     try {
@@ -890,6 +1138,7 @@ export default function MarketClientDetails() {
           statusRu: dealStatus,
           amount: dealBudget,
           debt_months: dealDebtMonths,
+          first_due_date: dealFirstDueDate,
         });
         setDeals((prev) =>
           prev.map((d) => (d.id === updated.id ? updated : d))
@@ -902,12 +1151,17 @@ export default function MarketClientDetails() {
         statusRu: dealStatus,
         amount: dealBudget,
         debt_months: dealDebtMonths,
+        first_due_date: dealFirstDueDate,
       });
       setDeals((prev) => [created, ...prev]);
       closeDealForm();
     } catch (e) {
       console.error(e);
-      alert(msgFromError(e, "Не удалось сохранить сделку"));
+      setAlert({
+        open: true,
+        type: "error",
+        message: msgFromError(e, "Не удалось сохранить сделку"),
+      });
     }
   };
 
@@ -967,17 +1221,24 @@ export default function MarketClientDetails() {
 
   const handleClientDelete = async () => {
     if (!client?.id) return;
-    if (!window.confirm("Удалить клиента? Действие необратимо.")) return;
-    try {
-      await deleteClientApi(client.id);
-      setClients((prev) =>
-        Array.isArray(prev) ? prev.filter((c) => c.id !== client.id) : prev
-      );
-      navigate("/crm/clients", { replace: true });
-    } catch (e) {
-      console.error(e);
-      setSaveClientErr(msgFromError(e, "Не удалось удалить клиента"));
-    }
+    setConfirmDialog({
+      open: true,
+      message: "Удалить клиента? Действие необратимо.",
+      onConfirm: async () => {
+        try {
+          await deleteClientApi(client.id);
+          setClients((prev) =>
+            Array.isArray(prev) ? prev.filter((c) => c.id !== client.id) : prev
+          );
+          navigate("/crm/clients", { replace: true });
+          setConfirmDialog({ open: false, message: "", onConfirm: null });
+        } catch (e) {
+          console.error(e);
+          setSaveClientErr(msgFromError(e, "Не удалось удалить клиента"));
+          setConfirmDialog({ open: false, message: "", onConfirm: null });
+        }
+      },
+    });
   };
 
   const handleDealDelete = async () => {
@@ -988,7 +1249,11 @@ export default function MarketClientDetails() {
       closeDealForm();
     } catch (e) {
       console.error(e);
-      alert(msgFromError(e, "Не удалось удалить сделку"));
+      setAlert({
+        open: true,
+        type: "error",
+        message: msgFromError(e, "Не удалось удалить сделку"),
+      });
     }
   };
 
@@ -997,6 +1262,7 @@ export default function MarketClientDetails() {
     setDealBudget("");
     setDealStatus("Продажа");
     setDealDebtMonths("");
+    setDealFirstDueDate("");
     setEditingDeal(null);
     setIsDealFormOpen(false);
   };
@@ -1476,26 +1742,41 @@ export default function MarketClientDetails() {
             </label>
 
             {isDebtSelected && (
-              <label className="field">
-                <span>
-                  Срок долга (мес.) <b className="req">*</b>
-                </span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  step="1"
-                  min="1"
-                  value={dealDebtMonths}
-                  onChange={(e) => setDealDebtMonths(e.target.value)}
-                  onBlur={() => {
-                    const n = parseInt(dealDebtMonths || "0", 10);
-                    setDealDebtMonths(
-                      Number.isFinite(n) && n > 0 ? String(n) : ""
-                    );
-                  }}
-                  placeholder="Например: 6"
-                />
-              </label>
+              <>
+                <label className="field">
+                  <span>
+                    Срок долга (мес.) <b className="req">*</b>
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="1"
+                    value={dealDebtMonths}
+                    onChange={(e) => setDealDebtMonths(e.target.value)}
+                    onBlur={() => {
+                      const n = parseInt(dealDebtMonths || "0", 10);
+                      setDealDebtMonths(
+                        Number.isFinite(n) && n > 0 ? String(n) : ""
+                      );
+                    }}
+                    placeholder="Например: 6"
+                  />
+                </label>
+                <label className="field">
+                  <span>Дата первого платежа</span>
+                  <input
+                    type="date"
+                    value={dealFirstDueDate}
+                    onChange={(e) => setDealFirstDueDate(e.target.value)}
+                    placeholder="Выберите дату"
+                  />
+                  <div className="hint">
+                    График платежей будет формироваться с этой даты (того же
+                    числа каждого месяца)
+                  </div>
+                </label>
+              </>
             )}
 
             <div className="modal-actions" style={{ flexWrap: "wrap" }}>
@@ -1647,6 +1928,28 @@ export default function MarketClientDetails() {
           </div>
         </div>
       )}
+
+      <AlertModal
+        open={alert.open}
+        type={alert.type}
+        message={alert.message}
+        okText="Ok"
+        onClose={() => setAlert((a) => ({ ...a, open: false }))}
+      />
+      <AlertModal
+        open={confirmDialog.open}
+        type="info"
+        message={confirmDialog.message}
+        okText="Подтвердить"
+        onClose={() =>
+          setConfirmDialog({ open: false, message: "", onConfirm: null })
+        }
+        onConfirm={() => {
+          if (confirmDialog.onConfirm) {
+            confirmDialog.onConfirm();
+          }
+        }}
+      />
     </div>
   );
 }

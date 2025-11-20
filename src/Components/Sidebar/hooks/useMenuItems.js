@@ -2,8 +2,8 @@ import { useMemo, useCallback } from "react";
 import { MENU_CONFIG } from "../config/menuConfig";
 import { HIDE_RULES } from "../config/hideRules";
 import { useMenuPermissions } from "./useMenuPermissions";
-import { Warehouse } from "lucide-react";
 import { menuIcons } from "../config/menuIcons";
+import { getAdditionalServicesForMenu } from "../config/additionalServicesConfig";
 
 /**
  * Хук для сборки финального списка пунктов меню
@@ -110,21 +110,24 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       );
     }
 
-    // Специальный пункт для сектора "Консалтинг": добавить "Склад" в Доп. услуги
-    const sectorName = company?.sector?.name?.toLowerCase?.() || "";
-    if (sectorName === "консалтинг" && hasPermission("can_view_products")) {
-      const stockItem = {
-        label: "Склад",
-        to: "/crm/sklad",
-        icon: () => <Warehouse className="sidebar__menu-icon" />,
-        permission: "can_view_products",
-        implemented: true,
-      };
+    // Получаем динамические дополнительные услуги из конфигурации
+    const dynamicServices = getAdditionalServicesForMenu({
+      hasPermission,
+      isAllowed: isAllowedForPerm,
+      company,
+      tariff,
+      sector: company?.sector?.name,
+    });
+
+    // Добавляем динамические услуги, если их еще нет
+    dynamicServices.forEach((service) => {
       const exists = children.some(
-        (c) => c.to === stockItem.to || c.label === stockItem.label
+        (c) => c.to === service.to || c.label === service.label
       );
-      if (!exists) children.push(stockItem);
-    }
+      if (!exists) {
+        children.push(service);
+      }
+    });
 
     // Если нет прав ни на группу, ни на дочерние — ничего не показывать
     if (!groupAllowed && children.length === 0) return null;
@@ -136,7 +139,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       implemented: true,
       children,
     };
-  }, [hasPermission, company]);
+  }, [hasPermission, company, tariff]);
 
   /**
    * Собирает финальный список меню

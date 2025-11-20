@@ -573,8 +573,6 @@
 //   );
 // }
 
-
-
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Clients.scss";
@@ -657,11 +655,15 @@ export default function MarketClients() {
   const TABS = useMemo(() => {
     const base = [...BASE_TABS];
     if (sectorName === "Гостиница") {
-      base.splice(1, 0, { key: "clientsBooking", label: "Клиенты бронирование" });
+      base.splice(1, 0, {
+        key: "clientsBooking",
+        label: "Клиенты бронирование",
+      });
     } else {
       base.push({
         key: "resellers",
-        label: sectorName === "Строительная компания" ? "Подрядчики" : "Реализаторы",
+        label:
+          sectorName === "Строительная компания" ? "Подрядчики" : "Реализаторы",
       });
     }
     return base;
@@ -685,7 +687,9 @@ export default function MarketClients() {
   });
 
   const tryLoadWithType = async (typeValue) => {
-    const res = await api.get("/main/clients/", { params: { type: typeValue } });
+    const res = await api.get("/main/clients/", {
+      params: { type: typeValue },
+    });
     return listFrom(res);
   };
 
@@ -699,7 +703,7 @@ export default function MarketClients() {
         const res = await api.get("/main/clients/clients/with-debts/");
         const list = listFrom(res);
         console.log(res);
-        
+
         setRows(list);
         return;
       }
@@ -758,7 +762,9 @@ export default function MarketClients() {
     if (v === "client") return "Клиент";
     if (v === "suppliers") return "Поставщик";
     if (v === "implementers")
-      return sectorName === "Строительная компания" ? "Подрядчики" : "Реализатор";
+      return sectorName === "Строительная компания"
+        ? "Подрядчики"
+        : "Реализатор";
     if (v === "debtor" || v === "debtors") return "Должник";
     return "—";
   };
@@ -778,8 +784,12 @@ export default function MarketClients() {
     const s = search.toLowerCase();
     return onlyThisTab.filter(
       (c) =>
-        String(c.full_name || c.fio || "").toLowerCase().includes(s) ||
-        String(c.phone || "").toLowerCase().includes(s)
+        String(c.full_name || c.fio || "")
+          .toLowerCase()
+          .includes(s) ||
+        String(c.phone || "")
+          .toLowerCase()
+          .includes(s)
     );
   }, [rows, search, activeTab]);
 
@@ -1018,7 +1028,10 @@ export default function MarketClients() {
                   tabIndex={0}
                   onKeyDown={(e) => e.key === "Enter" && openCard(c)}
                 >
-                  <span className="ellipsis" title={c.full_name || c.fio || "—"}>
+                  <span
+                    className="ellipsis"
+                    title={c.full_name || c.fio || "—"}
+                  >
                     {c.full_name || c.fio || "—"}
                   </span>
                   <span>{c.phone || "—"}</span>
@@ -1128,4 +1141,3 @@ export default function MarketClients() {
     </section>
   );
 }
-

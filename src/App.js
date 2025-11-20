@@ -365,14 +365,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="building/objects"
               element={
                 <ProtectedRoute>
                   <Branch />
                 </ProtectedRoute>
               }
-            />
+            /> */}
             <Route
               path="branch/:id"
               element={

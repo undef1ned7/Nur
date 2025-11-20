@@ -1,5 +1,5 @@
 // src/Components/pages/Sell/SellMainStart.jsx
-import { Minus, Plus, Search } from "lucide-react";
+import { Minus, Pencil, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useDebounce } from "../../../hooks/useDebounce";
@@ -12,6 +12,7 @@ import {
   addCustomItem,
   createDeal,
   getProductCheckout, // будем получать PDF/JSON для печати
+  deleteProductInCart,
 } from "../../../store/creators/saleThunk";
 import {
   createClientAsync,
@@ -589,6 +590,13 @@ const SellMainStart = ({ show, setShow }) => {
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountValue, setDiscountValue] = useState("");
+  const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [cashReceived, setCashReceived] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState(null); // "cash" или "card"
+  const [cashPaymentConfirmed, setCashPaymentConfirmed] = useState(false); // флаг подтверждения оплаты в модалке
   const [customService, setCustomService] = useState({
     name: "",
     price: "",
@@ -639,6 +647,13 @@ const SellMainStart = ({ show, setShow }) => {
   });
 
   const [qty, setQty] = useState("");
+
+  // Автоматическое заполнение телефона при выборе клиента в тарифе "Старт"
+  useEffect(() => {
+    if (company?.subscription_plan?.name === "Старт" && pickClient?.phone) {
+      setState((prev) => ({ ...prev, phone: pickClient.phone }));
+    }
+  }, [clientId, pickClient, company?.subscription_plan?.name]);
 
   useEffect(() => {
     if (selectedItem) setQty(String(selectedItem.quantity ?? ""));
@@ -732,10 +747,51 @@ const SellMainStart = ({ show, setShow }) => {
     }
   }, [cashBoxes, selectCashBox]);
 
+  // Проверка подключения принтера
   useEffect(() => {
+    const checkPrinterConnection = async () => {
+      if (!("usb" in navigator)) {
+        setIsPrinterConnected(false);
+        return;
+      }
+      try {
+        const state = await ensureUsbReadyAuto();
+        setIsPrinterConnected(state !== null && usbState.dev !== null);
+      } catch {
+        setIsPrinterConnected(false);
+      }
+    };
+
     // Автоподключение USB при монтировании
     attachUsbListenersOnce();
-    ensureUsbReadyAuto().catch(() => {});
+
+    // Проверяем при монтировании
+    checkPrinterConnection();
+
+    // Проверяем периодически (каждые 2 секунды)
+    const interval = setInterval(checkPrinterConnection, 2000);
+
+    // Слушаем события подключения/отключения USB
+    const handleConnect = async () => {
+      // Небольшая задержка, чтобы устройство успело подключиться
+      setTimeout(checkPrinterConnection, 500);
+    };
+    const handleDisconnect = () => {
+      setIsPrinterConnected(false);
+    };
+
+    if ("usb" in navigator) {
+      navigator.usb.addEventListener("connect", handleConnect);
+      navigator.usb.addEventListener("disconnect", handleDisconnect);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if ("usb" in navigator) {
+        navigator.usb.removeEventListener("connect", handleConnect);
+        navigator.usb.removeEventListener("disconnect", handleDisconnect);
+      }
+    };
   }, []);
 
   // Управление видимостью дропдауна на основе результатов поиска
@@ -833,6 +889,93 @@ const SellMainStart = ({ show, setShow }) => {
     onRefresh();
   };
 
+  // Функции для работы с товарами в таблице
+  const handleIncreaseQty = async (item) => {
+    if (!start?.id) return;
+    const productId = item.product || item.id;
+    const available = getAvailableQtyForProduct(productId, products);
+    const currentQty = Number(item.quantity) || 0;
+
+    if (available && currentQty >= available) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Нельзя добавить больше, чем есть на складе",
+      });
+      return;
+    }
+
+    try {
+      await dispatch(
+        manualFilling({ id: start.id, productId: item.product || item.id })
+      ).unwrap();
+      onRefresh();
+    } catch (error) {
+      console.error("Ошибка при увеличении количества:", error);
+      setAlert({
+        open: true,
+        type: "error",
+        message: error?.data?.detail || "Ошибка при увеличении количества",
+      });
+    }
+  };
+
+  const handleDecreaseQty = async (item) => {
+    if (!start?.id) return;
+    const currentQty = Number(item.quantity) || 0;
+    const next = Math.max(0, currentQty - 1);
+
+    if (next === 0) {
+      // Если количество становится 0, удаляем товар
+      await handleRemoveItem(item);
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateManualFilling({
+          id: start.id,
+          productId: item.id,
+          quantity: next,
+        })
+      ).unwrap();
+      onRefresh();
+    } catch (error) {
+      console.error("Ошибка при уменьшении количества:", error);
+      setAlert({
+        open: true,
+        type: "error",
+        message: error?.data?.detail || "Ошибка при уменьшении количества",
+      });
+    }
+  };
+
+  const handleRemoveItem = async (item) => {
+    if (!start?.id) return;
+
+    try {
+      await dispatch(
+        deleteProductInCart({
+          id: start.id,
+          productId: item.id,
+        })
+      ).unwrap();
+      onRefresh();
+
+      // Если удаляемый товар был выбран, сбрасываем выбор
+      if (selectedId === item.id) {
+        setSelectedId(null);
+      }
+    } catch (error) {
+      console.error("Ошибка при удалении товара:", error);
+      setAlert({
+        open: true,
+        type: "error",
+        message: error?.data?.detail || "Ошибка при удалении товара",
+      });
+    }
+  };
+
   const validate = (f) => {
     const e = {};
     if (!f.full_name.trim()) e.full_name = "Это поле не может быть пустым.";
@@ -920,8 +1063,41 @@ const SellMainStart = ({ show, setShow }) => {
     }
   };
 
+  // Обработка оплаты наличными
+  const handleCashPayment = async () => {
+    const received = Number(cashReceived);
+    const total = Number(currentTotal);
+
+    if (!received || received <= 0) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Введите сумму, полученную от покупателя",
+      });
+      return;
+    }
+
+    if (received < total) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: `Недостаточно средств. К оплате: ${total.toFixed(2)} сом`,
+      });
+      return;
+    }
+
+    // Устанавливаем способ оплаты и закрываем модалку
+    // cashReceived сохраняется для использования при checkout
+    setPaymentMethod("cash");
+    setCashPaymentConfirmed(true); // помечаем, что оплата подтверждена
+    setShowCashModal(false);
+    // Оплата будет выполнена через кнопки "Печать чека" или "Без чека"
+  };
+
   // Ключевая функция: checkout + ПЕЧАТЬ
-  const performCheckout = async (withReceipt) => {
+  const performCheckout = async (withReceipt, paymentType = null) => {
+    // Используем выбранный способ оплаты, если не передан явно
+    const finalPaymentType = paymentType || paymentMethod || "card";
     try {
       if (!cashData.cashbox) {
         setAlert({
@@ -1020,13 +1196,42 @@ const SellMainStart = ({ show, setShow }) => {
         ).unwrap();
       }
 
-      const result = await run(
-        productCheckout({
-          id: start?.id,
-          bool: withReceipt,
-          clientId: clientId,
-        })
-      );
+      // Валидация для оплаты наличными
+      if (finalPaymentType === "cash") {
+        if (!cashReceived || Number(cashReceived) <= 0) {
+          setAlert({
+            open: true,
+            type: "error",
+            message: "Введите сумму, полученную от покупателя",
+          });
+          return;
+        }
+        const total = Number(currentTotal);
+        const received = Number(cashReceived);
+        if (received < total) {
+          setAlert({
+            open: true,
+            type: "error",
+            message: `Недостаточно средств. К оплате: ${total.toFixed(2)} сом`,
+          });
+          return;
+        }
+      }
+
+      // Формируем параметры для checkout
+      const checkoutParams = {
+        id: start?.id,
+        bool: withReceipt,
+        clientId: clientId,
+      };
+
+      // Если оплата наличными, обязательно добавляем payment_method и cash_received
+      if (finalPaymentType === "cash") {
+        checkoutParams.payment_method = "cash";
+        checkoutParams.cash_received = Number(cashReceived).toFixed(2);
+      }
+
+      const result = await run(productCheckout(checkoutParams));
 
       const amountForCash = debt === "Предоплата" ? amount : start.total;
       if (debt !== "Долги") {
@@ -1036,6 +1241,7 @@ const SellMainStart = ({ show, setShow }) => {
             name: cashData.name === "" ? "Продажа" : cashData.name,
             amount: amountForCash,
             source_cashbox_flow_id: result?.sale_id,
+            type: finalPaymentType === "cash" ? "income" : "income",
           })
         );
       }
@@ -1060,6 +1266,11 @@ const SellMainStart = ({ show, setShow }) => {
         type: "success",
         message: "Операция успешно выполнена!",
       });
+
+      // Сбрасываем способ оплаты после успешной операции
+      setPaymentMethod(null);
+      setCashReceived("");
+      setCashPaymentConfirmed(false);
 
       dispatch(startSale());
     } catch (e) {
@@ -1128,7 +1339,8 @@ const SellMainStart = ({ show, setShow }) => {
                     }
                   >
                     <div style={{ fontWeight: "500" }}>
-                      {product.product_name || product.name}
+                      {product.product_name || product.name} {product.quantity}{" "}
+                      шт
                     </div>
                     {product.unit_price && (
                       <div
@@ -1218,9 +1430,9 @@ const SellMainStart = ({ show, setShow }) => {
       </div>
 
       <div className="start__body">
-        <div className="col-8">
+        <div className="col-8 start__body-column">
           <div className="start__body-column">
-            <div className="sell__body-header">
+            {/* <div className="sell__body-header">
               <h2 className="start__body-title">
                 {selectedItem?.product_name}
               </h2>
@@ -1329,7 +1541,7 @@ const SellMainStart = ({ show, setShow }) => {
                   onChange={onDiscountChange}
                 />
               </div>
-            </div>
+            </div> */}
             <div className="start__body-wrapper">
               <div className="start__body-wrapper">
                 <table className="start__body-table">
@@ -1345,9 +1557,56 @@ const SellMainStart = ({ show, setShow }) => {
                         <td>{idx + 1}.</td>
                         <td>{item.product_name ?? item.display_name}</td>
                         <td>{item.unit_price}</td>
-                        <td>{item.quantity} шт</td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <button
+                              className="start__table-btn start__table-btn--minus"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDecreaseQty(item);
+                              }}
+                              title="Уменьшить количество"
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <span
+                              style={{ minWidth: "40px", textAlign: "center" }}
+                            >
+                              {item.quantity} шт
+                            </span>
+                            <button
+                              className="start__table-btn start__table-btn--plus"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleIncreaseQty(item);
+                              }}
+                              title="Увеличить количество"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        </td>
                         <td>
                           {Number(item.unit_price) * Number(item.quantity)}
+                        </td>
+                        <td>
+                          <button
+                            className="start__table-btn start__table-btn--delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveItem(item);
+                            }}
+                            title="Удалить товар"
+                          >
+                            <X size={16} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1366,7 +1625,7 @@ const SellMainStart = ({ show, setShow }) => {
               Доп. услуги
             </button>
 
-            {products?.slice(0, 10).map((product) => (
+            {products?.map((product) => (
               <button
                 key={product.id || product.name}
                 className={cx(
@@ -1414,9 +1673,37 @@ const SellMainStart = ({ show, setShow }) => {
                 <b>Без скидок</b>
                 <p>{currentSubtotal}</p>
               </div>
-              <div className="start__total-row">
+              <div
+                className="start__total-row"
+                style={{ position: "relative" }}
+              >
                 <b>Скидка</b>
-                <p>{currentDiscount}</p>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <p>{currentDiscount || 0}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDiscountValue(currentDiscount || "");
+                      setShowDiscountModal(true);
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#007bff",
+                      fontSize: "14px",
+                    }}
+                    title="Изменить скидку"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </div>
               </div>
               <div className="start__total-row">
                 <b>ИТОГО</b>
@@ -1434,21 +1721,63 @@ const SellMainStart = ({ show, setShow }) => {
 
               <div className="start__total-row1">
                 <button
-                  className="start__total-pay"
-                  onClick={() => performCheckout(true)}
+                  className={`start__total-pay ${
+                    paymentMethod === "cash" ? "active" : ""
+                  }`}
+                  onClick={() => setShowCashModal(true)}
                   disabled={!start?.id}
-                  title="Оформить и напечатать чек"
+                  style={{
+                    backgroundColor:
+                      paymentMethod === "cash" ? "#f7d617" : undefined,
+                    border:
+                      paymentMethod === "cash" ? "2px solid #000" : undefined,
+                  }}
                 >
-                  Печать чека
+                  Наличными
                 </button>
                 <button
-                  className="start__total-pay"
-                  onClick={() => performCheckout(false)}
+                  className={`start__total-pay ${
+                    paymentMethod === "card" ? "active" : ""
+                  }`}
+                  onClick={() => setPaymentMethod("card")}
                   disabled={!start?.id}
+                  style={{
+                    backgroundColor:
+                      paymentMethod === "card" ? "#f7d617" : undefined,
+                    border:
+                      paymentMethod === "card" ? "2px solid #000" : undefined,
+                  }}
                 >
-                  Без чека
+                  Переводом
                 </button>
               </div>
+
+              {paymentMethod && (
+                <div
+                  className="start__total-row1"
+                  style={{ marginTop: "10px" }}
+                >
+                  <button
+                    className="start__total-pay"
+                    onClick={() => performCheckout(true)}
+                    disabled={!start?.id || !isPrinterConnected}
+                    title={
+                      !isPrinterConnected
+                        ? "Принтер не подключен. Подключите принтер для печати чека."
+                        : "Оформить и напечатать чек"
+                    }
+                  >
+                    Печать чека
+                  </button>
+                  <button
+                    className="start__total-pay"
+                    onClick={() => performCheckout(false)}
+                    disabled={!start?.id}
+                  >
+                    Без чека
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1682,6 +2011,7 @@ const SellMainStart = ({ show, setShow }) => {
                   className="sell__header-input"
                   onChange={onChange2}
                   name="phone"
+                  value={state.phone}
                 />
                 <label>Дата оплаты</label>
                 <input
@@ -1839,6 +2169,244 @@ const SellMainStart = ({ show, setShow }) => {
                 onClick={handleAddCustomService}
               >
                 Добавить
+              </button>
+            </div>
+          </div>
+        </UniversalModal>
+      )}
+
+      {showDiscountModal && (
+        <UniversalModal
+          onClose={() => {
+            setShowDiscountModal(false);
+            setDiscountValue("");
+          }}
+          title={"Общая скидка"}
+        >
+          <div className="start__discount" style={{ width: "379px" }}>
+            <div>
+              <label>Сумма скидки</label>
+              <input
+                className="sell__header-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                placeholder="Введите сумму скидки"
+                autoFocus
+              />
+              {currentSubtotal && (
+                <p
+                  style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}
+                >
+                  Сумма без скидки: {currentSubtotal}
+                </p>
+              )}
+            </div>
+            <div
+              style={{
+                marginTop: "20px",
+                display: "flex",
+                columnGap: "10px",
+                justifyContent: "end",
+              }}
+            >
+              <button
+                className="sell__reset"
+                type="button"
+                onClick={() => {
+                  setShowDiscountModal(false);
+                  setDiscountValue("");
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                className="start__total-pay"
+                style={{ width: "auto" }}
+                type="button"
+                onClick={() => {
+                  const discount =
+                    discountValue.trim() === "" ? "0" : discountValue;
+                  onDiscountChange({ target: { value: discount } });
+                  setShowDiscountModal(false);
+                  setDiscountValue("");
+                }}
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        </UniversalModal>
+      )}
+
+      {showCashModal && (
+        <UniversalModal
+          onClose={() => {
+            // Если оплата не была подтверждена (закрыли через клик вне модалки или крестик), очищаем
+            if (!cashPaymentConfirmed) {
+              setCashReceived("");
+              setPaymentMethod(null);
+            }
+            setCashPaymentConfirmed(false); // сбрасываем флаг
+            setShowCashModal(false);
+          }}
+          title={"Оплата наличными"}
+        >
+          <div className="start__cash-payment" style={{ width: "400px" }}>
+            <div style={{ marginBottom: "20px" }}>
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 600,
+                  marginBottom: "10px",
+                }}
+              >
+                К оплате: {currentTotal} сом
+              </div>
+            </div>
+            <div style={{ marginBottom: "20px" }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: 500,
+                }}
+              >
+                Сумма от покупателя
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={cashReceived}
+                onChange={(e) => setCashReceived(e.target.value)}
+                placeholder="Введите сумму"
+                className="sell__header-input"
+                style={{ width: "100%" }}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const received = Number(cashReceived);
+                    const total = Number(currentTotal);
+                    if (received >= total) {
+                      handleCashPayment();
+                    } else {
+                      setAlert({
+                        open: true,
+                        type: "error",
+                        message: `Недостаточно средств. К оплате: ${total.toFixed(
+                          2
+                        )} сом`,
+                      });
+                    }
+                  }
+                }}
+              />
+            </div>
+            {cashReceived && Number(cashReceived) > 0 && (
+              <div
+                style={{
+                  marginBottom: "20px",
+                  padding: "15px",
+                  backgroundColor: "#f5f5f5",
+                  borderRadius: "8px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <span>Получено:</span>
+                  <span style={{ fontWeight: 600 }}>
+                    {Number(cashReceived).toFixed(2)} сом
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <span>К оплате:</span>
+                  <span style={{ fontWeight: 600 }}>
+                    {Number(currentTotal).toFixed(2)} сом
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    paddingTop: "10px",
+                    borderTop: "2px solid #ddd",
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    color:
+                      Number(cashReceived) >= Number(currentTotal)
+                        ? "#22c55e"
+                        : "#ef4444",
+                  }}
+                >
+                  <span>Сдача:</span>
+                  <span>
+                    {(Number(cashReceived) - Number(currentTotal)).toFixed(2)}{" "}
+                    сом
+                  </span>
+                </div>
+                {Number(cashReceived) < Number(currentTotal) && (
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "8px",
+                      backgroundColor: "#fee2e2",
+                      color: "#b42318",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      textAlign: "center",
+                    }}
+                  >
+                    Недостаточно средств
+                  </div>
+                )}
+              </div>
+            )}
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                className="sell__reset"
+                type="button"
+                onClick={() => {
+                  // При отмене очищаем сумму и способ оплаты
+                  setCashReceived("");
+                  setPaymentMethod(null);
+                  setCashPaymentConfirmed(false);
+                  setShowCashModal(false);
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                className="start__total-pay"
+                style={{ width: "auto" }}
+                type="button"
+                onClick={handleCashPayment}
+                disabled={
+                  !cashReceived ||
+                  Number(cashReceived) < Number(currentTotal) ||
+                  Number(cashReceived) <= 0
+                }
+              >
+                Оплатить
               </button>
             </div>
           </div>

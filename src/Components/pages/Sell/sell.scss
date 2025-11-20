@@ -63,6 +63,8 @@
 .col-8 {
   width: 66.6%;
   padding: 0 15px;
+  min-width: 0; // Позволяет flex-элементам правильно сжиматься
+  box-sizing: border-box; // Учитывает padding в ширине
 }
 .col-4 {
   width: 33.3%;
@@ -70,6 +72,20 @@
 }
 
 .start {
+  &__discount {
+    .sell__header-input {
+      width: 100%;
+      padding: 8px 13px;
+      outline: none;
+    }
+  }
+  &__cash-payment {
+    .sell__header-input {
+      width: 100%;
+      padding: 8px 13px;
+      outline: none;
+    }
+  }
   &__clientForm {
     width: 379px;
     display: flex;
@@ -187,6 +203,11 @@
       line-height: 100%;
       letter-spacing: 0%;
     }
+    &-column {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
     &-table {
       margin-top: 10px;
       border-collapse: collapse;
@@ -214,16 +235,42 @@
     margin-top: 15px;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    // align-self: end;
-    // align-self: flex-end;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
     gap: 10px;
+    padding-bottom: 5px;
+    width: 700px;
+    max-width: 100%;
+    box-sizing: border-box;
+    // Скрытие скроллбара для WebKit браузеров
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 3px;
+      &:hover {
+        background: #555;
+      }
+    }
+    // Для Firefox
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
     &-add {
-      padding: 10px 25px;
+      padding: 8px 20px;
       border-radius: 8px;
       background-color: #f7d617;
       border: none;
       cursor: pointer;
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-size: 14px;
+      min-width: fit-content;
       &.active {
         outline: 2px solid #3b82f6;
       }
@@ -648,9 +695,13 @@
   }
   .start__products {
     gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
   }
   .start__products-add {
-    width: 100%;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .start__total-row1 {
     flex-direction: column;
@@ -658,6 +709,66 @@
   }
   .start__total-pay {
     width: 100%;
+  }
+}
+
+// Стили для кнопок в таблице товаров (для всех размеров экрана)
+.start__table-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: #f5f5f5;
+    border-color: #bbb;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &--plus {
+    &:hover {
+      background-color: #e8f5e9;
+      border-color: #4caf50;
+      color: #2e7d32;
+    }
+  }
+
+  &--minus {
+    &:hover {
+      background-color: #fff3e0;
+      border-color: #ff9800;
+      color: #e65100;
+    }
+  }
+
+  &--delete {
+    &:hover {
+      background-color: #ffebee;
+      border-color: #f44336;
+      color: #c62828;
+    }
   }
 }
 
@@ -702,5 +813,522 @@
       padding: 10px 8px;
       font-size: 13px;
     }
+  }
+
+  // Стили для кнопок в таблице товаров
+  .start__table-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      background-color: #f5f5f5;
+      border-color: #bbb;
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    &--plus {
+      &:hover {
+        background-color: #e8f5e9;
+        border-color: #4caf50;
+        color: #2e7d32;
+      }
+    }
+
+    &--minus {
+      &:hover {
+        background-color: #fff3e0;
+        border-color: #ff9800;
+        color: #e65100;
+      }
+    }
+
+    &--delete {
+      &:hover {
+        background-color: #ffebee;
+        border-color: #f44336;
+        color: #c62828;
+      }
+    }
+  }
+}
+
+// ============================================
+// АДАПТИВНЫЕ СТИЛИ ДЛЯ СТРАНИЦ ПРОДАЖ
+// ============================================
+
+// Планшеты и небольшие десктопы (768px - 1200px)
+@media screen and (max-width: 1200px) and (min-width: 768px) {
+  .col-8 {
+    width: 60%;
+    padding: 0 10px;
+  }
+
+  .col-4 {
+    width: 40%;
+    padding: 0 10px;
+  }
+
+  .start__body {
+    flex-direction: row;
+    gap: 15px;
+  }
+
+  .start__total {
+    margin-top: 0;
+    width: 100%;
+  }
+
+  .sell__header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .sell__header-left {
+    flex: 1 1 auto;
+    min-width: 200px;
+    max-width: 100%;
+  }
+
+  .start__products {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .start__body-table {
+    font-size: 13px;
+
+    td {
+      padding: 10px 8px;
+      font-size: 13px;
+    }
+  }
+
+  .start__total-row1 {
+    flex-direction: row;
+    gap: 10px;
+  }
+
+  .start__total-pay {
+    width: auto;
+    flex: 1;
+  }
+
+  .start__actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .start__actions-left {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  // Улучшенная таблица для планшетов
+  .start__body-wrapper {
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .start__body-table {
+    width: 100%;
+    min-width: 500px;
+  }
+
+  // Кнопки в таблице
+  .start__table-btn {
+    width: 26px;
+    height: 26px;
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+// Мобильные устройства (до 768px)
+@media screen and (max-width: 768px) {
+  // Общие стили
+  .col-8,
+  .col-4 {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  // Заголовок страницы продаж
+  .sell__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 10px;
+    margin-bottom: 20px;
+  }
+
+  .sell__header-left {
+    width: 100%;
+    flex-direction: column;
+    gap: 10px;
+
+    > * {
+      width: 100%;
+    }
+  }
+
+  .sell__header-input {
+    width: 100%;
+  }
+
+  .sell__header-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  // Таблица продаж (Sell.jsx)
+  .sell__table {
+    font-size: 12px;
+
+    thead {
+      display: none; // Скрываем заголовки на мобильных
+    }
+
+    tbody {
+      tr {
+        display: block;
+        position: relative;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        padding-top: 40px; // Место для чекбокса
+        background: #fff;
+      }
+
+      td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+        text-align: right;
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        &[data-label=""] {
+          // Для ячеек без метки (чекбокс, кнопки)
+          justify-content: flex-start;
+          &::before {
+            display: none;
+          }
+        }
+
+        &::before {
+          content: attr(data-label);
+          font-weight: 600;
+          text-align: left;
+          margin-right: 10px;
+          flex-shrink: 0;
+        }
+
+        &:first-child {
+          // Чекбокс - показываем отдельно в начале строки
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          border-bottom: none;
+          padding: 0;
+        }
+      }
+    }
+  }
+
+  // Обёртка таблицы
+  .sell__wrappper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  // Кнопка возврата в мобильной версии
+  .sell__table-refund {
+    width: 100%;
+    padding: 8px;
+    font-size: 13px;
+    margin-top: 5px;
+  }
+
+  // Страница продажи (SellMainStart.jsx)
+  .start__body {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .start__body-column {
+    width: 100%;
+  }
+
+  .start__body-title {
+    font-size: 18px;
+    margin-bottom: 10px;
+  }
+
+  // Таблица товаров в корзине
+  .start__body-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .start__body-table {
+    min-width: 600px;
+    font-size: 12px;
+
+    td {
+      padding: 8px 5px;
+      font-size: 12px;
+    }
+  }
+
+  // Действия с товарами
+  .start__actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .start__actions-left {
+    width: 100%;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .start__actions-input {
+    width: 100% !important;
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .start__actions-row {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .start__actions-btn {
+    flex: 1;
+    min-width: 40px;
+  }
+
+  // Кнопки товаров
+  .start__products {
+    margin-top: 15px;
+    padding-bottom: 10px;
+    gap: 8px;
+  }
+
+  .start__products-add {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  // Боковая панель с итогами
+  .start__total {
+    width: 100%;
+    margin-top: 20px;
+  }
+
+  .start__total-top {
+    padding: 20px 15px;
+  }
+
+  .start__total-row {
+    font-size: 14px;
+    margin-bottom: 12px;
+
+    b {
+      font-size: 14px;
+    }
+
+    h4 {
+      font-size: 20px;
+    }
+  }
+
+  .start__total-bottom {
+    padding: 15px;
+  }
+
+  .start__total-debt {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 12px;
+  }
+
+  .start__total-row1 {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .start__total-pay {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  // Модальные окна
+  .start__clientForm,
+  .start__debt,
+  .start__custom-service {
+    width: 100%;
+    max-width: 100%;
+    padding: 15px;
+  }
+
+  // Кнопки действий
+  .sell__delete,
+  .sell__reset {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+}
+
+// Маленькие мобильные устройства (до 480px)
+@media screen and (max-width: 480px) {
+  .sell {
+    padding: 10px;
+  }
+
+  .sell__header {
+    padding: 8px;
+    margin-bottom: 15px;
+  }
+
+  .sell__header-input {
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  .sell__header-btn {
+    padding: 10px 15px;
+    font-size: 13px;
+  }
+
+  .start__body-title {
+    font-size: 16px;
+  }
+
+  .start__body-table {
+    min-width: 500px;
+    font-size: 11px;
+
+    td {
+      padding: 6px 4px;
+      font-size: 11px;
+    }
+  }
+
+  .start__actions-input {
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  .start__products-add {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .start__total-top {
+    padding: 15px 10px;
+  }
+
+  .start__total-row {
+    font-size: 13px;
+
+    h4 {
+      font-size: 18px;
+    }
+  }
+
+  .start__table-btn {
+    width: 24px;
+    height: 24px;
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  // Улучшенная таблица для очень маленьких экранов
+  .sell__table {
+    tbody {
+      td {
+        padding: 6px 0;
+        font-size: 11px;
+      }
+    }
+  }
+}
+
+// Очень маленькие экраны (до 360px)
+@media screen and (max-width: 360px) {
+  .start__body-table {
+    min-width: 450px;
+  }
+
+  .start__products-add {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .start__total-row {
+    font-size: 12px;
+
+    h4 {
+      font-size: 16px;
+    }
+  }
+}
+
+// Горизонтальная ориентация на мобильных
+@media screen and (max-width: 768px) and (orientation: landscape) {
+  .start__body {
+    flex-direction: row;
+  }
+
+  .col-8 {
+    width: 60%;
+  }
+
+  .col-4 {
+    width: 40%;
+  }
+
+  .start__total {
+    margin-top: 0;
   }
 }

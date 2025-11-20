@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { X } from "lucide-react";
 import { useClient } from "../../../../../store/slices/ClientSlice";
@@ -20,6 +20,13 @@ import {
 import { createDeal } from "../../../../../store/creators/saleThunk";
 import AddProductBarcode from "../../AddProductBarcode";
 import { createProductAsync } from "../../../../../store/creators/productCreators";
+import api from "../../../../../api";
+
+// Функция для создания долга
+async function createDebt(payload) {
+  const res = await api.post("/main/debts/", payload);
+  return res.data;
+}
 
 const AddModal = ({
   onClose,
@@ -81,6 +88,16 @@ const AddModal = ({
   });
   const [showInputs, setShowInputs] = useState(false);
 
+  // Состояния для долга
+  const [debt, setDebt] = useState("");
+  const [amount, setAmount] = useState("");
+  const [debtMonths, setDebtMonths] = useState("");
+  const [showDebtForm, setShowDebtForm] = useState(false);
+  const [debtState, setDebtState] = useState({
+    phone: "",
+    dueDate: "",
+  });
+
   const onChange = (e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
@@ -93,6 +110,17 @@ const AddModal = ({
       [name]: type === "number" ? (value === "" ? "" : parseInt(value)) : value,
     }));
   };
+
+  const onChangeDebt = (e) => {
+    const { name, value } = e.target;
+    setDebtState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Получаем выбранного поставщика для долга
+  const pickSupplier = useMemo(() => {
+    if (!newItemData.client) return null;
+    return list.find((x) => String(x.id) === String(newItemData.client));
+  }, [list, newItemData.client]);
 
   const handleSubmit = async () => {
     const {
@@ -117,6 +145,45 @@ const AddModal = ({
       return;
     }
 
+    // Валидация для долговых операций
+    if (debt && !client) {
+      alert("Выберите поставщика для долговой операции");
+      return;
+    }
+
+    if (debt === "Долги") {
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        alert("Введите корректный срок долга (в месяцах)");
+        return;
+      }
+      if (company?.subscription_plan?.name === "Старт") {
+        if (!debtState.dueDate) {
+          alert("Выберите дату оплаты");
+          return;
+        }
+        if (!debtState.phone) {
+          alert("Введите номер телефона поставщика");
+          return;
+        }
+      }
+    }
+
+    if (debt === "Предоплата") {
+      if (!amount || Number(amount) <= 0) {
+        alert("Введите корректную сумму предоплаты");
+        return;
+      }
+      const totalAmount = Number(purchase_price) * Number(quantity);
+      if (Number(amount) > totalAmount) {
+        alert("Сумма предоплаты не может превышать общую сумму");
+        return;
+      }
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        alert("Введите корректный срок долга (в месяцах)");
+        return;
+      }
+    }
+
     const payload = {
       name,
       barcode,
@@ -130,23 +197,77 @@ const AddModal = ({
 
     try {
       const product = await dispatch(createProductAsync(payload)).unwrap();
-      await dispatch(
-        addCashFlows({
-          ...cashData,
-          amount: (product?.purchase_price * product?.quantity).toFixed(2),
-          source_cashbox_flow_id: product.id,
-        })
-      ).unwrap();
-      if (client !== "") {
+      const totalAmount = Number(product?.purchase_price * product?.quantity);
+
+      // Создание долга, если выбран
+      if (debt === "Долги" && client) {
+        if (company?.subscription_plan?.name === "Старт") {
+          await createDebt({
+            name: pickSupplier?.full_name,
+            phone: debtState.phone,
+            due_date: debtState.dueDate,
+            amount: totalAmount,
+          });
+        }
+
+        // Создание сделки
+        await dispatch(
+          createDeal({
+            clientId: client,
+            title: `Долг ${pickSupplier?.full_name}`,
+            statusRu: debt,
+            amount: totalAmount,
+            debtMonths: Number(debtMonths),
+          })
+        ).unwrap();
+      }
+
+      if (debt === "Предоплата" && client) {
+        await dispatch(
+          createDeal({
+            clientId: client,
+            title: `Предоплата ${pickSupplier?.full_name}`,
+            statusRu: debt,
+            amount: totalAmount,
+            prepayment: Number(amount),
+            debtMonths: Number(debtMonths),
+          })
+        ).unwrap();
+      }
+
+      // Добавление денежного потока только если не долг
+      if (debt !== "Долги") {
+        const amountForCash = debt === "Предоплата" ? amount : totalAmount;
+        await dispatch(
+          addCashFlows({
+            ...cashData,
+            amount: amountForCash,
+            source_cashbox_flow_id: product.id,
+          })
+        ).unwrap();
+      }
+
+      if (client !== "" && !debt) {
         await dispatch(
           createDeal({
             clientId: newItemData?.client,
             title: newItemData?.name,
             statusRu: "Продажа",
-            amount: (product?.purchase_price * product?.quantity).toFixed(2),
+            amount: totalAmount,
           })
         ).unwrap();
       }
+
+      // Очищаем данные долга
+      setDebt("");
+      setAmount("");
+      setDebtMonths("");
+      setShowDebtForm(false);
+      setDebtState({
+        phone: "",
+        dueDate: "",
+      });
+
       onClose();
       onSaveSuccess();
     } catch (err) {
@@ -355,6 +476,218 @@ const AddModal = ({
               </form>
             )}
           </div>
+          <div className="add-modal__section">
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                cursor: "pointer",
+                marginBottom: showDebtForm ? "15px" : "0",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showDebtForm}
+                onChange={(e) => setShowDebtForm(e.target.checked)}
+                style={{ width: "18px", height: "18px", cursor: "pointer" }}
+              />
+              <strong style={{ fontSize: "14px" }}>Добавить долг</strong>
+            </label>
+
+            {/* Форма долга */}
+            {showDebtForm && (
+              <div style={{ marginTop: "15px" }}>
+                {!newItemData.client && (
+                  <p
+                    style={{
+                      margin: "5px 0",
+                      color: "#ff0000",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Выберите поставщика в форме выше!
+                  </p>
+                )}
+                {company?.subscription_plan?.name === "Старт" &&
+                  newItemData.client && (
+                    <>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "5px",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                        }}
+                      >
+                        Телефон поставщика
+                      </label>
+                      <input
+                        type="text"
+                        onChange={onChangeDebt}
+                        name="phone"
+                        value={debtState.phone}
+                        className="add-modal__input"
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                          marginBottom: "10px",
+                        }}
+                      />
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "5px",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                        }}
+                      >
+                        Дата оплаты
+                      </label>
+                      <input
+                        type="date"
+                        onChange={onChangeDebt}
+                        name="dueDate"
+                        value={debtState.dueDate}
+                        className="add-modal__input"
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                          marginBottom: "10px",
+                        }}
+                      />
+                    </>
+                  )}
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "5px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Тип оплаты
+                </label>
+                <select
+                  value={debt}
+                  onChange={(e) => setDebt(e.target.value)}
+                  className="add-modal__input"
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <option value="">Тип оплаты</option>
+                  <option value="Предоплата">Предоплата</option>
+                  <option value="Долги">Долг</option>
+                </select>
+                {debt === "Предоплата" && (
+                  <>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "5px",
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Сумма предоплаты
+                    </label>
+                    <input
+                      type="text"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="add-modal__input"
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                        marginBottom: "10px",
+                      }}
+                    />
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "5px",
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Срок долга (мес.)
+                    </label>
+                    <input
+                      type="text"
+                      value={debtMonths}
+                      onChange={(e) => setDebtMonths(e.target.value)}
+                      className="add-modal__input"
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                        marginBottom: "10px",
+                      }}
+                    />
+                  </>
+                )}
+                {debt === "Долги" && (
+                  <>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "5px",
+                        fontSize: "13px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Срок долга (мес.)
+                    </label>
+                    <input
+                      type="text"
+                      value={debtMonths}
+                      onChange={(e) => setDebtMonths(e.target.value)}
+                      className="add-modal__input"
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                        marginBottom: "10px",
+                      }}
+                    />
+                  </>
+                )}
+                {debt && newItemData.client && (
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "10px",
+                      backgroundColor: "#e8f5e9",
+                      borderRadius: "4px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    <strong>Сумма долга:</strong>{" "}
+                    {(
+                      Number(newItemData.purchase_price) *
+                      Number(newItemData.quantity)
+                    ).toFixed(2)}{" "}
+                    сом
+                    <br />
+                    <strong>Поставщик:</strong> {pickSupplier?.full_name}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="add-modal__section">
             <label>Розничная цена *</label>
@@ -399,6 +732,8 @@ const AddModal = ({
               required
             />
           </div>
+
+          {/* Чекбокс для включения формы долга */}
 
           <div className="add-modal__footer">
             <button
@@ -460,6 +795,13 @@ const AddModal = ({
       amount: newItemData.price,
     }));
   }, [newItemData, selectCashBox]);
+
+  // Автоматическое заполнение телефона при выборе поставщика в тарифе "Старт"
+  useEffect(() => {
+    if (company?.subscription_plan?.name === "Старт" && pickSupplier?.phone) {
+      setDebtState((prev) => ({ ...prev, phone: pickSupplier.phone }));
+    }
+  }, [newItemData.client, pickSupplier, company?.subscription_plan?.name]);
 
   return (
     <div className="add-modal wareSklad">
