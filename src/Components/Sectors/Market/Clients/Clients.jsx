@@ -575,7 +575,7 @@
 
 
 
-import React, { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Clients.scss";
 import api from "../../../../api";
@@ -622,6 +622,7 @@ const isInvalidChoiceError = (e) => {
 const BASE_TABS = [
   { key: "clients", label: "Клиенты" },
   { key: "suppliers", label: "Поставщики" },
+  { key: "debtors", label: "Должники" },
 ];
 
 const tabKeyFromType = (t) => {
@@ -693,6 +694,16 @@ export default function MarketClients() {
       setLoading(true);
       setError("");
 
+      // ───── отдельный запрос для ДОЛЖНИКОВ ─────
+      if (activeTab === "debtors") {
+        const res = await api.get("/main/clients/clients/with-debts/");
+        const list = listFrom(res);
+        console.log(res);
+        
+        setRows(list);
+        return;
+      }
+
       const knownType = acceptedTypeByTab[activeTab];
       const variants =
         TYPE_VARIANTS_BY_TAB[activeTab] || [knownType].filter(Boolean);
@@ -748,12 +759,16 @@ export default function MarketClients() {
     if (v === "suppliers") return "Поставщик";
     if (v === "implementers")
       return sectorName === "Строительная компания" ? "Подрядчики" : "Реализатор";
+    if (v === "debtor" || v === "debtors") return "Должник";
     return "—";
   };
 
   const filtered = useMemo(() => {
     const base = Array.isArray(rows) ? rows : [];
     const onlyThisTab = base.filter((r) => {
+      // Для должников показываем всё, что вернул эндпоинт
+      if (activeTab === "debtors") return true;
+
       const tab = tabKeyFromType(r?.type);
       if (!tab) return activeTab === "clients";
       return tab === activeTab;
@@ -885,6 +900,8 @@ export default function MarketClients() {
       ? resellersTabLabel
       : activeTab === "clientsBooking"
       ? "Клиенты бронирование"
+      : activeTab === "debtors"
+      ? "Должники"
       : "Клиенты";
 
   // ───────────────────────── clientsBooking рендерит HostelClients
@@ -957,15 +974,19 @@ export default function MarketClients() {
           <button className="btn" onClick={load} disabled={loading}>
             Обновить
           </button>
-          <button className="btn" onClick={() => setIsAddOpen(true)}>
-            {activeTab === "clients"
-              ? "Новый клиент"
-              : activeTab === "suppliers"
-              ? "Новый поставщик"
-              : sectorName === "Строительная компания"
-              ? "Новый подрядчик"
-              : "Новый реализатор"}
-          </button>
+
+          {/* На вкладке должников кнопку добавления скрываем */}
+          {activeTab !== "debtors" && (
+            <button className="btn" onClick={() => setIsAddOpen(true)}>
+              {activeTab === "clients"
+                ? "Новый клиент"
+                : activeTab === "suppliers"
+                ? "Новый поставщик"
+                : sectorName === "Строительная компания"
+                ? "Новый подрядчик"
+                : "Новый реализатор"}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1107,3 +1128,4 @@ export default function MarketClients() {
     </section>
   );
 }
+

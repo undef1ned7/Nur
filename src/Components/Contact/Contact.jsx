@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Suppliers from "./Suppliers/Suppliers";
 import ContactClient from "./ContactClient/ContactClient";
 import Implementers from "./Implementers/Implementers";
@@ -17,7 +17,7 @@ const Contact = () => {
     {
       label: "Реализаторы",
       content: <Implementers />,
-    },
+    }
   ];
   return (
     <section>
