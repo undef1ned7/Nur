@@ -1229,6 +1229,9 @@ const SellMainStart = ({ show, setShow }) => {
       if (finalPaymentType === "cash") {
         checkoutParams.payment_method = "cash";
         checkoutParams.cash_received = Number(cashReceived).toFixed(2);
+      } else if (finalPaymentType === "card") {
+        // При переводе отправляем payment_method="transfer"
+        checkoutParams.payment_method = "transfer";
       }
 
       const result = await run(productCheckout(checkoutParams));
@@ -1724,7 +1727,17 @@ const SellMainStart = ({ show, setShow }) => {
                   className={`start__total-pay ${
                     paymentMethod === "cash" ? "active" : ""
                   }`}
-                  onClick={() => setShowCashModal(true)}
+                  onClick={() => {
+                    if (paymentMethod === "cash") {
+                      // Отмена выбора наличных
+                      setPaymentMethod(null);
+                      setCashReceived("");
+                      setCashPaymentConfirmed(false);
+                    } else {
+                      // Открываем модалку для выбора наличных
+                      setShowCashModal(true);
+                    }
+                  }}
                   disabled={!start?.id}
                   style={{
                     backgroundColor:
@@ -1732,6 +1745,11 @@ const SellMainStart = ({ show, setShow }) => {
                     border:
                       paymentMethod === "cash" ? "2px solid #000" : undefined,
                   }}
+                  title={
+                    paymentMethod === "cash"
+                      ? "Нажмите, чтобы отменить выбор"
+                      : "Оплата наличными"
+                  }
                 >
                   Наличными
                 </button>
@@ -1739,7 +1757,15 @@ const SellMainStart = ({ show, setShow }) => {
                   className={`start__total-pay ${
                     paymentMethod === "card" ? "active" : ""
                   }`}
-                  onClick={() => setPaymentMethod("card")}
+                  onClick={() => {
+                    if (paymentMethod === "card") {
+                      // Отмена выбора перевода
+                      setPaymentMethod(null);
+                    } else {
+                      // Выбираем перевод
+                      setPaymentMethod("card");
+                    }
+                  }}
                   disabled={!start?.id}
                   style={{
                     backgroundColor:
@@ -1747,6 +1773,11 @@ const SellMainStart = ({ show, setShow }) => {
                     border:
                       paymentMethod === "card" ? "2px solid #000" : undefined,
                   }}
+                  title={
+                    paymentMethod === "card"
+                      ? "Нажмите, чтобы отменить выбор"
+                      : "Оплата переводом"
+                  }
                 >
                   Переводом
                 </button>
