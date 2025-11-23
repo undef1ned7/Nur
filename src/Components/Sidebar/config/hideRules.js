@@ -6,7 +6,7 @@ export const HIDE_RULES = [
   {
     when: {}, // Пустое условие означает "всегда"
     hide: {
-      labels: ["Отделы"],
+      labels: ["Отделы", "Обзор"],
     },
   },
   {
@@ -183,6 +183,12 @@ export const HIDE_RULES = [
         "/crm/raspisanie",
         "/crm/brand-category",
       ],
+    },
+  },
+  {
+    when: { sector: "Логистика" },
+    hide: {
+      toIncludes: ["/crm/debts", "/crm/obzor", "/crm/zakaz"],
     },
   },
 ];

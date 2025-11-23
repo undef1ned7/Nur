@@ -564,6 +564,15 @@ export const MENU_CONFIG = {
         implemented: true,
       },
     ],
+    logistics: [
+      // {
+      //   label: "Каталог",
+      //   to: "/crm/production/catalog",
+      //   icon: menuIcons.layers,
+      //   permission: "can_view_catalog",
+      //   implemented: true,
+      // },
+    ],
   },
 
   // Дополнительные услуги
