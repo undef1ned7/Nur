@@ -565,13 +565,20 @@ export const MENU_CONFIG = {
       },
     ],
     logistics: [
-      // {
-      //   label: "Каталог",
-      //   to: "/crm/production/catalog",
-      //   icon: menuIcons.layers,
-      //   permission: "can_view_catalog",
-      //   implemented: true,
-      // },
+      {
+        label: "Логистика",
+        to: "/crm/logistics",
+        icon: menuIcons.logistics,
+        permission: "can_view_catalog",
+        implemented: true,
+      },
+      {
+        label: "Магазин",
+        to: "/crm/logistics-shop",
+        icon: menuIcons.shopLogistics,
+        permission: "can_view_catalog",
+        implemented: true,
+      },
     ],
   },
 

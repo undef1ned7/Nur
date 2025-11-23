@@ -50,6 +50,7 @@ import {
   FaWarehouse,
 } from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
+import { CiDeliveryTruck, CiShoppingCart } from "react-icons/ci";
 
 /**
  * Создает иконку с классом для стилизации
@@ -107,4 +108,8 @@ export const menuIcons = {
   // Дополнительные
   instagramIcon: () => createIcon(InstagramIcon),
   documentScanner: () => createIcon(MdDocumentScanner),
+
+  // Логистика
+  logistics: () => createIcon(CiDeliveryTruck),
+  shopLogistics: () => createIcon(CiShoppingCart) 
 };
