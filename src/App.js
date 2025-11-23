@@ -108,6 +108,7 @@ import Cook from "./Components/Sectors/cafe/Cook/Cook";
 import CafeInventory from "./Components/Sectors/cafe/Inventory/CafeInventory";
 import Branch from "./Components/pages/Branch/Branch";
 import BranchDetails from "./Components/pages/Branch/BranchDetails";
+import Logistics from "./Components/pages/logistics/Logistics";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -1010,6 +1011,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Pending />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="logistics"
+              element={
+                <ProtectedRoute>
+                  <Logistics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="logistics-shop"
+              element={
+                <ProtectedRoute>
+                  <Logistics />
                 </ProtectedRoute>
               }
             />
