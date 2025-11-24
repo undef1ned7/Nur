@@ -1,21 +1,8 @@
+// "use client"; // если вдруг в Next.js
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Area,
-  AreaChart,
-} from "recharts";
 import {
   TrendingUp,
   DollarSign,
@@ -25,19 +12,44 @@ import {
   Award,
   Activity,
   Package,
+  BarChart3,
 } from "lucide-react";
 import { AnalyticsHeader } from "./AnalyticsHeader";
+
+// Chart.js + react-chartjs-2
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
+} from "chart.js";
+import { Line, Bar, Doughnut } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  ChartTooltip,
+  ChartLegend
+);
 
 export function SalesAnalyticsView({ cars = [] }) {
   const [period, setPeriod] = useState("all");
 
-  // Проданные авто
+  // === БАЗОВЫЕ ДАННЫЕ ===
   const soldCars = cars.filter((car) => car.status === "sold" && car.soldDate);
 
-  // Debug: проверка данных
   useEffect(() => {
-    console.log("SalesAnalyticsView - cars:", cars?.length || 0);
-    console.log("SalesAnalyticsView - soldCars:", soldCars?.length || 0);
+    console.log("cars:", cars.length, cars);
+    console.log("soldCars:", soldCars.length, soldCars);
   }, [cars, soldCars]);
 
   const handleRefresh = () => {
@@ -58,7 +70,7 @@ export function SalesAnalyticsView({ cars = [] }) {
     console.log("Exporting data:", csvData);
   };
 
-  // Метрики
+  // === МЕТРИКИ ===
   const totalRevenue = soldCars.reduce(
     (sum, car) => sum + (car.salePrice || car.price || 0),
     0
@@ -68,15 +80,17 @@ export function SalesAnalyticsView({ cars = [] }) {
   const avgProfit = soldCars.length > 0 ? totalProfit / soldCars.length : 0;
   const avgMargin = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
 
-  // Продажи по маркам
+  // === ПРОДАЖИ ПО МАРКАМ ===
   const salesByMake = soldCars.reduce((acc, car) => {
-    const make = car.make;
+    const make = car.make || "Не указано";
     if (!acc[make]) {
       acc[make] = { count: 0, revenue: 0, profit: 0 };
     }
+    const revenue = car.salePrice || car.price || 0;
+    const profit = revenue - (car.price || 0);
     acc[make].count += 1;
-    acc[make].revenue += car.salePrice || car.price || 0;
-    acc[make].profit += (car.salePrice || car.price || 0) - (car.price || 0);
+    acc[make].revenue += revenue;
+    acc[make].profit += profit;
     return acc;
   }, {});
 
@@ -89,60 +103,62 @@ export function SalesAnalyticsView({ cars = [] }) {
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  // Продажи по месяцам
+  // === ПРОДАЖИ ПО МЕСЯЦАМ ===
   const salesByMonth = soldCars.reduce((acc, car) => {
     if (!car.soldDate) return acc;
 
     const date = new Date(car.soldDate);
+    if (isNaN(date.getTime())) return acc;
+
     const monthKey = `${date.getFullYear()}-${String(
       date.getMonth() + 1
     ).padStart(2, "0")}`;
+
+    const revenue = car.salePrice || car.price || 0;
+    const profit = revenue - (car.price || 0);
 
     if (!acc[monthKey]) {
       acc[monthKey] = { count: 0, revenue: 0, profit: 0 };
     }
     acc[monthKey].count += 1;
-    acc[monthKey].revenue += car.salePrice || car.price || 0;
-    acc[monthKey].profit +=
-      (car.salePrice || car.price || 0) - (car.price || 0);
+    acc[monthKey].revenue += revenue;
+    acc[monthKey].profit += profit;
     return acc;
   }, {});
+
+  const monthNames = [
+    "Янв",
+    "Фев",
+    "Мар",
+    "Апр",
+    "Май",
+    "Июн",
+    "Июл",
+    "Авг",
+    "Сен",
+    "Окт",
+    "Ноя",
+    "Дек",
+  ];
 
   const monthData = Object.entries(salesByMonth)
     .map(([month, data]) => {
       const [year, monthNum] = month.split("-");
-      const monthNames = [
-        "Янв",
-        "Фев",
-        "Мар",
-        "Апр",
-        "Май",
-        "Июн",
-        "Июл",
-        "Авг",
-        "Сен",
-        "Окт",
-        "Ноя",
-        "Дек",
-      ];
       const idx = parseInt(monthNum, 10) - 1;
       return {
-        month: monthNames[idx],
-        fullMonth: `${monthNames[idx]} ${year}`,
-        count: data.count,
+        monthKey: month,
+        month: `${monthNames[idx]} ${year}`,
         revenue: data.revenue,
         profit: data.profit,
       };
     })
-    // сортировка по времени (по ключу `monthKey`, но мы уже потеряли год,
-    // так что оставляем как есть или при желании можно пересортировать
-    // по исходному объекту)
-    .sort((a, b) => a.fullMonth.localeCompare(b.fullMonth));
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 
-  // Топ авто по прибыли
+  // === ТОП-5 ПРОДАЖ ===
   const topCars = [...soldCars]
     .map((car) => {
-      const profit = (car.salePrice || car.price || 0) - (car.price || 0);
+      const revenue = car.salePrice || car.price || 0;
+      const profit = revenue - (car.price || 0);
       const margin = car.price ? (profit / car.price) * 100 : 0;
       return {
         ...car,
@@ -153,7 +169,6 @@ export function SalesAnalyticsView({ cars = [] }) {
     .sort((a, b) => b.profit - a.profit)
     .slice(0, 5);
 
-  // Цвета
   const COLORS = [
     "#2563eb",
     "#10b981",
@@ -163,7 +178,7 @@ export function SalesAnalyticsView({ cars = [] }) {
     "#6366f1",
   ];
 
-  // Статус склада
+  // === СТАТУСЫ СКЛАДА ===
   const inventoryStatus = [
     {
       name: "На витрине",
@@ -189,10 +204,74 @@ export function SalesAnalyticsView({ cars = [] }) {
     },
   ].filter((item) => item.value > 0);
 
-  // Примерные значения
   const growthRate = 12.5;
   const conversionRate =
-    soldCars.length > 0 ? (soldCars.length / cars.length) * 100 : 0;
+    cars.length > 0 ? (soldCars.length / cars.length) * 100 : 0;
+
+  // === ДАННЫЕ ДЛЯ ГРАФИКОВ CHART.JS ===
+
+  // 1) Линейный график по месяцам
+  const lineChartData = {
+  labels: monthData.map((m) => m.month),
+  datasets: [
+    {
+      label: "Выручка",
+      data: monthData.map((m) => m.revenue),
+      borderWidth: 2,
+      tension: 0.3,
+      borderColor: "#2563eb", // синий
+      backgroundColor: "rgba(37, 99, 235, 0.15)",
+      pointBackgroundColor: "#2563eb",
+      pointBorderColor: "#ffffff",
+      fill: true,
+    },
+    {
+      label: "Прибыль",
+      data: monthData.map((m) => m.profit),
+      borderWidth: 2,
+      tension: 0.3,
+      borderColor: "#10b981", // зеленый
+      backgroundColor: "rgba(16, 185, 129, 0.15)",
+      pointBackgroundColor: "#10b981",
+      pointBorderColor: "#ffffff",
+      fill: true,
+    },
+  ],
+};
+
+  // 2) Бар-чарт по маркам
+  const barChartData = {
+  labels: makeData.map((m) => m.make),
+  datasets: [
+    {
+      label: "Выручка",
+      data: makeData.map((m) => m.revenue),
+      backgroundColor: "#2563eb",
+      borderColor: "#2563eb",
+      borderWidth: 1,
+      borderRadius: 6,
+    },
+    {
+      label: "Прибыль",
+      data: makeData.map((m) => m.profit),
+      backgroundColor: "#10b981",
+      borderColor: "#10b981",
+      borderWidth: 1,
+      borderRadius: 6,
+    },
+  ],
+};
+
+  // 3) Круговая диаграмма по статусам
+  const doughnutData = {
+    labels: inventoryStatus.map((i) => i.name),
+    datasets: [
+      {
+        data: inventoryStatus.map((i) => i.value),
+        backgroundColor: inventoryStatus.map((i) => i.color),
+      },
+    ],
+  };
 
   return (
     <div className="space-y-6">
@@ -204,9 +283,9 @@ export function SalesAnalyticsView({ cars = [] }) {
         onPeriodChange={setPeriod}
       />
 
-      {/* Основные метрики */}
+      {/* Метрики */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Revenue */}
+        {/* Общая выручка */}
         <Card className="border-2 border-[#ffd600]/20 bg-gradient-to-br from-[#ffd600]/10 to-white">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
@@ -220,24 +299,18 @@ export function SalesAnalyticsView({ cars = [] }) {
                 <TrendingUp className="h-3 w-3 mr-1" />+{growthRate}%
               </Badge>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">
-                Общая выручка
-              </p>
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-[#ffd600]">
-                  ${totalRevenue.toLocaleString()}
-                </h2>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                За {monthData.length} месяц
-                {monthData.length > 1 ? "а" : ""}
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground mb-1">Общая выручка</p>
+            <h2 className="text-[#ffd600]">
+              ${totalRevenue.toLocaleString()}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              За {monthData.length} месяц
+              {monthData.length > 1 ? "а" : ""}
+            </p>
           </CardContent>
         </Card>
 
-        {/* Net Profit */}
+        {/* Чистая прибыль */}
         <Card className="border-2 border-green-100 bg-gradient-to-br from-green-50 to-white">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
@@ -251,23 +324,19 @@ export function SalesAnalyticsView({ cars = [] }) {
                 {avgMargin.toFixed(1)}%
               </Badge>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">
-                Чистая прибыль
-              </p>
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-green-600">
-                  ${totalProfit.toLocaleString()}
-                </h2>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Средняя маржа {avgMargin.toFixed(1)}%
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Чистая прибыль
+            </p>
+            <h2 className="text-green-600">
+              ${totalProfit.toLocaleString()}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Средняя маржа {avgMargin.toFixed(1)}%
+            </p>
           </CardContent>
         </Card>
 
-        {/* Cars Sold */}
+        {/* Количество продаж */}
         <Card className="border-2 border-purple-100 bg-gradient-to-br from-purple-50 to-white">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
@@ -281,27 +350,25 @@ export function SalesAnalyticsView({ cars = [] }) {
                 {conversionRate.toFixed(0)}%
               </Badge>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">
-                Продано автомобилей
-              </p>
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-purple-600">{soldCars.length}</h2>
-                <span className="text-sm text-muted-foreground">
-                  из {cars.length}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Средний чек $
-                {soldCars.length > 0
-                  ? (totalRevenue / soldCars.length).toFixed(0)
-                  : "0"}
-              </p>
+            <p className="text-sm text-muted-foreground mb-1">
+              Продано автомобилей
+            </p>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-purple-600">{soldCars.length}</h2>
+              <span className="text-sm text-muted-foreground">
+                из {cars.length}
+              </span>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Средний чек $
+              {soldCars.length > 0
+                ? (totalRevenue / soldCars.length).toFixed(0)
+                : "0"}
+            </p>
           </CardContent>
         </Card>
 
-        {/* Average Profit */}
+        {/* Средняя прибыль */}
         <Card className="border-2 border-orange-100 bg-gradient-to-br from-orange-50 to-white">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
@@ -316,26 +383,22 @@ export function SalesAnalyticsView({ cars = [] }) {
                 Активно
               </Badge>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">
-                Средняя прибыль
-              </p>
-              <div className="flex items-baseline gap-2">
-                <h2 className="text-orange-600">
-                  ${avgProfit > 0 ? avgProfit.toFixed(0) : "0"}
-                </h2>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                На одну продажу
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Средняя прибыль
+            </p>
+            <h2 className="text-orange-600">
+              ${avgProfit > 0 ? avgProfit.toFixed(0) : "0"}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              На одну продажу
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Основные графики */}
+      {/* Графики */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Динамика продаж */}
+        {/* Динамика продаж по месяцам */}
         <Card className="shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -349,110 +412,25 @@ export function SalesAnalyticsView({ cars = [] }) {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            {monthData && monthData.length > 0 ? (
-              <div
-                className="w-full"
-                style={{ height: "320px", minHeight: "320px" }}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={monthData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="colorRevenue"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#2563eb"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#2563eb"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                      <linearGradient
-                        id="colorProfit"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#10b981"
-                          stopOpacity={0.3}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor="#10b981"
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fill: "#6b7280", fontSize: 12 }}
-                      tickLine={{ stroke: "#e5e7eb" }}
-                    />
-                    <YAxis
-                      tick={{ fill: "#6b7280", fontSize: 12 }}
-                      tickLine={{ stroke: "#e5e7eb" }}
-                      tickFormatter={(value) => `$${value / 1000}k`}
-                    />
-                    <Tooltip
-                      formatter={(value) => [`$${value.toLocaleString()}`, ""]}
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                      }}
-                      labelStyle={{ color: "#1f2937" }}
-                    />
-                    <Legend />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#2563eb"
-                      strokeWidth={2}
-                      fillOpacity={0.6}
-                      fill="url(#colorRevenue)"
-                      name="Выручка"
-                      dot={{
-                        fill: "#2563eb",
-                        r: 4,
-                        strokeWidth: 2,
-                        stroke: "#fff",
-                      }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="profit"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      fillOpacity={0.6}
-                      fill="url(#colorProfit)"
-                      name="Прибыль"
-                      dot={{
-                        fill: "#10b981",
-                        r: 4,
-                        strokeWidth: 2,
-                        stroke: "#fff",
-                      }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+            {monthData.length > 0 ? (
+              <div style={{ height: 320 }}>
+                <Line
+                  data={lineChartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { position: "bottom" },
+                    },
+                    scales: {
+                      y: {
+                        ticks: {
+                          callback: (val) => `$${val / 1000}k`,
+                        },
+                      },
+                    },
+                  }}
+                />
               </div>
             ) : (
               <div className="h-[320px] flex items-center justify-center text-gray-600">
@@ -479,51 +457,25 @@ export function SalesAnalyticsView({ cars = [] }) {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            {makeData && makeData.length > 0 ? (
-              <div
-                className="w-full"
-                style={{ height: "320px", minHeight: "320px" }}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={makeData}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="make"
-                      tick={{ fill: "#6b7280", fontSize: 12 }}
-                      tickLine={{ stroke: "#e5e7eb" }}
-                    />
-                    <YAxis
-                      tick={{ fill: "#6b7280", fontSize: 12 }}
-                      tickLine={{ stroke: "#e5e7eb" }}
-                      tickFormatter={(value) => `$${value / 1000}k`}
-                    />
-                    <Tooltip
-                      formatter={(value) => [`$${value.toLocaleString()}`, ""]}
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                      }}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="revenue"
-                      fill="#2563eb"
-                      radius={[8, 8, 0, 0]}
-                      name="Выручка"
-                    />
-                    <Bar
-                      dataKey="profit"
-                      fill="#10b981"
-                      radius={[8, 8, 0, 0]}
-                      name="Прибыль"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+            {makeData.length > 0 ? (
+              <div style={{ height: 320 }}>
+                <Bar
+                  data={barChartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { position: "bottom" },
+                    },
+                    scales: {
+                      y: {
+                        ticks: {
+                          callback: (val) => `$${val / 1000}k`,
+                        },
+                      },
+                    },
+                  }}
+                />
               </div>
             ) : (
               <div className="h-[320px] flex items-center justify-center text-gray-600">
@@ -537,7 +489,8 @@ export function SalesAnalyticsView({ cars = [] }) {
         </Card>
       </div>
 
-      {/* Вторичные графики */}
+      {/* Распределение + Топ-5 + таблица — можешь оставить свои, только круг заменим на Doughnut */}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Распределение склада */}
         <Card className="shadow-sm lg:col-span-1">
@@ -550,36 +503,19 @@ export function SalesAnalyticsView({ cars = [] }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            {inventoryStatus && inventoryStatus.length > 0 ? (
+            {inventoryStatus.length > 0 ? (
               <div className="space-y-4">
-                <div
-                  className="w-full"
-                  style={{ height: "200px", minHeight: "200px" }}
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={inventoryStatus}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {inventoryStatus.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div style={{ height: 200 }}>
+                  <Doughnut
+                    data={doughnutData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: { display: false },
+                      },
+                    }}
+                  />
                 </div>
                 <div className="space-y-2">
                   {inventoryStatus.map((item, index) => (
@@ -652,13 +588,18 @@ export function SalesAnalyticsView({ cars = [] }) {
                       <div className="flex items-center gap-1 font-semibold">
                         <span
                           className={
-                            car.profit > 0 ? "text-green-600" : "text-red-600"
+                            car.profit > 0
+                              ? "text-green-600"
+                              : "text-red-600"
                           }
                         >
                           ${Math.abs(car.profit).toLocaleString()}
                         </span>
                       </div>
-                      <Badge variant="secondary" className="mt-1 text-xs">
+                      <Badge
+                        variant="secondary"
+                        className="mt-1 text-xs"
+                      >
                         {car.margin.toFixed(1)}% маржа
                       </Badge>
                     </div>
@@ -682,7 +623,7 @@ export function SalesAnalyticsView({ cars = [] }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
-              <BarChart className="h-4 w-4 text-gray-600" />
+              <BarChart3 className="h-4 w-4 text-gray-600" />
             </div>
             Детальная статистика по маркам
           </CardTitle>
@@ -718,7 +659,8 @@ export function SalesAnalyticsView({ cars = [] }) {
                             <div
                               className="h-2 w-2 rounded-full"
                               style={{
-                                backgroundColor: COLORS[index % COLORS.length],
+                                backgroundColor:
+                                  COLORS[index % COLORS.length],
                               }}
                             />
                             <span className="font-medium">{item.make}</span>
@@ -760,7 +702,7 @@ export function SalesAnalyticsView({ cars = [] }) {
             </div>
           ) : (
             <div className="py-12 text-center text-gray-600">
-              <BarChart className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
+              <BarChart3 className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
               <p className="text-gray-600">Нет данных для отображения</p>
             </div>
           )}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { CarDetailsDialog } from "./components/CarDetailsDialog";
 import { AcceptCarDialog } from "./components/AcceptCarDialog";
@@ -8,7 +8,6 @@ import { SetForSaleDialog } from "./components/SetForSaleDialog";
 import { OrderDialog } from "./components/OrderDialog";
 import { QuickSellDialog } from "./components/QuickSellDialog";
 
-import { AppHeader } from "./components/AppHeader";
 import { LogisticsView } from "./components/LogisticsView";
 import { ShopView } from "./components/ShopView";
 
