@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,33 @@ export function SetForSaleDialog({
     includedServices: [],
   });
 
+  // Инициализация и сброс формы при открытии/закрытии
+  useEffect(() => {
+    if (open && car) {
+      // Инициализируем данные из существующего автомобиля, если они есть
+      setSaleData({
+        salePrice: car.salePrice || car.price || 0,
+        mileage: car.mileage || 0,
+        fuelType: car.fuelType || "Бензин",
+        transmission: car.transmission || "Автомат",
+        color: car.color || "",
+        features: car.features ? car.features.join(", ") : "",
+        includedServices: car.includedServices || [],
+      });
+    } else if (!open) {
+      // Сброс при закрытии
+      setSaleData({
+        salePrice: 0,
+        mileage: 0,
+        fuelType: "Бензин",
+        transmission: "Автомат",
+        color: "",
+        features: "",
+        includedServices: [],
+      });
+    }
+  }, [open, car]);
+
   const handleSubmit = () => {
     if (car) {
       onSetForSale(car.id, {
@@ -43,15 +70,6 @@ export function SetForSaleDialog({
         status: "for_sale",
       });
       onOpenChange(false);
-      setSaleData({
-        salePrice: 0,
-        mileage: 0,
-        fuelType: "Бензин",
-        transmission: "Автомат",
-        color: "",
-        features: "",
-        includedServices: [],
-      });
     }
   };
 
@@ -87,10 +105,10 @@ export function SetForSaleDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="p-4 bg-muted rounded-lg">
-            <p className="text-muted-foreground">
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-gray-600">
               Исходная стоимость:{" "}
-              <span className="text-foreground">
+              <span className="text-gray-900 font-semibold">
                 ${car.price?.toLocaleString()}
               </span>
             </p>
@@ -200,7 +218,7 @@ export function SetForSaleDialog({
               {availableServices.map((service) => (
                 <div
                   key={service.id}
-                  className="flex items-start space-x-3 p-3 border rounded-lg"
+                  className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <Checkbox
                     id={service.id}
@@ -209,27 +227,31 @@ export function SetForSaleDialog({
                   />
                   <div className="flex-1">
                     <label htmlFor={service.id} className="cursor-pointer">
-                      <p>{service.name}</p>
-                      <p className="text-muted-foreground">
+                      <p className="text-gray-900 font-medium">
+                        {service.name}
+                      </p>
+                      <p className="text-gray-600 text-sm">
                         {service.description}
                       </p>
                     </label>
                   </div>
-                  <div className="flex items-center gap-1 text-primary">
+                  <div className="flex items-center gap-1 text-[#ffd600] font-semibold">
                     <DollarSign className="h-4 w-4" />
-                    <span>{service.price.toLocaleString()}</span>
+                    <span>${service.price.toLocaleString()}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="p-4 bg-primary/10 rounded-lg">
+          <div className="p-4 bg-[#ffd600]/10 rounded-lg border border-[#ffd600]/20">
             <div className="flex items-center justify-between">
-              <span>Итоговая цена с услугами:</span>
-              <span className="flex items-center gap-1">
+              <span className="text-gray-700 font-medium">
+                Итоговая цена с услугами:
+              </span>
+              <span className="flex items-center gap-1 text-[#ffd600] font-semibold text-lg">
                 <DollarSign className="h-5 w-5" />
-                <span>{totalWithServices.toLocaleString()}</span>
+                <span>${totalWithServices.toLocaleString()}</span>
               </span>
             </div>
           </div>

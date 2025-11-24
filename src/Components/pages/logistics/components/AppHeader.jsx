@@ -7,7 +7,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { Car as CarIcon, Bell, TruckIcon, Store, UserCircle } from "lucide-react";
+import {
+  Car as CarIcon,
+  Bell,
+  TruckIcon,
+  Store,
+  UserCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 export function AppHeader({
@@ -30,12 +36,12 @@ export function AppHeader({
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-lg">
-              <CarIcon className="h-7 w-7 text-white" />
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[#ffd600] to-[#ffd600] flex items-center justify-center shadow-lg">
+              <CarIcon className="h-7 w-7 text-gray-900" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                <h1 className="bg-gradient-to-r from-[#ffd600] to-[#ffd600] bg-clip-text text-transparent">
                   nurcrm.kg
                 </h1>
                 <Badge variant="secondary" className="text-xs">
@@ -96,8 +102,8 @@ export function AppHeader({
             <Select value={currentUser.id} onValueChange={handleUserSelect}>
               <SelectTrigger className="w-[240px]">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <UserCircle className="h-5 w-5 text-primary" />
+                  <div className="h-8 w-8 rounded-full bg-[#ffd600]/10 flex items-center justify-center">
+                    <UserCircle className="h-5 w-5 text-[#ffd600]" />
                   </div>
                   <div className="text-left">
                     <div className="text-sm">{currentUser.name}</div>

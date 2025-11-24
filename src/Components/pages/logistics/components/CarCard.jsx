@@ -6,7 +6,7 @@ import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  in_transit: "bg-blue-100 text-blue-800 border-blue-200",
+  in_transit: "bg-[#ffd600]/20 text-[#ffd600] border-[#ffd600]/30",
   arrived: "bg-purple-100 text-purple-800 border-purple-200",
   accepted: "bg-green-100 text-green-800 border-green-200",
   for_sale: "bg-cyan-100 text-cyan-800 border-cyan-200",
@@ -31,8 +31,8 @@ export function CarCard({
   onSetForSale,
 }) {
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="aspect-video bg-muted relative">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-gray-200">
+      <div className="aspect-video bg-gray-100 relative">
         {car.photos && car.photos.length > 0 ? (
           <img
             src={car.photos[0]}
@@ -59,28 +59,28 @@ export function CarCard({
             <h3 className="mb-1">
               {car.make} {car.model}
             </h3>
-            <p className="text-muted-foreground">
+            <p className="text-gray-600">
               {car.year} • VIN: {car.vin}
             </p>
           </div>
           {car.price && (
-            <div className="flex items-center gap-1 text-primary">
+            <div className="flex items-center gap-1 text-[#ffd600] font-semibold">
               <DollarSign className="h-4 w-4" />
-              <span>{car.price.toLocaleString()}</span>
+              <span>${car.price.toLocaleString()}</span>
             </div>
           )}
         </div>
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="flex items-center gap-2 text-gray-600">
           <MapPin className="h-4 w-4" />
           <span>
             {car.origin} → {car.destination}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="flex items-center gap-2 text-gray-600">
           <Calendar className="h-4 w-4" />
           <span>
             Прибытие:{" "}
@@ -88,13 +88,13 @@ export function CarCard({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="flex items-center gap-2 text-gray-600">
           <User className="h-4 w-4" />
           <span>Агент: {car.agentName}</span>
         </div>
 
         {car.notes && (
-          <div className="flex items-start gap-2 text-muted-foreground">
+          <div className="flex items-start gap-2 text-gray-600">
             <FileText className="h-4 w-4 mt-0.5" />
             <span className="line-clamp-2">{car.notes}</span>
           </div>
@@ -110,24 +110,20 @@ export function CarCard({
           Подробнее
         </Button>
 
-        {userRole === "agent" &&
-          car.status === "pending" &&
-          onUpdateStatus && (
-            <Button
-              className="flex-1"
-              onClick={() => onUpdateStatus(car.id, "in_transit")}
-            >
-              Отправить
-            </Button>
-          )}
+        {userRole === "agent" && car.status === "pending" && onUpdateStatus && (
+          <Button
+            className="flex-1"
+            onClick={() => onUpdateStatus(car.id, "in_transit")}
+          >
+            Отправить
+          </Button>
+        )}
 
-        {userRole === "manager" &&
-          car.status === "arrived" &&
-          onAccept && (
-            <Button className="flex-1" onClick={() => onAccept(car)}>
-              Принять
-            </Button>
-          )}
+        {userRole === "manager" && car.status === "arrived" && onAccept && (
+          <Button className="flex-1" onClick={() => onAccept(car)}>
+            Принять
+          </Button>
+        )}
 
         {userRole === "manager" &&
           car.status === "accepted" &&

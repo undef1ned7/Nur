@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,14 @@ export function OrderDialog({
     phone: "",
   });
   const [selectedServices, setSelectedServices] = useState([]);
+
+  // Сброс формы при закрытии
+  useEffect(() => {
+    if (!open) {
+      setCustomerData({ name: "", email: "", phone: "" });
+      setSelectedServices([]);
+    }
+  }, [open]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -88,20 +96,20 @@ export function OrderDialog({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Car Info */}
-          <div className="p-4 bg-muted rounded-lg">
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex items-start justify-between">
               <div>
-                <h3>
+                <h3 className="text-gray-900 font-semibold">
                   {car.make} {car.model} ({car.year})
                 </h3>
-                <p className="text-muted-foreground">VIN: {car.vin}</p>
+                <p className="text-gray-600">VIN: {car.vin}</p>
               </div>
               <div className="text-right">
-                <p className="text-muted-foreground">Цена автомобиля</p>
-                <div className="flex items-center gap-1 text-primary">
+                <p className="text-gray-600 text-sm">Цена автомобиля</p>
+                <div className="flex items-center gap-1 text-[#ffd600] font-semibold">
                   <DollarSign className="h-5 w-5" />
                   <span className="text-xl">
-                    {car.salePrice?.toLocaleString()}
+                    ${car.salePrice?.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -112,7 +120,7 @@ export function OrderDialog({
 
           {/* Customer Info */}
           <div className="space-y-4">
-            <h4 className="flex items-center gap-2">
+            <h4 className="flex items-center gap-2 text-gray-900 font-semibold">
               <User className="h-4 w-4" />
               Контактная информация
             </h4>
@@ -134,7 +142,7 @@ export function OrderDialog({
               <div className="space-y-2">
                 <Label htmlFor="customer-email">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                   <Input
                     id="customer-email"
                     type="email"
@@ -155,7 +163,7 @@ export function OrderDialog({
               <div className="space-y-2">
                 <Label htmlFor="customer-phone">Телефон</Label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                   <Input
                     id="customer-phone"
                     type="tel"
@@ -180,7 +188,7 @@ export function OrderDialog({
           {/* Included Services */}
           {includedServicesList.length > 0 && (
             <div className="space-y-3">
-              <h4>Включенные услуги</h4>
+              <h4 className="text-gray-900 font-semibold">Включенные услуги</h4>
               <div className="space-y-2">
                 {includedServicesList.map((serviceId) => {
                   const service = availableServices.find(
@@ -193,8 +201,10 @@ export function OrderDialog({
                       className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
                     >
                       <div>
-                        <p>{service.name}</p>
-                        <p className="text-muted-foreground">
+                        <p className="text-gray-900 font-medium">
+                          {service.name}
+                        </p>
+                        <p className="text-gray-600 text-sm">
                           {service.description}
                         </p>
                       </div>
@@ -211,12 +221,14 @@ export function OrderDialog({
           {/* Additional Services */}
           {additionalServices.length > 0 && (
             <div className="space-y-3">
-              <h4>Дополнительные услуги</h4>
+              <h4 className="text-gray-900 font-semibold">
+                Дополнительные услуги
+              </h4>
               <div className="space-y-2">
                 {additionalServices.map((service) => (
                   <div
                     key={service.id}
-                    className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <Checkbox
                       id={`service-${service.id}`}
@@ -228,15 +240,17 @@ export function OrderDialog({
                         htmlFor={`service-${service.id}`}
                         className="cursor-pointer"
                       >
-                        <p>{service.name}</p>
-                        <p className="text-muted-foreground">
+                        <p className="text-gray-900 font-medium">
+                          {service.name}
+                        </p>
+                        <p className="text-gray-600 text-sm">
                           {service.description}
                         </p>
                       </label>
                     </div>
-                    <div className="flex items-center gap-1 text-primary">
+                    <div className="flex items-center gap-1 text-[#ffd600] font-semibold">
                       <DollarSign className="h-4 w-4" />
-                      <span>{service.price.toLocaleString()}</span>
+                      <span>${service.price.toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -247,25 +261,29 @@ export function OrderDialog({
           <Separator />
 
           {/* Total */}
-          <div className="p-4 bg-primary/10 rounded-lg space-y-2">
-            <div className="flex items-center justify-between text-muted-foreground">
+          <div className="p-4 bg-[#ffd600]/10 rounded-lg border border-[#ffd600]/20 space-y-2">
+            <div className="flex items-center justify-between text-gray-700">
               <span>Автомобиль:</span>
-              <span>${car.salePrice?.toLocaleString()}</span>
+              <span className="font-medium">
+                ${car.salePrice?.toLocaleString()}
+              </span>
             </div>
             {servicesTotal > 0 && (
-              <div className="flex items-center justify-between text-muted-foreground">
+              <div className="flex items-center justify-between text-gray-700">
                 <span>Дополнительные услуги:</span>
-                <span>${servicesTotal.toLocaleString()}</span>
+                <span className="font-medium">
+                  ${servicesTotal.toLocaleString()}
+                </span>
               </div>
             )}
             <Separator />
             <div className="flex items-center justify-between">
-              <span>Итого к оплате:</span>
-              <div className="flex items-center gap-1 text-primary">
+              <span className="text-gray-900 font-semibold">
+                Итого к оплате:
+              </span>
+              <div className="flex items-center gap-1 text-[#ffd600] font-semibold">
                 <DollarSign className="h-6 w-6" />
-                <span className="text-2xl">
-                  {totalPrice.toLocaleString()}
-                </span>
+                <span className="text-2xl">${totalPrice.toLocaleString()}</span>
               </div>
             </div>
           </div>

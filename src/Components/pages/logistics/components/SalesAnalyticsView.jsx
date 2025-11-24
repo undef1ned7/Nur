@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import {
@@ -28,11 +28,17 @@ import {
 } from "lucide-react";
 import { AnalyticsHeader } from "./AnalyticsHeader";
 
-export function SalesAnalyticsView({ cars }) {
+export function SalesAnalyticsView({ cars = [] }) {
   const [period, setPeriod] = useState("all");
 
   // Проданные авто
   const soldCars = cars.filter((car) => car.status === "sold" && car.soldDate);
+
+  // Debug: проверка данных
+  useEffect(() => {
+    console.log("SalesAnalyticsView - cars:", cars?.length || 0);
+    console.log("SalesAnalyticsView - soldCars:", soldCars?.length || 0);
+  }, [cars, soldCars]);
 
   const handleRefresh = () => {
     console.log("Refreshing analytics data...");
@@ -57,10 +63,7 @@ export function SalesAnalyticsView({ cars }) {
     (sum, car) => sum + (car.salePrice || car.price || 0),
     0
   );
-  const totalCost = soldCars.reduce(
-    (sum, car) => sum + (car.price || 0),
-    0
-  );
+  const totalCost = soldCars.reduce((sum, car) => sum + (car.price || 0), 0);
   const totalProfit = totalRevenue - totalCost;
   const avgProfit = soldCars.length > 0 ? totalProfit / soldCars.length : 0;
   const avgMargin = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
@@ -73,8 +76,7 @@ export function SalesAnalyticsView({ cars }) {
     }
     acc[make].count += 1;
     acc[make].revenue += car.salePrice || car.price || 0;
-    acc[make].profit +=
-      (car.salePrice || car.price || 0) - (car.price || 0);
+    acc[make].profit += (car.salePrice || car.price || 0) - (car.price || 0);
     return acc;
   }, {});
 
@@ -140,11 +142,8 @@ export function SalesAnalyticsView({ cars }) {
   // Топ авто по прибыли
   const topCars = [...soldCars]
     .map((car) => {
-      const profit =
-        (car.salePrice || car.price || 0) - (car.price || 0);
-      const margin = car.price
-        ? (profit / car.price) * 100
-        : 0;
+      const profit = (car.salePrice || car.price || 0) - (car.price || 0);
+      const margin = car.price ? (profit / car.price) * 100 : 0;
       return {
         ...car,
         profit,
@@ -208,18 +207,17 @@ export function SalesAnalyticsView({ cars }) {
       {/* Основные метрики */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Revenue */}
-        <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-white">
+        <Card className="border-2 border-[#ffd600]/20 bg-gradient-to-br from-[#ffd600]/10 to-white">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="h-12 w-12 rounded-xl bg-blue-500 flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-white" />
+              <div className="h-12 w-12 rounded-xl bg-[#ffd600] flex items-center justify-center">
+                <DollarSign className="h-6 w-6 text-gray-900" />
               </div>
               <Badge
                 variant="secondary"
                 className="bg-green-100 text-green-700 hover:bg-green-100"
               >
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +{growthRate}%
+                <TrendingUp className="h-3 w-3 mr-1" />+{growthRate}%
               </Badge>
             </div>
             <div>
@@ -227,7 +225,7 @@ export function SalesAnalyticsView({ cars }) {
                 Общая выручка
               </p>
               <div className="flex items-baseline gap-2">
-                <h2 className="text-blue-600">
+                <h2 className="text-[#ffd600]">
                   ${totalRevenue.toLocaleString()}
                 </h2>
               </div>
@@ -276,12 +274,12 @@ export function SalesAnalyticsView({ cars }) {
               <div className="h-12 w-12 rounded-xl bg-purple-500 flex items-center justify-center">
                 <ShoppingCart className="h-6 w-6 text-white" />
               </div>
-            <Badge
-              variant="secondary"
-              className="bg-purple-100 text-purple-700 hover:bg-purple-100"
-            >
-              {conversionRate.toFixed(0)}%
-            </Badge>
+              <Badge
+                variant="secondary"
+                className="bg-purple-100 text-purple-700 hover:bg-purple-100"
+              >
+                {conversionRate.toFixed(0)}%
+              </Badge>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">
@@ -342,110 +340,125 @@ export function SalesAnalyticsView({ cars }) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Activity className="h-4 w-4 text-blue-600" />
+                <div className="h-8 w-8 rounded-lg bg-[#ffd600]/20 flex items-center justify-center">
+                  <Activity className="h-4 w-4 text-[#ffd600]" />
                 </div>
                 Динамика продаж
               </CardTitle>
               <Badge variant="outline">За период</Badge>
             </div>
           </CardHeader>
-          <CardContent>
-            {monthData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <AreaChart data={monthData}>
-                  <defs>
-                    <linearGradient
-                      id="colorRevenue"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="#2563eb"
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="#2563eb"
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                    <linearGradient
-                      id="colorProfit"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="#10b981"
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="#10b981"
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#e5e7eb"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fill: "#6b7280", fontSize: 12 }}
-                    tickLine={{ stroke: "#e5e7eb" }}
-                  />
-                  <YAxis
-                    tick={{ fill: "#6b7280", fontSize: 12 }}
-                    tickLine={{ stroke: "#e5e7eb" }}
-                    tickFormatter={(value) => `$${value / 1000}k`}
-                  />
-                  <Tooltip
-                    formatter={(value) => [
-                      `$${value.toLocaleString()}`,
-                      "",
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      boxShadow:
-                        "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                    }}
-                    labelStyle={{ color: "#1f2937" }}
-                  />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#2563eb"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorRevenue)"
-                    name="Выручка"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="profit"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorProfit)"
-                    name="Прибыль"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          <CardContent className="p-6">
+            {monthData && monthData.length > 0 ? (
+              <div
+                className="w-full"
+                style={{ height: "320px", minHeight: "320px" }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={monthData}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="colorRevenue"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#2563eb"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#2563eb"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="colorProfit"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#10b981"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#10b981"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      tickLine={{ stroke: "#e5e7eb" }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      tickLine={{ stroke: "#e5e7eb" }}
+                      tickFormatter={(value) => `$${value / 1000}k`}
+                    />
+                    <Tooltip
+                      formatter={(value) => [`$${value.toLocaleString()}`, ""]}
+                      contentStyle={{
+                        backgroundColor: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                      }}
+                      labelStyle={{ color: "#1f2937" }}
+                    />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#2563eb"
+                      strokeWidth={2}
+                      fillOpacity={0.6}
+                      fill="url(#colorRevenue)"
+                      name="Выручка"
+                      dot={{
+                        fill: "#2563eb",
+                        r: 4,
+                        strokeWidth: 2,
+                        stroke: "#fff",
+                      }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="profit"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fillOpacity={0.6}
+                      fill="url(#colorProfit)"
+                      name="Прибыль"
+                      dot={{
+                        fill: "#10b981",
+                        r: 4,
+                        strokeWidth: 2,
+                        stroke: "#fff",
+                      }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="h-[320px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[320px] flex items-center justify-center text-gray-600">
                 <div className="text-center">
-                  <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Нет данных для отображения</p>
+                  <Calendar className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
+                  <p className="text-gray-600">Нет данных для отображения</p>
                 </div>
               </div>
             )}
@@ -462,62 +475,61 @@ export function SalesAnalyticsView({ cars }) {
                 </div>
                 Продажи по маркам
               </CardTitle>
-              <Badge variant="outline">
-                {makeData.length} марок
-              </Badge>
+              <Badge variant="outline">{makeData.length} марок</Badge>
             </div>
           </CardHeader>
-          <CardContent>
-            {makeData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={makeData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#e5e7eb"
-                  />
-                  <XAxis
-                    dataKey="make"
-                    tick={{ fill: "#6b7280", fontSize: 12 }}
-                    tickLine={{ stroke: "#e5e7eb" }}
-                  />
-                  <YAxis
-                    tick={{ fill: "#6b7280", fontSize: 12 }}
-                    tickLine={{ stroke: "#e5e7eb" }}
-                    tickFormatter={(value) => `$${value / 1000}k`}
-                  />
-                  <Tooltip
-                    formatter={(value) => [
-                      `$${value.toLocaleString()}`,
-                      "",
-                    ]}
-                    contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      boxShadow:
-                        "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="revenue"
-                    fill="#2563eb"
-                    radius={[8, 8, 0, 0]}
-                    name="Выручка"
-                  />
-                  <Bar
-                    dataKey="profit"
-                    fill="#10b981"
-                    radius={[8, 8, 0, 0]}
-                    name="Прибыль"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+          <CardContent className="p-6">
+            {makeData && makeData.length > 0 ? (
+              <div
+                className="w-full"
+                style={{ height: "320px", minHeight: "320px" }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={makeData}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="make"
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      tickLine={{ stroke: "#e5e7eb" }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 12 }}
+                      tickLine={{ stroke: "#e5e7eb" }}
+                      tickFormatter={(value) => `$${value / 1000}k`}
+                    />
+                    <Tooltip
+                      formatter={(value) => [`$${value.toLocaleString()}`, ""]}
+                      contentStyle={{
+                        backgroundColor: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                      }}
+                    />
+                    <Legend />
+                    <Bar
+                      dataKey="revenue"
+                      fill="#2563eb"
+                      radius={[8, 8, 0, 0]}
+                      name="Выручка"
+                    />
+                    <Bar
+                      dataKey="profit"
+                      fill="#10b981"
+                      radius={[8, 8, 0, 0]}
+                      name="Прибыль"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <div className="h-[320px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[320px] flex items-center justify-center text-gray-600">
                 <div className="text-center">
-                  <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Нет данных для отображения</p>
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
+                  <p className="text-gray-600">Нет данных для отображения</p>
                 </div>
               </div>
             )}
@@ -537,36 +549,38 @@ export function SalesAnalyticsView({ cars }) {
               Распределение
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {inventoryStatus.length > 0 ? (
+          <CardContent className="p-6">
+            {inventoryStatus && inventoryStatus.length > 0 ? (
               <div className="space-y-4">
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={inventoryStatus}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {inventoryStatus.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div
+                  className="w-full"
+                  style={{ height: "200px", minHeight: "200px" }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={inventoryStatus}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {inventoryStatus.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
                 <div className="space-y-2">
                   {inventoryStatus.map((item, index) => (
                     <div
@@ -580,10 +594,7 @@ export function SalesAnalyticsView({ cars }) {
                         />
                         <span className="text-sm">{item.name}</span>
                       </div>
-                      <Badge
-                        variant="secondary"
-                        className="tabular-nums"
-                      >
+                      <Badge variant="secondary" className="tabular-nums">
                         {item.value}
                       </Badge>
                     </div>
@@ -591,10 +602,10 @@ export function SalesAnalyticsView({ cars }) {
                 </div>
               </div>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[250px] flex items-center justify-center text-gray-600">
                 <div className="text-center">
-                  <Activity className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Нет данных</p>
+                  <Activity className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
+                  <p className="text-gray-600">Нет данных</p>
                 </div>
               </div>
             )}
@@ -622,10 +633,8 @@ export function SalesAnalyticsView({ cars }) {
                     key={car.id}
                     className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-all border border-transparent hover:border-border"
                   >
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md">
-                      <span className="font-semibold">
-                        #{index + 1}
-                      </span>
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-[#ffd600] to-[#ffd600] text-gray-900 shadow-md">
+                      <span className="font-semibold">#{index + 1}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">
@@ -643,18 +652,13 @@ export function SalesAnalyticsView({ cars }) {
                       <div className="flex items-center gap-1 font-semibold">
                         <span
                           className={
-                            car.profit > 0
-                              ? "text-green-600"
-                              : "text-red-600"
+                            car.profit > 0 ? "text-green-600" : "text-red-600"
                           }
                         >
                           ${Math.abs(car.profit).toLocaleString()}
                         </span>
                       </div>
-                      <Badge
-                        variant="secondary"
-                        className="mt-1 text-xs"
-                      >
+                      <Badge variant="secondary" className="mt-1 text-xs">
                         {car.margin.toFixed(1)}% маржа
                       </Badge>
                     </div>
@@ -662,10 +666,10 @@ export function SalesAnalyticsView({ cars }) {
                 ))}
               </div>
             ) : (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+              <div className="h-[250px] flex items-center justify-center text-gray-600">
                 <div className="text-center">
-                  <Award className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Нет проданных автомобилей</p>
+                  <Award className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
+                  <p className="text-gray-600">Нет проданных автомобилей</p>
                 </div>
               </div>
             )}
@@ -690,21 +694,11 @@ export function SalesAnalyticsView({ cars }) {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left p-4 font-medium">Марка</th>
-                    <th className="text-right p-4 font-medium">
-                      Продано
-                    </th>
-                    <th className="text-right p-4 font-medium">
-                      Выручка
-                    </th>
-                    <th className="text-right p-4 font-medium">
-                      Прибыль
-                    </th>
-                    <th className="text-right p-4 font-medium">
-                      Средний чек
-                    </th>
-                    <th className="text-right p-4 font-medium">
-                      Маржа
-                    </th>
+                    <th className="text-right p-4 font-medium">Продано</th>
+                    <th className="text-right p-4 font-medium">Выручка</th>
+                    <th className="text-right p-4 font-medium">Прибыль</th>
+                    <th className="text-right p-4 font-medium">Средний чек</th>
+                    <th className="text-right p-4 font-medium">Маржа</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -712,9 +706,7 @@ export function SalesAnalyticsView({ cars }) {
                     const avgPrice = item.revenue / item.count;
                     const margin =
                       item.revenue > 0
-                        ? (item.profit /
-                            (item.revenue - item.profit)) *
-                          100
+                        ? (item.profit / (item.revenue - item.profit)) * 100
                         : 0;
                     return (
                       <tr
@@ -726,13 +718,10 @@ export function SalesAnalyticsView({ cars }) {
                             <div
                               className="h-2 w-2 rounded-full"
                               style={{
-                                backgroundColor:
-                                  COLORS[index % COLORS.length],
+                                backgroundColor: COLORS[index % COLORS.length],
                               }}
                             />
-                            <span className="font-medium">
-                              {item.make}
-                            </span>
+                            <span className="font-medium">{item.make}</span>
                           </div>
                         </td>
                         <td className="text-right p-4 tabular-nums">
@@ -757,9 +746,7 @@ export function SalesAnalyticsView({ cars }) {
                         </td>
                         <td className="text-right p-4">
                           <Badge
-                            variant={
-                              margin > 15 ? "default" : "secondary"
-                            }
+                            variant={margin > 15 ? "default" : "secondary"}
                             className="tabular-nums"
                           >
                             {margin.toFixed(1)}%
@@ -772,9 +759,9 @@ export function SalesAnalyticsView({ cars }) {
               </table>
             </div>
           ) : (
-            <div className="py-12 text-center text-muted-foreground">
-              <BarChart className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Нет данных для отображения</p>
+            <div className="py-12 text-center text-gray-600">
+              <BarChart className="h-12 w-12 mx-auto mb-2 opacity-50 text-gray-400" />
+              <p className="text-gray-600">Нет данных для отображения</p>
             </div>
           )}
         </CardContent>

@@ -43,8 +43,16 @@ export function LogisticsView({
     <>
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <StatCard title="Всего автомобилей" value={stats.total} icon={CarIcon} />
-        <StatCard title="Ожидают отправки" value={stats.pending} icon={Package} />
+        <StatCard
+          title="Всего автомобилей"
+          value={stats.total}
+          icon={CarIcon}
+        />
+        <StatCard
+          title="Ожидают отправки"
+          value={stats.pending}
+          icon={Package}
+        />
         <StatCard title="В пути" value={stats.inTransit} icon={TruckIcon} />
         <StatCard title="Прибыли" value={stats.arrived} icon={CarIcon} />
         <StatCard title="Приняты" value={stats.accepted} icon={CheckCircle2} />
@@ -87,20 +95,16 @@ export function LogisticsView({
       {/* Tabs */}
       <Tabs defaultValue="all" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="all">
-            Все ({nonShopCars.length})
-          </TabsTrigger>
+          <TabsTrigger value="all">Все ({nonShopCars.length})</TabsTrigger>
           {currentUser.role === "agent" && (
             <>
               <TabsTrigger value="pending">
                 Ожидают (
-                {filteredCars.filter((c) => c.status === "pending").length}
-                )
+                {filteredCars.filter((c) => c.status === "pending").length})
               </TabsTrigger>
               <TabsTrigger value="in_transit">
                 В пути (
-                {filteredCars.filter((c) => c.status === "in_transit").length}
-                )
+                {filteredCars.filter((c) => c.status === "in_transit").length})
               </TabsTrigger>
             </>
           )}
@@ -108,13 +112,11 @@ export function LogisticsView({
             <>
               <TabsTrigger value="arrived">
                 Прибыли (
-                {filteredCars.filter((c) => c.status === "arrived").length}
-                )
+                {filteredCars.filter((c) => c.status === "arrived").length})
               </TabsTrigger>
               <TabsTrigger value="accepted">
                 Приняты (
-                {filteredCars.filter((c) => c.status === "accepted").length}
-                )
+                {filteredCars.filter((c) => c.status === "accepted").length})
               </TabsTrigger>
             </>
           )}
@@ -122,7 +124,7 @@ export function LogisticsView({
 
         <TabsContent value="all" className="space-y-4">
           {nonShopCars.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="text-center py-12 text-gray-600">
               <CarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Автомобили не найдены</p>
             </div>

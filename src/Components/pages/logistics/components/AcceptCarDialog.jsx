@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,8 +11,21 @@ import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { CheckCircle2 } from "lucide-react";
 
-export function AcceptCarDialog({ car, open, onOpenChange, onAccept, managerName }) {
+export function AcceptCarDialog({
+  car,
+  open,
+  onOpenChange,
+  onAccept,
+  managerName,
+}) {
   const [notes, setNotes] = useState("");
+
+  // Сброс формы при закрытии
+  useEffect(() => {
+    if (!open) {
+      setNotes("");
+    }
+  }, [open]);
 
   const handleAccept = () => {
     if (car) {
@@ -38,20 +51,20 @@ export function AcceptCarDialog({ car, open, onOpenChange, onAccept, managerName
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="p-4 bg-muted rounded-lg space-y-2">
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
             <p>
-              <span className="text-muted-foreground">Автомобиль:</span>{" "}
-              <span>
+              <span className="text-gray-600">Автомобиль:</span>{" "}
+              <span className="text-gray-900 font-medium">
                 {car.make} {car.model} ({car.year})
               </span>
             </p>
             <p>
-              <span className="text-muted-foreground">VIN:</span>{" "}
-              <span>{car.vin}</span>
+              <span className="text-gray-600">VIN:</span>{" "}
+              <span className="text-gray-900 font-medium">{car.vin}</span>
             </p>
             <p>
-              <span className="text-muted-foreground">Агент:</span>{" "}
-              <span>{car.agentName}</span>
+              <span className="text-gray-600">Агент:</span>{" "}
+              <span className="text-gray-900 font-medium">{car.agentName}</span>
             </p>
           </div>
 

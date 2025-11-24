@@ -1,19 +1,35 @@
 import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { Calendar, Gauge, Fuel, Settings, Palette, Star, DollarSign } from "lucide-react";
+import {
+  Calendar,
+  Gauge,
+  Fuel,
+  Settings,
+  Palette,
+  Star,
+  DollarSign,
+} from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
-export function ShopCarCard({ car, onViewDetails, onOrder, onSell, isManager }) {
+export function ShopCarCard({
+  car,
+  onViewDetails,
+  onOrder,
+  onSell,
+  isManager,
+}) {
   const totalPrice = car.salePrice || 0;
   const discount =
     car.originalPrice && car.salePrice
-      ? Math.round(((car.originalPrice - car.salePrice) / car.originalPrice) * 100)
+      ? Math.round(
+          ((car.originalPrice - car.salePrice) / car.originalPrice) * 100
+        )
       : 0;
 
   return (
-    <Card className="overflow-hidden hover:shadow-xl transition-all">
-      <div className="aspect-video bg-muted relative">
+    <Card className="overflow-hidden hover:shadow-xl transition-all border-gray-200">
+      <div className="aspect-video bg-gray-100 relative">
         {car.photos && car.photos.length > 0 ? (
           <img
             src={car.photos[0]}
@@ -49,35 +65,35 @@ export function ShopCarCard({ car, onViewDetails, onOrder, onSell, isManager }) 
           <h3 className="mb-1">
             {car.make} {car.model}
           </h3>
-          <p className="text-muted-foreground">{car.year} год</p>
+          <p className="text-gray-600">{car.year} год</p>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           {car.mileage !== undefined && (
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2 text-gray-600">
               <Gauge className="h-4 w-4" />
               <span>{car.mileage.toLocaleString()} км</span>
             </div>
           )}
 
           {car.fuelType && (
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2 text-gray-600">
               <Fuel className="h-4 w-4" />
               <span>{car.fuelType}</span>
             </div>
           )}
 
           {car.transmission && (
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2 text-gray-600">
               <Settings className="h-4 w-4" />
               <span>{car.transmission}</span>
             </div>
           )}
 
           {car.color && (
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2 text-gray-600">
               <Palette className="h-4 w-4" />
               <span>{car.color}</span>
             </div>
@@ -99,17 +115,18 @@ export function ShopCarCard({ car, onViewDetails, onOrder, onSell, isManager }) 
           </div>
         )}
 
-        <div className="pt-2 border-t">
+        <div className="pt-2 border-t border-gray-200">
           <div className="flex items-baseline justify-between">
             <div>
-              {car.originalPrice && car.originalPrice > (car.salePrice || 0) && (
-                <p className="text-muted-foreground line-through">
-                  ${car.originalPrice.toLocaleString()}
-                </p>
-              )}
-              <div className="flex items-center gap-1 text-primary">
+              {car.originalPrice &&
+                car.originalPrice > (car.salePrice || 0) && (
+                  <p className="text-gray-500 line-through">
+                    ${car.originalPrice.toLocaleString()}
+                  </p>
+                )}
+              <div className="flex items-center gap-1 text-[#ffd600] font-semibold">
                 <DollarSign className="h-5 w-5" />
-                <span className="text-2xl">{totalPrice.toLocaleString()}</span>
+                <span className="text-2xl">${totalPrice.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -117,7 +134,11 @@ export function ShopCarCard({ car, onViewDetails, onOrder, onSell, isManager }) 
       </CardContent>
 
       <CardFooter className="gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => onViewDetails(car)}>
+        <Button
+          variant="outline"
+          className="flex-1"
+          onClick={() => onViewDetails(car)}
+        >
           Подробнее
         </Button>
         {isManager && onSell ? (

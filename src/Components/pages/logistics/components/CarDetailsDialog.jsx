@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  in_transit: "bg-blue-100 text-blue-800 border-blue-200",
+  in_transit: "bg-[#ffd600]/20 text-[#ffd600] border-[#ffd600]/30",
   arrived: "bg-purple-100 text-purple-800 border-purple-200",
   accepted: "bg-green-100 text-green-800 border-green-200",
   for_sale: "bg-cyan-100 text-cyan-800 border-cyan-200",
@@ -71,14 +71,14 @@ export function CarDetailsDialog({ car, open, onOpenChange }) {
           <TabsContent value="details" className="space-y-6">
             {car.photos && car.photos.length > 0 && (
               <div className="space-y-2">
-                <h4>Фотографии</h4>
+                <h4 className="text-gray-900 font-semibold mb-2">Фотографии</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {car.photos.map((photo, index) => (
                     <img
                       key={index}
                       src={photo}
                       alt={`${car.make} ${car.model} - фото ${index + 1}`}
-                      className="w-full h-48 object-cover rounded-lg"
+                      className="w-full h-48 object-cover rounded-lg border border-gray-200"
                     />
                   ))}
                 </div>
@@ -89,79 +89,87 @@ export function CarDetailsDialog({ car, open, onOpenChange }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-3">
-                <h4>Информация об автомобиле</h4>
+                <h4 className="text-gray-900 font-semibold">
+                  Информация об автомобиле
+                </h4>
 
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-gray-600">
                   <Package className="h-4 w-4" />
                   <div>
-                    <p className="text-foreground">VIN номер</p>
-                    <p>{car.vin}</p>
+                    <p className="text-gray-900 font-medium">VIN номер</p>
+                    <p className="text-gray-700">{car.vin}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-gray-600">
                   <Calendar className="h-4 w-4" />
                   <div>
-                    <p className="text-foreground">Год выпуска</p>
-                    <p>{car.year}</p>
+                    <p className="text-gray-900 font-medium">Год выпуска</p>
+                    <p className="text-gray-700">{car.year}</p>
                   </div>
                 </div>
 
                 {car.price && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="flex items-center gap-2 text-gray-600">
                     <DollarSign className="h-4 w-4" />
                     <div>
-                      <p className="text-foreground">Стоимость</p>
-                      <p>${car.price.toLocaleString()}</p>
+                      <p className="text-gray-900 font-medium">Стоимость</p>
+                      <p className="text-blue-600 font-semibold">
+                        ${car.price.toLocaleString()}
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
 
               <div className="space-y-3">
-                <h4>Логистика</h4>
+                <h4 className="text-gray-900 font-semibold">Логистика</h4>
 
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-gray-600">
                   <MapPin className="h-4 w-4" />
                   <div>
-                    <p className="text-foreground">Маршрут</p>
-                    <p>
+                    <p className="text-gray-900 font-medium">Маршрут</p>
+                    <p className="text-gray-700">
                       {car.origin} → {car.destination}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-gray-600">
                   <Calendar className="h-4 w-4" />
                   <div>
-                    <p className="text-foreground">Дата отправки</p>
-                    <p>
+                    <p className="text-gray-900 font-medium">Дата отправки</p>
+                    <p className="text-gray-700">
                       {new Date(car.shippingDate).toLocaleDateString("ru-RU")}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-gray-600">
                   <Calendar className="h-4 w-4" />
                   <div>
-                    <p className="text-foreground">Ожидаемое прибытие</p>
-                    <p>
-                      {new Date(
-                        car.estimatedArrival
-                      ).toLocaleDateString("ru-RU")}
+                    <p className="text-gray-900 font-medium">
+                      Ожидаемое прибытие
+                    </p>
+                    <p className="text-gray-700">
+                      {new Date(car.estimatedArrival).toLocaleDateString(
+                        "ru-RU"
+                      )}
                     </p>
                   </div>
                 </div>
 
                 {car.actualArrival && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className="flex items-center gap-2 text-gray-600">
                     <Calendar className="h-4 w-4" />
                     <div>
-                      <p className="text-foreground">Фактическое прибытие</p>
-                      <p>
-                        {new Date(
-                          car.actualArrival
-                        ).toLocaleDateString("ru-RU")}
+                      <p className="text-gray-900 font-medium">
+                        Фактическое прибытие
+                      </p>
+                      <p className="text-gray-700">
+                        {new Date(car.actualArrival).toLocaleDateString(
+                          "ru-RU"
+                        )}
                       </p>
                     </div>
                   </div>
@@ -172,29 +180,31 @@ export function CarDetailsDialog({ car, open, onOpenChange }) {
             <Separator />
 
             <div className="space-y-3">
-              <h4>Дополнительная информация</h4>
+              <h4 className="text-gray-900 font-semibold">
+                Дополнительная информация
+              </h4>
 
-              <div className="flex items-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-2 text-gray-600">
                 <User className="h-4 w-4" />
                 <div>
-                  <p className="text-foreground">Агент</p>
-                  <p>{car.agentName}</p>
+                  <p className="text-gray-900 font-medium">Агент</p>
+                  <p className="text-gray-700">{car.agentName}</p>
                 </div>
               </div>
 
               {car.acceptedBy && (
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-gray-600">
                   <User className="h-4 w-4" />
                   <div>
-                    <p className="text-foreground">Принял</p>
-                    <p>
+                    <p className="text-gray-900 font-medium">Принял</p>
+                    <p className="text-gray-700">
                       {car.acceptedBy}{" "}
                       {car.acceptedDate && (
                         <>
                           (
-                          {new Date(
-                            car.acceptedDate
-                          ).toLocaleDateString("ru-RU")}
+                          {new Date(car.acceptedDate).toLocaleDateString(
+                            "ru-RU"
+                          )}
                           )
                         </>
                       )}
@@ -204,11 +214,11 @@ export function CarDetailsDialog({ car, open, onOpenChange }) {
               )}
 
               {car.notes && (
-                <div className="flex items-start gap-2 text-muted-foreground">
+                <div className="flex items-start gap-2 text-gray-600">
                   <FileText className="h-4 w-4 mt-0.5" />
                   <div>
-                    <p className="text-foreground">Примечания</p>
-                    <p>{car.notes}</p>
+                    <p className="text-gray-900 font-medium">Примечания</p>
+                    <p className="text-gray-700">{car.notes}</p>
                   </div>
                 </div>
               )}

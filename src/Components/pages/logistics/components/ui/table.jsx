@@ -40,7 +40,7 @@ function TableFooter({ className, ...props }) {
     <tfoot
       data-slot="table-footer"
       className={cn(
-        "bg-muted/50 border-t font-medium [&>tr]:last:border-b-0",
+        "bg-gray-50 border-t border-gray-200 font-medium [&>tr]:last:border-b-0",
         className
       )}
       {...props}
@@ -53,7 +53,7 @@ function TableRow({ className, ...props }) {
     <tr
       data-slot="table-row"
       className={cn(
-        "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
+        "hover:bg-gray-50 data-[state=selected]:bg-gray-100 border-b border-gray-200 transition-colors",
         className
       )}
       {...props}
@@ -66,7 +66,7 @@ function TableHead({ className, ...props }) {
     <th
       data-slot="table-head"
       className={cn(
-        "text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "text-gray-900 h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] bg-gray-50",
         className
       )}
       {...props}
@@ -91,7 +91,7 @@ function TableCaption({ className, ...props }) {
   return (
     <caption
       data-slot="table-caption"
-      className={cn("text-muted-foreground mt-4 text-sm", className)}
+      className={cn("text-gray-600 mt-4 text-sm", className)}
       {...props}
     />
   );

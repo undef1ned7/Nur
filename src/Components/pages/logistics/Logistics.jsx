@@ -15,7 +15,7 @@ import { ShopView } from "./components/ShopView";
 const mockUsers = [
   {
     id: "1",
-  name: "Алексей Иванов",
+    name: "Алексей Иванов",
     role: "agent",
     email: "agent@example.com",
     phone: "+7 999 111-22-33",
@@ -370,7 +370,7 @@ const initialCars = [
 ];
 
 function Logistics() {
-  const [currentUser, setCurrentUser] = useState(mockUsers[1]); // менеджер по умолчанию
+  const [currentUser, setCurrentUser] = useState(mockUsers[0]); // агент по умолчанию
   const [cars, setCars] = useState(initialCars);
   const [orders, setOrders] = useState([]);
   const [selectedCar, setSelectedCar] = useState(null);
@@ -386,7 +386,9 @@ function Logistics() {
   const navigate = useNavigate();
 
   // Определяем активную страницу по URL
-  const isShopPage = location.pathname.includes("logistics-shop");
+  const isShopPage =
+    location.pathname.includes("logistics-shop") ||
+    location.pathname.endsWith("/logistics-shop");
   const activeView = isShopPage ? "shop" : "logistics";
 
   const handleAddCar = (newCar) => {
@@ -530,9 +532,9 @@ function Logistics() {
 
   const handleUserChange = (user) => {
     setCurrentUser(user);
-    // Если заходим как клиент – сразу ведём на /logistics/shop
+    // Если заходим как клиент – сразу ведём на /crm/logistics-shop
     if (user.role === "customer") {
-      navigate("/logistics/shop");
+      navigate("/crm/logistics-shop");
     }
     toast.success(`Вы вошли как ${user.name}`);
   };
@@ -560,7 +562,7 @@ function Logistics() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-gray-50">
       {/* Header */}
       {/* <AppHeader
         currentUser={currentUser}
@@ -569,47 +571,81 @@ function Logistics() {
         activeView={activeView}
         onChangeView={(view) => {
           if (view === "shop") {
-            navigate("/logistics/shop");
+            navigate("/crm/logistics-shop");
           } else {
-            navigate("/logistics");
+            navigate("/crm/logistics");
           }
         }}
         onUserChange={handleUserChange}
       /> */}
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {activeView === "logistics" &&
-            (currentUser.role === "agent" || currentUser.role === "manager") && (
-                <LogisticsView
-                currentUser={currentUser}
-                stats={stats}
-                filteredCars={filteredCars}
-                searchQuery={searchQuery}
-                statusFilter={statusFilter}
-                onSearchChange={setSearchQuery}
-                onStatusFilterChange={setStatusFilter}
-                onAddCar={handleAddCar}
-                onViewDetails={handleViewDetails}
-                onOpenAcceptDialog={handleOpenAcceptDialog}
-                onUpdateStatus={handleUpdateStatus}
-                onOpenSetForSaleDialog={handleOpenSetForSaleDialog}
-                />
-            )}
+      {/* Role Switcher */}
+      <div className="px-4 pt-2 pb-2">
+        <div className="flex items-center justify-end gap-3">
+          <span className="text-sm text-gray-600">Роль:</span>
+          <select
+            value={currentUser.role}
+            onChange={(e) => {
+              const role = e.target.value;
+              const userWithRole = { ...currentUser, role };
+              setCurrentUser(userWithRole);
+              toast.success(
+                `Роль изменена на: ${
+                  role === "agent"
+                    ? "Агент"
+                    : role === "manager"
+                    ? "Менеджер"
+                    : "Покупатель"
+                }`
+              );
+              if (role === "customer") {
+                navigate("/crm/logistics-shop");
+              } else {
+                navigate("/crm/logistics");
+              }
+            }}
+            className="px-3 py-1.5 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ffd600] focus:border-[#ffd600]"
+          >
+            <option value="agent">Агент</option>
+            <option value="manager">Менеджер</option>
+            <option value="customer">Покупатель</option>
+          </select>
+          <div className="text-sm text-gray-600">({currentUser.name})</div>
+        </div>
+      </div>
 
-            {activeView === "shop" && (
-            <ShopView
-                currentUser={currentUser}
-                stats={stats}
-                cars={cars}
-                orders={orders}
-                onSellCar={handleSellCar}
-                onViewDetails={handleViewDetails}
-                onOpenSetForSaleDialog={handleOpenSetForSaleDialog}
-                onOpenQuickSellDialog={handleOpenQuickSellDialog}
-                onOpenOrderDialog={handleOpenOrderDialog}
-            />
-            )}
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-4">
+        {activeView === "logistics" && (
+          <LogisticsView
+            currentUser={currentUser}
+            stats={stats}
+            filteredCars={filteredCars}
+            searchQuery={searchQuery}
+            statusFilter={statusFilter}
+            onSearchChange={setSearchQuery}
+            onStatusFilterChange={setStatusFilter}
+            onAddCar={handleAddCar}
+            onViewDetails={handleViewDetails}
+            onOpenAcceptDialog={handleOpenAcceptDialog}
+            onUpdateStatus={handleUpdateStatus}
+            onOpenSetForSaleDialog={handleOpenSetForSaleDialog}
+          />
+        )}
+
+        {activeView === "shop" && (
+          <ShopView
+            currentUser={currentUser}
+            stats={stats}
+            cars={cars}
+            orders={orders}
+            onSellCar={handleSellCar}
+            onViewDetails={handleViewDetails}
+            onOpenSetForSaleDialog={handleOpenSetForSaleDialog}
+            onOpenQuickSellDialog={handleOpenQuickSellDialog}
+            onOpenOrderDialog={handleOpenOrderDialog}
+          />
+        )}
       </main>
 
       {/* Dialogs (общие для обеих страниц) */}

@@ -96,11 +96,11 @@ export function TrackingMap({ car }) {
         {/* Route Visualization */}
         <div className="relative">
           {/* Background route line */}
-          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-muted" />
+          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200" />
 
           {/* Progress line */}
           <div
-            className="absolute left-6 top-0 w-0.5 bg-primary transition-all duration-500"
+            className="absolute left-6 top-0 w-0.5 bg-[#ffd600] transition-all duration-500"
             style={{ height: `${progress}%` }}
           />
 
@@ -119,10 +119,10 @@ export function TrackingMap({ car }) {
                     relative z-10 flex items-center justify-center w-12 h-12 rounded-full border-2
                     ${
                       milestone.status === "completed"
-                        ? "bg-primary border-primary text-primary-foreground"
+                        ? "bg-[#ffd600] border-[#ffd600] text-gray-900"
                         : milestone.status === "active"
-                        ? "bg-background border-primary text-primary animate-pulse"
-                        : "bg-background border-muted text-muted-foreground"
+                        ? "bg-white border-[#ffd600] text-[#ffd600] animate-pulse"
+                        : "bg-white border-gray-300 text-gray-400"
                     }
                   `}
                   >
@@ -137,17 +137,19 @@ export function TrackingMap({ car }) {
                   <div className="flex-1 pt-1">
                     <div className="flex items-start justify-between mb-1">
                       <div>
-                        <h4 className="mb-1">{milestone.label}</h4>
-                        <p className="text-muted-foreground">
-                          {milestone.description}
-                        </p>
+                        <h4 className="mb-1 text-gray-900 font-semibold">
+                          {milestone.label}
+                        </h4>
+                        <p className="text-gray-600">{milestone.description}</p>
                       </div>
                       {milestone.status === "active" && (
-                        <Badge className="bg-blue-500">В процессе</Badge>
+                        <Badge className="bg-[#ffd600] text-gray-900 border border-[#ffd600]">
+                          В процессе
+                        </Badge>
                       )}
                     </div>
                     {milestone.date && (
-                      <div className="flex items-center gap-2 text-muted-foreground mt-2">
+                      <div className="flex items-center gap-2 text-gray-600 mt-2">
                         <Clock className="h-4 w-4" />
                         <span>
                           {new Date(milestone.date).toLocaleDateString(
@@ -171,8 +173,8 @@ export function TrackingMap({ car }) {
         {/* Progress Bar */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Прогресс доставки</span>
-            <span>{progress}%</span>
+            <span className="text-gray-700 font-medium">Прогресс доставки</span>
+            <span className="text-gray-900 font-semibold">{progress}%</span>
           </div>
           <Progress value={progress} className="h-2" />
         </div>
@@ -181,13 +183,13 @@ export function TrackingMap({ car }) {
         {car.status !== "accepted" &&
           car.status !== "for_sale" &&
           car.status !== "sold" && (
-            <div className="p-4 bg-muted rounded-lg">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <div className="flex items-center gap-2 text-gray-600">
                   <Clock className="h-4 w-4" />
                   <span>Ожидаемое прибытие:</span>
                 </div>
-                <span>
+                <span className="text-gray-900 font-semibold">
                   {new Date(car.estimatedArrival).toLocaleDateString("ru-RU", {
                     day: "numeric",
                     month: "long",
@@ -198,19 +200,18 @@ export function TrackingMap({ car }) {
           )}
 
         {/* Current Location Indicator */}
-        <div className="flex items-start gap-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-          <TransportIcon className="h-5 w-5 text-primary mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-[#ffd600]/10 rounded-lg border border-[#ffd600]/20">
+          <TransportIcon className="h-5 w-5 text-[#ffd600] mt-0.5" />
           <div>
-            <p>Текущий статус</p>
-            <p className="text-muted-foreground">
+            <p className="text-gray-900 font-semibold">Текущий статус</p>
+            <p className="text-gray-700">
               {car.status === "pending" &&
                 "Ожидает отправки из порта отправления"}
               {car.status === "in_transit" &&
                 "Автомобиль в пути, морская перевозка"}
               {car.status === "arrived" &&
                 "Прибыл в порт назначения, ожидает приемки"}
-              {car.status === "accepted" &&
-                "Принят в салоне, готов к продаже"}
+              {car.status === "accepted" && "Принят в салоне, готов к продаже"}
               {car.status === "for_sale" && "Выставлен на продажу"}
               {car.status === "sold" && "Продан клиенту"}
             </p>

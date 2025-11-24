@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,17 @@ export function QuickSellDialog({ car, open, onOpenChange, onSell }) {
     setNotes("");
   };
 
+  // Инициализация и сброс формы при открытии/закрытии
+  useEffect(() => {
+    if (open && car) {
+      // Подставляем цену по умолчанию при открытии
+      setSalePrice(car.salePrice?.toString() || car.price?.toString() || "");
+    } else if (!open) {
+      // Сброс при закрытии
+      resetForm();
+    }
+  }, [open, car]);
+
   const handleSubmit = () => {
     if (!car) return;
 
@@ -55,19 +66,6 @@ export function QuickSellDialog({ car, open, onOpenChange, onSell }) {
     onOpenChange(false);
   };
 
-  const handleOpenChange = (newOpen) => {
-    if (newOpen && car) {
-      // Подставляем цену по умолчанию
-      setSalePrice(
-        car.salePrice?.toString() || car.price?.toString() || ""
-      );
-    } else if (!newOpen) {
-      // Сброс при закрытии
-      resetForm();
-    }
-    onOpenChange(newOpen);
-  };
-
   if (!car) return null;
 
   const profit =
@@ -76,7 +74,7 @@ export function QuickSellDialog({ car, open, onOpenChange, onSell }) {
       : 0;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -90,23 +88,23 @@ export function QuickSellDialog({ car, open, onOpenChange, onSell }) {
 
         <div className="space-y-4">
           {/* Информация об авто */}
-          <div className="p-4 bg-muted rounded-lg">
-            <h4>
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="text-gray-900 font-semibold">
               {car.make} {car.model} ({car.year})
             </h4>
-            <p className="text-sm text-muted-foreground">VIN: {car.vin}</p>
+            <p className="text-sm text-gray-600">VIN: {car.vin}</p>
             <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Цена закупки:</span>
-              <span className="text-primary">
+              <span className="text-gray-600">Цена закупки:</span>
+              <span className="text-[#ffd600] font-semibold">
                 ${car.price?.toLocaleString()}
               </span>
             </div>
             {car.salePrice && (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Цена на витрине:
+                <span className="text-gray-600">Цена на витрине:</span>
+                <span className="text-gray-900 font-medium">
+                  ${car.salePrice.toLocaleString()}
                 </span>
-                <span>${car.salePrice.toLocaleString()}</span>
               </div>
             )}
           </div>
@@ -186,7 +184,7 @@ export function QuickSellDialog({ car, open, onOpenChange, onSell }) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Отмена
           </Button>
           <Button

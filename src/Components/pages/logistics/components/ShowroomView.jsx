@@ -80,10 +80,8 @@ export function ShowroomView({
     avgPrice:
       showroomCars.length > 0
         ? Math.round(
-            showroomCars.reduce(
-              (sum, car) => sum + (car.salePrice || 0),
-              0
-            ) / showroomCars.length
+            showroomCars.reduce((sum, car) => sum + (car.salePrice || 0), 0) /
+              showroomCars.length
           )
         : 0,
     avgYear:
@@ -96,10 +94,8 @@ export function ShowroomView({
     avgMileage:
       showroomCars.length > 0
         ? Math.round(
-            showroomCars.reduce(
-              (sum, car) => sum + (car.mileage || 0),
-              0
-            ) / showroomCars.length
+            showroomCars.reduce((sum, car) => sum + (car.mileage || 0), 0) /
+              showroomCars.length
           )
         : 0,
   };
@@ -111,7 +107,7 @@ export function ShowroomView({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-[#ffd600] to-purple-600 flex items-center justify-center">
                 <Store className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -125,33 +121,39 @@ export function ShowroomView({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Store className="h-4 w-4" />
                 <span>Всего в продаже</span>
               </div>
-              <p className="text-2xl">{stats.total}</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {stats.total}
+              </p>
             </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <DollarSign className="h-4 w-4" />
                 <span>Средняя цена</span>
               </div>
-              <p className="text-2xl">${stats.avgPrice.toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                ${stats.avgPrice.toLocaleString()}
+              </p>
             </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Calendar className="h-4 w-4" />
                 <span>Средний год</span>
               </div>
-              <p className="text-2xl">{stats.avgYear}</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {stats.avgYear}
+              </p>
             </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Gauge className="h-4 w-4" />
                 <span>Средний пробег</span>
               </div>
-              <p className="text-2xl">
+              <p className="text-2xl font-semibold text-gray-900">
                 {stats.avgMileage.toLocaleString()} км
               </p>
             </div>
@@ -224,9 +226,7 @@ export function ShowroomView({
                   <SelectItem value="price-low">
                     Цена: по возрастанию
                   </SelectItem>
-                  <SelectItem value="price-high">
-                    Цена: по убыванию
-                  </SelectItem>
+                  <SelectItem value="price-high">Цена: по убыванию</SelectItem>
                   <SelectItem value="year-new">Год: новые</SelectItem>
                   <SelectItem value="year-old">Год: старые</SelectItem>
                 </SelectContent>
@@ -235,7 +235,7 @@ export function ShowroomView({
 
             {(searchQuery || makeFilter !== "all" || priceRange !== "all") && (
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">
+                <span className="text-gray-600">
                   Найдено: {filteredCars.length}
                 </span>
                 <Button
@@ -259,9 +259,9 @@ export function ShowroomView({
       {filteredCars.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
-            <Store className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="mb-2">Автомобили не найдены</h3>
-            <p className="text-muted-foreground">
+            <Store className="h-16 w-16 mx-auto mb-4 text-gray-400 opacity-50" />
+            <h3 className="mb-2 text-gray-900">Автомобили не найдены</h3>
+            <p className="text-gray-600">
               Попробуйте изменить параметры фильтрации
             </p>
           </CardContent>

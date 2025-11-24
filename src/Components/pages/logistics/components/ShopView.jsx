@@ -24,7 +24,11 @@ export function ShopView({
     <>
       {/* Shop Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Автомобили в продаже" value={stats.forSale} icon={Store} />
+        <StatCard
+          title="Автомобили в продаже"
+          value={stats.forSale}
+          icon={Store}
+        />
         <StatCard
           title="На складе"
           value={stats.arrived + stats.accepted}
@@ -40,28 +44,30 @@ export function ShopView({
       >
         <TabsList
           className={
-            currentUser.role === "manager" ? "grid w-full grid-cols-5" : ""
+            currentUser.role === "manager"
+              ? "grid w-full grid-cols-5"
+              : currentUser.role === "agent"
+              ? "grid w-full grid-cols-4"
+              : ""
           }
         >
           {currentUser.role === "manager" && (
             <>
-              <TabsTrigger value="sales">
-                Продажи ({stats.sold})
-              </TabsTrigger>
+              <TabsTrigger value="sales">Продажи ({stats.sold})</TabsTrigger>
               <TabsTrigger value="warehouse">
                 Склад ({stats.arrived + stats.accepted})
               </TabsTrigger>
             </>
           )}
-          <TabsTrigger value="showroom">
-            Витрина ({stats.forSale})
-          </TabsTrigger>
-          {currentUser.role === "manager" && (
+          <TabsTrigger value="showroom">Витрина ({stats.forSale})</TabsTrigger>
+          {(currentUser.role === "manager" || currentUser.role === "agent") && (
             <>
               <TabsTrigger value="analytics">Аналитика</TabsTrigger>
-              <TabsTrigger value="orders">
-                Заказы ({orders.length})
-              </TabsTrigger>
+              {currentUser.role === "manager" && (
+                <TabsTrigger value="orders">
+                  Заказы ({orders.length})
+                </TabsTrigger>
+              )}
             </>
           )}
         </TabsList>
@@ -101,94 +107,93 @@ export function ShopView({
           />
         </TabsContent>
 
-        {currentUser.role === "manager" && (
-          <>
-            <TabsContent value="analytics">
-              <SalesAnalyticsView cars={cars} />
-            </TabsContent>
+        {(currentUser.role === "manager" || currentUser.role === "agent") && (
+          <TabsContent value="analytics">
+            <SalesAnalyticsView cars={cars} />
+          </TabsContent>
+        )}
 
-            <TabsContent value="orders">
-              {orders.length > 0 ? (
-                <div className="space-y-6">
-                  <h2>Заказы клиентов</h2>
-                  <div className="grid gap-4">
-                    {orders.map((order) => {
-                      const car = cars.find((c) => c.id === order.carId);
-                      if (!car) return null;
-                      return (
-                        <Card key={order.id}>
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <CardTitle>
-                                  {car.make} {car.model} ({car.year})
-                                </CardTitle>
-                                <p className="text-muted-foreground">
-                                  Заказ #{order.id.slice(-6)}
-                                </p>
-                              </div>
-                              <Badge>
-                                {order.status === "pending"
-                                  ? "В обработке"
-                                  : order.status === "confirmed"
-                                  ? "Подтвержден"
-                                  : order.status === "completed"
-                                  ? "Завершен"
-                                  : "Отменен"}
-                              </Badge>
+        {currentUser.role === "manager" && (
+          <TabsContent value="orders">
+            {orders.length > 0 ? (
+              <div className="space-y-6">
+                <h2>Заказы клиентов</h2>
+                <div className="grid gap-4">
+                  {orders.map((order) => {
+                    const car = cars.find((c) => c.id === order.carId);
+                    if (!car) return null;
+                    return (
+                      <Card key={order.id}>
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <CardTitle>
+                                {car.make} {car.model} ({car.year})
+                              </CardTitle>
+                              <p className="text-gray-600">
+                                Заказ #{order.id.slice(-6)}
+                              </p>
                             </div>
-                          </CardHeader>
-                          <CardContent className="space-y-2">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-muted-foreground">Клиент</p>
-                                <p>{order.customerName}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">
-                                  Дата заказа
-                                </p>
-                                <p>
-                                  {new Date(
-                                    order.orderDate
-                                  ).toLocaleDateString("ru-RU")}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Услуги</p>
-                                <p>
-                                  {order.selectedServices.length} выбрано
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Итого</p>
-                                <div className="flex items-center gap-1 text-primary">
-                                  <span className="text-lg">
-                                    $
-                                    {order.totalPrice.toLocaleString()}
-                                  </span>
-                                </div>
+                            <Badge className="bg-[#ffd600]/20 text-[#ffd600] border border-[#ffd600]/30">
+                              {order.status === "pending"
+                                ? "В обработке"
+                                : order.status === "confirmed"
+                                ? "Подтвержден"
+                                : order.status === "completed"
+                                ? "Завершен"
+                                : "Отменен"}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-gray-600 text-sm">Клиент</p>
+                              <p className="text-gray-900 font-medium">
+                                {order.customerName}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 text-sm">
+                                Дата заказа
+                              </p>
+                              <p className="text-gray-900 font-medium">
+                                {new Date(order.orderDate).toLocaleDateString(
+                                  "ru-RU"
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 text-sm">Услуги</p>
+                              <p className="text-gray-900 font-medium">
+                                {order.selectedServices.length} выбрано
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 text-sm">Итого</p>
+                              <div className="flex items-center gap-1 text-[#ffd600] font-semibold">
+                                <span className="text-lg">
+                                  ${order.totalPrice.toLocaleString()}
+                                </span>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
-              ) : (
-                <Card>
-                  <CardContent className="text-center py-12">
-                    <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <h3 className="mb-2">Нет заказов</h3>
-                    <p className="text-muted-foreground">
-                      Пока нет заказов от клиентов
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-          </>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-gray-400 opacity-50" />
+                  <h3 className="mb-2 text-gray-900">Нет заказов</h3>
+                  <p className="text-gray-600">Пока нет заказов от клиентов</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         )}
       </Tabs>
     </>

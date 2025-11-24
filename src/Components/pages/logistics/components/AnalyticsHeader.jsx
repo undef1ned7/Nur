@@ -9,7 +9,12 @@ import {
 import { Download, Calendar, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-export function AnalyticsHeader({ onRefresh, onExport, period, onPeriodChange }) {
+export function AnalyticsHeader({
+  onRefresh,
+  onExport,
+  period,
+  onPeriodChange,
+}) {
   const handleRefresh = () => {
     onRefresh();
     toast.success("Данные обновлены");
@@ -23,7 +28,7 @@ export function AnalyticsHeader({ onRefresh, onExport, period, onPeriodChange })
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
       <div>
-        <h2 className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+        <h2 className="bg-gradient-to-r from-[#ffd600] to-[#ffd600] bg-clip-text text-transparent">
           Аналитика продаж
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -50,7 +55,7 @@ export function AnalyticsHeader({ onRefresh, onExport, period, onPeriodChange })
           variant="outline"
           size="icon"
           onClick={handleRefresh}
-          className="hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200"
+          className="hover:bg-[#ffd600]/10 hover:text-[#ffd600] hover:border-[#ffd600]/20"
         >
           <RefreshCw className="h-4 w-4" />
         </Button>

@@ -2,11 +2,11 @@ import { Card, CardContent } from "./ui/card";
 
 export function StatCard({ title, value, icon: Icon, description, trend }) {
   return (
-    <Card className="border-border/50 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="border-gray-200 shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="pt-6">
         <div className="flex items-start justify-between mb-4">
-          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Icon className="h-6 w-6 text-primary" />
+          <div className="h-12 w-12 rounded-xl bg-[#ffd600]/20 flex items-center justify-center">
+            <Icon className="h-6 w-6 text-[#ffd600]" />
           </div>
           {trend && (
             <div
@@ -22,12 +22,12 @@ export function StatCard({ title, value, icon: Icon, description, trend }) {
           )}
         </div>
         <div>
-          <p className="text-sm text-muted-foreground mb-1">{title}</p>
+          <p className="text-sm text-gray-600 mb-1">{title}</p>
           <div className="flex items-baseline gap-2">
-            <h2 className="text-foreground">{value}</h2>
+            <h2 className="text-gray-900 text-2xl font-semibold">{value}</h2>
           </div>
           {description && (
-            <p className="text-xs text-muted-foreground mt-1">{description}</p>
+            <p className="text-xs text-gray-500 mt-1">{description}</p>
           )}
         </div>
       </CardContent>
