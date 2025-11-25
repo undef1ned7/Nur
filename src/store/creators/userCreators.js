@@ -32,7 +32,7 @@ export const loginUserAsync = createAsyncThunk(
   async (formData, { rejectWithValue }) => {
     try {
       const response = await loginUser(formData);
-      localStorage.setItem('userData', JSON.stringify(response))
+      localStorage.setItem("userData", JSON.stringify(response));
       if (response.access) {
         localStorage.setItem("accessToken", response.access);
 
@@ -164,3 +164,26 @@ export const updateUserCompanyName = createAsyncThunk(
   }
 );
 
+export const getScalesToken = createAsyncThunk(
+  "user/getScalesToken",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get("/users/scales/token/");
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+export const sendProductsToScales = createAsyncThunk(
+  "user/sendProductsToScales",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post("/users/scales/send-products/", payload);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);

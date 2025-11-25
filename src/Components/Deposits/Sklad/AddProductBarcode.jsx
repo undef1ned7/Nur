@@ -47,6 +47,8 @@ const AddProductBarcode = ({
     quantity: "1",
     price: "",
     purchase_price: "",
+    plu: "",
+    scale_type: "",
   });
   const [debt, setDebt] = useState("");
   const [amount, setAmount] = useState("");
@@ -237,6 +239,8 @@ const AddProductBarcode = ({
         createProductWithBarcode({
           barcode: scannedProduct.barcode,
           ...state,
+          plu: state.plu ? Number(state.plu) : null,
+          scale_type: state.scale_type || null,
         })
       ).unwrap();
 
@@ -301,6 +305,8 @@ const AddProductBarcode = ({
         quantity: "1",
         price: "",
         purchase_price: "",
+        plu: "",
+        scale_type: "",
       });
       setBarcodeScan("");
       setCashData((prev) => ({
@@ -357,6 +363,8 @@ const AddProductBarcode = ({
       quantity: "1",
       price: "",
       purchase_price: "",
+      plu: "",
+      scale_type: "",
     });
     setBarcodeScan("");
     setCashData((prev) => ({
@@ -501,6 +509,48 @@ const AddProductBarcode = ({
                 width: "100%",
               }}
             />
+          </div>
+
+          <div style={{ marginBottom: "15px" }}>
+            <label style={{ display: "block", marginBottom: "5px" }}>
+              <strong>ПЛУ:</strong>
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="2147483647"
+              name="plu"
+              value={state.plu}
+              onChange={onChange}
+              placeholder="Номер ПЛУ для весов (можно не заполнять)"
+              style={{
+                padding: "8px",
+                border: "1px solid #ccc",
+                borderRadius: "4px",
+                width: "100%",
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: "15px" }}>
+            <label style={{ display: "block", marginBottom: "5px" }}>
+              <strong>Тип товара для весов:</strong>
+            </label>
+            <select
+              name="scale_type"
+              value={state.scale_type}
+              onChange={onChange}
+              style={{
+                padding: "8px",
+                border: "1px solid #ccc",
+                borderRadius: "4px",
+                width: "100%",
+              }}
+            >
+              <option value="">-- Выберите тип --</option>
+              <option value="piece">Штучный</option>
+              <option value="weight">Весовой</option>
+            </select>
           </div>
 
           {/* Переключатель долга */}

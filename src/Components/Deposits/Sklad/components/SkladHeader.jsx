@@ -11,12 +11,14 @@ const SkladHeader = ({
   isFiltered,
   onResetFilters,
   isBuildingCompany,
+  isMarketCompany,
   onShowReceiveModal,
   onShowHistoryModal,
   selectCashBox,
   onSelectCashBox,
   cashBoxes,
   onAdd,
+  onSendToScales,
 }) => {
   return (
     <div className="sklad__header">
@@ -65,6 +67,11 @@ const SkladHeader = ({
             <button className="sklad__add" onClick={onAdd}>
               <Plus size={16} style={{ marginRight: "4px" }} /> Добавить товар
             </button>
+            {isMarketCompany && (
+              <button className="sklad__add" onClick={onSendToScales}>
+                Отправить на весы
+              </button>
+            )}
           </>
         )}
       </div>

@@ -84,7 +84,7 @@ const AddCashFlowsModal = ({ onClose }) => {
             }
           />
         </div>
-        <div className="vitrina__modal-section">
+        {/* <div className="vitrina__modal-section">
           <label>Касса</label>
           {newCashbox.cashbox && cashBoxes && cashBoxes.length > 0 ? (
             <span
@@ -105,7 +105,7 @@ const AddCashFlowsModal = ({ onClose }) => {
               Нет доступных касс
             </span>
           )}
-        </div>
+        </div> */}
 
         <div className="vitrina__modal-footer">
           <button
@@ -114,11 +114,8 @@ const AddCashFlowsModal = ({ onClose }) => {
           >
             Отмена
           </button>
-          <button
-            className="vitrina__button vitrina__button--save"
-            onClick={handleAddCashbox}
-          >
-            Добавить
+          <button className="sklad__add" onClick={handleAddCashbox}>
+            Создать расход
           </button>
         </div>
       </div>

@@ -211,6 +211,13 @@ const SECTOR_ACCESS_TYPES = {
     { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
     { value: "Каталог", label: "Каталог", backendKey: "can_view_catalog" },
   ],
+  Логистика: [
+    {
+      value: "Логистика",
+      label: "Логистика",
+      backendKey: "can_view_logistics",
+    },
+  ],
 };
 
 // Пользователь — владелец?

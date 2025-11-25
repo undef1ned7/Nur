@@ -109,6 +109,7 @@ import CafeInventory from "./Components/Sectors/cafe/Inventory/CafeInventory";
 import Branch from "./Components/pages/Branch/Branch";
 import BranchDetails from "./Components/pages/Branch/BranchDetails";
 import Logistics from "./Components/pages/logistics/Logistics";
+import LogisticsPage from "./Components/Sectors/logistics/LogisticsPage/LogisticsPage";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -408,7 +409,7 @@ function App() {
               path="barber/warehouse"
               element={
                 <ProtectedRoute>
-                  <BarberSklad />
+                  <Sklad />
                 </ProtectedRoute>
               }
             />
@@ -1018,18 +1019,19 @@ function App() {
               path="logistics"
               element={
                 <ProtectedRoute>
-                  <Logistics />
+                  {/* <Logistics /> */}
+                  <LogisticsPage />
                 </ProtectedRoute>
               }
             />
-            <Route
+            {/* <Route
               path="logistics-shop"
               element={
                 <ProtectedRoute>
                   <Logistics />
                 </ProtectedRoute>
               }
-            />
+            /> */}
           </Route>
         </>
       </Routes>

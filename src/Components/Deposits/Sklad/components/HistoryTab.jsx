@@ -45,6 +45,7 @@ const HistoryTab = ({
         isFiltered={isFiltered}
         onResetFilters={onResetFilters}
         isBuildingCompany={false}
+        isMarketCompany={false}
         selectCashBox=""
         cashBoxes={[]}
       />

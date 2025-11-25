@@ -15,6 +15,7 @@ import { useDispatch } from "react-redux";
 import {
   updateUserCompanyName,
   updateUserData,
+  getScalesToken,
 } from "../../../../store/creators/userCreators";
 import { useNavigate } from "react-router-dom";
 
@@ -117,6 +118,119 @@ const Settings = () => {
       alert("Ваши данные успешно изменены");
     } catch (err) {
       console.error("Failed to update:", err);
+    }
+  };
+
+  // Создание токена для доступа к весам
+  const handleCreateScalesToken = async () => {
+    try {
+      const result = await dispatch(getScalesToken()).unwrap();
+      // Извлекаем токен из ответа API (поле scale_api_token)
+      const token =
+        result?.scale_api_token ||
+        result?.token ||
+        result?.access_token ||
+        (typeof result === "string" ? result : null);
+
+      if (!token) {
+        alert("Токен не найден в ответе сервера");
+        return;
+      }
+
+      // Показываем токен пользователю и даем возможность скопировать
+      const tokenString = String(token);
+
+      // Создаем модальное окно для отображения токена
+      const modal = document.createElement("div");
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      `;
+
+      const modalContent = document.createElement("div");
+      modalContent.style.cssText = `
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      `;
+
+      modalContent.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Токен для доступа к весам</h3>
+        <p style="margin: 0 0 12px 0; color: #666; font-size: 14px;">Скопируйте токен и сохраните его в безопасном месте:</p>
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 16px; word-break: break-all; font-family: monospace; font-size: 12px;">
+          ${tokenString}
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button id="copyTokenBtn" style="
+            padding: 8px 16px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+          ">Копировать</button>
+          <button id="closeModalBtn" style="
+            padding: 8px 16px;
+            background: #e5e7eb;
+            color: #374151;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+          ">Закрыть</button>
+        </div>
+      `;
+
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+
+      const copyBtn = modalContent.querySelector("#copyTokenBtn");
+      const closeBtn = modalContent.querySelector("#closeModalBtn");
+
+      copyBtn.onclick = () => {
+        navigator.clipboard
+          .writeText(tokenString)
+          .then(() => {
+            copyBtn.textContent = "Скопировано!";
+            copyBtn.style.background = "#10b981";
+            setTimeout(() => {
+              copyBtn.textContent = "Копировать";
+              copyBtn.style.background = "#2563eb";
+            }, 2000);
+          })
+          .catch(() => {
+            alert("Не удалось скопировать. Токен: " + tokenString);
+          });
+      };
+
+      closeBtn.onclick = () => {
+        document.body.removeChild(modal);
+      };
+
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      };
+    } catch (err) {
+      console.error("Ошибка при создании токена:", err);
+      const errorMessage =
+        err?.detail ||
+        err?.message ||
+        (typeof err === "string" ? err : "Не удалось создать токен");
+      alert(`Ошибка: ${errorMessage}`);
     }
   };
 
@@ -605,6 +719,53 @@ const Settings = () => {
             {passwordsMismatch && (
               <p className="settings__error-text">Пароли не совпадают</p>
             )}
+          </div>
+
+          {/* Токен для весов */}
+          <div className="settings__form-group" style={{ marginTop: "30px" }}>
+            <h3 className="settings__label" style={{ marginBottom: "12px" }}>
+              Токен для доступа к весам
+            </h3>
+            <p
+              className="settings__label"
+              style={{
+                fontSize: "14px",
+                color: "#666",
+                marginBottom: "12px",
+                fontWeight: "normal",
+              }}
+            >
+              Создайте токен для интеграции с весами. Токен будет показан один
+              раз - сохраните его в безопасном месте.
+            </p>
+            <button
+              type="button"
+              className="settings__btn settings__btn--secondary"
+              onClick={handleCreateScalesToken}
+              style={{
+                width: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 2V6M12 18V22M6 12H2M22 12H18M19.07 19.07L16.24 16.24M19.07 4.93L16.24 7.76M4.93 19.07L7.76 16.24M4.93 4.93L7.76 7.76"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Создать токен
+            </button>
           </div>
         </div>
 

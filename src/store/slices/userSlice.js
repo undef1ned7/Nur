@@ -10,6 +10,7 @@ import {
   submitApplicationAsync,
   updateUserData,
   updateUserCompanyName,
+  getScalesToken,
 } from "../creators/userCreators";
 import { useSelector } from "react-redux";
 import api from "../../api";
@@ -207,6 +208,19 @@ const userSlice = createSlice({
         state.loading = false;
       })
       .addCase(updateUserCompanyName.rejected, (state, { payload }) => {
+        state.loading = false;
+        state.error = payload;
+      })
+
+      // GET SCALES TOKEN
+      .addCase(getScalesToken.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getScalesToken.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(getScalesToken.rejected, (state, { payload }) => {
         state.loading = false;
         state.error = payload;
       });

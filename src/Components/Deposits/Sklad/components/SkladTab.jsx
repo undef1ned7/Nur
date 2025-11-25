@@ -16,12 +16,14 @@ const SkladTab = ({
   isFiltered,
   onResetFilters,
   isBuildingCompany,
+  isMarketCompany,
   onShowReceiveModal,
   onShowHistoryModal,
   selectCashBox,
   onSelectCashBox,
   cashBoxes,
   onAdd,
+  onSendToScales,
   isSelected,
   toggleRow,
   toggleSelectAllOnPage,
@@ -55,12 +57,14 @@ const SkladTab = ({
         isFiltered={isFiltered}
         onResetFilters={onResetFilters}
         isBuildingCompany={isBuildingCompany}
+        isMarketCompany={isMarketCompany}
         onShowReceiveModal={onShowReceiveModal}
         onShowHistoryModal={onShowHistoryModal}
         selectCashBox={selectCashBox}
         onSelectCashBox={onSelectCashBox}
         cashBoxes={cashBoxes}
         onAdd={onAdd}
+        onSendToScales={onSendToScales}
       />
 
       {filterP.length !== 0 && (

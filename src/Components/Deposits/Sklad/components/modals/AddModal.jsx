@@ -60,6 +60,8 @@ const AddModal = ({
     quantity: "",
     client: "",
     purchase_price: "",
+    plu: "",
+    scale_type: "",
   });
 
   const [state, setState] = useState({
@@ -193,6 +195,8 @@ const AddModal = ({
       quantity: Number(quantity),
       client,
       purchase_price,
+      plu: newItemData.plu ? Number(newItemData.plu) : null,
+      scale_type: newItemData.scale_type || null,
     };
 
     try {
@@ -333,41 +337,46 @@ const AddModal = ({
             />
           </div>
 
-          <div className="add-modal__section">
-            <label>Бренд *</label>
-            <select
-              name="brand_name"
-              className="add-modal__input"
-              value={newItemData.brand_name}
-              onChange={handleChange}
-              required
-            >
-              <option value="">-- Выберите бренд --</option>
-              {brands.map((brand, idx) => (
-                <option key={brand.id ?? idx} value={brand.name}>
-                  {brand.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {company?.sector?.name !== "Барбершоп" && (
+            <>
+              <div className="add-modal__section">
+                <label>Бренд *</label>
+                <select
+                  name="brand_name"
+                  className="add-modal__input"
+                  value={newItemData.brand_name}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">-- Выберите бренд --</option>
+                  {brands.map((brand, idx) => (
+                    <option key={brand.id ?? idx} value={brand.name}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="add-modal__section">
-            <label>Категория *</label>
-            <select
-              name="category_name"
-              className="add-modal__input"
-              value={newItemData.category_name}
-              onChange={handleChange}
-              required
-            >
-              <option value="">-- Выберите категорию --</option>
-              {categories.map((category, idx) => (
-                <option key={category.id ?? idx} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="add-modal__section">
+                <label>Категория *</label>
+                <select
+                  name="category_name"
+                  className="add-modal__input"
+                  value={newItemData.category_name}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">-- Выберите категорию --</option>
+                  {categories.map((category, idx) => (
+                    <option key={category.id ?? idx} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
           <div className="add-modal__section">
             <label>Поставщик *</label>
             <select
@@ -732,6 +741,37 @@ const AddModal = ({
               required
             />
           </div>
+          {company?.sector?.name == "Магазин" && (
+            <>
+              <div className="add-modal__section">
+                <label>ПЛУ</label>
+                <input
+                  type="number"
+                  name="plu"
+                  placeholder="Номер ПЛУ для весов (можно не заполнять)"
+                  className="add-modal__input"
+                  value={newItemData.plu}
+                  onChange={handleChange}
+                  min="0"
+                  max="2147483647"
+                />
+              </div>
+
+              <div className="add-modal__section">
+                <label>Тип товара для весов</label>
+                <select
+                  name="scale_type"
+                  className="add-modal__input"
+                  value={newItemData.scale_type}
+                  onChange={handleChange}
+                >
+                  <option value="">-- Выберите тип --</option>
+                  <option value="piece">Штучный</option>
+                  <option value="weight">Весовой</option>
+                </select>
+              </div>
+            </>
+          )}
 
           {/* Чекбокс для включения формы долга */}
 

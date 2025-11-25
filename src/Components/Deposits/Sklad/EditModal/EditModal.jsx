@@ -37,6 +37,8 @@ export default function EditModal({
     price: item.price || "",
     purchase_price: item.purchase_price || "",
     quantity: item.quantity || "",
+    plu: item.plu || "",
+    scale_type: item.scale_type || "",
   });
   const dispatch = useDispatch();
   const changeEditData = (key, value) => {
@@ -82,7 +84,7 @@ export default function EditModal({
         ).unwrap();
       }
 
-      alert("Данные сохранены");
+      // alert("Данные сохранены");
       onSaveSuccess?.();
     } catch (err) {
       console.error("Failed to update product:", err);
@@ -254,6 +256,38 @@ export default function EditModal({
             min="0"
             required
           />
+        </div>
+
+        {/* ПЛУ */}
+        <div className="edit-modal__section">
+          <label>ПЛУ</label>
+          <input
+            type="number"
+            name="plu"
+            value={editData.plu}
+            onChange={(e) => {
+              changeEditData("plu", e.target.value);
+            }}
+            min="0"
+            max="2147483647"
+            placeholder="Номер ПЛУ для весов (можно не заполнять)"
+          />
+        </div>
+
+        {/* Тип товара для весов */}
+        <div className="edit-modal__section">
+          <label>Тип товара для весов</label>
+          <select
+            name="scale_type"
+            value={editData.scale_type}
+            onChange={(e) => {
+              changeEditData("scale_type", e.target.value);
+            }}
+          >
+            <option value="">-- Выберите тип --</option>
+            <option value="piece">Штучный</option>
+            <option value="weight">Весовой</option>
+          </select>
         </div>
 
         <div className="edit-modal__footer">

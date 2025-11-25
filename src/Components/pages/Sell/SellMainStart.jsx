@@ -647,6 +647,7 @@ const SellMainStart = ({ show, setShow }) => {
   });
 
   const [qty, setQty] = useState("");
+  const [itemQuantities, setItemQuantities] = useState({});
 
   // Автоматическое заполнение телефона при выборе клиента в тарифе "Старт"
   useEffect(() => {
@@ -910,6 +911,11 @@ const SellMainStart = ({ show, setShow }) => {
         manualFilling({ id: start.id, productId: item.product || item.id })
       ).unwrap();
       onRefresh();
+      // Обновляем локальное состояние после обновления
+      setItemQuantities((prev) => ({
+        ...prev,
+        [item.id]: String(currentQty + 1),
+      }));
     } catch (error) {
       console.error("Ошибка при увеличении количества:", error);
       setAlert({
@@ -940,6 +946,11 @@ const SellMainStart = ({ show, setShow }) => {
         })
       ).unwrap();
       onRefresh();
+      // Обновляем локальное состояние после обновления
+      setItemQuantities((prev) => ({
+        ...prev,
+        [item.id]: String(next),
+      }));
     } catch (error) {
       console.error("Ошибка при уменьшении количества:", error);
       setAlert({
@@ -976,6 +987,66 @@ const SellMainStart = ({ show, setShow }) => {
     }
   };
 
+  // Обработчик изменения количества через инпут
+  const handleItemQtyChange = (item, value) => {
+    setItemQuantities((prev) => ({
+      ...prev,
+      [item.id]: value,
+    }));
+  };
+
+  // Обработчик потери фокуса инпута количества
+  const handleItemQtyBlur = async (item) => {
+    if (!start?.id) return;
+    const inputValue = itemQuantities[item.id] || "";
+    let qtyNum;
+
+    if (inputValue === "" || inputValue === "0") {
+      qtyNum = item.quantity || 0;
+    } else {
+      qtyNum = Math.max(0, toNum(inputValue));
+    }
+
+    const productId = item.product || item.id;
+    const available = getAvailableQtyForProduct(productId, products);
+    if (available && qtyNum > available) {
+      qtyNum = available;
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Нельзя установить количество больше остатка",
+      });
+    }
+
+    setItemQuantities((prev) => ({
+      ...prev,
+      [item.id]: String(qtyNum),
+    }));
+
+    if (qtyNum === 0) {
+      await handleRemoveItem(item);
+      return;
+    }
+
+    try {
+      await dispatch(
+        updateManualFilling({
+          id: start.id,
+          productId: item.id,
+          quantity: qtyNum,
+        })
+      ).unwrap();
+      onRefresh();
+    } catch (error) {
+      console.error("Ошибка при обновлении количества:", error);
+      setAlert({
+        open: true,
+        type: "error",
+        message: error?.data?.detail || "Ошибка при обновлении количества",
+      });
+    }
+  };
+
   const validate = (f) => {
     const e = {};
     if (!f.full_name.trim()) e.full_name = "Это поле не может быть пустым.";
@@ -1007,6 +1078,16 @@ const SellMainStart = ({ show, setShow }) => {
   const currentSubtotal = start?.subtotal;
   const currentDiscount = start?.order_discount_total;
   const currentTotal = start?.total;
+
+  // Инициализация локальных значений количества для элементов таблицы
+  useEffect(() => {
+    const items = start?.items || [];
+    const quantities = {};
+    items.forEach((item) => {
+      quantities[item.id] = String(item.quantity ?? "");
+    });
+    setItemQuantities(quantities);
+  }, [start?.items]);
 
   const handleAddCustomService = async () => {
     try {
@@ -1579,10 +1660,33 @@ const SellMainStart = ({ show, setShow }) => {
                             >
                               <Minus size={16} />
                             </button>
-                            <span
-                              style={{ minWidth: "40px", textAlign: "center" }}
-                            >
-                              {item.quantity} шт
+                            <input
+                              type="number"
+                              min="0"
+                              value={
+                                itemQuantities[item.id] ?? item.quantity ?? ""
+                              }
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleItemQtyChange(item, e.target.value);
+                              }}
+                              onBlur={(e) => {
+                                e.stopPropagation();
+                                handleItemQtyBlur(item);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: "60px",
+                                textAlign: "center",
+                                border: "1px solid #ddd",
+                                borderRadius: "4px",
+                                padding: "4px 8px",
+                                fontSize: "14px",
+                              }}
+                              title="Редактировать количество"
+                            />
+                            <span style={{ fontSize: "14px", color: "#666" }}>
+                              шт
                             </span>
                             <button
                               className="start__table-btn start__table-btn--plus"

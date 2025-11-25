@@ -955,6 +955,13 @@ const Masters = () => {
             backendKey: "can_view_catalog",
           },
         ],
+        Логистика: [
+          {
+            value: "Логистика",
+            label: "Логистика",
+            backendKey: "can_view_logistics",
+          },
+        ],
       };
 
       const getAllAccessTypes = (sectorName) => {

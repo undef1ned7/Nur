@@ -6,6 +6,7 @@ import productsReducer from "./slices/productSlice";
 import eventReducer from "./slices/eventsSlice";
 import notificationReducer from "./slices/notificationSlice";
 import analyticsReucer from "./slices/analyticsSlice";
+import logisticsReducer from "./slices/logisticsSlice";
 import departmentReducer from "./slices/departmentSlice"; // Импортируем редюсер для департаментов
 import clientReducer from "./slices/ClientSlice"; // Импортируем редюсер для клиентов
 import saleReducer from "./slices/saleSlice";
@@ -34,6 +35,7 @@ const store = configureStore({
     product: productsReducer,
     notification: notificationReducer,
     analytics: analyticsReucer,
+    logistics: logisticsReducer,
     departments: departmentReducer,
     client: clientReducer,
     sale: saleReducer,

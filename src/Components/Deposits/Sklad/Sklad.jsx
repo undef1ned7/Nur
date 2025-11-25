@@ -11,6 +11,7 @@ import {
 import { clearProducts } from "../../../store/slices/productSlice";
 import { getCashBoxes, useCash } from "../../../store/slices/cashSlice";
 import { useUser } from "../../../store/slices/userSlice";
+import { sendProductsToScales } from "../../../store/creators/userCreators";
 
 // Компоненты
 import EditModal from "./EditModal/EditModal";
@@ -117,6 +118,8 @@ export default function Sklad() {
   const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
   const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
   const isBuildingCompany = sectorName === "строительная компания";
+  const isMarketCompany =
+    sectorName === "магазин" || sectorName === "цветочный магазин";
   const isStartPlan = planName === "старт";
 
   // Загрузка данных
@@ -245,6 +248,32 @@ export default function Sklad() {
     setItemId1(item);
   };
 
+  // Отправка товаров на весы
+  const handleSendToScales = async () => {
+    try {
+      const payload = {
+        plu_start: 1, // По умолчанию начинаем с 1
+      };
+
+      // Если есть выбранные товары, добавляем их ID
+      if (selectedIds && selectedIds.size > 0) {
+        payload.product_ids = Array.from(selectedIds);
+      }
+
+      await dispatch(sendProductsToScales(payload)).unwrap();
+
+      setAlertMessage("Товары успешно отправлены на весы");
+      setShowSuccessAlert(true);
+    } catch (err) {
+      const errorMessage =
+        err?.detail ||
+        err?.message ||
+        (typeof err === "string" ? err : "Не удалось отправить товары на весы");
+      setAlertMessage(errorMessage);
+      setShowErrorAlert(true);
+    }
+  };
+
   const totalPages =
     count && products.length > 0 ? Math.ceil(count / products.length) : 1;
 
@@ -262,12 +291,14 @@ export default function Sklad() {
           isFiltered={isFiltered}
           onResetFilters={handleResetAllFiltersWithReset}
           isBuildingCompany={isBuildingCompany}
+          isMarketCompany={isMarketCompany}
           onShowReceiveModal={() => setShowReceiveModal(true)}
           onShowHistoryModal={() => setShowHistoryModal(true)}
           selectCashBox={selectCashBox}
           onSelectCashBox={setSelectCashBox}
           cashBoxes={cashBoxes}
           onAdd={handleAdd}
+          onSendToScales={handleSendToScales}
           isSelected={isSelected}
           toggleRow={toggleRow}
           toggleSelectAllOnPage={toggleSelectAllOnPage}
