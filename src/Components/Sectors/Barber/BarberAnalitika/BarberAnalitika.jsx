@@ -341,6 +341,63 @@ const BarberAnalitika = () => {
     const n = Number(p);
     return Number.isFinite(n) ? n : 0;
   };
+
+// раскрываем услуги записи: и services[], и одиночное service
+const servicesOfAppointment = (a) => {
+  const rows = [];
+
+  // 1) новый вариант: массив services
+  if (Array.isArray(a.services) && a.services.length) {
+    a.services.forEach((s) => {
+      if (!s) return;
+
+      const rawId =
+        typeof s === "object"
+          ? s.id ?? s.service ?? s.service_id
+          : s;
+      const id = rawId != null ? String(rawId) : "";
+
+      const meta = typeof s === "object" ? s : svcById(id);
+      const name =
+        meta?.service_name ||
+        meta?.name ||
+        a.service_name ||
+        (id ? svcById(id)?.name : "") ||
+        "—";
+
+      const price = toNum(
+        (typeof s === "object" &&
+          (s.price ?? s.amount ?? s.total)) ??
+          a.service_price ??
+          a.price ??
+          meta?.price ??
+          0
+      );
+
+      if (!id && name === "—") return;
+      rows.push({ key: id || name, name, price });
+    });
+
+    return rows;
+  }
+
+  // 2) старый вариант: одиночное поле service / service_name
+  if (a.service || a.service_name) {
+    const id = a.service ? String(a.service) : "";
+    const meta = svcById(id);
+    const name =
+      a.service_name ||
+      meta?.name ||
+      (id ? `ID ${id}` : "—");
+    const price = priceOf(a);
+
+    rows.push({ key: id || name, name, price });
+  }
+
+  return rows;
+};
+
+
   const empName = (id) => employees.find((x) => String(x.id) === String(id))?.name || `ID ${id}`;
   const clientNameBarber = (id) => {
     const c = clientsBarber.find((x) => String(x.id) === String(id));
@@ -426,19 +483,51 @@ const BarberAnalitika = () => {
     return [...m.values()].sort((x, y) => (y.sum - x.sum) || (y.count - x.count));
   }, [filteredApps, employees]);
 
-  const rankServices = useMemo(() => {
-    const m = new Map();
-    filteredApps.forEach((a) => {
-      const key = String(a.service);
-      if (!key) return;
-      const rec = m.get(key) || { id: key, name: (svcById(key)?.name || `ID ${key}`), count: 0, sum: 0 };
-      if (COUNTABLE_FOR_RANK.has(a.status)) rec.count += 1;
-      if (a.status === "completed") rec.sum += priceOf(a);
-      m.set(key, rec);
-    });
-    return [...m.values()].sort((x, y) => (y.sum - x.sum) || (y.count - x.count));
-  }, [filteredApps, services]);
+  // const rankServices = useMemo(() => {
+  //   const m = new Map();
+  //   filteredApps.forEach((a) => {
+  //     const key = String(a.service);
+  //     if (!key) return;
+  //     const rec = m.get(key) || { id: key, name: (svcById(key)?.name || `ID ${key}`), count: 0, sum: 0 };
+  //     if (COUNTABLE_FOR_RANK.has(a.status)) rec.count += 1;
+  //     if (a.status === "completed") rec.sum += priceOf(a);
+  //     m.set(key, rec);
+  //   });
+  //   return [...m.values()].sort((x, y) => (y.sum - x.sum) || (y.count - x.count));
+  // }, [filteredApps, services]);
 
+const rankServices = useMemo(() => {
+  const m = new Map();
+
+  filteredApps.forEach((a) => {
+    const svcList = servicesOfAppointment(a);
+    if (!svcList.length) return;
+
+    svcList.forEach(({ key, name, price }) => {
+      const id = key || name;
+      const rec =
+        m.get(id) || {
+          id,
+          name,
+          count: 0,
+          sum: 0,
+        };
+
+      if (COUNTABLE_FOR_RANK.has(a.status)) rec.count += 1;
+      if (a.status === "completed") rec.sum += price;
+
+      m.set(id, rec);
+    });
+  });
+
+  return [...m.values()].sort(
+    (x, y) => y.sum - x.sum || y.count - x.count
+  );
+}, [filteredApps, services]);
+
+
+
+  
   const rankClientsVisits = useMemo(() => {
     const m = new Map();
     filteredApps.forEach((a) => {
@@ -841,7 +930,9 @@ const BarberAnalitika = () => {
             {rankBarbers.slice(0, 6).map((r) => (
               <li key={r.id} className="ba-rankItem">
                 <span className="ba-rankName">{r.name}</span>
-                <span className="ba-rankCount">{fmtInt(r.count)} • {fmtMoney(r.sum)}</span>
+<span className="ba-rankCount">
+  {fmtInt(r.count)}
+</span>
               </li>
             ))}
             {!loading && !rankBarbers.length && <div className="ba-muted">Нет записей.</div>}
@@ -856,7 +947,9 @@ const BarberAnalitika = () => {
             {rankServices.slice(0, 6).map((r) => (
               <li key={r.id} className="ba-rankItem">
                 <span className="ba-rankName">{r.name}</span>
-                <span className="ba-rankCount">{fmtInt(r.count)} • {fmtMoney(r.sum)}</span>
+<span className="ba-rankCount">
+  {fmtInt(r.count)}
+</span>
               </li>
             ))}
             {!loading && !rankServices.length && <div className="ba-muted">Нет данных.</div>}
@@ -874,7 +967,7 @@ const BarberAnalitika = () => {
                 <th>Клиент</th>
                 <th>Приходов</th>
                 <th>Сумма</th>
-                <th>Последний визит</th>
+                {/* <th>Последний визит</th> */}
               </tr>
             </thead>
             <tbody>
@@ -883,11 +976,11 @@ const BarberAnalitika = () => {
                   <td>{r.name}</td>
                   <td>{fmtInt(r.count)}</td>
                   <td className="ba-money">{fmtMoney(r.sum)}</td>
-                  <td>{padDate(r.last_at) || padDate(r.start_at) || padDate(r.updated_at) || padDate(lastVisitOf(r.id))}</td>
+                  {/* <td>{padDate(r.last_at) || padDate(r.start_at) || padDate(r.updated_at) || padDate(lastVisitOf(r.id))}</td> */}
                 </tr>
               ))}
               {!rankClientsVisits.length && (
-                <tr><td colSpan="4" className="ba-muted">Нет данных.</td></tr>
+                <tr><td colSpan="3" className="ba-muted">Нет данных.</td></tr>
               )}
             </tbody>
           </table>

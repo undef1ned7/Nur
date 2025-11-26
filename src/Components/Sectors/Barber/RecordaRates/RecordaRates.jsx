@@ -1,4 +1,3 @@
-// // RecordaRates.jsx
 // import React, { useMemo, useState, useEffect } from "react";
 // import "./RecordaRates.scss";
 // import { FaSync, FaTimes } from "react-icons/fa";
@@ -9,50 +8,120 @@
 // const fmtMoney = (n) => `${Number(n || 0).toLocaleString("ru-RU")} сом`;
 
 // const MONTHS = [
-//   "Январь","Февраль","Март","Апрель","Май","Июнь",
-//   "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
+//   "Январь",
+//   "Февраль",
+//   "Март",
+//   "Апрель",
+//   "Май",
+//   "Июнь",
+//   "Июль",
+//   "Август",
+//   "Сентябрь",
+//   "Октябрь",
+//   "Ноябрь",
+//   "Декабрь",
 // ];
 
-// /* даты без TZ-шума: берём только YYYY-MM и YYYY-MM-DD из строки */
+// const KG_OFFSET_MS = 6 * 60 * 60 * 1000;
+// const isCompleted = (s) =>
+//   String(s || "")
+//     .trim()
+//     .toLowerCase() === "completed";
 // const y_m_fromStartAt = (iso) => {
-//   const s = String(iso || "");
-//   const y = +s.slice(0, 4);
-//   const m = +s.slice(5, 7);
-//   return Number.isFinite(y) && Number.isFinite(m) ? { y, m } : null;
+//   if (!iso) return null;
+//   const t = Date.parse(String(iso));
+//   if (!Number.isFinite(t)) return null;
+//   const d = new Date(t + KG_OFFSET_MS);
+//   return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 };
 // };
-// const dateYYYYMMDD = (iso) => String(iso || "").slice(0, 10);
+// const dateKG = (iso) => {
+//   const t = Date.parse(String(iso));
+//   if (!Number.isFinite(t)) return "";
+//   const d = new Date(t + KG_OFFSET_MS);
+//   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(
+//     d.getUTCDate()
+//   )}`;
+// };
 
-// /* нормализация чисел */
-// const toMoney = (v) => {
+// const toNum = (v) => {
 //   if (v === "" || v == null) return 0;
-//   const n = Number(String(v).replace(/[^\d.]/g, ""));
-//   return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
-// };
-// const clampMoney = (value, max = 10_000_000) => {
-//   if (value === "" || value == null) return "";
-//   const n = Number(String(value).replace(/[^\d.]/g, ""));
-//   if (!Number.isFinite(n) || n < 0) return 0;
-//   return Math.min(Math.round(n), max);
-// };
-// const clampPercent = (value) => {
-//   if (value === "" || value == null) return "";
-//   const n = Number(String(value).replace(/[^\d.]/g, ""));
-//   if (!Number.isFinite(n) || n < 0) return 0;
-//   return Math.min(Math.round(n), 100);
+//   const n = Number(String(v).replace(/[^\d.-]/g, ""));
+//   return Number.isFinite(n) ? n : 0;
 // };
 
-// const isCompleted = (s) => String(s || "").trim().toLowerCase() === "completed";
-// const getDraft = (draft, barberId, period) => draft?.[barberId]?.[period] || {};
+// /* универсальный расчёт суммы услуги по записи */
+// const makePriceOf = (services) => {
+//   const byId = new Map();
+//   (Array.isArray(services) ? services : []).forEach((s) => {
+//     const id = String(s?.id ?? "");
+//     if (!id) return;
+//     const p = toNum(s?.price);
+//     if (p) byId.set(id, p);
+//   });
+
+//   const pickDirect = (o) => toNum(o?.total ?? o?.sum ?? o?.amount ?? o?.price);
+//   const extractId = (o) => String(o?.id ?? o?.service ?? o?.service_id ?? "");
+
+//   return (a) => {
+//     // прямые поля на самой записи
+//     const direct =
+//       toNum(a?.total_amount) ||
+//       toNum(a?.total) ||
+//       toNum(a?.paid_amount) ||
+//       toNum(a?.amount) ||
+//       toNum(a?.service_price) ||
+//       toNum(a?.price);
+//     if (direct) return direct;
+
+//     // массивы услуг/товаров в записи
+//     const arrays = [a?.services, a?.items, a?.positions];
+//     for (const arr of arrays) {
+//       if (!Array.isArray(arr) || !arr.length) continue;
+//       let sum = 0;
+//       for (const it of arr) {
+//         if (it && typeof it === "object") {
+//           const v = pickDirect(it);
+//           if (v) sum += v;
+//           else {
+//             const id = extractId(it);
+//             if (id && byId.has(id)) sum += toNum(byId.get(id));
+//           }
+//         } else {
+//           const id = String(it ?? "");
+//           if (id && byId.has(id)) sum += toNum(byId.get(id));
+//         }
+//       }
+//       if (sum) return sum;
+//     }
+
+//     // одиночная услуга
+//     const sid = String(a?.service ?? "");
+//     if (sid && byId.has(sid)) return toNum(byId.get(sid));
+
+//     return 0;
+//   };
+// };
 
 // /* ==== Модалка "Дни" ==== */
 // const DaysModal = ({ open, onClose, title, rows }) => {
 //   if (!open) return null;
 //   return (
-//     <div className="recordarates__overlay" onClick={onClose} role="dialog" aria-modal="true">
+//     <div
+//       className="recordarates__overlay"
+//       onClick={onClose}
+//       role="dialog"
+//       aria-modal="true"
+//     >
 //       <div className="recordarates__modal" onClick={(e) => e.stopPropagation()}>
 //         <div className="recordarates__modalHead">
 //           <h4 className="recordarates__modalTitle">{title}</h4>
-//           <button type="button" className="recordarates__iconBtn" aria-label="Закрыть" onClick={onClose} title="Закрыть">
+//           <button
+//             type="button"
+//             className="recordarates__iconBtn"
+//             aria-label="Закрыть"
+//             onClick={onClose}
+//             title="Закрыть"
+//           >
 //             <FaTimes />
 //           </button>
 //         </div>
@@ -68,20 +137,34 @@
 //             </thead>
 //             <tbody>
 //               {rows.length === 0 ? (
-//                 <tr><td className="recordarates__muted" colSpan={4}>Нет данных</td></tr>
-//               ) : rows.map((r) => (
-//                 <tr key={r.date}>
-//                   <td>{r.date}</td>
-//                   <td>{fmtInt(r.completed)}</td>
-//                   <td>{fmtMoney(r.revenue)}</td>
-//                   <td><b>{fmtMoney(r.payout)}</b></td>
+//                 <tr>
+//                   <td className="recordarates__muted" colSpan={4}>
+//                     Нет данных
+//                   </td>
 //                 </tr>
-//               ))}
+//               ) : (
+//                 rows.map((r) => (
+//                   <tr key={r.date}>
+//                     <td>{r.date}</td>
+//                     <td>{fmtInt(r.completed)}</td>
+//                     <td>{fmtMoney(r.revenue)}</td>
+//                     <td>
+//                       <b>{fmtMoney(r.payout)}</b>
+//                     </td>
+//                   </tr>
+//                 ))
+//               )}
 //             </tbody>
 //           </table>
 //         </div>
 //         <div className="recordarates__modalFoot">
-//           <button type="button" className="recordarates__btn recordarates__btn--secondary" onClick={onClose}>Закрыть</button>
+//           <button
+//             type="button"
+//             className="recordarates__btn recordarates__btn--secondary"
+//             onClick={onClose}
+//           >
+//             Закрыть
+//           </button>
 //         </div>
 //       </div>
 //     </div>
@@ -104,52 +187,21 @@
 // }) => {
 //   const [page, setPage] = useState(1);
 //   const [draftRates, setDraftRates] = useState({});
-//   const [daysModal, setDaysModal] = useState({ open: false, title: "", rows: [] });
+//   const [daysModal, setDaysModal] = useState({
+//     open: false,
+//     title: "",
+//     rows: [],
+//   });
 //   const period = `${year}-${pad2(month)}`;
 
-//   useEffect(() => { setDraftRates({}); setPage(1); }, [period]);
+//   useEffect(() => {
+//     setDraftRates({});
+//     setPage(1);
+//   }, [period]);
 
-//   /* справочник цен услуг: id -> price */
-//   const servicePriceById = useMemo(() => {
-//     const map = new Map();
-//     for (const s of Array.isArray(services) ? services : []) {
-//       const id = String(s?.id ?? "");
-//       if (!id) continue;
-//       const price = toMoney(s?.price);
-//       if (price) map.set(id, price);
-//     }
-//     return map;
-//   }, [services]);
+//   const priceOf = useMemo(() => makePriceOf(services), [services]);
 
-//   /* цена записи — та же логика, что у вас в Recorda/PayrollDaily */
-//   const priceOf = (a) => {
-//     // 1) total (если пришёл с бэка)
-//     if (a?.total != null) return toMoney(a.total);
-//     // 2) service_price
-//     if (a?.service_price != null) return toMoney(a.service_price);
-//     // 3) сумма по услугам
-//     if (Array.isArray(a?.services) && a.services.length) {
-//       let sum = 0;
-//       for (const s of a.services) {
-//         if (s && typeof s === "object") {
-//           sum += toMoney(s.price ?? s.amount ?? s.total);
-//         } else {
-//           const sid = String(s);
-//           sum += toMoney(servicePriceById.get(sid));
-//         }
-//       }
-//       if (sum) return sum;
-//     }
-//     // 4) запасной вариант
-//     if (a?.price != null) return toMoney(a.price);
-//     if (a?.amount != null) return toMoney(a.amount);
-//     // 5) одиночная услуга по id
-//     const sid = String(a?.service ?? "");
-//     if (sid && servicePriceById.has(sid)) return toMoney(servicePriceById.get(sid));
-//     return 0;
-//   };
-
-//   /* начальные ставки -> draft для текущего периода */
+//   /* начальные ставки → драфт для текущего периода */
 //   useEffect(() => {
 //     setDraftRates((prev) => {
 //       const next = { ...prev };
@@ -157,18 +209,20 @@
 //         const r = rates[barberId] || {};
 //         next[barberId] = next[barberId] || {};
 //         next[barberId][period] = {
-//           perRecord: r.perRecord === "" || r.perRecord == null ? 0 : toMoney(r.perRecord),
+//           perRecord:
+//             r.perRecord === "" || r.perRecord == null
+//               ? 0
+//               : Number(r.perRecord) || 0,
 //           percent:
 //             r.percent == null && r.perPercent == null && r.perMonth != null
-//               ? Math.min(100, toMoney(r.perMonth))
-//               : Math.min(100, toMoney(r.percent ?? r.perPercent ?? 0)),
+//               ? Number(r.perMonth) || 0
+//               : Number(r.percent ?? r.perPercent ?? 0) || 0,
 //         };
 //       }
 //       return next;
 //     });
 //   }, [period, rates]);
 
-//   /* сотрудники */
 //   const normalizedEmployees = useMemo(() => {
 //     const seen = new Set();
 //     const arr = [];
@@ -176,8 +230,7 @@
 //       const id = String(e?.id ?? "");
 //       if (!id || seen.has(id)) continue;
 //       seen.add(id);
-//       const name = e?.name || [e?.last_name, e?.first_name].filter(Boolean).join(" ").trim() || e?.email || "—";
-//       arr.push({ id, name });
+//       arr.push({ id, name: e?.name || "—" });
 //     }
 //     return arr.sort((a, b) => a.name.localeCompare(b.name, "ru"));
 //   }, [employees]);
@@ -207,7 +260,7 @@
 //       map.set(key, (map.get(key) || 0) + priceOf(a));
 //     }
 //     return map;
-//   }, [appointments, year, month, servicePriceById]);
+//   }, [appointments, year, month, priceOf]);
 
 //   /* разбивка по дням */
 //   const daysByMaster = useMemo(() => {
@@ -218,54 +271,87 @@
 //       if (!ym || ym.y !== Number(year) || ym.m !== Number(month)) continue;
 //       const empId = String(a?.barber ?? a?.employee ?? a?.master ?? "");
 //       if (!empId) continue;
-//       const day = dateYYYYMMDD(a?.start_at);
+//       const day = dateKG(a?.start_at);
 //       const inner = m.get(empId) || new Map();
 //       const prev = inner.get(day) || { records: 0, revenue: 0 };
-//       inner.set(day, { records: prev.records + 1, revenue: prev.revenue + priceOf(a) });
+//       inner.set(day, {
+//         records: prev.records + 1,
+//         revenue: prev.revenue + priceOf(a),
+//       });
 //       m.set(empId, inner);
 //     }
 //     return m;
-//   }, [appointments, year, month, servicePriceById]);
+//   }, [appointments, year, month, priceOf]);
 
-//   /* строки */
+//   const getDraft = (draft, barberId, periodKey) =>
+//     draft?.[barberId]?.[periodKey] || {};
+
+//   /* строки таблицы */
 //   const rows = useMemo(() => {
 //     return normalizedEmployees.map((e) => {
 //       const base = rates[e.id] || {};
 //       const draft = getDraft(draftRates, e.id, period);
-
-//       const perRecordRaw = draft.perRecord ?? (base.perRecord === "" || base.perRecord == null ? "" : toMoney(base.perRecord));
-//       const percentRaw =
-//         draft.percent ?? (base.percent == null && base.perPercent == null && base.perMonth != null
-//           ? Math.min(100, toMoney(base.perMonth))
-//           : Math.min(100, toMoney(base.percent ?? base.perPercent ?? 0)));
-
-//       const perRecordCalc = toMoney(perRecordRaw);
-//       const percentCalc = Math.min(100, toMoney(percentRaw));
+//       const perRecord =
+//         draft.perRecord ??
+//         (base.perRecord === "" || base.perRecord == null
+//           ? 0
+//           : Number(base.perRecord) || 0);
+//       const percent =
+//         draft.percent ??
+//         (base.percent == null &&
+//         base.perPercent == null &&
+//         base.perMonth != null
+//           ? Number(base.perMonth) || 0
+//           : Number(base.percent ?? base.perPercent ?? 0) || 0);
 
 //       const completed = Number(doneByMaster.get(String(e.id)) || 0);
 //       const revenue = Number(revenueByMaster.get(String(e.id)) || 0);
-//       const total = completed * perRecordCalc + Math.round((revenue * percentCalc) / 100);
-
+//       const total =
+//         completed * (Number(perRecord) || 0) +
+//         Math.round((revenue * (Number(percent) || 0)) / 100);
 //       return {
-//         id: e.id, name: e.name,
-//         completed, revenue,
-//         perRecordRaw, percentRaw,
-//         perRecordCalc, percentCalc,
+//         id: e.id,
+//         name: e.name,
+//         completed,
+//         revenue,
+//         perRecord,
+//         percent,
 //         total,
 //       };
 //     });
-//   }, [normalizedEmployees, rates, draftRates, doneByMaster, revenueByMaster, period]);
+//   }, [
+//     normalizedEmployees,
+//     rates,
+//     draftRates,
+//     doneByMaster,
+//     revenueByMaster,
+//     period,
+//   ]);
 
-//   const totals = useMemo(() => rows.reduce((acc, r) => acc + Number(r.total || 0), 0), [rows]);
+//   const totals = useMemo(
+//     () => rows.reduce((acc, r) => acc + Number(r.total || 0), 0),
+//     [rows]
+//   );
 
 //   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-//   const [safePage, visible] = useMemo(() => {
-//     const p = Math.min(Math.max(1, page), totalPages);
-//     return [p, rows.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE)];
-//   }, [page, totalPages, rows]);
+//   const safePage = Math.min(Math.max(1, page), totalPages);
+//   const visible = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-//   /* события */
+//   /* изменения ставок */
 //   const handleRateChange = (barberId, field, raw) => {
+//     const clampMoney = (v, max = 10_000_000) => {
+//       if (v === "" || v == null) return "";
+//       const n = toNum(v);
+//       if (!Number.isFinite(n) || n < 0) return 0;
+//       return Math.min(Math.round(n), max);
+//     };
+//     const clampPercent = (v) => {
+//       if (v === "" || v == null) return "";
+//       const n = toNum(v);
+//       if (!Number.isFinite(n) || n < 0) return 0;
+//       return Math.min(Math.round(n), 100);
+//     };
+
 //     const nextVal = field === "percent" ? clampPercent(raw) : clampMoney(raw);
 //     setDraftRates((prev) => {
 //       const byUser = { ...(prev[barberId] || {}) };
@@ -276,15 +362,19 @@
 //   };
 
 //   const handleSave = () => {
-//     onSaveRates?.({ perRecordPeriod: period, percentPeriods: [period] });
+//     onSaveRates?.({
+//       perRecordPeriod: period,
+//       percentPeriods: [period],
+//     });
 //   };
 
 //   const openDays = (row) => {
-//     const perRecord = row.perRecordCalc;
-//     const percent = row.percentCalc;
+//     const perRecord = Number(row.perRecord) || 0;
+//     const percent = Number(row.percent) || 0;
 //     const map = daysByMaster.get(String(row.id)) || new Map();
 //     const list = Array.from(map, ([date, v]) => {
-//       const payout = v.records * perRecord + Math.round((v.revenue * percent) / 100);
+//       const payout =
+//         v.records * perRecord + Math.round((v.revenue * percent) / 100);
 //       return { date, completed: v.records, revenue: v.revenue, payout };
 //     }).sort((a, b) => a.date.localeCompare(b.date));
 //     setDaysModal({ open: true, title: `${row.name} — ${period}`, rows: list });
@@ -308,11 +398,16 @@
 //             <select
 //               className="recordarates__select"
 //               value={month}
-//               onChange={(e) => { onChangeMonth?.(Number(e.target.value)); setPage(1); }}
+//               onChange={(e) => {
+//                 onChangeMonth?.(Number(e.target.value));
+//                 setPage(1);
+//               }}
 //               aria-label="Месяц"
 //             >
 //               {MONTHS.map((m, i) => (
-//                 <option key={m} value={i + 1}>{m}</option>
+//                 <option key={m} value={i + 1}>
+//                   {m}
+//                 </option>
 //               ))}
 //             </select>
 //           </label>
@@ -322,11 +417,16 @@
 //             <select
 //               className="recordarates__select"
 //               value={year}
-//               onChange={(e) => { onChangeYear?.(Number(e.target.value)); setPage(1); }}
+//               onChange={(e) => {
+//                 onChangeYear?.(Number(e.target.value));
+//                 setPage(1);
+//               }}
 //               aria-label="Год"
 //             >
 //               {yearOptions.map((y) => (
-//                 <option key={y} value={y}>{y}</option>
+//                 <option key={y} value={y}>
+//                   {y}
+//                 </option>
 //               ))}
 //             </select>
 //           </label>
@@ -373,8 +473,10 @@
 //                     type="text"
 //                     inputMode="numeric"
 //                     pattern="[0-9]*"
-//                     value={r.perRecordRaw === 0 ? "" : r.perRecordRaw}
-//                     onChange={(e) => handleRateChange(r.id, "perRecord", e.target.value)}
+//                     value={r.perRecord}
+//                     onChange={(e) =>
+//                       handleRateChange(r.id, "perRecord", e.target.value)
+//                     }
 //                     placeholder="сом/запись"
 //                     aria-label="Ставка за запись"
 //                     title="Ставка за запись"
@@ -387,8 +489,10 @@
 //                     type="text"
 //                     inputMode="numeric"
 //                     pattern="[0-9]*"
-//                     value={r.percentRaw === 0 ? "" : r.percentRaw}
-//                     onChange={(e) => handleRateChange(r.id, "percent", e.target.value)}
+//                     value={r.percent}
+//                     onChange={(e) =>
+//                       handleRateChange(r.id, "percent", e.target.value)
+//                     }
 //                     placeholder="% с услуги"
 //                     aria-label="Процент с услуги"
 //                     title="Процент с услуги"
@@ -396,7 +500,9 @@
 //                   />
 //                 </td>
 //                 <td>{fmtMoney(r.revenue)}</td>
-//                 <td><b>{fmtMoney(r.total)}</b></td>
+//                 <td>
+//                   <b>{fmtMoney(r.total)}</b>
+//                 </td>
 //                 <td>
 //                   <button
 //                     type="button"
@@ -411,15 +517,21 @@
 //             ))}
 //             {!visible.length && (
 //               <tr>
-//                 <td className="recordarates__muted" colSpan={7}>Нет мастеров.</td>
+//                 <td className="recordarates__muted" colSpan={7}>
+//                   Нет мастеров.
+//                 </td>
 //               </tr>
 //             )}
 //           </tbody>
 
 //           <tfoot>
 //             <tr>
-//               <td colSpan={5} style={{ textAlign: "right" }}><b>Итого фонд выплат:</b></td>
-//               <td><b>{fmtMoney(totals)}</b></td>
+//               <td colSpan={5} style={{ textAlign: "right" }}>
+//                 <b>Итого фонд выплат:</b>
+//               </td>
+//               <td>
+//                 <b>{fmtMoney(totals)}</b>
+//               </td>
 //               <td />
 //             </tr>
 //           </tfoot>
@@ -436,7 +548,9 @@
 //           >
 //             Назад
 //           </button>
-//           <span className="recordarates__pageInfo">Стр. {safePage}/{totalPages}</span>
+//           <span className="recordarates__pageInfo">
+//             Стр. {safePage}/{totalPages}
+//           </span>
 //           <button
 //             className="recordarates__pageBtn"
 //             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
@@ -459,6 +573,10 @@
 // };
 
 // export default RecordaRates;
+
+
+
+
 
 import React, { useMemo, useState, useEffect } from "react";
 import "./RecordaRates.scss";
@@ -489,6 +607,7 @@ const isCompleted = (s) =>
   String(s || "")
     .trim()
     .toLowerCase() === "completed";
+
 const y_m_fromStartAt = (iso) => {
   if (!iso) return null;
   const t = Date.parse(String(iso));
@@ -496,6 +615,7 @@ const y_m_fromStartAt = (iso) => {
   const d = new Date(t + KG_OFFSET_MS);
   return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1 };
 };
+
 const dateKG = (iso) => {
   const t = Date.parse(String(iso));
   if (!Number.isFinite(t)) return "";
@@ -509,59 +629,6 @@ const toNum = (v) => {
   if (v === "" || v == null) return 0;
   const n = Number(String(v).replace(/[^\d.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
-};
-
-/* универсальный расчёт суммы услуги по записи */
-const makePriceOf = (services) => {
-  const byId = new Map();
-  (Array.isArray(services) ? services : []).forEach((s) => {
-    const id = String(s?.id ?? "");
-    if (!id) return;
-    const p = toNum(s?.price);
-    if (p) byId.set(id, p);
-  });
-
-  const pickDirect = (o) => toNum(o?.total ?? o?.sum ?? o?.amount ?? o?.price);
-  const extractId = (o) => String(o?.id ?? o?.service ?? o?.service_id ?? "");
-
-  return (a) => {
-    // прямые поля на самой записи
-    const direct =
-      toNum(a?.total_amount) ||
-      toNum(a?.total) ||
-      toNum(a?.paid_amount) ||
-      toNum(a?.amount) ||
-      toNum(a?.service_price) ||
-      toNum(a?.price);
-    if (direct) return direct;
-
-    // массивы услуг/товаров в записи
-    const arrays = [a?.services, a?.items, a?.positions];
-    for (const arr of arrays) {
-      if (!Array.isArray(arr) || !arr.length) continue;
-      let sum = 0;
-      for (const it of arr) {
-        if (it && typeof it === "object") {
-          const v = pickDirect(it);
-          if (v) sum += v;
-          else {
-            const id = extractId(it);
-            if (id && byId.has(id)) sum += toNum(byId.get(id));
-          }
-        } else {
-          const id = String(it ?? "");
-          if (id && byId.has(id)) sum += toNum(byId.get(id));
-        }
-      }
-      if (sum) return sum;
-    }
-
-    // одиночная услуга
-    const sid = String(a?.service ?? "");
-    if (sid && byId.has(sid)) return toNum(byId.get(sid));
-
-    return 0;
-  };
 };
 
 /* ==== Модалка "Дни" ==== */
@@ -640,7 +707,7 @@ const RecordaRates = ({
   onChangeMonth,
   employees = [],
   appointments = [],
-  services = [],
+  _services = [], // на будущее, чтобы eslint не ругался
   rates = {},
   ratesLoading = false,
   ratesError = "",
@@ -661,8 +728,6 @@ const RecordaRates = ({
     setPage(1);
   }, [period]);
 
-  const priceOf = useMemo(() => makePriceOf(services), [services]);
-
   /* начальные ставки → драфт для текущего периода */
   useEffect(() => {
     setDraftRates((prev) => {
@@ -671,10 +736,15 @@ const RecordaRates = ({
         const r = rates[barberId] || {};
         next[barberId] = next[barberId] || {};
         next[barberId][period] = {
+          // ставка за запись
           perRecord:
             r.perRecord === "" || r.perRecord == null
               ? 0
               : Number(r.perRecord) || 0,
+          // фиксированная сумма за период
+          fixed:
+            r.fixed === "" || r.fixed == null ? 0 : Number(r.fixed) || 0,
+          // процент
           percent:
             r.percent == null && r.perPercent == null && r.perMonth != null
               ? Number(r.perMonth) || 0
@@ -697,7 +767,7 @@ const RecordaRates = ({
     return arr.sort((a, b) => a.name.localeCompare(b.name, "ru"));
   }, [employees]);
 
-  /* агрегаты по месяцу */
+  /* завершённые по месяцу */
   const doneByMaster = useMemo(() => {
     const map = new Map();
     for (const a of Array.isArray(appointments) ? appointments : []) {
@@ -711,6 +781,7 @@ const RecordaRates = ({
     return map;
   }, [appointments, year, month]);
 
+  /* ВЫРУЧКА: ТОЛЬКО ИЗ appointment.price */
   const revenueByMaster = useMemo(() => {
     const map = new Map();
     for (const a of Array.isArray(appointments) ? appointments : []) {
@@ -719,12 +790,13 @@ const RecordaRates = ({
       if (!ym || ym.y !== Number(year) || ym.m !== Number(month)) continue;
       const key = String(a?.barber ?? a?.employee ?? a?.master ?? "");
       if (!key) continue;
-      map.set(key, (map.get(key) || 0) + priceOf(a));
+      const price = toNum(a?.price); // только price
+      map.set(key, (map.get(key) || 0) + price);
     }
     return map;
-  }, [appointments, year, month, priceOf]);
+  }, [appointments, year, month]);
 
-  /* разбивка по дням */
+  /* разбивка по дням (для модалки, без распределения fixed по дням) */
   const daysByMaster = useMemo(() => {
     const m = new Map(); // empId -> Map(date -> {records, revenue})
     for (const a of Array.isArray(appointments) ? appointments : []) {
@@ -736,14 +808,15 @@ const RecordaRates = ({
       const day = dateKG(a?.start_at);
       const inner = m.get(empId) || new Map();
       const prev = inner.get(day) || { records: 0, revenue: 0 };
+      const price = toNum(a?.price);
       inner.set(day, {
         records: prev.records + 1,
-        revenue: prev.revenue + priceOf(a),
+        revenue: prev.revenue + price,
       });
       m.set(empId, inner);
     }
     return m;
-  }, [appointments, year, month, priceOf]);
+  }, [appointments, year, month]);
 
   const getDraft = (draft, barberId, periodKey) =>
     draft?.[barberId]?.[periodKey] || {};
@@ -753,11 +826,19 @@ const RecordaRates = ({
     return normalizedEmployees.map((e) => {
       const base = rates[e.id] || {};
       const draft = getDraft(draftRates, e.id, period);
+
       const perRecord =
         draft.perRecord ??
         (base.perRecord === "" || base.perRecord == null
           ? 0
           : Number(base.perRecord) || 0);
+
+      const fixed =
+        draft.fixed ??
+        (base.fixed === "" || base.fixed == null
+          ? 0
+          : Number(base.fixed) || 0);
+
       const percent =
         draft.percent ??
         (base.percent == null &&
@@ -768,15 +849,20 @@ const RecordaRates = ({
 
       const completed = Number(doneByMaster.get(String(e.id)) || 0);
       const revenue = Number(revenueByMaster.get(String(e.id)) || 0);
+
+      // К выплате = записи * ставка + фикс + процент от выручки
       const total =
         completed * (Number(perRecord) || 0) +
+        (Number(fixed) || 0) +
         Math.round((revenue * (Number(percent) || 0)) / 100);
+
       return {
         id: e.id,
         name: e.name,
         completed,
         revenue,
         perRecord,
+        fixed,
         percent,
         total,
       };
@@ -814,12 +900,15 @@ const RecordaRates = ({
       return Math.min(Math.round(n), 100);
     };
 
-    const nextVal = field === "percent" ? clampPercent(raw) : clampMoney(raw);
+    const nextVal =
+      field === "percent" ? clampPercent(raw) : clampMoney(raw);
+
     setDraftRates((prev) => {
       const byUser = { ...(prev[barberId] || {}) };
       byUser[period] = { ...(byUser[period] || {}), [field]: nextVal };
       return { ...prev, [barberId]: byUser };
     });
+
     onChangeRate?.(barberId, field, nextVal);
   };
 
@@ -827,6 +916,7 @@ const RecordaRates = ({
     onSaveRates?.({
       perRecordPeriod: period,
       percentPeriods: [period],
+      // fixed можно тоже передавать в этом объекте, если нужно
     });
   };
 
@@ -835,8 +925,10 @@ const RecordaRates = ({
     const percent = Number(row.percent) || 0;
     const map = daysByMaster.get(String(row.id)) || new Map();
     const list = Array.from(map, ([date, v]) => {
+      // В разбивке по дням учитываем только переменную часть
       const payout =
-        v.records * perRecord + Math.round((v.revenue * percent) / 100);
+        v.records * perRecord +
+        Math.round((v.revenue * percent) / 100);
       return { date, completed: v.records, revenue: v.revenue, payout };
     }).sort((a, b) => a.date.localeCompare(b.date));
     setDaysModal({ open: true, title: `${row.name} — ${period}`, rows: list });
@@ -917,7 +1009,8 @@ const RecordaRates = ({
             <tr>
               <th>Мастер</th>
               <th>Завершено</th>
-              <th>Ставка / запись</th>
+              <th>Запись</th>
+              <th>Фиксированный</th>
               <th>Процент, %</th>
               <th>Выручка</th>
               <th>К выплате</th>
@@ -942,6 +1035,22 @@ const RecordaRates = ({
                     placeholder="сом/запись"
                     aria-label="Ставка за запись"
                     title="Ставка за запись"
+                    disabled={ratesLoading}
+                  />
+                </td>
+                <td>
+                  <input
+                    className="recordarates__numInput"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={r.fixed}
+                    onChange={(e) =>
+                      handleRateChange(r.id, "fixed", e.target.value)
+                    }
+                    placeholder="фикс/месяц"
+                    aria-label="Фиксированная ставка"
+                    title="Фиксированная ставка"
                     disabled={ratesLoading}
                   />
                 </td>
@@ -979,7 +1088,7 @@ const RecordaRates = ({
             ))}
             {!visible.length && (
               <tr>
-                <td className="recordarates__muted" colSpan={7}>
+                <td className="recordarates__muted" colSpan={8}>
                   Нет мастеров.
                 </td>
               </tr>
@@ -988,7 +1097,7 @@ const RecordaRates = ({
 
           <tfoot>
             <tr>
-              <td colSpan={5} style={{ textAlign: "right" }}>
+              <td colSpan={6} style={{ textAlign: "right" }}>
                 <b>Итого фонд выплат:</b>
               </td>
               <td>
@@ -1035,3 +1144,4 @@ const RecordaRates = ({
 };
 
 export default RecordaRates;
+
