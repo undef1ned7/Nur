@@ -28,8 +28,12 @@
   /* Аналитика */
   &__analytics {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
+  }
+  .logistics-page__analytics-card--all {
+    background: #ffffff;
+    border-top: 3px solid #000000;
   }
 
   &__analytics-card {
