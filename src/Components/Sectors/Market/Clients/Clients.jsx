@@ -1009,8 +1009,8 @@ export default function MarketClients() {
           ))}
         </div>
       ) : (
-        <div className="tableContainer">
-          <div className="table">
+        <div className="tableContainer w-full">
+          <div className="table w-full">
             <div className="thead">
               <span>ФИО</span>
               <span>Телефон</span>
