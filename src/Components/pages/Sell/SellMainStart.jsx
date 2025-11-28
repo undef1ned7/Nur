@@ -593,10 +593,15 @@ const SellMainStart = ({ show, setShow }) => {
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountValue, setDiscountValue] = useState("");
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+  const [showPaymentChoiceModal, setShowPaymentChoiceModal] = useState(false);
+  const [paymentChoice, setPaymentChoice] = useState("cash"); // 'cash' или 'card'
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashReceived, setCashReceived] = useState("");
   const [paymentMethod, setPaymentMethod] = useState(null); // "cash" или "card"
   const [cashPaymentConfirmed, setCashPaymentConfirmed] = useState(false); // флаг подтверждения оплаты в модалке
+  const [showReceiptChoiceModal, setShowReceiptChoiceModal] = useState(false);
+  const [receiptWithCheck, setReceiptWithCheck] = useState(true); // true = с чеком, false = без
+  const [pendingCheckout, setPendingCheckout] = useState(null); // { withReceipt, paymentType }
   const [customService, setCustomService] = useState({
     name: "",
     price: "",
@@ -794,6 +799,112 @@ const SellMainStart = ({ show, setShow }) => {
       }
     };
   }, []);
+
+  // Глобальные горячие клавиши:
+  // Enter — открыть модалку выбора оплаты, в модалке Enter подтверждает,
+  // стрелка влево — наличные, стрелка вправо — перевод
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target.tagName;
+      const isInputLike =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        e.target.isContentEditable;
+
+      // Не перехватываем ввод в полях и когда открыты другие модалки
+      if (
+        isInputLike ||
+        showNewClientModal ||
+        showDebtModal ||
+        showCustomServiceModal ||
+        showDiscountModal ||
+        showCashModal
+      ) {
+        return;
+      }
+
+      // Обработка модалки выбора чека (с чеком / без чека)
+      if (showReceiptChoiceModal) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setReceiptWithCheck(true);
+          return;
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          setReceiptWithCheck(false);
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          setPendingCheckout({
+            withReceipt: receiptWithCheck,
+            paymentType: paymentMethod || "card",
+          });
+          setShowReceiptChoiceModal(false);
+          setCashPaymentConfirmed(false);
+          return;
+        }
+      }
+
+      // Обработка модалки выбора способа оплаты
+      if (showPaymentChoiceModal) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setPaymentChoice("cash");
+          return;
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          setPaymentChoice("card");
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          // Вызываем handleConfirmPaymentChoice через состояние
+          const total = Number(start?.total || 0);
+          if (paymentChoice === "cash") {
+            setPaymentMethod("cash");
+            setCashReceived(total > 0 ? total.toFixed(2) : "");
+            setShowPaymentChoiceModal(false);
+            setShowCashModal(true);
+          } else {
+            setPaymentMethod("card");
+            setShowPaymentChoiceModal(false);
+            setReceiptWithCheck(true);
+            setShowReceiptChoiceModal(true);
+          }
+          return;
+        }
+      }
+
+      // Enter на главном экране: открываем модалку выбора способа оплаты
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!start?.id || !(start?.items || []).length) return;
+        setPaymentChoice("cash");
+        setShowPaymentChoiceModal(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    start?.id,
+    start?.items,
+    start?.total,
+    showNewClientModal,
+    showDebtModal,
+    showCustomServiceModal,
+    showDiscountModal,
+    showCashModal,
+    showPaymentChoiceModal,
+    showReceiptChoiceModal,
+    receiptWithCheck,
+    paymentMethod,
+    paymentChoice,
+  ]);
 
   // Управление видимостью дропдауна на основе результатов поиска
   useEffect(() => {
@@ -1167,12 +1278,12 @@ const SellMainStart = ({ show, setShow }) => {
       return;
     }
 
-    // Устанавливаем способ оплаты и закрываем модалку
-    // cashReceived сохраняется для использования при checkout
+    // Устанавливаем способ оплаты и открываем модалку выбора чека
     setPaymentMethod("cash");
-    setCashPaymentConfirmed(true); // помечаем, что оплата подтверждена
+    setCashPaymentConfirmed(true);
     setShowCashModal(false);
-    // Оплата будет выполнена через кнопки "Печать чека" или "Без чека"
+    setReceiptWithCheck(true);
+    setShowReceiptChoiceModal(true);
   };
 
   // Ключевая функция: checkout + ПЕЧАТЬ
@@ -1244,7 +1355,7 @@ const SellMainStart = ({ show, setShow }) => {
           setAlert({
             open: true,
             type: "error",
-            message: "Введите корректный срок долга (в месяцах)",
+            message: "Введите корректный срок долга",
           });
           return;
         }
@@ -1254,7 +1365,7 @@ const SellMainStart = ({ show, setShow }) => {
           setAlert({
             open: true,
             type: "error",
-            message: "Введите корректный срок долга (в месяцах)",
+            message: "Введите корректный срок долга",
           });
           return;
         }
@@ -1368,6 +1479,191 @@ const SellMainStart = ({ show, setShow }) => {
           e?.message ||
           ""
         }`,
+      });
+    }
+  };
+
+  // Подтверждение выбора способа оплаты из модалки (клавиатура/Enter)
+  const handleConfirmPaymentChoice = async () => {
+    if (!start?.id || !(start?.items || []).length) return;
+    const total = Number(currentTotal || 0);
+
+    try {
+      if (paymentChoice === "cash") {
+        // Для наличных: открываем модалку ввода суммы
+        setPaymentMethod("cash");
+        setCashReceived(total > 0 ? total.toFixed(2) : "");
+        setShowPaymentChoiceModal(false);
+        setShowCashModal(true);
+      } else {
+        // Для перевода: открываем модалку выбора чека
+        setPaymentMethod("card");
+        setShowPaymentChoiceModal(false);
+        setReceiptWithCheck(true);
+        setShowReceiptChoiceModal(true);
+      }
+    } catch (error) {
+      console.error("Ошибка при подтверждении оплаты:", error);
+    }
+  };
+
+  // Обработка отложенного вызова performCheckout
+  useEffect(() => {
+    if (pendingCheckout) {
+      performCheckout(pendingCheckout.withReceipt, pendingCheckout.paymentType);
+      setPendingCheckout(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCheckout]);
+
+  // Обработка сохранения долга
+  const handleSaveDebt = async () => {
+    try {
+      // Валидация
+      if (!clientId) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Выберите клиента",
+        });
+        return;
+      }
+
+      if (!debt) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Выберите тип оплаты",
+        });
+        return;
+      }
+
+      if (debt === "Долги") {
+        // Для долга: проверяем обязательные поля для тарифа "Старт"
+        if (company?.subscription_plan?.name === "Старт") {
+          if (!state.phone) {
+            setAlert({
+              open: true,
+              type: "error",
+              message: "Введите номер телефона",
+            });
+            return;
+          }
+          if (!state.dueDate) {
+            setAlert({
+              open: true,
+              type: "error",
+              message: "Выберите дату оплаты",
+            });
+            return;
+          }
+          if (!debtMonths || Number(debtMonths) <= 0) {
+            setAlert({
+              open: true,
+              type: "error",
+              message: "Введите корректный срок долга",
+            });
+            return;
+          }
+
+          // Создаем долг для тарифа "Старт"
+          await createDebt({
+            name: pickClient?.full_name,
+            phone: state.phone,
+            due_date: state.dueDate,
+            amount: start?.total,
+          });
+        } else {
+          // Для других тарифов: проверяем только срок долга
+          if (!debtMonths || Number(debtMonths) <= 0) {
+            setAlert({
+              open: true,
+              type: "error",
+              message: "Введите корректный срок долга",
+            });
+            return;
+          }
+        }
+
+        // Создаем сделку для долга
+        if (clientId) {
+          const totalForDeal = start?.total;
+          await dispatch(
+            createDeal({
+              clientId: clientId,
+              title: `Долг ${pickClient?.full_name}`,
+              statusRu: debt,
+              amount: totalForDeal,
+              debtMonths: Number(debtMonths),
+            })
+          ).unwrap();
+        }
+      } else if (debt === "Предоплата") {
+        // Для предоплаты: проверяем сумму и срок
+        if (!amount || Number(amount) <= 0) {
+          setAlert({
+            open: true,
+            type: "error",
+            message: "Введите корректную сумму предоплаты",
+          });
+          return;
+        }
+
+        const totalToCheck = start?.total;
+        if (Number(amount) > Number(totalToCheck)) {
+          setAlert({
+            open: true,
+            type: "error",
+            message: "Сумма предоплаты не может превышать общую сумму",
+          });
+          return;
+        }
+
+        if (!debtMonths || Number(debtMonths) <= 0) {
+          setAlert({
+            open: true,
+            type: "error",
+            message: "Введите корректный срок долга",
+          });
+          return;
+        }
+
+        // Создаем сделку для предоплаты
+        if (clientId) {
+          const totalForDeal = start?.total;
+          await dispatch(
+            createDeal({
+              clientId: clientId,
+              title: `Предоплата ${pickClient?.full_name}`,
+              statusRu: debt,
+              amount: totalForDeal,
+              prepayment: Number(amount),
+              debtMonths: Number(debtMonths),
+            })
+          ).unwrap();
+        }
+      }
+
+      setAlert({
+        open: true,
+        type: "success",
+        message:
+          debt === "Долги"
+            ? "Долг успешно создан!"
+            : "Предоплата успешно сохранена!",
+      });
+
+      // Закрываем модалку после успешного сохранения
+      setShowDebtModal(false);
+    } catch (error) {
+      console.error("Ошибка при сохранении долга:", error);
+      setAlert({
+        open: true,
+        type: "error",
+        message:
+          error?.message ||
+          error?.data?.detail ||
+          "Ошибка при сохранении долга",
       });
     }
   };
@@ -2177,7 +2473,7 @@ const SellMainStart = ({ show, setShow }) => {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
-                <label htmlFor="">Срок долга (мес.) </label>
+                <label htmlFor="">Срок долга</label>
                 <input
                   type="text"
                   className="sell__header-input"
@@ -2188,7 +2484,7 @@ const SellMainStart = ({ show, setShow }) => {
             )}
             {debt === "Долги" && (
               <>
-                <label htmlFor="">Срок долга (мес.) </label>
+                <label htmlFor="">Срок долга</label>
                 <input
                   type="text"
                   className="sell__header-input"
@@ -2216,7 +2512,7 @@ const SellMainStart = ({ show, setShow }) => {
                 className="start__total-pay"
                 style={{ width: "auto" }}
                 type="button"
-                onClick={() => setShowDebtModal(false)}
+                onClick={handleSaveDebt}
               >
                 Сохранить
               </button>
@@ -2542,6 +2838,193 @@ const SellMainStart = ({ show, setShow }) => {
                 }
               >
                 Оплатить
+              </button>
+            </div>
+          </div>
+        </UniversalModal>
+      )}
+
+      {showPaymentChoiceModal && (
+        <UniversalModal
+          onClose={() => {
+            setShowPaymentChoiceModal(false);
+          }}
+          title={"Выбор способа оплаты"}
+        >
+          <div
+            style={{
+              width: "360px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <p style={{ fontSize: "14px", color: "#555" }}>
+              Нажмите стрелку влево для выбора оплаты <b>наличными</b>, стрелку
+              вправо — для оплаты <b>переводом</b>. Enter — подтвердить.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "space-between",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPaymentChoice("cash")}
+                className={`start__total-pay ${
+                  paymentChoice === "cash" ? "active" : ""
+                }`}
+                style={{
+                  flex: 1,
+                  border:
+                    paymentChoice === "cash"
+                      ? "2px solid #000"
+                      : "1px solid #ddd",
+                  backgroundColor:
+                    paymentChoice === "cash" ? "#f7d617" : "#f3f4f6",
+                }}
+              >
+                Наличными (←)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentChoice("card")}
+                className={`start__total-pay ${
+                  paymentChoice === "card" ? "active" : ""
+                }`}
+                style={{
+                  flex: 1,
+                  border:
+                    paymentChoice === "card"
+                      ? "2px solid #000"
+                      : "1px solid #ddd",
+                  backgroundColor:
+                    paymentChoice === "card" ? "#f7d617" : "#f3f4f6",
+                }}
+              >
+                Переводом (→)
+              </button>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+              }}
+            >
+              <button
+                type="button"
+                className="sell__reset"
+                onClick={() => setShowPaymentChoiceModal(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="start__total-pay"
+                style={{ width: "auto" }}
+                onClick={handleConfirmPaymentChoice}
+              >
+                Подтвердить (Enter)
+              </button>
+            </div>
+          </div>
+        </UniversalModal>
+      )}
+
+      {showReceiptChoiceModal && (
+        <UniversalModal
+          onClose={() => {
+            setShowReceiptChoiceModal(false);
+            setCashPaymentConfirmed(false);
+          }}
+          title={"Продажа с чеком или без"}
+        >
+          <div
+            style={{
+              width: "360px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <p style={{ fontSize: "14px", color: "#555" }}>
+              Выберите, как провести оплату: <b>с печатью чека</b> или
+              <b> без чека</b>. Enter подтвердит текущий выбор.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "space-between",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setReceiptWithCheck(true)}
+                className={`start__total-pay ${
+                  receiptWithCheck ? "active" : ""
+                }`}
+                style={{
+                  flex: 1,
+                  border: receiptWithCheck
+                    ? "2px solid #000"
+                    : "1px solid #ddd",
+                  backgroundColor: receiptWithCheck ? "#f7d617" : "#f3f4f6",
+                }}
+              >
+                С чеком (←)
+              </button>
+              <button
+                type="button"
+                onClick={() => setReceiptWithCheck(false)}
+                className={`start__total-pay ${
+                  !receiptWithCheck ? "active" : ""
+                }`}
+                style={{
+                  flex: 1,
+                  border: !receiptWithCheck
+                    ? "2px solid #000"
+                    : "1px solid #ddd",
+                  backgroundColor: !receiptWithCheck ? "#f7d617" : "#f3f4f6",
+                }}
+              >
+                Без чека (→)
+              </button>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+              }}
+            >
+              <button
+                type="button"
+                className="sell__reset"
+                onClick={() => {
+                  setShowReceiptChoiceModal(false);
+                  setCashPaymentConfirmed(false);
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="start__total-pay"
+                style={{ width: "auto" }}
+                onClick={() => {
+                  setPendingCheckout({
+                    withReceipt: receiptWithCheck,
+                    paymentType: paymentMethod || "card",
+                  });
+                  setShowReceiptChoiceModal(false);
+                  setCashPaymentConfirmed(false);
+                }}
+              >
+                Подтвердить (Enter)
               </button>
             </div>
           </div>

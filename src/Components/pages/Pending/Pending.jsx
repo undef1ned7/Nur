@@ -150,9 +150,61 @@ const Pending = () => {
     }
   };
 
-  const handleBulkAccept = () => bulkUpdate(Array.from(selected), true);
+  const handleBulkAccept = () => bulkUpdate(Array.from(selected), "approved");
 
-  const handleBulkReject = () => bulkUpdate(Array.from(selected), false);
+  const handleBulkReject = async () => {
+    if (!selected.size) return;
+    setProcessing(true);
+    try {
+      const selectedIds = Array.from(selected);
+      const selectedItems = pending.filter((item) =>
+        selectedIds.includes(item.id)
+      );
+
+      // Обновляем статус всех выбранных элементов
+      await Promise.all(
+        selectedIds.map((id) =>
+          dispatch(
+            updateCashFlows({
+              productId: id,
+              updatedData: { status: "rejected" },
+            })
+          ).unwrap()
+        )
+      );
+
+      // Применяем логику удаления связанных записей для каждого элемента
+      for (const item of selectedItems) {
+        if (item.source_business_operation_id === "Склад") {
+          dispatch(deleteProductAsync(item?.source_cashbox_flow_id));
+        }
+
+        if (item.source_business_operation_id === "Продажа") {
+          dispatch(deleteSale(item?.source_cashbox_flow_id));
+        }
+
+        if (item.source_business_operation_id === "Оплата долга") {
+          dispatch(onPayDebtDeal(item?.source_cashbox_flow_id));
+        }
+
+        if (item.source_business_operation_id === "Сырье") {
+          dispatch(deleteItemsMake(item.source_cashbox_flow_id));
+        }
+
+        if (item.source_business_operation_id === "Продажа производство") {
+          dispatch(deleteSale(item?.source_cashbox_flow_id));
+        }
+      }
+
+      await refresh();
+      // очищаем выбранные
+      setSelected(new Set());
+    } catch (e) {
+      alert("Не все операции прошли успешно. Проверьте список и повторите.");
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   // --- чекбоксы ---
   const allIds = useMemo(() => pending.map((p) => p.id), [pending]);

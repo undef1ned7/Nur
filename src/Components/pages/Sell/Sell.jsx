@@ -36,7 +36,6 @@ const STATUSES = [
   { value: "canceled", label: "Отменена" },
 ];
 
-// Для select сделки
 export const DEAL_STATUS_RU = ["Продажа", "Долги", "Предоплата"];
 
 const Sell = () => {
@@ -150,7 +149,7 @@ const Sell = () => {
   const kindTranslate = {
     new: "Новый",
     paid: "Оплаченный",
-    canceled: "Отмененный",
+    canceled: "возвращенный",
   };
 
   const handleAddCashbox = async () => {
