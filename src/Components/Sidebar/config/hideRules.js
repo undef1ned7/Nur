@@ -188,7 +188,7 @@ export const HIDE_RULES = [
   {
     when: { sector: "Логистика" },
     hide: {
-      toIncludes: ["/crm/debts", "/crm/obzor", "/crm/zakaz"],
+      toIncludes: ["/crm/debts", "/crm/obzor", "/crm/zakaz", "/crm/sell", "/crm/sklad", "/crm/brand-category"],
     },
   },
 ];

@@ -572,6 +572,13 @@ export const MENU_CONFIG = {
         permission: "can_view_logistics",
         implemented: true,
       },
+      {
+        label: "Аналитика",
+        to: "/crm/logistics-analytics",
+        icon: menuIcons.chartLine,
+        permission: "can_view_analytics",
+        implemented: true,
+      },
       // {
       //   label: "Магазин",
       //   to: "/crm/logistics-shop",
