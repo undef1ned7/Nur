@@ -109,7 +109,7 @@ async function sendXp365bKyrillicInit(dev, outEP) {
 /* ====================== openUsbDevice ====================== */
 
 /**
- * Открытие устройства и поиск bulk OUT endpoint (интерфейс 0 alt 0),
+ * Открытие устройства и поиск bulk OUT endpoint,
  * + отправка init-команд для кириллицы.
  */
 async function openUsbDevice(dev) {
@@ -120,7 +120,8 @@ async function openUsbDevice(dev) {
   }
 
   if (dev.configuration === null) {
-    await dev.selectConfiguration(1);
+    // пробуем первую конфигурацию
+    await dev.selectConfiguration(1).catch(() => {});
   }
 
   const cfg = dev.configuration;
@@ -372,6 +373,38 @@ export async function printXp365bBarcodeLabel(params) {
   console.log("Команда на печать отправлена");
 }
 
+/* ====================== Кодировки CP866 / CP1251 ====================== */
+
+function encodeCP1251(s = "") {
+  const out = [];
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c <= 0x7f) out.push(c);
+    else if (c === 0x0401) out.push(0xa8); // Ё
+    else if (c === 0x0451) out.push(0xb8); // ё
+    else if (c >= 0x0410 && c <= 0x042f) out.push(0xc0 + (c - 0x0410)); // А-Я
+    else if (c >= 0x0430 && c <= 0x044f) out.push(0xe0 + (c - 0x0430)); // а-я
+    else if (c === 0x2116) out.push(0xb9); // №
+    else out.push(0x3f); // ?
+  }
+  return new Uint8Array(out);
+}
+
+function encodeCP866(s = "") {
+  const out = [];
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c <= 0x7f) out.push(c);
+    else if (c >= 0x0410 && c <= 0x042f) out.push(0x80 + (c - 0x0410)); // А-Я
+    else if (c >= 0x0430 && c <= 0x044f) out.push(0xa0 + (c - 0x0430)); // а-я
+    else if (c === 0x0401) out.push(0xf0); // Ё
+    else if (c === 0x0451) out.push(0xf1); // ё
+    else if (c === 0x2116) out.push(0xfc); // №
+    else out.push(0x3f); // ?
+  }
+  return new Uint8Array(out);
+}
+
 /* ====================== Тест кодировки (графика + кириллица) ====================== */
 
 export async function testXp365bEncodingPrint() {
@@ -404,7 +437,6 @@ export async function testXp365bEncodingPrint() {
     "SET DENSITY 10",
     "SET DARKNESS 10",
     "BOX 10,10,440,260,4",
-    "BAR 20,130,420,6",
     "CODEPAGE 866",
     'TEXT 30,30,"TSS24.BF2",0,1,1,"HELLO 123"',
     'TEXT 30,70,"TSS16.BF2",0,1,1,"CP866: Привет 123"',
@@ -426,8 +458,90 @@ export async function testXp365bEncodingPrint() {
   console.log("Тест кодировки + графики отправлен");
 }
 
-/* ====================== Повесим тест на window для DevTools ====================== */
+// Тест кодовых страниц принтера (866 и 1251)
+export async function printXp365bCodepageTest() {
+  if (typeof navigator === "undefined" || !("usb" in navigator)) {
+    throw new Error("Браузер не поддерживает WebUSB");
+  }
+
+  // простые ASCII-строки
+  const ascii = (s) =>
+    new Uint8Array(
+      [...s].map((ch) => {
+        const c = ch.charCodeAt(0);
+        return c >= 0x20 && c <= 0x7e ? c : 0x3f;
+      })
+    );
+
+  const enc866 = (s) => encodeCP866(s);
+  const enc1251 = (s) => encodeCP1251(s);
+
+  // 1) Подключаемся к принтеру
+  if (!usbState.dev || usbState.outEP == null) {
+    const st = await ensureUsbReadyAuto();
+    if (!st || !st.dev) {
+      await connectXp365bManually();
+    }
+  }
+
+  const dev = usbState.dev;
+  const outEP = usbState.outEP;
+  if (!dev || outEP == null) {
+    throw new Error("Принтер XP-365B не подключён");
+  }
+
+  // 2) Собираем TSPL-команды
+  const chunks = [];
+
+  chunks.push(ascii("SIZE 58 mm,40 mm\r\n"));
+  chunks.push(ascii("GAP 2 mm,0 mm\r\n"));
+  chunks.push(ascii("DIRECTION 1\r\n"));
+  chunks.push(ascii("REFERENCE 0,0\r\n"));
+  chunks.push(ascii("CLS\r\n"));
+  chunks.push(ascii("SET DENSITY 10\r\n"));
+  chunks.push(ascii("SET DARKNESS 10\r\n"));
+  chunks.push(ascii("BOX 10,10,440,260,4\r\n"));
+
+  // ASCII строка
+  chunks.push(ascii("CODEPAGE 866\r\n"));
+  chunks.push(ascii('TEXT 30,20,"TSS24.BF2",0,1,1,"HELLO 123"\r\n'));
+
+  // CP866: Привет 123
+  chunks.push(ascii('TEXT 30,60,"TSS16.BF2",0,1,1,"'));
+  chunks.push(enc866("CP866: Привет 123"));
+  chunks.push(ascii('"\r\n'));
+
+  // CP1251: Привет 123
+  chunks.push(ascii("CODEPAGE 1251\r\n"));
+  chunks.push(ascii('TEXT 30,100,"TSS16.BF2",0,1,1,"'));
+  chunks.push(enc1251("CP1251: Привет 123"));
+  chunks.push(ascii('"\r\n'));
+
+  chunks.push(ascii("PRINT 1\r\n"));
+
+  // 3) Склеиваем и отправляем
+  let totalLen = 0;
+  for (const c of chunks) totalLen += c.length;
+  const buf = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const c of chunks) {
+    buf.set(c, offset);
+    offset += c.length;
+  }
+
+  console.log("Отправляем тест кодовых страниц XP-365B...");
+  const SLICE = 4096;
+  for (let i = 0; i < buf.length; i += SLICE) {
+    const part = buf.subarray(i, Math.min(i + SLICE, buf.length));
+    await dev.transferOut(outEP, part);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  console.log("Тест кодовых страниц отправлен");
+}
+
+/* ====================== Повесим тесты на window для DevTools ====================== */
 
 if (typeof window !== "undefined") {
   window.testXp365bEncodingPrint = testXp365bEncodingPrint;
+  window.printXp365bCodepageTest = printXp365bCodepageTest;
 }
