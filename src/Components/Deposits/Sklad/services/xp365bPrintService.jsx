@@ -1,29 +1,45 @@
 /**
  * Xprinter XP-365B Print Service (TSPL)
- * Печать штрих-кодовых этикеток через WebUSB
+ * Печать штрих-кодовых этикеток через WebUSB + команды для кириллицы
  */
 
-// Глобальное состояние USB
-const usbState = { dev: null, opening: null };
+// ===== Глобальное состояние USB =====
+const usbState = {
+  dev: null,
+  outEP: null,
+  opening: null,
+};
 
-// Разбиение больших буферов на куски
-const chunkBytes = (u8, size = 8 * 1024) => {
+// Разбиение буфера на куски
+const chunkBytes = (u8, size = 4096) => {
   const out = [];
   for (let i = 0; i < u8.length; i += size) out.push(u8.subarray(i, i + size));
   return out;
 };
 
-// Простейший ASCII-энкодер (TSPL команды — ASCII)
-function asciiEncode(str = "") {
-  const bytes = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i);
-    bytes[i] = code >= 32 && code <= 126 ? code : 0x3f; // печатаемые ASCII, иначе '?'
+// Энкодер TSPL (ASCII → bytes)
+const tsplEncoder = new TextEncoder();
+const encodeTspl = (s) => tsplEncoder.encode(s);
+
+/* ====================== util: перенос строки ====================== */
+function wrap(text = "", width = 24) {
+  const words = String(text || "").split(/\s+/);
+  let line = "";
+  const out = [];
+  for (const w of words) {
+    const next = line ? line + " " + w : w;
+    if (next.length <= width) {
+      line = next;
+    } else {
+      if (line) out.push(line);
+      line = w;
+    }
   }
-  return bytes;
+  if (line) out.push(line);
+  return out;
 }
 
-/* ---------- WebUSB helpers ---------- */
+/* ====================== WebUSB helpers ====================== */
 
 function saveVidPidToLS(dev) {
   try {
@@ -41,29 +57,60 @@ async function tryUsbAutoConnect() {
   const savedPid = parseInt(localStorage.getItem("xp365b_pid") || "", 16);
 
   const devs = await navigator.usb.getDevices();
-  return (
+  const dev =
     devs.find(
       (d) =>
         (!savedVid || d.vendorId === savedVid) &&
         (!savedPid || d.productId === savedPid)
-    ) || null
-  );
+    ) || null;
+
+  return dev;
 }
 
+// запрос устройства через диалог
 async function requestUsbDevice() {
   if (typeof navigator === "undefined" || !("usb" in navigator)) {
     throw new Error("Браузер не поддерживает WebUSB");
   }
 
-  // Классы "printer" и vendor-specific
-  const filters = [{ classCode: 0x07 }, { classCode: 0xff }];
+  // как в html-примере — по классу принтера
+  const filters = [{ classCode: 0x07 }];
   return await navigator.usb.requestDevice({ filters });
 }
 
+/* ====================== спец. команды для кириллицы ====================== */
+
 /**
- * Более «терпимый» openUsbDevice:
- *  - выбираем любой интерфейс с OUT endpoint
- *  - claim/selectAlt пробуем, но не считаем ошибку фатальной (особенно на macOS)
+ * Отправка сервисных команд:
+ *  1F 1B 1F FE 01
+ *  1F 1B 1F FE 11
+ * которые в конфигураторе рекомендуют для включения кириллицы.
+ */
+async function sendXp365bKyrillicInit(dev, outEP) {
+  try {
+    // первый пакет: 1F 1B 1F FE 01
+    const cmd1 = new Uint8Array([0x1f, 0x1b, 0x1f, 0xfe, 0x01]);
+    // второй пакет: 1F 1B 1F FE 11
+    const cmd2 = new Uint8Array([0x1f, 0x1b, 0x1f, 0xfe, 0x11]);
+
+    await dev.transferOut(outEP, cmd1);
+    await new Promise((r) => setTimeout(r, 5));
+    await dev.transferOut(outEP, cmd2);
+    await new Promise((r) => setTimeout(r, 5));
+
+    console.log(
+      "XP-365B: кириллические init-команды отправлены (1F 1B 1F FE 01/11)"
+    );
+  } catch (e) {
+    console.warn("XP-365B: не удалось отправить кириллический init:", e);
+  }
+}
+
+/* ====================== openUsbDevice ====================== */
+
+/**
+ * Открытие устройства и поиск bulk OUT endpoint (интерфейс 0 alt 0),
+ * + отправка init-команд для кириллицы.
  */
 async function openUsbDevice(dev) {
   if (!dev) throw new Error("USB устройство не найдено");
@@ -72,20 +119,18 @@ async function openUsbDevice(dev) {
     await dev.open();
   }
 
-  if (dev.configuration == null) {
-    // пробуем конфигурацию 2 (как у тебя на скрине), иначе первую
-    let cfgNum = 1;
-    if (dev.configurations?.length) {
-      const cfg2 = dev.configurations.find((c) => c.configurationValue === 2);
-      cfgNum = cfg2 ? 2 : dev.configurations[0].configurationValue;
-    }
-    await dev.selectConfiguration(cfgNum).catch(() => {});
+  if (dev.configuration === null) {
+    await dev.selectConfiguration(1);
   }
 
   const cfg = dev.configuration;
-  if (!cfg) throw new Error("Нет активной USB-конфигурации");
+  if (!cfg) throw new Error("Нет конфигурации у принтера");
 
   console.log("XP-365B config:", cfg);
+
+  let outEP = null;
+  let chosenInterface = null;
+  let chosenAlt = null;
 
   for (const intf of cfg.interfaces) {
     for (const alt of intf.alternates) {
@@ -102,69 +147,94 @@ async function openUsbDevice(dev) {
       const out = endpoints.find(
         (e) => e.direction === "out" && e.type === "bulk"
       );
-      if (!out) continue;
-
-      // Пытаемся захватить интерфейс
-      try {
-        await dev.claimInterface(intf.interfaceNumber);
-      } catch (e) {
-        console.warn("claimInterface failed:", e);
-        continue;
+      if (out) {
+        chosenInterface = intf.interfaceNumber;
+        chosenAlt = alt.alternateSetting || 0;
+        outEP = out.endpointNumber;
+        break;
       }
-
-      const needAlt =
-        typeof alt.alternateSetting === "number" ? alt.alternateSetting : 0;
-      try {
-        if (dev.selectAlternateInterface) {
-          await dev.selectAlternateInterface(intf.interfaceNumber, needAlt);
-        }
-      } catch (e) {
-        console.warn("selectAlternateInterface failed:", e);
-        try {
-          await dev.releaseInterface(intf.interfaceNumber);
-        } catch {}
-        continue;
-      }
-
-      return {
-        iface: intf.interfaceNumber,
-        alt: needAlt,
-        outEP: out.endpointNumber,
-      };
     }
+    if (outEP != null) break;
   }
 
-  throw new Error(
-    "Принтер найден, но не удалось захватить интерфейс с bulk OUT.\n" +
-      "На macOS это почти всегда значит, что этот интерфейс уже занят системным драйвером принтера.\n" +
-      "Браузер через WebUSB не может им управлять. Либо уберите системный драйвер/принтер, " +
-      "либо печатайте через системную печать (window.print / PDF) или с другой ОС (Windows + WinUSB)."
+  if (outEP == null) {
+    throw new Error("Bulk OUT endpoint не найден");
+  }
+
+  await dev.claimInterface(chosenInterface);
+  if (dev.selectAlternateInterface) {
+    await dev.selectAlternateInterface(chosenInterface, chosenAlt);
+  }
+
+  console.log(
+    "Используем интерфейс",
+    chosenInterface,
+    "alt",
+    chosenAlt,
+    "OUT EP",
+    outEP
   );
+
+  // === тут отправляем специальные команды для кириллицы ===
+  await sendXp365bKyrillicInit(dev, outEP);
+
+  return { outEP };
 }
 
+/**
+ * ensureUsbReadyAuto:
+ *  - пробует автоконнект по сохранённым VID/PID
+ *  - не показывает диалог пользователю (для статуса)
+ */
 async function ensureUsbReadyAuto() {
   if (typeof navigator === "undefined" || !("usb" in navigator)) {
     throw new Error("WebUSB не поддерживается");
   }
 
-  if (usbState.dev) return usbState;
+  if (usbState.dev && usbState.outEP != null) {
+    return usbState;
+  }
 
   if (!usbState.opening) {
     usbState.opening = (async () => {
       const dev = await tryUsbAutoConnect();
       if (!dev) return null;
-      await openUsbDevice(dev);
+      const { outEP } = await openUsbDevice(dev);
       usbState.dev = dev;
+      usbState.outEP = outEP;
       return usbState;
     })().finally(() => {
       usbState.opening = null;
     });
   }
 
-  await usbState.opening;
-  return usbState.dev ? usbState : null;
+  const res = await usbState.opening;
+  return res;
 }
 
+/**
+ * Явное подключение с диалогом (для кнопки "Подключить принтер")
+ */
+export async function connectXp365bManually() {
+  if (typeof navigator === "undefined" || !("usb" in navigator)) {
+    throw new Error("Браузер не поддерживает WebUSB");
+  }
+
+  let dev = usbState.dev;
+
+  if (!dev) {
+    dev = await requestUsbDevice();
+    saveVidPidToLS(dev);
+  }
+
+  const { outEP } = await openUsbDevice(dev);
+  usbState.dev = dev;
+  usbState.outEP = outEP;
+}
+
+/**
+ * Слушатели connect/disconnect
+ */
 export function attachXp365bUsbListenersOnce() {
   if (typeof navigator === "undefined" || !("usb" in navigator)) return;
   if (attachXp365bUsbListenersOnce._did) return;
@@ -177,82 +247,86 @@ export function attachXp365bUsbListenersOnce() {
       if (!savedVid || !savedPid) return;
       if (e.device.vendorId !== savedVid || e.device.productId !== savedPid)
         return;
-      await openUsbDevice(e.device);
+
+      const { outEP } = await openUsbDevice(e.device);
       usbState.dev = e.device;
+      usbState.outEP = outEP;
     } catch (err) {
       console.warn("XP-365B auto-connect failed:", err);
+      usbState.dev = null;
+      usbState.outEP = null;
     }
   });
 
   navigator.usb.addEventListener("disconnect", (e) => {
     if (usbState.dev && e.device === usbState.dev) {
       usbState.dev = null;
+      usbState.outEP = null;
     }
   });
 }
 
+/**
+ * Проверка статуса подключения (без показа диалога)
+ */
 export async function checkXp365bConnection() {
   if (typeof navigator === "undefined" || !("usb" in navigator)) return false;
   try {
-    const state = await ensureUsbReadyAuto();
-    return state !== null && usbState.dev !== null;
+    const st = await ensureUsbReadyAuto();
+    return !!(st && st.dev && st.outEP != null);
   } catch {
     return false;
   }
 }
 
-/**
- * Ручное подключение (для кнопки "Подключить принтер")
- */
-export async function connectXp365bManually() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
+/* ====================== TSPL: этикетка ====================== */
+
+function buildTsplLabel({ title, barcode, widthMm = 58, heightMm = 40 }) {
+  const name = (title || "Тестовый товар").trim();
+  const code = (barcode || "123456789012").trim();
+
+  const nameLines = wrap(name, 24);
+
+  let y = 30;
+  const cmds = [];
+
+  cmds.push(`SIZE ${widthMm} mm,${heightMm} mm\r\n`);
+  cmds.push(`GAP 2 mm,0 mm\r\n`);
+  cmds.push("DIRECTION 1\r\n");
+  cmds.push("REFERENCE 0,0\r\n");
+  cmds.push("CLS\r\n");
+
+  // кодовая страница под кириллицу (после init-команд)
+  cmds.push("CODEPAGE 866\r\n");
+
+  // первая строка — крупный шрифт
+  cmds.push(
+    `TEXT 30,${y},"TSS24.BF2",0,1,1,"${(nameLines[0] || "")
+      .replace(/"/g, "")
+      .slice(0, 24)}"\r\n`
+  );
+
+  // вторая строка (если есть) — поменьше
+  if (nameLines[1]) {
+    y += 30;
+    cmds.push(
+      `TEXT 30,${y},"TSS16.BF2",0,1,1,"${nameLines[1]
+        .replace(/"/g, "")
+        .slice(0, 24)}"\r\n`
+    );
   }
 
-  if (usbState.dev) {
-    await openUsbDevice(usbState.dev);
-    return;
-  }
+  // ниже — штрихкод
+  y += 70;
+  cmds.push(`BARCODE 30,${y},"128",60,1,0,2,4,"${code.replace(/"/g, "")}"\r\n`);
 
-  const dev = await requestUsbDevice(); // диалог выбора устройства
-  saveVidPidToLS(dev);
-  await openUsbDevice(dev);
-  usbState.dev = dev;
+  cmds.push("PRINT 1\r\n");
+
+  const tsplStr = cmds.join("");
+  return encodeTspl(tsplStr);
 }
 
-/* ---------- Построение TSPL-команд для этикетки ---------- */
-
-function buildTsplForBarcodeLabel({
-  barcode,
-  title = "",
-  copies = 1,
-  widthMm = 40,
-  heightMm = 30,
-}) {
-  const safeBarcode = String(barcode || "").replace(/"/g, "");
-  const safeTitle = String(title || "")
-    .replace(/"/g, "")
-    .slice(0, 30);
-
-  let cmd = "";
-
-  cmd += `SIZE ${widthMm} mm,${heightMm} mm\r\n`;
-  cmd += "GAP 2 mm,0\r\n";
-  cmd += "DIRECTION 1\r\n";
-  cmd += "REFERENCE 0,0\r\n";
-  cmd += "CLS\r\n";
-
-  if (safeTitle) {
-    cmd += `TEXT 40,20,"0",0,1,1,"${safeTitle}"\r\n`;
-  }
-
-  cmd += `BARCODE 40,80,"128",80,1,0,2,4,"${safeBarcode}"\r\n`;
-  cmd += `PRINT ${copies},1\r\n`;
-
-  return asciiEncode(cmd);
-}
-
-/* ---------- Печать этикетки со штрих-кодом через USB ---------- */
+/* ====================== Печать этикетки со штрих-кодом ====================== */
 
 export async function printXp365bBarcodeLabel(params) {
   if (!params || !params.barcode) {
@@ -263,26 +337,97 @@ export async function printXp365bBarcodeLabel(params) {
     throw new Error("Браузер не поддерживает WebUSB");
   }
 
-  await ensureUsbReadyAuto();
-
-  let dev = usbState.dev;
-  if (!dev) {
-    dev = await requestUsbDevice();
-    saveVidPidToLS(dev);
-    usbState.dev = dev;
+  // если уже подключены — не лезем в диалог
+  if (!usbState.dev || usbState.outEP == null) {
+    const st = await ensureUsbReadyAuto();
+    if (!st || !st.dev) {
+      await connectXp365bManually();
+    }
   }
 
-  const { outEP } = await openUsbDevice(dev);
+  const dev = usbState.dev;
+  const outEP = usbState.outEP;
 
-  const tsplBytes = buildTsplForBarcodeLabel({
+  if (!dev || outEP == null) {
+    throw new Error("Принтер XP-365B не подключён");
+  }
+
+  const buf = buildTsplLabel({
+    title: params.title || "Товар",
     barcode: params.barcode,
-    title: params.title,
-    copies: params.copies ?? 1,
-    widthMm: params.widthMm ?? 40,
-    heightMm: params.heightMm ?? 30,
+    widthMm: params.widthMm ?? 58,
+    heightMm: params.heightMm ?? 40,
   });
 
-  for (const part of chunkBytes(tsplBytes)) {
+  console.log("Печатаем этикетку XP-365B (TSPL + кириллический init):", {
+    barcode: params.barcode,
+    title: params.title,
+  });
+
+  for (const part of chunkBytes(buf)) {
     await dev.transferOut(outEP, part);
+    await new Promise((r) => setTimeout(r, 5));
   }
+
+  console.log("Команда на печать отправлена");
+}
+
+/* ====================== Тест кодировки (графика + кириллица) ====================== */
+
+export async function testXp365bEncodingPrint() {
+  if (typeof navigator === "undefined" || !("usb" in navigator)) {
+    throw new Error("Браузер не поддерживает WebUSB");
+  }
+
+  if (!usbState.dev || usbState.outEP == null) {
+    const st = await ensureUsbReadyAuto();
+    if (!st || !st.dev) {
+      await connectXp365bManually();
+    }
+  }
+
+  const dev = usbState.dev;
+  const outEP = usbState.outEP;
+  if (!dev || outEP == null) {
+    throw new Error("Принтер XP-365B не подключён");
+  }
+
+  // на всякий случай ещё раз отправим init-команды перед тестом
+  await sendXp365bKyrillicInit(dev, outEP);
+
+  const tspl = [
+    "SIZE 58 mm,40 mm",
+    "GAP 2 mm,0 mm",
+    "DIRECTION 1",
+    "REFERENCE 0,0",
+    "CLS",
+    "SET DENSITY 10",
+    "SET DARKNESS 10",
+    "BOX 10,10,440,260,4",
+    "BAR 20,130,420,6",
+    "CODEPAGE 866",
+    'TEXT 30,30,"TSS24.BF2",0,1,1,"HELLO 123"',
+    'TEXT 30,70,"TSS16.BF2",0,1,1,"CP866: Привет 123"',
+    "CODEPAGE 1251",
+    'TEXT 30,110,"TSS16.BF2",0,1,1,"CP1251: Привет 123"',
+    "PRINT 1",
+    "",
+  ].join("\r\n");
+
+  console.log("TSPL encoding + graphics test:\n", tspl);
+
+  const buf = encodeTspl(tspl);
+
+  for (const part of chunkBytes(buf)) {
+    await dev.transferOut(outEP, part);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+
+  console.log("Тест кодировки + графики отправлен");
+}
+
+/* ====================== Повесим тест на window для DevTools ====================== */
+
+if (typeof window !== "undefined") {
+  window.testXp365bEncodingPrint = testXp365bEncodingPrint;
 }

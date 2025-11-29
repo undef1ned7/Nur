@@ -7,15 +7,20 @@ import {
   connectXp365bManually,
 } from "../services/xp365bPrintService";
 
+/**
+ * Компонент таба для печати штрих-кодов
+ */
 const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
   const [printingIds, setPrintingIds] = useState(new Set());
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
+  // слушатели USB — один раз
   useEffect(() => {
     attachXp365bUsbListenersOnce();
   }, []);
 
+  // периодическая проверка подключения
   useEffect(() => {
     let cancelled = false;
 
@@ -37,6 +42,7 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
     };
   }, []);
 
+  // фильтрация товаров
   const filteredProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
     const search = searchTerm?.trim().toLowerCase() || "";
@@ -65,6 +71,7 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
     }
   };
 
+  // печать штрих-кода
   const handlePrintBarcode = async (product) => {
     if (!product.barcode) {
       alert("У товара отсутствует штрих-код");
@@ -77,9 +84,9 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
       await printXp365bBarcodeLabel({
         barcode: product.barcode,
         title: product.name || "Товар",
-        copies: 1,
-        widthMm: 40,
-        heightMm: 30,
+        // размеры — как в рабочем HTML (можешь потом поменять на 40x30)
+        widthMm: 58,
+        heightMm: 40,
       });
 
       const connected = await checkXp365bConnection();
