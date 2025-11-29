@@ -1,13 +1,42 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import "./BarcodePrintTab.scss";
+import {
+  printXp365bBarcodeLabel,
+  attachXp365bUsbListenersOnce,
+  checkXp365bConnection,
+  connectXp365bManually,
+} from "../services/xp365bPrintService";
 
-/**
- * Компонент таба для печати штрих-кодов
- */
 const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
   const [printingIds, setPrintingIds] = useState(new Set());
+  const [isPrinterConnected, setIsPrinterConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  // Фильтрация товаров по поиску
+  useEffect(() => {
+    attachXp365bUsbListenersOnce();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkConnection = async () => {
+      try {
+        const connected = await checkXp365bConnection();
+        if (!cancelled) setIsPrinterConnected(connected);
+      } catch {
+        if (!cancelled) setIsPrinterConnected(false);
+      }
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 2000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
   const filteredProducts = useMemo(() => {
     if (!products || products.length === 0) return [];
     const search = searchTerm?.trim().toLowerCase() || "";
@@ -19,7 +48,23 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
     });
   }, [products, searchTerm]);
 
-  // Функция печати штрих-кода
+  const handleConnectPrinter = async () => {
+    try {
+      setIsConnecting(true);
+      await connectXp365bManually();
+      const connected = await checkXp365bConnection();
+      setIsPrinterConnected(connected);
+      if (!connected) {
+        alert("Принтер не обнаружен. Убедитесь, что он подключен по USB.");
+      }
+    } catch (e) {
+      console.error("Ошибка подключения принтера:", e);
+      alert(e.message || "Не удалось подключиться к принтеру");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
   const handlePrintBarcode = async (product) => {
     if (!product.barcode) {
       alert("У товара отсутствует штрих-код");
@@ -29,97 +74,40 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
     setPrintingIds((prev) => new Set(prev).add(product.id));
 
     try {
-      // Создаем окно для печати
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        alert("Пожалуйста, разрешите всплывающие окна для печати");
-        setPrintingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(product.id);
-          return next;
-        });
-        return;
+      await printXp365bBarcodeLabel({
+        barcode: product.barcode,
+        title: product.name || "Товар",
+        copies: 1,
+        widthMm: 40,
+        heightMm: 30,
+      });
+
+      const connected = await checkXp365bConnection();
+      setIsPrinterConnected(connected);
+    } catch (error) {
+      console.error("Ошибка при печати на XP-365B:", error);
+
+      const connected = await checkXp365bConnection();
+      setIsPrinterConnected(connected);
+
+      let errorMessage = "Не удалось отправить данные на принтер";
+
+      if (error.message) {
+        if (error.message.includes("WebUSB")) {
+          errorMessage =
+            "Браузер не поддерживает WebUSB. Используйте Chrome или Edge.";
+        } else if (
+          error.message.includes("не найден") ||
+          error.message.includes("не найдено")
+        ) {
+          errorMessage =
+            "Принтер не подключен. Подключите принтер XP-365B и попробуйте снова.";
+        } else {
+          errorMessage = error.message;
+        }
       }
 
-      // Генерируем HTML для печати штрих-кода
-      const barcodeHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Штрих-код: ${product.name}</title>
-            <style>
-              @media print {
-                @page {
-                  size: 50mm 30mm;
-                  margin: 5mm;
-                }
-                body {
-                  margin: 0;
-                  padding: 0;
-                }
-              }
-              body {
-                font-family: Arial, sans-serif;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                padding: 10px;
-                text-align: center;
-              }
-              .barcode-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 5px;
-              }
-              .barcode-value {
-                font-size: 14px;
-                font-weight: bold;
-                letter-spacing: 2px;
-              }
-              .product-name {
-                font-size: 10px;
-                max-width: 200px;
-                word-wrap: break-word;
-              }
-              .barcode-image {
-                margin: 5px 0;
-              }
-            </style>
-            <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-          </head>
-          <body>
-            <div class="barcode-container">
-              <div class="product-name">${product.name || "Товар"}</div>
-              <svg id="barcode" class="barcode-image"></svg>
-              <div class="barcode-value">${product.barcode}</div>
-            </div>
-            <script>
-              JsBarcode("#barcode", "${product.barcode}", {
-                format: "CODE128",
-                width: 2,
-                height: 50,
-                displayValue: false
-              });
-              window.onload = function() {
-                setTimeout(function() {
-                  window.print();
-                  window.onafterprint = function() {
-                    window.close();
-                  };
-                }, 500);
-              };
-            </script>
-          </body>
-        </html>
-      `;
-
-      printWindow.document.write(barcodeHtml);
-      printWindow.document.close();
-    } catch (error) {
-      console.error("Ошибка при печати штрих-кода:", error);
-      alert("Не удалось распечатать штрих-код");
+      alert(errorMessage);
     } finally {
       setPrintingIds((prev) => {
         const next = new Set(prev);
@@ -149,6 +137,32 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
             className="barcode-print-tab__search"
           />
         </div>
+
+        <div className="barcode-print-tab__printer-controls">
+          <div className="barcode-print-tab__printer-status">
+            <span
+              className={`barcode-print-tab__status-indicator ${
+                isPrinterConnected
+                  ? "barcode-print-tab__status-indicator--connected"
+                  : "barcode-print-tab__status-indicator--disconnected"
+              }`}
+            />
+            <span className="barcode-print-tab__status-text">
+              {isPrinterConnected
+                ? "Принтер подключен"
+                : "Принтер не подключен"}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="barcode-print-tab__connect-btn"
+            onClick={handleConnectPrinter}
+            disabled={isConnecting}
+          >
+            {isConnecting ? "Подключение..." : "Подключить принтер"}
+          </button>
+        </div>
       </div>
 
       <div className="barcode-print-tab__content">
@@ -175,10 +189,16 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
                   <button
                     className="barcode-print-tab__print-btn"
                     onClick={() => handlePrintBarcode(product)}
-                    disabled={printingIds.has(product.id) || !product.barcode}
+                    disabled={
+                      printingIds.has(product.id) ||
+                      !product.barcode ||
+                      !isPrinterConnected
+                    }
                     title={
                       !product.barcode
                         ? "У товара отсутствует штрих-код"
+                        : !isPrinterConnected
+                        ? "Принтер не подключен. Подключите принтер XP-365B."
                         : "Распечатать штрих-код"
                     }
                   >
