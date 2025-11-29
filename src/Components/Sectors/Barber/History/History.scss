@@ -1,116 +1,283 @@
-/* src/components/Education/History.scss */
 :root{
   --bh-primary:#f7d74f;
+  --bh-primary-dark:#d4b800;
   --bh-text:#0f172a;
   --bh-muted:#6b7280;
   --bh-border:#e5e7eb;
   --bh-surface:#ffffff;
 
   --bh-danger:#e74c3c;
-  --bh-danger-bg:rgba(231,76,60,.12);
-  --bh-danger-br:rgba(231,76,60,.35);
+  --bh-danger-bg:rgba(231,76,60,.08);
+  --bh-danger-br:rgba(231,76,60,.3);
+
+  --bh-status-canceled-bg:#fff4e5;
+  --bh-status-canceled-text:#c05621;
 }
 
-.barberhistory, .barberhistory *{ box-sizing:border-box; }
+.barberhistory,
+.barberhistory *{
+  box-sizing:border-box;
+}
 
+/* страница */
 .barberhistory{
-  background:var(--bh-surface);
-  border-radius:14px;
-  box-shadow:0 4px 16px rgba(0,0,0,.05);
-  padding:20px;
   display:grid;
-  gap:14px;
+  gap:16px;
+  padding:16px 0;
   color:var(--bh-text);
 }
 
-/* header */
+/* header: количество + фильтры */
 .barberhistory__header{
   display:grid;
-  grid-template-columns:1fr auto;
-  gap:12px;
+  grid-template-rows:auto auto;
+  row-gap:8px;
+}
+
+.barberhistory__subtitle{
+  font-size:14px;
+  color:var(--bh-muted);
+}
+
+/* ===== filters ===== */
+.barberhistory__filters{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+  column-gap:10px;
+  row-gap:8px;
   align-items:end;
 }
-.barberhistory__titleWrap{ display:grid; gap:4px; }
-.barberhistory__title{ margin:0; font-size:20px; font-weight:900; color:var(--bh-text); }
-.barberhistory__subtitle{ color:var(--bh-muted); font-size:13px; }
 
-/* filters */
-.barberhistory__filters{ display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
-.barberhistory__field{ display:grid; gap:6px; }
-.barberhistory__label{ font-size:13px; color:var(--bh-muted); font-weight:700; }
-.barberhistory__input{
-  height:40px; min-width:160px;
-  border:1px solid var(--bh-border); border-radius:12px;
-  background:#fff; color:var(--bh-text);
-  padding:0 12px; font-size:14px;
+.barberhistory__field{
+  display:grid;
+  gap:6px;
 }
-.barberhistory__input:focus{ outline:none; border-color:var(--bh-primary); }
-.barberhistory__field--invalid .barberhistory__input{ border-color:#dc2626; }
-.barberhistory__btn{
-  display:inline-flex; align-items:center; justify-content:center;
-  height:40px; padding:0 14px; border-radius:12px;
-  border:1px solid var(--bh-border); background:#fff; color:var(--bh-text);
-  font-weight:700; cursor:pointer; transition:.18s;
-}
-.barberhistory__btn:hover{ background:#f9fafb; }
-.barberhistory__btn:active{ transform:translateY(1px); }
 
-/* list */
-.barberhistory__list{
-  display:grid; gap:10px;
-  max-height: clamp(360px, 64dvh, 720px);
-  overflow:auto; padding-right:6px;
+.barberhistory__label{
+  font-size:13px;
+  font-weight:600;
+  color:var(--bh-muted);
 }
-.barberhistory__list::-webkit-scrollbar{ width:8px; height:8px; }
-.barberhistory__list::-webkit-scrollbar-thumb{ background:#e2e8f0; border-radius:8px; }
 
-/* card */
-.barberhistory__card{
+.barberhistory__control{
+  display:flex;
+  align-items:center;
   border:1px solid var(--bh-border);
-  background:#fafafa;
   border-radius:12px;
-  padding:14px;
+  background:#ffffff;
+  padding-left:14px;
+  height:42px;
+  width:100%;
 }
-.barberhistory__card:hover{ background:#f1f5f9; }
+
+.barberhistory__input{
+  flex:1;
+  border:none;
+  background:transparent;
+  font-size:14px;
+  color:var(--bh-text);
+  height:100%;
+}
+
+.barberhistory__input::placeholder{
+  color:#9ca3af;
+}
+
+.barberhistory__input:focus{
+  outline:none;
+}
+
+.barberhistory__iconBtn{
+  width:42px;
+  height:30px;
+  margin-right:8px;
+  border-radius:8px;
+  border:none;
+  background:#ffffff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  font-size:14px;
+  color:#9ca3af;
+  transition:.15s;
+}
+
+.barberhistory__iconBtn:hover{
+  background:#f3f4f6;
+  color:#4b5563;
+}
+
+.barberhistory__field--invalid .barberhistory__control{
+  border-color:#dc2626;
+}
+
+/* кнопка Сброс */
+.barberhistory__btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:42px;
+  padding:0 18px;
+  border-radius:12px;
+  border:1px solid var(--bh-border);
+  background:#ffffff;
+  color:var(--bh-text);
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:.15s;
+}
+
+.barberhistory__btn:hover{
+  background:#f9fafb;
+}
+
+.barberhistory__btn:active{
+  transform:translateY(1px);
+}
+
+/* ===== list ===== */
+.barberhistory__list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* карточки */
+.barberhistory__card{
+  background:var(--bh-surface);
+  border-radius:16px;
+  border:1px solid var(--bh-border);
+  box-shadow:0 3px 12px rgba(15,23,42,.05);
+  padding:16px 20px;
+}
+
 .barberhistory__cardHead{
-  display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:8px;
 }
-.barberhistory__name{ margin:0; font-size:16px; font-weight:800; color:var(--bh-text); }
+
+.barberhistory__name{
+  margin:0;
+  font-size:14px;
+  font-weight:700;
+  color:#64748b;
+}
+
+/* статус */
 .barberhistory__status{
-  font-size:12px; color:#111; background:var(--bh-primary);
-  padding:4px 8px; border-radius:999px; font-weight:800;
+  font-size:13px;
+  font-weight:700;
+  padding:6px 18px;
+  border-radius:999px;
+  background:var(--bh-primary);
+  color:#111827;
 }
 
-.barberhistory__meta{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-.barberhistory__meta .bh-item{ color:var(--bh-muted); font-size:13px; white-space:nowrap; }
-.barberhistory__meta .bh-item + .bh-item::before{ content:"•"; margin:0 6px; color:var(--bh-muted); }
+.barberhistory__status--completed{
+  background:var(--bh-primary);
+  color:#111827;
+}
 
-/* alerts */
+.barberhistory__status--canceled{
+  background:var(--bh-status-canceled-bg);
+  color:var(--bh-status-canceled-text);
+}
+
+/* мета-инфа: две строки как на скрине */
+.barberhistory__meta{
+  display:grid;
+  row-gap:4px;
+  font-size:14px;
+  color:var(--bh-muted);
+}
+
+.barberhistory__metaRow{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+.barberhistory__metaRow .bh-item{
+  white-space:nowrap;
+}
+
+.barberhistory__metaRow .bh-item + .bh-item::before{
+  content:"•";
+  margin:0 8px;
+  color:var(--bh-muted);
+}
+
+/* алерты */
 .barberhistory__alert{
-  padding:10px 12px; border-radius:12px;
-  border:1px solid var(--bh-danger-br); background:var(--bh-danger-bg); color:var(--bh-danger);
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid var(--bh-danger-br);
+  background:var(--bh-danger-bg);
+  color:var(--bh-danger);
+  font-size:13px;
 }
 
-/* pager */
-.barberhistory__pager{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:6px; }
+/* пагинация */
+.barberhistory__pager{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin-top:4px;
+}
+
 .barberhistory__pageBtn{
-  border:1px solid var(--bh-border); background:#fff; color:var(--bh-text);
-  padding:8px 12px; border-radius:10px; cursor:pointer;
+  border:1px solid var(--bh-border);
+  background:#ffffff;
+  color:var(--bh-text);
+  padding:8px 14px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:13px;
 }
-.barberhistory__pageBtn:hover{ background:#f9fafb; }
-.barberhistory__pageBtn:disabled{ opacity:.6; cursor:default; }
-.barberhistory__pageInfo{ color:var(--bh-muted); }
 
-/* responsive */
-@media (max-width: 760px){
-  .barberhistory{ padding:16px; }
-  .barberhistory__header{ grid-template-columns:1fr; }
-  .barberhistory__title{ font-size:18px; }
-  .barberhistory__filters{ gap:8px; }
-  .barberhistory__input{ min-width:140px; }
+.barberhistory__pageBtn:hover{
+  background:#f9fafb;
 }
-@media (max-width: 380px){
-  .barberhistory{ padding:14px; }
-  .barberhistory__input{ min-width:0; width:100%; }
-  .barberhistory__filters{ width:100%; }
+
+.barberhistory__pageBtn:disabled{
+  opacity:.6;
+  cursor:default;
+}
+
+.barberhistory__pageInfo{
+  font-size:13px;
+  color:var(--bh-muted);
+}
+
+/* адаптив */
+@media (max-width: 800px){
+  .barberhistory__filters{
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  .barberhistory__btn{
+    width:100%;
+    justify-content:center;
+  }
+}
+
+@media (max-width: 600px){
+  .barberhistory{
+    padding:12px 0;
+  }
+
+  .barberhistory__card{
+    padding:14px 12px;
+  }
+
+  .barberhistory__status{
+    padding:4px 12px;
+    font-size:12px;
+  }
 }

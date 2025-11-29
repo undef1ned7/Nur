@@ -1,0 +1,82 @@
+/* src/Components/Sectors/Barber/Masters/MastersTabs.scss */
+:root {
+  --masters-primary: #f7d74f;
+  --masters-primary-dark: #d4b800;
+  --masters-text: #0f172a;
+  --masters-muted: #6b7280;
+  --masters-border: #e5e7eb;
+  --masters-surface: #ffffff;
+}
+
+.masters-tabs {
+  /* фон как у страницы, без белой карточки */
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  /* верхняя полоса с табами */
+  &__tabbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    border-bottom: 1px solid var(--masters-border);
+    padding-top: 8px;
+  }
+
+  &__tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 14px 14px 0 0;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--masters-text);
+    cursor: pointer;
+    outline: none;
+    margin-bottom: -1px; /* чтобы активная вкладка перекрывала бордер снизу */
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+
+    &-icon {
+      font-size: 18px;
+    }
+
+    &-label {
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    &:hover {
+      background: rgba(15, 23, 42, 0.03);
+    }
+
+    &--active {
+      background: var(--masters-primary);
+      color: #111827;
+    }
+  }
+
+  &__content {
+    margin-top: 16px;
+  }
+
+  &__placeholder {
+    padding: 40px 16px;
+    text-align: center;
+  }
+
+  &__placeholder-text {
+    margin: 0;
+    font-size: 14px;
+    color: var(--masters-muted);
+  }
+}

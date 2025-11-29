@@ -35,6 +35,7 @@ import BarberClients from "./Components/Sectors/Barber/Clients/Clients";
 import BarberDocuments from "./Components/Sectors/Barber/Documents/Documents";
 import BarberHistory from "./Components/Sectors/Barber/History/History";
 import Masters from "./Components/Sectors/Barber/Masters/Masters";
+import MastersTabs from "./Components/Sectors/Barber/Masters/MastersTabs";
 import Recorda from "./Components/Sectors/Barber/Recorda/Recorda";
 import BarberServices from "./Components/Sectors/Barber/Services/Services";
 import BuildingWork from "./Components/Sectors/Building/BuildingWork/BuildingWork";
@@ -100,7 +101,6 @@ import ConsultingReports from "./Components/Sectors/Consulting/Kassa/Reports/Rep
 import ConsultingBookings from "./Components/Sectors/Consulting/Bookings/Bookings";
 import ConsultingAnalytics from "./Components/Sectors/Consulting/Analytics/Analytics";
 import ProductionAgents from "./Components/Sectors/Production/ProductionAgents/ProductionAgents";
-import BarberSklad from "./Components/Sectors/Barber/Sklad/Sklad";
 import Pending from "./Components/pages/Pending/Pending";
 import PiloramaWarehouse from "./Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
 import ProductionCatalog from "./Components/Sectors/Production/Catalog/ProductionCatalog";
@@ -425,7 +425,7 @@ function App() {
               path="barber/masters"
               element={
                 <ProtectedRoute>
-                  <Masters />
+                  <MastersTabs />
                 </ProtectedRoute>
               }
             />

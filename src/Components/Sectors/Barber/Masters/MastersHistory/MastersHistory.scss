@@ -1,0 +1,360 @@
+/* MastersHistory.scss */
+:root {
+  --mh-text: #0f172a;
+  --mh-muted: #6b7280;
+  --mh-border: #e5e7eb;
+  --mh-surface: #ffffff;
+  --mh-primary: #f7d74f;
+
+  --mh-st-booked-text: #1d4ed8;
+  --mh-st-confirmed-text: #047857;
+  --mh-st-completed-text: #15803d;
+  --mh-st-canceled-text: #b91c1c;
+  --mh-st-no-show-text: #92400e;
+  --mh-st-other-text: #4b5563;
+}
+
+.mastershistory {
+  background: var(--mh-surface);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 75vh;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* "4 записей - стр. 1/2" */
+  &__subtitle {
+    font-size: 14px;
+    color: var(--mh-muted);
+  }
+
+  /* селекты в 4 колонки на всю ширину — как на 1-м скрине */
+  &__filters {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 10px;
+    align-items: flex-end;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__label {
+    font-size: 13px;
+    color: var(--mh-muted);
+  }
+
+  &__alert {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.06);
+    color: #b91c1c;
+    font-size: 14px;
+  }
+
+  &__list {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  /* карточка */
+  &__card {
+    border-radius: 12px;
+    border: 1px solid var(--mh-border);
+    border-left-width: 4px;
+    border-left-color: var(--mh-border);
+    padding: 10px 16px;
+    background: #ffffff;
+  }
+
+  &__card--booked {
+    border-left-color: var(--mh-st-booked-text);
+  }
+  &__card--confirmed {
+    border-left-color: var(--mh-st-confirmed-text);
+  }
+  &__card--completed {
+    border-left-color: var(--mh-st-completed-text);
+  }
+  &__card--canceled {
+    border-left-color: var(--mh-st-canceled-text);
+  }
+  &__card--no-show {
+    border-left-color: var(--mh-st-no-show-text);
+  }
+  &__card--other {
+    border-left-color: var(--mh-border);
+  }
+
+  &__cardHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mh-text);
+  }
+
+  &__status {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  &__status--booked {
+    color: var(--mh-st-booked-text);
+  }
+  &__status--confirmed {
+    color: var(--mh-st-confirmed-text);
+  }
+  &__status--completed {
+    color: var(--mh-st-completed-text);
+  }
+  &__status--canceled {
+    color: var(--mh-st-canceled-text);
+  }
+  &__status--no-show {
+    color: var(--mh-st-no-show-text);
+  }
+  &__status--other {
+    color: var(--mh-st-other-text);
+  }
+
+  /* тело карточки — строки как на референсе */
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    color: var(--mh-text);
+  }
+
+  &__line {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+
+  &__line--summary {
+    margin-top: 4px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  &__key {
+    font-weight: 500;
+  }
+
+  &__key--bold {
+    font-weight: 700;
+  }
+
+  &__value {
+    white-space: normal;
+  }
+
+  &__value--bold {
+    font-weight: 700;
+  }
+
+  &__pager {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--mh-muted);
+  }
+
+  &__pageBtn {
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--mh-border);
+    background: #fff;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    &:not(:disabled):hover {
+      background: #f9fafb;
+    }
+  }
+
+  &__pageInfo {
+    font-size: 13px;
+  }
+
+  @media (max-width: 1024px) {
+    &__filters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    padding: 14px;
+
+    &__filters {
+      grid-template-columns: 1fr;
+    }
+
+    &__card {
+      padding: 8px 12px;
+    }
+
+    &__name {
+      font-size: 13px;
+    }
+
+    &__body {
+      font-size: 12px;
+    }
+  }
+}
+
+/* ===== кастомный селект ===== */
+
+.mh-select {
+  position: relative;
+  width: 100%;
+
+  &--disabled {
+    .mh-select__control {
+      background: #f9fafb;
+      color: #9ca3af;
+      cursor: default;
+      border-color: #e5e7eb;
+      box-shadow: none;
+    }
+
+    .mh-select__arrow {
+      border-top-color: #cbd5e1;
+    }
+  }
+
+  &__control {
+    width: 100%;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--mh-border);
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--mh-text);
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease,
+      background-color 0.15s ease;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &--open {
+      border-color: var(--mh-primary);
+      box-shadow: 0 0 0 1px rgba(247, 215, 79, 0.8);
+    }
+  }
+
+  &__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #4b5563;
+    transition: transform 0.15s ease;
+  }
+
+  &__arrow--open {
+    transform: rotate(180deg);
+  }
+
+  &__dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+    z-index: 30;
+  }
+
+  &__list {
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  &__option {
+    padding: 9px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--mh-text);
+    white-space: nowrap;
+
+    &:hover {
+      background: #f3f4f6;
+    }
+
+    &--active {
+      background: var(--mh-primary);
+      color: #111827;
+      font-weight: 600;
+    }
+  }
+
+  &__list::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &__list::-webkit-scrollbar-track {
+    background: #e5e7eb;
+    border-radius: 999px;
+  }
+
+  &__list::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 999px;
+  }
+}
