@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import "./Sklad.scss";
 
@@ -20,6 +20,7 @@ import MarriageModal from "./MarriageModal";
 import AlertModal from "../../common/AlertModal/AlertModal";
 import SkladTab from "./components/SkladTab";
 import HistoryTab from "./components/HistoryTab";
+import BarcodePrintTab from "./components/BarcodePrintTab";
 
 // Модальные окна
 import AddBrandModal from "./components/modals/AddBrandModal";
@@ -277,7 +278,18 @@ export default function Sklad() {
   const totalPages =
     count && products.length > 0 ? Math.ceil(count / products.length) : 1;
 
-  const tabs = [
+  // Фильтрация товаров по типу для маркета
+  const pieceProducts = useMemo(
+    () => products.filter((p) => p.scale_type === "piece"),
+    [products]
+  );
+  const weightProducts = useMemo(
+    () => products.filter((p) => p.scale_type === "weight"),
+    [products]
+  );
+
+  // Базовые табы (для строительной компании и других)
+  const baseTabs = [
     {
       label: "Склад",
       content: (
@@ -355,11 +367,115 @@ export default function Sklad() {
     },
   ];
 
+  // Табы для маркета (три таба)
+  const marketTabs = [
+    {
+      label: "Штучные",
+      content: (
+        <SkladTab
+          products={pieceProducts}
+          loading={loading}
+          error={error}
+          count={pieceProducts.length}
+          searchTerm={searchTerm}
+          onSearchChange={handleSearchChangeWithReset}
+          isFiltered={isFiltered}
+          onResetFilters={handleResetAllFiltersWithReset}
+          isBuildingCompany={isBuildingCompany}
+          isMarketCompany={isMarketCompany}
+          onShowReceiveModal={() => setShowReceiveModal(true)}
+          onShowHistoryModal={() => setShowHistoryModal(true)}
+          selectCashBox={selectCashBox}
+          onSelectCashBox={setSelectCashBox}
+          cashBoxes={cashBoxes}
+          onAdd={handleAdd}
+          onSendToScales={handleSendToScales}
+          isSelected={isSelected}
+          toggleRow={toggleRow}
+          toggleSelectAllOnPage={toggleSelectAllOnPage}
+          onEdit={handleEdit}
+          onOpenMarriage={handleOpenMarriage}
+          onOpenAddProduct={handleOpenAddProduct}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          next={next}
+          previous={previous}
+          creating={creating}
+          updating={updating}
+          deleting={deleting}
+          onNextPage={() => handleNextPage(next)}
+          onPreviousPage={() => handlePreviousPage(previous)}
+          selectedIds={selectedIds}
+          onBulkDelete={handleBulkDelete}
+          onClearSelection={clearSelection}
+          bulkDeleting={bulkDeleting}
+        />
+      ),
+    },
+    {
+      label: "Килограммовые",
+      content: (
+        <SkladTab
+          products={weightProducts}
+          loading={loading}
+          error={error}
+          count={weightProducts.length}
+          searchTerm={searchTerm}
+          onSearchChange={handleSearchChangeWithReset}
+          isFiltered={isFiltered}
+          onResetFilters={handleResetAllFiltersWithReset}
+          isBuildingCompany={isBuildingCompany}
+          isMarketCompany={isMarketCompany}
+          onShowReceiveModal={() => setShowReceiveModal(true)}
+          onShowHistoryModal={() => setShowHistoryModal(true)}
+          selectCashBox={selectCashBox}
+          onSelectCashBox={setSelectCashBox}
+          cashBoxes={cashBoxes}
+          onAdd={handleAdd}
+          onSendToScales={handleSendToScales}
+          isSelected={isSelected}
+          toggleRow={toggleRow}
+          toggleSelectAllOnPage={toggleSelectAllOnPage}
+          onEdit={handleEdit}
+          onOpenMarriage={handleOpenMarriage}
+          onOpenAddProduct={handleOpenAddProduct}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          next={next}
+          previous={previous}
+          creating={creating}
+          updating={updating}
+          deleting={deleting}
+          onNextPage={() => handleNextPage(next)}
+          onPreviousPage={() => handlePreviousPage(previous)}
+          selectedIds={selectedIds}
+          onBulkDelete={handleBulkDelete}
+          onClearSelection={clearSelection}
+          bulkDeleting={bulkDeleting}
+        />
+      ),
+    },
+    {
+      label: "Печать штрих-кодов",
+      content: (
+        <BarcodePrintTab
+          products={products}
+          loading={loading}
+          searchTerm={searchTerm}
+          onSearchChange={handleSearchChangeWithReset}
+        />
+      ),
+    },
+  ];
+
+  // Выбираем табы в зависимости от типа компании
+  const tabs = isMarketCompany ? marketTabs : baseTabs;
+
   return (
     <div className="sklad">
       {isStartPlan ? (
         <>{tabs[0].content}</>
-      ) : isBuildingCompany ? (
+      ) : isBuildingCompany || isMarketCompany ? (
         <>
           <div className="vitrina__header" style={{ margin: "15px 0" }}>
             <div className="vitrina__tabs">
