@@ -62,10 +62,11 @@ html {
   }
 }
 
+// Общие настройки высоты корневых контейнеров
 .App,
 #root,
 body {
-  // height: auto;
+  min-height: 100vh;
 }
 .content_background {
   position: absolute;
@@ -403,17 +404,6 @@ body {
 }
 .bookings__input {
   width: 100%;
-}
-
-// Добавляем стили для улучшения скроллинга
-html {
-  scroll-behavior: smooth;
-  overflow-x: hidden;
-}
-
-/* Предотвращаем горизонтальный скролл */
-* {
-  max-width: 100%;
 }
 
 // Улучшаем поведение на мобильных устройствах

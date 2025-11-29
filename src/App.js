@@ -110,6 +110,7 @@ import Branch from "./Components/pages/Branch/Branch";
 import BranchDetails from "./Components/pages/Branch/BranchDetails";
 import Logistics from "./Components/pages/logistics/Logistics";
 import LogisticsPage from "./Components/Sectors/logistics/LogisticsPage/LogisticsPage";
+import LogisticsAnalytics from "./Components/pages/LogisticsAnalytics/LogisticsAnalytics";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -172,6 +173,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
 
           <Route path="/crm" element={<Layout />}>
             <Route
@@ -1021,6 +1023,15 @@ function App() {
                 <ProtectedRoute>
                   {/* <Logistics /> */}
                   <LogisticsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="logistics-analytics"
+              element={
+                <ProtectedRoute>
+                  {/* <Logistics /> */}
+                  <LogisticsAnalytics />
                 </ProtectedRoute>
               }
             />
