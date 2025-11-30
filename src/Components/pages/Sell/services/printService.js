@@ -1,64 +1,38 @@
-import { X } from "lucide-react";
-import { useEffect } from "react";
-import { useDispatch } from "react-redux";
-// import "./Sklad.scss";
-
-import {
-  getProductCheckout,
-  getProductInvoice,
-  historySellObjectDetail,
-  historySellProductDetail,
-} from "../../../store/creators/saleThunk";
-import { useSale } from "../../../store/slices/saleSlice";
-import { useUser } from "../../../store/slices/userSlice";
-import { de } from "date-fns/locale";
-
-/* ============================================================
-   A) WebUSB + ESC/POS helpers (автоподключение + печать PDF)
-   ============================================================ */
-
-// Глобальное состояние, чтобы не открывать устройство каждый раз
-// src/Components/pages/Sell/SellDetail.jsx
-
-/* ============================================================
-   A) WebUSB + ESC/POS helpers (автоподключение, JSON и PDF)
-   ============================================================ */
+/**
+ * Print Service
+ * Модуль для работы с печатью чеков через WebUSB и ESC/POS принтеры
+ */
 
 // Глобальное состояние USB
 const usbState = { dev: null, opening: null };
 
-// ====== 0) НАСТРОЙКИ БУМАГИ 72 мм ======
-// ====== 72 мм (80мм принтер) ======
+// ====== НАСТРОЙКИ БУМАГИ 72 мм (80мм принтер) ======
 const DOTS_PER_LINE = Number(localStorage.getItem("escpos_dpl") || 576);
-
-// Шрифт: 'A' (крупнее) или 'B' (мельче). По умолчанию B — ниже строка.
+// Шрифт: 'A' или 'B'
 const FONT = (localStorage.getItem("escpos_font") || "B").toUpperCase();
-
 // ширина символа в точках (Font A ~12, Font B ~9)
 const CHAR_DOT_WIDTH = FONT === "B" ? 9 : 12;
-
-// межстрочный интервал в точках (уменьшаем высоту строк)
+// межстрочный интервал
 const LINE_DOT_HEIGHT = Number(
   localStorage.getItem("escpos_line") || (FONT === "B" ? 22 : 24)
 );
-
-// ширина строки в символах исходя из выбранного шрифта
+// ширина строки в символах
 const CHARS_PER_LINE = Number(
   localStorage.getItem("escpos_cpl") ||
     Math.floor(DOTS_PER_LINE / CHAR_DOT_WIDTH)
 );
 
-// Быстрые тюнеры из консоли:
-function setEscposDotsPerLine(n) {
+// Быстрые тюнеры (пригодятся в консоли):
+export function setEscposDotsPerLine(n) {
   localStorage.setItem("escpos_dpl", String(n));
 }
-function setEscposCharsPerLine(n) {
+export function setEscposCharsPerLine(n) {
   localStorage.setItem("escpos_cpl", String(n));
 }
-function setEscposLineHeight(n) {
+export function setEscposLineHeight(n) {
   localStorage.setItem("escpos_line", String(n));
 }
-function setEscposFont(ch) {
+export function setEscposFont(ch) {
   localStorage.setItem("escpos_font", String(ch).toUpperCase());
 }
 
@@ -70,62 +44,42 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 };
 
 /* ---------- Кодовые страницы и энкодеры ---------- */
-// По вашей самотест-ленте: 66 — PC866 (Cyrillic#2), 73 — WCP1251 (Cyrillic)
+// 66 — PC866, 73 — CP1251 (часто встречается у Xprinter)
 const CODEPAGE = Number(localStorage.getItem("escpos_cp") ?? 73);
-function setEscposCodepage(n) {
+export function setEscposCodepage(n) {
   localStorage.setItem("escpos_cp", String(n));
 }
-
-// поддерживаем оба номера и их «альтернативы» некоторых прошивок
-const CP866_CODES = new Set([66, 18]); // 18 встречается у части Xprinter
-const CP1251_CODES = new Set([73, 22]); // 22 иногда тоже = 1251
+const CP866_CODES = new Set([66, 18]);
+const CP1251_CODES = new Set([73, 22]);
 
 function encodeCP1251(s = "") {
   const out = [];
   for (const ch of s) {
     const c = ch.codePointAt(0);
-    if (c <= 0x7f) {
-      out.push(c);
-    } else if (c === 0x0401) {
-      out.push(0xa8); // Ё
-    } else if (c === 0x0451) {
-      out.push(0xb8); // ё
-    } else if (c >= 0x0410 && c <= 0x042f) {
-      out.push(0xc0 + (c - 0x0410)); // А..Я
-    } else if (c >= 0x0430 && c <= 0x044f) {
-      out.push(0xe0 + (c - 0x0430)); // а..я
-    } else if (c === 0x2116) {
-      out.push(0xb9); // №
-    } else {
-      out.push(0x3f);
-    }
+    if (c <= 0x7f) out.push(c);
+    else if (c === 0x0401) out.push(0xa8);
+    else if (c === 0x0451) out.push(0xb8);
+    else if (c >= 0x0410 && c <= 0x042f) out.push(0xc0 + (c - 0x0410));
+    else if (c >= 0x0430 && c <= 0x044f) out.push(0xe0 + (c - 0x0430));
+    else if (c === 0x2116) out.push(0xb9);
+    else out.push(0x3f);
   }
   return new Uint8Array(out);
 }
-
 function encodeCP866(s = "") {
   const out = [];
   for (const ch of s) {
     const c = ch.codePointAt(0);
-    if (c <= 0x7f) {
-      out.push(c);
-    } else if (c >= 0x0410 && c <= 0x042f) {
-      out.push(0x80 + (c - 0x0410)); // А..Я
-    } else if (c >= 0x0430 && c <= 0x044f) {
-      out.push(0xa0 + (c - 0x0430)); // а..я
-    } else if (c === 0x0401) {
-      out.push(0xf0); // Ё
-    } else if (c === 0x0451) {
-      out.push(0xf1); // ё
-    } else if (c === 0x2116) {
-      out.push(0xfc); // №
-    } else {
-      out.push(0x3f);
-    }
+    if (c <= 0x7f) out.push(c);
+    else if (c >= 0x0410 && c <= 0x042f) out.push(0x80 + (c - 0x0410));
+    else if (c >= 0x0430 && c <= 0x044f) out.push(0xa0 + (c - 0x0430));
+    else if (c === 0x0401) out.push(0xf0);
+    else if (c === 0x0451) out.push(0xf1);
+    else if (c === 0x2116) out.push(0xfc);
+    else out.push(0x3f);
   }
   return new Uint8Array(out);
 }
-
 const getEncoder = (n) =>
   CP866_CODES.has(n)
     ? encodeCP866
@@ -133,7 +87,7 @@ const getEncoder = (n) =>
     ? encodeCP1251
     : encodeCP1251;
 
-/* ---------- Рендер PDF в растр (резерв) ---------- */
+/* ---------- PDF → растер ---------- */
 async function ensurePdfJs() {
   if (typeof window === "undefined") throw new Error("No window");
   if (window.pdfjsLib) return window.pdfjsLib;
@@ -148,7 +102,6 @@ async function ensurePdfJs() {
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   return window.pdfjsLib;
 }
-
 async function pdfBlobToCanvas(pdfBlob, targetWidth = 384) {
   const pdfjsLib = await ensurePdfJs();
   const ab = await pdfBlob.arrayBuffer();
@@ -164,7 +117,6 @@ async function pdfBlobToCanvas(pdfBlob, targetWidth = 384) {
   await page.render({ canvasContext: ctx, viewport: scaled }).promise;
   return canvas;
 }
-
 function canvasToRasterBytes(canvas, threshold = 180) {
   const w = canvas.width;
   const h = canvas.height;
@@ -185,7 +137,6 @@ function canvasToRasterBytes(canvas, threshold = 180) {
   }
   return { raster, w, h, bytesPerLine };
 }
-
 function buildEscPosForRaster(raster, bytesPerLine, h) {
   const xL = bytesPerLine & 0xff;
   const xH = (bytesPerLine >> 8) & 0xff;
@@ -196,16 +147,8 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
   const alignLeft = ESC(0x1b, 0x61, 0x00);
   const header = ESC(0x1d, 0x76, 0x30, 0x00, xL, xH, yL, yH);
 
-  // было: \n\n\n + full cut — это даёт много пустоты
-  // стало: одна строка и рез
-  const feedAndCut = new Uint8Array([
-    0x1b,
-    0x64,
-    0x01, // ESC d n  -> подача на 1 строку
-    0x1d,
-    0x56,
-    0x00, // GS V 0  -> полный отрез
-  ]);
+  // компактная подача + рез
+  const feedAndCut = new Uint8Array([0x1b, 0x64, 0x01, 0x1d, 0x56, 0x00]);
 
   const total = new Uint8Array(
     init.length +
@@ -227,7 +170,7 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
   return total;
 }
 
-/* ---------- JSON → ESC/POS (кириллица) ---------- */
+/* ---------- JSON → ESC/POS ---------- */
 const money = (n) => Number(n || 0).toFixed(2);
 function lr(left, right, width = 32) {
   const L = String(left ?? "");
@@ -235,9 +178,8 @@ function lr(left, right, width = 32) {
   const spaces = Math.max(1, width - L.length - R.length);
   return L + " ".repeat(spaces) + R;
 }
-
 function buildReceiptFromJSON(payload, opts = {}) {
-  const width = opts.width || CHARS_PER_LINE; // <-- так
+  const width = opts.width || CHARS_PER_LINE;
   const divider = "-".repeat(width);
   const enc = getEncoder(CODEPAGE);
 
@@ -262,7 +204,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40)); // init
   chunks.push(ESC(0x1b, 0x52, 0x07)); // International: Russia
-  chunks.push(ESC(0x1b, 0x74, CODEPAGE)); // Codepage: 66 (PC866) или 73 (WCP1251)
+  chunks.push(ESC(0x1b, 0x74, CODEPAGE)); // кодовая страница
 
   chunks.push(ESC(0x1b, 0x61, 0x01)); // center
   if (company) chunks.push(enc(company + "\n"));
@@ -290,9 +232,9 @@ function buildReceiptFromJSON(payload, opts = {}) {
     chunks.push(enc(lr("Скидка:", "-" + money(discount), width) + "\n"));
   if (tax) chunks.push(enc(lr("Налог:", money(tax), width) + "\n"));
 
-  chunks.push(ESC(0x1b, 0x45, 0x01));
+  chunks.push(ESC(0x1b, 0x45, 0x01)); // bold on
   chunks.push(enc(lr("ИТОГО:", money(total), width) + "\n"));
-  chunks.push(ESC(0x1b, 0x45, 0x00));
+  chunks.push(ESC(0x1b, 0x45, 0x00)); // bold off
 
   const havePayments = paidCash || paidCard || change;
   if (havePayments) {
@@ -307,7 +249,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
   chunks.push(enc(divider + "\n"));
   chunks.push(ESC(0x1b, 0x61, 0x01));
   chunks.push(enc("Спасибо за покупку!\n\n"));
-  chunks.push(ESC(0x1d, 0x56, 0x00));
+  chunks.push(ESC(0x1d, 0x56, 0x00)); // полный рез
   chunks.push(ESC(0x0a, 0x0a, 0x0a));
   return chunks;
 }
@@ -322,7 +264,6 @@ async function looksLikePdf(blob) {
     return false;
   }
 }
-
 async function tryParseJsonFromBlob(blob) {
   try {
     const text = await blob.text();
@@ -339,45 +280,6 @@ async function tryParseJsonFromBlob(blob) {
   }
 }
 
-async function handleCheckoutResponseForPrinting(res) {
-  if (
-    res &&
-    typeof res === "object" &&
-    !(res instanceof Blob) &&
-    Array.isArray(res.items)
-  ) {
-    await printReceiptJSONViaUSB(res);
-    return;
-  }
-  if (res instanceof Blob) {
-    if (await looksLikePdf(res)) {
-      await printReceiptFromPdfUSB(res);
-      return;
-    }
-    const parsed = await tryParseJsonFromBlob(res);
-    if (parsed?.json) {
-      await printReceiptJSONViaUSB(parsed.json);
-      return;
-    }
-    if (parsed?.pdfBlob && (await looksLikePdf(parsed.pdfBlob))) {
-      await printReceiptFromPdfUSB(parsed.pdfBlob);
-      return;
-    }
-    const url = URL.createObjectURL(res);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "receipt.pdf";
-    a.click();
-    URL.revokeObjectURL(url);
-    throw new Error("Получен невалидный PDF и не JSON: сохранён как файл.");
-  }
-  if (res && typeof res === "object" && Array.isArray(res.items)) {
-    await printReceiptJSONViaUSB(res);
-    return;
-  }
-  throw new Error("Неизвестный формат ответа для печати");
-}
-
 /* ---------- WebUSB ---------- */
 function saveVidPidToLS(dev) {
   try {
@@ -385,7 +287,6 @@ function saveVidPidToLS(dev) {
     localStorage.setItem("escpos_pid", dev.productId.toString(16));
   } catch {}
 }
-
 async function tryUsbAutoConnect() {
   if (!("usb" in navigator)) throw new Error("Браузер не поддерживает WebUSB");
   const savedVid = parseInt(localStorage.getItem("escpos_vid") || "", 16);
@@ -399,15 +300,14 @@ async function tryUsbAutoConnect() {
     ) || null
   );
 }
-
 async function requestUsbDevice() {
   const filters = [{ classCode: 0x07 }, { classCode: 0xff }];
   return await navigator.usb.requestDevice({ filters });
 }
-
 async function openUsbDevice(dev) {
   if (!dev) throw new Error("USB устройство не найдено");
   if (!dev.opened) await dev.open();
+
   if (dev.configuration == null) {
     await dev.selectConfiguration(1).catch(() => {});
     if (dev.configuration == null && dev.configurations?.length) {
@@ -450,7 +350,6 @@ async function openUsbDevice(dev) {
     "Не удалось захватить интерфейс с bulk OUT. На Windows установите WinUSB (Zadig) и закройте другие приложения принтера."
   );
 }
-
 async function ensureUsbReadyAuto() {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
   if (usbState.dev) return usbState;
@@ -467,7 +366,7 @@ async function ensureUsbReadyAuto() {
   return usbState.dev ? usbState : null;
 }
 
-function attachUsbListenersOnce() {
+export function attachUsbListenersOnce() {
   if (!("usb" in navigator)) return;
   if (attachUsbListenersOnce._did) return;
   attachUsbListenersOnce._did = true;
@@ -493,6 +392,16 @@ function attachUsbListenersOnce() {
   });
 }
 
+export async function checkPrinterConnection() {
+  if (!("usb" in navigator)) return false;
+  try {
+    const state = await ensureUsbReadyAuto();
+    return state !== null && usbState.dev !== null;
+  } catch {
+    return false;
+  }
+}
+
 /* ---------- Печать ---------- */
 async function printReceiptFromPdfUSB(pdfBlob) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
@@ -504,7 +413,7 @@ async function printReceiptFromPdfUSB(pdfBlob) {
   }
   const { outEP } = await openUsbDevice(dev);
 
-  // ВАЖНО: для 72 мм печатаем на всю ширину принтера
+  // печатаем на ширину принтера
   const canvas = await pdfBlobToCanvas(pdfBlob, DOTS_PER_LINE);
   const { raster, bytesPerLine, h } = canvasToRasterBytes(canvas);
   const escpos = buildEscPosForRaster(raster, bytesPerLine, h);
@@ -524,9 +433,7 @@ async function printReceiptJSONViaUSB(payload) {
   }
   const { outEP } = await openUsbDevice(dev);
 
-  // ВАЖНО: width = CHARS_PER_LINE (обычно 48 для 576 dots)
   const parts = buildReceiptFromJSON(payload, { width: CHARS_PER_LINE });
-
   for (const data of parts) {
     for (const chunk of chunkBytes(data)) {
       await dev.transferOut(outEP, chunk);
@@ -534,173 +441,43 @@ async function printReceiptJSONViaUSB(payload) {
   }
 }
 
-// Диагностическая печать страниц 66/73
-async function printCyrPagesTest() {
-  if (!("usb" in navigator)) return;
-  await ensureUsbReadyAuto();
-  let dev = usbState.dev;
-  if (!dev) {
-    dev = await requestUsbDevice();
-    saveVidPidToLS(dev);
+/* ---------- Главная функция обработки ответа для печати ---------- */
+export async function handleCheckoutResponseForPrinting(res) {
+  if (
+    res &&
+    typeof res === "object" &&
+    !(res instanceof Blob) &&
+    Array.isArray(res.items)
+  ) {
+    await printReceiptJSONViaUSB(res);
+    return;
   }
-  const { outEP } = await openUsbDevice(dev);
-  for (const n of [66, 73]) {
-    const enc = getEncoder(n);
-    const data = [
-      ESC(0x1b, 0x40),
-      ESC(0x1b, 0x52, 0x07),
-      ESC(0x1b, 0x74, n),
-      enc(`Кодовая страница ${n}: ТЕСТ Ёжик Яя №\n`),
-      enc("-".repeat(32) + "\n\n"),
-    ];
-    for (const d of data) await dev.transferOut(outEP, d);
+  if (res instanceof Blob) {
+    if (await looksLikePdf(res)) {
+      await printReceiptFromPdfUSB(res);
+      return;
+    }
+    const parsed = await tryParseJsonFromBlob(res);
+    if (parsed?.json) {
+      await printReceiptJSONViaUSB(parsed.json);
+      return;
+    }
+    if (parsed?.pdfBlob && (await looksLikePdf(parsed.pdfBlob))) {
+      await printReceiptFromPdfUSB(parsed.pdfBlob);
+      return;
+    }
+    // не PDF и не JSON — сохраним как файл (фолбэк)
+    const url = URL.createObjectURL(res);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "receipt.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+    throw new Error("Получен невалидный PDF и не JSON: сохранён как файл.");
   }
+  if (res && typeof res === "object" && Array.isArray(res.items)) {
+    await printReceiptJSONViaUSB(res);
+    return;
+  }
+  throw new Error("Неизвестный формат ответа для печати");
 }
-/* ============================================================
-   B) Компонент SellDetail
-   ============================================================ */
-
-const SellDetail = ({ onClose, id }) => {
-  const dispatch = useDispatch();
-  const { historyDetail: item, historyObjectDetail } = useSale();
-  const { company } = useUser();
-
-  const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
-  const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
-  const isBuildingCompany = sectorName === "строительная компания";
-  const isStartPlan = planName === "старт";
-
-  const kindTranslate = {
-    new: "Новый",
-    paid: "Оплаченный",
-    canceled: "возвращенный",
-  };
-
-  const filterField = isStartPlan
-    ? item
-    : isBuildingCompany
-    ? historyObjectDetail
-    : item;
-
-  useEffect(() => {
-    dispatch(historySellProductDetail(id));
-    dispatch(historySellObjectDetail(id));
-  }, [id, dispatch]);
-
-  // Автоподключение USB при монтировании
-  useEffect(() => {
-    attachUsbListenersOnce();
-    ensureUsbReadyAuto().catch(() => {});
-  }, []);
-
-  const handlePrintReceipt = async () => {
-    try {
-      const res = await dispatch(getProductCheckout(item?.id)).unwrap();
-      await handleCheckoutResponseForPrinting(res);
-    } catch (e) {
-      console.error("Печать чека не удалась:", e);
-      alert(
-        "Не удалось распечатать чек. Проверьте WinUSB и формат ответа (JSON/PDF)."
-      );
-    }
-  };
-
-  const handleDownloadInvoice = async () => {
-    try {
-      const pdfInvoiceBlob = await dispatch(
-        getProductInvoice(item?.id)
-      ).unwrap();
-      if (pdfInvoiceBlob instanceof Blob) {
-        const url = window.URL.createObjectURL(pdfInvoiceBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "invoice.pdf";
-        link.click();
-        window.URL.revokeObjectURL(url);
-      } else {
-        // если бэк вдруг вернул не Blob — попробуем преобразовать
-        const data = new Blob([JSON.stringify(pdfInvoiceBlob, null, 2)], {
-          type: "application/octet-stream",
-        });
-        const url = window.URL.createObjectURL(data);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "invoice.bin";
-        link.click();
-        window.URL.revokeObjectURL(url);
-      }
-    } catch (err) {
-      console.error("Скачивание накладной не удалось:", err);
-      alert(err?.detail || "Не удалось получить накладную");
-    }
-  };
-
-  return (
-    <div className="sellDetail add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ width: "700px" }}>
-        <div className="add-modal__header">
-          <h3>Детали продажи</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
-        </div>
-        <div className="sellDetail__content">
-          <div className="sell__box">
-            <p className="receipt__title">Клиент: {filterField?.client_name}</p>
-            <p className="receipt__title">
-              Статус:{" "}
-              {kindTranslate[filterField?.status] || filterField?.status}
-            </p>
-            <p className="receipt__title">
-              Дата:{" "}
-              {filterField?.created_at
-                ? new Date(filterField.created_at).toLocaleString()
-                : "-"}
-            </p>
-          </div>
-
-          <div className="receipt">
-            {filterField?.items?.map((product, idx) => (
-              <div className="receipt__item" key={idx}>
-                <p className="receipt__item-name">
-                  {idx + 1}. {product.product_name ?? product.object_name}
-                </p>
-                <div>
-                  <p>{product.tax_total}</p>
-                  <p className="receipt__item-price">
-                    {product.quantity} x {product.unit_price} ≡{" "}
-                    {product.quantity * product.unit_price}
-                  </p>
-                </div>
-              </div>
-            ))}
-
-            <div className="receipt__total">
-              <b>ИТОГО</b>
-              <div
-                style={{ gap: "10px", display: "flex", alignItems: "center" }}
-              >
-                <p>Общая скидка {filterField?.discount_total} </p>
-                <p>Налог {filterField?.tax_total}</p>
-                <b>≡ {filterField?.total}</b>
-              </div>
-            </div>
-
-            <div className="receipt__row">
-              <button className="receipt__row-btn" onClick={handlePrintReceipt}>
-                Чек
-              </button>
-              <button
-                className="receipt__row-btn"
-                onClick={handleDownloadInvoice}
-              >
-                Накладной
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default SellDetail;

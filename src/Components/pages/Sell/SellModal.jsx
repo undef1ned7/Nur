@@ -1515,7 +1515,7 @@ function PaymentBlock({
             />
           </div>
           <div className="add-modal__section">
-            <label>Срок долга (месяцев) *</label>
+            <label>Срок долга *</label>
             <input
               className="add-modal__input"
               placeholder="Например, 6"
@@ -1557,7 +1557,7 @@ function PaymentBlock({
       {debt === "Долги" && (
         <>
           <div className="add-modal__section">
-            <label>Срок долга (месяцев) *</label>
+            <label>Срок долга *</label>
             <input
               className="add-modal__input"
               placeholder="Например, 6"

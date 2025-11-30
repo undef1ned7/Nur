@@ -988,7 +988,7 @@ const SellStart = ({ show, setShow }) => {
           setAlert({
             open: true,
             type: "error",
-            message: "Введите корректный срок долга (в месяцах)",
+            message: "Введите корректный срок долга",
           });
           return;
         }
@@ -999,7 +999,7 @@ const SellStart = ({ show, setShow }) => {
           setAlert({
             open: true,
             type: "error",
-            message: "Введите корректный срок долга (в месяцах)",
+            message: "Введите корректный срок долга",
           });
           return;
         }

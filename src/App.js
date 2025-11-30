@@ -111,6 +111,7 @@ import BranchDetails from "./Components/pages/Branch/BranchDetails";
 import Logistics from "./Components/pages/logistics/Logistics";
 import LogisticsPage from "./Components/Sectors/logistics/LogisticsPage/LogisticsPage";
 import LogisticsAnalytics from "./Components/pages/LogisticsAnalytics/LogisticsAnalytics";
+import { ScrollToTop } from "./hooks/ScrollToTop";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -159,6 +160,7 @@ function App() {
 
   return (
     <BrowserRouter>
+    <ScrollToTop />
       <Routes>
         <>
           <Route path="/login" element={<Login />} />

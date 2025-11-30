@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import Header from "../Header/Header";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import arnament from "../Photo/Group 1216.png";
 import arnament2 from "../Photo/Group 1204.png";
 import arnament3 from "../Photo/Group 1215.png";
@@ -45,10 +45,16 @@ const Layout = () => {
   const { company } = useUser();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     dispatch(getCompany());
   }, [dispatch]);
+
+  // 🔹 каждый переход на новый роут — скроллим страницу наверх
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -70,11 +76,14 @@ const Layout = () => {
         }}
         className="content_background"
       ></div>
-      <div className={`App ${isSidebarOpen ? "App--sidebar-open" : ""}`}>
+
+      <div className="App">
         <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
         <div
-          className={`content ${languageFunc()}`}
+          className={`content ${languageFunc()} ${
+            isSidebarOpen ? "content--sidebar-open" : ""
+          }`}
           onClick={isSidebarOpen ? closeSidebar : undefined}
         >
           {daysLeft !== null && !hideAnnouncement && (

@@ -390,7 +390,7 @@ export default function ConsultingSale({
 
                 {dealStatus === "Долги" && (
                   <div className="sale__field sale__field--full">
-                    <label className="sale__label">Срок долга (месяцев)</label>
+                    <label className="sale__label">Срок долга</label>
                     <input
                       className="sale__input"
                       type="number"
@@ -418,7 +418,7 @@ export default function ConsultingSale({
                     </div>
                     <div className="sale__field sale__field--full">
                       <label className="sale__label">
-                        Срок долга (месяцев)
+                        Срок долга
                       </label>
                       <input
                         className="sale__input"
