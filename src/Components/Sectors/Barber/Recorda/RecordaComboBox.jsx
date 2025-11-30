@@ -24,6 +24,7 @@ const RecordaComboBox = ({
     );
   }, [items, q]);
 
+  // закрываем по клику вне и по Esc
   useEffect(() => {
     const onDoc = (e) => {
       if (!wrapRef.current) return;
@@ -40,6 +41,7 @@ const RecordaComboBox = ({
     };
   }, []);
 
+  // когда дропдаун открыт — фокус в поиск
   useEffect(() => {
     if (open) {
       window.requestAnimationFrame(() => {
@@ -47,6 +49,12 @@ const RecordaComboBox = ({
       });
     }
   }, [open]);
+
+  // если value поменялся снаружи (выбор или сброс) — гарантированно закрываем
+  useEffect(() => {
+    setOpen(false);
+    setQ("");
+  }, [value]);
 
   const selected = items.find((i) => String(i.id) === String(value));
 
@@ -103,10 +111,13 @@ const RecordaComboBox = ({
                   className={`barberrecorda__comboOption ${
                     it.disabled ? "is-disabled" : ""
                   }`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     if (!it.disabled) {
                       onChange?.(it.id, it);
-                      setOpen(false);
+                      setOpen(false); // ← жёстко закрываем
+                      setQ("");
                     }
                   }}
                   disabled={it.disabled}

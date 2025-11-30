@@ -21,6 +21,8 @@ import {
   serviceNamesFromRecord,
   clientNameOf,
   priceOfAppointment,
+  basePriceOfAppointment,
+  discountPercentOfAppointment,
   parseUserDate,
   statusLabel,
 } from "./HistoryUtils";
@@ -299,7 +301,15 @@ const History = () => {
             const time = timeISO(a.start_at);
             const client = clientNameOf(a, clients);
             const service = serviceNamesFromRecord(a, services);
-            const price = priceOfAppointment(a, services);
+
+            const totalPrice = priceOfAppointment(a, services);
+            const basePrice = basePriceOfAppointment(a, services);
+            const discountPct = discountPercentOfAppointment(
+              a,
+              basePrice,
+              totalPrice
+            );
+
             const statusKey = String(a.status || "").toLowerCase();
             const statusText = a.status_display || statusLabel(a.status);
 
@@ -311,6 +321,8 @@ const History = () => {
                 : "barberhistory__status";
 
             const barber = barberNameOf(a, employees);
+            const discountLabel =
+              discountPct !== null ? `${discountPct}%` : "0%";
 
             return (
               <article
@@ -333,12 +345,22 @@ const History = () => {
                       Клиент: {client}
                     </span>
                   </div>
+
                   <div className="barberhistory__metaRow">
                     <span className="bh-item">
                       Услуга: {service}
                     </span>
+                  </div>
+
+                  <div className="barberhistory__metaRow barberhistory__metaRow--summary">
                     <span className="bh-item">
-                      Цена: {fmtMoney(price)}
+                      Цена без скидки: {fmtMoney(basePrice)}
+                    </span>
+                    <span className="bh-item">
+                      Скидка: {discountLabel}
+                    </span>
+                    <span className="bh-item bh-item--bold">
+                      Итого: {fmtMoney(totalPrice)}
                     </span>
                   </div>
                 </div>

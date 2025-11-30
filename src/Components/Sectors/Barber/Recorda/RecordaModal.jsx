@@ -572,7 +572,26 @@ const RecordaModal = ({
                   </div>
                 </label>
 
-                {/* Начало / Конец */}
+
+
+                                {/* Услуги */}
+                <label
+                  className={`barberrecorda__field barberrecorda__field--full barberrecorda__field--services ${
+                    fieldErrs.services ? "is-invalid" : ""
+                  }`}
+                >
+                  <span className="barberrecorda__label">
+                    Услуги <b className="barberrecorda__req">*</b>
+                  </span>
+                  <RecordaServicesPicker
+                    items={serviceItems}
+                    selectedIds={selServices}
+                    onChange={setSelServices}
+                    summary={servicesSummary}
+                  />
+                </label>
+
+                                {/* Начало / Конец */}
                 <div className="barberrecorda__row barberrecorda__row--2">
                   <label
                     className={`barberrecorda__field ${
@@ -615,6 +634,8 @@ const RecordaModal = ({
                     />
                   </label>
                 </div>
+
+
 
                 {/* Сотрудник */}
                 <label
@@ -662,22 +683,7 @@ const RecordaModal = ({
                   />
                 </label>
 
-                {/* Услуги */}
-                <label
-                  className={`barberrecorda__field barberrecorda__field--full barberrecorda__field--services ${
-                    fieldErrs.services ? "is-invalid" : ""
-                  }`}
-                >
-                  <span className="barberrecorda__label">
-                    Услуги <b className="barberrecorda__req">*</b>
-                  </span>
-                  <RecordaServicesPicker
-                    items={serviceItems}
-                    selectedIds={selServices}
-                    onChange={setSelServices}
-                    summary={servicesSummary}
-                  />
-                </label>
+
 
                 {/* Скидка / Цена */}
                 <div className="barberrecorda__row barberrecorda__row--2">

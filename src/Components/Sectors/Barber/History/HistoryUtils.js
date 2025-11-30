@@ -117,6 +117,35 @@ export const priceOfAppointment = (a, services) => {
   return null;
 };
 
+/* базовая цена без скидки, как в MastersHistory */
+export const basePriceOfAppointment = (a, services) => {
+  const candidates = [
+    a.base_price,
+    a.price_before_discount,
+    a.full_price,
+    a.sum_before_discount,
+  ];
+  for (const c of candidates) {
+    const n = num(c);
+    if (n !== null) return n;
+  }
+  return priceOfAppointment(a, services);
+};
+
+export const discountPercentOfAppointment = (a, basePrice, totalPrice) => {
+  const direct = a.discount_percent ?? a.discount ?? a.discount_value ?? null;
+  const nDirect = num(direct);
+  if (nDirect !== null) return nDirect;
+
+  const base = num(basePrice);
+  const total = num(totalPrice);
+  if (base && total && base > total) {
+    const pct = Math.round((1 - total / base) * 100);
+    if (pct > 0) return pct;
+  }
+  return null;
+};
+
 /* ===== парсим ввод ДД.ММ.ГГГГ (опц. время) ===== */
 export const parseUserDate = (str) => {
   const txt = String(str || "").trim();

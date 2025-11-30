@@ -9,18 +9,24 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
   const [q, setQ] = useState("");
   const wrapRef = useRef(null);
 
+  const safeSelected = Array.isArray(selectedIds) ? selectedIds : [];
+
   const already = useMemo(
-    () => new Set(selectedIds.map(String)),
-    [selectedIds]
+    () => new Set(safeSelected.map(String)),
+    [safeSelected]
   );
 
   const filtered = useMemo(() => {
     const text = q.trim().toLowerCase();
-    if (!text) return items;
-    return items.filter((it) =>
-      (it.search || it.label || "").toLowerCase().includes(text)
-    );
-  }, [items, q]);
+    if (!text) {
+      return (items || []).filter((it) => !already.has(String(it.id)));
+    }
+    return (items || [])
+      .filter((it) => !already.has(String(it.id)))
+      .filter((it) =>
+        (it.search || it.label || "").toLowerCase().includes(text)
+      );
+  }, [items, q, already]);
 
   useEffect(() => {
     const onDoc = (e) => {
@@ -33,24 +39,30 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const onPick = (id) => {
+  const handlePick = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
     const sid = String(id);
     if (!already.has(sid)) {
-      onChange([...selectedIds, sid]);
+      onChange([...safeSelected, sid]);
     }
     setQ("");
-    setOpen(false);
+    setOpen(false); // закрываем после выбора
   };
 
-  const remove = (sid) =>
-    onChange(selectedIds.filter((id) => String(id) !== String(sid)));
+  const handleRemove = (e, sid) => {
+    e.preventDefault();
+    e.stopPropagation(); // чтобы клики по крестику вообще не влияли на открытие
+    const next = safeSelected.filter((id) => String(id) !== String(sid));
+    onChange(next);
+    setOpen(false); // на всякий случай ещё и закрываем
+  };
 
   return (
-    <div className="barberrecorda__svcField">
+    <div className="barberrecorda__svcField" ref={wrapRef}>
       {/* Поиск услуг с дропдауном */}
       <div
         className={`barberrecorda__svcSearchWrap ${open ? "is-open" : ""}`}
-        ref={wrapRef}
       >
         <div
           className="barberrecorda__svcSearch"
@@ -70,7 +82,10 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
         </div>
 
         {open && (
-          <div className="barberrecorda__svcDropdown">
+          <div
+            className="barberrecorda__svcDropdown"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             {filtered.length === 0 ? (
               <div className="barberrecorda__svcEmpty">
                 Ничего не найдено
@@ -81,7 +96,7 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
                   key={it.id}
                   type="button"
                   className="barberrecorda__svcOption"
-                  onClick={() => onPick(it.id)}
+                  onClick={(e) => handlePick(e, it.id)}
                 >
                   <div className="barberrecorda__svcOptionTitle">
                     {it.label}
@@ -92,9 +107,7 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
                         {it.categoryName}
                       </span>
                     )}
-                    {it.minutes ? (
-                      <span>⏱ {it.minutes} мин</span>
-                    ) : null}
+                    {it.minutes ? <span>⏱ {it.minutes} мин</span> : null}
                     {Number.isFinite(it.price) ? (
                       <span>💰 {fmtMoney(it.price)}</span>
                     ) : null}
@@ -107,7 +120,7 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
       </div>
 
       {/* Резюме + выбранные услуги */}
-      {selectedIds.length > 0 && (
+      {safeSelected.length > 0 && (
         <>
           <div className="barberrecorda__svcSummaryCard">
             <div className="barberrecorda__svcSummaryCol">
@@ -131,7 +144,7 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
           </div>
 
           <div className="barberrecorda__svcCards">
-            {selectedIds.map((id, idx) => {
+            {safeSelected.map((id, idx) => {
               const it = items.find((x) => String(x.id) === String(id));
               if (!it) return null;
               const name = it.label || "Услуга";
@@ -162,7 +175,7 @@ const RecordaServicesPicker = ({ items, selectedIds, onChange, summary }) => {
                     type="button"
                     className="barberrecorda__svcCardDel"
                     aria-label="Убрать услугу"
-                    onClick={() => remove(id)}
+                    onClick={(e) => handleRemove(e, id)}
                   >
                     <FaTimes />
                   </button>
