@@ -27,6 +27,7 @@ const DebtModal = ({
         <p className="start__debt-amount">
           Cумма долга: <b>{currentTotal}</b>
         </p>
+
         {clientId === "" && (
           <>
             <p style={{ margin: "5px 0" }} className="sell__header-necessarily">
@@ -49,6 +50,7 @@ const DebtModal = ({
             </select>
           </>
         )}
+
         {company?.subscription_plan?.name === "Старт" && (
           <>
             <label>Телефон</label>
@@ -59,55 +61,74 @@ const DebtModal = ({
               name="phone"
               value={state.phone}
             />
-            <label>Дата оплаты</label>
-            <input
-              type="date"
-              className="sell__header-input"
-              onChange={onChange2}
-              name="dueDate"
-            />
           </>
         )}
+
         <label>Тип оплаты</label>
         <select
           value={debt}
           onChange={(e) => setDebt(e.target.value)}
           className="sell__header-input"
-          name=""
         >
           <option value="">Тип оплаты</option>
           <option value="Предоплата">Предоплата</option>
           <option value="Долги">Долг</option>
         </select>
+
+        {/* Блок для "Предоплата" */}
         {debt === "Предоплата" && (
           <>
-            <label htmlFor="">Сумма предоплаты</label>
+            <label>Сумма предоплаты</label>
             <input
               type="text"
               className="sell__header-input"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <label htmlFor="">Срок долга</label>
+
+            <label>Срок долга (в месяцах)</label>
             <input
-              type="text"
+              type="number"
+              min="1"
               className="sell__header-input"
               value={debtMonths}
               onChange={(e) => setDebtMonths(e.target.value)}
             />
+
+            <label>Дата первого платежа</label>
+            <input
+              type="date"
+              className="sell__header-input"
+              name="dueDate"
+              value={state.dueDate}
+              onChange={onChange2}
+            />
           </>
         )}
+
+        {/* Блок для "Долги" */}
         {debt === "Долги" && (
           <>
-            <label htmlFor="">Срок долга</label>
+            <label>Срок долга (в месяцах)</label>
             <input
-              type="text"
+              type="number"
+              min="1"
               className="sell__header-input"
               value={debtMonths}
               onChange={(e) => setDebtMonths(e.target.value)}
             />
+
+            <label>Дата первого платежа</label>
+            <input
+              type="date"
+              className="sell__header-input"
+              name="dueDate"
+              value={state.dueDate}
+              onChange={onChange2}
+            />
           </>
         )}
+
         <div
           style={{
             marginTop: "20px",

@@ -9,24 +9,25 @@ import "./Sidebar.scss";
 import arnament1 from "../Photo/Group 1203.png";
 import arnament2 from "../Photo/Group 1204 (1).png";
 import Logo from "../Photo/logo2.png";
+import { useLocation } from "react-router-dom";
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const dispatch = useDispatch();
   const { company, profile, tariff, sector } = useUser();
   const [openDropdown, setOpenDropdown] = useState(null);
 
-  // Загружаем профиль при монтировании, если его нет
+  const location = useLocation();
+  const menuRef = useRef(null);   // 👈 ref теперь на меню
+
   useEffect(() => {
     if (!profile) {
       dispatch(getProfile());
     }
   }, [dispatch, profile]);
 
-  // Получаем данные из Redux вместо локальных запросов
   const currentTariff = tariff || company?.subscription_plan?.name || "Старт";
   const currentSector = sector || company?.sector?.name;
 
-  // Используем хук для сборки меню
   const menuItems = useMenuItems(
     company,
     currentSector,
@@ -34,11 +35,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     profile
   );
 
-  // Обработка клика вне dropdown
-  const dropdownRef = useRef(null);
+  // клик вне сайдбара
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
         setOpenDropdown(null);
       }
     };
@@ -48,6 +48,17 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     };
   }, []);
 
+  // 🔥 сброс скролла меню при смене страницы
+  useEffect(() => {
+    if (menuRef.current) {
+      menuRef.current.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+    }
+  }, [location.pathname]);
+
   const handleToggleDropdown = (itemLabel) => {
     setOpenDropdown(openDropdown === itemLabel ? null : itemLabel);
   };
@@ -56,14 +67,16 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
   return (
     <div className={`sidebar ${isOpen ? "sidebar--visible" : ""}`}>
-      <div className="sidebar__wrapper" ref={dropdownRef}>
+      <div className="sidebar__wrapper">
         <img src={arnament1} className="sidebar__arnament1" alt="Декор" />
         <img src={arnament2} className="sidebar__arnament2" alt="Декор" />
         <div className="sidebar__logo">
           <img src={Logo} alt="Логотип" />
         </div>
+
         {isLoading && <p>Загрузка данных...</p>}
-        <ul className="sidebar__menu">
+
+        <ul className="sidebar__menu" ref={menuRef}>
           {!isLoading &&
             menuItems.map((item) => (
               <MenuItem
@@ -80,5 +93,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     </div>
   );
 };
+
 
 export default Sidebar;

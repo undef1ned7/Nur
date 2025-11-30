@@ -25,7 +25,39 @@ import SellModal from "./SellModal";
 import SellMainStart from "./SellMainStart";
 import "./sell.scss";
 
-export async function createDebt(payload) {
+/**
+ * Создание долга для клиента.
+ *
+ * Ожидаемые аргументы:
+ * - clientId: string (uuid клиента)
+ * - title: string (заголовок, например "Долг Мирлан")
+ * - amount: string | number (сумма, например "30.00")
+ * - debtMonths?: number (срок в месяцах, по умолчанию 0)
+ * - firstDueDate?: string | null (дата первого платежа "YYYY-MM-DD", если работаем по дате)
+ * - note?: string (опциональный комментарий)
+ */
+export async function createDebt({
+  clientId,
+  title,
+  amount,
+  debtMonths = 0,
+  firstDueDate = null,
+  note = "",
+}) {
+  const payload = {
+    client: clientId,
+    kind: "debt",
+    title,
+    note: note || "",
+    amount, // "30.00" или число — как у тебя принято
+    debt_months: Number(debtMonths ?? 0), // <-- всегда отправляем, минимум 0
+  };
+
+  // Если работаем с датой (режим "день") — отправляем first_due_date
+  if (firstDueDate) {
+    payload.first_due_date = firstDueDate; // "YYYY-MM-DD"
+  }
+
   const res = await api.post("/main/debts/", payload);
   return res.data;
 }
@@ -36,7 +68,6 @@ const STATUSES = [
   { value: "canceled", label: "Отменена" },
 ];
 
-// Для select сделки
 export const DEAL_STATUS_RU = ["Продажа", "Долги", "Предоплата"];
 
 const Sell = () => {
@@ -150,7 +181,7 @@ const Sell = () => {
   const kindTranslate = {
     new: "Новый",
     paid: "Оплаченный",
-    canceled: "Отмененный",
+    canceled: "возвращенный",
   };
 
   const handleAddCashbox = async () => {
@@ -390,130 +421,6 @@ const Sell = () => {
           </div>
         </>
       )}
-      {/* <div className="sklad__header">
-        <div className="sklad__left">
-          <input
-            type="text"
-            placeholder="Поиск по истории"
-            className="sklad__search"
-            onChange={onChange}
-          />
-          <div className="sklad__center">
-            <span>Найдено: {filterField?.length ?? 0}</span>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          {!isBuildingCompany && filterField?.length > 0 && (
-            <button
-              className="barbermasters__btn barbermasters__btn--secondary"
-              onClick={handleClearAllHistory}
-              disabled={clearing}
-              title="Удалить всю историю"
-            >
-              <Trash /> {clearing ? "Очищаем..." : "Очистить историю"}
-            </button>
-          )}
-
-          {isBuildingCompany ? (
-            <button
-              className="sklad__add"
-              onClick={() => setShowBuilding(true)}
-            >
-              <Plus size={16} style={{ marginRight: 4 }} /> Продать квартиру
-            </button>
-          ) : (
-            <>
-              <button
-                className="sklad__add"
-                onClick={() => setShowSellModal(true)}
-              >
-                <Plus size={16} style={{ marginRight: 4 }} /> Продать товар
-              </button>
-
-              <button
-                className="sklad__add"
-                onClick={() => setShowAddCashboxModal(true)}
-              >
-                Прочие расходы
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {!!filterField?.length && <SelectionActions pageItems={filterField} />}
-
-      {(filterField?.length ?? 0) === 0 ? (
-        <p className="sklad__no-products-message">Нет записей.</p>
-      ) : (
-        <div className="table-wrapper" style={{ marginBottom: 20 }}>
-          <table className="sklad__table">
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={
-                      filterField.length > 0 &&
-                      filterField.every((i) => selectedIds.has(i.id))
-                    }
-                    onChange={() => toggleSelectAllOnPage(filterField)}
-                  />
-                </th>
-                <th>№</th>
-                <th>Клиент</th>
-                <th>Цена</th>
-                <th>Статус</th>
-                <th>Дата</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filterField.map((item, index) => (
-                <tr
-                  key={item.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => {
-                    setSellId(item.id);
-                    setShowDetailSell(true);
-                  }}
-                >
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={isSelected(item.id)}
-                      onChange={() => toggleRow(item.id)}
-                    />
-                  </td>
-                  <td>{index + 1}</td>
-                  <td>{item.client_name || "Нет имени"}</td>
-                  <td>{item.total ?? item.subtotal}</td>
-                  <td>{kindTranslate[item.status] || item.status}</td>
-                  <td>{new Date(item.created_at).toLocaleString()}</td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    {company.sector.name === "Магазин" && (
-                      <button
-                        className="btn edit-btn"
-                        onClick={() => handleOpen(item)}
-                      >
-                        Возврат
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )} */}
 
       {showAddCashboxModal && (
         <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />

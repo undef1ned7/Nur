@@ -155,7 +155,7 @@ const AddModal = ({
 
     if (debt === "Долги") {
       if (!debtMonths || Number(debtMonths) <= 0) {
-        alert("Введите корректный срок долга (в месяцах)");
+        alert("Введите корректный срок долга");
         return;
       }
       if (company?.subscription_plan?.name === "Старт") {
@@ -181,7 +181,7 @@ const AddModal = ({
         return;
       }
       if (!debtMonths || Number(debtMonths) <= 0) {
-        alert("Введите корректный срок долга (в месяцах)");
+        alert("Введите корректный срок долга");
         return;
       }
     }

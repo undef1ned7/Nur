@@ -756,7 +756,7 @@ const BarberAnalitika = () => {
       <section className="ba-kpis">
         <div className="kpi">
           <div className="kpi__icon"><CalendarDays size={18} /></div>
-          <div className="kpi__name">Записей (месяц)</div>
+          <div className="kpi__name">Записей</div>
           <div className="kpi__val">{fmtInt(totalApps)}</div>
         </div>
         <div className="kpi">
@@ -776,12 +776,12 @@ const BarberAnalitika = () => {
         </div>
         <div className="kpi kpi--accent">
           <div className="kpi__icon"><Wallet size={18} /></div>
-          <div className="kpi__name">Приход (месяц, общий)</div>
+          <div className="kpi__name">Приход</div>
           <div className="kpi__val">{fmtMoney(unifiedIncome)}</div>
         </div>
         <div className="kpi kpi--accent">
           <div className="kpi__icon"><Wallet size={18} /></div>
-          <div className="kpi__name">Расход (месяц, общий)</div>
+          <div className="kpi__name">Расход</div>
           <div className="kpi__val">{fmtMoney(unifiedExpense)}</div>
         </div>
       </section>
