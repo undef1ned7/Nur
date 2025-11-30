@@ -1,6 +1,6 @@
 /**
  * Xprinter XP-365B Print Service (TSPL)
- * Печать штрих-кодовых этикеток через WebUSB + команды для кириллицы
+ * Печать штрих-кодовых этикеток через WebUSB + кириллица через транслитерацию
  */
 
 // ===== Глобальное состояние USB =====
@@ -17,7 +17,7 @@ const chunkBytes = (u8, size = 4096) => {
   return out;
 };
 
-// Энкодер TSPL (ASCII → bytes)
+// Энкодер TSPL (ASCII → bytes; фактически UTF-8, но мы шлём только ASCII)
 const tsplEncoder = new TextEncoder();
 const encodeTspl = (s) => tsplEncoder.encode(s);
 
@@ -37,6 +37,66 @@ function wrap(text = "", width = 24) {
   }
   if (line) out.push(line);
   return out;
+}
+
+/* ====================== простая транслитерация RU/KG → LAT ====================== */
+
+const TRANSLIT_MAP = {
+  а: "a",
+  б: "b",
+  в: "v",
+  г: "g",
+  д: "d",
+  е: "e",
+  ё: "yo",
+  ж: "zh",
+  з: "z",
+  и: "i",
+  й: "y",
+  к: "k",
+  л: "l",
+  м: "m",
+  н: "n",
+  о: "o",
+  п: "p",
+  р: "r",
+  с: "s",
+  т: "t",
+  у: "u",
+  ф: "f",
+  х: "kh",
+  ц: "ts",
+  ч: "ch",
+  ш: "sh",
+  щ: "shch",
+  ы: "y",
+  э: "e",
+  ю: "yu",
+  я: "ya",
+  ъ: "",
+  ь: "",
+  // кыргызские
+  ө: "o",
+  ү: "u",
+  ң: "ng",
+};
+
+function translitToAscii(str = "") {
+  let res = "";
+  for (const ch of String(str)) {
+    const lower = ch.toLowerCase();
+    if (TRANSLIT_MAP[lower]) {
+      const tr = TRANSLIT_MAP[lower];
+      if (lower !== ch) {
+        res += tr.charAt(0).toUpperCase() + tr.slice(1);
+      } else {
+        res += tr;
+      }
+    } else {
+      res += ch;
+    }
+  }
+  return res;
 }
 
 /* ====================== WebUSB helpers ====================== */
@@ -73,24 +133,22 @@ async function requestUsbDevice() {
     throw new Error("Браузер не поддерживает WebUSB");
   }
 
-  // как в html-примере — по классу принтера
+  // по классу принтера
   const filters = [{ classCode: 0x07 }];
   return await navigator.usb.requestDevice({ filters });
 }
 
 /* ====================== спец. команды для кириллицы ====================== */
-
 /**
  * Отправка сервисных команд:
  *  1F 1B 1F FE 01
  *  1F 1B 1F FE 11
  * которые в конфигураторе рекомендуют для включения кириллицы.
+ * (мы сейчас шлём только ASCII, но команды не мешают)
  */
 async function sendXp365bKyrillicInit(dev, outEP) {
   try {
-    // первый пакет: 1F 1B 1F FE 01
     const cmd1 = new Uint8Array([0x1f, 0x1b, 0x1f, 0xfe, 0x01]);
-    // второй пакет: 1F 1B 1F FE 11
     const cmd2 = new Uint8Array([0x1f, 0x1b, 0x1f, 0xfe, 0x11]);
 
     await dev.transferOut(outEP, cmd1);
@@ -176,7 +234,6 @@ async function openUsbDevice(dev) {
     outEP
   );
 
-  // === тут отправляем специальные команды для кириллицы ===
   await sendXp365bKyrillicInit(dev, outEP);
 
   return { outEP };
@@ -280,50 +337,57 @@ export async function checkXp365bConnection() {
   }
 }
 
-/* ====================== TSPL: этикетка ====================== */
+/* ====================== TSPL: этикетка (ASCII + транслит) ====================== */
 
+// ВАЖНО: сделан на основе testXp365bSimple (который печатает HELLO)
 function buildTsplLabel({ title, barcode, widthMm = 58, heightMm = 40 }) {
-  const name = (title || "Тестовый товар").trim();
+  // транслитеруем кириллицу → латиница, чтобы были чистые ASCII-байты
+  const latinName = translitToAscii(title || "Test product").trim();
   const code = (barcode || "123456789012").trim();
 
-  const nameLines = wrap(name, 24);
+  // делим название на 1–2 строки
+  const nameLines = wrap(latinName, 18);
 
-  let y = 30;
+  let y = 20;
   const cmds = [];
 
-  cmds.push(`SIZE ${widthMm} mm,${heightMm} mm\r\n`);
-  cmds.push(`GAP 2 mm,0 mm\r\n`);
-  cmds.push("DIRECTION 1\r\n");
-  cmds.push("REFERENCE 0,0\r\n");
-  cmds.push("CLS\r\n");
+  // те же базовые команды, что и в testXp365bSimple
+  cmds.push(`SIZE ${widthMm} mm,${heightMm} mm`);
+  cmds.push("GAP 3 mm,0 mm");
+  cmds.push("DIRECTION 1");
+  cmds.push("REFERENCE 0,0");
+  cmds.push("CLS");
 
-  // кодовая страница под кириллицу (после init-команд)
-  cmds.push("CODEPAGE 866\r\n");
+  // БЕЗ CODEPAGE — только ASCII, как в HELLO
+  // cmds.push("CODEPAGE 866");
 
   // первая строка — крупный шрифт
   cmds.push(
-    `TEXT 30,${y},"TSS24.BF2",0,1,1,"${(nameLines[0] || "")
+    `TEXT 20,${y},"TSS24.BF2",0,1,1,"${(nameLines[0] || "")
       .replace(/"/g, "")
-      .slice(0, 24)}"\r\n`
+      .slice(0, 18)}"`
   );
 
-  // вторая строка (если есть) — поменьше
+  // вторая строка (если есть) — ниже, меньшим шрифтом
   if (nameLines[1]) {
-    y += 30;
+    y += 28;
     cmds.push(
-      `TEXT 30,${y},"TSS16.BF2",0,1,1,"${nameLines[1]
+      `TEXT 20,${y},"TSS16.BF2",0,1,1,"${nameLines[1]
         .replace(/"/g, "")
-        .slice(0, 24)}"\r\n`
+        .slice(0, 18)}"`
     );
   }
 
-  // ниже — штрихкод
-  y += 70;
-  cmds.push(`BARCODE 30,${y},"128",60,1,0,2,4,"${code.replace(/"/g, "")}"\r\n`);
+  // чуть ниже — штрихкод
+  y += 50;
+  cmds.push(`BARCODE 20,${y},"128",60,1,0,2,4,"${code.replace(/"/g, "")}"`);
 
-  cmds.push("PRINT 1\r\n");
+  cmds.push("PRINT 1");
+  cmds.push(""); // финальный \r\n
 
-  const tsplStr = cmds.join("");
+  const tsplStr = cmds.join("\r\n");
+  console.log("TSPL label string:\n", tsplStr);
+
   return encodeTspl(tsplStr);
 }
 
@@ -338,7 +402,6 @@ export async function printXp365bBarcodeLabel(params) {
     throw new Error("Браузер не поддерживает WebUSB");
   }
 
-  // если уже подключены — не лезем в диалог
   if (!usbState.dev || usbState.outEP == null) {
     const st = await ensureUsbReadyAuto();
     if (!st || !st.dev) {
@@ -360,9 +423,10 @@ export async function printXp365bBarcodeLabel(params) {
     heightMm: params.heightMm ?? 40,
   });
 
-  console.log("Печатаем этикетку XP-365B (TSPL + кириллический init):", {
+  console.log("Печатаем этикетку XP-365B (TSPL + translit):", {
     barcode: params.barcode,
     title: params.title,
+    latin: translitToAscii(params.title || "Товар"),
   });
 
   for (const part of chunkBytes(buf)) {
@@ -373,7 +437,7 @@ export async function printXp365bBarcodeLabel(params) {
   console.log("Команда на печать отправлена");
 }
 
-/* ====================== Кодировки CP866 / CP1251 ====================== */
+/* ====================== Кодировки CP866 / CP1251 (для тестов) ====================== */
 
 function encodeCP1251(s = "") {
   const out = [];
@@ -425,7 +489,6 @@ export async function testXp365bEncodingPrint() {
     throw new Error("Принтер XP-365B не подключён");
   }
 
-  // на всякий случай ещё раз отправим init-команды перед тестом
   await sendXp365bKyrillicInit(dev, outEP);
 
   const tspl = [
@@ -464,7 +527,6 @@ export async function printXp365bCodepageTest() {
     throw new Error("Браузер не поддерживает WebUSB");
   }
 
-  // простые ASCII-строки
   const ascii = (s) =>
     new Uint8Array(
       [...s].map((ch) => {
@@ -476,7 +538,6 @@ export async function printXp365bCodepageTest() {
   const enc866 = (s) => encodeCP866(s);
   const enc1251 = (s) => encodeCP1251(s);
 
-  // 1) Подключаемся к принтеру
   if (!usbState.dev || usbState.outEP == null) {
     const st = await ensureUsbReadyAuto();
     if (!st || !st.dev) {
@@ -490,7 +551,6 @@ export async function printXp365bCodepageTest() {
     throw new Error("Принтер XP-365B не подключён");
   }
 
-  // 2) Собираем TSPL-команды
   const chunks = [];
 
   chunks.push(ascii("SIZE 58 mm,40 mm\r\n"));
@@ -502,16 +562,13 @@ export async function printXp365bCodepageTest() {
   chunks.push(ascii("SET DARKNESS 10\r\n"));
   chunks.push(ascii("BOX 10,10,440,260,4\r\n"));
 
-  // ASCII строка
   chunks.push(ascii("CODEPAGE 866\r\n"));
   chunks.push(ascii('TEXT 30,20,"TSS24.BF2",0,1,1,"HELLO 123"\r\n'));
 
-  // CP866: Привет 123
   chunks.push(ascii('TEXT 30,60,"TSS16.BF2",0,1,1,"'));
   chunks.push(enc866("CP866: Привет 123"));
   chunks.push(ascii('"\r\n'));
 
-  // CP1251: Привет 123
   chunks.push(ascii("CODEPAGE 1251\r\n"));
   chunks.push(ascii('TEXT 30,100,"TSS16.BF2",0,1,1,"'));
   chunks.push(enc1251("CP1251: Привет 123"));
@@ -519,7 +576,6 @@ export async function printXp365bCodepageTest() {
 
   chunks.push(ascii("PRINT 1\r\n"));
 
-  // 3) Склеиваем и отправляем
   let totalLen = 0;
   for (const c of chunks) totalLen += c.length;
   const buf = new Uint8Array(totalLen);
@@ -539,9 +595,52 @@ export async function printXp365bCodepageTest() {
   console.log("Тест кодовых страниц отправлен");
 }
 
+/* ====================== Простой тест (HELLO) ====================== */
+
+export async function testXp365bSimple() {
+  if (typeof navigator === "undefined" || !("usb" in navigator)) {
+    throw new Error("Браузер не поддерживает WebUSB");
+  }
+
+  if (!usbState.dev || usbState.outEP == null) {
+    const st = await ensureUsbReadyAuto();
+    if (!st || !st.dev) {
+      await connectXp365bManually();
+    }
+  }
+
+  const dev = usbState.dev;
+  const outEP = usbState.outEP;
+  if (!dev || outEP == null) {
+    throw new Error("Принтер XP-365B не подключён");
+  }
+
+  const tspl = [
+    "SIZE 58 mm,40 mm",
+    "GAP 3 mm,0 mm",
+    "DIRECTION 1",
+    "REFERENCE 0,0",
+    "CLS",
+    'TEXT 20,20,"TSS24.BF2",0,1,1,"HELLO"',
+    "PRINT 1",
+    "",
+  ].join("\r\n");
+
+  const buf = encodeTspl(tspl);
+
+  console.log("Отправляем простой TSPL тест...");
+  for (const part of chunkBytes(buf)) {
+    await dev.transferOut(outEP, part);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  console.log("Простой TSPL тест отправлен");
+}
+
 /* ====================== Повесим тесты на window для DevTools ====================== */
 
 if (typeof window !== "undefined") {
   window.testXp365bEncodingPrint = testXp365bEncodingPrint;
   window.printXp365bCodepageTest = printXp365bCodepageTest;
+  window.testXp365bSimple = testXp365bSimple;
+  window.printXp365bBarcodeLabel = printXp365bBarcodeLabel;
 }
