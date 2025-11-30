@@ -1,9 +1,9 @@
 // src/Components/Sectors/Barber/Masters/MastersTabs.jsx
 import React, { useState } from "react";
 import { FaUsers, FaMoneyBillWave, FaHistory } from "react-icons/fa";
-import Masters from "./Masters.jsx";
-import MastersHistory from "./MastersHistory/MastersHistory.jsx";
-import MastersPayouts from "./MastersPayouts.jsx";
+import Masters from "../Masters.jsx";
+import MastersHistory from "../MastersHistory/MastersHistory.jsx";
+import MastersPayouts from "../RecordaRates/MastersPayouts/MastersPayouts.jsx";
 import "./MastersTabs.scss";
 
 const TAB_EMPLOYEES = "employees";

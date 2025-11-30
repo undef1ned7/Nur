@@ -30,12 +30,11 @@ import Sell from "./Components/pages/Sell/Sell";
 import SellDetail from "./Components/pages/Sell/SellDetail";
 import ApplicationList from "./Components/pages/SubmitApplication/ApplicationList";
 import SubmitApplication from "./Components/pages/SubmitApplication/SubmitApplication";
-import CashReports from "./Components/Sectors/Barber/CashReports/CashReports";
 import BarberClients from "./Components/Sectors/Barber/Clients/Clients";
 import BarberDocuments from "./Components/Sectors/Barber/Documents/Documents";
 import BarberHistory from "./Components/Sectors/Barber/History/History";
 import Masters from "./Components/Sectors/Barber/Masters/Masters";
-import MastersTabs from "./Components/Sectors/Barber/Masters/MastersTabs";
+import MastersTabs from "./Components/Sectors/Barber/Masters/MastersTabs/MastersTabs";
 import Recorda from "./Components/Sectors/Barber/Recorda/Recorda";
 import BarberServices from "./Components/Sectors/Barber/Services/Services";
 import BuildingWork from "./Components/Sectors/Building/BuildingWork/BuildingWork";
@@ -111,6 +110,7 @@ import BranchDetails from "./Components/pages/Branch/BranchDetails";
 import Logistics from "./Components/pages/logistics/Logistics";
 import LogisticsPage from "./Components/Sectors/logistics/LogisticsPage/LogisticsPage";
 import LogisticsAnalytics from "./Components/pages/LogisticsAnalytics/LogisticsAnalytics";
+import BarberAnalitika from "./Components/Sectors/Barber/BarberAnalitika/BarberAnalitika";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -468,7 +468,7 @@ function App() {
               path="barber/cash-reports"
               element={
                 <ProtectedRoute>
-                  <CashReports />
+                  <BarberAnalitika />
                 </ProtectedRoute>
               }
             />

@@ -1,16 +1,287 @@
+// /* Цвета/переменные */
+// :root {
+//   --ba-text: #0f172a;
+//   --ba-muted: #6b7280;
+//   --ba-border: #e5e7eb;
+//   --ba-surface: #fff;
+//   --ba-surface-2: #f8fafc;
+//   --ba-primary: #f7d74f;
+//   --ba-primary-dark: #d4b800;
+//   --ba-success: #16a34a;
+//   --ba-danger: #ef4444;
+//   --ba-shadow: 0 6px 20px rgba(0,0,0,.06);
+//   --ba-radius: 12px;
+// }
+
+// /* Корень */
+// .barber-analitika {
+//   color: var(--ba-text);
+//   display: flex;
+//   flex-direction: column;
+//   gap: 18px;
+// }
+
+// /* Шапка */
+// .ba-head {
+//   display: flex;
+//   align-items: center;
+//   justify-content: space-between;
+//   gap: 12px;
+// }
+
+// .ba-title {
+//   font-size: 22px;
+//   font-weight: 700;
+// }
+
+// .ba-filters {
+//   display: flex;
+//   align-items: center;
+//   gap: 8px;
+// }
+
+// .ba-select {
+//   border: 1px solid var(--ba-border);
+//   border-radius: 8px;
+//   background: var(--ba-surface);
+//   padding: 8px 10px;
+//   min-width: 120px;
+//   outline: none;
+// }
+
+// .ba-refresh {
+//   display: inline-flex;
+//   align-items: center;
+//   justify-content: center;
+//   border: 1px solid var(--ba-border);
+//   border-radius: 8px;
+//   background: var(--ba-surface);
+//   padding: 8px 10px;
+//   cursor: pointer;
+// }
+
+// .ba-alert {
+//   background: #fff3cd;
+//   border: 1px solid #ffe69c;
+//   color: #664d03;
+//   border-radius: 10px;
+//   padding: 10px 12px;
+// }
+
+// /* KPI */
+// .ba-kpis {
+//   display: grid;
+//   grid-template-columns: repeat(6, minmax(0, 1fr));
+//   gap: 12px;
+
+//   @media (max-width: 1200px) { grid-template-columns: repeat(3, 1fr); }
+//   @media (max-width: 640px)  { grid-template-columns: repeat(2, 1fr); }
+// }
+
+// .ba-kpis--secondary {
+//   margin-top: -6px;
+// }
+
+// .kpi {
+//   background: var(--ba-surface);
+//   border-radius: var(--ba-radius);
+//   box-shadow: var(--ba-shadow);
+//   padding: 14px;
+//   display: grid;
+//   grid-template-columns: auto 1fr;
+//   grid-template-areas:
+//     "icon name"
+//     "icon val";
+//   gap: 6px 10px;
+//   align-items: center;
+
+//   &__icon { grid-area: icon; color: var(--ba-muted); }
+//   &__name { grid-area: name; font-size: 12px; color: var(--ba-muted); }
+//   &__val  { grid-area: val; font-weight: 700; font-size: 18px; }
+// }
+
+// .kpi--accent {
+//   background: var(--ba-surface-2);
+//   border: 1px dashed var(--ba-border);
+// }
+
+// /* Панели/сетка */
+// .ba-grid {
+//   display: grid;
+//   grid-template-columns: repeat(3, minmax(0, 1fr));
+//   gap: 14px;
+
+//   @media (max-width: 1200px) { grid-template-columns: repeat(2, 1fr); }
+//   @media (max-width: 780px)  { grid-template-columns: 1fr; }
+// }
+
+// .ba-panel {
+//   background: var(--ba-surface);
+//   border-radius: var(--ba-radius);
+//   box-shadow: var(--ba-shadow);
+//   padding: 14px;
+// }
+
+// .ba-panel__head {
+//   display: flex;
+//   justify-content: space-between;
+//   align-items: center;
+// }
+
+// .ba-panel__title {
+//   font-weight: 700;
+//   margin-bottom: 10px;
+// }
+
+// /* Рейтинги */
+// .ba-rankList {
+//   list-style: none;
+//   padding: 0;
+//   margin: 0;
+//   display: grid;
+//   gap: 8px;
+// }
+// .ba-rankItem {
+//   display: flex;
+//   align-items: center;
+//   justify-content: space-between;
+//   border: 1px solid var(--ba-border);
+//   border-radius: 10px;
+//   padding: 8px 10px;
+//   background: var(--ba-surface-2);
+// }
+// .ba-rankName { font-weight: 600; }
+// .ba-rankCount { color: var(--ba-muted); }
+
+// /* Статусы */
+// .ba-statusList { display: grid; gap: 12px; }
+// .ba-statusHead {
+//   display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+// }
+// .ba-badge {
+//   display: inline-flex; align-items: center; gap: 6px;
+//   padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+//   background: var(--ba-surface-2); border: 1px solid var(--ba-border);
+// }
+// .ba-badge--completed { background: #ecfdf5; border-color: #bbf7d0; color: var(--ba-success); }
+// .ba-badge--aborted   { background: #fef2f2; border-color: #fecaca; color: var(--ba-danger); }
+
+// .ba-statusNum { font-weight: 700; }
+
+// .ba-progress {
+//   height: 8px; background: #eef2f7; border-radius: 10px; overflow: hidden;
+// }
+// .ba-progress__fill {
+//   height: 100%; background: var(--ba-primary); width: 0%;
+// }
+
+// .ba-statusMoney { margin-top: 6px; color: var(--ba-muted); }
+// .ba-muted { color: var(--ba-muted); text-align: center; padding: 6px 0; }
+
+// /* Карточка с таблицей */
+// .ba-card {
+//   background: var(--ba-surface);
+//   border-radius: var(--ba-radius);
+//   box-shadow: var(--ba-shadow);
+//   padding: 12px;
+
+//   &__head {
+//     display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+//   }
+//   &__title {
+//     display: flex; align-items: center; gap: 8px; font-weight: 700;
+//   }
+//   &__more {
+//     border: 1px solid var(--ba-border);
+//     background: var(--ba-surface);
+//     border-radius: 8px;
+//     padding: 6px;
+//     cursor: pointer;
+//   }
+//   &__pager {
+//     display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 8px;
+//   }
+// }
+
+// .ba-pager__btn {
+//   border: 1px solid var(--ba-border);
+//   background: var(--ba-surface);
+//   border-radius: 8px;
+//   padding: 6px 10px;
+// }
+// .ba-pager__info { color: var(--ba-muted); }
+
+// /* Таблицы */
+// .ba-tableWrap { width: 100%; overflow: auto; }
+// .ba-tableWrap--modal { max-height: 60vh; }
+
+// .ba-table {
+//   width: 100%;
+//   border-collapse: collapse;
+//   font-size: 14px;
+
+//   th, td {
+//     border-bottom: 1px solid var(--ba-border);
+//     padding: 8px 10px;
+//     text-align: left;
+//     vertical-align: middle;
+//   }
+
+//   thead th { background: var(--ba-surface-2); font-weight: 700; }
+// }
+
+// .ba-ellipsis {
+//   max-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+// }
+// .ba-money { text-align: right; }
+// .ba-empty { text-align: center; color: var(--ba-muted); padding: 18px 0; }
+
+// /* Модалка */
+// .ba-modal {
+//   position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+//   &__overlay { position: absolute; inset: 0; background: rgba(0,0,0,.25); }
+//   &__card {
+//     position: relative; z-index: 1; width: min(980px, 96vw);
+//     background: var(--ba-surface); border-radius: 14px; box-shadow: var(--ba-shadow);
+//     display: flex; flex-direction: column; overflow: hidden;
+//   }
+//   &__head {
+//     display: flex; align-items: center; justify-content: space-between;
+//     padding: 12px 14px; border-bottom: 1px solid var(--ba-border);
+//   }
+//   &__title { font-weight: 700; }
+//   &__icon {
+//     border: 1px solid var(--ba-border); background: var(--ba-surface); border-radius: 8px; padding: 6px; cursor: pointer;
+//   }
+//   &__body { padding: 12px; }
+//   &__footer {
+//     padding: 10px 14px; border-top: 1px solid var(--ba-border); display: flex; justify-content: center;
+//   }
+// }
+
+// /* Адаптив для узких экранов: KPI внизу даты/фильтров красиво складываются */
+// @media (max-width: 480px) {
+//   .ba-head { align-items: flex-start; flex-direction: column; gap: 10px; }
+//   .ba-filters { width: 100%; }
+//   .ba-select { flex: 1; min-width: 0; }
+// }
+
+
+
+
+
 /* Цвета/переменные */
 :root {
   --ba-text: #0f172a;
   --ba-muted: #6b7280;
   --ba-border: #e5e7eb;
-  --ba-surface: #fff;
+  --ba-surface: #ffffff;
   --ba-surface-2: #f8fafc;
   --ba-primary: #f7d74f;
-  --ba-primary-dark: #d4b800;
   --ba-success: #16a34a;
   --ba-danger: #ef4444;
-  --ba-shadow: 0 6px 20px rgba(0,0,0,.06);
-  --ba-radius: 12px;
+  --ba-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  --ba-radius: 18px;
 }
 
 /* Корень */
@@ -30,7 +301,7 @@
 }
 
 .ba-title {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
 }
 
@@ -42,9 +313,9 @@
 
 .ba-select {
   border: 1px solid var(--ba-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--ba-surface);
-  padding: 8px 10px;
+  padding: 8px 12px;
   min-width: 120px;
   outline: none;
 }
@@ -54,7 +325,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--ba-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--ba-surface);
   padding: 8px 10px;
   cursor: pointer;
@@ -64,68 +335,117 @@
   background: #fff3cd;
   border: 1px solid #ffe69c;
   color: #664d03;
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 10px 12px;
 }
 
 /* KPI */
 .ba-kpis {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
 
-  @media (max-width: 1200px) { grid-template-columns: repeat(3, 1fr); }
-  @media (max-width: 640px)  { grid-template-columns: repeat(2, 1fr); }
-}
-
-.ba-kpis--secondary {
-  margin-top: -6px;
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .kpi {
   background: var(--ba-surface);
-  border-radius: var(--ba-radius);
+  border-radius: 18px;
   box-shadow: var(--ba-shadow);
-  padding: 14px;
+  padding: 14px 16px;
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas:
     "icon name"
     "icon val";
-  gap: 6px 10px;
+  gap: 8px 10px;
   align-items: center;
 
-  &__icon { grid-area: icon; color: var(--ba-muted); }
-  &__name { grid-area: name; font-size: 12px; color: var(--ba-muted); }
-  &__val  { grid-area: val; font-weight: 700; font-size: 18px; }
+  &__icon {
+    grid-area: icon;
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__name {
+    grid-area: name;
+    font-size: 13px;
+    color: var(--ba-muted);
+  }
+
+  &__val {
+    grid-area: val;
+    font-weight: 700;
+    font-size: 20px;
+  }
 }
 
-.kpi--accent {
-  background: var(--ba-surface-2);
-  border: 1px dashed var(--ba-border);
+/* цвета иконок кпи */
+.kpi__icon--yellow {
+  background: #fefce8;
+  color: #eab308;
+}
+
+.kpi__icon--red {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.kpi__icon--blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.kpi__icon--purple {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.kpi__icon--green {
+  background: #ecfdf5;
+  color: #16a34a;
+}
+
+.kpi__icon--orange {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.kpi__icon--teal {
+  background: #ecfeff;
+  color: #0d9488;
+}
+
+.kpi__icon--pink {
+  background: #fdf2f8;
+  color: #db2777;
+}
+
+.kpi__icon--indigo {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.kpi__icon--cyan {
+  background: #e0f2fe;
+  color: #0284c7;
 }
 
 /* Панели/сетка */
-.ba-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-
-  @media (max-width: 1200px) { grid-template-columns: repeat(2, 1fr); }
-  @media (max-width: 780px)  { grid-template-columns: 1fr; }
-}
-
 .ba-panel {
   background: var(--ba-surface);
-  border-radius: var(--ba-radius);
+  border-radius: 18px;
   box-shadow: var(--ba-shadow);
-  padding: 14px;
-}
-
-.ba-panel__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 16px 18px;
 }
 
 .ba-panel__title {
@@ -133,64 +453,289 @@
   margin-bottom: 10px;
 }
 
-/* Рейтинги */
-.ba-rankList {
+/* Статусы */
+.ba-panel--statuses {
+  margin-top: 4px;
+}
+
+.ba-statusList {
+  display: grid;
+  gap: 12px;
+}
+
+.ba-statusRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ba-statusHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.ba-statusHeadRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ba-muted);
+}
+
+.ba-statusCount {
+  white-space: nowrap;
+}
+
+.ba-statusPercent {
+  font-weight: 700;
+}
+
+.ba-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--ba-surface-2);
+  border: 1px solid var(--ba-border);
+}
+
+.ba-badge--completed {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: var(--ba-success);
+}
+
+.ba-badge--aborted {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: var(--ba-danger);
+}
+
+.ba-progress {
+  height: 10px;
+  background: #e5edf6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ba-progress__fill {
+  height: 100%;
+  background: var(--ba-primary);
+  width: 0%;
+}
+
+.ba-statusMoney {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ba-muted);
+}
+
+.ba-muted {
+  color: var(--ba-muted);
+  text-align: center;
+  padding: 6px 0;
+}
+
+/* Сводка продаж */
+.ba-summaryRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ba-summaryCard {
+  background: var(--ba-surface);
+  border-radius: 18px;
+  box-shadow: var(--ba-shadow);
+  padding: 16px 18px;
+}
+
+.ba-summaryTitle {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.ba-summaryLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.ba-summaryLine:first-of-type {
+  margin-top: 0;
+}
+
+.ba-summaryValue {
+  font-weight: 600;
+}
+
+.ba-summaryValue--accent {
+  color: #eab308;
+  font-size: 18px;
+}
+
+/* Линейный график */
+.ba-panel--lineChart {
+  margin-top: 4px;
+}
+
+.ba-lineChart {
+  height: 260px;
+
+  @media (max-width: 900px) {
+    height: 220px;
+  }
+}
+
+/* Гриды */
+.ba-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.ba-grid--charts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ba-grid--tops {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ba-grid--cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Диаграммы */
+.ba-panel--chart {
+  display: flex;
+  flex-direction: column;
+}
+
+.ba-chart {
+  flex: 1;
+  min-height: 220px;
+}
+
+.ba-chart--bar {
+  min-height: 220px;
+}
+
+/* Топ списки */
+.ba-panel--list {
+  display: flex;
+  flex-direction: column;
+}
+
+.ba-topList {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
-.ba-rankItem {
+
+.ba-topItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid var(--ba-border);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 999px;
   background: var(--ba-surface-2);
-}
-.ba-rankName { font-weight: 600; }
-.ba-rankCount { color: var(--ba-muted); }
-
-/* Статусы */
-.ba-statusList { display: grid; gap: 12px; }
-.ba-statusHead {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
-}
-.ba-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
-  background: var(--ba-surface-2); border: 1px solid var(--ba-border);
-}
-.ba-badge--completed { background: #ecfdf5; border-color: #bbf7d0; color: var(--ba-success); }
-.ba-badge--aborted   { background: #fef2f2; border-color: #fecaca; color: var(--ba-danger); }
-
-.ba-statusNum { font-weight: 700; }
-
-.ba-progress {
-  height: 8px; background: #eef2f7; border-radius: 10px; overflow: hidden;
-}
-.ba-progress__fill {
-  height: 100%; background: var(--ba-primary); width: 0%;
+  padding: 10px 14px;
 }
 
-.ba-statusMoney { margin-top: 6px; color: var(--ba-muted); }
-.ba-muted { color: var(--ba-muted); text-align: center; padding: 6px 0; }
+.ba-topItem__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-/* Карточка с таблицей */
+.ba-topIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ba-topIcon--barber {
+  background: #fefce8;
+  color: #eab308;
+}
+
+.ba-topIcon--client {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.ba-topItem__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.ba-topItem__name {
+  font-weight: 600;
+}
+
+.ba-topItem__sub {
+  font-size: 13px;
+  color: var(--ba-muted);
+}
+
+.ba-topItem__sum {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ba-topEmpty {
+  text-align: center;
+  color: var(--ba-muted);
+}
+
+/* Таблицы / карточки */
 .ba-card {
   background: var(--ba-surface);
-  border-radius: var(--ba-radius);
+  border-radius: 18px;
   box-shadow: var(--ba-shadow);
-  padding: 12px;
+  padding: 12px 14px;
 
   &__head {
-    display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
   }
+
   &__title {
-    display: flex; align-items: center; gap: 8px; font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
   }
+
   &__more {
     border: 1px solid var(--ba-border);
     background: var(--ba-surface);
@@ -198,9 +743,59 @@
     padding: 6px;
     cursor: pointer;
   }
+
   &__pager {
-    display: flex; align-items: center; gap: 8px; justify-content: center; margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
   }
+}
+
+.ba-tableWrap {
+  width: 100%;
+  overflow: auto;
+}
+
+.ba-tableWrap--modal {
+  max-height: 60vh;
+}
+
+.ba-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th,
+  td {
+    border-bottom: 1px solid var(--ba-border);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  thead th {
+    background: var(--ba-surface-2);
+    font-weight: 700;
+  }
+}
+
+.ba-ellipsis {
+  max-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ba-money {
+  text-align: right;
+}
+
+.ba-empty {
+  text-align: center;
+  color: var(--ba-muted);
+  padding: 18px 0;
 }
 
 .ba-pager__btn {
@@ -209,59 +804,83 @@
   border-radius: 8px;
   padding: 6px 10px;
 }
-.ba-pager__info { color: var(--ba-muted); }
 
-/* Таблицы */
-.ba-tableWrap { width: 100%; overflow: auto; }
-.ba-tableWrap--modal { max-height: 60vh; }
-
-.ba-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-
-  th, td {
-    border-bottom: 1px solid var(--ba-border);
-    padding: 8px 10px;
-    text-align: left;
-    vertical-align: middle;
-  }
-
-  thead th { background: var(--ba-surface-2); font-weight: 700; }
+.ba-pager__info {
+  color: var(--ba-muted);
 }
-
-.ba-ellipsis {
-  max-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.ba-money { text-align: right; }
-.ba-empty { text-align: center; color: var(--ba-muted); padding: 18px 0; }
 
 /* Модалка */
 .ba-modal {
-  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
-  &__overlay { position: absolute; inset: 0; background: rgba(0,0,0,.25); }
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+  }
+
   &__card {
-    position: relative; z-index: 1; width: min(980px, 96vw);
-    background: var(--ba-surface); border-radius: 14px; box-shadow: var(--ba-shadow);
-    display: flex; flex-direction: column; overflow: hidden;
+    position: relative;
+    z-index: 1;
+    width: min(980px, 96vw);
+    background: var(--ba-surface);
+    border-radius: 18px;
+    box-shadow: var(--ba-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
+
   &__head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 14px; border-bottom: 1px solid var(--ba-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--ba-border);
   }
-  &__title { font-weight: 700; }
+
+  &__title {
+    font-weight: 700;
+  }
+
   &__icon {
-    border: 1px solid var(--ba-border); background: var(--ba-surface); border-radius: 8px; padding: 6px; cursor: pointer;
+    border: 1px solid var(--ba-border);
+    background: var(--ba-surface);
+    border-radius: 8px;
+    padding: 6px;
+    cursor: pointer;
   }
-  &__body { padding: 12px; }
+
+  &__body {
+    padding: 12px;
+  }
+
   &__footer {
-    padding: 10px 14px; border-top: 1px solid var(--ba-border); display: flex; justify-content: center;
+    padding: 10px 14px;
+    border-top: 1px solid var(--ba-border);
+    display: flex;
+    justify-content: center;
   }
 }
 
-/* Адаптив для узких экранов: KPI внизу даты/фильтров красиво складываются */
-@media (max-width: 480px) {
-  .ba-head { align-items: flex-start; flex-direction: column; gap: 10px; }
-  .ba-filters { width: 100%; }
-  .ba-select { flex: 1; min-width: 0; }
+/* Адаптив */
+@media (max-width: 520px) {
+  .ba-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .ba-filters {
+    width: 100%;
+  }
+
+  .ba-select {
+    flex: 1;
+    min-width: 0;
+  }
 }
