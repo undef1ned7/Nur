@@ -372,7 +372,7 @@ const SellMainStart = ({ show, setShow }) => {
           const total = Number(start?.total || 0);
           if (paymentChoice === "cash") {
             setPaymentMethod("cash");
-            setCashReceived(total > 0 ? total.toFixed(2) : "");
+            setCashReceived("");
             setShowPaymentChoiceModal(false);
             setShowCashModal(true);
           } else {
@@ -950,7 +950,7 @@ const SellMainStart = ({ show, setShow }) => {
     try {
       if (paymentChoice === "cash") {
         setPaymentMethod("cash");
-        setCashReceived(total > 0 ? total.toFixed(2) : "");
+        setCashReceived("");
         setShowPaymentChoiceModal(false);
         setShowCashModal(true);
       } else {
