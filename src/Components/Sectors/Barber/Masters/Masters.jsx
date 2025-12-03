@@ -1,5 +1,6 @@
 // src/components/Education/Masters.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaCheck,
   FaCopy,
@@ -192,6 +193,7 @@ const RoleSelect = ({
 
 /* ===================== Main component ===================== */
 const Masters = () => {
+  const navigate = useNavigate();
   const { company, tariff, profile } = useUser();
 
   const [tab, setTab] = useState("masters");
@@ -1278,6 +1280,21 @@ const Masters = () => {
                         Редактировать
                       </span>
                     </button>
+                    {company?.sector?.name === "Производство" &&
+                      (u.role === "agent" ||
+                        roleLabel?.toLowerCase().includes("агент")) && (
+                        <button
+                          className="barbermasters__btn barbermasters__btn--secondary"
+                          onClick={() =>
+                            navigate(`/crm/production/agents/${u.id}/analytics`)
+                          }
+                          title="Аналитика агента"
+                        >
+                          <span className="barbermasters__btnText">
+                            📊 Аналитика
+                          </span>
+                        </button>
+                      )}
                     <button
                       className="barbermasters__btn barbermasters__btn--secondary"
                       onClick={() => openAccessModal(u)}

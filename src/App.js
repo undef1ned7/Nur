@@ -112,6 +112,8 @@ import Logistics from "./Components/pages/logistics/Logistics";
 import LogisticsPage from "./Components/Sectors/logistics/LogisticsPage/LogisticsPage";
 import LogisticsAnalytics from "./Components/pages/LogisticsAnalytics/LogisticsAnalytics";
 import { ScrollToTop } from "./hooks/ScrollToTop";
+import ProductionRequest from "./Components/Sectors/Production/Request/ProductionRequest";
+import AgentAnalytics from "./Components/Sectors/Production/Analytics/AgentAnalytics";
 // import ClientDebtDetail from "./Components/Sectors/Building/ClientDebtDetail";
 
 function App() {
@@ -160,7 +162,7 @@ function App() {
 
   return (
     <BrowserRouter>
-    <ScrollToTop />
+      <ScrollToTop />
       <Routes>
         <>
           <Route path="/login" element={<Login />} />
@@ -175,7 +177,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
 
           <Route path="/crm" element={<Layout />}>
             <Route
@@ -970,6 +971,14 @@ function App() {
               }
             />
             <Route
+              path="production/agents/:agentId/analytics"
+              element={
+                <ProtectedRoute>
+                  <AgentAnalytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="production/agents"
               element={
                 <ProtectedRoute>
@@ -982,6 +991,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProductionCatalog />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="production/request"
+              element={
+                <ProtectedRoute>
+                  <ProductionRequest />
                 </ProtectedRoute>
               }
             />
@@ -1037,6 +1054,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             {/* <Route
               path="logistics-shop"
               element={

@@ -80,11 +80,19 @@ const Layout = () => {
       <div className="App">
         <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
+        {/* Overlay для мобильных устройств */}
+        {isSidebarOpen && (
+          <div
+            className="sidebar-overlay"
+            onClick={closeSidebar}
+            aria-hidden="true"
+          />
+        )}
+
         <div
           className={`content ${languageFunc()} ${
             isSidebarOpen ? "content--sidebar-open" : ""
           }`}
-          onClick={isSidebarOpen ? closeSidebar : undefined}
         >
           {daysLeft !== null && !hideAnnouncement && (
             <div className="announcement">

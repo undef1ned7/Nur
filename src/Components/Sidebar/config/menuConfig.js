@@ -546,6 +546,13 @@ export const MENU_CONFIG = {
         permission: "can_view_catalog",
         implemented: true,
       },
+      {
+        label: "Запросы",
+        to: "/crm/production/request",
+        icon: menuIcons.clipboardList,
+        permission: "can_view_catalog",
+        implemented: true,
+      },
     ],
 
     pilorama: [

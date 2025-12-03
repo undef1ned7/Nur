@@ -717,8 +717,11 @@ const SellMainStart = ({ show, setShow }) => {
 
   // Обработка оплаты наличными
   const handleCashPayment = async () => {
-    const received = Number(cashReceived);
-    const total = Number(currentTotal);
+    // Нормализуем значение: заменяем запятую на точку
+    const normalizedReceived = String(cashReceived).replace(/,/g, ".");
+    const normalizedTotal = String(currentTotal).replace(/,/g, ".");
+    const received = parseFloat(normalizedReceived) || 0;
+    const total = parseFloat(normalizedTotal) || 0;
 
     if (!received || received <= 0) {
       setAlert({
@@ -853,7 +856,13 @@ const SellMainStart = ({ show, setShow }) => {
       }
 
       if (finalPaymentType === "cash") {
-        if (!cashReceived || Number(cashReceived) <= 0) {
+        // Нормализуем значение: заменяем запятую на точку
+        const normalizedReceived = String(cashReceived).replace(/,/g, ".");
+        const normalizedTotal = String(currentTotal).replace(/,/g, ".");
+        const received = parseFloat(normalizedReceived) || 0;
+        const total = parseFloat(normalizedTotal) || 0;
+
+        if (!cashReceived || received <= 0) {
           setAlert({
             open: true,
             type: "error",
@@ -861,8 +870,6 @@ const SellMainStart = ({ show, setShow }) => {
           });
           return;
         }
-        const total = Number(currentTotal);
-        const received = Number(cashReceived);
         if (received < total) {
           setAlert({
             open: true,
@@ -881,7 +888,11 @@ const SellMainStart = ({ show, setShow }) => {
 
       if (finalPaymentType === "cash") {
         checkoutParams.payment_method = "cash";
-        checkoutParams.cash_received = Number(cashReceived).toFixed(2);
+        // Нормализуем значение: заменяем запятую на точку
+        const normalizedReceived = String(cashReceived).replace(/,/g, ".");
+        checkoutParams.cash_received = parseFloat(
+          normalizedReceived || 0
+        ).toFixed(2);
       } else if (finalPaymentType === "card") {
         checkoutParams.payment_method = "transfer";
       }

@@ -23,6 +23,7 @@ import {
   Warehouse,
   ReceiptText,
   Store,
+  ClipboardList,
 } from "lucide-react";
 import { BsFileEarmarkPerson, BsListCheck } from "react-icons/bs";
 import {
@@ -74,7 +75,7 @@ export const menuIcons = {
   instagram: () => createIcon(Instagram),
   cog: () => createIcon(FaCog),
   store: () => createIcon(Store),
-
+  clipboardList: () => createIcon(ClipboardList),
   // Секторные иконки
   listCheck: () => createIcon(BsListCheck),
   building: () => createIcon(FaBuilding),
@@ -111,5 +112,5 @@ export const menuIcons = {
 
   // Логистика
   logistics: () => createIcon(CiDeliveryTruck),
-  shopLogistics: () => createIcon(CiShoppingCart) 
+  shopLogistics: () => createIcon(CiShoppingCart),
 };
