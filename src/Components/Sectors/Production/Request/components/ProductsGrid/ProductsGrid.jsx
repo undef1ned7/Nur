@@ -11,6 +11,7 @@ const ProductsGrid = ({
   draggedItem,
   onRequestProduct,
   onClearSearch,
+  isOwner = false,
 }) => {
   return (
     <div className={`products-container ${viewMode}`}>
@@ -36,6 +37,7 @@ const ProductsGrid = ({
                 onDragEnd={onDragEnd}
                 isDragging={draggedItem === product.id}
                 onRequestProduct={onRequestProduct}
+                isOwner={isOwner}
               />
             </div>
           ))}

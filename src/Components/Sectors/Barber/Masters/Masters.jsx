@@ -956,6 +956,11 @@ const Masters = () => {
             label: "Каталог",
             backendKey: "can_view_catalog",
           },
+          {
+            value: "Запросы",
+            label: "Запросы",
+            backendKey: "can_view_request",
+          },
         ],
         Логистика: [
           {
@@ -1204,7 +1209,7 @@ const Masters = () => {
                         : "Редактировать"
                     }
                   >
-                    <FaEdit />{" "}
+                    <FaEdit />
                     <span className="barbermasters__btnText">
                       Редактировать
                     </span>
@@ -1215,7 +1220,7 @@ const Masters = () => {
                     disabled={r._sys || roleDeletingIds.has(r.id)}
                     title={r._sys ? "Системные роли нельзя удалять" : "Удалить"}
                   >
-                    <FaTrash />{" "}
+                    <FaTrash />
                     <span className="barbermasters__btnText">
                       {roleDeletingIds.has(r.id) ? "Удаление…" : "Удалить"}
                     </span>
@@ -1275,7 +1280,7 @@ const Masters = () => {
                       onClick={() => openEmpEdit(u)}
                       title="Редактировать сотрудника"
                     >
-                      <FaEdit />{" "}
+                      <FaEdit />
                       <span className="barbermasters__btnText">
                         Редактировать
                       </span>
@@ -1309,7 +1314,7 @@ const Masters = () => {
                       disabled={empDeletingIds.has(u.id)}
                       title="Удалить сотрудника"
                     >
-                      <FaTrash />{" "}
+                      <FaTrash />
                       <span className="barbermasters__btnText">
                         {empDeletingIds.has(u.id) ? "Удаление…" : "Удалить"}
                       </span>

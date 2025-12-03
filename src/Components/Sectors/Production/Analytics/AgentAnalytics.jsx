@@ -22,6 +22,9 @@ import {
   DollarSign,
   Package,
   RefreshCw,
+  BarChart3,
+  ArrowLeftRight,
+  Clock,
 } from "lucide-react";
 import api from "../../../../api";
 import "./AgentAnalytics.scss";
@@ -44,87 +47,50 @@ const AgentAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedAgent, setSelectedAgent] = useState(null);
-  const [transfers, setTransfers] = useState([]);
-  const [acceptances, setAcceptances] = useState([]);
-  const [salesData, setSalesData] = useState(null); // Данные по продажам с бэкенда
-  const [productsOnHand, setProductsOnHand] = useState(null); // Данные по товарам на руках с бэкенда
+  const [analyticsData, setAnalyticsData] = useState(null); // Полные данные аналитики с бэкенда
   const [period, setPeriod] = useState("month"); // day, week, month, year
 
   // Загрузка данных
   useEffect(() => {
-    if (agentId) {
-      fetchData();
-    }
+    fetchData();
   }, [agentId, period]);
 
   const fetchData = async () => {
-    if (!agentId) {
-      setError("ID агента не указан");
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError("");
 
-      // Загружаем данные конкретного агента, передачи, приёмки, аналитику продаж и товары на руках
-      const [agentRes, transfersRes, acceptancesRes, analyticsRes] =
-        await Promise.all([
-          api.get(`/users/employees/${agentId}/`).catch(() => ({ data: null })),
-          api
-            .get("/main/subreals/", { params: { agent: agentId } })
-            .catch(() => ({ data: { results: [] } })),
-          api
-            .get("/main/acceptances/", { params: { agent: agentId } })
-            .catch(() => ({ data: { results: [] } })),
-          api
-            .get(`/main/agents/${agentId}/analytics/`, {
-              params: { period },
-            })
-            .catch(() => ({
-              data: {
-                sales: null,
-                products_on_hand: null,
-              },
-            })),
-        ]);
+      // Если agentId не указан, используем эндпоинт для текущего пользователя
+      const endpoint = agentId
+        ? `/main/owners/agents/${agentId}/analytics/`
+        : `/main/agents/me/analytics/`;
 
-      if (!agentRes.data) {
-        setError("Агент не найден");
+      // Загружаем аналитику агента
+      const analyticsRes = await api.get(endpoint, {
+        params: { period },
+      });
+
+      if (!analyticsRes.data) {
+        setError("Данные аналитики не найдены");
         setLoading(false);
         return;
       }
 
-      setSelectedAgent(agentRes.data);
+      const data = analyticsRes.data;
 
-      const transfersList = Array.isArray(transfersRes.data?.results)
-        ? transfersRes.data.results
-        : Array.isArray(transfersRes.data)
-        ? transfersRes.data
-        : [];
-      const acceptancesList = Array.isArray(acceptancesRes.data?.results)
-        ? acceptancesRes.data.results
-        : Array.isArray(acceptancesRes.data)
-        ? acceptancesRes.data
-        : [];
-
-      setTransfers(transfersList);
-      setAcceptances(acceptancesList);
-
-      // Устанавливаем данные аналитики с бэкенда
-      if (analyticsRes.data) {
-        // Поддерживаем разные форматы ответа от бэкенда
-        const sales =
-          analyticsRes.data.sales || analyticsRes.data.sales_data || null;
-        const products =
-          analyticsRes.data.products_on_hand ||
-          analyticsRes.data.products_on_hand_data ||
-          null;
-
-        setSalesData(sales);
-        setProductsOnHand(products);
+      // Устанавливаем информацию об агенте из ответа
+      if (data.agent) {
+        setSelectedAgent({
+          id: data.agent.id,
+          first_name: data.agent.first_name,
+          last_name: data.agent.last_name,
+          email: data.agent.email || "",
+          track_number: data.agent.track_number || "",
+        });
       }
+
+      // Сохраняем полные данные аналитики
+      setAnalyticsData(data);
     } catch (err) {
       console.error("Ошибка загрузки данных:", err);
       setError("Не удалось загрузить данные аналитики");
@@ -133,66 +99,19 @@ const AgentAnalytics = () => {
     }
   };
 
-  // Фильтрация данных по периоду
-  const getDateRange = () => {
-    const now = new Date();
-    let start;
+  // Получаем историю передач из аналитики
+  const transfersHistory = useMemo(() => {
+    if (!analyticsData?.transfers_history) return [];
+    return analyticsData.transfers_history || [];
+  }, [analyticsData]);
 
-    switch (period) {
-      case "day":
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
-      case "week":
-        start = new Date(now);
-        start.setDate(now.getDate() - 7);
-        break;
-      case "month":
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case "year":
-        start = new Date(now.getFullYear(), 0, 1);
-        break;
-      default:
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    return { start, end: now };
-  };
-
-  const filteredTransfers = useMemo(() => {
-    const { start, end } = getDateRange();
-    return transfers.filter((t) => {
-      try {
-        const date = new Date(t.created_at || t.createdAt);
-        if (isNaN(date.getTime())) return false;
-        return date >= start && date <= end;
-      } catch {
-        return false;
-      }
-    });
-  }, [transfers, period]);
-
-  const filteredAcceptances = useMemo(() => {
-    const { start, end } = getDateRange();
-    return acceptances.filter((a) => {
-      try {
-        const date = new Date(a.accepted_at || a.created_at || a.createdAt);
-        if (isNaN(date.getTime())) return false;
-        return date >= start && date <= end;
-      } catch {
-        return false;
-      }
-    });
-  }, [acceptances, period]);
-
-  // Метрики для выбранного агента
+  // Метрики для выбранного агента из summary
   const metrics = useMemo(() => {
-    if (!selectedAgent) {
+    if (!analyticsData?.summary) {
       return {
         totalTransfers: 0,
         totalAcceptances: 0,
         totalQuantityTransferred: 0,
-        totalQuantityAccepted: 0,
         totalSalesAmount: 0,
         totalSalesCount: 0,
         totalProductsOnHand: 0,
@@ -200,243 +119,189 @@ const AgentAnalytics = () => {
       };
     }
 
-    const totalTransfers = filteredTransfers.length;
-    const totalAcceptances = filteredAcceptances.length;
-    const totalQuantityTransferred = filteredTransfers.reduce(
-      (sum, t) => sum + Number(t.qty_transferred || 0),
-      0
-    );
-    const totalQuantityAccepted = filteredAcceptances.reduce(
-      (sum, a) => sum + Number(a.qty || 0),
-      0
-    );
-
-    // Метрики по продажам (с бэкенда или временные данные)
-    const salesDataToUse = salesData || {
-      total_amount: 510000,
-      total_count: 102,
-    };
-    const totalSalesAmount = salesDataToUse.total_amount || 0;
-    const totalSalesCount = salesDataToUse.total_count || 0;
-
-    // Метрики по товарам на руках (с бэкенда или временные данные)
-    const productsDataToUse = productsOnHand || {
-      total_quantity: 165,
-      total_value: 825000,
-    };
-    const totalProductsOnHand = productsDataToUse.total_quantity || 0;
-    const totalProductsValue = productsDataToUse.total_value || 0;
+    const summary = analyticsData.summary;
 
     return {
-      totalTransfers,
-      totalAcceptances,
-      totalQuantityTransferred,
-      totalQuantityAccepted,
-      totalSalesAmount,
-      totalSalesCount,
-      totalProductsOnHand,
-      totalProductsValue,
+      totalTransfers: summary.transfers_count || 0,
+      totalAcceptances: summary.acceptances_count || 0,
+      totalQuantityTransferred: summary.items_transferred || 0,
+      totalSalesAmount: summary.sales_amount || 0,
+      totalSalesCount: summary.sales_count || 0,
+      totalProductsOnHand: summary.items_on_hand_qty || 0,
+      totalProductsValue: summary.items_on_hand_amount || 0,
     };
-  }, [
-    selectedAgent,
-    filteredTransfers,
-    filteredAcceptances,
-    salesData,
-    productsOnHand,
-  ]);
+  }, [analyticsData]);
 
-  // Данные для графика передач по товарам
+  // Данные для графика передач по товарам из charts.top_products_by_transfers
   const transfersByProductData = useMemo(() => {
-    const productMap = new Map();
-
-    filteredTransfers.forEach((t) => {
-      const productName =
-        t.product_name || `Товар #${t.product || t.product_id || "?"}`;
-      const quantity = Number(t.qty_transferred || 0);
-
-      if (productMap.has(productName)) {
-        productMap.set(productName, productMap.get(productName) + quantity);
-      } else {
-        productMap.set(productName, quantity);
-      }
-    });
-
-    const sorted = Array.from(productMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10); // Топ 10 товаров
-
-    return {
-      labels: sorted.map(([name]) => name),
-      datasets: [
-        {
-          label: "Количество передач",
-          data: sorted.map(([, qty]) => qty),
-          backgroundColor: "rgba(54, 162, 235, 0.6)",
-          borderColor: "rgba(54, 162, 235, 1)",
-          borderWidth: 1,
-        },
-      ],
-    };
-  }, [filteredTransfers]);
-
-  // Данные для графика передач по дням
-  const transfersByDateData = useMemo(() => {
-    try {
-      const { start, end } = getDateRange();
-      const days = [];
-      const counts = [];
-      const quantities = [];
-
-      const current = new Date(start);
-      while (current <= end) {
-        const dateStr = current.toISOString().slice(0, 10);
-        const dayTransfers = filteredTransfers.filter((t) => {
-          try {
-            const date = new Date(t.created_at || t.createdAt);
-            if (isNaN(date.getTime())) return false;
-            return date.toISOString().slice(0, 10) === dateStr;
-          } catch {
-            return false;
-          }
-        });
-
-        const count = dayTransfers.length;
-        const quantity = dayTransfers.reduce(
-          (sum, t) => sum + Number(t.qty_transferred || 0),
-          0
-        );
-
-        days.push(
-          new Date(dateStr).toLocaleDateString("ru-RU", {
-            day: "2-digit",
-            month: "2-digit",
-          })
-        );
-        counts.push(count);
-        quantities.push(quantity);
-        current.setDate(current.getDate() + 1);
-      }
-
-      return {
-        labels: days.length > 0 ? days : ["Нет данных"],
-        datasets: [
-          {
-            label: "Количество передач",
-            data: counts.length > 0 ? counts : [0],
-            borderColor: "rgba(153, 102, 255, 1)",
-            backgroundColor: "rgba(153, 102, 255, 0.2)",
-            tension: 0.4,
-            yAxisID: "y",
-          },
-          {
-            label: "Количество товаров",
-            data: quantities.length > 0 ? quantities : [0],
-            borderColor: "rgba(75, 192, 192, 1)",
-            backgroundColor: "rgba(75, 192, 192, 0.2)",
-            tension: 0.4,
-            yAxisID: "y1",
-          },
-        ],
-      };
-    } catch (err) {
-      console.error("Ошибка создания графика передач по датам:", err);
+    if (!analyticsData?.charts?.top_products_by_transfers) {
       return {
         labels: ["Нет данных"],
         datasets: [
           {
-            label: "Передачи",
+            label: "Количество передач",
             data: [0],
-            borderColor: "rgba(153, 102, 255, 1)",
-            backgroundColor: "rgba(153, 102, 255, 0.2)",
-            tension: 0.4,
+            backgroundColor: "#f7d74f",
+            borderColor: "#f7d74f",
+            borderWidth: 1,
+            borderRadius: 4,
           },
         ],
       };
     }
-  }, [filteredTransfers, period]);
 
-  // Данные для круговой диаграммы приёмок по товарам
-  const acceptancesByProductData = useMemo(() => {
-    const productMap = new Map();
-
-    filteredAcceptances.forEach((a) => {
-      const productName =
-        a.product_name || `Товар #${a.product || a.product_id || "?"}`;
-      const quantity = Number(a.qty || 0);
-
-      if (productMap.has(productName)) {
-        productMap.set(productName, productMap.get(productName) + quantity);
-      } else {
-        productMap.set(productName, quantity);
-      }
-    });
-
-    const sorted = Array.from(productMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8); // Топ 8 товаров
-
-    const colors = [
-      "rgba(255, 99, 132, 0.6)",
-      "rgba(54, 162, 235, 0.6)",
-      "rgba(255, 206, 86, 0.6)",
-      "rgba(75, 192, 192, 0.6)",
-      "rgba(153, 102, 255, 0.6)",
-      "rgba(255, 159, 64, 0.6)",
-      "rgba(199, 199, 199, 0.6)",
-      "rgba(83, 102, 255, 0.6)",
-    ];
+    const products = analyticsData.charts.top_products_by_transfers;
+    const sorted = [...products]
+      .sort((a, b) => (b.transfers_count || 0) - (a.transfers_count || 0))
+      .slice(0, 10);
 
     return {
-      labels: sorted.length > 0 ? sorted.map(([name]) => name) : ["Нет данных"],
+      labels: sorted.map((item) => item.product_name || "Без названия"),
+      datasets: [
+        {
+          label: "Количество передач",
+          data: sorted.map((item) => item.transfers_count || 0),
+          backgroundColor: "#f7d74f",
+          borderColor: "#f7d74f",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    };
+  }, [analyticsData]);
+
+  // Данные для графика передач по дням из charts.transfers_by_date
+  const transfersByDateData = useMemo(() => {
+    if (!analyticsData?.charts?.transfers_by_date) {
+      return {
+        labels: ["Нет данных"],
+        datasets: [
+          {
+            label: "Количество передач",
+            data: [0],
+            borderColor: "#f7d74f",
+            backgroundColor: "rgba(247, 215, 79, 0.2)",
+            tension: 0.4,
+            yAxisID: "y",
+            pointRadius: 4,
+            pointBackgroundColor: "#f7d74f",
+            pointBorderColor: "#fff",
+            pointBorderWidth: 2,
+          },
+          {
+            label: "Количество товаров",
+            data: [0],
+            borderColor: "rgba(107, 114, 128, 1)",
+            backgroundColor: "rgba(107, 114, 128, 0.2)",
+            tension: 0.4,
+            yAxisID: "y1",
+            pointRadius: 4,
+            pointBackgroundColor: "rgba(107, 114, 128, 1)",
+            pointBorderColor: "#fff",
+            pointBorderWidth: 2,
+          },
+        ],
+      };
+    }
+
+    const transfers = analyticsData.charts.transfers_by_date;
+
+    return {
+      labels:
+        transfers.length > 0
+          ? transfers.map((item) => {
+              try {
+                return new Date(item.date).toLocaleDateString("ru-RU", {
+                  day: "2-digit",
+                  month: "2-digit",
+                });
+              } catch {
+                return String(item.date || "?");
+              }
+            })
+          : ["Нет данных"],
+      datasets: [
+        {
+          label: "Количество передач",
+          data:
+            transfers.length > 0
+              ? transfers.map((item) => item.transfers_count || 0)
+              : [0],
+          borderColor: "#f7d74f",
+          backgroundColor: "rgba(247, 215, 79, 0.2)",
+          tension: 0.4,
+          yAxisID: "y",
+          pointRadius: 4,
+          pointBackgroundColor: "#f7d74f",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+        },
+        {
+          label: "Количество товаров",
+          data:
+            transfers.length > 0
+              ? transfers.map((item) => item.items_transferred || 0)
+              : [0],
+          borderColor: "rgba(107, 114, 128, 1)",
+          backgroundColor: "rgba(107, 114, 128, 0.2)",
+          tension: 0.4,
+          yAxisID: "y1",
+          pointRadius: 4,
+          pointBackgroundColor: "rgba(107, 114, 128, 1)",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+        },
+      ],
+    };
+  }, [analyticsData]);
+
+  // Данные для круговой диаграммы приёмок по товарам (если будет в API)
+  const acceptancesByProductData = useMemo(() => {
+    // Пока используем пустые данные, так как в API нет данных о приёмках по товарам
+    return {
+      labels: ["Нет данных"],
       datasets: [
         {
           label: "Приёмки",
-          data: sorted.length > 0 ? sorted.map(([, qty]) => qty) : [0],
-          backgroundColor: colors.slice(0, sorted.length || 1),
-          borderColor: colors
-            .slice(0, sorted.length || 1)
-            .map((c) => c.replace("0.6", "1")),
+          data: [0],
+          backgroundColor: ["rgba(199, 199, 199, 0.6)"],
+          borderColor: ["rgba(199, 199, 199, 1)"],
           borderWidth: 1,
         },
       ],
     };
-  }, [filteredAcceptances]);
+  }, []);
 
-  // Данные для графиков продаж (с бэкенда)
+  // Данные для графиков продаж из charts
   const salesChartData = useMemo(() => {
-    // Временные тестовые данные для демонстрации
-    const mockSalesData = {
-      by_date: [
-        { date: "2024-01-01", amount: 50000, count: 10 },
-        { date: "2024-01-02", amount: 75000, count: 15 },
-        { date: "2024-01-03", amount: 60000, count: 12 },
-        { date: "2024-01-04", amount: 80000, count: 18 },
-        { date: "2024-01-05", amount: 90000, count: 20 },
-      ],
-      by_product: [
-        { product_name: "Товар А", amount: 150000, count: 30 },
-        { product_name: "Товар Б", amount: 120000, count: 25 },
-        { product_name: "Товар В", amount: 100000, count: 20 },
-        { product_name: "Товар Г", amount: 80000, count: 15 },
-        { product_name: "Товар Д", amount: 60000, count: 12 },
-      ],
-      total_amount: 510000,
-      total_count: 102,
-    };
-
-    const dataToUse = salesData || mockSalesData;
-
-    if (!dataToUse) {
+    if (!analyticsData?.charts) {
       return {
         byDate: {
           labels: ["Нет данных"],
           datasets: [
             {
-              label: "Продажи",
+              label: "Сумма продаж (сом)",
               data: [0],
-              borderColor: "rgba(75, 192, 192, 1)",
-              backgroundColor: "rgba(75, 192, 192, 0.2)",
+              borderColor: "#f7d74f",
+              backgroundColor: "rgba(247, 215, 79, 0.2)",
               tension: 0.4,
+              yAxisID: "y",
+              pointRadius: 4,
+              pointBackgroundColor: "#f7d74f",
+              pointBorderColor: "#fff",
+              pointBorderWidth: 2,
+            },
+            {
+              label: "Количество продаж",
+              data: [0],
+              borderColor: "rgba(107, 114, 128, 1)",
+              backgroundColor: "rgba(107, 114, 128, 0.2)",
+              tension: 0.4,
+              yAxisID: "y1",
+              pointRadius: 4,
+              pointBackgroundColor: "rgba(107, 114, 128, 1)",
+              pointBorderColor: "#fff",
+              pointBorderWidth: 2,
             },
           ],
         },
@@ -444,11 +309,12 @@ const AgentAnalytics = () => {
           labels: ["Нет данных"],
           datasets: [
             {
-              label: "Продажи",
+              label: "Сумма продаж (сом)",
               data: [0],
-              backgroundColor: "rgba(54, 162, 235, 0.6)",
-              borderColor: "rgba(54, 162, 235, 1)",
+              backgroundColor: "#f7d74f",
+              borderColor: "#f7d74f",
               borderWidth: 1,
+              borderRadius: 4,
             },
           ],
         },
@@ -458,8 +324,8 @@ const AgentAnalytics = () => {
             {
               label: "Распределение продаж",
               data: [0],
-              backgroundColor: ["rgba(255, 99, 132, 0.6)"],
-              borderColor: ["rgba(255, 99, 132, 1)"],
+              backgroundColor: ["#f7d74f"],
+              borderColor: ["#f7d74f"],
               borderWidth: 1,
             },
           ],
@@ -467,15 +333,28 @@ const AgentAnalytics = () => {
       };
     }
 
-    // Предполагаем, что бэкенд возвращает данные в формате:
-    // { by_date: [{ date: "2024-01-01", amount: 1000, count: 5 }, ...],
-    //   by_product: [{ product_name: "Товар", amount: 500, count: 2 }, ...],
-    //   total_amount: 10000, total_count: 50 }
-
-    const byDate = Array.isArray(dataToUse.by_date) ? dataToUse.by_date : [];
-    const byProduct = Array.isArray(dataToUse.by_product)
-      ? dataToUse.by_product
+    const charts = analyticsData.charts;
+    const salesByDate = Array.isArray(charts.sales_by_date)
+      ? charts.sales_by_date
       : [];
+    const salesByProductAmount = Array.isArray(charts.sales_by_product_amount)
+      ? charts.sales_by_product_amount
+      : [];
+    const salesDistribution = Array.isArray(
+      charts.sales_distribution_by_product
+    )
+      ? charts.sales_distribution_by_product
+      : [];
+
+    const dataToUse = {
+      by_date: salesByDate,
+      by_product: salesByProductAmount,
+      distribution: salesDistribution,
+    };
+
+    const byDate = dataToUse.by_date || [];
+    const byProduct = dataToUse.by_product || [];
+    const distribution = dataToUse.distribution || [];
 
     return {
       byDate: {
@@ -483,14 +362,12 @@ const AgentAnalytics = () => {
           byDate.length > 0
             ? byDate.map((item) => {
                 try {
-                  return new Date(
-                    item.date || item.created_at
-                  ).toLocaleDateString("ru-RU", {
+                  return new Date(item.date).toLocaleDateString("ru-RU", {
                     day: "2-digit",
                     month: "2-digit",
                   });
                 } catch {
-                  return String(item.date || item.created_at || "?");
+                  return String(item.date || "?");
                 }
               })
             : ["Нет данных"],
@@ -499,23 +376,35 @@ const AgentAnalytics = () => {
             label: "Сумма продаж (сом)",
             data:
               byDate.length > 0
-                ? byDate.map((item) => Number(item.amount || item.total || 0))
+                ? byDate.map((item) =>
+                    Number(item.amount || item.sales_amount || 0)
+                  )
                 : [0],
-            borderColor: "rgba(75, 192, 192, 1)",
-            backgroundColor: "rgba(75, 192, 192, 0.2)",
+            borderColor: "#f7d74f",
+            backgroundColor: "rgba(247, 215, 79, 0.2)",
             tension: 0.4,
             yAxisID: "y",
+            pointRadius: 4,
+            pointBackgroundColor: "#f7d74f",
+            pointBorderColor: "#fff",
+            pointBorderWidth: 2,
           },
           {
             label: "Количество продаж",
             data:
               byDate.length > 0
-                ? byDate.map((item) => Number(item.count || item.quantity || 0))
+                ? byDate.map((item) =>
+                    Number(item.count || item.sales_count || 0)
+                  )
                 : [0],
-            borderColor: "rgba(255, 99, 132, 1)",
-            backgroundColor: "rgba(255, 99, 132, 0.2)",
+            borderColor: "rgba(107, 114, 128, 1)",
+            backgroundColor: "rgba(107, 114, 128, 0.2)",
             tension: 0.4,
             yAxisID: "y1",
+            pointRadius: 4,
+            pointBackgroundColor: "rgba(107, 114, 128, 1)",
+            pointBorderColor: "#fff",
+            pointBorderWidth: 2,
           },
         ],
       },
@@ -532,23 +421,24 @@ const AgentAnalytics = () => {
             data:
               byProduct.length > 0
                 ? byProduct.map((item) =>
-                    Number(item.amount || item.total || 0)
+                    Number(item.amount || item.sales_amount || 0)
                   )
                 : [0],
-            backgroundColor: "rgba(54, 162, 235, 0.6)",
-            borderColor: "rgba(54, 162, 235, 1)",
+            backgroundColor: "#f7d74f",
+            borderColor: "#f7d74f",
             borderWidth: 1,
+            borderRadius: 4,
           },
         ],
       },
       byProductDoughnut: {
         labels:
-          byProduct.length > 0
-            ? byProduct
+          distribution.length > 0
+            ? distribution
                 .sort(
                   (a, b) =>
-                    Number(b.amount || b.total || 0) -
-                    Number(a.amount || a.total || 0)
+                    Number(b.amount || b.sales_amount || 0) -
+                    Number(a.amount || a.sales_amount || 0)
                 )
                 .slice(0, 8)
                 .map((item) => item.product_name || item.name || "Без названия")
@@ -557,71 +447,59 @@ const AgentAnalytics = () => {
           {
             label: "Распределение продаж",
             data:
-              byProduct.length > 0
-                ? byProduct
+              distribution.length > 0
+                ? distribution
                     .sort(
                       (a, b) =>
-                        Number(b.amount || b.total || 0) -
-                        Number(a.amount || a.total || 0)
+                        Number(b.amount || b.sales_amount || 0) -
+                        Number(a.amount || a.sales_amount || 0)
                     )
                     .slice(0, 8)
-                    .map((item) => Number(item.amount || item.total || 0))
+                    .map((item) =>
+                      Number(item.amount || item.sales_amount || 0)
+                    )
                 : [0],
             backgroundColor: [
-              "rgba(255, 99, 132, 0.6)",
-              "rgba(54, 162, 235, 0.6)",
-              "rgba(255, 206, 86, 0.6)",
-              "rgba(75, 192, 192, 0.6)",
-              "rgba(153, 102, 255, 0.6)",
-              "rgba(255, 159, 64, 0.6)",
-              "rgba(199, 199, 199, 0.6)",
-              "rgba(83, 102, 255, 0.6)",
+              "#f7d74f",
+              "#f5c842",
+              "#f3b935",
+              "#f1aa28",
+              "#ef9b1b",
+              "#ed8c0e",
+              "#eb7d01",
+              "#d4b800",
             ],
             borderColor: [
-              "rgba(255, 99, 132, 1)",
-              "rgba(54, 162, 235, 1)",
-              "rgba(255, 206, 86, 1)",
-              "rgba(75, 192, 192, 1)",
-              "rgba(153, 102, 255, 1)",
-              "rgba(255, 159, 64, 1)",
-              "rgba(199, 199, 199, 1)",
-              "rgba(83, 102, 255, 1)",
+              "#f7d74f",
+              "#f5c842",
+              "#f3b935",
+              "#f1aa28",
+              "#ef9b1b",
+              "#ed8c0e",
+              "#eb7d01",
+              "#d4b800",
             ],
             borderWidth: 1,
           },
         ],
       },
     };
-  }, [salesData]);
+  }, [analyticsData]);
 
-  // Данные для графиков товаров на руках (с бэкенда)
+  // Данные для графиков товаров на руках из charts
   const productsOnHandChartData = useMemo(() => {
-    // Временные тестовые данные для демонстрации
-    const mockProductsData = {
-      by_product: [
-        { product_name: "Товар А", quantity: 50, value: 250000 },
-        { product_name: "Товар Б", quantity: 40, value: 200000 },
-        { product_name: "Товар В", quantity: 30, value: 150000 },
-        { product_name: "Товар Г", quantity: 25, value: 125000 },
-        { product_name: "Товар Д", quantity: 20, value: 100000 },
-      ],
-      total_quantity: 165,
-      total_value: 825000,
-    };
-
-    const dataToUse = productsOnHand || mockProductsData;
-
-    if (!dataToUse) {
+    if (!analyticsData?.charts) {
       return {
         byProduct: {
           labels: ["Нет данных"],
           datasets: [
             {
-              label: "Товары на руках",
+              label: "Количество",
               data: [0],
-              backgroundColor: "rgba(153, 102, 255, 0.6)",
-              borderColor: "rgba(153, 102, 255, 1)",
+              backgroundColor: "#f7d74f",
+              borderColor: "#f7d74f",
               borderWidth: 1,
+              borderRadius: 4,
             },
           ],
         },
@@ -629,32 +507,39 @@ const AgentAnalytics = () => {
           labels: ["Нет данных"],
           datasets: [
             {
-              label: "Стоимость",
+              label: "Стоимость (сом)",
               data: [0],
-              backgroundColor: "rgba(255, 159, 64, 0.6)",
-              borderColor: "rgba(255, 159, 64, 1)",
+              backgroundColor: "#f7d74f",
+              borderColor: "#f7d74f",
               borderWidth: 1,
+              borderRadius: 4,
             },
           ],
         },
       };
     }
 
-    // Предполагаем, что бэкенд возвращает данные в формате:
-    // { by_product: [{ product_name: "Товар", quantity: 10, value: 5000 }, ...],
-    //   total_quantity: 100, total_value: 50000 }
-
-    const byProduct = Array.isArray(dataToUse.by_product)
-      ? dataToUse.by_product
-      : Array.isArray(dataToUse.products)
-      ? dataToUse.products
+    const charts = analyticsData.charts;
+    const onHandQty = Array.isArray(charts.on_hand_by_product_qty)
+      ? charts.on_hand_by_product_qty
       : [];
+    const onHandAmount = Array.isArray(charts.on_hand_by_product_amount)
+      ? charts.on_hand_by_product_amount
+      : [];
+
+    const dataToUse = {
+      by_product_qty: onHandQty,
+      by_product_amount: onHandAmount,
+    };
+
+    const byProductQty = dataToUse.by_product_qty || [];
+    const byProductAmount = dataToUse.by_product_amount || [];
 
     return {
       byProduct: {
         labels:
-          byProduct.length > 0
-            ? byProduct.map(
+          byProductQty.length > 0
+            ? byProductQty.map(
                 (item) => item.product_name || item.name || "Без названия"
               )
             : ["Нет данных"],
@@ -662,21 +547,22 @@ const AgentAnalytics = () => {
           {
             label: "Количество",
             data:
-              byProduct.length > 0
-                ? byProduct.map((item) =>
-                    Number(item.quantity || item.qty || 0)
+              byProductQty.length > 0
+                ? byProductQty.map((item) =>
+                    Number(item.qty_on_hand || item.quantity || item.qty || 0)
                   )
                 : [0],
-            backgroundColor: "rgba(153, 102, 255, 0.6)",
-            borderColor: "rgba(153, 102, 255, 1)",
+            backgroundColor: "#f7d74f",
+            borderColor: "#f7d74f",
             borderWidth: 1,
+            borderRadius: 4,
           },
         ],
       },
       byValue: {
         labels:
-          byProduct.length > 0
-            ? byProduct.map(
+          byProductAmount.length > 0
+            ? byProductAmount.map(
                 (item) => item.product_name || item.name || "Без названия"
               )
             : ["Нет данных"],
@@ -684,19 +570,20 @@ const AgentAnalytics = () => {
           {
             label: "Стоимость (сом)",
             data:
-              byProduct.length > 0
-                ? byProduct.map((item) =>
-                    Number(item.value || item.total_value || 0)
+              byProductAmount.length > 0
+                ? byProductAmount.map((item) =>
+                    Number(item.amount || item.value || 0)
                   )
                 : [0],
-            backgroundColor: "rgba(255, 159, 64, 0.6)",
-            borderColor: "rgba(255, 159, 64, 1)",
+            backgroundColor: "#f7d74f",
+            borderColor: "#f7d74f",
             borderWidth: 1,
+            borderRadius: 4,
           },
         ],
       },
     };
-  }, [productsOnHand]);
+  }, [analyticsData]);
 
   const chartOptions = {
     responsive: true,
@@ -727,6 +614,11 @@ const AgentAnalytics = () => {
         beginAtZero: true,
         type: "linear",
         position: "left",
+        ticks: {
+          callback: function (value) {
+            return value.toLocaleString("ru-RU");
+          },
+        },
       },
       y1: {
         beginAtZero: true,
@@ -735,20 +627,44 @@ const AgentAnalytics = () => {
         grid: {
           drawOnChartArea: false,
         },
+        ticks: {
+          callback: function (value) {
+            return value.toLocaleString("ru-RU");
+          },
+        },
+      },
+      x: {
+        ticks: {
+          maxRotation: 45,
+          minRotation: 0,
+        },
       },
     },
   };
 
-  if (!agentId) {
-    return (
-      <div className="agent-analytics">
-        <div className="agent-analytics__error">
-          <p>ID агента не указан</p>
-          <button onClick={() => navigate(-1)}>Назад</button>
-        </div>
-      </div>
-    );
-  }
+  const horizontalBarChartOptions = {
+    ...chartOptions,
+    indexAxis: "y",
+    scales: {
+      x: {
+        beginAtZero: true,
+        ticks: {
+          callback: function (value) {
+            return value.toLocaleString("ru-RU");
+          },
+        },
+      },
+      y: {
+        ticks: {
+          maxRotation: 0,
+          minRotation: 0,
+        },
+      },
+    },
+  };
+
+  // Если agentId не указан, показываем аналитику для текущего пользователя
+  // Не показываем ошибку, так как это нормальный случай для сотрудника
 
   if (loading) {
     return (
@@ -789,20 +705,28 @@ const AgentAnalytics = () => {
   return (
     <div className="agent-analytics">
       <div className="agent-analytics__header">
-        <button
-          className="agent-analytics__back-btn"
-          onClick={() => navigate(-1)}
-        >
-          <ArrowLeft size={20} />
-          Назад
-        </button>
+        {agentId && (
+          <button
+            className="agent-analytics__back-btn"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft size={20} />
+            Назад
+          </button>
+        )}
         <h1 className="agent-analytics__title">
-          Аналитика агента:{" "}
-          {selectedAgent
-            ? `${selectedAgent.first_name || ""} ${
-                selectedAgent.last_name || ""
-              }`.trim() || selectedAgent.email
-            : "Загрузка..."}
+          {agentId ? (
+            <>
+              Аналитика агента:{" "}
+              {selectedAgent
+                ? `${selectedAgent.first_name || ""} ${
+                    selectedAgent.last_name || ""
+                  }`.trim() || selectedAgent.email
+                : "Загрузка..."}
+            </>
+          ) : (
+            "Моя аналитика"
+          )}
         </h1>
         <div className="agent-analytics__controls">
           <select
@@ -828,49 +752,72 @@ const AgentAnalytics = () => {
       {/* Метрики */}
       <div className="agent-analytics__metrics">
         <div className="agent-analytics__metric-card">
-          <Package size={24} />
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--blue">
+            <Package size={24} />
+          </div>
           <div>
             <h3>Передач</h3>
             <p>{metrics.totalTransfers}</p>
           </div>
         </div>
         <div className="agent-analytics__metric-card">
-          <ShoppingCart size={24} />
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
+            <ShoppingCart size={24} />
+          </div>
           <div>
             <h3>Приёмок</h3>
             <p>{metrics.totalAcceptances}</p>
           </div>
         </div>
         <div className="agent-analytics__metric-card">
-          <TrendingUp size={24} />
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+            <TrendingUp size={24} />
+          </div>
           <div>
             <h3>Товаров передано</h3>
             <p>{metrics.totalQuantityTransferred.toLocaleString()}</p>
           </div>
         </div>
         <div className="agent-analytics__metric-card">
-          <DollarSign size={24} />
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
+            <DollarSign size={24} />
+          </div>
           <div>
             <h3>Продаж</h3>
             <p>{metrics.totalSalesCount}</p>
           </div>
         </div>
         <div className="agent-analytics__metric-card">
-          <DollarSign size={24} />
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
+            <DollarSign size={24} />
+          </div>
           <div>
             <h3>Сумма продаж</h3>
             <p>{metrics.totalSalesAmount.toLocaleString()} сом</p>
           </div>
         </div>
         <div className="agent-analytics__metric-card">
-          <Package size={24} />
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <Package size={24} />
+          </div>
           <div>
             <h3>Товаров на руках</h3>
             <p>{metrics.totalProductsOnHand.toLocaleString()}</p>
           </div>
         </div>
         <div className="agent-analytics__metric-card">
-          <DollarSign size={24} />
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <Package size={24} />
+          </div>
+          <div>
+            <h3>Товаров на руках</h3>
+            <p>{metrics.totalProductsOnHand.toLocaleString()}</p>
+          </div>
+        </div>
+        <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+            <DollarSign size={24} />
+          </div>
           <div>
             <h3>Стоимость товаров</h3>
             <p>{metrics.totalProductsValue.toLocaleString()} сом</p>
@@ -880,11 +827,16 @@ const AgentAnalytics = () => {
 
       {/* Графики продаж */}
       <div className="agent-analytics__section">
-        <h2 className="agent-analytics__section-title">📊 Аналитика продаж</h2>
+        <h2 className="agent-analytics__section-title">
+          <span className="agent-analytics__section-icon chart-container">
+            <BarChart3 className="chart-icon" />
+          </span>
+          Аналитика продаж
+        </h2>
         <div className="agent-analytics__charts">
           {salesChartData?.byDate && (
             <div className="agent-analytics__chart-card">
-              <h2>Продажи по датам</h2>
+              <h3>Продажи по датам</h3>
               <div className="agent-analytics__chart-container">
                 <Line data={salesChartData.byDate} options={barChartOptions} />
               </div>
@@ -893,7 +845,7 @@ const AgentAnalytics = () => {
 
           {salesChartData?.byProduct && (
             <div className="agent-analytics__chart-card">
-              <h2>Продажи по товарам (сумма)</h2>
+              <h3>Продажи по товарам (сумма)</h3>
               <div className="agent-analytics__chart-container">
                 <Bar
                   data={salesChartData.byProduct}
@@ -902,28 +854,32 @@ const AgentAnalytics = () => {
               </div>
             </div>
           )}
-
-          {salesChartData?.byProductDoughnut && (
-            <div className="agent-analytics__chart-card">
-              <h2>Распределение продаж по товарам</h2>
-              <div className="agent-analytics__chart-container">
-                <Doughnut
-                  data={salesChartData.byProductDoughnut}
-                  options={chartOptions}
-                />
-              </div>
-            </div>
-          )}
         </div>
+        {salesChartData?.byProductDoughnut && (
+          <div className="agent-analytics__chart-card agent-analytics__chart-card--full">
+            <h3>Распределение продаж по товарам</h3>
+            <div className="agent-analytics__chart-container agent-analytics__chart-container--doughnut">
+              <Doughnut
+                data={salesChartData.byProductDoughnut}
+                options={chartOptions}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Графики товаров на руках */}
       <div className="agent-analytics__section">
-        <h2 className="agent-analytics__section-title">📦 Товары на руках</h2>
+        <h2 className="agent-analytics__section-title">
+          <span className="agent-analytics__section-icon chart-container">
+            <Package className="chart-icon" />
+          </span>
+          Товары на руках
+        </h2>
         <div className="agent-analytics__charts">
           {productsOnHandChartData?.byProduct && (
             <div className="agent-analytics__chart-card">
-              <h2>Товары на руках (количество)</h2>
+              <h3>Товары на руках (количество)</h3>
               <div className="agent-analytics__chart-container">
                 <Bar
                   data={productsOnHandChartData.byProduct}
@@ -935,7 +891,7 @@ const AgentAnalytics = () => {
 
           {productsOnHandChartData?.byValue && (
             <div className="agent-analytics__chart-card">
-              <h2>Товары на руках (стоимость)</h2>
+              <h3>Товары на руках (стоимость)</h3>
               <div className="agent-analytics__chart-container">
                 <Bar
                   data={productsOnHandChartData.byValue}
@@ -949,30 +905,26 @@ const AgentAnalytics = () => {
 
       {/* Графики передач и приёмок */}
       <div className="agent-analytics__section">
-        <h2 className="agent-analytics__section-title">
-          🔄 Передачи и приёмки
+        <h2 className="agent-analytics__section-title ">
+          <span className="agent-analytics__section-icon chart-container">
+            <ArrowLeftRight className="chart-icon" />
+          </span>
+          Передачи и приёмки
         </h2>
         <div className="agent-analytics__charts">
           <div className="agent-analytics__chart-card">
-            <h2>Передачи по датам</h2>
+            <h3>Передачи по датам</h3>
             <div className="agent-analytics__chart-container">
               <Line data={transfersByDateData} options={barChartOptions} />
             </div>
           </div>
 
           <div className="agent-analytics__chart-card">
-            <h2>Топ товаров по передачам</h2>
+            <h3>Топ товаров по передачам</h3>
             <div className="agent-analytics__chart-container">
-              <Bar data={transfersByProductData} options={barChartOptions} />
-            </div>
-          </div>
-
-          <div className="agent-analytics__chart-card">
-            <h2>Распределение приёмок по товарам</h2>
-            <div className="agent-analytics__chart-container">
-              <Doughnut
-                data={acceptancesByProductData}
-                options={chartOptions}
+              <Bar
+                data={transfersByProductData}
+                options={horizontalBarChartOptions}
               />
             </div>
           </div>
@@ -980,43 +932,62 @@ const AgentAnalytics = () => {
       </div>
 
       {/* Таблица передач */}
-      {filteredTransfers.length > 0 && (
-        <div className="agent-analytics__table-card">
-          <h2>История передач</h2>
-          <div className="agent-analytics__table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Дата</th>
-                  <th>Товар</th>
-                  <th>Количество</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransfers.slice(0, 20).map((transfer) => (
-                  <tr key={transfer.id}>
-                    <td>
-                      {new Date(
-                        transfer.created_at || transfer.createdAt
-                      ).toLocaleDateString("ru-RU")}
-                    </td>
-                    <td>
-                      {transfer.product_name ||
-                        `Товар #${
-                          transfer.product || transfer.product_id || "?"
-                        }`}
-                    </td>
-                    <td>
-                      {Number(transfer.qty_transferred || 0).toLocaleString()}
-                    </td>
-                    <td>{transfer.status || "—"}</td>
+      {transfersHistory.length > 0 && (
+        <>
+          <h2 className="agent-analytics__section-title">
+            <span className="agent-analytics__section-icon chart-container">
+              <Clock className="chart-icon" />
+            </span>
+            История передач
+          </h2>
+          <div className="agent-analytics__table-card noPadding">
+            <div className="agent-analytics__table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Товар</th>
+                    <th>Количество</th>
+                    <th>Статус</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {transfersHistory.slice(0, 20).map((transfer) => {
+                    const status =
+                      transfer.status_label || transfer.status || "Открыта";
+                    const isCompleted =
+                      status.toLowerCase().includes("завершена") ||
+                      status.toLowerCase().includes("completed") ||
+                      transfer.status === "completed";
+                    return (
+                      <tr key={transfer.id}>
+                        <td>
+                          {new Date(transfer.date).toLocaleDateString("ru-RU")}
+                        </td>
+                        <td>
+                          {transfer.product_name ||
+                            `Товар #${transfer.product_id || "?"}`}
+                        </td>
+                        <td>{Number(transfer.qty || 0).toLocaleString()}</td>
+                        <td>
+                          <span
+                            className={`agent-analytics__status ${
+                              isCompleted
+                                ? "agent-analytics__status--completed"
+                                : "agent-analytics__status--open"
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
