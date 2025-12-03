@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { X, Plus, Minus, ShoppingCart, User } from "lucide-react";
+import {
+  X,
+  Plus,
+  Minus,
+  ShoppingCart,
+  User,
+  Search,
+  ChevronDown,
+} from "lucide-react";
 import {
   submitAgentCartById,
   updateAgentCartItemById,
@@ -223,12 +231,31 @@ const RequestCart = ({
   onCreateNewCart,
 }) => {
   const dispatch = useDispatch();
-  const { list: clients, loading: clientsLoading } = useClient();
+  const {
+    list: clients,
+    loading: clientsLoading,
+    creating,
+    error: clientError,
+  } = useClient();
   const [submitting, setSubmitting] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
-  const [newClientName, setNewClientName] = useState("");
-  const [newClientPhone, setNewClientPhone] = useState("");
-  const [creatingClient, setCreatingClient] = useState(false);
+  const [isClientSelectorOpen, setIsClientSelectorOpen] = useState(false);
+  const [isCreateMode, setIsCreateMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [formError, setFormError] = useState("");
+  const [clientFormState, setClientFormState] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+    date: new Date().toISOString().split("T")[0],
+    type: "client",
+    llc: "",
+    inn: "",
+    okpo: "",
+    score: "",
+    bik: "",
+    address: "",
+  });
 
   // Загрузка клиентов при монтировании
   useEffect(() => {
@@ -270,94 +297,88 @@ const RequestCart = ({
     }
   };
 
-  // Выбор существующего клиента
-  const handleSelectClient = async (event) => {
-    if (!cartId) return;
-    const value = event.target.value;
+  // Универсальные хелперы под разные схемы клиента
+  const getClientName = (c) =>
+    (c?.name && String(c.name)) ||
+    (c?.full_name && String(c.full_name)) ||
+    [c?.first_name, c?.last_name].filter(Boolean).join(" ") ||
+    c?.username ||
+    "";
 
-    if (!value) {
-      // Убираем клиента
-      try {
-        await updateAgentCart(cartId, { client: null });
-        setSelectedClient(null);
-        onNotify && onNotify("success", "Клиент удалён из заявки");
-      } catch (e) {
-        console.error("Error clearing client from cart:", e);
-        const errorMessage =
-          e?.response?.data?.detail ||
-          e?.response?.data?.message ||
-          e?.message ||
-          "Не удалось удалить клиента";
-        onNotify &&
-          onNotify("error", `Ошибка при удалении клиента: ${errorMessage}`);
-      }
-      return;
-    }
+  const normalize = (s) =>
+    String(s ?? "")
+      .toLowerCase()
+      .trim();
+  const normalizePhone = (s) => String(s ?? "").replace(/\D/g, "");
 
-    const clientId = value;
-    const clientObj =
-      (Array.isArray(clients) ? clients : clients?.results || []).find(
-        (c) => String(c.id) === String(clientId)
-      ) || null;
+  // Клиенты могут быть массивом или { results: [...] }
+  const clientsList = Array.isArray(clients?.results)
+    ? clients.results
+    : clients || [];
 
-    try {
-      await updateAgentCart(cartId, { client: clientId });
-      setSelectedClient(clientObj);
-      onNotify && onNotify("success", "Клиент привязан к заявке");
-    } catch (e) {
-      console.error("Error updating cart client:", e);
-      const errorMessage =
-        e?.response?.data?.detail ||
-        e?.response?.data?.message ||
-        e?.message ||
-        "Не удалось обновить клиента";
-      onNotify &&
-        onNotify("error", `Ошибка при привязке клиента: ${errorMessage}`);
-    }
+  const filteredClients = (clientsList || []).filter((client) => {
+    const q = normalize(searchQuery);
+    const qPhone = normalizePhone(searchQuery);
+    const name = normalize(getClientName(client));
+    const phone = normalizePhone(client?.phone);
+
+    // Ищем либо по имени/фамилии, либо по телефону
+    return (
+      (q && name.includes(q)) ||
+      (qPhone && phone.includes(qPhone)) ||
+      (!q && !qPhone)
+    );
+  });
+
+  const handleClientFormChange = (e) => {
+    const { name, value } = e.target;
+    setClientFormState((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Создание нового клиента и привязка к корзине
-  const handleCreateClient = async () => {
-    if (!cartId) return;
-    const name = newClientName.trim();
-    const phone = newClientPhone.trim();
+  // Выбор существующего клиента (только локальное состояние, без API запроса)
+  const handleSelectClient = (client) => {
+    setSelectedClient(client);
+    setIsClientSelectorOpen(false);
+    setSearchQuery("");
+  };
 
-    if (!name) {
-      onNotify && onNotify("error", "Введите имя клиента");
+  // Создание нового клиента (только локальное состояние, без API запроса к корзине)
+  const handleCreateClient = async () => {
+    setFormError("");
+    if (!String(clientFormState.full_name || "").trim()) {
+      setFormError("Укажите имя клиента");
       return;
     }
 
-    setCreatingClient(true);
     try {
-      const action = await dispatch(
-        createClientAsync({
-          full_name: name,
-          phone: phone || undefined,
-          type: "client",
-        })
-      );
+      const action = await dispatch(createClientAsync(clientFormState));
       const created = action?.payload;
       if (created?.id) {
-        await updateAgentCart(cartId, { client: created.id });
+        // Сохраняем только в локальное состояние, без обновления корзины через API
         setSelectedClient(created);
-        setNewClientName("");
-        setNewClientPhone("");
-        onNotify && onNotify("success", "Клиент создан и привязан к заявке");
+        setIsCreateMode(false);
+        setSearchQuery("");
+        setIsClientSelectorOpen(false);
+        setClientFormState({
+          full_name: "",
+          phone: "",
+          email: "",
+          date: new Date().toISOString().split("T")[0],
+          type: "client",
+          llc: "",
+          inn: "",
+          okpo: "",
+          score: "",
+          bik: "",
+          address: "",
+        });
 
         // Обновляем список клиентов
         dispatch(fetchClientsAsync());
       }
     } catch (e) {
-      console.error("Error creating/selecting client:", e);
-      const errorMessage =
-        e?.response?.data?.detail ||
-        e?.response?.data?.message ||
-        e?.message ||
-        "Не удалось создать клиента";
-      onNotify &&
-        onNotify("error", `Ошибка при создании клиента: ${errorMessage}`);
-    } finally {
-      setCreatingClient(false);
+      console.error("Error creating client:", e);
+      // error handled in slice
     }
   };
 
@@ -374,7 +395,15 @@ const RequestCart = ({
 
     setSubmitting(true);
     try {
-      // Отправляем заявку через API
+      // Сначала обновляем корзину с выбранным клиентом (если есть)
+      if (selectedClient?.id) {
+        await updateAgentCart(cartId, { client: selectedClient.id });
+      } else {
+        // Если клиент не выбран, убираем его из корзины
+        await updateAgentCart(cartId, { client: null });
+      }
+
+      // Затем отправляем заявку через API
       await submitAgentCartById(cartId);
 
       // Создаем новую пустую корзину после успешной отправки
@@ -437,57 +466,227 @@ const RequestCart = ({
           </div>
 
           <div className="order-section">
-            <div className="client-block">
-              <h2 className="client-block__title">Клиент</h2>
-              <div className="client-block__field">
-                <label>Выберите клиента</label>
-                <div className="client-block__select-wrapper">
-                  <User size={18} className="client-block__icon" />
-                  <select
-                    value={selectedClient?.id || ""}
-                    onChange={handleSelectClient}
-                    disabled={clientsLoading || !cartId}
-                  >
-                    <option value="">Без клиента</option>
-                    {(Array.isArray(clients)
-                      ? clients
-                      : clients?.results || []
-                    ).map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.full_name || client.name || client.username}{" "}
-                        {client.phone ? `(${client.phone})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="client-block__field">
-                <label>Новый клиент</label>
-                <input
-                  type="text"
-                  placeholder="Имя клиента"
-                  value={newClientName}
-                  onChange={(e) => setNewClientName(e.target.value)}
-                  disabled={creatingClient}
-                />
-                <input
-                  type="tel"
-                  placeholder="Телефон (необязательно)"
-                  value={newClientPhone}
-                  onChange={(e) => setNewClientPhone(e.target.value)}
-                  disabled={creatingClient}
-                  style={{ marginTop: 8 }}
-                />
+            <div className="client-selector">
+              <label className="selector-label">Выберите клиента</label>
+              <div className="selector-dropdown">
                 <button
-                  type="button"
-                  className="client-block__create-btn"
-                  onClick={handleCreateClient}
-                  disabled={creatingClient || !newClientName.trim()}
-                  style={{ marginTop: 8 }}
+                  className="selector-trigger"
+                  onClick={() => setIsClientSelectorOpen((v) => !v)}
+                  disabled={!cartId}
                 >
-                  {creatingClient ? "Создание..." : "Создать и выбрать"}
+                  <div className="selected-client">
+                    <User size={20} />
+                    {selectedClient ? (
+                      <>
+                        <span>{getClientName(selectedClient)}</span>
+                        {selectedClient?.phone && (
+                          <span className="client-phone">
+                            {selectedClient.phone}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span>Выберите клиента</span>
+                    )}
+                  </div>
+                  <ChevronDown
+                    size={20}
+                    className={`chevron ${isClientSelectorOpen ? "open" : ""}`}
+                  />
                 </button>
+
+                {isClientSelectorOpen && (
+                  <div className="selector-dropdown-content">
+                    {!isCreateMode && (
+                      <>
+                        <div className="search-box">
+                          <Search size={16} />
+                          <input
+                            type="text"
+                            placeholder="Поиск по имени или телефону…"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                          />
+                        </div>
+                        <div
+                          className="actions-row"
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            marginBottom: 8,
+                            width: "100%",
+                          }}
+                        >
+                          <button
+                            className="create-client-btn"
+                            onClick={() => {
+                              setIsCreateMode(true);
+                              setFormError("");
+                            }}
+                          >
+                            + Новый клиент
+                          </button>
+                          <button
+                            className="clear-client-btn"
+                            onClick={() => handleSelectClient(null)}
+                            style={{ marginLeft: "auto" }}
+                          >
+                            Убрать клиента
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    {isCreateMode && (
+                      <div
+                        className="create-client-form"
+                        style={{ display: "grid", gap: 8, marginBottom: 12 }}
+                      >
+                        <input
+                          type="text"
+                          placeholder="Имя клиента"
+                          name="full_name"
+                          value={clientFormState.full_name}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        <input
+                          type="tel"
+                          placeholder="Телефон"
+                          name="phone"
+                          value={clientFormState.phone}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        <input
+                          type="text"
+                          placeholder="ОсОО"
+                          name="llc"
+                          value={clientFormState.llc}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        <input
+                          type="text"
+                          placeholder="ОКПО"
+                          name="okpo"
+                          value={clientFormState.okpo}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        <input
+                          type="text"
+                          placeholder="З/СЧЕТ"
+                          name="score"
+                          value={clientFormState.score}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        <input
+                          type="text"
+                          placeholder="БИК"
+                          name="bik"
+                          value={clientFormState.bik}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Адрес"
+                          name="address"
+                          value={clientFormState.address}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        <input
+                          type="email"
+                          placeholder="Email"
+                          name="email"
+                          value={clientFormState.email}
+                          onChange={handleClientFormChange}
+                          disabled={creating}
+                        />
+                        {formError ? (
+                          <div
+                            className="error"
+                            style={{ color: "#c00", fontSize: 12 }}
+                          >
+                            {formError}
+                          </div>
+                        ) : null}
+                        {clientError ? (
+                          <div
+                            className="error"
+                            style={{ color: "#c00", fontSize: 12 }}
+                          >
+                            {String(clientError)}
+                          </div>
+                        ) : null}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            className="save-client-btn"
+                            onClick={handleCreateClient}
+                            disabled={creating}
+                          >
+                            {creating ? "Сохранение..." : "Сохранить"}
+                          </button>
+                          <button
+                            className="cancel-create-btn"
+                            onClick={() => {
+                              setIsCreateMode(false);
+                              setFormError("");
+                            }}
+                            disabled={creating}
+                          >
+                            Отмена
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {!isCreateMode && (
+                      <div className="clients-list">
+                        {clientsLoading ? (
+                          <div className="loading">Загрузка клиентов...</div>
+                        ) : filteredClients.length === 0 ? (
+                          <div className="no-clients">Клиенты не найдены</div>
+                        ) : (
+                          filteredClients.map((client) => {
+                            const name = getClientName(client);
+                            return (
+                              <button
+                                key={
+                                  client?.id ?? `${name}-${client?.phone ?? ""}`
+                                }
+                                className={`client-option ${
+                                  selectedClient?.id && client?.id
+                                    ? selectedClient.id === client.id
+                                      ? "selected"
+                                      : ""
+                                    : getClientName(selectedClient) === name &&
+                                      selectedClient?.phone === client?.phone
+                                    ? "selected"
+                                    : ""
+                                }`}
+                                onClick={() => handleSelectClient(client)}
+                              >
+                                <div className="client-info">
+                                  <span className="client-name">
+                                    {name || "Без имени"}
+                                  </span>
+                                  {client?.phone && (
+                                    <span className="client-phone">
+                                      {client.phone}
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -1,70 +1,126 @@
-# Getting Started with Create React App
+# NUR CRM Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Многопрофильная CRM-система для управления бизнесом в различных отраслях.
 
-## Available Scripts
+## 📖 Документация
 
-In the project directory, you can run:
+**Полная документация проекта доступна в файле [PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md)**
+
+## 🚀 Быстрый старт
+
+### Требования
+
+- Node.js >= 14.x
+- npm >= 6.x или yarn >= 1.x
+
+### Установка
+
+```bash
+# Клонируйте репозиторий
+git clone <repository-url>
+
+# Перейдите в директорию проекта
+cd frontend-actual
+
+# Установите зависимости
+npm install
+# или
+yarn install
+```
+
+### Настройка окружения
+
+Создайте файл `.env` в корне проекта:
+
+```env
+REACT_APP_API_BASE_URL=https://app.nurcrm.kg/api
+```
+
+### Запуск в режиме разработки
+
+```bash
+npm start
+# или
+yarn start
+```
+
+Приложение откроется по адресу [http://localhost:3000](http://localhost:3000)
+
+## 📦 Доступные команды
 
 ### `npm start`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Запускает приложение в режиме разработки.  
+Откройте [http://localhost:3000](http://localhost:3000) в браузере.
 
 ### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Запускает тестовый раннер в интерактивном режиме.
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Создает production сборку в папке `build/`.  
+Приложение оптимизировано для production и готово к деплою.
 
 ### `npm run eject`
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+**⚠️ Внимание: это необратимая операция!**
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Извлекает конфигурацию Create React App в проект для полного контроля.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## 🎯 Основные возможности
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- ✅ Управление несколькими секторами бизнеса (кафе, маркет, барбершоп, школа, гостиница и др.)
+- ✅ Многопользовательская система с ролевым доступом
+- ✅ Управление филиалами и отделами
+- ✅ Аналитика и отчетность
+- ✅ Управление складом и товарами
+- ✅ Кассовые операции
+- ✅ Мобильная адаптивность
+- ✅ Многоязычность (русский, кыргызский)
 
-## Learn More
+## 🛠 Технологический стек
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- **React 18** — UI библиотека
+- **Redux Toolkit** — управление состоянием
+- **React Router** — маршрутизация
+- **Material-UI** — компоненты интерфейса
+- **SASS** — стилизация
+- **Tailwind CSS** — utility-first CSS
+- **Axios** — HTTP клиент
+- **i18next** — интернационализация
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 📚 Дополнительная документация
 
-### Code Splitting
+- [PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md) — полная документация проекта
+- [ADAPTIVE_GUIDE.md](./ADAPTIVE_GUIDE.md) — руководство по адаптивности
+- [ORDERS_API_DOCUMENTATION.md](./ORDERS_API_DOCUMENTATION.md) — документация API заказов
+- [CODE_ANALYSIS_SellMainStart.md](./CODE_ANALYSIS_SellMainStart.md) — анализ кода компонента продаж
+- [TRANSFER_ACCEPTANCE_GUIDE.md](./TRANSFER_ACCEPTANCE_GUIDE.md) — руководство по переводам
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## 📁 Структура проекта
 
-### Analyzing the Bundle Size
+```
+frontend-actual/
+├── public/          # Статические файлы
+├── src/
+│   ├── api/        # API сервисы
+│   ├── Components/ # React компоненты
+│   ├── hooks/      # Custom hooks
+│   ├── locales/    # Переводы
+│   ├── store/      # Redux store
+│   └── ...
+├── build/          # Production сборка
+└── package.json
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 🔗 Полезные ссылки
 
-### Making a Progressive Web App
+- [React Documentation](https://react.dev/)
+- [Redux Toolkit Documentation](https://redux-toolkit.js.org/)
+- [React Router Documentation](https://reactrouter.com/)
+- [Material-UI Documentation](https://mui.com/)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 📄 Лицензия
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Проект является проприетарным. Все права защищены.
