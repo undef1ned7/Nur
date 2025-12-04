@@ -320,6 +320,7 @@ const AddModal = ({
               className="add-modal__input"
               value={newItemData.name}
               onChange={handleChange}
+              onWheel={(e) => e.preventDefault()}
               required
             />
           </div>
@@ -330,6 +331,7 @@ const AddModal = ({
               type="text"
               name="barcode"
               placeholder="Штрих код"
+              onWheel={(e) => e.preventDefault()}
               className="add-modal__input"
               value={newItemData.barcode}
               onChange={handleChange}
@@ -343,6 +345,7 @@ const AddModal = ({
                 <label>Бренд *</label>
                 <select
                   name="brand_name"
+                  onWheel={(e) => e.preventDefault()}
                   className="add-modal__input"
                   value={newItemData.brand_name}
                   onChange={handleChange}
@@ -360,7 +363,9 @@ const AddModal = ({
               <div className="add-modal__section">
                 <label>Категория *</label>
                 <select
+                  type='text'
                   name="category_name"
+                  onWheel={(e) => e.preventDefault()}
                   className="add-modal__input"
                   value={newItemData.category_name}
                   onChange={handleChange}
@@ -382,6 +387,7 @@ const AddModal = ({
             <select
               name="client"
               className="add-modal__input"
+              onWheel={(e) => e.preventDefault()}
               value={newItemData.client}
               onChange={handleChange}
               required
@@ -415,6 +421,7 @@ const AddModal = ({
                   type="text"
                   placeholder="ФИО"
                   name="full_name"
+                  onWheel={(e) => e.preventDefault()}
                 />
                 <input
                   className="add-modal__input"
@@ -422,6 +429,7 @@ const AddModal = ({
                   type="text"
                   name="llc"
                   placeholder="ОсОО"
+                  onWheel={(e) => e.preventDefault()}
                 />
                 <input
                   className="add-modal__input"
@@ -429,6 +437,7 @@ const AddModal = ({
                   type="text"
                   name="inn"
                   placeholder="ИНН"
+                  onWheel={(e) => e.preventDefault()}
                 />
                 <input
                   className="add-modal__input"
@@ -436,6 +445,7 @@ const AddModal = ({
                   type="text"
                   name="okpo"
                   placeholder="ОКПО"
+                  onWheel={(e) => e.preventDefault()}
                 />
                 <input
                   className="add-modal__input"
@@ -443,12 +453,14 @@ const AddModal = ({
                   type="text"
                   name="score"
                   placeholder="Р/СЧЁТ"
+                  onWheel={(e) => e.preventDefault()}
                 />
                 <input
                   className="add-modal__input"
                   onChange={onChange}
                   type="text"
                   name="bik"
+                  onWheel={(e) => e.preventDefault()}
                   placeholder="БИК"
                 />
                 <input
@@ -457,6 +469,7 @@ const AddModal = ({
                   type="text"
                   name="address"
                   placeholder="Адрес"
+                  onWheel={(e) => e.preventDefault()}
                 />
                 <input
                   className="add-modal__input"
@@ -464,6 +477,8 @@ const AddModal = ({
                   type="text"
                   name="phone"
                   placeholder="Телефон"
+                  onWheel={(e) => e.preventDefault()}
+
                 />
                 <input
                   className="add-modal__input"
@@ -471,6 +486,8 @@ const AddModal = ({
                   type="email"
                   name="email"
                   placeholder="Почта"
+                  onWheel={(e) => e.preventDefault()}
+
                 />
                 <div style={{ display: "flex", columnGap: "10px" }}>
                   <button
@@ -500,6 +517,7 @@ const AddModal = ({
                 checked={showDebtForm}
                 onChange={(e) => setShowDebtForm(e.target.checked)}
                 style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                onWheel={(e) => e.preventDefault()}
               />
               <strong style={{ fontSize: "14px" }}>Добавить долг</strong>
             </label>
@@ -701,9 +719,10 @@ const AddModal = ({
           <div className="add-modal__section">
             <label>Розничная цена *</label>
             <input
-              type="number"
+              type="text"
               name="price"
               placeholder="999.99"
+              onWheel={(e) => e.preventDefault()}
               className="add-modal__input"
               value={newItemData.price}
               onChange={handleChange}
@@ -716,7 +735,7 @@ const AddModal = ({
           <div className="add-modal__section">
             <label>Закупочная цена *</label>
             <input
-              type="number"
+              type="text"
               name="purchase_price"
               placeholder="999.99"
               className="add-modal__input"
@@ -724,6 +743,7 @@ const AddModal = ({
               onChange={handleChange}
               min="0"
               step="0.01"
+              onWheel={(e) => e.preventDefault()}
               required
             />
           </div>
@@ -731,13 +751,14 @@ const AddModal = ({
           <div className="add-modal__section">
             <label>Количество *</label>
             <input
-              type="number"
+              type="text"
               name="quantity"
               placeholder="100"
               className="add-modal__input"
               value={newItemData.quantity}
               onChange={handleChange}
               min="0"
+              onWheel={(e) => e.preventDefault()}
               required
             />
           </div>
@@ -746,13 +767,14 @@ const AddModal = ({
               <div className="add-modal__section">
                 <label>ПЛУ</label>
                 <input
-                  type="number"
+                  type="text"
                   name="plu"
                   placeholder="Номер ПЛУ для весов (можно не заполнять)"
                   className="add-modal__input"
                   value={newItemData.plu}
                   onChange={handleChange}
                   min="0"
+                  onWheel={(e) => e.preventDefault()}
                   max="2147483647"
                 />
               </div>

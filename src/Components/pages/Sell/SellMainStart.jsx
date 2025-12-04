@@ -1092,6 +1092,7 @@ const SellMainStart = ({ show, setShow }) => {
         open: true,
         type: "error",
         message:
+          error?.data?.prepayment ||
           error?.message ||
           error?.data?.detail ||
           "Ошибка при сохранении долга",
