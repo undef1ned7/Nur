@@ -13,6 +13,7 @@ import {
   getScalesToken,
 } from "../../../../store/creators/userCreators";
 import { useNavigate } from "react-router-dom";
+import AlertModal from "../../../common/AlertModal/AlertModal";
 
 const Settings = () => {
   const dispatch = useDispatch();
@@ -43,6 +44,16 @@ const Settings = () => {
     return "Безопасность";
   }, [isOwner, isMarketSector]);
 
+  // Инициализируем настройку сайдбара из localStorage при загрузке (только один раз)
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebarAutoClose");
+    if (saved === null) {
+      // Если настройка не сохранена, устанавливаем по умолчанию false
+      localStorage.setItem("sidebarAutoClose", "false");
+    }
+    // Не обновляем состояние здесь, так как оно уже инициализировано в useState
+  }, []); // Пустой массив зависимостей - выполняется только один раз
+
   const [activeTab, setActiveTab] = useState("Безопасность");
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -66,6 +77,34 @@ const Settings = () => {
     }
   }, [isMarketSector, isOwner, activeTab, isInitialized]);
   const [saving, setSaving] = useState(false);
+
+  // --- Состояние для AlertModal
+  const [alertModal, setAlertModal] = useState({
+    open: false,
+    type: "success",
+    message: "",
+  });
+
+  const showAlert = (type, message) => {
+    setAlertModal({ open: true, type, message });
+  };
+
+  const closeAlert = () => {
+    setAlertModal({ open: false, type: "success", message: "" });
+  };
+
+  // --- Настройки интерфейса (сайдбар)
+  // Инициализируем из localStorage, если значение есть, иначе false
+  const [sidebarAutoClose, setSidebarAutoClose] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sidebarAutoClose");
+      if (saved === null) {
+        return false; // По умолчанию false (сайдбар остается открытым)
+      }
+      return saved === "true";
+    }
+    return false;
+  });
 
   // --- Пароли
   const [formData, setFormData] = useState({
@@ -139,10 +178,10 @@ const Settings = () => {
     setSaving(true);
     try {
       await dispatch(updateUserCompanyName(companyState)).unwrap();
-      alert("Данные компании успешно сохранены");
+      showAlert("success", "Данные компании успешно сохранены");
     } catch (err) {
       console.error("Failed to update company:", err);
-      alert("Ошибка при сохранении данных компании");
+      showAlert("error", "Ошибка при сохранении данных компании");
     } finally {
       setSaving(false);
     }
@@ -157,19 +196,19 @@ const Settings = () => {
       (s) => s.trim() !== ""
     );
     if (!anyPasswordFilled) {
-      alert("Заполните поля для изменения пароля");
+      showAlert("warning", "Заполните поля для изменения пароля");
       return;
     }
 
     if (passwordsMismatch) {
-      alert("Пароли не совпадают");
+      showAlert("error", "Пароли не совпадают");
       return;
     }
 
     setSaving(true);
     try {
       await dispatch(updateUserData(formData)).unwrap();
-      alert("Пароль успешно изменен");
+      showAlert("success", "Пароль успешно изменен");
       setFormData({
         current_password: "",
         new_password: "",
@@ -177,7 +216,7 @@ const Settings = () => {
       });
     } catch (err) {
       console.error("Failed to update password:", err);
-      alert("Ошибка при изменении пароля");
+      showAlert("error", "Ошибка при изменении пароля");
     } finally {
       setSaving(false);
     }
@@ -205,6 +244,18 @@ const Settings = () => {
     });
   };
 
+  // Сохранение настроек интерфейса
+  const handleSaveInterfaceSettings = async (e) => {
+    e.preventDefault();
+    try {
+      localStorage.setItem("sidebarAutoClose", String(sidebarAutoClose));
+      showAlert("success", "Настройки интерфейса успешно сохранены");
+    } catch (err) {
+      console.error("Failed to save interface settings:", err);
+      showAlert("error", "Ошибка при сохранении настроек интерфейса");
+    }
+  };
+
   // Создание токена для доступа к весам
   const handleCreateScalesToken = async () => {
     try {
@@ -217,7 +268,7 @@ const Settings = () => {
         (typeof result === "string" ? result : null);
 
       if (!token) {
-        alert("Токен не найден в ответе сервера");
+        showAlert("error", "Токен не найден в ответе сервера");
         return;
       }
 
@@ -295,7 +346,7 @@ const Settings = () => {
             }, 2000);
           })
           .catch(() => {
-            alert("Не удалось скопировать. Токен: " + tokenString);
+            showAlert("error", "Не удалось скопировать. Токен: " + tokenString);
           });
       };
 
@@ -314,7 +365,7 @@ const Settings = () => {
         err?.detail ||
         err?.message ||
         (typeof err === "string" ? err : "Не удалось создать токен");
-      alert(`Ошибка: ${errorMessage}`);
+      showAlert("error", `Ошибка: ${errorMessage}`);
     }
   };
 
@@ -909,6 +960,118 @@ const Settings = () => {
             </div>
           </div>
         );
+      case "Интерфейс":
+        return (
+          <form
+            onSubmit={handleSaveInterfaceSettings}
+            className="settings__tab-form"
+          >
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M3 7V5C3 3.89543 3.89543 3 5 3H19C20.1046 3 21 3.89543 21 5V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V17"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M7 13L10 16L17 9"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Настройки интерфейса
+              </h2>
+
+              <div className="settings__form-group">
+                <label
+                  className="settings__label"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    cursor: "pointer",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sidebarAutoClose}
+                    onChange={(e) => {
+                      const newValue = e.target.checked;
+                      setSidebarAutoClose(newValue);
+                      // Сохраняем в localStorage сразу при изменении
+                      localStorage.setItem(
+                        "sidebarAutoClose",
+                        String(newValue)
+                      );
+                    }}
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span style={{ fontWeight: "600" }}>
+                    Автоматически закрывать сайдбар при переходе на другую
+                    страницу
+                  </span>
+                </label>
+                <p
+                  className="settings__label"
+                  style={{
+                    fontSize: "14px",
+                    color: "#666",
+                    marginTop: "8px",
+                    fontWeight: "normal",
+                    lineHeight: "1.6",
+                    marginLeft: "32px",
+                  }}
+                >
+                  {sidebarAutoClose
+                    ? "Сайдбар будет автоматически закрываться при каждом переходе на новую страницу."
+                    : "Сайдбар будет оставаться открытым при переходах между страницами."}
+                </p>
+              </div>
+            </div>
+
+            {/* Кнопки действий для таба интерфейса */}
+            <div className="settings__actions">
+              <button
+                className="settings__btn settings__btn--primary"
+                type="submit"
+                disabled={saving}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M20 7L10 17L5 12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {saving ? "Сохранение..." : "Сохранить изменения"}
+              </button>
+            </div>
+          </form>
+        );
       default:
         return null;
     }
@@ -1001,6 +1164,15 @@ const Settings = () => {
           Выйти из аккаунта
         </button>
       </div>
+
+      {/* AlertModal для уведомлений */}
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        message={alertModal.message}
+        onClose={closeAlert}
+        okText="Ок"
+      />
 
       {/* Если понадобится вернуть вкладки */}
       {/* {tariff !== "Старт" && (

@@ -1,7 +1,12 @@
 import React, { useMemo } from "react";
 import "./Tabs.scss";
 
-const allTabs = ["Моя компания", "Безопасность", "Токен для весов"];
+const allTabs = [
+  "Моя компания",
+  "Безопасность",
+  "Токен для весов",
+  "Интерфейс",
+];
 
 const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
   // Определяем, является ли сфера "магазин" (market)

@@ -44,9 +44,19 @@ const Layout = () => {
   const dispatch = useDispatch();
   const { company } = useUser();
   // На десктопе по умолчанию сайдбар открыт, на мобильных - закрыт
+  // Но учитываем настройку автоматического закрытия
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
-      return window.innerWidth >= 769;
+      const isDesktop = window.innerWidth >= 769;
+      const sidebarAutoClose =
+        localStorage.getItem("sidebarAutoClose") === "true";
+
+      // На десктопе: открыт по умолчанию, если настройка не требует закрытия
+      if (isDesktop) {
+        return !sidebarAutoClose;
+      }
+      // На мобильных: закрыт по умолчанию
+      return false;
     }
     return true; // По умолчанию открыт для SSR
   });
@@ -57,15 +67,35 @@ const Layout = () => {
     dispatch(getCompany());
   }, [dispatch]);
 
+  // Проверяем настройку автоматического закрытия сайдбара при переходах
+  useEffect(() => {
+    const savedSetting = localStorage.getItem("sidebarAutoClose");
+    const sidebarAutoClose = savedSetting === "true";
+
+    // Только если настройка явно включена (true) - закрываем сайдбар
+    if (sidebarAutoClose) {
+      setIsSidebarOpen(false);
+    }
+    // Если настройка выключена (false) или не установлена (null) - НЕ меняем состояние сайдбара
+    // Это предотвращает "прыгание" сайдбара при переходах
+  }, [location.pathname]);
+
   // Обновляем состояние при изменении размера окна
   useEffect(() => {
     const handleResize = () => {
+      const savedSetting = localStorage.getItem("sidebarAutoClose");
+      const sidebarAutoClose = savedSetting === "true";
+
       if (window.innerWidth >= 769) {
-        // На десктопе открываем сайдбар, если он был закрыт
-        setIsSidebarOpen(true);
+        // На десктопе открываем сайдбар, если настройка не требует автоматического закрытия
+        if (!sidebarAutoClose) {
+          setIsSidebarOpen(true);
+        }
+        // Если настройка включена - не меняем состояние (остается как было)
       } else {
-        // На мобильных закрываем
-        setIsSidebarOpen(false);
+        // На мобильных устройствах НЕ меняем состояние сайдбара при изменении размера
+        // Состояние должно управляться только через настройку автоматического закрытия при переходах
+        // или пользователем вручную
       }
     };
 
