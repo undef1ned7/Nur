@@ -161,10 +161,13 @@ export const CashModal = ({
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                const normalizedValue = cashReceived.replace(/,/g, ".");
+                const normalizedValue = cashReceived.replace(/,/g, ".").trim();
                 const received = parseFloat(normalizedValue) || 0;
-                const total =
-                  parseFloat(String(currentTotal).replace(/,/g, ".")) || 0;
+                const totalStr = String(currentTotal || 0)
+                  .replace(/,/g, ".")
+                  .replace(/\s/g, "")
+                  .replace(/[^\d.]/g, "");
+                const total = parseFloat(totalStr) || 0;
                 if (received >= total && received > 0) {
                   onPay();
                 } else {
@@ -182,10 +185,13 @@ export const CashModal = ({
         </div>
         {cashReceived &&
           (() => {
-            const normalizedReceived = cashReceived.replace(/,/g, ".");
-            const normalizedTotal = String(currentTotal).replace(/,/g, ".");
+            const normalizedReceived = cashReceived.replace(/,/g, ".").trim();
+            const totalStr = String(currentTotal || 0)
+              .replace(/,/g, ".")
+              .replace(/\s/g, "")
+              .replace(/[^\d.]/g, "");
             const received = parseFloat(normalizedReceived) || 0;
-            const total = parseFloat(normalizedTotal) || 0;
+            const total = parseFloat(totalStr) || 0;
             return (
               received > 0 && (
                 <div
@@ -279,10 +285,13 @@ export const CashModal = ({
             onClick={onPay}
             disabled={(() => {
               if (!cashReceived) return true;
-              const normalizedReceived = cashReceived.replace(/,/g, ".");
-              const normalizedTotal = String(currentTotal).replace(/,/g, ".");
+              const normalizedReceived = cashReceived.replace(/,/g, ".").trim();
+              const totalStr = String(currentTotal || 0)
+                .replace(/,/g, ".")
+                .replace(/\s/g, "")
+                .replace(/[^\d.]/g, "");
               const received = parseFloat(normalizedReceived) || 0;
-              const total = parseFloat(normalizedTotal) || 0;
+              const total = parseFloat(totalStr) || 0;
               return received < total || received <= 0;
             })()}
           >

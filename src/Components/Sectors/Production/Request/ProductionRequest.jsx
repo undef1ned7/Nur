@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import { useProducts } from "../../../../store/slices/productSlice";
+import { useUser } from "../../../../store/slices/userSlice";
 import { createAgentCartItem } from "../../../../api/agentCarts";
 import { useCart } from "./hooks/useCart";
 import { useProductFilter } from "./hooks/useProductFilter";
@@ -16,6 +17,10 @@ import "./ProductionRequest.scss";
 const ProductionRequest = () => {
   const dispatch = useDispatch();
   const { list: products, categories, loading, error } = useProducts();
+  const { profile } = useUser();
+
+  // Проверяем, является ли пользователь владельцем
+  const isOwner = profile?.role_display === "Владелец";
 
   // Состояние UI
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -272,6 +277,7 @@ const ProductionRequest = () => {
           draggedItem={draggedItem}
           onRequestProduct={handleRequestProduct}
           onClearSearch={handleClearSearch}
+          isOwner={isOwner}
         />
       )}
 

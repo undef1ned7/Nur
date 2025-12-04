@@ -550,7 +550,7 @@ export const MENU_CONFIG = {
         label: "Запросы",
         to: "/crm/production/request",
         icon: menuIcons.clipboardList,
-        permission: "can_view_catalog",
+        permission: "can_view_request",
         implemented: true,
       },
     ],

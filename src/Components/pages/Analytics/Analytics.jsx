@@ -19,6 +19,7 @@ import {
 import { fetchBranchesAsync } from "../../../store/creators/branchCreators";
 import { useSale } from "../../../store/slices/saleSlice";
 import { useUser } from "../../../store/slices/userSlice";
+import AgentAnalytics from "../../Sectors/Production/Analytics/AgentAnalytics";
 
 import "./Analytics.scss";
 
@@ -182,7 +183,7 @@ const Analytics = () => {
   );
 
   // из userSlice
-  const { profile } = useUser();
+  const { profile, sector, company } = useUser();
 
   /* ---------- controls ---------- */
   // По умолчанию показываем текущий месяц (с 1 числа)
@@ -893,6 +894,22 @@ const Analytics = () => {
       ? [{ key: "branches", label: "Филиалы" }]
       : []),
   ];
+
+  // Проверяем, является ли пользователь сотрудником в сфере "Производство"
+  const isProductionEmployee = useMemo(() => {
+    const currentSector = sector || company?.sector?.name || "";
+    const sectorLower = currentSector.toLowerCase();
+    const isProduction =
+      sectorLower === "производство" || sectorLower === "production";
+    const isEmployee =
+      profile?.role_display && profile.role_display !== "Владелец";
+    return isProduction && isEmployee;
+  }, [sector, company, profile]);
+
+  // Если пользователь - сотрудник в сфере Производство, показываем AgentAnalytics
+  if (isProductionEmployee) {
+    return <AgentAnalytics />;
+  }
 
   return (
     <div className="analytics">

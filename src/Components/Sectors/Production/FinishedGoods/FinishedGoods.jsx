@@ -281,8 +281,6 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     const required = [
       ["name", "Название"],
       ["barcode", "Штрихкод"],
-      ["brand_name", "Бренд"],
-      ["category_name", "Категория"],
       ["price", "Розничная цена"],
       ["quantity", "Количество"],
       ["purchase_price", "Закупочная цена"],

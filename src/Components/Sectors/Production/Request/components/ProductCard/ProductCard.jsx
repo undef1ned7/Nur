@@ -9,6 +9,7 @@ const ProductCard = ({
   onDragEnd,
   isDragging,
   onRequestProduct,
+  isOwner = false,
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [showQuantityControls, setShowQuantityControls] = useState(false);
@@ -89,77 +90,81 @@ const ProductCard = ({
           )}
         </div>
 
-        {!available ? (
-          <div className="out-of-stock-message">Недоступен</div>
-        ) : (
+        {!isOwner && (
           <>
-            {!showQuantityControls ? (
-              <div className="product-cart-controls">
-                <button
-                  className="add-to-cart-btn"
-                  onClick={handleQuickRequest}
-                  disabled={!available}
-                >
-                  <ShoppingCart size={16} />
-                  Быстро запросить
-                </button>
-                <button
-                  className="select-quantity-btn"
-                  onClick={handleToggleQuantityControls}
-                  disabled={!available}
-                >
-                  Выбрать количество
-                </button>
-              </div>
+            {!available ? (
+              <div className="out-of-stock-message">Недоступен</div>
             ) : (
-              <div className="product-quantity-controls">
-                <div className="quantity-selector-inline">
-                  <button
-                    className="quantity-btn-small"
-                    onClick={handleDecrement}
-                    disabled={quantity <= 1}
-                    type="button"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxQuantity || 999}
-                    value={quantity}
-                    onChange={(e) =>
-                      handleQuantityChange(Number(e.target.value))
-                    }
-                    className="quantity-input-small"
-                  />
-                  <button
-                    className="quantity-btn-small"
-                    onClick={handleIncrement}
-                    disabled={!available || quantity >= maxQuantity}
-                    type="button"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-                <button
-                  className="add-to-cart-btn"
-                  onClick={handleRequestClick}
-                  disabled={!available || quantity <= 0}
-                >
-                  <ShoppingCart size={16} />
-                  Запросить ({quantity})
-                </button>
-                <button
-                  className="cancel-quantity-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowQuantityControls(false);
-                    setQuantity(1);
-                  }}
-                >
-                  Отмена
-                </button>
-              </div>
+              <>
+                {!showQuantityControls ? (
+                  <div className="product-cart-controls">
+                    <button
+                      className="add-to-cart-btn"
+                      onClick={handleQuickRequest}
+                      disabled={!available}
+                    >
+                      <ShoppingCart size={16} />
+                      Быстро запросить
+                    </button>
+                    <button
+                      className="select-quantity-btn"
+                      onClick={handleToggleQuantityControls}
+                      disabled={!available}
+                    >
+                      Выбрать количество
+                    </button>
+                  </div>
+                ) : (
+                  <div className="product-quantity-controls">
+                    <div className="quantity-selector-inline">
+                      <button
+                        className="quantity-btn-small"
+                        onClick={handleDecrement}
+                        disabled={quantity <= 1}
+                        type="button"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        max={maxQuantity || 999}
+                        value={quantity}
+                        onChange={(e) =>
+                          handleQuantityChange(Number(e.target.value))
+                        }
+                        className="quantity-input-small"
+                      />
+                      <button
+                        className="quantity-btn-small"
+                        onClick={handleIncrement}
+                        disabled={!available || quantity >= maxQuantity}
+                        type="button"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                    <button
+                      className="add-to-cart-btn"
+                      onClick={handleRequestClick}
+                      disabled={!available || quantity <= 0}
+                    >
+                      <ShoppingCart size={16} />
+                      Запросить ({quantity})
+                    </button>
+                    <button
+                      className="cancel-quantity-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowQuantityControls(false);
+                        setQuantity(1);
+                      }}
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
