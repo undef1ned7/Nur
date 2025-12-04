@@ -5,6 +5,14 @@
   background: #f6f7f9;
   min-height: 100vh;
 
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 12px;
+  }
+
   &__header {
     background: #fff;
     border: 1px solid #e0e0e0;
@@ -16,6 +24,12 @@
     margin-bottom: 24px;
     gap: 16px;
     flex-wrap: wrap;
+
+    @media (max-width: 768px) {
+      flex-direction: column;
+      padding: 12px;
+      gap: 12px;
+    }
   }
 
   &__back-btn {
@@ -32,6 +46,17 @@
     color: #333;
     text-decoration: none;
 
+    @media (max-width: 768px) {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 480px) {
+      padding: 6px 10px;
+      font-size: 12px;
+      gap: 6px;
+    }
+
     &:hover {
       background: #f9f9f9;
       border-color: #ccc;
@@ -44,12 +69,27 @@
     margin: 0;
     flex: 1;
     color: #333;
+    word-break: break-word;
+
+    @media (max-width: 768px) {
+      font-size: 20px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 18px;
+    }
   }
 
   &__controls {
     display: flex;
     align-items: center;
     gap: 12px;
+
+    @media (max-width: 768px) {
+      width: 100%;
+      justify-content: space-between;
+    }
   }
 
   &__period-select {
@@ -60,6 +100,16 @@
     cursor: pointer;
     background: white;
     color: #333;
+
+    @media (max-width: 768px) {
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 480px) {
+      padding: 6px 8px;
+      font-size: 12px;
+    }
 
     &:focus {
       outline: none;
@@ -93,10 +143,32 @@
     justify-content: center;
     min-height: 400px;
     gap: 16px;
+    padding: 24px;
+
+    @media (max-width: 768px) {
+      min-height: 300px;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    @media (max-width: 480px) {
+      min-height: 250px;
+      padding: 12px;
+      gap: 10px;
+    }
 
     p {
       font-size: 16px;
       color: #666;
+      text-align: center;
+
+      @media (max-width: 768px) {
+        font-size: 14px;
+      }
+
+      @media (max-width: 480px) {
+        font-size: 13px;
+      }
     }
   }
 
@@ -107,6 +179,18 @@
     border-top: 4px solid #3498db;
     border-radius: 50%;
     animation: spin 1s linear infinite;
+
+    @media (max-width: 768px) {
+      width: 32px;
+      height: 32px;
+      border-width: 3px;
+    }
+
+    @media (max-width: 480px) {
+      width: 28px;
+      height: 28px;
+      border-width: 3px;
+    }
   }
 
   @keyframes spin {
@@ -127,9 +211,23 @@
       border-radius: 8px;
       cursor: pointer;
       font-size: 14px;
+      transition: background 0.2s;
 
+      @media (max-width: 768px) {
+        padding: 8px 16px;
+        font-size: 13px;
+      }
+
+      @media (max-width: 480px) {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
       &:hover {
         background: #2980b9;
+      }
+
+      &:active {
+        transform: scale(0.98);
       }
     }
   }
@@ -164,10 +262,24 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     transition: all 0.2s;
 
+    @media (max-width: 768px) {
+      padding: 16px;
+      gap: 12px;
+    }
+
+    @media (max-width: 480px) {
+      padding: 12px;
+      gap: 10px;
+    }
+
     &:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       border: 1px solid #f7d74f;
+
+      @media (max-width: 768px) {
+        transform: none;
+      }
     }
 
     &--highlighted {
@@ -180,6 +292,10 @@
       font-size: 14px;
       color: #666;
       font-weight: 500;
+
+      @media (max-width: 480px) {
+        font-size: 12px;
+      }
     }
 
     p {
@@ -187,6 +303,14 @@
       font-size: 24px;
       font-weight: 600;
       color: #333;
+
+      @media (max-width: 768px) {
+        font-size: 20px;
+      }
+
+      @media (max-width: 480px) {
+        font-size: 18px;
+      }
     }
   }
 
@@ -199,9 +323,29 @@
     justify-content: center;
     border-radius: 10px;
 
+    @media (max-width: 768px) {
+      width: 40px;
+      height: 40px;
+    }
+
+    @media (max-width: 480px) {
+      width: 36px;
+      height: 36px;
+    }
+
     svg {
       width: 24px;
       height: 24px;
+
+      @media (max-width: 768px) {
+        width: 20px;
+        height: 20px;
+      }
+
+      @media (max-width: 480px) {
+        width: 18px;
+        height: 18px;
+      }
     }
 
     &--blue {
@@ -233,6 +377,14 @@
   &__section {
     margin-bottom: 48px;
 
+    @media (max-width: 768px) {
+      margin-bottom: 32px;
+    }
+
+    @media (max-width: 480px) {
+      margin-bottom: 24px;
+    }
+
     &-title {
       font-size: 20px;
       font-weight: 600;
@@ -241,6 +393,17 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
+
+      @media (max-width: 768px) {
+        font-size: 18px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 480px) {
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
     }
 
     &-icon {
@@ -248,6 +411,14 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+
+      @media (max-width: 768px) {
+        font-size: 20px;
+      }
+
+      @media (max-width: 480px) {
+        font-size: 18px;
+      }
     }
   }
 
@@ -257,8 +428,20 @@
     gap: 24px;
     margin-bottom: 32px;
 
+    @media (max-width: 1024px) {
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+    }
+
     @media (max-width: 768px) {
       grid-template-columns: 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 480px) {
+      gap: 12px;
+      margin-bottom: 20px;
     }
   }
 
@@ -269,6 +452,16 @@
     padding: 24px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 
+    @media (max-width: 768px) {
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 480px) {
+      padding: 12px;
+      border-radius: 6px;
+    }
+
     &--full {
       grid-column: 1 / -1;
     }
@@ -278,18 +471,54 @@
       font-size: 16px;
       font-weight: 600;
       color: #333;
+
+      @media (max-width: 768px) {
+        font-size: 14px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 480px) {
+        font-size: 13px;
+        margin-bottom: 12px;
+      }
     }
   }
 
   &__chart-container {
     height: 300px;
     position: relative;
+    width: 100%;
+    min-height: 250px;
+
+    @media (max-width: 768px) {
+      height: 280px;
+      min-height: 220px;
+    }
+
+    @media (max-width: 480px) {
+      height: 250px;
+      min-height: 200px;
+    }
 
     &--doughnut {
       height: 400px;
       display: flex;
       align-items: center;
       justify-content: center;
+
+      @media (max-width: 768px) {
+        height: 350px;
+      }
+
+      @media (max-width: 480px) {
+        height: 300px;
+      }
+    }
+
+    // Адаптивность для Chart.js
+    canvas {
+      max-width: 100% !important;
+      height: auto !important;
     }
   }
 
@@ -299,6 +528,24 @@
     border-radius: 12px;
     padding: 24px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+    @media (max-width: 768px) {
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 480px) {
+      padding: 12px;
+      border-radius: 6px;
+    }
+
+    &.noPadding {
+      padding: 0;
+
+      @media (max-width: 768px) {
+        padding: 0;
+      }
+    }
   }
 
   &__table-title {
@@ -309,14 +556,41 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+
+    @media (max-width: 768px) {
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 14px;
+      margin-bottom: 12px;
+      gap: 6px;
+    }
   }
 
   &__table {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+
+    @media (max-width: 768px) {
+      overflow-x: scroll;
+    }
 
     table {
       width: 100%;
       border-collapse: collapse;
+      min-width: 600px;
+
+      @media (max-width: 768px) {
+        min-width: 500px;
+      }
+
+      @media (max-width: 480px) {
+        min-width: 400px;
+        font-size: 12px;
+      }
 
       thead {
         background: #f8f9fa;
@@ -328,6 +602,17 @@
           font-size: 14px;
           color: #333;
           border-bottom: 2px solid #e0e0e0;
+          white-space: nowrap;
+
+          @media (max-width: 768px) {
+            padding: 10px 8px;
+            font-size: 13px;
+          }
+
+          @media (max-width: 480px) {
+            padding: 8px 6px;
+            font-size: 11px;
+          }
         }
       }
 
@@ -343,6 +628,16 @@
             padding: 12px;
             font-size: 14px;
             color: #666;
+
+            @media (max-width: 768px) {
+              padding: 10px 8px;
+              font-size: 13px;
+            }
+
+            @media (max-width: 480px) {
+              padding: 8px 6px;
+              font-size: 11px;
+            }
           }
         }
       }
@@ -372,13 +667,49 @@
   background-color: #ffd600;
   padding: 0.5rem;
   border-radius: 0.5rem;
+
+  @media (max-width: 768px) {
+    padding: 0.4rem;
+  }
+
+  @media (max-width: 480px) {
+    padding: 0.3rem;
+  }
 }
 
 .chart-icon {
   width: 1.5rem;
   height: 1.5rem;
   color: #1f2937; /* text-gray-900 */
+
+  @media (max-width: 768px) {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  @media (max-width: 480px) {
+    width: 1rem;
+    height: 1rem;
+  }
 }
+
 .noPadding {
   padding: 0;
+}
+
+// Адаптивные стили для Chart.js
+@media (max-width: 768px) {
+  .agent-analytics__chart-container {
+    canvas {
+      max-width: 100% !important;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .agent-analytics__chart-container {
+    canvas {
+      max-width: 100% !important;
+    }
+  }
 }

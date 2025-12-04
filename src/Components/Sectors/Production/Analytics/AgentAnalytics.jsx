@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Chart as ChartJS,
@@ -26,7 +26,7 @@ import {
   ArrowLeftRight,
   Clock,
 } from "lucide-react";
-import api from "../../../../api";
+import { fetchAgentAnalytics } from "../../../../store/creators/analyticsCreators";
 import "./AgentAnalytics.scss";
 
 ChartJS.register(
@@ -43,61 +43,43 @@ ChartJS.register(
 
 const AgentAnalytics = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { agentId } = useParams();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [selectedAgent, setSelectedAgent] = useState(null);
-  const [analyticsData, setAnalyticsData] = useState(null); // Полные данные аналитики с бэкенда
   const [period, setPeriod] = useState("month"); // day, week, month, year
+
+  // Получаем данные из Redux store
+  const {
+    data: analyticsData,
+    loading,
+    error: analyticsError,
+  } = useSelector((state) => state.analytics.agentAnalytics);
 
   // Загрузка данных
   useEffect(() => {
-    fetchData();
-  }, [agentId, period]);
+    dispatch(fetchAgentAnalytics({ agentId, period }));
+  }, [agentId, period, dispatch]);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      // Если agentId не указан, используем эндпоинт для текущего пользователя
-      const endpoint = agentId
-        ? `/main/owners/agents/${agentId}/analytics/`
-        : `/main/agents/me/analytics/`;
-
-      // Загружаем аналитику агента
-      const analyticsRes = await api.get(endpoint, {
-        params: { period },
-      });
-
-      if (!analyticsRes.data) {
-        setError("Данные аналитики не найдены");
-        setLoading(false);
-        return;
-      }
-
-      const data = analyticsRes.data;
-
-      // Устанавливаем информацию об агенте из ответа
-      if (data.agent) {
-        setSelectedAgent({
-          id: data.agent.id,
-          first_name: data.agent.first_name,
-          last_name: data.agent.last_name,
-          email: data.agent.email || "",
-          track_number: data.agent.track_number || "",
-        });
-      }
-
-      // Сохраняем полные данные аналитики
-      setAnalyticsData(data);
-    } catch (err) {
-      console.error("Ошибка загрузки данных:", err);
-      setError("Не удалось загрузить данные аналитики");
-    } finally {
-      setLoading(false);
-    }
+  const fetchData = () => {
+    dispatch(fetchAgentAnalytics({ agentId, period }));
   };
+
+  // Получаем информацию об агенте из данных аналитики
+  const selectedAgent = useMemo(() => {
+    if (!analyticsData?.agent) return null;
+    return {
+      id: analyticsData.agent.id,
+      first_name: analyticsData.agent.first_name,
+      last_name: analyticsData.agent.last_name,
+      email: analyticsData.agent.email || "",
+      track_number: analyticsData.agent.track_number || "",
+    };
+  }, [analyticsData]);
+
+  const error = analyticsError
+    ? typeof analyticsError === "string"
+      ? analyticsError
+      : analyticsError.message || "Не удалось загрузить данные аналитики"
+    : "";
 
   // Получаем историю передач из аналитики
   const transfersHistory = useMemo(() => {
@@ -151,7 +133,7 @@ const AgentAnalytics = () => {
     }
 
     const products = analyticsData.charts.top_products_by_transfers;
-    const sorted = [...products]
+    const sorted = Array.from(products)
       .sort((a, b) => (b.transfers_count || 0) - (a.transfers_count || 0))
       .slice(0, 10);
 
@@ -431,58 +413,65 @@ const AgentAnalytics = () => {
           },
         ],
       },
-      byProductDoughnut: {
-        labels:
-          distribution.length > 0
-            ? distribution
-                .sort(
-                  (a, b) =>
-                    Number(b.amount || b.sales_amount || 0) -
-                    Number(a.amount || a.sales_amount || 0)
-                )
-                .slice(0, 8)
-                .map((item) => item.product_name || item.name || "Без названия")
-            : ["Нет данных"],
-        datasets: [
-          {
-            label: "Распределение продаж",
-            data:
-              distribution.length > 0
-                ? distribution
-                    .sort(
-                      (a, b) =>
-                        Number(b.amount || b.sales_amount || 0) -
-                        Number(a.amount || a.sales_amount || 0)
-                    )
-                    .slice(0, 8)
-                    .map((item) =>
-                      Number(item.amount || item.sales_amount || 0)
-                    )
-                : [0],
-            backgroundColor: [
-              "#f7d74f",
-              "#f5c842",
-              "#f3b935",
-              "#f1aa28",
-              "#ef9b1b",
-              "#ed8c0e",
-              "#eb7d01",
-              "#d4b800",
+      byProductDoughnut: (() => {
+        if (distribution.length === 0) {
+          return {
+            labels: ["Нет данных"],
+            datasets: [
+              {
+                label: "Распределение продаж",
+                data: [0],
+                backgroundColor: ["#f7d74f"],
+                borderColor: ["#f7d74f"],
+                borderWidth: 1,
+              },
             ],
-            borderColor: [
-              "#f7d74f",
-              "#f5c842",
-              "#f3b935",
-              "#f1aa28",
-              "#ef9b1b",
-              "#ed8c0e",
-              "#eb7d01",
-              "#d4b800",
-            ],
-            borderWidth: 1,
-          },
-        ],
-      },
+          };
+        }
+
+        const sortedDistribution = Array.from(distribution).sort(
+          (a, b) =>
+            Number(b.amount || b.sales_amount || 0) -
+            Number(a.amount || a.sales_amount || 0)
+        );
+
+        const top8 = sortedDistribution.slice(0, 8);
+
+        return {
+          labels: top8.map(
+            (item) => item.product_name || item.name || "Без названия"
+          ),
+          datasets: [
+            {
+              label: "Распределение продаж",
+              data: top8.map((item) =>
+                Number(item.amount || item.sales_amount || 0)
+              ),
+              backgroundColor: [
+                "#f7d74f",
+                "#f5c842",
+                "#f3b935",
+                "#f1aa28",
+                "#ef9b1b",
+                "#ed8c0e",
+                "#eb7d01",
+                "#d4b800",
+              ],
+              borderColor: [
+                "#f7d74f",
+                "#f5c842",
+                "#f3b935",
+                "#f1aa28",
+                "#ef9b1b",
+                "#ed8c0e",
+                "#eb7d01",
+                "#d4b800",
+              ],
+              borderWidth: 1,
+            },
+          ],
+        };
+      })(),
     };
   }, [analyticsData]);
 
@@ -588,9 +577,21 @@ const AgentAnalytics = () => {
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    interaction: {
+      mode: "index",
+      intersect: false,
+    },
     plugins: {
       legend: {
         position: "top",
+        labels: {
+          boxWidth: 12,
+          padding: 10,
+          font: {
+            size: 12,
+          },
+          usePointStyle: true,
+        },
       },
       tooltip: {
         callbacks: {
@@ -603,6 +604,14 @@ const AgentAnalytics = () => {
             return `${label}: ${formattedValue}`;
           },
         },
+        titleFont: {
+          size: 13,
+        },
+        bodyFont: {
+          size: 12,
+        },
+        padding: 10,
+        boxPadding: 6,
       },
     },
   };
@@ -618,6 +627,14 @@ const AgentAnalytics = () => {
           callback: function (value) {
             return value.toLocaleString("ru-RU");
           },
+          font: {
+            size: 11,
+          },
+        },
+        title: {
+          font: {
+            size: 12,
+          },
         },
       },
       y1: {
@@ -631,12 +648,28 @@ const AgentAnalytics = () => {
           callback: function (value) {
             return value.toLocaleString("ru-RU");
           },
+          font: {
+            size: 11,
+          },
+        },
+        title: {
+          font: {
+            size: 12,
+          },
         },
       },
       x: {
         ticks: {
           maxRotation: 45,
           minRotation: 0,
+          font: {
+            size: 11,
+          },
+        },
+        title: {
+          font: {
+            size: 12,
+          },
         },
       },
     },
@@ -652,12 +685,28 @@ const AgentAnalytics = () => {
           callback: function (value) {
             return value.toLocaleString("ru-RU");
           },
+          font: {
+            size: 11,
+          },
+        },
+        title: {
+          font: {
+            size: 12,
+          },
         },
       },
       y: {
         ticks: {
           maxRotation: 0,
           minRotation: 0,
+          font: {
+            size: 11,
+          },
+        },
+        title: {
+          font: {
+            size: 12,
+          },
         },
       },
     },
@@ -677,7 +726,7 @@ const AgentAnalytics = () => {
     );
   }
 
-  if (error) {
+  if (error && !loading) {
     return (
       <div className="agent-analytics">
         <div className="agent-analytics__error">
@@ -691,7 +740,7 @@ const AgentAnalytics = () => {
     );
   }
 
-  if (!selectedAgent) {
+  if (!loading && !selectedAgent && analyticsData) {
     return (
       <div className="agent-analytics">
         <div className="agent-analytics__error">
@@ -794,15 +843,6 @@ const AgentAnalytics = () => {
           <div>
             <h3>Сумма продаж</h3>
             <p>{metrics.totalSalesAmount.toLocaleString()} сом</p>
-          </div>
-        </div>
-        <div className="agent-analytics__metric-card">
-          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
-            <Package size={24} />
-          </div>
-          <div>
-            <h3>Товаров на руках</h3>
-            <p>{metrics.totalProductsOnHand.toLocaleString()}</p>
           </div>
         </div>
         <div className="agent-analytics__metric-card">

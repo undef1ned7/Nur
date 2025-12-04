@@ -800,6 +800,8 @@
   .start__debt {
     width: 100%;
     max-width: 100%;
+    height: 80vh;
+    overflow-y: scroll;
   }
   .start__body-wrapper {
     width: 100%;
@@ -971,7 +973,7 @@
 }
 
 // Мобильные устройства (до 768px)
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 1200px) { // менял Султан) с 768
   // Общие стили
   .col-8,
   .col-4 {

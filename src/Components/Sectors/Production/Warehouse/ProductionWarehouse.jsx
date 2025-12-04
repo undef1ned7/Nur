@@ -298,11 +298,11 @@ const PendingModal = ({ onClose, onChanged }) => {
                 <tbody>
                   {filterReturns.map((returnItem, idx) => (
                     <tr key={returnItem.id}>
-                      <td>{idx + 1}</td>
-                      <td>{returnItem.product || "—"}</td>
-                      <td>{returnItem.agent || "—"}</td>
-                      <td>{returnItem.qty || 0}</td>
-                      <td>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Товар">{returnItem.product || "—"}</td>
+                      <td data-label="Агент">{returnItem.agent || "—"}</td>
+                      <td data-label="Кол-во">{returnItem.qty || 0}</td>
+                      <td data-label="Дата возврата">
                         {returnItem.returned_at
                           ? new Date(returnItem.returned_at).toLocaleString(
                               "ru-RU",
@@ -317,7 +317,7 @@ const PendingModal = ({ onClose, onChanged }) => {
                             )
                           : "—"}
                       </td>
-                      <td>
+                      <td data-label="">
                         <button
                           className="add-modal__save"
                           style={{ marginRight: 8 }}
@@ -417,26 +417,26 @@ const PendingModal = ({ onClose, onChanged }) => {
                 <tbody>
                   {filteredRows.map((cart, idx) => (
                     <tr key={cart.id}>
-                      <td>{idx + 1}</td>
-                      <td>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Агент">
                         {cart?.agent_name ||
                           `${cart?.agent?.first_name || ""} ${
                             cart?.agent?.last_name || ""
                           }`}
                       </td>
-                      <td>
+                      <td data-label="Клиент">
                         {cart?.client_name || cart?.client?.full_name || "—"}
                       </td>
-                      <td>{cart?.note || "—"}</td>
-                      <td>
+                      <td data-label="Комментарий">{cart?.note || "—"}</td>
+                      <td data-label="Отправлено">
                         {cart?.submitted_at
                           ? new Date(cart.submitted_at).toLocaleString("ru-RU")
                           : "—"}
                       </td>
-                      <td>
+                      <td data-label="Позиций">
                         {Array.isArray(cart?.items) ? cart.items.length : 0}
                       </td>
-                      <td>
+                      <td data-label="">
                         <button
                           className="add-modal__save"
                           style={{ marginRight: 8 }}
@@ -741,26 +741,26 @@ const AgentCartsPendingModal = ({ onClose }) => {
               <tbody>
                 {filteredRows.map((cart, idx) => (
                   <tr key={cart.id}>
-                    <td>{idx + 1}</td>
-                    <td>
+                    <td data-label="№">{idx + 1}</td>
+                    <td data-label="Агент">
                       {cart?.agent_name ||
                         `${cart?.agent?.first_name || ""} ${
                           cart?.agent?.last_name || ""
                         }`}
                     </td>
-                    <td>
+                    <td data-label="Клиент">
                       {cart?.client_name || cart?.client?.full_name || "—"}
                     </td>
-                    <td>{cart?.note || "—"}</td>
-                    <td>
+                    <td data-label="Комментарий">{cart?.note || "—"}</td>
+                    <td data-label="Отправлено">
                       {cart?.submitted_at
                         ? new Date(cart.submitted_at).toLocaleString("ru-RU")
                         : "—"}
                     </td>
-                    <td>
+                    <td data-label="Позиций">
                       {Array.isArray(cart?.items) ? cart.items.length : 0}
                     </td>
-                    <td>
+                    <td data-label="">
                       <button
                         className="add-modal__save"
                         style={{ marginRight: 8 }}

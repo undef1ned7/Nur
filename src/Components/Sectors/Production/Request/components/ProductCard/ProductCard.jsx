@@ -67,13 +67,15 @@ const ProductCard = ({
       onDragEnd={onDragEnd}
     >
       <div className="product-image">
-        <img
-          src={
-            product.images?.[0]?.image_url ||
-            "https://via.placeholder.com/300x200"
-          }
-          alt={product.name}
-        />
+        {product.images?.[0]?.image_url ? (
+          <img src={product.images?.[0]?.image_url} alt={product.name} />
+        ) : (
+          <img
+            src="https://img.icons8.com/ios7/1200/no-image.jpg"
+            alt={product.name}
+            style={{ objectFit: "contain" }}
+          />
+        )}
         <div className="product-overlay">
           <button className="view-btn" onClick={() => onView(product)}>
             <Eye size={20} />
