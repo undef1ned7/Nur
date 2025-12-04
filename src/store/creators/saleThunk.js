@@ -336,7 +336,15 @@ export const addCustomItem = createAsyncThunk(
 export const createDeal = createAsyncThunk(
   "deals/create",
   async (
-    { clientId, title, statusRu, amount, debtMonths, prepayment }, // prepayment и debtMonths могут приходить вместе
+    {
+      clientId,
+      title,
+      statusRu,
+      amount,
+      debtMonths,
+      prepayment,
+      first_due_date, // <=== ДОБАВИЛИ
+    }, // prepayment и debtMonths могут приходить вместе
     { rejectWithValue }
   ) => {
     try {
@@ -345,20 +353,32 @@ export const createDeal = createAsyncThunk(
       // Базовый payload
       const payload = {
         title: String(title || "").trim(),
-        kind, // enum: sale | debt | prepayment
+        kind, // enum: sale | debt | prepayment (или у тебя всё сведено к "debt")
         amount: toDecimalString(amount), // общая сумма сделки
         note: "",
         client: clientId,
       };
 
-      // Если это "Долги" ИЛИ "Предоплата", на клиенте мы уже передали kind="debt"
       if (kind === "debt") {
-        if (hasPositiveNumber(debtMonths)) {
-          payload.debt_months = Number(debtMonths);
+        // 1) ВСЕГДА отправляем debt_months (даже если 0)
+        const monthsNum = Number(debtMonths);
+        payload.debt_months = Number.isFinite(monthsNum) ? monthsNum : 0;
+
+        // 2) Если пришла предоплата (режим "Предоплата") — шлём prepayment
+        if (
+          prepayment !== undefined &&
+          prepayment !== null &&
+          prepayment !== ""
+        ) {
+          const prepaymentNum = Number(prepayment);
+          if (!Number.isNaN(prepaymentNum) && prepaymentNum >= 0) {
+            payload.prepayment = toDecimalString(prepaymentNum);
+          }
         }
-        // Если пришла предоплата (значит выбран режим "Предоплата")
-        if (hasPositiveNumber(prepayment)) {
-          payload.prepayment = toDecimalString(prepayment);
+
+        // 3) Дата первого платежа (день месяца)
+        if (first_due_date) {
+          payload.first_due_date = first_due_date; // "YYYY-MM-DD"
         }
       }
 

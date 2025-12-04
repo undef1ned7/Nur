@@ -281,8 +281,6 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     const required = [
       ["name", "Название"],
       ["barcode", "Штрихкод"],
-      ["brand_name", "Бренд"],
-      ["category_name", "Категория"],
       ["price", "Розничная цена"],
       ["quantity", "Количество"],
       ["purchase_price", "Закупочная цена"],
@@ -625,7 +623,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
         {dealStatus === "Долги" && (
           <div style={{ display: "grid", gap: 8 }}>
-            <label>Срок долга (месяцев)</label>
+            <label>Срок долга</label>
             <input
               className="add-modal__input"
               type="number"
@@ -653,7 +651,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               />
             </div>
             <div className="sale__field sale__field--full">
-              <label className="sale__label">Срок долга (месяцев)</label>
+              <label className="sale__label">Срок долга</label>
               <input
                 className="sale__input"
                 type="number"

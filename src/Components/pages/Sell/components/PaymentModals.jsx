@@ -136,20 +136,39 @@ export const CashModal = ({
             Сумма от покупателя
           </label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
             value={cashReceived}
-            onChange={(e) => setCashReceived(e.target.value)}
+            onChange={(e) => {
+              let value = e.target.value;
+              // Заменяем запятую на точку для единообразия
+              value = value.replace(/,/g, ".");
+              // Удаляем все символы кроме цифр и точки
+              value = value.replace(/[^\d.]/g, "");
+              // Удаляем лишние точки (оставляем только первую)
+              const parts = value.split(".");
+              if (parts.length > 2) {
+                value = parts[0] + "." + parts.slice(1).join("");
+              }
+              // Ограничиваем до 2 знаков после запятой
+              if (parts.length === 2 && parts[1].length > 2) {
+                value = parts[0] + "." + parts[1].substring(0, 2);
+              }
+              setCashReceived(value);
+            }}
             placeholder="Введите сумму"
             className="sell__header-input"
             style={{ width: "100%" }}
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                const received = Number(cashReceived);
-                const total = Number(currentTotal);
-                if (received >= total) {
+                const normalizedValue = cashReceived.replace(/,/g, ".").trim();
+                const received = parseFloat(normalizedValue) || 0;
+                const totalStr = String(currentTotal || 0)
+                  .replace(/,/g, ".")
+                  .replace(/\s/g, "")
+                  .replace(/[^\d.]/g, "");
+                const total = parseFloat(totalStr) || 0;
+                if (received >= total && received > 0) {
                   onPay();
                 } else {
                   setAlert({
@@ -164,75 +183,82 @@ export const CashModal = ({
             }}
           />
         </div>
-        {cashReceived && Number(cashReceived) > 0 && (
-          <div
-            style={{
-              marginBottom: "20px",
-              padding: "15px",
-              backgroundColor: "#f5f5f5",
-              borderRadius: "8px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "8px",
-              }}
-            >
-              <span>Получено:</span>
-              <span style={{ fontWeight: 600 }}>
-                {Number(cashReceived).toFixed(2)} сом
-              </span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "8px",
-              }}
-            >
-              <span>К оплате:</span>
-              <span style={{ fontWeight: 600 }}>
-                {Number(currentTotal).toFixed(2)} сом
-              </span>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                paddingTop: "10px",
-                borderTop: "2px solid #ddd",
-                fontSize: "18px",
-                fontWeight: 700,
-                color:
-                  Number(cashReceived) >= Number(currentTotal)
-                    ? "#22c55e"
-                    : "#ef4444",
-              }}
-            >
-              <span>Сдача:</span>
-              <span>
-                {(Number(cashReceived) - Number(currentTotal)).toFixed(2)} сом
-              </span>
-            </div>
-            {Number(cashReceived) < Number(currentTotal) && (
-              <div
-                style={{
-                  marginTop: "10px",
-                  padding: "8px",
-                  backgroundColor: "#fee2e2",
-                  color: "#b42318",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                  textAlign: "center",
-                }}
-              >
-                Недостаточно средств
-              </div>
-            )}
-          </div>
-        )}
+        {cashReceived &&
+          (() => {
+            const normalizedReceived = cashReceived.replace(/,/g, ".").trim();
+            const totalStr = String(currentTotal || 0)
+              .replace(/,/g, ".")
+              .replace(/\s/g, "")
+              .replace(/[^\d.]/g, "");
+            const received = parseFloat(normalizedReceived) || 0;
+            const total = parseFloat(totalStr) || 0;
+            return (
+              received > 0 && (
+                <div
+                  style={{
+                    marginBottom: "20px",
+                    padding: "15px",
+                    backgroundColor: "#f5f5f5",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <span>Получено:</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {received.toFixed(2)} сом
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <span>К оплате:</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {total.toFixed(2)} сом
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      paddingTop: "10px",
+                      borderTop: "2px solid #ddd",
+                      fontSize: "18px",
+                      fontWeight: 700,
+                      color: received >= total ? "#22c55e" : "#ef4444",
+                    }}
+                  >
+                    <span>Сдача:</span>
+                    <span>{(received - total).toFixed(2)} сом</span>
+                  </div>
+                  {received < total && (
+                    <div
+                      style={{
+                        marginTop: "10px",
+                        padding: "8px",
+                        backgroundColor: "#fee2e2",
+                        color: "#b42318",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        textAlign: "center",
+                      }}
+                    >
+                      Недостаточно средств
+                    </div>
+                  )}
+                </div>
+              )
+            );
+          })()}
         <div
           style={{
             display: "flex",
@@ -257,11 +283,17 @@ export const CashModal = ({
             style={{ width: "auto" }}
             type="button"
             onClick={onPay}
-            disabled={
-              !cashReceived ||
-              Number(cashReceived) < Number(currentTotal) ||
-              Number(cashReceived) <= 0
-            }
+            disabled={(() => {
+              if (!cashReceived) return true;
+              const normalizedReceived = cashReceived.replace(/,/g, ".").trim();
+              const totalStr = String(currentTotal || 0)
+                .replace(/,/g, ".")
+                .replace(/\s/g, "")
+                .replace(/[^\d.]/g, "");
+              const received = parseFloat(normalizedReceived) || 0;
+              const total = parseFloat(totalStr) || 0;
+              return received < total || received <= 0;
+            })()}
           >
             Оплатить
           </button>

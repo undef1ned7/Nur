@@ -346,7 +346,7 @@ const BarberAnalitika = () => {
 
       {errorMsg && <div className="ba-alert">{errorMsg}</div>}
 
-      {/* KPI 10 карточек */}
+      {/* KPI 10 карточек */}Ы
       <section className="ba-kpis">
         {kpiCards.map((card) => (
           <div key={card.key} className="kpi">

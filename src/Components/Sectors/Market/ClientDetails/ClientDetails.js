@@ -154,6 +154,13 @@ function formatDateDDMMYYYY(input) {
   return `${dd}.${mm}.${yyyy}`;
 }
 
+/* ========================================================================
+   Modal: DebtModal
+   - можно редактировать:
+     - общую сумму долга / месяцы / дату первого платежа
+     - СУММУ каждого платежа (installments[].amount)
+     - СРОК ОПЛАТЫ каждого платежа (installments[].due_date)
+   ======================================================================== */
 const DebtModal = ({ id, onClose, onChanged }) => {
   const dispatch = useDispatch();
   const { dealDetail } = useClient();
@@ -166,7 +173,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
     first_due_date: "",
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [selectCashBox, setSelectCashBox] = useState("");
   const [cashData, setCashData] = useState({
     cashbox: "",
     type: "income",
@@ -184,11 +190,16 @@ const DebtModal = ({ id, onClose, onChanged }) => {
     onConfirm: null,
   });
 
-  // грузим детали сделки
+  // Локальные правки для installments: { [number]: { amount?, due_date? } }
+  const [installmentEdits, setInstallmentEdits] = useState({});
+  // Суммы платежей (оплаты) по каждому взносу
+  const [paymentAmounts, setPaymentAmounts] = useState({});
+
+  // грузим детали сделки и кассы
   useEffect(() => {
     dispatch(getClientDealDetail({ clientId, dealId: id }));
     dispatch(getCashBoxes());
-  }, [id, dispatch]);
+  }, [id, dispatch, clientId]);
 
   // Автоматически выбираем первую кассу по индексу
   useEffect(() => {
@@ -205,7 +216,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
   useEffect(() => {
     if (dealDetail) {
       setState({
-        // редактируем исходную сумму (amount), сервер сам посчитает debt_amount/remaining_debt
         amount: dealDetail.amount != null ? String(dealDetail.amount) : "",
         debt_months:
           dealDetail.debt_months != null ? String(dealDetail.debt_months) : "",
@@ -213,39 +223,113 @@ const DebtModal = ({ id, onClose, onChanged }) => {
           ? toYYYYMMDD(dealDetail.first_due_date)
           : "",
       });
+      // сбрасываем правки по графику
+      setInstallmentEdits({});
+      setPaymentAmounts({});
     }
   }, [dealDetail]);
+
+  const installments = useMemo(() => {
+    return Array.isArray(dealDetail?.installments)
+      ? dealDetail.installments
+      : [];
+  }, [dealDetail]);
+
+  const firstDueDate =
+    dealDetail?.first_due_date ?? installments[0]?.due_date ?? null;
+
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      amount: dealDetail?.debt_amount,
+    }));
+  }, [dealDetail]);
+
+  // источники значений (форма/сервер)
+  const amountNum = toNumber(isEditing ? state.amount : dealDetail?.amount);
+  const monthsNum = toNumber(
+    isEditing ? state.debt_months : dealDetail?.debt_months
+  );
+
+  const monthly = isEditing
+    ? Number.isFinite(amountNum) && Number.isFinite(monthsNum) && monthsNum > 0
+      ? (amountNum / monthsNum).toFixed(2)
+      : "—"
+    : dealDetail?.monthly_payment ?? "—";
 
   const onChange = (e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
   };
 
+  // ===== Сохранение (общие поля + installments) =====
   const onSubmit = async () => {
     try {
       const amount = Number(state.amount);
       const months = Number(state.debt_months);
 
+      // готовим payload для графика платежей
+      let installmentsPayload = null;
+      if (Array.isArray(installments) && installments.length) {
+        installmentsPayload = installments.map((p) => {
+          const edit = installmentEdits[p.number] || {};
+
+          const rawAmount =
+            edit.amount !== undefined && edit.amount !== null
+              ? edit.amount
+              : p.amount;
+
+          const rawDate =
+            edit.due_date !== undefined && edit.due_date !== null
+              ? edit.due_date
+              : p.due_date;
+
+          const parsedAmount = Number(
+            String(rawAmount).toString().replace(",", ".")
+          );
+
+          return {
+            // ВАЖНО: поле "number" как в ответе сервера
+            number: p.number,
+            amount: Number.isFinite(parsedAmount)
+              ? parsedAmount.toFixed(2)
+              : Number(p.amount || 0).toFixed(2),
+            due_date: toYYYYMMDD(rawDate),
+          };
+        });
+      }
+
+      const payload = {
+        amount: Number.isFinite(amount) ? amount : 0,
+        debt_months: Number.isFinite(months) ? months : 0,
+        ...(state.first_due_date
+          ? { first_due_date: toYYYYMMDD(state.first_due_date) }
+          : {}),
+        ...(installmentsPayload && installmentsPayload.length
+          ? { installments: installmentsPayload }
+          : {}),
+      };
+
       await dispatch(
         updateDealDetail({
           id,
-          data: {
-            amount: Number.isFinite(amount) ? amount : 0,
-            debt_months: Number.isFinite(months) ? months : 0,
-            ...(state.first_due_date
-              ? { first_due_date: toYYYYMMDD(state.first_due_date) }
-              : {}),
-          },
+          data: payload,
           clientId,
         })
       ).unwrap();
+
       onChanged?.();
       dispatch(getClientDealDetail({ clientId, dealId: id }));
 
       setIsEditing(false);
+      setInstallmentEdits({});
     } catch (e) {
       console.error(e);
-      // показать тост/ошибку пользователю при желании
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Не удалось сохранить изменения",
+      });
     }
   };
 
@@ -261,15 +345,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
       dispatch(getClientDealDetail({ clientId, dealId: id }));
     } catch (e) {
       console.error(e);
-    }
-  };
-
-  const onCancellationPayment = async (id) => {
-    try {
-      await dispatch(cancellationOfPayment(id)).unwrap();
-      dispatch(getClientDealDetail({ clientId, dealId: id }));
-    } catch (e) {
-      console.log(e);
     }
   };
 
@@ -290,43 +365,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
       },
     });
   };
-
-  // источники значений (форма/сервер)
-  const amountNum = toNumber(isEditing ? state.amount : dealDetail?.amount);
-  const monthsNum = toNumber(
-    isEditing ? state.debt_months : dealDetail?.debt_months
-  );
-
-  const monthly = isEditing
-    ? Number.isFinite(amountNum) && Number.isFinite(monthsNum) && monthsNum > 0
-      ? (amountNum / monthsNum).toFixed(2)
-      : "—"
-    : dealDetail?.monthly_payment ?? "—";
-
-  // ===== График платежей (только то, что пришло с сервера) =====
-  const installments = useMemo(() => {
-    return Array.isArray(dealDetail?.installments)
-      ? dealDetail.installments
-      : [];
-  }, [dealDetail]);
-
-  // Состояние для хранения введенных сумм оплаты для каждого платежа
-  const [paymentAmounts, setPaymentAmounts] = useState({});
-
-  const onCashChange = (e) => {
-    const { name, value } = e.target;
-    setCashData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const firstDueDate =
-    dealDetail?.first_due_date ?? installments[0]?.due_date ?? null;
-
-  useEffect(() => {
-    setState((prev) => ({
-      ...prev,
-      amount: dealDetail?.debt_amount,
-    }));
-  }, [dealDetail]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -365,7 +403,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
               onChange={onChange}
             />
           ) : (
-            // показываем именно debt_amount, который уже учитывает предоплату и расчёты сервера
             <div className="value">
               {dealDetail?.debt_amount ?? dealDetail?.amount ?? "—"}
             </div>
@@ -459,6 +496,17 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                   <tbody>
                     {installments.map((p) => {
                       const paid = Boolean(p.paid_on);
+                      const edit = installmentEdits[p.number] || {};
+
+                      const amountInputValue =
+                        edit.amount !== undefined && edit.amount !== null
+                          ? edit.amount
+                          : p.amount;
+
+                      const dueDateInputValue =
+                        edit.due_date !== undefined && edit.due_date !== null
+                          ? edit.due_date
+                          : toYYYYMMDD(p.due_date);
 
                       return (
                         <tr
@@ -467,18 +515,63 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                           aria-checked={paid}
                         >
                           <td style={{ textAlign: "left" }}>{p.number}</td>
+
+                          {/* Срок оплаты (редактируемый) */}
                           <td style={{ textAlign: "left" }}>
-                            {formatDateDDMMYYYY(p.due_date)}
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                className="debt__input"
+                                value={dueDateInputValue || ""}
+                                onChange={(e) =>
+                                  setInstallmentEdits((prev) => ({
+                                    ...prev,
+                                    [p.number]: {
+                                      ...prev[p.number],
+                                      due_date: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            ) : (
+                              formatDateDDMMYYYY(p.due_date)
+                            )}
                           </td>
 
-                          <td style={{ textAlign: "right" }}>{p.amount}</td>
+                          {/* Сумма (редактируемая) */}
+                          <td style={{ textAlign: "right" }}>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="debt__input"
+                                value={amountInputValue}
+                                onChange={(e) =>
+                                  setInstallmentEdits((prev) => ({
+                                    ...prev,
+                                    [p.number]: {
+                                      ...prev[p.number],
+                                      amount: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            ) : (
+                              p.amount
+                            )}
+                          </td>
 
+                          {/* Остаток после платежа (сервера) */}
                           <td style={{ textAlign: "right" }}>
                             {p.balance_after}
                           </td>
+
                           <td style={{ textAlign: "right" }}>
                             {p.paid_on ? formatDateDDMMYYYY(p.paid_on) : "—"}
                           </td>
+
+                          {/* Сумма оплаты (фактический платеж сейчас) */}
                           <td style={{ textAlign: "right" }}>
                             {paid ? (
                               <span title="Платёж уже проведён">—</span>
@@ -534,11 +627,9 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                           </td>
                           <td style={{ textAlign: "right" }}>
                             {paid ? (
-                              <>
-                                <span title="Платёж уже проведён">
-                                  Оплачено ✓
-                                </span>
-                              </>
+                              <span title="Платёж уже проведён">
+                                Оплачено ✓
+                              </span>
                             ) : (
                               <button
                                 className="schedule__pay-btn"
@@ -548,7 +639,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                   cursor: "pointer",
                                 }}
                                 onClick={() => {
-                                  // Получаем введенную сумму или используем полную сумму взноса
                                   const userEnteredAmount =
                                     paymentAmounts[p.number] !== undefined &&
                                     paymentAmounts[p.number] !== ""
@@ -561,7 +651,6 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                   );
                                   const remaining = fullAmount - alreadyPaid;
 
-                                  // Проверяем, есть ли что оплачивать
                                   if (remaining <= 0) {
                                     setAlert({
                                       open: true,
@@ -571,12 +660,10 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                     return;
                                   }
 
-                                  // Определяем сумму платежа
                                   let paymentAmount;
                                   let shouldSendAmount = false;
 
                                   if (userEnteredAmount !== null) {
-                                    // Пользователь ввел сумму
                                     if (
                                       !Number.isFinite(userEnteredAmount) ||
                                       userEnteredAmount <= 0
@@ -600,31 +687,24 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                       return;
                                     }
                                     paymentAmount = userEnteredAmount;
-                                    // Если сумма меньше остатка - это частичная оплата, передаем amount
-                                    // Если сумма равна остатку - можно не передавать, система возьмет остаток
                                     shouldSendAmount =
                                       paymentAmount < remaining;
                                   } else {
-                                    // Пользователь не ввел сумму - используем остаток (полная оплата)
                                     paymentAmount = remaining;
-                                    // Не передаем amount - система сама возьмет остаток
                                     shouldSendAmount = false;
                                   }
 
-                                  // Показываем модальное окно подтверждения
                                   setConfirmDialog({
                                     open: true,
                                     message: `Подтверждаете оплату ${paymentAmount.toFixed(
                                       2
                                     )} сом?`,
                                     onConfirm: () => {
-                                      // Формируем данные для API
                                       const paymentData = {
                                         installment_number: p.number,
                                         date: toYYYYMMDD(new Date()),
                                       };
 
-                                      // Передаем amount только для частичных платежей
                                       if (shouldSendAmount) {
                                         paymentData.amount =
                                           paymentAmount.toFixed(2);
@@ -641,13 +721,11 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                             "Оплата долга",
                                         })
                                       );
-                                      // Очищаем введенную сумму после оплаты
                                       setPaymentAmounts((prev) => {
                                         const next = { ...prev };
                                         delete next[p.number];
                                         return next;
                                       });
-                                      // Закрываем диалог подтверждения
                                       setConfirmDialog({
                                         open: false,
                                         message: "",
@@ -726,6 +804,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                     ? toYYYYMMDD(dealDetail.first_due_date)
                     : "",
                 });
+                setInstallmentEdits({});
                 setIsEditing(false);
               }}
             >
@@ -760,6 +839,9 @@ const DebtModal = ({ id, onClose, onChanged }) => {
   );
 };
 
+/* ========================================================================
+   MarketClientDetails
+   ======================================================================== */
 export default function MarketClientDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -819,17 +901,15 @@ export default function MarketClientDetails() {
   });
   const dispatch = useDispatch();
 
-  // ====== НОВОЕ: состояние фильтра дат ======
+  // ====== состояние фильтра дат ======
   const [dateFrom, setDateFrom] = useState(""); // 'YYYY-MM-DD'
   const [dateTo, setDateTo] = useState(""); // 'YYYY-MM-DD'
-  // ==========================================
 
   // ====== Reconciliation filters ======
   const [reconciliationFilters, setReconciliationFilters] = useState({
     start: "",
     end: "",
   });
-  // ===================================
 
   useEffect(() => {
     setClient(initialClient);
@@ -978,13 +1058,11 @@ export default function MarketClientDetails() {
     await api.delete(`/main/clients/${clientId}/deals/${dealId}/`);
   };
 
-  // ====== Reconciliation API ======
-  // ВЕРСИЯ СКАЧИВАНИЯ PDF
+  // ====== Reconciliation API (акт сверки) ======
   const fetchReconciliation = async (clientId, filters) => {
     setReconciliationLoading(true);
     setReconciliationErr("");
 
-    // вспомогалки
     const downloadBlob = (blob, suggestedName = "reconciliation.pdf") => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -998,7 +1076,6 @@ export default function MarketClientDetails() {
 
     const nameFromCD = (cd, fallback) => {
       if (!cd) return fallback;
-      // filename*=UTF-8''... или filename="..."
       const star = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(cd);
       const plain = /filename="?([^"]+)"?/i.exec(cd);
       const raw = (star?.[1] || plain?.[1] || "").trim();
@@ -1015,7 +1092,6 @@ export default function MarketClientDetails() {
       if (filters.start) params.append("start", filters.start);
       if (filters.end) params.append("end", filters.end);
 
-      // Пытаемся получить PDF напрямую
       const res = await api.get(`/main/clients/${clientId}/reconciliation/`, {
         params,
         responseType: "blob",
@@ -1024,7 +1100,6 @@ export default function MarketClientDetails() {
 
       const ct = (res.headers?.["content-type"] || "").toLowerCase();
 
-      // 1) Сервер сразу вернул PDF
       if (ct.includes("application/pdf")) {
         const filename = nameFromCD(
           res.headers?.["content-disposition"],
@@ -1033,14 +1108,11 @@ export default function MarketClientDetails() {
           }.pdf`
         );
         downloadBlob(res.data, filename);
-        // если тебе ещё нужно отображать данные — можешь оставить state:
         setReconciliationData(null);
         return;
       }
 
-      // 2) Сервер вернул JSON (например, { url: "..."} или { pdf_base64: "..." })
       if (ct.includes("application/json") || ct.includes("text/json")) {
-        // прочитать blob -> text -> JSON
         const text = await res.data.text();
         let json;
         try {
@@ -1049,11 +1121,7 @@ export default function MarketClientDetails() {
           throw new Error("Неверный формат ответа при загрузке акта сверки");
         }
 
-        // 2a) Есть прямая ссылка на PDF
         if (json.url) {
-          // Можно просто открыть в новой вкладке:
-          // window.open(json.url, "_blank", "noopener");
-          // Или скачать файл через fetch:
           const pdfResp = await fetch(json.url);
           const pdfBlob = await pdfResp.blob();
           downloadBlob(
@@ -1066,7 +1134,6 @@ export default function MarketClientDetails() {
           return;
         }
 
-        // 2b) Есть base64 строка
         if (json.pdf_base64) {
           const byteChars = atob(json.pdf_base64);
           const byteNums = new Array(byteChars.length);
@@ -1086,12 +1153,10 @@ export default function MarketClientDetails() {
           return;
         }
 
-        // Иначе — просто сохраним «как есть» (если нужно что-то показать в модалке)
         setReconciliationData(json);
         return;
       }
 
-      // 3) Нестандартный ответ — попробуем сохранить как PDF по умолчанию
       const fallbackBlob = new Blob([res.data], { type: "application/pdf" });
       downloadBlob(
         fallbackBlob,
@@ -1108,8 +1173,6 @@ export default function MarketClientDetails() {
     }
   };
 
-  // =================================
-
   const isDebtSelected = ruStatusToKind(dealStatus) === "debt";
 
   const canSaveDeal =
@@ -1125,7 +1188,7 @@ export default function MarketClientDetails() {
         open: true,
         type: "error",
         message: isDebtSelected
-          ? "Заполните название, сумму и срок долга (в месяцах)"
+          ? "Заполните название, сумму и срок долга"
           : "Заполните название и корректную сумму",
       });
       return;
@@ -1165,7 +1228,7 @@ export default function MarketClientDetails() {
     }
   };
 
-  /* ===== API: Client (без статуса и без type!) ===== */
+  /* ===== API: Client (без статуса и без type) ===== */
   const updateClientApi = async (
     clientId,
     { full_name, phone, email, date }
@@ -1297,26 +1360,20 @@ export default function MarketClientDetails() {
 
   const clientName = client?.fio || client?.full_name || "—";
 
-  // ====== НОВОЕ: утилиты и вычисление отфильтрованных сделок ======
+  // ====== датка сделки для фильтра ======
   const getDealDateISO = (deal) => {
-    // берём первое доступное поле даты
     const raw = deal?.date || deal?.created_at || deal?.updated_at || null;
     if (!raw) return null;
 
-    // если ISO с временем — оставляем только YYYY-MM-DD
-    // если уже YYYY-MM-DD — вернётся как есть
     try {
-      // ISO-строка?
       const d = new Date(raw);
       if (!Number.isNaN(d.getTime())) {
-        // преобразуем в локальную дату ISO (без времени)
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, "0");
         const dd = String(d.getDate()).padStart(2, "0");
         return `${yyyy}-${mm}-${dd}`;
       }
     } catch {}
-    // на всякий случай чистим регуляркой
     const m = String(raw).match(/^(\d{4}-\d{2}-\d{2})/);
     return m ? m[1] : null;
   };
@@ -1372,8 +1429,6 @@ export default function MarketClientDetails() {
     }
   };
   console.log(company);
-
-  // ================================================================
 
   return (
     <div className="client-details">
@@ -1492,7 +1547,7 @@ export default function MarketClientDetails() {
         </div>
       </div>
 
-      {/* ===== НОВОЕ: Панель фильтра дат по сделкам ===== */}
+      {/* Панель фильтра дат по сделкам */}
       <div className="filters panel" style={{ marginTop: 12 }}>
         <div className="rows">
           <div className="row">
@@ -1547,12 +1602,10 @@ export default function MarketClientDetails() {
             </div>
           </div>
         </div>
-        {/* <div className="divider" /> */}
         <div className="muted">
           Показано: <b>{filteredDeals.length}</b> из {deals.length}
         </div>
       </div>
-      {/* ================================================= */}
 
       <div className="deals-list">
         <h3>Сделки</h3>
@@ -1608,13 +1661,15 @@ export default function MarketClientDetails() {
         />
       )}
 
-      {/* ===== Modal: Редактировать клиента ===== */}
+      {/* Модалка: Редактировать клиента */}
       {isClientFormOpen && (
         <div className="modal-overlay">
           <div className="modal" role="dialog" aria-modal="true">
             <h3>Редактировать клиента</h3>
 
-            {saveClientErr && <div className="alert alert--error">Ошибка</div>}
+            {saveClientErr && (
+              <div className="alert alert--error">Ошибка</div>
+            )}
 
             <label className="field">
               <span>
@@ -1693,7 +1748,7 @@ export default function MarketClientDetails() {
         </div>
       )}
 
-      {/* ===== Modal: Сделка ===== */}
+      {/* Модалка: Сделка */}
       {isDealFormOpen && (
         <div className="modal-overlay">
           <div className="modal">
@@ -1807,7 +1862,7 @@ export default function MarketClientDetails() {
         </div>
       )}
 
-      {/* ===== Modal: Акт сверки ===== */}
+      {/* Модалка: Акт сверки */}
       {showReconciliation && (
         <div className="modal-overlay">
           <div
@@ -1818,7 +1873,6 @@ export default function MarketClientDetails() {
           >
             <h3>Акт сверки с клиентом</h3>
 
-            {/* Фильтры для акта сверки */}
             <div className="filters panel" style={{ marginBottom: 20 }}>
               <div className="rows">
                 <div className="row">
@@ -1853,44 +1907,7 @@ export default function MarketClientDetails() {
                     />
                   </div>
                 </div>
-                {/* <div className="row">
-                  <div className="label">Источник</div>
-                  <div className="value">
-                    <select
-                      className="analytics-sales__input"
-                      value={reconciliationFilters.source}
-                      onChange={(e) =>
-                        setReconciliationFilters((prev) => ({
-                          ...prev,
-                          source: e.target.value,
-                        }))
-                      }
-                    >
-                      <option value="both">Продажи и сделки</option>
-                      <option value="sales">Только продажи</option>
-                      <option value="deals">Только сделки</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="label">Валюта</div>
-                  <div className="value">
-                    <select
-                      className="analytics-sales__input"
-                      value={reconciliationFilters.currency}
-                      onChange={(e) =>
-                        setReconciliationFilters((prev) => ({
-                          ...prev,
-                          currency: e.target.value,
-                        }))
-                      }
-                    >
-                      <option value="KGS">Сом</option>
-                      <option value="USD">Доллар</option>
-                      <option value="EUR">Евро</option>
-                    </select>
-                  </div>
-                </div> */}
+
                 <div className="row">
                   <div className="label">Действия</div>
                   <div className="value">
@@ -1908,14 +1925,11 @@ export default function MarketClientDetails() {
               </div>
             </div>
 
-            {/* Ошибка загрузки */}
             {reconciliationErr && (
               <div className="alert alert--error" style={{ marginBottom: 16 }}>
                 {reconciliationErr}
               </div>
             )}
-
-            {/* Данные акта сверки */}
 
             <div className="modal-actions">
               <button

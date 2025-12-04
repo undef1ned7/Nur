@@ -227,6 +227,171 @@
     font-size: 16px;
     font-weight: 500;
   }
+
+  // Модалка предпросмотра
+  &__preview {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 20px;
+  }
+
+  &__preview-label {
+    background: white;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+  }
+
+  &__preview-label-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 500px;
+  }
+
+  &__preview-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+    text-align: left;
+    word-wrap: break-word;
+    max-width: 100%;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  &__preview-barcode-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__preview-barcode-wrapper {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    padding: 15px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    min-height: 80px;
+  }
+
+  &__preview-barcode-canvas {
+    max-width: 100%;
+    height: auto;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+
+  &__preview-barcode-text {
+    font-family: "Courier New", monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    letter-spacing: 1px;
+    text-align: left;
+    padding-left: 4px;
+  }
+
+  &__preview-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  &__preview-cancel-btn {
+    padding: 10px 20px;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+      background: #e8e8e8;
+      border-color: #bbb;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__preview-print-btn {
+    padding: 10px 24px;
+    background-color: #ffd400;
+    color: #1a1a1a;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    &:hover:not(:disabled) {
+      background-color: #ffdc33;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      transform: translateY(-1px);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      background-color: #e0e0e0;
+      color: #999;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+  }
+
+  &__printer-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__connect-btn {
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+      background-color: #0056b3;
+    }
+
+    &:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+  }
 }
 
 // Адаптивность

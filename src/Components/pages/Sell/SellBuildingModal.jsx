@@ -450,7 +450,7 @@ const SellBuildingModal = ({ onClose }) => {
             {/* Если «Долги» — спрашиваем срок в месяцах */}
             {dealStatus === "Долги" && (
               <div style={{ display: "grid", gap: 8 }}>
-                <label>Срок долга (месяцев)</label>
+                <label>Срок долга</label>
                 <input
                   className="add-modal__input"
                   type="number"
@@ -478,7 +478,7 @@ const SellBuildingModal = ({ onClose }) => {
                   />
                 </div>
                 <div className="sale__field sale__field--full">
-                  <label className="sale__label">Срок долга (месяцев)</label>
+                  <label className="sale__label">Срок долга</label>
                   <input
                     className="sale__input"
                     type="number"

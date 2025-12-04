@@ -573,7 +573,7 @@ const SellDetail = ({ onClose, id }) => {
   const kindTranslate = {
     new: "Новый",
     paid: "Оплаченный",
-    canceled: "Отмененный",
+    canceled: "возвращенный",
   };
 
   const filterField = isStartPlan

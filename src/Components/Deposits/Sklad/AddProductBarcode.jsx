@@ -192,7 +192,7 @@ const AddProductBarcode = ({
       if (debt === "Долги") {
         if (!debtMonths || Number(debtMonths) <= 0) {
           if (onShowErrorAlert) {
-            onShowErrorAlert("Введите корректный срок долга (в месяцах)");
+            onShowErrorAlert("Введите корректный срок долга");
           }
           return;
         }
@@ -229,7 +229,7 @@ const AddProductBarcode = ({
         }
         if (!debtMonths || Number(debtMonths) <= 0) {
           if (onShowErrorAlert) {
-            onShowErrorAlert("Введите корректный срок долга (в месяцах)");
+            onShowErrorAlert("Введите корректный срок долга");
           }
           return;
         }

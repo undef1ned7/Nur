@@ -325,7 +325,7 @@ const AddModal = ({ onClose }) => {
               className="add-modal__section"
               style={{ display: "grid", gap: 8 }}
             >
-              <label>Срок долга (месяцев)</label>
+              <label>Срок долга</label>
               <input
                 className="add-modal__input"
                 type="number"

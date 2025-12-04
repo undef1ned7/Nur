@@ -37,7 +37,6 @@ import {
   attachUsbListenersOnce,
   checkPrinterConnection,
 } from "./services/printService";
-import { validateClientForm, validateCheckout } from "./services/validation";
 import {
   toNum,
   getAvailableQtyForProduct,
@@ -68,9 +67,11 @@ const SellMainStart = ({ show, setShow }) => {
   const { start, foundProduct } = useSale();
   const { list: products } = useProducts();
   const { list: clients = [] } = useClient();
+
   // Флаг для отслеживания недавнего сканирования (чтобы не открывать модалку при Enter от сканера)
   const lastScanTimeRef = useRef(0);
-  // Автодобавление товара по сканеру штрих‑кода
+
+  // Автодобавление товара по сканеру штрих-кода
   const { error: barcodeScanError } = useBarcodeToCart(start?.id, {
     onError: (msg) =>
       setAlert({
@@ -86,6 +87,7 @@ const SellMainStart = ({ show, setShow }) => {
 
   const [clientId, setClientId] = useState("");
   const [debtMonths, setDebtMonths] = useState("");
+
   const [form, setForm] = useState({
     full_name: "",
     phone: "",
@@ -140,17 +142,20 @@ const SellMainStart = ({ show, setShow }) => {
     status:
       company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
   });
+
   const dispatch = useDispatch();
   const run = (thunk) => dispatch(thunk).unwrap();
+
   const [selectClient, setSelectClient] = useState("");
   const [selectCashBox, setSelectCashBox] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
 
   const [selectedId, setSelectedId] = useState(null);
-  const selectedItem = useMemo(() => {
-    return (start?.items || []).find((i) => i.id === selectedId) || null;
-  }, [start?.items, selectedId]);
+  const selectedItem = useMemo(
+    () => (start?.items || []).find((i) => i.id === selectedId) || null,
+    [start?.items, selectedId]
+  );
 
   const filterClient = useMemo(
     () =>
@@ -185,6 +190,7 @@ const SellMainStart = ({ show, setShow }) => {
   }, [selectedItem]);
 
   const debouncedDiscount = useDebounce((v) => {
+    if (!start || !selectedItem) return;
     dispatch(
       manualFilling({
         id: start.id,
@@ -194,6 +200,7 @@ const SellMainStart = ({ show, setShow }) => {
       })
     );
   }, 600);
+
   const onProductDiscountChange = (e) => debouncedDiscount(e.target.value);
 
   const onChange2 = (e) => {
@@ -362,11 +369,10 @@ const SellMainStart = ({ show, setShow }) => {
         }
         if (e.key === "Enter") {
           e.preventDefault();
-          // Вызываем handleConfirmPaymentChoice через состояние
           const total = Number(start?.total || 0);
           if (paymentChoice === "cash") {
             setPaymentMethod("cash");
-            setCashReceived(total > 0 ? total.toFixed(2) : "");
+            setCashReceived("");
             setShowPaymentChoiceModal(false);
             setShowCashModal(true);
           } else {
@@ -383,7 +389,6 @@ const SellMainStart = ({ show, setShow }) => {
       // НО игнорируем Enter, если недавно было сканирование (в течение 500мс)
       if (e.key === "Enter") {
         const timeSinceLastScan = Date.now() - lastScanTimeRef.current;
-        // Если Enter нажат в течение 500мс после сканирования, игнорируем его
         if (timeSinceLastScan < 500) {
           return;
         }
@@ -485,7 +490,6 @@ const SellMainStart = ({ show, setShow }) => {
         manualFilling({ id: start.id, productId: item.product || item.id })
       ).unwrap();
       onRefresh();
-      // Обновляем локальное состояние после обновления
       setItemQuantities((prev) => ({
         ...prev,
         [item.id]: String(currentQty + 1),
@@ -506,7 +510,6 @@ const SellMainStart = ({ show, setShow }) => {
     const next = Math.max(0, currentQty - 1);
 
     if (next === 0) {
-      // Если количество становится 0, удаляем товар
       await handleRemoveItem(item);
       return;
     }
@@ -520,7 +523,6 @@ const SellMainStart = ({ show, setShow }) => {
         })
       ).unwrap();
       onRefresh();
-      // Обновляем локальное состояние после обновления
       setItemQuantities((prev) => ({
         ...prev,
         [item.id]: String(next),
@@ -547,7 +549,6 @@ const SellMainStart = ({ show, setShow }) => {
       ).unwrap();
       onRefresh();
 
-      // Если удаляемый товар был выбран, сбрасываем выбор
       if (selectedId === item.id) {
         setSelectedId(null);
       }
@@ -621,8 +622,6 @@ const SellMainStart = ({ show, setShow }) => {
     }
   };
 
-  const filterData = products;
-  const currentCart = start;
   const currentItems = start?.items || [];
   const currentSubtotal = start?.subtotal;
   const currentDiscount = start?.order_discount_total;
@@ -693,10 +692,36 @@ const SellMainStart = ({ show, setShow }) => {
     }
   };
 
+  // === Helper: валидация срока долга (месяцы + дата) ===
+  const validateDebtTerm = () => {
+    if (debt === "Долги" || debt === "Предоплата") {
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Введите корректный срок долга (в месяцах)",
+        });
+        return false;
+      }
+      if (!state.dueDate) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Выберите дату первого платежа",
+        });
+        return false;
+      }
+    }
+    return true;
+  };
+
   // Обработка оплаты наличными
   const handleCashPayment = async () => {
-    const received = Number(cashReceived);
-    const total = Number(currentTotal);
+    // Нормализуем значение: заменяем запятую на точку
+    const normalizedReceived = String(cashReceived).replace(/,/g, ".");
+    const normalizedTotal = String(currentTotal).replace(/,/g, ".");
+    const received = parseFloat(normalizedReceived) || 0;
+    const total = parseFloat(normalizedTotal) || 0;
 
     if (!received || received <= 0) {
       setAlert({
@@ -716,7 +741,6 @@ const SellMainStart = ({ show, setShow }) => {
       return;
     }
 
-    // Устанавливаем способ оплаты и открываем модалку выбора чека
     setPaymentMethod("cash");
     setCashPaymentConfirmed(true);
     setShowCashModal(false);
@@ -726,7 +750,6 @@ const SellMainStart = ({ show, setShow }) => {
 
   // Ключевая функция: checkout + ПЕЧАТЬ
   const performCheckout = async (withReceipt, paymentType = null) => {
-    // Используем выбранный способ оплаты, если не передан явно
     const finalPaymentType = paymentType || paymentMethod || "card";
     try {
       if (!cashData.cashbox) {
@@ -747,29 +770,16 @@ const SellMainStart = ({ show, setShow }) => {
           });
           return;
         }
-        if (!state.dueDate && company.subscription_plan.name === "Старт") {
-          setAlert({
-            open: true,
-            type: "error",
-            message: "Выберите дату",
-          });
-          return;
-        }
-        if (!state.phone && company.subscription_plan.name === "Старт") {
-          setAlert({
-            open: true,
-            type: "error",
-            message: "Введите номер телефона",
-          });
-          return;
-        }
+
         if (company.subscription_plan.name === "Старт") {
-          await createDebt({
-            name: pickClient?.full_name,
-            phone: state.phone,
-            due_date: state.dueDate,
-            amount: start?.total,
-          });
+          if (!state.phone) {
+            setAlert({
+              open: true,
+              type: "error",
+              message: "Введите номер телефона",
+            });
+            return;
+          }
         }
       }
 
@@ -808,46 +818,51 @@ const SellMainStart = ({ show, setShow }) => {
           });
           return;
         }
-        if (!debtMonths || Number(debtMonths) <= 0) {
-          setAlert({
-            open: true,
-            type: "error",
-            message: "Введите корректный срок долга",
-          });
-          return;
-        }
+        if (!validateDebtTerm()) return;
       }
       if (debt === "Долги") {
-        if (!debtMonths || Number(debtMonths) <= 0) {
-          setAlert({
-            open: true,
-            type: "error",
-            message: "Введите корректный срок долга",
-          });
-          return;
-        }
+        if (!validateDebtTerm()) return;
+      }
+
+      // Стартовый тариф: создаём запись в /main/debts/
+      if (debt === "Долги" && company.subscription_plan.name === "Старт") {
+        await createDebt({
+          name: pickClient?.full_name,
+          phone: state.phone,
+          due_date: state.dueDate,
+          amount: start?.total,
+        });
       }
 
       if (clientId) {
         const totalForDeal = start?.total;
-        await dispatch(
-          createDeal({
-            clientId: clientId,
-            title: `${debt || "Продажа"} ${pickClient?.full_name}`,
-            statusRu: debt,
-            amount: totalForDeal,
-            prepayment: debt === "Предоплата" ? Number(amount) : undefined,
-            debtMonths:
-              debt === "Долги" || debt === "Предоплата"
-                ? Number(debtMonths)
-                : undefined,
-          })
-        ).unwrap();
+        const dealPayload = {
+          clientId: clientId,
+          title: `${debt || "Продажа"} ${pickClient?.full_name}`,
+          statusRu: debt,
+          amount: totalForDeal,
+        };
+
+        if (debt === "Предоплата") {
+          dealPayload.prepayment = Number(amount);
+        }
+
+        if (debt === "Долги" || debt === "Предоплата") {
+          dealPayload.debtMonths = Number(debtMonths || 0);
+          dealPayload.first_due_date = state.dueDate; // <-- Дата платежа
+        }
+
+        await dispatch(createDeal(dealPayload)).unwrap();
       }
 
-      // Валидация для оплаты наличными
       if (finalPaymentType === "cash") {
-        if (!cashReceived || Number(cashReceived) <= 0) {
+        // Нормализуем значение: заменяем запятую на точку
+        const normalizedReceived = String(cashReceived).replace(/,/g, ".");
+        const normalizedTotal = String(currentTotal).replace(/,/g, ".");
+        const received = parseFloat(normalizedReceived) || 0;
+        const total = parseFloat(normalizedTotal) || 0;
+
+        if (!cashReceived || received <= 0) {
           setAlert({
             open: true,
             type: "error",
@@ -855,8 +870,6 @@ const SellMainStart = ({ show, setShow }) => {
           });
           return;
         }
-        const total = Number(currentTotal);
-        const received = Number(cashReceived);
         if (received < total) {
           setAlert({
             open: true,
@@ -867,19 +880,20 @@ const SellMainStart = ({ show, setShow }) => {
         }
       }
 
-      // Формируем параметры для checkout
       const checkoutParams = {
         id: start?.id,
         bool: withReceipt,
         clientId: clientId,
       };
 
-      // Если оплата наличными, обязательно добавляем payment_method и cash_received
       if (finalPaymentType === "cash") {
         checkoutParams.payment_method = "cash";
-        checkoutParams.cash_received = Number(cashReceived).toFixed(2);
+        // Нормализуем значение: заменяем запятую на точку
+        const normalizedReceived = String(cashReceived).replace(/,/g, ".");
+        checkoutParams.cash_received = parseFloat(
+          normalizedReceived || 0
+        ).toFixed(2);
       } else if (finalPaymentType === "card") {
-        // При переводе отправляем payment_method="transfer"
         checkoutParams.payment_method = "transfer";
       }
 
@@ -898,9 +912,6 @@ const SellMainStart = ({ show, setShow }) => {
         );
       }
 
-      // setShow(false); // Убрано: компонент больше не закрывается после checkout
-
-      // === РАЗНИЦА: если withReceipt — получаем ответ бэка и ПЕЧАТАЕМ ЧЕРЕЗ USB ===
       if (withReceipt && result?.sale_id) {
         try {
           const resp = await run(getProductCheckout(result.sale_id));
@@ -922,7 +933,6 @@ const SellMainStart = ({ show, setShow }) => {
         message: "Операция успешно выполнена!",
       });
 
-      // Сбрасываем способ оплаты после успешной операции
       setPaymentMethod(null);
       setCashReceived("");
       setCashPaymentConfirmed(false);
@@ -950,13 +960,11 @@ const SellMainStart = ({ show, setShow }) => {
 
     try {
       if (paymentChoice === "cash") {
-        // Для наличных: открываем модалку ввода суммы
         setPaymentMethod("cash");
-        setCashReceived(total > 0 ? total.toFixed(2) : "");
+        setCashReceived("");
         setShowPaymentChoiceModal(false);
         setShowCashModal(true);
       } else {
-        // Для перевода: открываем модалку выбора чека
         setPaymentMethod("card");
         setShowPaymentChoiceModal(false);
         setReceiptWithCheck(true);
@@ -976,10 +984,9 @@ const SellMainStart = ({ show, setShow }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCheckout]);
 
-  // Обработка сохранения долга
+  // Обработка сохранения долга из модалки (кнопка "Сохранить" в DebtModal)
   const handleSaveDebt = async () => {
     try {
-      // Валидация
       if (!clientId) {
         setAlert({
           open: true,
@@ -998,8 +1005,9 @@ const SellMainStart = ({ show, setShow }) => {
         return;
       }
 
+      if (!validateDebtTerm()) return;
+
       if (debt === "Долги") {
-        // Для долга: проверяем обязательные поля для тарифа "Старт"
         if (company?.subscription_plan?.name === "Старт") {
           if (!state.phone) {
             setAlert({
@@ -1009,57 +1017,30 @@ const SellMainStart = ({ show, setShow }) => {
             });
             return;
           }
-          if (!state.dueDate) {
-            setAlert({
-              open: true,
-              type: "error",
-              message: "Выберите дату оплаты",
-            });
-            return;
-          }
-          if (!debtMonths || Number(debtMonths) <= 0) {
-            setAlert({
-              open: true,
-              type: "error",
-              message: "Введите корректный срок долга",
-            });
-            return;
-          }
 
-          // Создаем долг для тарифа "Старт"
+          // Создаём отдельный "долг" в /main/debts/
           await createDebt({
             name: pickClient?.full_name,
             phone: state.phone,
             due_date: state.dueDate,
             amount: start?.total,
           });
-        } else {
-          // Для других тарифов: проверяем только срок долга
-          if (!debtMonths || Number(debtMonths) <= 0) {
-            setAlert({
-              open: true,
-              type: "error",
-              message: "Введите корректный срок долга",
-            });
-            return;
-          }
         }
 
-        // Создаем сделку для долга
         if (clientId) {
           const totalForDeal = start?.total;
-          await dispatch(
-            createDeal({
-              clientId: clientId,
-              title: `Долг ${pickClient?.full_name}`,
-              statusRu: debt,
-              amount: totalForDeal,
-              debtMonths: Number(debtMonths),
-            })
-          ).unwrap();
+          const dealPayload = {
+            clientId: clientId,
+            title: `Долг ${pickClient?.full_name}`,
+            statusRu: debt,
+            amount: totalForDeal,
+            debtMonths: Number(debtMonths || 0),
+            first_due_date: state.dueDate,
+          };
+
+          await dispatch(createDeal(dealPayload)).unwrap();
         }
       } else if (debt === "Предоплата") {
-        // Для предоплаты: проверяем сумму и срок
         if (!amount || Number(amount) <= 0) {
           setAlert({
             open: true,
@@ -1079,28 +1060,19 @@ const SellMainStart = ({ show, setShow }) => {
           return;
         }
 
-        if (!debtMonths || Number(debtMonths) <= 0) {
-          setAlert({
-            open: true,
-            type: "error",
-            message: "Введите корректный срок долга",
-          });
-          return;
-        }
-
-        // Создаем сделку для предоплаты
         if (clientId) {
           const totalForDeal = start?.total;
-          await dispatch(
-            createDeal({
-              clientId: clientId,
-              title: `Предоплата ${pickClient?.full_name}`,
-              statusRu: debt,
-              amount: totalForDeal,
-              prepayment: Number(amount),
-              debtMonths: Number(debtMonths),
-            })
-          ).unwrap();
+          const dealPayload = {
+            clientId: clientId,
+            title: `Предоплата ${pickClient?.full_name}`,
+            statusRu: debt,
+            amount: totalForDeal,
+            prepayment: Number(amount),
+            debtMonths: Number(debtMonths || 0),
+            first_due_date: state.dueDate,
+          };
+
+          await dispatch(createDeal(dealPayload)).unwrap();
         }
       }
 
@@ -1113,7 +1085,6 @@ const SellMainStart = ({ show, setShow }) => {
             : "Предоплата успешно сохранена!",
       });
 
-      // Закрываем модалку после успешного сохранения
       setShowDebtModal(false);
     } catch (error) {
       console.error("Ошибка при сохранении долга:", error);
@@ -1174,7 +1145,7 @@ const SellMainStart = ({ show, setShow }) => {
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  d="M19 11H13V5C13 4.73478 12.8946 4.48043 12.7071 4.29289C12.5196 4.10536 12.2652 4 12 4C11.7348 4 11.4804 4.10536 11.2929 4.29289C11.1054 4.48043 11 4.73478 11 5V11H5C4.73478 11 4.48043 11.1054 4.29289 11.2929C4.10536 11.4804 4 11.7348 4 12C4 12.2652 4.10536 12.5196 4.29289 12.7071C4.4804 12.8946 4.73478 13 5 13H11V19C11 19.2652 11.1054 19.5196 11.2929 19.7071C11.4804 19.8946 11.7348 20 12 20C12.2652 20 12.5196 19.8946 12.7071 19.7071C12.8946 19.5196 13 19.2652 13 19V13H19C19.2652 13 19.5196 12.8946 19.7071 12.7071C19.8946 12.5196 20 12.2652 20 12C20 11.7348 19.8946 11.4804 19.7071 11.2929C19.5196 11.1054 19.2652 11 19 11Z"
+                  d="M19 11H13V5C13 4.73478 12.8946 4.48043 12.7071 4.29289C12.5196 4.10536 12.2652 4 12 4C11.7348 4 11.4804 4.10536 11.2929 4.29289C11.1054 4.48043 11 4.73478 11 5V11H5C4.73478 11 4.4804 11.1054 4.29289 11.2929C4.10536 11.4804 4 11.7348 4 12C4 12.2652 4.10536 12.5196 4.29289 12.7071C4.4804 12.8946 4.73478 13 5 13H11V19C11 19.2652 11.1054 19.5196 11.2929 19.7071C11.4804 19.8946 11.7348 20 12 20C12.2652 20 12.5196 19.8946 12.7071 19.7071C12.8946 19.5196 13 19.2652 13 19V13H19C19.2652 13 19.5196 12.8946 19.7071 12.7071C19.8946 12.5196 20 12.2652 20 12C20 11.7348 19.8946 11.4804 19.7071 11.2929C19.5196 11.1054 19.2652 11 19 11Z"
                   fill="#CCCCCC"
                 />
               </svg>
@@ -1421,12 +1392,10 @@ const SellMainStart = ({ show, setShow }) => {
                   }`}
                   onClick={() => {
                     if (paymentMethod === "cash") {
-                      // Отмена выбора наличных
                       setPaymentMethod(null);
                       setCashReceived("");
                       setCashPaymentConfirmed(false);
                     } else {
-                      // Открываем модалку для выбора наличных
                       setShowCashModal(true);
                     }
                   }}
@@ -1451,10 +1420,8 @@ const SellMainStart = ({ show, setShow }) => {
                   }`}
                   onClick={() => {
                     if (paymentMethod === "card") {
-                      // Отмена выбора перевода
                       setPaymentMethod(null);
                     } else {
-                      // Выбираем перевод
                       setPaymentMethod("card");
                     }
                   }}
