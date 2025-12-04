@@ -43,13 +43,35 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 const Layout = () => {
   const dispatch = useDispatch();
   const { company } = useUser();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // На десктопе по умолчанию сайдбар открыт, на мобильных - закрыт
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 769;
+    }
+    return true; // По умолчанию открыт для SSR
+  });
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
     dispatch(getCompany());
   }, [dispatch]);
+
+  // Обновляем состояние при изменении размера окна
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 769) {
+        // На десктопе открываем сайдбар, если он был закрыт
+        setIsSidebarOpen(true);
+      } else {
+        // На мобильных закрываем
+        setIsSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // 🔹 каждый переход на новый роут — скроллим страницу наверх
   useEffect(() => {
@@ -77,7 +99,7 @@ const Layout = () => {
         className="content_background"
       ></div>
 
-      <div className="App">
+      <div className={`App ${!isSidebarOpen ? "sidebar-collapsed" : ""}`}>
         <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
         {/* Overlay для мобильных устройств */}

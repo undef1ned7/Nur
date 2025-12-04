@@ -1,7 +1,7 @@
 .sidebar {
   width: 60%;
   height: 100vh;
-  background-color: #1a1a1a;
+  background: linear-gradient(180deg, #1a1a1a 0%, #1f1f1f 100%);
   color: #b3b3b3;
   display: flex;
   flex-direction: column;
@@ -9,31 +9,75 @@
   top: 0;
   left: 0;
   transform: translateX(-100%);
-  transition: transform 0.3s ease-in-out;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 100;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
   &__submenu {
     padding-left: 20px;
+    padding-top: 8px;
     display: none;
     list-style: none;
+    animation: slideDown 0.3s ease-out;
 
     &.open {
       display: block;
     }
 
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     .sidebar__submenu-item {
-      font-size: 14px;
-      padding: 7px 0;
-      padding-left: 5px;
+      font-size: 13px;
+      padding: 10px 0;
+      padding-left: 32px;
       display: flex;
       align-items: center;
       text-decoration: none;
-      color: inherit;
+      color: #999;
+      position: relative;
+      transition: all 0.2s ease;
+      border-radius: 6px;
+      margin: 2px 0;
+
+      &::before {
+        content: "•";
+        position: absolute;
+        left: 16px;
+        color: #666;
+        font-size: 12px;
+        transition: all 0.2s ease;
+      }
+
+      &:hover {
+        color: #ffffff;
+        padding-left: 36px;
+        background: rgba(255, 255, 255, 0.05);
+
+        &::before {
+          color: #f7d74f;
+          transform: scale(1.5);
+        }
+      }
 
       &--active {
-        // font-weight: bold;
-        // color: #007bff;
-        background-color: #333;
-        color: #ffffff;
+        background: rgba(247, 215, 79, 0.1);
+        color: #f7d74f;
+        font-weight: 500;
+        padding-left: 36px;
+
+        &::before {
+          color: #f7d74f;
+          transform: scale(1.5);
+        }
       }
     }
   }
@@ -45,19 +89,45 @@
   // Показываем сайдбар на мобильных устройствах, когда он открыт
   &--visible {
     transform: translateX(0);
+    animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes slideInLeft {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
   }
 
   @media (min-width: 769px) {
     width: 250px;
     transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  // Скрытое состояние на десктопе (должно быть после медиа-запроса для приоритета)
+  &--collapsed {
+    @media (min-width: 769px) {
+      transform: translateX(-100%) !important;
+      box-shadow: none;
+    }
   }
 
   &__wrapper {
-    padding-top: 30px;
     position: relative;
-    height: 100%;
+    height: calc(100vh - 80px); // Вычитаем высоту header
     width: 100%;
+    margin-top: 80px; // Отступ сверху для фиксированного header
     overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(247, 215, 79, 0.3) transparent;
+    padding-top: 10px;
   }
 
   &__arnament2 {
@@ -65,7 +135,8 @@
     position: absolute;
     top: 0;
     right: 0;
-    z-index: -1;
+    z-index: 0;
+    pointer-events: none;
 
     @media (max-width: 576px) {
       width: 20%;
@@ -81,7 +152,8 @@
     position: absolute;
     bottom: 0;
     left: 0;
-    z-index: -1;
+    z-index: 0;
+    pointer-events: none;
 
     @media (max-width: 576px) {
       width: 27%;
@@ -92,15 +164,51 @@
     }
   }
 
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    height: 80px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 10;
+    background: linear-gradient(
+      180deg,
+      #1a1a1a 0%,
+      rgba(26, 26, 26, 0.95) 100%
+    );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    @media (min-width: 769px) {
+      width: 250px;
+    }
+
+    @media (max-width: 768px) {
+      width: 60%;
+    }
+  }
+
   &__logo {
     display: flex;
     align-items: center;
-    padding: 0 20px;
-    margin-bottom: 30px;
-    height: 40px;
+    flex: 1;
+    transition: opacity 0.2s ease;
 
     img {
       width: 100px;
+      transition: transform 0.2s ease;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+
+      &:hover {
+        transform: scale(1.05);
+      }
 
       @media (max-width: 576px) {
         width: 90px;
@@ -112,9 +220,72 @@
     }
   }
 
+  &__close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    color: #b3b3b3;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 36px;
+    height: 36px;
+    position: relative;
+    overflow: hidden;
+
+    @media (max-width: 768px) {
+      display: none; // Скрываем на мобильных, там overlay закрывает
+    }
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      transform: translate(-50%, -50%);
+      transition: width 0.3s ease, height 0.3s ease;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+
+      &::before {
+        width: 100%;
+        height: 100%;
+      }
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+      position: relative;
+      z-index: 1;
+      transition: transform 0.2s ease;
+    }
+
+    &:hover svg {
+      transform: rotate(90deg);
+    }
+  }
+
   &__menu {
     list-style: none;
-    padding: 0;
+    padding: 10px 0;
     margin: 0;
     overflow-y: auto;
     max-height: none;
@@ -123,69 +294,175 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     scrollbar-gutter: stable both-edges;
+
     &::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
     }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
     &::-webkit-scrollbar-thumb {
-      background: #f7d74f;
-      border-radius: 8px;
+      background: linear-gradient(180deg, #f7d74f 0%, #f5c842 100%);
+      border-radius: 10px;
+      transition: background 0.2s ease;
+
+      &:hover {
+        background: linear-gradient(180deg, #f9e066 0%, #f7d74f 100%);
+      }
     }
   }
 
   &__menu-item {
     display: flex;
     align-items: center;
-    padding: 12px 15px;
+    padding: 14px 20px;
     cursor: pointer;
     font-size: 14px;
+    font-weight: 500;
     text-decoration: none;
     color: #b3b3b3;
     position: relative;
-    transition: background-color 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin: 2px 10px;
+    border-radius: 8px;
+    overflow: hidden;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #f7d74f 0%, #f5c842 100%);
+      transform: scaleY(0);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 0 4px 4px 0;
+    }
 
     &--disabled {
-      color: #999; // Например, серый цвет текста
-      cursor: not-allowed; // Курсор "не разрешено"
-      // Дополнительные стили для иконок или других элементов внутри заблокированного пункта
+      color: #666;
+      cursor: not-allowed;
+      opacity: 0.5;
+
       .sidebar__menu-icon {
-        color: #bbb;
+        color: #666;
       }
     }
 
     @media (max-width: 576px) {
       font-size: 13px;
-      padding: 10px 12px;
+      padding: 12px 16px;
+      margin: 2px 8px;
     }
 
     @media (max-width: 320px) {
       font-size: 12px;
-      padding: 8px 10px;
+      padding: 10px 14px;
+      margin: 2px 6px;
     }
 
-    &:hover {
-      background-color: #333;
+    &:hover:not(&--disabled) {
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      transform: translateX(4px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+      &::before {
+        transform: scaleY(1);
+      }
+
+      .sidebar__menu-icon {
+        color: #f7d74f;
+        transform: scale(1.1);
+      }
     }
 
     &--active {
-      background-color: #333;
+      background: linear-gradient(
+        90deg,
+        rgba(247, 215, 79, 0.15) 0%,
+        rgba(247, 215, 79, 0.05) 100%
+      );
       color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(247, 215, 79, 0.1);
+
+      &::before {
+        transform: scaleY(1);
+      }
+
+      .sidebar__menu-icon {
+        color: #f7d74f;
+      }
     }
   }
 
   &__menu-icon {
-    margin-right: 10px;
+    margin-right: 12px;
     font-size: 18px;
     color: #b3b3b3;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     @media (max-width: 576px) {
       font-size: 16px;
-      margin-right: 8px;
+      margin-right: 10px;
+      width: 18px;
     }
 
     @media (max-width: 320px) {
       font-size: 14px;
-      margin-right: 6px;
+      margin-right: 8px;
+      width: 16px;
+    }
+  }
+
+  &__loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 20px;
+  }
+
+  &__loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(247, 215, 79, 0.2);
+    border-top-color: #f7d74f;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  &__loading-text {
+    color: #b3b3b3;
+    font-size: 14px;
+    margin: 0;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
     }
   }
 }

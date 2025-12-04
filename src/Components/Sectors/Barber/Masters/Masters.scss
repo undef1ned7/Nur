@@ -1,5 +1,17 @@
 /* Masters.scss */
 @import "../styles/barbershop.scss";
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --primary-light: #fef3c7;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+  --success: #10b981;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+}
 
 .barbermasters,
 .barbermasters * {
@@ -8,17 +20,18 @@
 
 /* ====== Контейнер ====== */
 .barbermasters {
-  --radius: 14px;
+  --radius: 16px;
   --shadow: 0 10px 30px rgba(2, 6, 23, 0.12);
-  --padX: 20px;
+  --shadow-lg: 0 20px 40px rgba(2, 6, 23, 0.15);
+  --padX: 24px;
 
-  background: var(--surface);
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
   border-radius: var(--radius);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
   max-height: 100dvh;
   overflow: auto;
 
@@ -601,6 +614,894 @@
     color: var(--muted);
     font-size: 14px;
   }
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(
+      90deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+}
+
+/* ====== Хедер ====== */
+.barbermasters__header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: end;
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(247, 215, 79, 0.2);
+  margin-bottom: 4px;
+}
+.barbermasters__titleWrap {
+  display: grid;
+  gap: 6px;
+}
+.barbermasters__title {
+  margin: 0;
+  color: var(--text);
+  font-weight: 900;
+  font-size: 24px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--text) 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.barbermasters__subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: inline-block;
+  }
+}
+
+/* Действия */
+.barbermasters__actions {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 260px) minmax(240px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+
+  // Фиксируем кнопку с иконкой
+  > .barbermasters__btn--primary {
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    padding: 0;
+    justify-content: center;
+    justify-self: end;
+  }
+}
+.barbermasters__tabs {
+  display: flex;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+/* Кнопки */
+.barbermasters__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  line-height: 1;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: #fff;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+  }
+
+  &:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+}
+.barbermasters__btn svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease;
+}
+.barbermasters__btn:hover svg {
+  transform: scale(1.1);
+}
+.barbermasters__btn:active {
+  transform: scale(0.98);
+}
+.barbermasters__btn--primary {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  color: #111;
+  box-shadow: 0 4px 12px rgba(247, 215, 79, 0.3);
+  width: fit-content;
+  min-width: 44px;
+
+  &:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #b89400 100%);
+    box-shadow: 0 6px 16px rgba(247, 215, 79, 0.4);
+    transform: translateY(-2px);
+  }
+}
+.barbermasters__btn--secondary {
+  border: 1px solid var(--border);
+  background: #fff;
+
+  &:hover {
+    background: linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+}
+.barbermasters__btn--danger {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: #fff;
+
+  &:hover {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fecaca 100%);
+    border-color: var(--danger);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+  }
+}
+.barbermasters__btn.is-active {
+  background: linear-gradient(135deg, var(--primary-light) 0%, #fde68a 100%);
+  border-color: var(--primary);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(247, 215, 79, 0.2);
+}
+.barbermasters__btnText {
+  display: inline;
+  position: relative;
+  z-index: 1;
+}
+
+/* Поиск */
+.barbermasters__search {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.barbermasters__searchInput {
+  width: 100%;
+  height: 44px;
+  padding: 10px 16px 10px 42px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+    background: #fff;
+  }
+
+  &:hover:not(:focus) {
+    border-color: #cbd5e1;
+  }
+}
+.barbermasters__searchInput::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.barbermasters__searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 16px;
+  transition: color 0.3s ease;
+  z-index: 1;
+}
+.barbermasters__searchInput:focus + .barbermasters__searchIcon,
+.barbermasters__search:hover .barbermasters__searchIcon {
+  color: var(--primary);
+}
+
+/* ====== Лист и карточки ====== */
+.barbermasters__list {
+  display: grid;
+  gap: 12px;
+  max-height: clamp(340px, 64dvh, 720px);
+  overflow: auto;
+  padding-right: 8px;
+  padding-top: 4px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.barbermasters__list::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.barbermasters__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.barbermasters__list::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  border-radius: 8px;
+
+  &:hover {
+    background: linear-gradient(180deg, var(--primary-dark) 0%, #b89400 100%);
+  }
+}
+
+.barbermasters__card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(
+      180deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+  }
+
+  &:hover {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+    &::before {
+      transform: scaleY(1);
+    }
+  }
+}
+.barbermasters__cardLeft {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.barbermasters__avatar {
+  min-width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  color: #fff;
+  font-weight: 900;
+  font-size: 16px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(247, 215, 79, 0.4);
+  transition: all 0.3s ease;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: linear-gradient(
+      135deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+  }
+}
+.barbermasters__card:hover .barbermasters__avatar {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(247, 215, 79, 0.5);
+
+  &::after {
+    opacity: 0.3;
+  }
+}
+.barbermasters__nameRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.barbermasters__name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.barbermasters__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.barbermasters__meta .bm-item {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.barbermasters__meta .bm-item + .bm-item::before {
+  content: "•";
+  margin: 0 10px;
+  color: var(--muted);
+  opacity: 0.6;
+}
+.barbermasters__cardActions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  min-width: fit-content;
+  flex-wrap: wrap;
+}
+
+/* Кнопка копирования в модалке логина */
+.barbermasters__copyBtn {
+  margin-left: 8px;
+}
+
+/* ====== Алерты ====== */
+.barbermasters__alert {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 2px solid rgba(231, 76, 60, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(231, 76, 60, 0.1) 0%,
+    rgba(231, 76, 60, 0.05) 100%
+  );
+  color: #e74c3c;
+  font-weight: 500;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.barbermasters__alert--inModal {
+  margin: 16px var(--padX) 0;
+}
+
+/* ====== Пагинация списков ====== */
+.barbermasters__pager {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+.barbermasters__pageList {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.barbermasters__pageBtn {
+  border: 2px solid var(--border);
+  background: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 44px;
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+.barbermasters__pageBtn.is-active {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  border-color: var(--primary);
+  color: #111;
+  box-shadow: 0 4px 12px rgba(247, 215, 79, 0.3);
+  font-weight: 700;
+}
+.barbermasters__pageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+.barbermasters__dots {
+  color: var(--muted);
+  align-self: center;
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+/* ====== Overlay & Modal ====== */
+.barbermasters__overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.7) 0%,
+    rgba(15, 23, 42, 0.5) 100%
+  );
+  backdrop-filter: blur(8px) saturate(180%);
+  -webkit-backdrop-filter: blur(8px) saturate(180%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 70;
+  min-height: 100dvh;
+  overflow: auto;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.barbermasters__modal {
+  position: relative;
+  width: min(640px, 96vw);
+  max-height: min(94dvh, 820px);
+  margin: 0;
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.barbermasters__modal--taller {
+  max-height: min(94dvh, 860px);
+}
+
+/* Заголовок модалки */
+.barbermasters__modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px var(--padX);
+  border-bottom: 2px solid rgba(247, 215, 79, 0.2);
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+  }
+}
+.barbermasters__modalTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--text) 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.barbermasters__iconBtn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 0;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: var(--text);
+    background: rgba(0, 0, 0, 0.1);
+    transform: rotate(90deg);
+  }
+}
+
+/* Тело модалки */
+.barbermasters__content {
+  padding: 16px var(--padX);
+  display: flex;
+  flex-direction: column;
+  row-gap: 12px;
+}
+
+/* Форма и поля */
+.barbermasters__form {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 0;
+}
+.barbermasters__grid {
+  padding: 16px var(--padX);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  overflow: auto;
+  min-height: 0;
+}
+.barbermasters__field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.barbermasters__field--full {
+  grid-column: 1 / -1;
+}
+.barbermasters__label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.2px;
+
+  b {
+    color: var(--danger);
+    font-weight: 800;
+  }
+}
+.barbermasters__req {
+  color: var(--danger);
+  font-weight: 800;
+}
+.barbermasters__input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+  }
+
+  &:hover:not(:focus) {
+    border-color: #cbd5e1;
+  }
+}
+.barbermasters__input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.barbermasters__input--invalid {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+.barbermasters__field--invalid .barbermasters__input {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+/* Футер модалки */
+.barbermasters__footer {
+  border-top: 2px solid rgba(247, 215, 79, 0.2);
+  padding: 16px var(--padX);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+  }
+}
+.barbermasters__spacer {
+  flex: 1 1 auto;
+}
+.barbermasters__footerRight {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ====== Кастомный Select ====== */
+.barbermasters__select {
+  position: relative;
+  min-width: 220px;
+}
+.barbermasters__selectControl {
+  width: 100%;
+  height: 44px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0 40px 0 16px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    border-color: #cbd5e1;
+  }
+}
+.barbermasters__select.is-open .barbermasters__selectControl {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+}
+.barbermasters__selectValue {
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.barbermasters__selectValue.is-placeholder {
+  color: var(--muted);
+}
+.barbermasters__selectCaret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #9ca3af;
+  transition: all 0.3s ease;
+}
+.barbermasters__select.is-open .barbermasters__selectCaret {
+  border-top-color: var(--primary);
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.barbermasters__selectMenu {
+  position: absolute;
+  z-index: 120;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  animation: selectSlideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 320px; // Ограничиваем общую высоту меню
+}
+
+@keyframes selectSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.barbermasters__selectSearch {
+  position: relative;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.barbermasters__selectSearchInput {
+  width: 100%;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 10px 36px;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.3s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+  }
+}
+.barbermasters__selectSearchIcon {
+  position: absolute;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+.barbermasters__selectSearchInput:focus + .barbermasters__selectSearchIcon,
+.barbermasters__selectSearch:hover .barbermasters__selectSearchIcon {
+  color: var(--primary);
+}
+
+.barbermasters__selectList {
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 0;
+  min-height: 0; // Позволяет списку сжиматься
+}
+.barbermasters__selectList::-webkit-scrollbar {
+  width: 8px;
+}
+.barbermasters__selectList::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  border-radius: 8px;
+}
+.barbermasters__selectItem {
+  width: 100%;
+  background: #fff;
+  border: 0;
+  text-align: left;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+
+  &:hover {
+    background: linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%);
+    padding-left: 20px;
+  }
+}
+.barbermasters__selectItem.is-active {
+  background: linear-gradient(
+    135deg,
+    rgba(247, 215, 79, 0.2) 0%,
+    rgba(247, 215, 79, 0.1) 100%
+  );
+  color: var(--text);
+  font-weight: 600;
+  border-left: 3px solid var(--primary);
+}
+.barbermasters__selectEmpty {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+  min-height: auto; // Не растягиваем пустое состояние
+  max-height: none;
 }
 
 /* ====== Адаптив ====== */
@@ -642,6 +1543,35 @@
       max-height: 70dvh;
     }
   }
+  .barbermasters__header {
+    grid-template-columns: 1fr;
+  }
+  .barbermasters__actions {
+    grid-template-columns: 1fr 44px;
+    grid-template-areas:
+      "tabs plus"
+      "role role"
+      "search search";
+    align-items: start;
+    gap: 10px;
+  }
+  .barbermasters__tabs {
+    grid-area: tabs;
+  }
+  .barbermasters__select {
+    grid-area: role;
+  }
+  .barbermasters__search {
+    grid-area: search;
+  }
+  .barbermasters__actions > .barbermasters__btn--primary {
+    grid-area: plus;
+    justify-self: end;
+    align-self: start;
+  }
+  .barbermasters__list {
+    max-height: 70dvh;
+  }
 }
 
 @media (max-width: 720px) {
@@ -670,6 +1600,22 @@
       min-width: 100%;
     }
   }
+  .barbermasters__title {
+    font-size: 18px;
+  }
+  .barbermasters__btnText {
+    display: none;
+  }
+  .barbermasters__modal {
+    width: 96vw;
+    max-height: 94dvh;
+  }
+  .barbermasters__grid {
+    grid-template-columns: 1fr;
+  }
+  .barbermasters__select {
+    min-width: 100%;
+  }
 }
 
 @media (max-width: 380px) {
@@ -692,6 +1638,13 @@
       flex: 1 1 100%;
     }
   }
+  .barbermasters__input {
+    font-size: 13px;
+    padding: 0 10px;
+  }
+  .barbermasters__footer .barbermasters__btn {
+    flex: 1 1 100%;
+  }
 }
 
 /* Reduce motion */
@@ -700,5 +1653,7 @@
     &__btn {
       transition: none !important;
     }
+  .barbermasters__btn {
+    transition: none !important;
   }
 }

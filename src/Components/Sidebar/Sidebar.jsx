@@ -5,6 +5,7 @@ import { useMenuItems } from "./hooks/useMenuItems";
 import MenuItem from "./components/MenuItem";
 import Lang from "../Lang/Lang";
 import "./Sidebar.scss";
+import { X } from "lucide-react";
 
 import arnament1 from "../Photo/Group 1203.png";
 import arnament2 from "../Photo/Group 1204 (1).png";
@@ -17,7 +18,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const [openDropdown, setOpenDropdown] = useState(null);
 
   const location = useLocation();
-  const menuRef = useRef(null);   // 👈 ref теперь на меню
+  const menuRef = useRef(null); // 👈 ref теперь на меню
 
   useEffect(() => {
     if (!profile) {
@@ -66,15 +67,33 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const isLoading = !company || !profile;
 
   return (
-    <div className={`sidebar ${isOpen ? "sidebar--visible" : ""}`}>
-      <div className="sidebar__wrapper">
-        <img src={arnament1} className="sidebar__arnament1" alt="Декор" />
-        <img src={arnament2} className="sidebar__arnament2" alt="Декор" />
+    <div
+      className={`sidebar ${
+        isOpen ? "sidebar--visible" : "sidebar--collapsed"
+      }`}
+    >
+      <img src={arnament1} className="sidebar__arnament1" alt="Декор" />
+      <img src={arnament2} className="sidebar__arnament2" alt="Декор" />
+      <div className="sidebar__header">
         <div className="sidebar__logo">
           <img src={Logo} alt="Логотип" />
         </div>
+        <button
+          className="sidebar__close-btn"
+          onClick={toggleSidebar}
+          aria-label="Закрыть сайдбар"
+        >
+          <X size={20} />
+        </button>
+      </div>
 
-        {isLoading && <p>Загрузка данных...</p>}
+      <div className="sidebar__wrapper">
+        {isLoading && (
+          <div className="sidebar__loading">
+            <div className="sidebar__loading-spinner"></div>
+            <p className="sidebar__loading-text">Загрузка данных...</p>
+          </div>
+        )}
 
         <ul className="sidebar__menu" ref={menuRef}>
           {!isLoading &&
@@ -93,6 +112,5 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     </div>
   );
 };
-
 
 export default Sidebar;
