@@ -518,7 +518,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
 
                           {/* Срок оплаты (редактируемый) */}
                           <td style={{ textAlign: "left" }}>
-                            {isEditing ? (
+                            {/* {isEditing ? (
                               <input
                                 type="date"
                                 className="debt__input"
@@ -535,12 +535,14 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                               />
                             ) : (
                               formatDateDDMMYYYY(p.due_date)
-                            )}
+                            )} */}
+
+                            {formatDateDDMMYYYY(p.due_date)}
                           </td>
 
                           {/* Сумма (редактируемая) */}
                           <td style={{ textAlign: "right" }}>
-                            {isEditing ? (
+                            {/* {isEditing ? (
                               <input
                                 type="number"
                                 step="0.01"
@@ -559,7 +561,9 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                               />
                             ) : (
                               p.amount
-                            )}
+                            )} */}
+
+                            {p.amount}
                           </td>
 
                           {/* Остаток после платежа (сервера) */}
@@ -1809,7 +1813,7 @@ export default function MarketClientDetails() {
                     min="1"
                     value={dealDebtMonths}
                     onChange={(e) => setDealDebtMonths(e.target.value)}
-                    onBlur={() => {
+                  onBlur={() => {
                       const n = parseInt(dealDebtMonths || "0", 10);
                       setDealDebtMonths(
                         Number.isFinite(n) && n > 0 ? String(n) : ""

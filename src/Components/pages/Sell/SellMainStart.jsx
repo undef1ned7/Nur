@@ -1092,6 +1092,7 @@ const SellMainStart = ({ show, setShow }) => {
         open: true,
         type: "error",
         message:
+          error?.data?.prepayment ||
           error?.message ||
           error?.data?.detail ||
           "Ошибка при сохранении долга",
@@ -1156,8 +1157,8 @@ const SellMainStart = ({ show, setShow }) => {
         <div className="sell__header-left"></div>
       </div>
 
-      <div className="start__body">
-        <div className="col-8 start__body-column">
+      <div className="block gap-4 xl:flex justify-between ">
+        <div className="w-full xl:w-[66%] start__body-column">
           <div className="start__body-column">
             {/* <div className="sell__body-header">
               <h2 className="start__body-title">
@@ -1332,7 +1333,7 @@ const SellMainStart = ({ show, setShow }) => {
           </div>
         </div>
 
-        <div className="col-4">
+        <div className="w-[100%]! xl:w-[33%]!">
           <div className="start__total">
             <div className="start__total-top">
               <div className="start__total-row">
