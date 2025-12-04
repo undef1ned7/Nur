@@ -1,3 +1,4 @@
+// CatalogAnalytics.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   RefreshCcw,
@@ -6,8 +7,6 @@ import {
   Wallet,
   Trophy,
   Boxes,
-  Info,
-  X,
 } from "lucide-react";
 import "./CatalogAnalytics.scss";
 import { useDispatch, useSelector } from "react-redux";
@@ -21,146 +20,20 @@ import {
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import api from "../../../../api";
 
-/* ─── helpers ─── */
-const toNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-const fmt = (x) =>
-  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(toNum(x));
-const take = (arr, n) => arr.slice(0, n);
-const asArray = (d) =>
-  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
-const clean = (s, fallback = "—") => (s ?? "").toString().trim() || fallback;
-const keyOf = (s, fallback = "—") =>
-  clean(s, fallback).replace(/\s+/g, " ").toLowerCase();
-
-const months = [
-  "Январь","Февраль","Март","Апрель","Май","Июнь",
-  "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
-];
-
-const monthRange = (year, monthIdx) => {
-  const start = new Date(year, monthIdx, 1, 0, 0, 0, 0);
-  const end = new Date(year, monthIdx + 1, 1, 0, 0, 0, 0);
-  return { startTs: start.getTime(), endTs: end.getTime() - 1 };
-};
-
-const tsOf = (x) => {
-  const v =
-    x?.created_at || x?.sold_at || x?.date || x?.datetime || x?.accepted_at || x?.updated_at;
-  const t = v ? new Date(v).getTime() : 0;
-  return Number.isFinite(t) ? t : 0;
-};
-
-async function fetchAllConstructionCashflows(params = {}) {
-  const acc = [];
-  let page = 1;
-  for (;;) {
-    try {
-      const res = await api.get("/construction/cashflows/", {
-        params: { page, page_size: 200, ...params },
-      });
-      const rows = asArray(res?.data);
-      acc.push(...rows);
-      if (!res?.data?.next) break;
-      page += 1;
-    } catch (e) {
-      console.error(e);
-      break;
-    }
-  }
-  return acc;
-}
-
-/* ─── tiny pager ─── */
-const usePaged = (rows, pageSize) => {
-  const [page, setPage] = useState(1);
-  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
-  useEffect(() => setPage(1), [rows, pageSize]);
-  const slice = useMemo(
-    () => rows.slice((page - 1) * pageSize, page * pageSize),
-    [rows, page, pageSize]
-  );
-  return { page, pages, setPage, slice };
-};
-
-/* ─── modal ─── */
-const DetailsModal = ({ title, columns, rows, getKey, onClose, pageSize = 12 }) => {
-  const { page, pages, setPage, slice } = usePaged(rows, pageSize);
-
-  useEffect(() => {
-    const onEsc = (e) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onEsc);
-    return () => window.removeEventListener("keydown", onEsc);
-  }, [onClose]);
-
-  return (
-    <div className="ca-modal" role="dialog" aria-modal="true">
-      <div className="ca-modal__overlay" onClick={onClose} />
-      <div className="ca-modal__card" aria-label={title}>
-        <div className="ca-modal__head">
-          <h3 className="ca-modal__title">{title}</h3>
-          <button className="ca-modal__icon" onClick={onClose} aria-label="Закрыть" type="button">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="ca-modal__body">
-          <div className="ca-tableWrap ca-tableWrap--modal">
-            <table className="ca-table">
-              <thead>
-                <tr>
-                  {columns.map((c) => (
-                    <th key={c.key} scope="col">{c.title}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {slice.length === 0 ? (
-                  <tr>
-                    <td colSpan={columns.length} className="ca-empty">Нет данных</td>
-                  </tr>
-                ) : (
-                  slice.map((r, i) => (
-                    <tr key={getKey(r, i)}>
-                      {columns.map((c) => (
-                        <td key={c.key} className={c.className || ""}>
-                          {c.render ? c.render(r) : r[c.key]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="ca-modal__footer">
-          <div className="ca-pager" aria-label="Пагинация">
-            <button
-              className="ca-pager__btn"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              aria-label="Назад"
-              type="button"
-            >
-              ←
-            </button>
-            <span className="ca-pager__info">Страница {page} из {pages}</span>
-            <button
-              className="ca-pager__btn"
-              onClick={() => setPage((p) => Math.min(pages, p + 1))}
-              disabled={page >= pages}
-              aria-label="Вперёд"
-              type="button"
-            >
-              →
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+import CatalogAnalyticsDetailsModal from "./CatalogAnalyticsDetailsModal.jsx";
+import CatalogAnalyticsCard from "./CatalogAnalyticsCard.jsx";
+import {
+  toNum,
+  fmt,
+  take,
+  asArray,
+  clean,
+  keyOf,
+  months,
+  monthRange,
+  tsOf,
+  fetchAllConstructionCashflows,
+} from "./CatalogAnalyticsUtils";
 
 /* ─── основной компонент ─── */
 const CatalogAnalytics = () => {
@@ -172,10 +45,18 @@ const CatalogAnalytics = () => {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [monthIdx, setMonthIdx] = useState(now.getMonth());
-  const { startTs, endTs } = useMemo(() => monthRange(year, monthIdx), [year, monthIdx]);
+  const { startTs, endTs } = useMemo(
+    () => monthRange(year, monthIdx),
+    [year, monthIdx]
+  );
 
   /* модалка */
-  const [modal, setModal] = useState({ open: false, title: "", columns: [], rows: [] });
+  const [modal, setModal] = useState({
+    open: false,
+    title: "",
+    columns: [],
+    rows: [],
+  });
   const openModal = (payload) => setModal({ open: true, ...payload });
   const closeModal = () => setModal((p) => ({ ...p, open: false }));
 
@@ -195,31 +76,17 @@ const CatalogAnalytics = () => {
     });
   }, [history, historyObjects, startTs, endTs]);
 
-  /* индексы товаров */
-  const productById = useMemo(() => {
-    const map = new Map();
-    (products || []).forEach((p) => {
-      if (p?.id != null) map.set(String(p.id), p);
-    });
-    return map;
+  /* KPI склада (снимок) */
+  const stockKpis = useMemo(() => {
+    const list = products || [];
+    const positions = list.length;
+    const totalQty = list.reduce((a, p) => a + toNum(p.quantity), 0);
+    const stockValueRetail = list.reduce(
+      (a, p) => a + toNum(p.price) * toNum(p.quantity),
+      0
+    );
+    return { positions, totalQty, stockValueRetail };
   }, [products]);
-
-  const productByName = useMemo(() => {
-    const map = new Map();
-    (products || []).forEach((p) => {
-      if (!p) return;
-      const key = keyOf(p.name || "", "");
-      map.set(key, p);
-    });
-    return map;
-  }, [products]);
-
-  const findProductForItem = (it) => {
-    const pid = it?.product || it?.product_id || it?.object_item || it?.object_id || it?.id;
-    if (pid != null && productById.has(String(pid))) return productById.get(String(pid));
-    const name = it?.product_name || it?.object_name || it?.name || it?.title || "";
-    return productByName.get(keyOf(name, "")) || null;
-  };
 
   /* Поставщики: закупки за выбранный период */
   const suppliersRows = useMemo(() => {
@@ -229,15 +96,18 @@ const CatalogAnalytics = () => {
     });
     const m = new Map();
     const names = new Map();
+
     for (const p of inPeriod) {
       const display = clean(p.client_name || p.client, "—");
       const k = keyOf(display, "—");
       names.set(k, display);
-      const unit = p.purchase_price != null ? toNum(p.purchase_price) : toNum(p.price);
+      const unit =
+        p.purchase_price != null ? toNum(p.purchase_price) : toNum(p.price);
       const sum = unit * toNum(p.quantity);
       const prev = m.get(k) || { sum: 0, items: 0 };
       m.set(k, { sum: prev.sum + sum, items: prev.items + 1 });
     }
+
     return Array.from(m, ([k, v]) => ({
       name: names.get(k) || "—",
       items: v.items,
@@ -260,12 +130,15 @@ const CatalogAnalytics = () => {
     for (const p of products || []) {
       const qty = toNum(p.quantity);
       const value = qty * toNum(p.price);
+
       const bDisp = clean(
-        p?.brand_name || (typeof p?.brand === "string" ? p.brand : p?.brand?.name),
+        p?.brand_name ||
+          (typeof p?.brand === "string" ? p.brand : p?.brand?.name),
         "—"
       );
       const cDisp = clean(
-        p?.category_name || (typeof p?.category === "string" ? p.category : p?.category?.name),
+        p?.category_name ||
+          (typeof p?.category === "string" ? p.category : p?.category?.name),
         "—"
       );
       const bKey = keyOf(bDisp, "—");
@@ -299,13 +172,16 @@ const CatalogAnalytics = () => {
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       setLoadingCash(true);
       try {
         const flows = await fetchAllConstructionCashflows();
 
         const dirOf = (cf) => {
-          const raw = String(cf.type ?? cf.kind ?? cf.direction ?? "").trim().toLowerCase();
+          const raw = String(
+            cf.type ?? cf.kind ?? cf.direction ?? ""
+          ).trim().toLowerCase();
           if (["income", "приход"].includes(raw)) return "income";
           if (["expense", "расход"].includes(raw)) return "expense";
           const amt = toNum(cf.amount ?? cf.value ?? cf.sum ?? 0);
@@ -355,14 +231,19 @@ const CatalogAnalytics = () => {
         if (!cancelled) setLoadingCash(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [startTs, endTs]);
 
-  const cashTotals = useMemo(() => {
-    const income = cashRows.reduce((a, r) => a + toNum(r.income), 0);
-    const expense = cashRows.reduce((a, r) => a + toNum(r.expense), 0);
-    return { income, expense, net: income - expense };
-  }, [cashRows]);
+  const cashTotals = useMemo(
+    () => ({
+      income: cashRows.reduce((a, r) => a + toNum(r.income), 0),
+      expense: cashRows.reduce((a, r) => a + toNum(r.expense), 0),
+    }),
+    [cashRows]
+  );
 
   /* Товары (продажи за период) — агрегация */
   const [productsRowsAgg, setProductsRowsAgg] = useState([]);
@@ -370,6 +251,7 @@ const CatalogAnalytics = () => {
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       setLoadingProducts(true);
       const m = new Map();
@@ -416,17 +298,22 @@ const CatalogAnalytics = () => {
           qty: v.qty,
           revenue: v.revenue,
         })).sort((a, b) => b.revenue - a.revenue);
+
         setProductsRowsAgg(rows);
         setLoadingProducts(false);
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [periodSales, dispatch]);
 
   /* Клиенты (продажи за период) */
   const clientsRows = useMemo(() => {
     const m = new Map();
     const names = new Map();
+
     for (const s of periodSales) {
       const disp = clean(s.client_name || s.client, "Без имени");
       const k = keyOf(disp, "без имени");
@@ -434,99 +321,13 @@ const CatalogAnalytics = () => {
       const prev = m.get(k) || { sum: 0, cnt: 0 };
       m.set(k, { sum: prev.sum + toNum(s.total), cnt: prev.cnt + 1 });
     }
+
     return Array.from(m, ([k, v]) => ({
       name: names.get(k) || "—",
       orders: v.cnt,
       revenue: v.sum,
     })).sort((a, b) => b.revenue - a.revenue);
   }, [periodSales]);
-
-  /* KPI склада (снимок) */
-  const stockKpis = useMemo(() => {
-    const positions = (products || []).length;
-    const totalQty = (products || []).reduce((a, p) => a + toNum(p.quantity), 0);
-    const stockValueRetail = (products || []).reduce(
-      (a, p) => a + toNum(p.price) * toNum(p.quantity),
-      0
-    );
-    return { positions, totalQty, stockValueRetail };
-  }, [products]);
-
-  /* карточка (12 строк на страницу) */
-  const renderCard = ({ icon, title, columns, rows, moreTitle }) => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { page, pages, setPage, slice } = usePaged(rows, 12);
-    return (
-      <div className="ca-card">
-        <div className="ca-card__head">
-          <div className="ca-card__title">
-            {icon}
-            <span>{title}</span>
-          </div>
-          <button
-            className="ca-card__more"
-            aria-label="Подробнее"
-            title="Подробнее"
-            type="button"
-            onClick={() => openModal({ title: moreTitle || title, columns, rows })}
-          >
-            <Info size={16} />
-          </button>
-        </div>
-
-        <div className="ca-tableWrap">
-          <table className="ca-table">
-            <thead>
-              <tr>
-                {columns.map((c) => (
-                  <th key={c.key} scope="col">{c.title}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {slice.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className="ca-empty">Нет данных</td>
-                </tr>
-              ) : (
-                slice.map((r, i) => (
-                  <tr key={`${title}-${i}`}>
-                    {columns.map((c) => (
-                      <td key={c.key} className={c.className || ""}>
-                        {c.render ? c.render(r) : r[c.key]}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="ca-card__pager">
-          <button
-            className="ca-pager__btn"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            aria-label="Назад"
-            type="button"
-          >
-            ←
-          </button>
-          <span className="ca-pager__info">{page} / {pages}</span>
-          <button
-            className="ca-pager__btn"
-            onClick={() => setPage((p) => Math.min(pages, p + 1))}
-            disabled={page >= pages}
-            aria-label="Вперёд"
-            type="button"
-          >
-            →
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   const years = useMemo(() => {
     const cur = new Date().getFullYear();
@@ -548,7 +349,9 @@ const CatalogAnalytics = () => {
             aria-label="Фильтр по году"
           >
             {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
+              <option key={y} value={y}>
+                {y}
+              </option>
             ))}
           </select>
           <select
@@ -558,12 +361,14 @@ const CatalogAnalytics = () => {
             aria-label="Фильтр по месяцу"
           >
             {months.map((m, i) => (
-              <option key={m} value={i}>{m}</option>
+              <option key={m} value={i}>
+                {m}
+              </option>
             ))}
           </select>
           <button
             className="catalog-analytics__refresh"
-            onClick={() => setYear((y) => y)} // триггер для перерасчёта (без запроса)
+            onClick={() => setYear((y) => y)} // мягкий "refresh" для пересчёта
             aria-label="Обновить"
             title="Обновить"
             type="button"
@@ -576,27 +381,37 @@ const CatalogAnalytics = () => {
       {/* KPI */}
       <div className="catalog-analytics__kpis">
         <div className="kpi">
-          <div className="kpi__icon"><Boxes size={18} /></div>
+          <div className="kpi__icon">
+            <Boxes size={18} />
+          </div>
           <div className="kpi__name">Позиции</div>
           <div className="kpi__val">{stockKpis.positions}</div>
         </div>
         <div className="kpi">
-          <div className="kpi__icon"><PackageSearch size={18} /></div>
+          <div className="kpi__icon">
+            <PackageSearch size={18} />
+          </div>
           <div className="kpi__name">Штук на складе</div>
           <div className="kpi__val">{fmt(stockKpis.totalQty)}</div>
         </div>
         <div className="kpi">
-          <div className="kpi__icon"><Wallet size={18} /></div>
+          <div className="kpi__icon">
+            <Wallet size={18} />
+          </div>
           <div className="kpi__name">Оценка запасов</div>
           <div className="kpi__val">{fmt(stockKpis.stockValueRetail)} c</div>
         </div>
         <div className="kpi">
-          <div className="kpi__icon"><Wallet size={18} /></div>
+          <div className="kpi__icon">
+            <Wallet size={18} />
+          </div>
           <div className="kpi__name">Приход (месяц)</div>
           <div className="kpi__val">{fmt(cashTotals.income)} c</div>
         </div>
         <div className="kpi">
-          <div className="kpi__icon"><Wallet size={18} /></div>
+          <div className="kpi__icon">
+            <Wallet size={18} />
+          </div>
           <div className="kpi__name">Расход (месяц)</div>
           <div className="kpi__val">{fmt(cashTotals.expense)} c</div>
         </div>
@@ -604,76 +419,117 @@ const CatalogAnalytics = () => {
 
       {/* сетка карточек */}
       <div className="catalog-analytics__grid">
-        {renderCard({
-          icon: <Users2 size={16} />,
-          title: "Поставщики",
-          columns: [
+        <CatalogAnalyticsCard
+          icon={<Users2 size={16} />}
+          title="Поставщики"
+          columns={[
             { key: "name", title: "Поставщик", className: "ca-ellipsis" },
             { key: "items", title: "Позиции" },
-            { key: "amount", title: "Сумма", className: "ca-money", render: (r) => `${fmt(r.amount)} c` },
-          ],
-          rows: suppliersRows,
-        })}
+            {
+              key: "amount",
+              title: "Сумма",
+              className: "ca-money",
+              render: (r) => `${fmt(r.amount)} c`,
+            },
+          ]}
+          rows={suppliersRows}
+          onMore={openModal}
+        />
 
-        {renderCard({
-          icon: <Trophy size={16} />,
-          title: "Бренды",
-          columns: [
+        <CatalogAnalyticsCard
+          icon={<Trophy size={16} />}
+          title="Бренды"
+          columns={[
             { key: "name", title: "Бренд", className: "ca-ellipsis" },
             { key: "qty", title: "Штук" },
-            { key: "value", title: "Стоимость", className: "ca-money", render: (r) => `${fmt(r.value)} c` },
-          ],
-          rows: brandsRows,
-        })}
+            {
+              key: "value",
+              title: "Стоимость",
+              className: "ca-money",
+              render: (r) => `${fmt(r.value)} c`,
+            },
+          ]}
+          rows={brandsRows}
+          onMore={openModal}
+        />
 
-        {renderCard({
-          icon: <PackageSearch size={16} />,
-          title: "Категории",
-          columns: [
+        <CatalogAnalyticsCard
+          icon={<PackageSearch size={16} />}
+          title="Категории"
+          columns={[
             { key: "name", title: "Категория", className: "ca-ellipsis" },
             { key: "qty", title: "Штук" },
-            { key: "value", title: "Стоимость", className: "ca-money", render: (r) => `${fmt(r.value)} c` },
-          ],
-          rows: categoriesRows,
-        })}
+            {
+              key: "value",
+              title: "Стоимость",
+              className: "ca-money",
+              render: (r) => `${fmt(r.value)} c`,
+            },
+          ]}
+          rows={categoriesRows}
+          onMore={openModal}
+        />
 
-        {renderCard({
-          icon: <Wallet size={16} />,
-          title: "Кассы",
-          columns: [
+        <CatalogAnalyticsCard
+          icon={<Wallet size={16} />}
+          title="Кассы"
+          columns={[
             { key: "name", title: "Касса", className: "ca-ellipsis" },
             { key: "ops", title: "Операции" },
-            { key: "income", title: "Приход", className: "ca-money", render: (r) => `${fmt(r.income)} c` },
-            { key: "expense", title: "Расход", className: "ca-money", render: (r) => `${fmt(r.expense)} c` },
-          ],
-          rows: loadingCash ? [] : cashRows,
-        })}
+            {
+              key: "income",
+              title: "Приход",
+              className: "ca-money",
+              render: (r) => `${fmt(r.income)} c`,
+            },
+            {
+              key: "expense",
+              title: "Расход",
+              className: "ca-money",
+              render: (r) => `${fmt(r.expense)} c`,
+            },
+          ]}
+          rows={loadingCash ? [] : cashRows}
+          onMore={openModal}
+        />
 
-        {renderCard({
-          icon: <PackageSearch size={16} />,
-          title: "Товары",
-          columns: [
+        <CatalogAnalyticsCard
+          icon={<PackageSearch size={16} />}
+          title="Товары"
+          columns={[
             { key: "name", title: "Товар", className: "ca-ellipsis" },
             { key: "qty", title: "Кол-во" },
-            { key: "revenue", title: "Выручка", className: "ca-money", render: (r) => `${fmt(r.revenue)} c` },
-          ],
-          rows: loadingProducts ? [] : productsRowsAgg,
-        })}
+            {
+              key: "revenue",
+              title: "Выручка",
+              className: "ca-money",
+              render: (r) => `${fmt(r.revenue)} c`,
+            },
+          ]}
+          rows={loadingProducts ? [] : productsRowsAgg}
+          onMore={openModal}
+        />
 
-        {renderCard({
-          icon: <Users2 size={16} />,
-          title: "Клиенты",
-          columns: [
+        <CatalogAnalyticsCard
+          icon={<Users2 size={16} />}
+          title="Клиенты"
+          columns={[
             { key: "name", title: "Клиент", className: "ca-ellipsis" },
             { key: "orders", title: "Заказы" },
-            { key: "revenue", title: "Выручка", className: "ca-money", render: (r) => `${fmt(r.revenue)} c` },
-          ],
-          rows: clientsRows,
-        })}
+            {
+              key: "revenue",
+              title: "Выручка",
+              className: "ca-money",
+              render: (r) => `${fmt(r.revenue)} c`,
+            },
+          ]}
+          rows={clientsRows}
+          onMore={openModal}
+        />
       </div>
 
       {modal.open && (
-        <DetailsModal
+        <CatalogAnalyticsDetailsModal
           title={modal.title}
           columns={modal.columns}
           rows={modal.rows}

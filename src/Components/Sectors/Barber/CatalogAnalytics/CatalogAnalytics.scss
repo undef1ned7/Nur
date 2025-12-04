@@ -1,12 +1,5 @@
-:root{
-  --ca-bg:#ffffff;
-  --ca-text:#111111;
-  --ca-muted:#6b7280;
-  --ca-border:#e5e7eb;
-  --ca-accent:#111827;
-  --ca-accent-2:#f3f4f6;
-  --ca-danger:#ef4444;
-}
+/* CatalogAnalytics.scss */
+@import "../styles/barbershop.scss";
 
 .catalog-analytics{
   display:grid; gap:16px; color:var(--ca-text);

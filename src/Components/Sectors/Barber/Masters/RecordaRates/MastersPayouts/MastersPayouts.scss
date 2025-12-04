@@ -1,0 +1,41 @@
+/* MastersPayouts.scss */
+:root {
+  --mp-bg: #f9fafb;
+  --mp-surface: #ffffff;
+  --mp-border: #e5e7eb;
+  --mp-text: #0f172a;
+  --mp-muted: #6b7280;
+}
+
+.masterspayouts {
+  background: var(--mp-surface);
+  border-radius: 16px;
+  border: 1px solid var(--mp-border);
+  padding: 16px;
+  color: var(--mp-text);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 220px);
+  overflow: hidden;
+
+  &__inner {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  &__error {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    font-size: 13px;
+    color: #b91c1c;
+  }
+
+  &__loading {
+    font-size: 13px;
+    color: var(--mp-muted);
+  }
+}

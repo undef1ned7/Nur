@@ -1,125 +1,33 @@
-// src/components/Education/History.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import "./History.scss";
 import api from "../../../../api";
 import { useSelector } from "react-redux";
+import { FaCalendarAlt } from "react-icons/fa";
 
-/* ===== utils ===== */
-const pad = (n) => String(n).padStart(2, "0");
-const asArray = (d) =>
-  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
-const norm = (s) =>
-  String(s || "")
-    .trim()
-    .toLowerCase();
+import {
+  PAGE_SIZE,
+  asArray,
+  norm,
+  dateISO,
+  timeISO,
+  fmtMoney,
+  barberNameOf,
+  serviceNamesFromRecord,
+  clientNameOf,
+  priceOfAppointment,
+  basePriceOfAppointment,
+  discountPercentOfAppointment,
+  parseUserDate,
+  statusLabel,
+} from "./HistoryUtils";
 
-const dateISO = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d)) return "";
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
-const timeISO = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d)) return "";
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-const num = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-const fmtMoney = (v) =>
-  v === null || v === undefined || v === ""
-    ? "—"
-    : `${Number(v).toLocaleString("ru-RU")} сом`;
-
-/* ===== name helpers ===== */
-const fullNameEmp = (e) =>
-  [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim() ||
-  e?.email ||
-  "—";
-
-const barberNameOf = (a, employees) => {
-  if (a?.barber_name) return a.barber_name;
-  if (a?.employee_name) return a.employee_name;
-  if (a?.master_name) return a.master_name;
-  const e = employees.find((x) => String(x.id) === String(a?.barber));
-  return e ? fullNameEmp(e) : "—";
-};
-
-const serviceNamesFromRecord = (r, services) => {
-  if (Array.isArray(r.services_names) && r.services_names.length)
-    return r.services_names.join(", ");
-  if (Array.isArray(r.services) && r.services.length) {
-    const m = new Map(services.map((s) => [String(s.id), s]));
-    const names = r.services.map(
-      (id) => m.get(String(id))?.service_name || m.get(String(id))?.name || id
-    );
-    return names.join(", ");
-  }
-  return r.service_name || "—";
-};
-
-const clientNameOf = (r, clients) => {
-  if (r.client_name) return r.client_name;
-  const c = clients.find((x) => String(x.id) === String(r.client));
-  return c?.full_name || c?.name || "—";
-};
-const clientPhoneOf = (r, clients) => {
-  if (r.client_phone) return r.client_phone;
-  const c = clients.find((x) => String(x.id) === String(r.client));
-  return c?.phone || c?.phone_number || "";
-};
-
-/* ===== price resolver ===== */
-const priceOfAppointment = (a, services) => {
-  // 1) любые числовые поля, которые часто встречаются в API
-  const candidates = [
-    a.total,
-    a.total_price,
-    a.total_amount,
-    a.final_total,
-    a.payable_total,
-    a.grand_total,
-    a.sum,
-    a.amount,
-    a.service_total,
-    a.services_total,
-    a.service_price,
-    a.price,
-    a.discounted_total,
-    a.price_total,
-  ];
-  for (const c of candidates) {
-    const n = num(c);
-    if (n !== null) return n;
-  }
-
-  // 2) детальные услуги с ценой
-  if (Array.isArray(a.services_details) && a.services_details.length) {
-    const s = a.services_details.reduce(
-      (acc, it) => acc + (num(it?.price) || 0),
-      0
-    );
-    if (s > 0) return s;
-  }
-
-  // 3) список id услуг → суммируем цены из справочника услуг
-  if (Array.isArray(a.services) && a.services.length) {
-    const m = new Map(services.map((s) => [String(s.id), s]));
-    const s = a.services.reduce(
-      (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
-      0
-    );
-    if (s > 0) return s;
-  }
-
-  return null; // не нашли
-};
-
-/* ===== main ===== */
-const PAGE_SIZE = 12;
+import HistoryPager from "./HistoryPager";
 
 const History = () => {
   const { isAuthenticated, currentUser } = useSelector((s) => s.user) || {};
@@ -137,11 +45,20 @@ const History = () => {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  const [from, setFrom] = useState(""); // YYYY-MM-DD
-  const [to, setTo] = useState(""); // YYYY-MM-DD
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [fromRaw, setFromRaw] = useState("");
+  const [toRaw, setToRaw] = useState("");
+
   const [page, setPage] = useState(1);
 
-  const invalidRange = useMemo(() => from && to && from > to, [from, to]);
+  const fromRef = useRef(null);
+  const toRef = useRef(null);
+
+  const invalidRange = useMemo(
+    () => from && to && from > to,
+    [from, to]
+  );
 
   const fetchEmployees = useCallback(
     async () => asArray((await api.get("/users/employees/")).data),
@@ -238,11 +155,15 @@ const History = () => {
     if (invalidRange) return [];
     let arr = myAppointments;
     if (from) {
-      const t = new Date(`${from}T00:00:00`).getTime();
+      const t = new Date(
+        from.includes("T") ? from : `${from}T00:00:00`
+      ).getTime();
       arr = arr.filter((x) => new Date(x.start_at).getTime() >= t);
     }
     if (to) {
-      const t = new Date(`${to}T23:59:59`).getTime();
+      const t = new Date(
+        to.includes("T") ? to : `${to}T23:59:59`
+      ).getTime();
       arr = arr.filter((x) => new Date(x.start_at).getTime() <= t);
     }
     return arr;
@@ -250,40 +171,37 @@ const History = () => {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const rows = filtered.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
 
   useEffect(() => {
     setPage(1);
   }, [from, to, filtered.length]);
 
-  const statusLabel = (s) =>
-    s === "booked"
-      ? "Забронировано"
-      : s === "confirmed"
-      ? "Подтверждено"
-      : s === "completed"
-      ? "Завершено"
-      : s === "canceled"
-      ? "Отменено"
-      : s === "no_show"
-      ? "Не пришёл"
-      : s || "—";
+  const totalLabel = loading
+    ? "Загрузка…"
+    : `${filtered.length} записей${
+        filtered.length > PAGE_SIZE ? ` · стр. ${safePage}/${totalPages}` : ""
+      }`;
+
+  const handleReset = () => {
+    setFrom("");
+    setTo("");
+    setFromRaw("");
+    setToRaw("");
+  };
+
+  const handlePrevPage = () =>
+    setPage((p) => Math.max(1, p - 1));
+  const handleNextPage = () =>
+    setPage((p) => Math.min(totalPages, p + 1));
 
   return (
     <section className="barberhistory">
       <header className="barberhistory__header">
-        <div className="barberhistory__titleWrap">
-          <h2 className="barberhistory__title">Моя история</h2>
-          <span className="barberhistory__subtitle">
-            {loading
-              ? "Загрузка…"
-              : `${filtered.length} записей${
-                  filtered.length > PAGE_SIZE
-                    ? ` · стр. ${safePage}/${totalPages}`
-                    : ""
-                }`}
-          </span>
-        </div>
+        <span className="barberhistory__subtitle">{totalLabel}</span>
 
         <div className="barberhistory__filters">
           <label
@@ -292,33 +210,68 @@ const History = () => {
             }`}
           >
             <span className="barberhistory__label">От</span>
-            <input
-              type="date"
-              className="barberhistory__input"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-            />
+            <div className="barberhistory__control">
+              <input
+                ref={fromRef}
+                type="text"
+                className="barberhistory__input"
+                placeholder="ДД.ММ.ГГГГ  --:--"
+                value={fromRaw}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFromRaw(val);
+                  const iso = parseUserDate(val);
+                  setFrom(iso || "");
+                }}
+              />
+              <button
+                type="button"
+                className="barberhistory__iconBtn"
+                onClick={() =>
+                  fromRef.current && fromRef.current.focus()
+                }
+              >
+                <FaCalendarAlt />
+              </button>
+            </div>
           </label>
+
           <label
             className={`barberhistory__field ${
               invalidRange ? "barberhistory__field--invalid" : ""
             }`}
           >
             <span className="barberhistory__label">До</span>
-            <input
-              type="date"
-              className="barberhistory__input"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-            />
+            <div className="barberhistory__control">
+              <input
+                ref={toRef}
+                type="text"
+                className="barberhistory__input"
+                placeholder="ДД.ММ.ГГГГ  --:--"
+                value={toRaw}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setToRaw(val);
+                  const iso = parseUserDate(val);
+                  setTo(iso || "");
+                }}
+              />
+              <button
+                type="button"
+                className="barberhistory__iconBtn"
+                onClick={() =>
+                  toRef.current && toRef.current.focus()
+                }
+              >
+                <FaCalendarAlt />
+              </button>
+            </div>
           </label>
+
           <button
             type="button"
             className="barberhistory__btn barberhistory__btn--secondary"
-            onClick={() => {
-              setFrom("");
-              setTo("");
-            }}
+            onClick={handleReset}
           >
             Сброс
           </button>
@@ -327,7 +280,9 @@ const History = () => {
 
       {!!err && <div className="barberhistory__alert">{err}</div>}
       {invalidRange && (
-        <div className="barberhistory__alert">Диапазон дат неверен.</div>
+        <div className="barberhistory__alert">
+          Диапазон дат неверен.
+        </div>
       )}
       {!isAuthenticated && (
         <div className="barberhistory__alert">
@@ -345,11 +300,29 @@ const History = () => {
             const date = dateISO(a.start_at);
             const time = timeISO(a.start_at);
             const client = clientNameOf(a, clients);
-            const phone = clientPhoneOf(a, clients);
             const service = serviceNamesFromRecord(a, services);
-            const price = priceOfAppointment(a, services);
-            const status = a.status_display || statusLabel(a.status);
+
+            const totalPrice = priceOfAppointment(a, services);
+            const basePrice = basePriceOfAppointment(a, services);
+            const discountPct = discountPercentOfAppointment(
+              a,
+              basePrice,
+              totalPrice
+            );
+
+            const statusKey = String(a.status || "").toLowerCase();
+            const statusText = a.status_display || statusLabel(a.status);
+
+            const statusClass =
+              statusKey === "completed"
+                ? "barberhistory__status barberhistory__status--completed"
+                : statusKey === "canceled"
+                ? "barberhistory__status barberhistory__status--canceled"
+                : "barberhistory__status";
+
             const barber = barberNameOf(a, employees);
+            const discountLabel =
+              discountPct !== null ? `${discountPct}%` : "0%";
 
             return (
               <article
@@ -360,15 +333,36 @@ const History = () => {
                   <h4 className="barberhistory__name">
                     {date} • {time}
                   </h4>
-                  <span className="barberhistory__status">{status}</span>
+                  <span className={statusClass}>{statusText}</span>
                 </div>
 
                 <div className="barberhistory__meta">
-                  <span className="bh-item">Сотрудник: {barber}</span>
-                  <span className="bh-item">Клиент: {client}</span>
-                  {phone ? <span className="bh-item">{phone}</span> : null}
-                  <span className="bh-item">Услуга: {service}</span>
-                  <span className="bh-item">Цена: {fmtMoney(price)}</span>
+                  <div className="barberhistory__metaRow">
+                    <span className="bh-item">
+                      Сотрудник: {barber}
+                    </span>
+                    <span className="bh-item">
+                      Клиент: {client}
+                    </span>
+                  </div>
+
+                  <div className="barberhistory__metaRow">
+                    <span className="bh-item">
+                      Услуга: {service}
+                    </span>
+                  </div>
+
+                  <div className="barberhistory__metaRow barberhistory__metaRow--summary">
+                    <span className="bh-item">
+                      Цена без скидки: {fmtMoney(basePrice)}
+                    </span>
+                    <span className="bh-item">
+                      Скидка: {discountLabel}
+                    </span>
+                    <span className="bh-item bh-item--bold">
+                      Итого: {fmtMoney(totalPrice)}
+                    </span>
+                  </div>
                 </div>
               </article>
             );
@@ -376,27 +370,13 @@ const History = () => {
         )}
       </div>
 
-      {filtered.length > PAGE_SIZE && (
-        <nav className="barberhistory__pager" aria-label="Пагинация">
-          <button
-            className="barberhistory__pageBtn"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={safePage === 1}
-          >
-            Назад
-          </button>
-          <span className="barberhistory__pageInfo">
-            Стр. {safePage}/{totalPages}
-          </span>
-          <button
-            className="barberhistory__pageBtn"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={safePage === totalPages}
-          >
-            Далее
-          </button>
-        </nav>
-      )}
+      <HistoryPager
+        filteredCount={filtered.length}
+        safePage={safePage}
+        totalPages={totalPages}
+        onPrev={handlePrevPage}
+        onNext={handleNextPage}
+      />
     </section>
   );
 };

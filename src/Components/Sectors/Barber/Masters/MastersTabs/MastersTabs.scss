@@ -1,0 +1,139 @@
+/* src/Components/Sectors/Barber/Masters/MastersTabs.scss */
+@import "../../styles/barbershop.scss";
+
+.masters-tabs {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 100%;
+  overflow-x: hidden;
+
+  /* верхняя полоса с табами */
+  &__tabbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-top: 8px;
+    max-width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  &__tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 14px 14px 0 0;
+    background: transparent;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+    margin-bottom: -1px; /* активная перекрывает бордер */
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+    white-space: nowrap; /* чтобы текст не ломался внутри */
+
+    &-icon {
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    &-label {
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    &:hover {
+      background: rgba(15, 23, 42, 0.03);
+    }
+
+    &--active {
+      background: var(--primary);
+      color: #111827;
+    }
+  }
+
+  &__content {
+    margin-top: 16px;
+  }
+
+  &__placeholder {
+    padding: 40px 16px;
+    text-align: center;
+  }
+
+  &__placeholder-text {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* ===== адаптив ===== */
+
+  @media (max-width: 900px) {
+    &__tabbar {
+      gap: 16px;
+    }
+
+    &__tab {
+      padding: 8px 18px;
+      font-size: 14px;
+
+      &-icon {
+        font-size: 16px;
+      }
+    }
+  }
+
+  @media (max-width: 600px) {
+    &__tabbar {
+      gap: 12px;
+      padding-top: 4px;
+    }
+
+    &__tab {
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+  }
+
+  /* до 480 сохраняем в одну линию, ужимаем */
+  @media (max-width: 480px) {
+    &__tabbar {
+      gap: 10px;
+    }
+
+    &__tab {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+  }
+
+  /* 320px: одна линия + горизонтальный скролл */
+  @media (max-width: 360px) {
+    &__tabbar {
+      gap: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+    }
+
+    &__tab {
+      padding: 8px 10px;
+      font-size: 13px;
+      /* фиксим минимальную ширину, чтобы было удобно тапать */
+      min-width: 120px;
+    }
+  }
+}

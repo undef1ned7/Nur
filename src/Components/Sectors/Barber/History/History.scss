@@ -1,116 +1,395 @@
-/* src/components/Education/History.scss */
-:root{
-  --bh-primary:#f7d74f;
-  --bh-text:#0f172a;
-  --bh-muted:#6b7280;
-  --bh-border:#e5e7eb;
-  --bh-surface:#ffffff;
+/* History.scss */
+@import "../styles/barbershop.scss";
 
-  --bh-danger:#e74c3c;
-  --bh-danger-bg:rgba(231,76,60,.12);
-  --bh-danger-br:rgba(231,76,60,.35);
-}
+.barberhistory {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  display: grid;
+  gap: 16px;
+  padding: 16px 0;
+  color: var(--bh-text);
+  overflow-x: hidden;
 
-.barberhistory, .barberhistory *{ box-sizing:border-box; }
+  * {
+    box-sizing: inherit;
+  }
 
-.barberhistory{
-  background:var(--bh-surface);
-  border-radius:14px;
-  box-shadow:0 4px 16px rgba(0,0,0,.05);
-  padding:20px;
-  display:grid;
-  gap:14px;
-  color:var(--bh-text);
-}
+  /* ===== header: количество + фильтры ===== */
+  &__header {
+    display: grid;
+    grid-template-rows: auto auto;
+    row-gap: 8px;
+  }
 
-/* header */
-.barberhistory__header{
-  display:grid;
-  grid-template-columns:1fr auto;
-  gap:12px;
-  align-items:end;
-}
-.barberhistory__titleWrap{ display:grid; gap:4px; }
-.barberhistory__title{ margin:0; font-size:20px; font-weight:900; color:var(--bh-text); }
-.barberhistory__subtitle{ color:var(--bh-muted); font-size:13px; }
+  &__subtitle {
+    font-size: 14px;
+    color: var(--bh-muted);
+  }
 
-/* filters */
-.barberhistory__filters{ display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
-.barberhistory__field{ display:grid; gap:6px; }
-.barberhistory__label{ font-size:13px; color:var(--bh-muted); font-weight:700; }
-.barberhistory__input{
-  height:40px; min-width:160px;
-  border:1px solid var(--bh-border); border-radius:12px;
-  background:#fff; color:var(--bh-text);
-  padding:0 12px; font-size:14px;
-}
-.barberhistory__input:focus{ outline:none; border-color:var(--bh-primary); }
-.barberhistory__field--invalid .barberhistory__input{ border-color:#dc2626; }
-.barberhistory__btn{
-  display:inline-flex; align-items:center; justify-content:center;
-  height:40px; padding:0 14px; border-radius:12px;
-  border:1px solid var(--bh-border); background:#fff; color:var(--bh-text);
-  font-weight:700; cursor:pointer; transition:.18s;
-}
-.barberhistory__btn:hover{ background:#f9fafb; }
-.barberhistory__btn:active{ transform:translateY(1px); }
+  /* ===== filters ===== */
+  &__filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    column-gap: 10px;
+    row-gap: 8px;
+    align-items: end;
+  }
 
-/* list */
-.barberhistory__list{
-  display:grid; gap:10px;
-  max-height: clamp(360px, 64dvh, 720px);
-  overflow:auto; padding-right:6px;
-}
-.barberhistory__list::-webkit-scrollbar{ width:8px; height:8px; }
-.barberhistory__list::-webkit-scrollbar-thumb{ background:#e2e8f0; border-radius:8px; }
+  &__field {
+    display: grid;
+    gap: 6px;
 
-/* card */
-.barberhistory__card{
-  border:1px solid var(--bh-border);
-  background:#fafafa;
-  border-radius:12px;
-  padding:14px;
-}
-.barberhistory__card:hover{ background:#f1f5f9; }
-.barberhistory__cardHead{
-  display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;
-}
-.barberhistory__name{ margin:0; font-size:16px; font-weight:800; color:var(--bh-text); }
-.barberhistory__status{
-  font-size:12px; color:#111; background:var(--bh-primary);
-  padding:4px 8px; border-radius:999px; font-weight:800;
-}
+    &--invalid {
+      .barberhistory__control {
+        border-color: #dc2626;
+      }
+    }
+  }
 
-.barberhistory__meta{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-.barberhistory__meta .bh-item{ color:var(--bh-muted); font-size:13px; white-space:nowrap; }
-.barberhistory__meta .bh-item + .bh-item::before{ content:"•"; margin:0 6px; color:var(--bh-muted); }
+  &__label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bh-muted);
+  }
 
-/* alerts */
-.barberhistory__alert{
-  padding:10px 12px; border-radius:12px;
-  border:1px solid var(--bh-danger-br); background:var(--bh-danger-bg); color:var(--bh-danger);
-}
+  &__control {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--bh-border);
+    border-radius: 12px;
+    background: #ffffff;
+    padding-left: 14px;
+    height: 42px;
+    width: 100%;
+  }
 
-/* pager */
-.barberhistory__pager{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:6px; }
-.barberhistory__pageBtn{
-  border:1px solid var(--bh-border); background:#fff; color:var(--bh-text);
-  padding:8px 12px; border-radius:10px; cursor:pointer;
-}
-.barberhistory__pageBtn:hover{ background:#f9fafb; }
-.barberhistory__pageBtn:disabled{ opacity:.6; cursor:default; }
-.barberhistory__pageInfo{ color:var(--bh-muted); }
+  &__input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: var(--bh-text);
+    height: 100%;
+    min-width: 0;
 
-/* responsive */
-@media (max-width: 760px){
-  .barberhistory{ padding:16px; }
-  .barberhistory__header{ grid-template-columns:1fr; }
-  .barberhistory__title{ font-size:18px; }
-  .barberhistory__filters{ gap:8px; }
-  .barberhistory__input{ min-width:140px; }
-}
-@media (max-width: 380px){
-  .barberhistory{ padding:14px; }
-  .barberhistory__input{ min-width:0; width:100%; }
-  .barberhistory__filters{ width:100%; }
+    &::placeholder {
+      color: #9ca3af;
+    }
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  &__iconBtn {
+    width: 42px;
+    height: 30px;
+    margin-right: 8px;
+    border-radius: 8px;
+    border: none;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    color: #9ca3af;
+    transition: 0.15s;
+
+    &:hover {
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+  }
+
+  /* кнопка Сброс */
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 12px;
+    border: 1px solid var(--bh-border);
+    background: #ffffff;
+    color: var(--bh-text);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.15s;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &:active {
+      transform: translateY(1px);
+    }
+
+    &--secondary {
+      /* запас на будущее */
+    }
+  }
+
+  /* ===== list ===== */
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  /* ===== карточки ===== */
+  &__card {
+    background: var(--bh-surface);
+    border-radius: 16px;
+    border: 1px solid var(--bh-border);
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.05);
+    padding: 16px 20px;
+    min-width: 0;
+  }
+
+  &__cardHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #64748b;
+    word-break: break-word;
+  }
+
+  /* статус */
+  &__status {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 18px;
+    border-radius: 999px;
+    background: var(--bh-primary);
+    color: #111827;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-align: center;
+
+    &--completed {
+      background: var(--bh-primary);
+      color: #111827;
+    }
+
+    &--canceled {
+      background: var(--bh-status-canceled-bg);
+      color: var(--bh-status-canceled-text);
+    }
+  }
+
+  /* мета-инфа */
+  &__meta {
+    display: grid;
+    row-gap: 4px;
+    font-size: 14px;
+    color: var(--bh-muted);
+  }
+
+  &__metaRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+
+    &--summary {
+      font-weight: 500;
+    }
+  }
+
+  .bh-item {
+    white-space: nowrap;
+
+    &--bold {
+      font-weight: 700;
+      color: var(--bh-text);
+    }
+  }
+
+  &__metaRow {
+    .bh-item + .bh-item::before {
+      content: "•";
+      margin: 0 4px 0 0;
+      color: var(--bh-muted);
+    }
+  }
+
+  /* ===== алерты ===== */
+  &__alert {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--bh-danger-br);
+    background: var(--bh-danger-bg);
+    color: var(--bh-danger);
+    font-size: 13px;
+  }
+
+  /* ===== пагинация ===== */
+  &__pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  &__pageBtn {
+    border: 1px solid var(--bh-border);
+    background: #ffffff;
+    color: var(--bh-text);
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  &__pageInfo {
+    font-size: 13px;
+    color: var(--bh-muted);
+  }
+
+  /* ===== адаптив ===== */
+
+  /* планшеты и ниже */
+  @media (max-width: 800px) {
+    & {
+      padding: 12px 0;
+    }
+
+    &__filters {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    &__btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  /* телефоны ~600 и ниже */
+  @media (max-width: 600px) {
+    &__card {
+      padding: 14px 12px;
+    }
+
+    &__cardHead {
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    &__status {
+      padding: 4px 12px;
+      font-size: 12px;
+      max-width: 100%;
+      white-space: normal;
+    }
+
+    &__name {
+      font-size: 13px;
+    }
+
+    &__meta {
+      font-size: 13px;
+    }
+
+    /* чтобы текст не растягивал строку */
+    &__metaRow {
+      .bh-item {
+        white-space: normal;
+      }
+
+      .bh-item + .bh-item::before {
+        display: none;
+      }
+    }
+  }
+
+  /* маленькие телефоны ~480 и ниже */
+  @media (max-width: 480px) {
+    &__cardHead {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    &__filters {
+      row-gap: 6px;
+    }
+
+    &__input {
+      font-size: 13px;
+    }
+
+    &__pageBtn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    &__pageInfo {
+      font-size: 12px;
+    }
+  }
+
+  /* очень маленькие экраны 320–360px */
+  @media (max-width: 360px) {
+    & {
+      padding-top: 8px;
+      padding-bottom: 8px;
+      gap: 12px;
+    }
+
+    &__card {
+      padding: 12px 10px;
+      border-radius: 12px;
+    }
+
+    &__subtitle {
+      font-size: 13px;
+    }
+
+    &__label {
+      font-size: 12px;
+    }
+
+    &__input {
+      font-size: 12px;
+    }
+
+    &__name {
+      font-size: 12px;
+    }
+
+    &__meta {
+      font-size: 12px;
+    }
+
+    &__alert {
+      font-size: 12px;
+      padding: 8px 10px;
+    }
+
+    &__status {
+      font-size: 11px;
+      padding: 3px 10px;
+    }
+  }
 }

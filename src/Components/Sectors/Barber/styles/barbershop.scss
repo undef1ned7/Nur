@@ -1,0 +1,75 @@
+/* ===== ГЛОБАЛЬНЫЙ ROOT ДЛЯ ВСЕХ БАРБЕР-БЛОКОВ ===== */
+:root {
+/* базовая палитра (уже есть, просто напоминание) */
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+
+  /* RecordaRates (recordarates) */
+  --rr-primary: var(--primary);
+  --rr-primary-dark: var(--primary-dark);
+  --rr-text: var(--text);
+  --rr-muted: var(--muted);
+  --rr-border: var(--border);
+  --rr-surface: var(--surface);
+  --rr-danger-bg: #fee2e2;
+  --rr-danger-border: #fecaca;
+  --rr-danger-text: #7f1d1d;
+
+  /* PayrollDaily (payrolldaily) — тёмная тема отдельно */
+  --pd-bg: #0b0c0f;
+  --pd-card: #12141a;
+  --pd-text: #e6e8ee;
+  --pd-muted: #9aa3b2;
+  --pd-border: #232633;
+  --pd-accent: #4f46e5;
+  --pd-accent-2: #0ea5e9;
+  --pd-danger: #ef4444;
+  --pd-success: #16a34a;
+
+  /* MastersPayouts (masterspayouts) */
+  --mp-bg: #f9fafb;
+  --mp-surface: #ffffff;
+  --mp-border: #e5e7eb;
+  --mp-text: #0f172a;
+  --mp-muted: #6b7280;
+
+  /* History (barberhistory) */
+  --bh-primary: var(--primary);
+  --bh-primary-dark: var(--primary-dark);
+  --bh-text: var(--text);
+  --bh-muted: var(--muted);
+  --bh-border: var(--border);
+  --bh-surface: var(--surface);
+
+  --bh-danger: #e74c3c;
+  --bh-danger-bg: rgba(231, 76, 60, 0.08);
+  --bh-danger-br: rgba(231, 76, 60, 0.3);
+
+  --bh-status-canceled-bg: #fff4e5;
+  --bh-status-canceled-text: #c05621;
+
+  /* Catalog analytics (catalog-analytics) */
+  --ca-bg: var(--surface);
+  --ca-text: #111111;
+  --ca-muted: var(--muted);
+  --ca-border: var(--border);
+  --ca-accent: #111827;
+  --ca-accent-2: #f3f4f6;
+  --ca-danger: #ef4444;
+
+  /* Barber analitika (barber-analitika + ba-*) */
+  --ba-text: var(--text);
+  --ba-muted: var(--muted);
+  --ba-border: var(--border);
+  --ba-surface: var(--surface);
+  --ba-surface-2: #f8fafc;
+  --ba-primary: var(--primary);
+  --ba-success: #16a34a;
+  --ba-danger: #ef4444;
+  --ba-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  --ba-radius: 18px;
+}
