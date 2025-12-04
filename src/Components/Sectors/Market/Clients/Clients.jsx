@@ -947,7 +947,7 @@ export default function MarketClients() {
 
   // ───────────────────────── остальные вкладки
   return (
-    <section className="clients">
+    <section className="clients overflow-scroll">
       <nav className="tabs" aria-label="Секции">
         {TABS.map((t) => (
           <button
@@ -1009,49 +1009,51 @@ export default function MarketClients() {
           ))}
         </div>
       ) : (
-        <div className="tableContainer w-full">
-          <div className="table w-full">
-            <div className="thead">
-              <span>ФИО</span>
-              <span>Телефон</span>
-              <span>Тип</span>
-              <span>Дата</span>
-              <span></span>
-            </div>
-            <div className="tbody">
-              {filtered.map((c) => (
-                <div
-                  className="row"
-                  key={c.id}
-                  onClick={() => openCard(c)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === "Enter" && openCard(c)}
-                >
-                  <span
-                    className="ellipsis"
-                    title={c.full_name || c.fio || "—"}
+        <div className="overflow-auto">
+          <div className="tableContainer w-[1150px]">
+            <div className="table w-full">
+              <div className="thead">
+                <span>ФИО</span>
+                <span>Телефон</span>
+                <span>Тип</span>
+                <span>Дата</span>
+                <span></span>
+              </div>
+              <div className="tbody ">
+                {filtered.map((c) => (
+                  <div
+                    className="row"
+                    key={c.id}
+                    onClick={() => openCard(c)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === "Enter" && openCard(c)}
                   >
-                    {c.full_name || c.fio || "—"}
-                  </span>
-                  <span>{c.phone || "—"}</span>
-                  <span>{ctxTypeLabel(c.type)}</span>
-                  <span>{c.date || "—"}</span>
-                  <span className="linkCell">
-                    <Link
-                      to={`${CARD_BASE}${c.id}`} // абсолютный путь
-                      state={c}
-                      onClick={(e) => e.stopPropagation()}
-                      className="link"
+                    <span
+                      className="ellipsis"
+                      title={c.full_name || c.fio || "—"}
                     >
-                      Открыть
-                    </Link>
-                  </span>
-                </div>
-              ))}
-              {filtered.length === 0 && (
-                <div className="empty">Ничего не найдено</div>
-              )}
+                      {c.full_name || c.fio || "—"}
+                    </span>
+                    <span>{c.phone || "—"}</span>
+                    <span>{ctxTypeLabel(c.type)}</span>
+                    <span>{c.date || "—"}</span>
+                    <span className="linkCell">
+                      <Link
+                        to={`${CARD_BASE}${c.id}`} // абсолютный путь
+                        state={c}
+                        onClick={(e) => e.stopPropagation()}
+                        className="link"
+                      >
+                        Открыть
+                      </Link>
+                    </span>
+                  </div>
+                ))}
+                {filtered.length === 0 && (
+                  <div className="empty">Ничего не найдено</div>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -46,12 +46,13 @@ const SkladHeader = ({
       </div>
 
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "20px",
-          flexWrap: "wrap",
-        }}
+      className="flex-col xl:flex-row flex items-center gap-5 flex-wrap "
+        // style={{
+        //   display: "flex",
+        //   alignItems: "center",
+        //   gap: "20px",
+        //   flexWrap: "wrap",
+        // }}
       >
         {isBuildingCompany ? (
           <>
