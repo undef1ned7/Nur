@@ -192,6 +192,22 @@
 /* ============ Таблица ============ */
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  @media (max-width: 768px) {
+    overflow-x: auto;
+  }
+}
+
+// Адаптивность для warehouseP контейнера
+.warehouseP {
+  @media (max-width: 768px) {
+    padding: 12px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 8px;
+  }
 }
 
 .sklad__table {
@@ -273,14 +289,111 @@
     padding: 10px 8px;
   }
 }
+
+// Адаптивные стили для таблиц (как в Sell.jsx)
+@media screen and (max-width: 768px) {
+  .sklad__table {
+    font-size: 12px;
+
+    thead {
+      display: none; // Скрываем заголовки на мобильных
+    }
+
+    tbody {
+      tr {
+        display: block;
+        position: relative;
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        background: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+        text-align: right;
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        &[data-label=""] {
+          // Для ячеек без метки (кнопки)
+          justify-content: flex-start;
+          flex-wrap: wrap;
+          gap: 8px;
+          &::before {
+            display: none;
+          }
+        }
+
+        &::before {
+          content: attr(data-label);
+          font-weight: 600;
+          text-align: left;
+          margin-right: 10px;
+          flex-shrink: 0;
+          color: #6b7280;
+        }
+      }
+    }
+  }
+
+  // Обёртка таблицы
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  // Кнопки в таблице на мобильных
+  .sklad__table button,
+  .add-modal__save,
+  .add-modal__cancel {
+    width: 100%;
+    padding: 8px;
+    font-size: 13px;
+    margin-right: 0 !important;
+    margin-bottom: 5px;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
 @media (max-width: 480px) {
   .sklad__table {
-    min-width: 520px;
-    font-size: 12px;
+    font-size: 11px;
+
+    tbody {
+      tr {
+        padding: 8px;
+        margin-bottom: 12px;
+      }
+
+      td {
+        padding: 6px 0;
+        font-size: 11px;
+
+        &::before {
+          font-size: 10px;
+          margin-right: 8px;
+        }
+      }
+    }
   }
-  .sklad__table th,
-  .sklad__table td {
-    padding: 8px 6px;
+
+  .sklad__table button,
+  .add-modal__save,
+  .add-modal__cancel {
+    padding: 6px;
+    font-size: 12px;
   }
 }
 

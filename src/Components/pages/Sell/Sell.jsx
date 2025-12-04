@@ -402,7 +402,7 @@ const Sell = () => {
                         {/* {item.products
                           .map((product) => product.name)
                           .join(", ")} */}
-                        Чай
+                        {item.first_item_name || "-"}
                       </td>
                       <td data-label="Метод оплаты">
                         {item.payment_method || "-"}
