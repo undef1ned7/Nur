@@ -81,7 +81,7 @@ const ClientModal = ({
 
   return (
     <UniversalModal onClose={onClose} title={"Добавить клиента"}>
-      <form className="start__clientForm" onSubmit={handleSubmit}>
+      <form className="start__clientForm h-[80vh] overflow-y-auto" onSubmit={handleSubmit}>
         <div>
           <label>ФИО</label>
           <input
