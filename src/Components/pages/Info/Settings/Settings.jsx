@@ -1,11 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import "./Settings.scss";
 import Tabs from "../Tabs/Tabs";
-import General from "../pages/General/General";
-import Security from "../pages/Security/Security";
-import Users from "../pages/Users/Users";
-import Funnels from "../pages/Funnels/Funnels";
-import Company from "../pages/Company/Company";
 import {
   getProfile,
   logoutUser,
@@ -25,7 +20,52 @@ const Settings = () => {
 
   const { tariff, errorChange: errors, company, profile } = useUser();
 
-  const [activeTab, setActiveTab] = useState("Общие");
+  // Определяем, является ли сфера "магазин" (market)
+  const isMarketSector = useMemo(() => {
+    if (!company?.sector?.name) return false;
+    const sectorName = company.sector.name.toLowerCase().trim();
+    return (
+      sectorName === "магазин" ||
+      sectorName === "цветочный магазин" ||
+      sectorName.includes("магазин")
+    );
+  }, [company?.sector?.name]);
+
+  // Определяем, является ли пользователь владельцем
+  const isOwner = useMemo(() => {
+    return profile?.role === "owner";
+  }, [profile?.role]);
+
+  // Определяем начальный активный таб в зависимости от доступных табов
+  const initialTab = useMemo(() => {
+    if (isOwner) return "Моя компания";
+    if (isMarketSector) return "Токен для весов";
+    return "Безопасность";
+  }, [isOwner, isMarketSector]);
+
+  const [activeTab, setActiveTab] = useState("Безопасность");
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Устанавливаем начальный таб при первой загрузке данных
+  useEffect(() => {
+    if (company && profile && !isInitialized) {
+      setActiveTab(initialTab);
+      setIsInitialized(true);
+    }
+  }, [company, profile, initialTab, isInitialized]);
+
+  // Обновляем активный таб, если текущий стал недоступен
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    // Если текущий таб недоступен, переключаемся на первый доступный
+    if (activeTab === "Моя компания" && !isOwner) {
+      setActiveTab(isMarketSector ? "Токен для весов" : "Безопасность");
+    } else if (activeTab === "Токен для весов" && !isMarketSector) {
+      setActiveTab(isOwner ? "Моя компания" : "Безопасность");
+    }
+  }, [isMarketSector, isOwner, activeTab, isInitialized]);
+  const [saving, setSaving] = useState(false);
 
   // --- Пароли
   const [formData, setFormData] = useState({
@@ -91,34 +131,78 @@ const Settings = () => {
     );
   }, [formData.new_password, formData.new_password2]);
 
-  const saveCompany = async () => {
-    if (profile?.role === "owner") {
+  // Сохранение данных компании
+  const handleSaveCompany = async (e) => {
+    e.preventDefault();
+    if (profile?.role !== "owner") return;
+
+    setSaving(true);
+    try {
       await dispatch(updateUserCompanyName(companyState)).unwrap();
+      alert("Данные компании успешно сохранены");
+    } catch (err) {
+      console.error("Failed to update company:", err);
+      alert("Ошибка при сохранении данных компании");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const savePassword = async () => {
+  // Сохранение пароля
+  const handleSavePassword = async (e) => {
+    e.preventDefault();
+
     // Если пользователь ничего не вводил — просто пропускаем обновление пароля
     const anyPasswordFilled = Object.values(formData).some(
       (s) => s.trim() !== ""
     );
-    if (!anyPasswordFilled) return;
+    if (!anyPasswordFilled) {
+      alert("Заполните поля для изменения пароля");
+      return;
+    }
 
     if (passwordsMismatch) {
-      throw new Error("Пароли не совпадают");
+      alert("Пароли не совпадают");
+      return;
     }
-    await dispatch(updateUserData(formData)).unwrap();
+
+    setSaving(true);
+    try {
+      await dispatch(updateUserData(formData)).unwrap();
+      alert("Пароль успешно изменен");
+      setFormData({
+        current_password: "",
+        new_password: "",
+        new_password2: "",
+      });
+    } catch (err) {
+      console.error("Failed to update password:", err);
+      alert("Ошибка при изменении пароля");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await savePassword();
-      await saveCompany();
-      alert("Ваши данные успешно изменены");
-    } catch (err) {
-      console.error("Failed to update:", err);
-    }
+  // Сброс формы компании
+  const handleResetCompany = () => {
+    setCompanyState({
+      name: company?.name || "",
+      llc: company?.llc || "",
+      inn: company?.inn || "",
+      okpo: company?.okpo || "",
+      score: company?.score || "",
+      bik: company?.bik || "",
+      address: company?.address || "",
+    });
+  };
+
+  // Сброс формы пароля
+  const handleResetPassword = () => {
+    setFormData({
+      current_password: "",
+      new_password: "",
+      new_password2: "",
+    });
   };
 
   // Создание токена для доступа к весам
@@ -234,20 +318,599 @@ const Settings = () => {
     }
   };
 
-  const renderContent = () => {
+  const renderTabContent = () => {
     switch (activeTab) {
-      case "Общие":
-        return <General />;
+      case "Моя компания":
+        return (
+          <form onSubmit={handleSaveCompany} className="settings__tab-form">
+            {profile?.role === "owner" && (
+              <div className="settings__section">
+                <h2 className="settings__section-title">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M20 7L10 17L5 12"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Основная информация
+                </h2>
+
+                {/* Название компании */}
+                <div className="settings__form-group">
+                  <label className="settings__label" htmlFor="companyName">
+                    Название компании
+                  </label>
+                  <div className="settings__input-wrapper">
+                    <input
+                      id="companyName"
+                      name="name"
+                      type="text"
+                      className="settings__input"
+                      placeholder="Введите название компании"
+                      value={companyState.name}
+                      onChange={handleCompanyChange}
+                    />
+                    <div className="settings__input-icon">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M20 7L10 17L5 12"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Остальные поля компании */}
+                {[
+                  {
+                    id: "llc",
+                    label: "Название ООО",
+                    placeholder: "Введите название ООО",
+                  },
+                  { id: "inn", label: "ИНН", placeholder: "Введите ИНН" },
+                  { id: "okpo", label: "ОКПО", placeholder: "Введите ОКПО" },
+                  {
+                    id: "score",
+                    label: "Расчетный счет",
+                    placeholder: "Введите расчетный счет",
+                  },
+                  { id: "bik", label: "БИК", placeholder: "Введите БИК" },
+                  {
+                    id: "address",
+                    label: "Адрес",
+                    placeholder: "Введите адрес",
+                  },
+                ].map((field) => (
+                  <div
+                    key={field.id}
+                    className="settings__form-group"
+                    style={{ marginTop: "15px" }}
+                  >
+                    <label className="settings__label" htmlFor={field.id}>
+                      {field.label}
+                    </label>
+                    <div className="settings__input-wrapper">
+                      <input
+                        id={field.id}
+                        name={field.id}
+                        type="text"
+                        className="settings__input"
+                        placeholder={field.placeholder}
+                        value={companyState[field.id] ?? ""}
+                        onChange={handleCompanyChange}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Кнопки действий для таба компании */}
+            {profile?.role === "owner" && (
+              <div className="settings__actions">
+                <button
+                  className="settings__btn settings__btn--primary"
+                  type="submit"
+                  disabled={saving}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M20 7L10 17L5 12"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {saving ? "Сохранение..." : "Сохранить изменения"}
+                </button>
+
+                <button
+                  className="settings__btn settings__btn--secondary"
+                  type="button"
+                  onClick={handleResetCompany}
+                  disabled={saving}
+                >
+                  Отменить
+                </button>
+              </div>
+            )}
+          </form>
+        );
       case "Безопасность":
-        return <Security />;
-      case "Пользователи":
-        return <Users />;
-      case "Воронки":
-        return <Funnels />;
-      case "Компания":
-        return <Company />;
+        return (
+          <form onSubmit={handleSavePassword} className="settings__tab-form">
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 15V3M12 15L8 11M12 15L16 11M2 17L2.621 19.485C2.72915 19.9177 2.97882 20.3018 3.33033 20.5763C3.68184 20.8508 4.11501 20.9999 4.561 21H19.439C19.885 20.9999 20.3182 20.8508 20.6697 20.5763C21.0212 20.3018 21.2708 19.9177 21.379 19.485L22 17"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Безопасность
+              </h2>
+
+              {/* Текущий пароль */}
+              <div className="settings__form-group">
+                {!formData.current_password.trim() &&
+                errors?.current_password ? (
+                  <label
+                    style={{ color: "red" }}
+                    className="settings__label"
+                    htmlFor="currentPassword"
+                  >
+                    {errors.current_password[0]}
+                  </label>
+                ) : (
+                  <label className="settings__label" htmlFor="currentPassword">
+                    Текущий пароль
+                  </label>
+                )}
+                <div className="settings__input-wrapper">
+                  <input
+                    id="currentPassword"
+                    name="current_password"
+                    type={showPassword.current ? "text" : "password"}
+                    className="settings__input"
+                    placeholder="Введите текущий пароль"
+                    value={formData.current_password}
+                    onChange={handlePasswordInputChange}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="settings__password-toggle"
+                    onClick={() => togglePasswordVisibility("current")}
+                  >
+                    {showPassword.current ? (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M1 12S5 4 12 4S23 12 23 12"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 5C14.1493 5 16.195 5.77714 17.7781 7.16045C19.3613 8.54375 20.5 10.4816 20.5 12.5C20.5 14.5184 19.3613 16.4562 17.7781 17.8395C16.195 19.2229 14.1493 20 12 20C9.85075 20 7.80504 19.2229 6.22195 17.8395C4.63886 16.4562 3.5 14.5184 3.5 12.5C3.5 10.4816 4.63886 8.54375 6.22195 7.16045C7.80504 5.77714 9.85075 5 12 5Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20C7 20 2 15 2 10C2 5.03 6.58 1 12 1C16.42 1 20.97 5.03 21 10C21 15 18.97 20 12 20C10.06 20 8.24 19.43 6.67 18.43"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 10.3431 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 2V5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 19V22"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Новый пароль */}
+              <div className="settings__form-group">
+                {!formData.new_password.trim() && errors?.new_password ? (
+                  <label
+                    style={{ color: "red" }}
+                    className="settings__label"
+                    htmlFor="newPassword"
+                  >
+                    {errors.new_password[0]}
+                  </label>
+                ) : (
+                  <label className="settings__label" htmlFor="newPassword">
+                    Новый пароль
+                  </label>
+                )}
+                <div className="settings__input-wrapper">
+                  <input
+                    id="newPassword"
+                    name="new_password"
+                    type={showPassword.new ? "text" : "password"}
+                    className="settings__input"
+                    placeholder="Введите новый пароль"
+                    value={formData.new_password}
+                    onChange={handlePasswordInputChange}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="settings__password-toggle"
+                    onClick={() => togglePasswordVisibility("new")}
+                  >
+                    {showPassword.new ? (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M1 12S5 4 12 4S23 12 23 12"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 5C14.1493 5 16.195 5.77714 17.7781 7.16045C19.3613 8.54375 20.5 10.4816 20.5 12.5C20.5 14.5184 19.3613 16.4562 17.7781 17.8395C16.195 19.2229 14.1493 20 12 20C9.85075 20 7.80504 19.2229 6.22195 17.8395C4.63886 16.4562 3.5 14.5184 3.5 12.5C3.5 10.4816 4.63886 8.54375 6.22195 7.16045C7.80504 5.77714 9.85075 5 12 5Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20C7 20 2 15 2 10C2 5.03 6.58 1 12 1C16.42 1 20.97 5.03 21 10C21 15 18.97 20 12 20C10.06 20 8.24 19.43 6.67 18.43"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 10.3431 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 2V5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 19V22"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                <div className="settings__password-strength">
+                  <div className="settings__strength-bar">
+                    <div
+                      className={`settings__strength-fill ${
+                        formData.new_password.length > 8
+                          ? "strong"
+                          : formData.new_password.length > 5
+                          ? "medium"
+                          : "weak"
+                      }`}
+                    />
+                  </div>
+                  <span className="settings__strength-text">
+                    {formData.new_password.length === 0
+                      ? "Введите пароль"
+                      : formData.new_password.length < 6
+                      ? "Слабый"
+                      : formData.new_password.length < 9
+                      ? "Средний"
+                      : "Сильный"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Повтор пароля */}
+              <div className="settings__form-group">
+                {!formData.new_password2.trim() && errors?.new_password2 ? (
+                  <label
+                    style={{ color: "red" }}
+                    className="settings__label"
+                    htmlFor="repeatPassword"
+                  >
+                    {errors.new_password2[0]}
+                  </label>
+                ) : (
+                  <label className="settings__label" htmlFor="repeatPassword">
+                    Повторите новый пароль
+                  </label>
+                )}
+                <div className="settings__input-wrapper">
+                  <input
+                    id="repeatPassword"
+                    name="new_password2"
+                    type={showPassword.repeat ? "text" : "password"}
+                    className={`settings__input ${
+                      passwordsMismatch ? "error" : ""
+                    }`}
+                    placeholder="Повторите новый пароль"
+                    value={formData.new_password2}
+                    onChange={handlePasswordInputChange}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="settings__password-toggle"
+                    onClick={() => togglePasswordVisibility("repeat")}
+                  >
+                    {showPassword.repeat ? (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M1 12S5 4 12 4S23 12 23 12"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 5C14.1493 5 16.195 5.77714 17.7781 7.16045C19.3613 8.54375 20.5 10.4816 20.5 12.5C20.5 14.5184 19.3613 16.4562 17.7781 17.8395C16.195 19.2229 14.1493 20 12 20C9.85075 20 7.80504 19.2229 6.22195 17.8395C4.63886 16.4562 3.5 14.5184 3.5 12.5C3.5 10.4816 4.63886 8.54375 6.22195 7.16045C7.80504 5.77714 9.85075 5 12 5Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M17.94 17.94A10.07 10.07 0 0 1 12 20C7 20 2 15 2 10C2 5.03 6.58 1 12 1C16.42 1 20.97 5.03 21 10C21 15 18.97 20 12 20C10.06 20 8.24 19.43 6.67 18.43"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 10.3431 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 2V5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 19V22"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {passwordsMismatch && (
+                  <p className="settings__error-text">Пароли не совпадают</p>
+                )}
+              </div>
+            </div>
+
+            {/* Кнопки действий для таба безопасности */}
+            <div className="settings__actions">
+              <button
+                className="settings__btn settings__btn--primary"
+                type="submit"
+                disabled={passwordsMismatch || saving}
+                title={passwordsMismatch ? "Пароли не совпадают" : undefined}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M20 7L10 17L5 12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {saving ? "Сохранение..." : "Сохранить изменения"}
+              </button>
+
+              <button
+                className="settings__btn settings__btn--secondary"
+                type="button"
+                onClick={handleResetPassword}
+                disabled={saving}
+              >
+                Отменить
+              </button>
+            </div>
+          </form>
+        );
+      case "Токен для весов":
+        return (
+          <div className="settings__tab-content">
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 2V6M12 18V22M6 12H2M22 12H18M19.07 19.07L16.24 16.24M19.07 4.93L16.24 7.76M4.93 19.07L7.76 16.24M4.93 4.93L7.76 7.76"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Токен для доступа к весам
+              </h2>
+
+              <div className="settings__form-group">
+                <p
+                  className="settings__label"
+                  style={{
+                    fontSize: "14px",
+                    color: "#666",
+                    marginBottom: "20px",
+                    fontWeight: "normal",
+                    lineHeight: "1.6",
+                  }}
+                >
+                  Создайте токен для интеграции с весами. Токен будет показан
+                  один раз - сохраните его в безопасном месте.
+                </p>
+                <button
+                  type="button"
+                  className="settings__btn settings__btn--primary"
+                  onClick={handleCreateScalesToken}
+                  style={{
+                    width: "auto",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 2V6M12 18V22M6 12H2M22 12H18M19.07 19.07L16.24 16.24M19.07 4.93L16.24 7.76M4.93 19.07L7.76 16.24M4.93 4.93L7.76 7.76"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Создать токен
+                </button>
+              </div>
+            </div>
+          </div>
+        );
       default:
-        return <General />;
+        return null;
     }
   };
 
@@ -286,540 +949,16 @@ const Settings = () => {
         </div>
       </div>
 
-      <form className="settings__content" onSubmit={handleSubmit}>
-        {profile?.role === "owner" && (
-          <div className="settings__section">
-            <h2 className="settings__section-title">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M20 7L10 17L5 12"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Основная информация
-            </h2>
+      {/* Табы */}
+      <Tabs
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        company={company}
+        profile={profile}
+      />
 
-            {/* Название компании */}
-            <div className="settings__form-group">
-              <label className="settings__label" htmlFor="companyName">
-                Название компании
-              </label>
-              <div className="settings__input-wrapper">
-                <input
-                  id="companyName"
-                  name="name"
-                  type="text"
-                  className="settings__input"
-                  placeholder="Введите название компании"
-                  value={companyState.name}
-                  onChange={handleCompanyChange}
-                />
-                <div className="settings__input-icon">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M20 7L10 17L5 12"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Остальные поля компании */}
-            {[
-              {
-                id: "llc",
-                label: "Название ООО",
-                placeholder: "Введите название ООО",
-              },
-              { id: "inn", label: "ИНН", placeholder: "Введите ИНН" },
-              { id: "okpo", label: "ОКПО", placeholder: "Введите ОКПО" },
-              {
-                id: "score",
-                label: "Расчетный счет",
-                placeholder: "Введите расчетный счет",
-              },
-              { id: "bik", label: "БИК", placeholder: "Введите БИК" },
-              { id: "address", label: "Адрес", placeholder: "Введите адрес" },
-            ].map((field) => (
-              <div
-                key={field.id}
-                className="settings__form-group"
-                style={{ marginTop: "15px" }}
-              >
-                <label className="settings__label" htmlFor={field.id}>
-                  {field.label}
-                </label>
-                <div className="settings__input-wrapper">
-                  <input
-                    id={field.id}
-                    name={field.id}
-                    type="text"
-                    className="settings__input"
-                    placeholder={field.placeholder}
-                    value={companyState[field.id] ?? ""}
-                    onChange={handleCompanyChange}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Безопасность */}
-        <div className="settings__section">
-          <h2 className="settings__section-title">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M12 15V3M12 15L8 11M12 15L16 11M2 17L2.621 19.485C2.72915 19.9177 2.97882 20.3018 3.33033 20.5763C3.68184 20.8508 4.11501 20.9999 4.561 21H19.439C19.885 20.9999 20.3182 20.8508 20.6697 20.5763C21.0212 20.3018 21.2708 19.9177 21.379 19.485L22 17"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Безопасность
-          </h2>
-
-          {/* Текущий пароль */}
-          <div className="settings__form-group">
-            {!formData.current_password.trim() && errors?.current_password ? (
-              <label
-                style={{ color: "red" }}
-                className="settings__label"
-                htmlFor="currentPassword"
-              >
-                {errors.current_password[0]}
-              </label>
-            ) : (
-              <label className="settings__label" htmlFor="currentPassword">
-                Текущий пароль
-              </label>
-            )}
-            <div className="settings__input-wrapper">
-              <input
-                id="currentPassword"
-                name="current_password"
-                type={showPassword.current ? "text" : "password"}
-                className="settings__input"
-                placeholder="Введите текущий пароль"
-                value={formData.current_password}
-                onChange={handlePasswordInputChange}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                className="settings__password-toggle"
-                onClick={() => togglePasswordVisibility("current")}
-              >
-                {showPassword.current ? (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M1 12S5 4 12 4S23 12 23 12"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 5C14.1493 5 16.195 5.77714 17.7781 7.16045C19.3613 8.54375 20.5 10.4816 20.5 12.5C20.5 14.5184 19.3613 16.4562 17.7781 17.8395C16.195 19.2229 14.1493 20 12 20C9.85075 20 7.80504 19.2229 6.22195 17.8395C4.63886 16.4562 3.5 14.5184 3.5 12.5C3.5 10.4816 4.63886 8.54375 6.22195 7.16045C7.80504 5.77714 9.85075 5 12 5Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M17.94 17.94A10.07 10.07 0 0 1 12 20C7 20 2 15 2 10C2 5.03 6.58 1 12 1C16.42 1 20.97 5.03 21 10C21 15 18.97 20 12 20C10.06 20 8.24 19.43 6.67 18.43"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 10.3431 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 2V5"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 19V22"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Новый пароль */}
-          <div className="settings__form-group">
-            {!formData.new_password.trim() && errors?.new_password ? (
-              <label
-                style={{ color: "red" }}
-                className="settings__label"
-                htmlFor="newPassword"
-              >
-                {errors.new_password[0]}
-              </label>
-            ) : (
-              <label className="settings__label" htmlFor="newPassword">
-                Новый пароль
-              </label>
-            )}
-            <div className="settings__input-wrapper">
-              <input
-                id="newPassword"
-                name="new_password"
-                type={showPassword.new ? "text" : "password"}
-                className="settings__input"
-                placeholder="Введите новый пароль"
-                value={formData.new_password}
-                onChange={handlePasswordInputChange}
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                className="settings__password-toggle"
-                onClick={() => togglePasswordVisibility("new")}
-              >
-                {showPassword.new ? (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M1 12S5 4 12 4S23 12 23 12"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 5C14.1493 5 16.195 5.77714 17.7781 7.16045C19.3613 8.54375 20.5 10.4816 20.5 12.5C20.5 14.5184 19.3613 16.4562 17.7781 17.8395C16.195 19.2229 14.1493 20 12 20C9.85075 20 7.80504 19.2229 6.22195 17.8395C4.63886 16.4562 3.5 14.5184 3.5 12.5C3.5 10.4816 4.63886 8.54375 6.22195 7.16045C7.80504 5.77714 9.85075 5 12 5Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M17.94 17.94A10.07 10.07 0 0 1 12 20C7 20 2 15 2 10C2 5.03 6.58 1 12 1C16.42 1 20.97 5.03 21 10C21 15 18.97 20 12 20C10.06 20 8.24 19.43 6.67 18.43"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 10.3431 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 2V5"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 19V22"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </button>
-            </div>
-
-            <div className="settings__password-strength">
-              <div className="settings__strength-bar">
-                <div
-                  className={`settings__strength-fill ${
-                    formData.new_password.length > 8
-                      ? "strong"
-                      : formData.new_password.length > 5
-                      ? "medium"
-                      : "weak"
-                  }`}
-                />
-              </div>
-              <span className="settings__strength-text">
-                {formData.new_password.length === 0
-                  ? "Введите пароль"
-                  : formData.new_password.length < 6
-                  ? "Слабый"
-                  : formData.new_password.length < 9
-                  ? "Средний"
-                  : "Сильный"}
-              </span>
-            </div>
-          </div>
-
-          {/* Повтор пароля */}
-          <div className="settings__form-group">
-            {!formData.new_password2.trim() && errors?.new_password2 ? (
-              <label
-                style={{ color: "red" }}
-                className="settings__label"
-                htmlFor="repeatPassword"
-              >
-                {errors.new_password2[0]}
-              </label>
-            ) : (
-              <label className="settings__label" htmlFor="repeatPassword">
-                Повторите новый пароль
-              </label>
-            )}
-            <div className="settings__input-wrapper">
-              <input
-                id="repeatPassword"
-                name="new_password2"
-                type={showPassword.repeat ? "text" : "password"}
-                className={`settings__input ${
-                  passwordsMismatch ? "error" : ""
-                }`}
-                placeholder="Повторите новый пароль"
-                value={formData.new_password2}
-                onChange={handlePasswordInputChange}
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                className="settings__password-toggle"
-                onClick={() => togglePasswordVisibility("repeat")}
-              >
-                {showPassword.repeat ? (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M1 12S5 4 12 4S23 12 23 12"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 5C14.1493 5 16.195 5.77714 17.7781 7.16045C19.3613 8.54375 20.5 10.4816 20.5 12.5C20.5 14.5184 19.3613 16.4562 17.7781 17.8395C16.195 19.2229 14.1493 20 12 20C9.85075 20 7.80504 19.2229 6.22195 17.8395C4.63886 16.4562 3.5 14.5184 3.5 12.5C3.5 10.4816 4.63886 8.54375 6.22195 7.16045C7.80504 5.77714 9.85075 5 12 5Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M17.94 17.94A10.07 10.07 0 0 1 12 20C7 20 2 15 2 10C2 5.03 6.58 1 12 1C16.42 1 20.97 5.03 21 10C21 15 18.97 20 12 20C10.06 20 8.24 19.43 6.67 18.43"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 10.3431 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 2V5"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M12 19V22"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </button>
-            </div>
-            {passwordsMismatch && (
-              <p className="settings__error-text">Пароли не совпадают</p>
-            )}
-          </div>
-
-          {/* Токен для весов */}
-          <div className="settings__form-group" style={{ marginTop: "30px" }}>
-            <h3 className="settings__label" style={{ marginBottom: "12px" }}>
-              Токен для доступа к весам
-            </h3>
-            <p
-              className="settings__label"
-              style={{
-                fontSize: "14px",
-                color: "#666",
-                marginBottom: "12px",
-                fontWeight: "normal",
-              }}
-            >
-              Создайте токен для интеграции с весами. Токен будет показан один
-              раз - сохраните его в безопасном месте.
-            </p>
-            <button
-              type="button"
-              className="settings__btn settings__btn--secondary"
-              onClick={handleCreateScalesToken}
-              style={{
-                width: "auto",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M12 2V6M12 18V22M6 12H2M22 12H18M19.07 19.07L16.24 16.24M19.07 4.93L16.24 7.76M4.93 19.07L7.76 16.24M4.93 4.93L7.76 7.76"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Создать токен
-            </button>
-          </div>
-        </div>
-
-        {/* Кнопки действий */}
-        <div className="settings__actions">
-          <button
-            className="settings__btn settings__btn--primary"
-            type="submit"
-            disabled={passwordsMismatch}
-            title={passwordsMismatch ? "Пароли не совпадают" : undefined}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M20 7L10 17L5 12"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Сохранить изменения
-          </button>
-
-          <button
-            className="settings__btn settings__btn--secondary"
-            type="button"
-            onClick={() => {
-              // Сбрасываем локальные изменения к значениям из стора
-              setCompanyState({
-                name: company?.name || "",
-                llc: company?.llc || "",
-                inn: company?.inn || "",
-                okpo: company?.okpo || "",
-                score: company?.score || "",
-                bik: company?.bik || "",
-                address: company?.address || "",
-              });
-              setFormData({
-                current_password: "",
-                new_password: "",
-                new_password2: "",
-              });
-            }}
-          >
-            Отменить
-          </button>
-        </div>
-      </form>
+      {/* Контент табов */}
+      <div className="settings__content">{renderTabContent()}</div>
 
       <div className="settings__footer">
         <button
