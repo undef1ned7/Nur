@@ -371,8 +371,10 @@ const Sell = () => {
                   </th>
                   <th>№</th>
                   <th>Клиент</th>
+                  <th>Товар</th>
                   <th>Цена</th>
                   <th>Статус</th>
+                  <th>Метод оплаты</th>
                   <th>Дата</th>
                   <th></th>
                 </tr>
@@ -396,6 +398,15 @@ const Sell = () => {
                       </td>
                       <td data-label="№">{idx + 1}</td>
                       <td data-label="Клиент">{item.client_name || "-"}</td>
+                      <td data-label="Товар">
+                        {/* {item.products
+                          .map((product) => product.name)
+                          .join(", ")} */}
+                        Чай
+                      </td>
+                      <td data-label="Метод оплаты">
+                        {item.payment_method || "-"}
+                      </td>
                       <td data-label="Цена">{item.total}</td>
                       <td data-label="Статус">
                         {kindTranslate[item.status] || item.status}
