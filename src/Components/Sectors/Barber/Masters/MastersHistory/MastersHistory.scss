@@ -1,21 +1,16 @@
 /* MastersHistory.scss */
-:root {
-  --mh-text: #0f172a;
-  --mh-muted: #6b7280;
-  --mh-border: #e5e7eb;
-  --mh-surface: #ffffff;
-  --mh-primary: #f7d74f;
+@import "../../styles/barbershop.scss";
 
+.mastershistory {
+  /* локальные варики только для статусов */
   --mh-st-booked-text: #1d4ed8;
   --mh-st-confirmed-text: #047857;
   --mh-st-completed-text: #15803d;
   --mh-st-canceled-text: #b91c1c;
   --mh-st-no-show-text: #92400e;
   --mh-st-other-text: #4b5563;
-}
 
-.mastershistory {
-  background: var(--mh-surface);
+  background: var(--surface);
   border-radius: 16px;
   padding: 18px 20px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
@@ -35,7 +30,7 @@
   /* "4 записей - стр. 1/2" */
   &__subtitle {
     font-size: 14px;
-    color: var(--mh-muted);
+    color: var(--muted);
   }
 
   /* селекты в 4 колонки на всю ширину — как на 1-м скрине */
@@ -56,7 +51,7 @@
 
   &__label {
     font-size: 13px;
-    color: var(--mh-muted);
+    color: var(--muted);
   }
 
   &__alert {
@@ -80,9 +75,9 @@
   /* карточка */
   &__card {
     border-radius: 12px;
-    border: 1px solid var(--mh-border);
+    border: 1px solid var(--border);
     border-left-width: 4px;
-    border-left-color: var(--mh-border);
+    border-left-color: var(--border);
     padding: 10px 16px;
     background: #ffffff;
   }
@@ -103,7 +98,7 @@
     border-left-color: var(--mh-st-no-show-text);
   }
   &__card--other {
-    border-left-color: var(--mh-border);
+    border-left-color: var(--border);
   }
 
   &__cardHead {
@@ -118,7 +113,7 @@
     margin: 0;
     font-size: 14px;
     font-weight: 600;
-    color: var(--mh-text);
+    color: var(--text);
   }
 
   &__status {
@@ -152,7 +147,7 @@
     flex-direction: column;
     gap: 2px;
     font-size: 13px;
-    color: var(--mh-text);
+    color: var(--text);
   }
 
   &__line {
@@ -190,13 +185,13 @@
     gap: 8px;
     align-items: center;
     font-size: 13px;
-    color: var(--mh-muted);
+    color: var(--muted);
   }
 
   &__pageBtn {
     padding: 6px 12px;
     border-radius: 10px;
-    border: 1px solid var(--mh-border);
+    border: 1px solid var(--border);
     background: #fff;
     font-weight: 600;
     cursor: pointer;
@@ -266,16 +261,18 @@
     width: 100%;
     height: 44px;
     border-radius: 12px;
-    border: 1px solid var(--mh-border);
+    border: 1px solid var(--border);
     background: #ffffff;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 12px;
     font-size: 14px;
-    color: var(--mh-text);
+    color: var(--text);
     cursor: pointer;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease,
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
       background-color 0.15s ease;
 
     &:hover {
@@ -283,7 +280,7 @@
     }
 
     &--open {
-      border-color: var(--mh-primary);
+      border-color: var(--primary);
       box-shadow: 0 0 0 1px rgba(247, 215, 79, 0.8);
     }
   }
@@ -330,7 +327,7 @@
     padding: 9px 14px;
     font-size: 14px;
     cursor: pointer;
-    color: var(--mh-text);
+    color: var(--text);
     white-space: nowrap;
 
     &:hover {
@@ -338,7 +335,7 @@
     }
 
     &--active {
-      background: var(--mh-primary);
+      background: var(--primary);
       color: #111827;
       font-weight: 600;
     }

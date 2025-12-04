@@ -1,15 +1,5 @@
 /* PayrollDaily.scss */
-:root {
-  --pd-bg: #0b0c0f;
-  --pd-card: #12141a;
-  --pd-text: #e6e8ee;
-  --pd-muted: #9aa3b2;
-  --pd-border: #232633;
-  --pd-accent: #4f46e5;
-  --pd-accent-2: #0ea5e9;
-  --pd-danger: #ef4444;
-  --pd-success: #16a34a;
-}
+@import "../../../styles/barbershop.scss";
 
 .payrolldaily {
   color: var(--pd-text);
@@ -80,12 +70,15 @@
     color: var(--pd-text);
     padding: 0 12px;
     cursor: pointer;
-    transition: border-color .12s ease-in-out, background .12s ease-in-out;
+    transition:
+      border-color 0.12s ease-in-out,
+      background 0.12s ease-in-out;
 
     &--primary {
       background: linear-gradient(180deg, var(--pd-accent), var(--pd-accent-2));
       border-color: transparent;
     }
+
     &--secondary:hover {
       border-color: var(--pd-accent-2);
     }
@@ -97,7 +90,9 @@
     }
   }
 
-  &__btnText { font-weight: 600; }
+  &__btnText {
+    font-weight: 600;
+  }
 
   &__alert {
     background: rgba(239, 68, 68, 0.12);
@@ -113,7 +108,6 @@
     border: 1px solid var(--pd-border);
     border-radius: 12px;
     overflow: hidden;
-    /* скролл контейнера */
     max-height: 70vh;
     overflow: auto;
 
@@ -127,7 +121,8 @@
     border-collapse: collapse;
     font-size: 14px;
 
-    th, td {
+    th,
+    td {
       padding: 10px 12px;
       border-bottom: 1px solid var(--pd-border);
       vertical-align: middle;
@@ -143,7 +138,7 @@
       font-size: 12px;
       color: var(--pd-muted);
       text-transform: uppercase;
-      letter-spacing: .02em;
+      letter-spacing: 0.02em;
     }
 
     tfoot th {
@@ -157,8 +152,14 @@
     }
   }
 
-  &__muted { color: var(--pd-muted); }
-  &__empty { color: var(--pd-muted); text-align: center; }
+  &__muted {
+    color: var(--pd-muted);
+  }
+
+  &__empty {
+    color: var(--pd-muted);
+    text-align: center;
+  }
 
   &__ellipsis {
     white-space: nowrap;
@@ -167,7 +168,9 @@
     max-width: 320px;
   }
 
-  &__actions { text-align: right; }
+  &__actions {
+    text-align: right;
+  }
 
   &__link {
     appearance: none;
@@ -179,7 +182,9 @@
     padding: 0;
     font: inherit;
 
-    &:hover { color: var(--pd-accent); }
+    &:hover {
+      color: var(--pd-accent);
+    }
   }
 
   /* modal */
@@ -213,7 +218,10 @@
     border-bottom: 1px solid var(--pd-border);
   }
 
-  &__modalTitle { margin: 0; font-size: 16px; }
+  &__modalTitle {
+    margin: 0;
+    font-size: 16px;
+  }
 
   &__iconBtn {
     background: none;
@@ -221,7 +229,9 @@
     color: var(--pd-muted);
     cursor: pointer;
 
-    &:hover { color: var(--pd-text); }
+    &:hover {
+      color: var(--pd-text);
+    }
   }
 
   &__modalBody {
@@ -237,7 +247,7 @@
   }
 }
 
-/* ===================== BEM блок ComboBox ===================== */
+/* ===================== ComboBox ===================== */
 .pd-combo {
   position: relative;
   min-width: 220px;
@@ -255,10 +265,18 @@
     cursor: pointer;
   }
 
-  &__text { flex: 1; text-align: left; }
-  &__text--ph { color: var(--pd-muted); }
+  &__text {
+    flex: 1;
+    text-align: left;
 
-  &__caret { opacity: .7; }
+    &--ph {
+      color: var(--pd-muted);
+    }
+  }
+
+  &__caret {
+    opacity: 0.7;
+  }
 
   &__popup {
     position: absolute;
@@ -268,7 +286,7 @@
     background: var(--pd-card);
     border: 1px solid var(--pd-border);
     border-radius: 12px;
-    box-shadow: 0 12px 28px rgba(0,0,0,.28);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
     z-index: 20;
     display: flex;
     flex-direction: column;
@@ -283,7 +301,10 @@
     border-bottom: 1px solid var(--pd-border);
   }
 
-  &__searchIcon { color: var(--pd-muted); }
+  &__searchIcon {
+    color: var(--pd-muted);
+  }
+
   &__searchInput {
     border: 0;
     outline: none;
@@ -293,7 +314,7 @@
   }
 
   &__list {
-    overflow-y: auto; /* скрулл */
+    overflow-y: auto;
   }
 
   &__option {

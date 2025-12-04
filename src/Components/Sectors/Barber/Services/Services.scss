@@ -1,12 +1,6 @@
 /* Services.scss */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #e3c63a;
-  --text: #111827;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-}
+@import "../styles/barbershop.scss"; // путь подправь под свой проект
+
 
 .barberservices,
 .barberservices * {

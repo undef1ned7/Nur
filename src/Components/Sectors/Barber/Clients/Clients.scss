@@ -1,12 +1,5 @@
 /* Clients.scss */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-}
+@import "../styles/barbershop.scss";
 
 $accent-active: #27ae60;
 $accent-inactive: #7f8c8d;

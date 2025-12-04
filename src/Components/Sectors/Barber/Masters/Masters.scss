@@ -1,15 +1,10 @@
 /* Masters.scss */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-}
+@import "../styles/barbershop.scss";
 
 .barbermasters,
-.barbermasters * { box-sizing: border-box; }
+.barbermasters * {
+  box-sizing: border-box;
+}
 
 /* ====== Контейнер ====== */
 .barbermasters {
@@ -19,270 +14,691 @@
 
   background: var(--surface);
   border-radius: var(--radius);
-  box-shadow: 0 4px 16px rgba(0,0,0,.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
   max-height: 100dvh;
   overflow: auto;
-}
 
-/* ====== Хедер ====== */
-.barbermasters__header{
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: end;
-}
-.barbermasters__titleWrap{ display:grid; gap:4px; }
-.barbermasters__title{ margin:0; color:var(--text); font-weight:800; font-size:20px; }
-.barbermasters__subtitle{ color:var(--muted); font-size:13px; }
+  /* ====== Хедер ====== */
+  &__header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: end;
+  }
 
-/* Действия */
-.barbermasters__actions{
-  display: grid;
-  grid-template-columns: auto minmax(220px, 260px) minmax(240px, 1fr) 44px;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.barbermasters__tabs{ display:flex; gap:8px; }
+  &__titleWrap {
+    display: grid;
+    gap: 4px;
+  }
 
-/* Кнопки */
-.barbermasters__btn{
-  display:inline-flex; align-items:center; gap:8px;
-  height:40px; padding:0 14px; line-height:1;
-  border-radius:12px; border:1px solid transparent;
-  background:#fff; color:var(--text); font-weight:700; font-size:14px;
-  cursor:pointer; transition:.18s;
-}
-.barbermasters__btn svg{ width:18px; height:18px; flex:0 0 auto; }
-.barbermasters__btn:active{ transform:translateY(1px); }
-.barbermasters__btn--primary{ background:var(--primary); color:#111; }
-.barbermasters__btn--primary:hover{ background:var(--primary-dark); }
-.barbermasters__btn--secondary{ border:1px solid var(--border); }
-.barbermasters__btn--secondary:hover{ background:#f9fafb; }
-.barbermasters__btn--danger{ border:1px solid #ef4444; color:#ef4444; background:#fff; }
-.barbermasters__btn--danger:hover{ background:rgba(239,68,68,.06); }
-.barbermasters__btn.is-active{ background:#f9fafb; border-color:var(--border); }
-.barbermasters__btnText{ display:inline; }
+  &__title {
+    margin: 0;
+    color: var(--text);
+    font-weight: 800;
+    font-size: 20px;
+  }
 
-/* Поиск */
-.barbermasters__search{ position:relative; width:100%; min-width:0; }
-.barbermasters__searchInput{
-  width:100%; height:40px;
-  padding:10px 12px 10px 34px;
-  border:1px solid var(--border); border-radius:12px;
-  font-size:14px; background:#fff;
-}
-.barbermasters__searchInput:focus{ outline:none; border-color:var(--primary); }
-.barbermasters__searchInput::placeholder{ color:var(--muted); opacity:.9; }
-.barbermasters__searchIcon{
-  position:absolute; left:10px; top:50%; transform:translateY(-50%);
-  color:var(--muted); font-size:14px;
-}
+  &__subtitle {
+    color: var(--muted);
+    font-size: 13px;
+  }
 
-/* ====== Лист и карточки ====== */
-.barbermasters__list{
-  display:grid; gap:10px;
-  max-height: clamp(340px, 64dvh, 720px);
-  overflow: auto;
-  padding-right: 6px;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-.barbermasters__list::-webkit-scrollbar{ width:8px; height:8px; }
-.barbermasters__list::-webkit-scrollbar-thumb{ background:#e2e8f0; border-radius:8px; }
+  /* Действия */
+  &__actions {
+    display: grid;
+    grid-template-columns: auto minmax(220px, 260px) minmax(240px, 1fr) 44px;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
 
-.barbermasters__card{
-  display:flex; align-items:center; gap:12px; justify-content:space-between;
-  padding:14px; border:1px solid var(--border); border-radius:12px;
-  background:#fafafa; transition:background .18s;
-}
-.barbermasters__card:hover{ background:#f1f5f9; }
-.barbermasters__cardLeft{ display:flex; gap:12px; align-items:flex-start; min-width:0; }
-.barbermasters__avatar{
-  min-width:40px; height:40px; border-radius:50%;
-  background:linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color:#fff; font-weight:800; font-size:14px;
-  display:grid; place-items:center; box-shadow:var(--shadow);
-}
-.barbermasters__nameRow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.barbermasters__name{ margin:0; font-size:16px; font-weight:800; color:var(--text); }
-.barbermasters__meta{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-.barbermasters__meta .bm-item{ color:var(--muted); font-size:13px; white-space:nowrap; }
-.barbermasters__meta .bm-item + .bm-item::before{ content:"•"; margin:0 8px; color:var(--muted); }
-.barbermasters__cardActions{ margin-left:auto; display:flex; gap:8px; min-width:fit-content; }
+  &__tabs {
+    display: flex;
+    gap: 8px;
+  }
 
-/* Кнопка копирования в модалке логина */
-.barbermasters__copyBtn{ margin-left:8px; }
+  /* Кнопки */
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 14px;
+    line-height: 1;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background: #fff;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.18s;
 
-/* ====== Алерты ====== */
-.barbermasters__alert{
-  padding:10px 12px; border-radius:12px;
-  border:1px solid rgba(231,76,60,.35); background:rgba(231,76,60,.12);
-  color:#e74c3c;
-}
-.barbermasters__alert--inModal{ margin:12px var(--padX) 0; }
+    svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
 
-/* ====== Пагинация списков ====== */
-.barbermasters__pager{ display:flex; gap:10px; align-items:center; justify-content:center; margin-top:10px; flex-wrap:wrap; }
-.barbermasters__pageList{ display:flex; gap:6px; list-style:none; margin:0; padding:0; }
-.barbermasters__pageBtn{ border:1px solid var(--border); background:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; }
-.barbermasters__pageBtn:hover{ background:#f9fafb; }
-.barbermasters__pageBtn.is-active{ background:var(--primary); border-color:var(--primary); color:#111; }
-.barbermasters__pageBtn:disabled{ opacity:.6; cursor:default; }
-.barbermasters__dots{ color:var(--muted); align-self:flex-end; padding-bottom:2px; }
+    &.is-active {
+      background: #f9fafb;
+      border-color: var(--border);
+    }
 
-/* ====== Overlay & Modal ====== */
-.barbermasters__overlay{
-  position:fixed; inset:0;
-  background:rgba(15,23,42,.55);
-  backdrop-filter:saturate(140%) blur(2px);
-  display:flex; align-items:center; justify-content:center;
-  padding:16px; z-index:70; min-height:100dvh;
-  overflow:auto;
-}
-.barbermasters__modal{
-  position:relative;
-  width:min(640px,96vw);
-  max-height:min(94dvh,820px);
-  margin:0;
-  background:#fff; border-radius:14px; box-shadow:var(--shadow);
-  display:grid; grid-template-rows:auto 1fr; overflow:hidden;
-}
-.barbermasters__modal--taller{ max-height:min(94dvh,860px); }
+    &--primary {
+      background: var(--primary);
+      color: #111;
 
-/* Заголовок модалки */
-.barbermasters__modalHeader{
-  display:flex; justify-content:space-between; align-items:center;
-  padding:14px var(--padX); border-bottom:1px solid var(--border);
-}
-.barbermasters__modalTitle{ margin:0; font-size:18px; font-weight:900; }
-.barbermasters__iconBtn{ background:none; border:0; color:var(--muted); font-size:18px; cursor:pointer; }
-.barbermasters__iconBtn:hover{ color:var(--text); }
+      &:hover {
+        background: var(--primary-dark);
+      }
+    }
 
-/* Тело модалки */
-.barbermasters__content{
-  padding:16px var(--padX);
-  display:flex; flex-direction:column; row-gap:12px;
-}
+    &--secondary {
+      border: 1px solid var(--border);
 
-/* Форма и поля */
-.barbermasters__form{ display:grid; grid-template-rows:1fr auto; min-height:0; }
-.barbermasters__grid{
-  padding:16px var(--padX);
-  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:14px; overflow:auto; min-height:0;
-}
-.barbermasters__field{ display:grid; gap:6px; min-width:0; }
-.barbermasters__field--full{ grid-column:1 / -1; }
-.barbermasters__label{ font-size:14px; font-weight:700; color:var(--muted); }
-.barbermasters__req{ color:#ef4444; }
-.barbermasters__input{
-  width:100%; min-width:0; height:44px;
-  border:1px solid var(--border); border-radius:10px;
-  padding:0 12px; font-size:14px; background:#fff;
-}
-.barbermasters__input:focus{ outline:none; border-color:var(--primary); }
-.barbermasters__input::placeholder{ color:var(--muted); opacity:.85; }
-.barbermasters__input--invalid{ border-color:#dc2626; }
-.barbermasters__field--invalid .barbermasters__input{ border-color:#dc2626; }
+      &:hover {
+        background: #f9fafb;
+      }
+    }
 
-/* Футер модалки */
-.barbermasters__footer{
-  border-top:1px solid var(--border);
-  padding:12px var(--padX);
-  display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap;
-  background:#fff;
-}
-.barbermasters__spacer{ flex:1 1 auto; }
-.barbermasters__footerRight{ display:flex; gap:10px; flex-wrap:wrap; }
+    &--danger {
+      border: 1px solid #ef4444;
+      color: #ef4444;
+      background: #fff;
 
-/* ====== Кастомный Select ====== */
-.barbermasters__select{ position:relative; min-width:220px; }
-.barbermasters__selectControl{
-  width:100%; height:40px;
-  border:1px solid var(--border); border-radius:12px; background:#fff;
-  padding:0 34px 0 12px; text-align:left;
-  display:flex; align-items:center; gap:6px;
-}
-.barbermasters__selectValue{ font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.barbermasters__selectValue.is-placeholder{ color:var(--muted); }
-.barbermasters__selectCaret{
-  position:absolute; right:10px; top:50%; transform:translateY(-50%);
-  width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-top:6px solid #9ca3af;
-}
-.barbermasters__select.is-open .barbermasters__selectCaret{ border-top-color:#111; }
+      &:hover {
+        background: rgba(239, 68, 68, 0.06);
+      }
+    }
 
-.barbermasters__selectMenu{
-  position:absolute; z-index:120; left:0; right:0; top:calc(100% + 6px);
-  background:#fff; border:1px solid var(--border); border-radius:12px;
-  box-shadow:0 10px 22px rgba(2,6,23,.12);
-  display:grid; grid-template-rows:auto 1fr; overflow:hidden;
-}
-.barbermasters__selectSearch{ position:relative; padding:10px; }
-.barbermasters__selectSearchInput{
-  width:100%; border:1px solid var(--border); border-radius:10px;
-  padding:10px 12px 10px 34px; font-size:14px; background:#fff;
-}
-.barbermasters__selectSearchInput:focus{ outline:none; border-color:var(--primary); }
-.barbermasters__selectSearchIcon{
-  position:absolute; left:20px; top:50%; transform:translateY(-50%);
-  color:#9ca3af; font-size:14px;
-}
+    &:active {
+      transform: translateY(1px);
+    }
+  }
 
-.barbermasters__selectList{ max-height:240px; overflow:auto; padding:6px 0; }
-.barbermasters__selectList::-webkit-scrollbar{ width:8px; }
-.barbermasters__selectList::-webkit-scrollbar-thumb{ background:#e2e8f0; border-radius:8px; }
-.barbermasters__selectItem{
-  width:100%; background:#fff; border:0; text-align:left;
-  padding:10px 12px; cursor:pointer; font-size:14px;
+  &__btnText {
+    display: inline;
+  }
+
+  /* Поиск */
+  &__search {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+
+  &__searchInput {
+    width: 100%;
+    height: 40px;
+    padding: 10px 12px 10px 34px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    background: #fff;
+
+    &::placeholder {
+      color: var(--muted);
+      opacity: 0.9;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  &__searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* ====== Лист и карточки ====== */
+  &__list {
+    display: grid;
+    gap: 10px;
+    max-height: clamp(340px, 64dvh, 720px);
+    overflow: auto;
+    padding-right: 6px;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 8px;
+    }
+  }
+
+  &__card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fafafa;
+    transition: background 0.18s;
+
+    &:hover {
+      background: #f1f5f9;
+    }
+  }
+
+  &__cardLeft {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  &__avatar {
+    min-width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    font-weight: 800;
+    font-size: 14px;
+    display: grid;
+    place-items: center;
+    box-shadow: var(--shadow);
+  }
+
+  &__nameRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+
+    .bm-item {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .bm-item + .bm-item::before {
+      content: "•";
+      margin: 0 8px;
+      color: var(--muted);
+    }
+  }
+
+  &__cardActions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    min-width: fit-content;
+  }
+
+  /* Кнопка копирования в модалке логина */
+  &__copyBtn {
+    margin-left: 8px;
+  }
+
+  /* ====== Алерты ====== */
+  &__alert {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(231, 76, 60, 0.35);
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+
+    &--inModal {
+      margin: 12px var(--padX) 0;
+    }
+  }
+
+  /* ====== Пагинация списков ====== */
+  &__pager {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  &__pageList {
+    display: flex;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__pageBtn {
+    border: 1px solid var(--border);
+    background: #fff;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &.is-active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #111;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+  }
+
+  &__dots {
+    color: var(--muted);
+    align-self: flex-end;
+    padding-bottom: 2px;
+  }
+
+  /* ====== Overlay & Modal ====== */
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: saturate(140%) blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 70;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  &__modal {
+    position: relative;
+    width: min(640px, 96vw);
+    max-height: min(94dvh, 820px);
+    margin: 0;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+
+    &--taller {
+      max-height: min(94dvh, 860px);
+    }
+  }
+
+  /* Заголовок модалки */
+  &__modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px var(--padX);
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__modalTitle {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  &__iconBtn {
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  /* Тело модалки */
+  &__content {
+    padding: 16px var(--padX);
+    display: flex;
+    flex-direction: column;
+    row-gap: 12px;
+  }
+
+  /* Форма и поля */
+  &__form {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    min-height: 0;
+  }
+
+  &__grid {
+    padding: 16px var(--padX);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  &__field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+
+    &--full {
+      grid-column: 1 / -1;
+    }
+
+    &--invalid .barbermasters__input {
+      border-color: #dc2626;
+    }
+  }
+
+  &__label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  &__req {
+    color: #ef4444;
+  }
+
+  &__input {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 14px;
+    background: #fff;
+
+    &::placeholder {
+      color: var(--muted);
+      opacity: 0.85;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    &--invalid {
+      border-color: #dc2626;
+    }
+  }
+
+  /* Футер модалки */
+  &__footer {
+    border-top: 1px solid var(--border);
+    padding: 12px var(--padX);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    background: #fff;
+  }
+
+  &__spacer {
+    flex: 1 1 auto;
+  }
+
+  &__footerRight {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* ====== Кастомный Select ====== */
+  &__select {
+    position: relative;
+    min-width: 220px;
+  }
+
+  &__selectControl {
+    width: 100%;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    padding: 0 34px 0 12px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__selectValue {
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &.is-placeholder {
+      color: var(--muted);
+    }
+  }
+
+  &__selectCaret {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #9ca3af;
+  }
+
+  &__selectMenu {
+    position: absolute;
+    z-index: 120;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.12);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  &__selectSearch {
+    position: relative;
+    padding: 10px;
+  }
+
+  &__selectSearchInput {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px 10px 34px;
+    font-size: 14px;
+    background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  &__selectSearchIcon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 14px;
+  }
+
+  &__selectList {
+    max-height: 240px;
+    overflow: auto;
+    padding: 6px 0;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 8px;
+    }
+  }
+
+  &__selectItem {
+    width: 100%;
+    background: #fff;
+    border: 0;
+    text-align: left;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &.is-active {
+      background: rgba(247, 215, 79, 0.25);
+    }
+  }
+
+  &__selectEmpty {
+    padding: 12px;
+    color: var(--muted);
+    font-size: 14px;
+  }
 }
-.barbermasters__selectItem:hover{ background:#f9fafb; }
-.barbermasters__selectItem.is-active{ background:rgba(247,215,79,.25); }
-.barbermasters__selectEmpty{ padding:12px; color:var(--muted); font-size:14px; }
 
 /* ====== Адаптив ====== */
-@media (max-width: 900px){
-  .barbermasters__header{ grid-template-columns:1fr; }
-  .barbermasters__actions{
-    grid-template-columns: 1fr 44px;
-    grid-template-areas:
-      "tabs plus"
-      "role role"
-      "search search";
-    align-items: start;
-    gap: 10px;
+@media (max-width: 900px) {
+  .barbermasters {
+    &__header {
+      grid-template-columns: 1fr;
+    }
+
+    &__actions {
+      grid-template-columns: 1fr 44px;
+      grid-template-areas:
+        "tabs plus"
+        "role role"
+        "search search";
+      align-items: start;
+      gap: 10px;
+    }
+
+    &__tabs {
+      grid-area: tabs;
+    }
+
+    &__select {
+      grid-area: role;
+    }
+
+    &__search {
+      grid-area: search;
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      grid-area: plus;
+      justify-self: end;
+      align-self: start;
+    }
+
+    &__list {
+      max-height: 70dvh;
+    }
   }
-  .barbermasters__tabs{ grid-area: tabs; }
-  .barbermasters__select{ grid-area: role; }
-  .barbermasters__search{ grid-area: search; }
-  .barbermasters__actions > .barbermasters__btn--primary{
-    grid-area: plus; justify-self: end; align-self: start;
-  }
-  .barbermasters__list{ max-height: 70dvh; }
 }
 
-@media (max-width: 720px){
-  .barbermasters{ padding:16px; border-radius:12px; }
-  .barbermasters__title{ font-size:18px; }
-  .barbermasters__btnText{ display:none; }
-  .barbermasters__modal{ width:96vw; max-height:94dvh; }
-  .barbermasters__grid{ grid-template-columns:1fr; }
-  .barbermasters__select{ min-width:100%; }
+@media (max-width: 720px) {
+  .barbermasters {
+    padding: 16px;
+    border-radius: 12px;
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__btnText {
+      display: none;
+    }
+
+    &__modal {
+      width: 96vw;
+      max-height: 94dvh;
+    }
+
+    &__grid {
+      grid-template-columns: 1fr;
+    }
+
+    &__select {
+      min-width: 100%;
+    }
+  }
 }
 
-@media (max-width: 380px){ .barbermasters{ padding:14px; } }
+@media (max-width: 380px) {
+  .barbermasters {
+    padding: 14px;
+  }
+}
 
-@media (max-width: 320px){
-  .barbermasters{ padding:12px; gap:14px; }
-  .barbermasters__input{ font-size:13px; padding:0 10px; }
-  .barbermasters__footer .barbermasters__btn{ flex:1 1 100%; }
+@media (max-width: 320px) {
+  .barbermasters {
+    padding: 12px;
+    gap: 14px;
+
+    &__input {
+      font-size: 13px;
+      padding: 0 10px;
+    }
+
+    &__footer .barbermasters__btn {
+      flex: 1 1 100%;
+    }
+  }
 }
 
 /* Reduce motion */
-@media (prefers-reduced-motion: reduce){
-  .barbermasters__btn{ transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .barbermasters {
+    &__btn {
+      transition: none !important;
+    }
+  }
 }

@@ -1,14 +1,5 @@
-:root {
-  --rr-primary: #f7d74f;
-  --rr-primary-dark: #d4b800;
-  --rr-text: #0f172a;
-  --rr-muted: #6b7280;
-  --rr-border: #e5e7eb;
-  --rr-surface: #ffffff;
-  --rr-danger-bg: #fee2e2;
-  --rr-danger-border: #fecaca;
-  --rr-danger-text: #7f1d1d;
-}
+/* RecordaRates.scss */
+@import "../../styles/barbershop.scss";
 
 .recordarates,
 .recordarates * {
@@ -23,7 +14,7 @@
   gap: 12px;
   color: var(--rr-text);
 
-  /* ===== шапка как на макете ===== */
+  /* ===== шапка ===== */
   &__header {
     display: flex;
     align-items: flex-end;
@@ -100,9 +91,10 @@
   /* ===== таблица ===== */
   &__tableWrap {
     border-radius: 14px;
-    overflow: hidden;
     background: #ffffff;
     box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+    overflow-x: auto;
+    overflow-y: hidden;
 
     &--modal {
       box-shadow: none;
@@ -123,6 +115,7 @@
       font-size: 14px;
       padding: 12px 18px;
       border-bottom: 1px solid var(--rr-border);
+      white-space: nowrap;
     }
 
     tbody td {
@@ -159,6 +152,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
   }
 
   &__link {
@@ -170,6 +164,7 @@
     cursor: pointer;
     padding: 0;
     font: inherit;
+    white-space: nowrap;
   }
 
   &__muted {
@@ -219,6 +214,7 @@
     align-items: center;
     font-size: 18px;
     font-weight: 600;
+    gap: 12px;
   }
 
   &__summaryLabel {
@@ -228,6 +224,7 @@
   &__summaryValue {
     font-weight: 800;
     font-size: 20px;
+    white-space: nowrap;
   }
 
   /* ===== модалки ===== */
@@ -294,6 +291,7 @@
     display: flex;
     gap: 8px;
     padding: 12px 18px 6px;
+    flex-wrap: wrap;
   }
 
   &__productTab {
@@ -305,6 +303,7 @@
     font-size: 14px;
     font-weight: 600;
     color: #4b5563;
+    white-space: nowrap;
 
     &--active {
       background: var(--rr-primary);
@@ -415,10 +414,10 @@
       border-right: 5px solid transparent;
       border-top: 6px solid #4b5563;
       transition: transform 0.15s ease;
-    }
 
-    &__arrow--open {
-      transform: rotate(180deg);
+      &--open {
+        transform: rotate(180deg);
+      }
     }
 
     &__dropdown {
@@ -438,6 +437,20 @@
       padding: 4px 0;
       margin: 0;
       list-style: none;
+
+      &::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: #e5e7eb;
+        border-radius: 999px;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: #4b5563;
+        border-radius: 999px;
+      }
     }
 
     &__option {
@@ -457,40 +470,125 @@
         font-weight: 600;
       }
     }
-
-    &__list::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &__list::-webkit-scrollbar-track {
-      background: #e5e7eb;
-      border-radius: 999px;
-    }
-
-    &__list::-webkit-scrollbar-thumb {
-      background: #4b5563;
-      border-radius: 999px;
-    }
   }
 
   /* ===== адаптив ===== */
+
   @media (max-width: 960px) {
     &__header {
       flex-direction: column;
       align-items: flex-start;
     }
+
+    &__btn {
+      align-self: flex-start;
+    }
   }
 
   @media (max-width: 640px) {
-    padding: 16px;
+    padding: 16px 12px;
+
+    &__header {
+      gap: 12px;
+    }
+
+    &__filters {
+      width: 100%;
+      gap: 12px;
+    }
+
+    &__filter {
+      width: 100%;
+    }
+
+    .rr-select__control {
+      width: 100%;
+    }
+
+    &__btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    &__pager {
+      justify-content: center;
+    }
+
+    &__summary {
+      flex-direction: column;
+      align-items: flex-start;
+      font-size: 16px;
+    }
+
+    &__summaryValue {
+      font-size: 18px;
+    }
 
     &__table {
-      min-width: 760px;
+      min-width: 720px;
+    }
+
+    &__overlay {
+      padding: 12px;
+    }
+
+    &__modal {
+      width: 100%;
+      border-radius: 14px;
+    }
+
+    &__productRow {
+      flex-direction: column;
+    }
+
+    &__productField {
+      width: 100%;
+      min-width: 0;
     }
 
     &__productFooter {
       flex-direction: column;
       align-items: flex-start;
+    }
+  }
+
+  @media (max-width: 360px) {
+    padding: 14px 8px;
+
+    &__table {
+      min-width: 640px;
+    }
+
+    &__header {
+      gap: 10px;
+    }
+
+    &__filterLabel {
+      font-size: 12px;
+    }
+
+    &__btn {
+      height: 40px;
+      padding: 0 16px;
+      font-size: 13px;
+    }
+
+    &__summary {
+      padding: 14px 14px;
+      border-radius: 12px;
+    }
+
+    &__summaryValue {
+      font-size: 17px;
+    }
+
+    &__pageBtn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    &__pageInfo {
+      font-size: 12px;
     }
   }
 }

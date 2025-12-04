@@ -1,20 +1,11 @@
 /* Recorda.scss */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-  --overlay: #0b1220cc;
-  --safe-pad: 72px;
-}
+
+@import "../styles/barbershop.scss";
 
 $radius: 16px;
 $shadow: 0 8px 28px rgba(2, 6, 23, 0.12);
 $slot-h: 56px;
 $col-header-h: 56px;
-
 .barberrecorda,
 .barberrecorda * {
   box-sizing: border-box;

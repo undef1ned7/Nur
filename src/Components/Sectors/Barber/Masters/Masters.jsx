@@ -1281,9 +1281,6 @@ const Masters = () => {
                       title="Редактировать сотрудника"
                     >
                       <FaEdit />
-                      <span className="barbermasters__btnText">
-                        Редактировать
-                      </span>
                     </button>
                     {company?.sector?.name === "Производство" &&
                       (u.role === "agent" ||
