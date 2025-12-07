@@ -1354,16 +1354,13 @@ const ProductionCatalog = () => {
       {/* Модальное окно корзины */}
       {showCart && (
         <div className="cart-modal-overlay" onClick={handleCloseCart}>
-          <div className="cart-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="cart-modal-header">
-              <h2>Корзина</h2>
-              <button className="close-cart-btn" onClick={handleCloseCart}>
-                ×
-              </button>
-            </div>
-            <div className="cart-modal-content">
-              <Cart agentCartId={agentCartId} onNotify={handleNotify} />
-            </div>
+          <div className="" onClick={(e) => e.stopPropagation()}>
+            <Cart
+              agentCartId={agentCartId}
+              onNotify={handleNotify}
+              onClose={handleCloseCart}
+            />
+            {/* </div> */}
           </div>
         </div>
       )}

@@ -43,29 +43,27 @@ const SkladTab = ({
   onBulkDelete,
   onClearSelection,
   bulkDeleting,
+  onShowFilterModal,
+  showHeader = true,
 }) => {
   const filterProducts = products.filter((item) => item.status === "accepted");
   const filterP = isBuildingCompany ? filterProducts : products;
 
   return (
     <>
-      <SkladHeader
-        searchTerm={searchTerm}
-        onSearchChange={onSearchChange}
-        count={count}
-        productsLength={products.length}
-        isFiltered={isFiltered}
-        onResetFilters={onResetFilters}
-        isBuildingCompany={isBuildingCompany}
-        isMarketCompany={isMarketCompany}
-        onShowReceiveModal={onShowReceiveModal}
-        onShowHistoryModal={onShowHistoryModal}
-        selectCashBox={selectCashBox}
-        onSelectCashBox={onSelectCashBox}
-        cashBoxes={cashBoxes}
-        onAdd={onAdd}
-        onSendToScales={onSendToScales}
-      />
+      {showHeader && (
+        <SkladHeader
+          isBuildingCompany={isBuildingCompany}
+          isMarketCompany={isMarketCompany}
+          onShowReceiveModal={onShowReceiveModal}
+          onShowHistoryModal={onShowHistoryModal}
+          selectCashBox={selectCashBox}
+          onSelectCashBox={onSelectCashBox}
+          cashBoxes={cashBoxes}
+          onAdd={onAdd}
+          onSendToScales={onSendToScales}
+        />
+      )}
 
       {filterP.length !== 0 && (
         <SelectionActions

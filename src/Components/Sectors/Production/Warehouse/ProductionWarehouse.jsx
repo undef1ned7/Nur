@@ -8,7 +8,11 @@ import {
   updateCashFlows,
   useCash,
 } from "../../../../store/slices/cashSlice";
-import { fetchProductsAsync } from "../../../../store/creators/productCreators";
+import {
+  fetchProductsAsync,
+  updateProductAsync,
+} from "../../../../store/creators/productCreators";
+import api from "../../../../api";
 import { X } from "lucide-react";
 import { useProducts } from "../../../../store/slices/productSlice";
 import {
@@ -179,11 +183,68 @@ const PendingModal = ({ onClose, onChanged }) => {
   const handleApprove = async (id) => {
     setActionLoadingId(id);
     try {
+      // Получаем данные корзины перед одобрением, чтобы знать какие товары и в каком количестве
+      const cart = rows.find((c) => c.id === id);
+      if (!cart || !cart.items || !Array.isArray(cart.items)) {
+        throw new Error("Не удалось найти данные корзины");
+      }
+
+      // Одобряем корзину
       await dispatch(approveAgentCartAsync(id)).unwrap();
+
+      // Уменьшаем количество товаров на складе для каждого товара в корзине
+      for (const item of cart.items) {
+        const productId = item.product;
+        const quantityToDeduct = Number(
+          item.quantity_requested || item.total_quantity || 0
+        );
+
+        if (!productId || quantityToDeduct <= 0) {
+          console.warn(
+            `Пропущен товар: productId=${productId}, quantity=${quantityToDeduct}`
+          );
+          continue;
+        }
+
+        try {
+          // Получаем текущий товар для получения актуального количества
+          const { data: currentProduct } = await api.get(
+            `/main/products/${productId}/`
+          );
+
+          const currentQuantity = Number(currentProduct?.quantity || 0);
+          const newQuantity = Math.max(0, currentQuantity - quantityToDeduct);
+
+          // Обновляем количество товара на складе через PATCH запрос
+          await dispatch(
+            updateProductAsync({
+              productId,
+              updatedData: {
+                quantity: newQuantity,
+              },
+            })
+          ).unwrap();
+        } catch (productError) {
+          console.error(
+            `Ошибка при обновлении количества товара ${productId}:`,
+            productError
+          );
+          // Продолжаем обработку других товаров даже при ошибке
+        }
+      }
+
       alert("Корзина одобрена");
+      // Обновляем список корзин
       await load();
+      // Обновляем список товаров на складе, чтобы отобразить актуальные количества
+      dispatch(fetchProductsAsync());
+      // Вызываем callback для обновления данных в родительском компоненте
+      onChanged?.();
     } catch (e) {
-      alert("Ошибка при одобрении корзины");
+      console.error("Ошибка при одобрении корзины:", e);
+      alert(
+        `Ошибка при одобрении корзины: ${e?.message || "неизвестная ошибка"}`
+      );
     } finally {
       setActionLoadingId(null);
     }
@@ -576,10 +637,16 @@ const ProductionWarehouse = () => {
       </div>
       <>{tabs[activeTab].content}</>
       {showPendingModal && (
-        <PendingModal onClose={() => setShowPendingModal(false)} />
+        <PendingModal
+          onClose={() => setShowPendingModal(false)}
+          onChanged={() => dispatch(fetchProductsAsync())}
+        />
       )}
       {showAgentCartsModal && (
-        <AgentCartsPendingModal onClose={() => setShowAgentCartsModal(false)} />
+        <AgentCartsPendingModal
+          onClose={() => setShowAgentCartsModal(false)}
+          onChanged={() => dispatch(fetchProductsAsync())}
+        />
       )}
       {showTransferStatusModal && (
         <TransferStatusModal
@@ -594,7 +661,7 @@ const ProductionWarehouse = () => {
 export default ProductionWarehouse;
 
 // Модалка: список агентских корзин в статусе SUBMITTED
-const AgentCartsPendingModal = ({ onClose }) => {
+const AgentCartsPendingModal = ({ onClose, onChanged }) => {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
@@ -622,11 +689,68 @@ const AgentCartsPendingModal = ({ onClose }) => {
   const handleApprove = async (id) => {
     setActionLoadingId(id);
     try {
+      // Получаем данные корзины перед одобрением, чтобы знать какие товары и в каком количестве
+      const cart = rows.find((c) => c.id === id);
+      if (!cart || !cart.items || !Array.isArray(cart.items)) {
+        throw new Error("Не удалось найти данные корзины");
+      }
+
+      // Одобряем корзину
       await dispatch(approveAgentCartAsync(id)).unwrap();
+
+      // Уменьшаем количество товаров на складе для каждого товара в корзине
+      for (const item of cart.items) {
+        const productId = item.product;
+        const quantityToDeduct = Number(
+          item.quantity_requested || item.total_quantity || 0
+        );
+
+        if (!productId || quantityToDeduct <= 0) {
+          console.warn(
+            `Пропущен товар: productId=${productId}, quantity=${quantityToDeduct}`
+          );
+          continue;
+        }
+
+        try {
+          // Получаем текущий товар для получения актуального количества
+          const { data: currentProduct } = await api.get(
+            `/main/products/${productId}/`
+          );
+
+          const currentQuantity = Number(currentProduct?.quantity || 0);
+          const newQuantity = Math.max(0, currentQuantity - quantityToDeduct);
+
+          // Обновляем количество товара на складе через PATCH запрос
+          await dispatch(
+            updateProductAsync({
+              productId,
+              updatedData: {
+                quantity: newQuantity,
+              },
+            })
+          ).unwrap();
+        } catch (productError) {
+          console.error(
+            `Ошибка при обновлении количества товара ${productId}:`,
+            productError
+          );
+          // Продолжаем обработку других товаров даже при ошибке
+        }
+      }
+
       alert("Корзина одобрена");
+      // Обновляем список корзин
       await load();
+      // Обновляем список товаров на складе, чтобы отобразить актуальные количества
+      dispatch(fetchProductsAsync());
+      // Вызываем callback для обновления данных в родительском компоненте
+      onChanged?.();
     } catch (e) {
-      alert("Ошибка при одобрении корзины");
+      console.error("Ошибка при одобрении корзины:", e);
+      alert(
+        `Ошибка при одобрении корзины: ${e?.message || "неизвестная ошибка"}`
+      );
     } finally {
       setActionLoadingId(null);
     }

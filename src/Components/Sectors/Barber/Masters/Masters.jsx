@@ -577,6 +577,7 @@ const Masters = () => {
       last_name: empForm.last_name.trim(),
       phone_number: empForm.phone_number.trim(),
       track_number: empForm.track_number.trim(),
+      can_view_settings: true, // Автоматически даем доступ к настройкам
     };
     if (empForm.roleChoice.startsWith("sys:"))
       payload.role = empForm.roleChoice.slice(4);

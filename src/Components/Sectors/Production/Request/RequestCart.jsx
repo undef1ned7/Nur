@@ -81,8 +81,8 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
   };
 
   return (
-    <div className="cart-item">
-      <div className="item-image">
+    <div className="request-cart-item">
+      <div className="request-cart-item__image">
         <img
           src={
             item?.images?.[0]?.image_url
@@ -93,23 +93,25 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
         />
       </div>
 
-      <div className="item-details">
-        <h3 className="item-name">{item.product_name || "Без названия"}</h3>
-        <div className="item-price">
+      <div className="request-cart-item__content">
+        <h3 className="request-cart-item__name">
+          {item.product_name || "Без названия"}
+        </h3>
+        <div className="request-cart-item__price">
           {Number(item.unit_price || item.price_snapshot || 0).toLocaleString()}{" "}
           сом
         </div>
 
-        <div className="item-actions">
-          <div className="quantity-controls">
+        <div className="request-cart-item__controls">
+          <div className="request-cart-item__quantity">
             <button
-              className="quantity-btn"
+              className="request-cart-item__quantity-btn"
               onClick={handleDecrement}
               disabled={quantity <= 1 || !editable}
               type="button"
               title="Уменьшить количество"
             >
-              <Minus size={16} />
+              <Minus size={18} />
             </button>
             <input
               type="number"
@@ -118,40 +120,40 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
               onChange={handleQuantityInputChange}
               onBlur={handleQuantityInputBlur}
               onClick={(e) => e.stopPropagation()}
-              className="quantity-input"
+              className="request-cart-item__quantity-input"
               disabled={!editable}
             />
             <button
-              className="quantity-btn"
+              className="request-cart-item__quantity-btn"
               onClick={handleIncrement}
               disabled={!editable}
               type="button"
               title="Увеличить количество"
             >
-              <Plus size={16} />
+              <Plus size={18} />
             </button>
           </div>
 
           <button
-            className="remove-btn"
+            className="request-cart-item__remove"
             onClick={handleRemove}
             disabled={!editable}
             type="button"
             title="Удалить товар из запроса"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="item-info">
-          <p className="total-qty">
+        <div className="request-cart-item__summary">
+          <span className="request-cart-item__summary-text">
             Количество:{" "}
             {Number(
               item.quantity_requested || item.quantity || 0
             ).toLocaleString()}{" "}
             шт.
-          </p>
-          <p className="total">
+          </span>
+          <span className="request-cart-item__summary-text">
             Сумма:{" "}
             {Number(
               Number(item.price_snapshot || item.unit_price || 0) *
@@ -163,7 +165,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
                 )
             ).toLocaleString()}{" "}
             сом
-          </p>
+          </span>
         </div>
       </div>
     </div>
@@ -189,28 +191,33 @@ const RequestSummary = ({ items, onSubmit, submitting }) => {
   const total = amount;
 
   return (
-    <div className="order-summary">
-      <h2>Сумма запроса</h2>
+    <div className="request-summary">
+      <h3 className="request-summary__title">Сумма запроса</h3>
 
-      <div className="summary-details">
-        <div className="summary-row">
-          <span>
+      <div className="request-summary__details">
+        <div className="request-summary__row">
+          <span className="request-summary__label">
             Общее количество: {qty} товара ({qty} шт)
           </span>
         </div>
-        <div className="summary-row">
-          <span>Общая стоимость: {total.toLocaleString()}.00 сом</span>
+        <div className="request-summary__row">
+          <span className="request-summary__label">
+            Общая стоимость: {total.toLocaleString()}.00 сом
+          </span>
         </div>
       </div>
 
-      <div className="summary-divider"></div>
+      <div className="request-summary__divider"></div>
 
-      <div className="total-amount">
-        <span>Итого: {total.toLocaleString()}.00 сом</span>
+      <div className="request-summary__total">
+        <span className="request-summary__total-label">
+          Итого: {total.toLocaleString()}.00 сом
+        </span>
       </div>
 
       <button
-        className="buy-btn"
+        type="button"
+        className="request-summary__submit"
         onClick={onSubmit}
         disabled={submitting || !items || items.length === 0}
       >
@@ -229,6 +236,7 @@ const RequestCart = ({
   onNotify,
   onRefresh,
   onCreateNewCart,
+  onClose,
 }) => {
   const dispatch = useDispatch();
   const {
@@ -438,16 +446,26 @@ const RequestCart = ({
   const isEditable = true; // TODO: проверять статус корзины
 
   return (
-    <div className="cart-page">
-      <div className="cart-container">
-        <div className="cart-header">
-          <h1>Запрос товаров</h1>
-        </div>
+    <div className="request-cart">
+      <div className="request-cart__container">
+        <header className="request-cart__header">
+          <h2 className="request-cart__title">Запрос товаров</h2>
+          {onClose && (
+            <button
+              type="button"
+              className="request-cart__close"
+              onClick={onClose}
+              aria-label="Закрыть"
+            >
+              <X size={24} />
+            </button>
+          )}
+        </header>
 
-        <div className="cart-content">
-          <div className="cart-items-section">
+        <div className="request-cart__body">
+          <div className="request-cart__items">
             {(items || []).length === 0 ? (
-              <div className="empty-cart">
+              <div className="request-cart__empty">
                 <ShoppingCart size={64} />
                 <h3>Запрос пуст</h3>
                 <p>Добавьте товары в запрос</p>
@@ -465,7 +483,7 @@ const RequestCart = ({
             )}
           </div>
 
-          <div className="order-section">
+          <aside className="request-cart__sidebar">
             <div className="client-selector">
               <label className="selector-label">Выберите клиента</label>
               <div className="selector-dropdown">
@@ -695,7 +713,7 @@ const RequestCart = ({
               onSubmit={handleSubmit}
               submitting={submitting}
             />
-          </div>
+          </aside>
         </div>
       </div>
     </div>

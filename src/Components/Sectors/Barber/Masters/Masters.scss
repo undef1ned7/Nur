@@ -718,7 +718,10 @@
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  visibility: visible;
+  opacity: 1;
+  z-index: 1;
 
   &::before {
     content: "";
@@ -802,6 +805,9 @@
   display: inline;
   position: relative;
   z-index: 1;
+  visibility: visible;
+  opacity: 1;
+  white-space: nowrap;
 }
 
 /* Поиск */
@@ -892,7 +898,7 @@
   background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 
   &::before {
     content: "";
@@ -1007,6 +1013,10 @@
   gap: 8px;
   min-width: fit-content;
   flex-wrap: wrap;
+  visibility: visible;
+  opacity: 1;
+  z-index: 1;
+  position: relative;
 }
 
 /* Кнопка копирования в модалке логина */
@@ -1505,72 +1515,136 @@
 }
 
 /* ====== Адаптив ====== */
+@media (max-width: 1024px) {
+  .barbermasters {
+    &__actions {
+      grid-template-columns: auto minmax(200px, 1fr) minmax(200px, 1fr) auto;
+      gap: 10px;
+    }
+
+    &__card {
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    &__cardActions {
+      width: 100%;
+      justify-content: flex-start;
+      margin-left: 0;
+      margin-top: 8px;
+    }
+  }
+}
+
 @media (max-width: 900px) {
   .barbermasters {
+    padding: 20px;
+    gap: 16px;
+
     &__header {
       grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    &__title {
+      font-size: 22px;
     }
 
     &__actions {
-      grid-template-columns: 1fr 44px;
+      grid-template-columns: 1fr;
       grid-template-areas:
-        "tabs plus"
-        "role role"
-        "search search";
-      align-items: start;
-      gap: 10px;
+        "tabs"
+        "role"
+        "search"
+        "plus";
+      gap: 12px;
     }
 
     &__tabs {
       grid-area: tabs;
+      width: 100%;
+      justify-content: center;
     }
 
     &__select {
       grid-area: role;
+      width: 100%;
+      min-width: 100%;
     }
 
     &__search {
       grid-area: search;
+      width: 100%;
     }
 
     &__actions > .barbermasters__btn--primary {
       grid-area: plus;
-      justify-self: end;
-      align-self: start;
+      justify-self: stretch;
+      width: 100%;
+      max-width: 100%;
     }
 
     &__list {
-      max-height: 70dvh;
+      max-height: 60dvh;
+      gap: 10px;
     }
-  }
-  .barbermasters__header {
-    grid-template-columns: 1fr;
-  }
-  .barbermasters__actions {
-    grid-template-columns: 1fr 44px;
-    grid-template-areas:
-      "tabs plus"
-      "role role"
-      "search search";
-    align-items: start;
-    gap: 10px;
-  }
-  .barbermasters__tabs {
-    grid-area: tabs;
-  }
-  .barbermasters__select {
-    grid-area: role;
-  }
-  .barbermasters__search {
-    grid-area: search;
-  }
-  .barbermasters__actions > .barbermasters__btn--primary {
-    grid-area: plus;
-    justify-self: end;
-    align-self: start;
-  }
-  .barbermasters__list {
-    max-height: 70dvh;
+
+    &__card {
+      padding: 14px 16px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    &__cardLeft {
+      width: 100%;
+      gap: 12px;
+    }
+
+    &__cardActions {
+      width: 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    &__cardActions .barbermasters__btn {
+      flex: 1 1 auto;
+      min-width: 120px;
+      justify-content: center;
+
+      &Text {
+        display: inline !important;
+      }
+    }
+
+    &__pager {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    &__pageList {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    &__modal {
+      width: min(95vw, 600px);
+      max-height: 90dvh;
+      border-radius: 16px;
+    }
+
+    &__grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 12px var(--padX);
+    }
+
+    &__overlay {
+      padding: 12px;
+    }
   }
 }
 
@@ -1578,72 +1652,346 @@
   .barbermasters {
     padding: 16px;
     border-radius: 12px;
+    gap: 14px;
 
     &__title {
-      font-size: 18px;
+      font-size: 20px;
     }
 
-    &__btnText {
-      display: none;
+    &__subtitle {
+      font-size: 13px;
+    }
+
+    &__btn {
+      height: 40px;
+      padding: 0 14px;
+      font-size: 13px;
+      min-width: 44px;
+      visibility: visible;
+      opacity: 1;
+
+      // Всегда показываем текст кнопок
+      &Text {
+        display: inline !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+    }
+
+    // В карточках действий всегда показываем текст
+    &__cardActions .barbermasters__btn {
+      &Text {
+        display: inline !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+    }
+
+    &__tabs {
+      gap: 6px;
+      padding: 3px;
+    }
+
+    &__searchInput {
+      height: 40px;
+      font-size: 14px;
+      padding: 8px 14px 8px 38px;
+    }
+
+    &__list {
+      max-height: 55dvh;
+      gap: 8px;
+    }
+
+    &__card {
+      padding: 12px 14px;
+      border-radius: 12px;
+    }
+
+    &__avatar {
+      min-width: 40px;
+      height: 40px;
+      font-size: 14px;
+    }
+
+    &__name {
+      font-size: 16px;
+    }
+
+    &__meta {
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    &__meta .bm-item {
+      font-size: 12px;
+    }
+
+    &__cardActions {
+      gap: 6px;
+    }
+
+    &__btn {
+      height: 36px;
+      padding: 0 12px;
+      font-size: 12px;
+      min-width: auto;
+      flex: 0 1 auto;
     }
 
     &__modal {
       width: 96vw;
-      max-height: 94dvh;
+      max-height: 92dvh;
+      border-radius: 14px;
+    }
+
+    &__modalHeader {
+      padding: 16px;
+    }
+
+    &__modalTitle {
+      font-size: 18px;
     }
 
     &__grid {
-      grid-template-columns: 1fr;
+      padding: 12px 16px;
+      gap: 12px;
+    }
+
+    &__input {
+      height: 42px;
+      font-size: 14px;
+      padding: 0 14px;
+    }
+
+    &__selectControl {
+      height: 42px;
+      font-size: 14px;
+    }
+
+    &__footer {
+      padding: 12px 16px;
+      flex-direction: column-reverse;
+    }
+
+    &__footerRight {
+      width: 100%;
+      flex-direction: column;
+    }
+
+    &__footer .barbermasters__btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    &__pager {
+      gap: 4px;
+      padding: 10px 0;
+    }
+
+    &__pageBtn {
+      padding: 8px 12px;
+      font-size: 13px;
+      min-width: 36px;
     }
 
     &__select {
       min-width: 100%;
     }
+
+    &__selectMenu {
+      max-height: 280px;
+    }
   }
-  .barbermasters__title {
-    font-size: 18px;
-  }
-  .barbermasters__btnText {
-    display: none;
-  }
-  .barbermasters__modal {
-    width: 96vw;
-    max-height: 94dvh;
-  }
-  .barbermasters__grid {
-    grid-template-columns: 1fr;
-  }
-  .barbermasters__select {
-    min-width: 100%;
+}
+
+@media (max-width: 480px) {
+  .barbermasters {
+    padding: 12px;
+    gap: 12px;
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__subtitle {
+      font-size: 12px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__btn {
+      height: 38px;
+      padding: 0 12px;
+    }
+
+    &__list {
+      max-height: 50dvh;
+    }
+
+    &__card {
+      padding: 10px 12px;
+    }
+
+    &__cardActions {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    &__cardActions .barbermasters__btn {
+      width: 100%;
+      justify-content: center;
+      min-width: auto;
+
+      &Text {
+        display: inline !important;
+      }
+    }
+
+    &__modal {
+      width: 98vw;
+      max-height: 95dvh;
+      border-radius: 12px;
+    }
+
+    &__modalHeader {
+      padding: 12px;
+    }
+
+    &__modalTitle {
+      font-size: 16px;
+    }
+
+    &__grid {
+      padding: 10px 12px;
+      gap: 10px;
+    }
+
+    &__input {
+      height: 40px;
+      font-size: 14px;
+      padding: 0 12px;
+    }
+
+    &__label {
+      font-size: 13px;
+    }
+
+    &__footer {
+      padding: 10px 12px;
+    }
+
+    &__pager {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__pageList {
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    &__pageBtn {
+      flex: 1 1 auto;
+      min-width: 40px;
+    }
   }
 }
 
 @media (max-width: 380px) {
   .barbermasters {
-    padding: 14px;
+    padding: 10px;
+    gap: 10px;
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__subtitle {
+      font-size: 11px;
+    }
+
+    &__btn {
+      height: 36px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+
+    &__card {
+      padding: 8px 10px;
+    }
+
+    &__avatar {
+      min-width: 36px;
+      height: 36px;
+      font-size: 12px;
+    }
+
+    &__name {
+      font-size: 14px;
+    }
+
+    &__meta .bm-item {
+      font-size: 11px;
+    }
+
+    &__input {
+      height: 38px;
+      font-size: 13px;
+      padding: 0 10px;
+    }
+
+    &__selectControl {
+      height: 38px;
+      font-size: 13px;
+      padding: 0 32px 0 12px;
+    }
+
+    &__modal {
+      width: 100vw;
+      max-height: 100dvh;
+      border-radius: 0;
+    }
+
+    &__overlay {
+      padding: 0;
+    }
   }
 }
 
 @media (max-width: 320px) {
   .barbermasters {
-    padding: 12px;
-    gap: 14px;
+    padding: 8px;
+    gap: 8px;
+
+    &__title {
+      font-size: 15px;
+    }
 
     &__input {
       font-size: 13px;
-      padding: 0 10px;
+      padding: 0 8px;
+      height: 36px;
+    }
+
+    &__btn {
+      height: 34px;
+      padding: 0 8px;
+      font-size: 11px;
     }
 
     &__footer .barbermasters__btn {
       flex: 1 1 100%;
+      width: 100%;
     }
-  }
-  .barbermasters__input {
-    font-size: 13px;
-    padding: 0 10px;
-  }
-  .barbermasters__footer .barbermasters__btn {
-    flex: 1 1 100%;
+
+    &__pageBtn {
+      padding: 6px 10px;
+      font-size: 12px;
+      min-width: 32px;
+    }
   }
 }
 

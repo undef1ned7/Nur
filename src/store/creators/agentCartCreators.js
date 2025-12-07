@@ -95,6 +95,7 @@ export const checkoutAgentCart = createAsyncThunk(
         ...(client_id && { client_id }),
         ...(department_id && { department_id }),
         ...(agent && { agent }),
+        payment_method: "transfer",
       });
       return data;
     } catch (error) {

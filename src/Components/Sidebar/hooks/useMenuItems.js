@@ -39,14 +39,16 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
    * Получает секторные пункты меню
    */
   const getSectorMenuItems = useCallback(() => {
-    if (!sector || !company?.sector?.name) return [];
+    // Используем переданный sector или берем из company
+    const currentSector = sector || company?.sector?.name;
+    if (!currentSector) return [];
 
     // Для тарифа "Старт" не показываем секторные пункты меню
     if (tariff === "Старт") {
       return [];
     }
 
-    const sectorName = company.sector.name.toLowerCase();
+    const sectorName = currentSector.toLowerCase();
     const sectorKey = sectorName.replace(/\s+/g, "_");
 
     // Маппинг названий секторов на ключи конфигурации
@@ -162,10 +164,15 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     // Собираем все пункты
     items = [...basicItems];
 
-    // Вставляем секторные пункты после "Обзор"
-    const overviewIndex = items.findIndex((item) => item.label === "Обзор");
-    if (overviewIndex !== -1 && sectorItems.length > 0) {
-      items.splice(overviewIndex + 1, 0, ...sectorItems);
+    // Вставляем секторные пункты после "Обзор" (если он есть), иначе в начало
+    if (sectorItems.length > 0) {
+      const overviewIndex = items.findIndex((item) => item.label === "Обзор");
+      if (overviewIndex !== -1) {
+        items.splice(overviewIndex + 1, 0, ...sectorItems);
+      } else {
+        // Если "Обзор" не найден, добавляем секторные пункты в начало
+        items.unshift(...sectorItems);
+      }
     }
 
     // Добавляем дополнительные услуги перед "Настройки"
