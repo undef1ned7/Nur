@@ -43,13 +43,65 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 const Layout = () => {
   const dispatch = useDispatch();
   const { company } = useUser();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // На десктопе по умолчанию сайдбар открыт, на мобильных - закрыт
+  // Но учитываем настройку автоматического закрытия
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const isDesktop = window.innerWidth >= 769;
+      const sidebarAutoClose =
+        localStorage.getItem("sidebarAutoClose") === "true";
+
+      // На десктопе: открыт по умолчанию, если настройка не требует закрытия
+      if (isDesktop) {
+        return !sidebarAutoClose;
+      }
+      // На мобильных: закрыт по умолчанию
+      return false;
+    }
+    return true; // По умолчанию открыт для SSR
+  });
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
     dispatch(getCompany());
   }, [dispatch]);
+
+  // Проверяем настройку автоматического закрытия сайдбара при переходах
+  useEffect(() => {
+    const savedSetting = localStorage.getItem("sidebarAutoClose");
+    const sidebarAutoClose = savedSetting === "true";
+
+    // Только если настройка явно включена (true) - закрываем сайдбар
+    if (sidebarAutoClose) {
+      setIsSidebarOpen(false);
+    }
+    // Если настройка выключена (false) или не установлена (null) - НЕ меняем состояние сайдбара
+    // Это предотвращает "прыгание" сайдбара при переходах
+  }, [location.pathname]);
+
+  // Обновляем состояние при изменении размера окна
+  useEffect(() => {
+    const handleResize = () => {
+      const savedSetting = localStorage.getItem("sidebarAutoClose");
+      const sidebarAutoClose = savedSetting === "true";
+
+      if (window.innerWidth >= 769) {
+        // На десктопе открываем сайдбар, если настройка не требует автоматического закрытия
+        if (!sidebarAutoClose) {
+          setIsSidebarOpen(true);
+        }
+        // Если настройка включена - не меняем состояние (остается как было)
+      } else {
+        // На мобильных устройствах НЕ меняем состояние сайдбара при изменении размера
+        // Состояние должно управляться только через настройку автоматического закрытия при переходах
+        // или пользователем вручную
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // 🔹 каждый переход на новый роут — скроллим страницу наверх
   useEffect(() => {
@@ -77,7 +129,7 @@ const Layout = () => {
         className="content_background"
       ></div>
 
-      <div className="App">
+      <div className={`App ${!isSidebarOpen ? "sidebar-collapsed" : ""}`}>
         <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
         {/* Overlay для мобильных устройств */}

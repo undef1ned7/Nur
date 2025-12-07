@@ -947,7 +947,10 @@ export default function MarketClients() {
 
   // ───────────────────────── остальные вкладки
   return (
-    <section className="clients overflow-scroll">
+    <section
+      className="clients overflow-scroll maxw-full"
+      style={{ maxWidth: "100%" }}
+    >
       <nav className="tabs" aria-label="Секции">
         {TABS.map((t) => (
           <button
@@ -1010,7 +1013,7 @@ export default function MarketClients() {
         </div>
       ) : (
         <div className="overflow-auto">
-          <div className="tableContainer w-[1150px]">
+          <div className="tableContainer w-[full]">
             <div className="table w-full">
               <div className="thead">
                 <span>ФИО</span>

@@ -184,6 +184,18 @@ const Sell = () => {
     canceled: "возвращенный",
   };
 
+  const paymentMethodTranslate = {
+    cash: "Наличные",
+    card: "Карта",
+    transfer: "Перевод",
+  };
+
+  const translatePaymentMethod = (method) => {
+    if (!method) return "-";
+    const lowerMethod = method.toLowerCase();
+    return paymentMethodTranslate[lowerMethod] || method;
+  };
+
   const handleAddCashbox = async () => {
     try {
       dispatch(addCashFlows({ ...newCashbox, cashbox: selectCashBox1 }));
@@ -372,9 +384,9 @@ const Sell = () => {
                   <th>№</th>
                   <th>Клиент</th>
                   <th>Товар</th>
+                  <th>Метод оплаты</th>
                   <th>Цена</th>
                   <th>Статус</th>
-                  <th>Метод оплаты</th>
                   <th>Дата</th>
                   <th></th>
                 </tr>
@@ -405,7 +417,7 @@ const Sell = () => {
                         {item.first_item_name || "-"}
                       </td>
                       <td data-label="Метод оплаты">
-                        {item.payment_method || "-"}
+                        {translatePaymentMethod(item.payment_method)}
                       </td>
                       <td data-label="Цена">{item.total}</td>
                       <td data-label="Статус">

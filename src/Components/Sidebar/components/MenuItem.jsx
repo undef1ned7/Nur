@@ -12,6 +12,38 @@ const MenuItem = ({
   const { label, to, icon, children } = item;
   const IconComponent = typeof icon === "function" ? icon() : icon;
 
+  // Проверяем настройку автоматического закрытия сайдбара
+  const shouldCloseOnClick = () => {
+    const isMobile = window.innerWidth < 769;
+    const sidebarAutoClose =
+      localStorage.getItem("sidebarAutoClose") === "true";
+
+    // На мобильных всегда закрываем при клике
+    if (isMobile) {
+      return true;
+    }
+
+    // На десктопе закрываем только если настройка включена
+    return sidebarAutoClose;
+  };
+
+  const handleClick = (e) => {
+    if (children) {
+      if (!isDropdownOpen) {
+        e.preventDefault();
+        onToggleDropdown();
+      } else {
+        if (shouldCloseOnClick()) {
+          toggleSidebar();
+        }
+      }
+    } else {
+      if (shouldCloseOnClick()) {
+        toggleSidebar();
+      }
+    }
+  };
+
   return (
     <li
       className={`sidebar__menu-item-wrapper ${children ? "has-children" : ""}`}
@@ -21,18 +53,7 @@ const MenuItem = ({
         className={({ isActive }) =>
           `sidebar__menu-item ${isActive ? "sidebar__menu-item--active" : ""}`
         }
-        onClick={(e) => {
-          if (children) {
-            if (!isDropdownOpen) {
-              e.preventDefault();
-              onToggleDropdown();
-            } else {
-              toggleSidebar();
-            }
-          } else {
-            toggleSidebar();
-          }
-        }}
+        onClick={handleClick}
       >
         {IconComponent}
         <span>{label}</span>
@@ -51,7 +72,11 @@ const MenuItem = ({
                       isActive ? "sidebar__submenu-item--active" : ""
                     }`
                   }
-                  onClick={toggleSidebar}
+                  onClick={() => {
+                    if (shouldCloseOnClick()) {
+                      toggleSidebar();
+                    }
+                  }}
                 >
                   {ChildIcon}
                   <span>{child.label}</span>

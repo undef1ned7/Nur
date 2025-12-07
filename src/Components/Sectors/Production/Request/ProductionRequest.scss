@@ -708,20 +708,23 @@
   left: 0;
   right: 0;
   bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  padding: 0;
 }
 
 .product-detail-modal {
   background: white;
-  border-radius: 12px;
-  max-width: 900px;
+  border-radius: 0;
+  max-width: 100%;
   width: 100%;
-  max-height: 90vh;
+  max-height: 100vh;
+  height: 100vh;
   overflow-y: auto;
   position: relative;
 
@@ -1079,20 +1082,23 @@
   left: 0;
   right: 0;
   bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  padding: 0;
 }
 
 .cart-modal {
   background: white;
-  border-radius: 12px;
-  max-width: 1200px;
+  border-radius: 0;
+  max-width: 100%;
   width: 100%;
-  max-height: 90vh;
+  max-height: 100vh;
+  height: 100vh;
   overflow: hidden;
   position: relative;
 
