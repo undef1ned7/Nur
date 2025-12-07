@@ -4,8 +4,8 @@
 
 $radius: 16px;
 $shadow: 0 8px 28px rgba(2, 6, 23, 0.12);
-$slot-h: 56px;
-$col-header-h: 56px;
+$slot-h: 32px;
+$col-header-h: 60px;
 .barberrecorda,
 .barberrecorda * {
   box-sizing: border-box;
@@ -20,6 +20,7 @@ $col-header-h: 56px;
   flex-direction: column;
   gap: 10px;
   color: var(--text);
+  --safe-pad: 40px; // <<< ДОБАВЬ ЭТУ СТРОКУ
 
   /* ===== top bar ===== */
   &__topBar {
@@ -169,16 +170,16 @@ $col-header-h: 56px;
 
   &__cols {
     display: flex;
-    gap: 12px;
+    gap: 6px;
     position: relative;
     padding: 8px;
   }
 
   &__calCol {
     position: relative;
-    flex: 0 0 360px;
-    min-width: 320px;
-    max-width: 440px;
+    flex: 0 0 240px;
+    min-width: 240px;
+    max-width: 320px;
     border: 1px solid var(--border);
     border-radius: 14px;
     background: #fff;
@@ -246,7 +247,7 @@ $col-header-h: 56px;
 
   &__eventsArea {
     position: relative;
-    padding-bottom: var(--safe-pad);
+    padding-bottom: 40px;
   }
 
   &__emptyInCol {
@@ -264,8 +265,8 @@ $col-header-h: 56px;
     position: absolute;
     z-index: 1;
     border: 1px solid;
-    border-radius: 16px;
-    padding: 12px;
+    border-radius: 12px;      // было 16px
+    padding: 8px 10px;        // было 12px
     cursor: pointer;
     overflow: hidden;
     transition: transform 0.06s ease, background 0.06s ease,
@@ -290,7 +291,7 @@ $col-header-h: 56px;
     gap: 6px;
     align-items: center;
     font-weight: 900;
-    font-size: 14px;
+    font-size: 13px;
     font-variant-numeric: tabular-nums;
     line-height: 1.15;
     white-space: nowrap;
@@ -299,7 +300,7 @@ $col-header-h: 56px;
   &__eventSvc {
     margin-top: 0;
     font-weight: 800;
-    font-size: 14px;
+    font-size: 13px;
     overflow: hidden;
     text-overflow: ellipsis;
     -webkit-line-clamp: 2;
@@ -309,7 +310,7 @@ $col-header-h: 56px;
 
   &__eventClient {
     color: var(--text);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     margin-top: 2px;
     overflow: hidden;
