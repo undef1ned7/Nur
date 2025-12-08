@@ -29,10 +29,11 @@
 
 // const ts = (iso) => new Date(iso).getTime();
 
-// const SLOT_MIN = 30;
-// const SLOT_PX = 56;
-// const COL_HEADER_H = 56;
-// const SAFE_PAD = 72;
+// /* ===== размеры тайм-линии (компактные, как на первом скрине) ===== */
+// const SLOT_MIN = 30;      // шаг 30 минут
+// const SLOT_PX = 32;       // высота слота ~32px
+// const COL_HEADER_H = 60;  // высота шапки мастера
+// const SAFE_PAD = 40;      // безопасный отступ снизу
 
 // const OPEN_HOUR = 9;
 // const CLOSE_HOUR = 21;
@@ -106,9 +107,7 @@
 //           const first = e.first_name ?? "";
 //           const last = e.last_name ?? "";
 //           const name =
-//             ([last, first].filter(Boolean).join(" ").trim()) ||
-//             e.email ||
-//             "—";
+//             ([last, first].filter(Boolean).join(" ").trim()) || e.email || "—";
 //           return { id: e.id, name };
 //         })
 //         .sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -298,6 +297,7 @@
 // export default Recorda;
 
 
+
 // Recorda.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
@@ -338,25 +338,9 @@ const SAFE_PAD = 40;      // безопасный отступ снизу
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21;
 
-/* строка времени услуги -> минуты */
-const parseDurationMin = (raw) => {
-  if (raw == null) return 0;
-  const s = String(raw).trim().toLowerCase();
-  const hm = s.match(/^(\d{1,2})\s*:\s*(\d{1,2})$/);
-  if (hm) {
-    const h = +hm[1] || 0;
-    const m = +hm[2] || 0;
-    return Math.max(0, h * 60 + m);
-  }
-  const m2 = s.match(
-    /(?:(\d+)\s*(?:час|ч|h)[а-я]*)?\s*(?:(\d+)\s*(?:мин|m|min)?)?/
-  );
-  if (m2 && (m2[1] || m2[2])) {
-    return (+m2[1] || 0) * 60 + (+m2[2] || 0);
-  }
-  const n = Number(s.replace(/[^\d.]/g, ""));
-  return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
-};
+/* статусы, которые можно автоматически завершать */
+const AUTO_COMPLETE_SOURCE = new Set(["booked", "confirmed"]);
+const AUTO_COMPLETE_TARGET = "completed";
 
 const Recorda = () => {
   const [appointments, setAppointments] = useState([]);
@@ -542,6 +526,46 @@ const Recorda = () => {
     setModalOpen(false);
   };
 
+  /* ===== авто-завершение записей после конца времени ===== */
+  useEffect(() => {
+    const checkAndAutoComplete = async () => {
+      if (!appointments.length) return;
+      const now = Date.now();
+
+      const toUpdate = appointments.filter((a) => {
+        if (!a.end_at) return false;
+        if (!AUTO_COMPLETE_SOURCE.has(a.status)) return false;
+        const endTs = new Date(a.end_at).getTime();
+        return Number.isFinite(endTs) && endTs <= now;
+      });
+
+      if (!toUpdate.length) return;
+
+      try {
+        await Promise.all(
+          toUpdate.map((a) =>
+            api.patch(`/barbershop/appointments/${a.id}/`, {
+              status: AUTO_COMPLETE_TARGET,
+            })
+          )
+        );
+        // обновим данные после авто-завершения
+        await fetchAll();
+      } catch (e) {
+        // тихо в консоль, чтобы не спамить пользователю
+        console.error("Авто-завершение записей:", e);
+      }
+    };
+
+    // сразу после загрузки/обновления данных
+    checkAndAutoComplete();
+
+    // затем проверка раз в минуту
+    const timer = setInterval(checkAndAutoComplete, 60_000);
+    return () => clearInterval(timer);
+    // appointments в зависимостях, чтобы при обновлении данных пересоздавать таймер
+  }, [appointments]);
+
   return (
     <div className="barberrecorda">
       <RecordaHeader
@@ -595,3 +619,23 @@ const Recorda = () => {
 };
 
 export default Recorda;
+
+/* строка времени услуги -> минуты */
+function parseDurationMin(raw) {
+  if (raw == null) return 0;
+  const s = String(raw).trim().toLowerCase();
+  const hm = s.match(/^(\d{1,2})\s*:\s*(\d{1,2})$/);
+  if (hm) {
+    const h = +hm[1] || 0;
+    const m = +hm[2] || 0;
+    return Math.max(0, h * 60 + m);
+  }
+  const m2 = s.match(
+    /(?:(\d+)\s*(?:час|ч|h)[а-я]*)?\s*(?:(\d+)\s*(?:мин|m|min)?)?/
+  );
+  if (m2 && (m2[1] || m2[2])) {
+    return (+m2[1] || 0) * 60 + (+m2[2] || 0);
+  }
+  const n = Number(s.replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+}
