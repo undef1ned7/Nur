@@ -1025,7 +1025,7 @@ export default function MarketClients() {
               <div className="tbody ">
                 {filtered.map((c) => (
                   <div
-                    className="row"
+                    className="row grid grid-cols-[2fr_1.3fr_1fr_1fr_100px]"
                     key={c.id}
                     onClick={() => openCard(c)}
                     role="button"

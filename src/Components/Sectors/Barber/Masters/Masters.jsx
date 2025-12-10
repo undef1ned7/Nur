@@ -2020,8 +2020,8 @@ const Masters = () => {
               </button>
             </div>
             <div className="barbermasters__content">
-              <p className="barbermasters__label">
-                Логин: <b>{employData?.email}</b>
+              <p className="barbermasters__label flex justify-between">
+                <b>Логин: {employData?.email}</b>
                 <button
                   className="barbermasters__iconBtn barbermasters__copyBtn"
                   onClick={() =>
@@ -2034,8 +2034,8 @@ const Masters = () => {
                 </button>
               </p>
 
-              <p className="barbermasters__label">
-                Пароль: <b>{employData?.generated_password}</b>
+              <p className="barbermasters__label flex justify-between">
+                <b>Пароль: {employData?.generated_password}</b>
                 <button
                   className="barbermasters__iconBtn barbermasters__copyBtn"
                   onClick={() =>

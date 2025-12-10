@@ -79,6 +79,7 @@ import SchoolDocuments from "../Components/Sectors/School/Documents/Documents";
 // Market
 import MarketBar from "../Components/Sectors/Market/Bar/Bar";
 import MarketWarehouse from "../Components/Sectors/Market/Warehouse/Warehouse";
+import MarketProductDetail from "../Components/Sectors/Market/Warehouse/components/ProductDetail";
 import MarketCategories from "../Components/Sectors/Market/Categories/Categories";
 import MarketClients from "../Components/Sectors/Market/Clients/Clients";
 import MarketClientDetails from "../Components/Sectors/Market/ClientDetails/ClientDetails";
@@ -244,6 +245,7 @@ export const crmRoutes = (profile) => [
   // Market routes
   createProtectedRoute("market/bar", MarketBar),
   createProtectedRoute("market/warehouse", MarketWarehouse),
+  createProtectedRoute("market/warehouse/:id", MarketProductDetail),
   createProtectedRoute("market/categories", MarketCategories),
   createProtectedRoute("clients", MarketClients),
   createProtectedRoute("clients/:id", MarketClientDetails),
