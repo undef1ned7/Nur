@@ -119,7 +119,7 @@ $container-max: 1200px;
     height: $control-h;
     border: 1px solid rgba(255,255,255,.18);
     border-radius: $radius;
-    background: rgba(18,22,30,.45);
+    // background: rgba(18,22,30,.45);
 
     cursor: pointer;
     transition: background .18s ease, border-color .18s ease;

@@ -1,5 +1,5 @@
 // src/Components/Sectors/Production/ProductionAgents/UniversalModal/SellStart.jsx
-import { Minus, Plus, Search } from "lucide-react";
+import { Minus, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
@@ -579,6 +579,9 @@ const SellStart = ({ show, setShow }) => {
     quantity: "1",
   });
 
+  // Количество товаров для таблицы
+  const [itemQuantities, setItemQuantities] = useState({});
+
   const [selectedId, setSelectedId] = useState(null);
   const selectedItem = useMemo(() => {
     if (isPilorama) {
@@ -809,6 +812,228 @@ const SellStart = ({ show, setShow }) => {
     setSelectedId(item.id);
   };
 
+  // Функции для работы с товарами в таблице
+  const handleIncreaseQty = async (item) => {
+    if (isPilorama) {
+      if (!agentCart.currentCart?.id) return;
+      try {
+        await dispatch(
+          updateAgentCartItemQuantity({
+            cartId: agentCart.currentCart.id,
+            itemId: item.id,
+            quantity: (Number(item.quantity) || 0) + 1,
+          })
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        console.error("Ошибка при увеличении количества:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при увеличении количества",
+        });
+      }
+    } else {
+      if (!start?.id) return;
+      try {
+        await dispatch(
+          manualFillingInAgent({
+            id: start.id,
+            productId: item.product || item.id,
+          })
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        console.error("Ошибка при увеличении количества:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при увеличении количества",
+        });
+      }
+    }
+  };
+
+  const handleDecreaseQty = async (item) => {
+    if (isPilorama) {
+      if (!agentCart.currentCart?.id) return;
+      const currentQty = Number(item.quantity) || 0;
+      const next = Math.max(0, currentQty - 1);
+      if (next === 0) {
+        await handleRemoveItem(item);
+        return;
+      }
+      try {
+        await dispatch(
+          updateAgentCartItemQuantity({
+            cartId: agentCart.currentCart.id,
+            itemId: item.id,
+            quantity: next,
+          })
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        console.error("Ошибка при уменьшении количества:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при уменьшении количества",
+        });
+      }
+    } else {
+      if (!start?.id) return;
+      const currentQty = Number(item.quantity) || 0;
+      const next = Math.max(0, currentQty - 1);
+      try {
+        await dispatch(
+          updateManualFillingInAgent({
+            id: start.id,
+            productId: item.id,
+            quantity: next,
+          })
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        console.error("Ошибка при уменьшении количества:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при уменьшении количества",
+        });
+      }
+    }
+  };
+
+  const handleRemoveItem = async (item) => {
+    if (isPilorama) {
+      if (!agentCart.currentCart?.id) return;
+      try {
+        await dispatch(
+          removeItemFromAgentCart({
+            cartId: agentCart.currentCart.id,
+            itemId: item.id,
+          })
+        ).unwrap();
+        onRefresh();
+        if (selectedId === item.id) {
+          setSelectedId(null);
+        }
+      } catch (error) {
+        console.error("Ошибка при удалении товара:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при удалении товара",
+        });
+      }
+    } else {
+      // Для не-Pilorama нет функции удаления, только обнуление количества
+      if (!start?.id) return;
+      try {
+        await dispatch(
+          updateManualFillingInAgent({
+            id: start.id,
+            productId: item.id,
+            quantity: 0,
+          })
+        ).unwrap();
+        onRefresh();
+        if (selectedId === item.id) {
+          setSelectedId(null);
+        }
+      } catch (error) {
+        console.error("Ошибка при удалении товара:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при удалении товара",
+        });
+      }
+    }
+  };
+
+  // Обработчик изменения количества через инпут
+  const handleItemQtyChange = (item, value) => {
+    setItemQuantities((prev) => ({
+      ...prev,
+      [item.id]: value,
+    }));
+  };
+
+  // Обработчик потери фокуса инпута количества
+  const handleItemQtyBlur = async (item) => {
+    if (isPilorama) {
+      if (!agentCart.currentCart?.id) return;
+      const inputValue = itemQuantities[item.id] || "";
+      let qtyNum;
+      if (inputValue === "" || inputValue === "0") {
+        qtyNum = item.quantity || 0;
+      } else {
+        qtyNum = Math.max(0, toNum(inputValue));
+      }
+      setItemQuantities((prev) => ({
+        ...prev,
+        [item.id]: String(qtyNum),
+      }));
+      if (qtyNum === 0) {
+        await handleRemoveItem(item);
+        return;
+      }
+      try {
+        await dispatch(
+          updateAgentCartItemQuantity({
+            cartId: agentCart.currentCart.id,
+            itemId: item.id,
+            quantity: qtyNum,
+          })
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        console.error("Ошибка при обновлении количества:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при обновлении количества",
+        });
+      }
+    } else {
+      if (!start?.id) return;
+      const inputValue = itemQuantities[item.id] || "";
+      let qtyNum;
+      if (inputValue === "" || inputValue === "0") {
+        qtyNum = item.quantity || 0;
+      } else {
+        qtyNum = Math.max(0, toNum(inputValue));
+      }
+      setItemQuantities((prev) => ({
+        ...prev,
+        [item.id]: String(qtyNum),
+      }));
+      if (qtyNum === 0) {
+        await handleRemoveItem(item);
+        return;
+      }
+      try {
+        await dispatch(
+          updateManualFillingInAgent({
+            id: start.id,
+            productId: item.id,
+            quantity: qtyNum,
+          })
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        console.error("Ошибка при обновлении количества:", error);
+        setAlert({
+          open: true,
+          type: "error",
+          message: error?.data?.detail || "Ошибка при обновлении количества",
+        });
+      }
+    }
+  };
+
+  // Старые функции для обратной совместимости (если используются где-то еще)
   const incQty = () => {
     if (!selectedItem) return;
     const newQty = (toNum(qty) || 0) + 1;
@@ -897,6 +1122,16 @@ const SellStart = ({ show, setShow }) => {
     ? agentCart.order_discount_total
     : start?.order_discount_total;
   const currentTotal = isPilorama ? agentCart.total : start?.total;
+
+  // Инициализация локальных значений количества для элементов таблицы
+  useEffect(() => {
+    const items = currentItems || [];
+    const quantities = {};
+    items.forEach((item) => {
+      quantities[item.id] = String(item.quantity ?? "");
+    });
+    setItemQuantities(quantities);
+  }, [currentItems]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -1188,7 +1423,7 @@ const SellStart = ({ show, setShow }) => {
       <div className="start__body">
         <div className="col-8">
           <div className="start__body-column">
-            <div className="sell__body-header">
+            {/* <div className="sell__body-header">
               <h2 className="start__body-title">
                 {selectedItem?.product_name}
               </h2>
@@ -1275,7 +1510,7 @@ const SellStart = ({ show, setShow }) => {
                   onChange={onDiscountChange}
                 />
               </div>
-            </div>
+            </div> */}
             <div className="start__body-wrapper">
               <div className="start__body-wrapper">
                 <table className="start__body-table">
@@ -1289,11 +1524,81 @@ const SellStart = ({ show, setShow }) => {
                         title="Выбрать позицию"
                       >
                         <td>{idx + 1}.</td>
-                        <td>{item.product_name}</td>
+                        <td>{item.product_name ?? item.display_name}</td>
                         <td>{item.unit_price}</td>
-                        <td>{item.quantity} шт</td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <button
+                              className="start__table-btn start__table-btn--minus"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDecreaseQty(item);
+                              }}
+                              title="Уменьшить количество"
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={
+                                itemQuantities[item.id] ?? item.quantity ?? ""
+                              }
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleItemQtyChange(item, e.target.value);
+                              }}
+                              onBlur={(e) => {
+                                e.stopPropagation();
+                                handleItemQtyBlur(item);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: "60px",
+                                textAlign: "center",
+                                border: "1px solid #ddd",
+                                borderRadius: "4px",
+                                padding: "4px 8px",
+                                fontSize: "14px",
+                              }}
+                              title="Редактировать количество"
+                            />
+                            <span style={{ fontSize: "14px", color: "#666" }}>
+                              шт
+                            </span>
+                            <button
+                              className="start__table-btn start__table-btn--plus"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleIncreaseQty(item);
+                              }}
+                              title="Увеличить количество"
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
+                        </td>
                         <td>
                           {Number(item.unit_price) * Number(item.quantity)}
+                        </td>
+                        <td>
+                          <button
+                            className="start__table-btn start__table-btn--delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveItem(item);
+                            }}
+                            title="Удалить товар"
+                          >
+                            <X size={16} />
+                          </button>
                         </td>
                       </tr>
                     ))}

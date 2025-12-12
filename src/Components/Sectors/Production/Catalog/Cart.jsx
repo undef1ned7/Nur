@@ -697,7 +697,7 @@ const OrderSummary = ({
   );
 };
 
-const Cart = ({ agentCartId: agentCartIdProp = null, onNotify }) => {
+const Cart = ({ agentCartId: agentCartIdProp = null, onNotify, onClose }) => {
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
 
@@ -980,8 +980,13 @@ const Cart = ({ agentCartId: agentCartIdProp = null, onNotify }) => {
   return (
     <div className="cart-page">
       <div className="cart-container">
-        <div className="cart-header">
+        <div className="cart-header flex justify-between align-center">
           <h1>Корзина</h1>
+          {onClose && (
+            <button className="close-cart-btn" onClick={onClose}>
+              <X size={20} />
+            </button>
+          )}
         </div>
 
         <div className="cart-content">

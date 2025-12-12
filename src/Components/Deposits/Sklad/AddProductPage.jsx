@@ -1,0 +1,2147 @@
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  Plus,
+  Package,
+  ShoppingBag,
+  Scan,
+  Search,
+  HelpCircle,
+  ChevronDown,
+} from "lucide-react";
+import { useClient } from "../../../store/slices/ClientSlice";
+import { useProducts } from "../../../store/slices/productSlice";
+import { useUser } from "../../../store/slices/userSlice";
+import {
+  createClientAsync,
+  fetchClientsAsync,
+} from "../../../store/creators/clientCreators";
+import {
+  addCashFlows,
+  getCashBoxes,
+  useCash,
+} from "../../../store/slices/cashSlice";
+import { createDeal } from "../../../store/creators/saleThunk";
+import AddProductBarcode from "./AddProductBarcode";
+import {
+  createProductAsync,
+  fetchProductsAsync,
+  fetchBrandsAsync,
+  fetchCategoriesAsync,
+} from "../../../store/creators/productCreators";
+import { countries } from "../../../data/countries";
+import api from "../../../api";
+import "./AddProductPage.scss";
+
+// Функция для создания долга
+async function createDebt(payload) {
+  const res = await api.post("/main/debts/", payload);
+  return res.data;
+}
+
+const AddProductPage = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { list } = useClient();
+  const {
+    creating,
+    createError,
+    brands,
+    categories,
+    scannedProduct,
+    list: products,
+  } = useProducts();
+  const { company } = useUser();
+  const { list: cashBoxes } = useCash();
+
+  // Проверка на маркет
+  const isMarketSector = useMemo(() => {
+    if (!company?.sector?.name) return false;
+    const sectorName = company.sector.name.toLowerCase().trim();
+    return (
+      sectorName === "магазин" ||
+      sectorName === "цветочный магазин" ||
+      sectorName.includes("магазин")
+    );
+  }, [company?.sector?.name]);
+
+  const [activeTab, setActiveTab] = useState(0); // 0 - Ввод вручную, 1 - Сканирование
+  const [productType, setProductType] = useState("piece"); // "piece" или "weight"
+  const [selectCashBox, setSelectCashBox] = useState("");
+
+  // Для маркета: тип товара (товар/услуга/комплект)
+  const [itemType, setItemType] = useState("product"); // "product", "service", "kit"
+
+  // Дополнительные поля для маркета
+  const [marketData, setMarketData] = useState({
+    code: "",
+    article: "",
+    unit: "шт",
+    isWeightProduct: false,
+    isFractionalService: false,
+    plu: "", // PLU код для весового товара
+    height: "0",
+    width: "0",
+    depth: "0",
+    weight: "0",
+    description: "",
+    country: "",
+    purchasePrice: "",
+    markup: "0",
+    discount: "0",
+    supplier: "",
+    minStock: "0",
+    expiryDate: "",
+    kitProducts: [], // Для комплекта
+    kitSearchTerm: "",
+    packagings: [], // Список упаковок
+  });
+
+  // Для поиска товаров в комплекте
+  const [kitSearchResults, setKitSearchResults] = useState([]);
+  const [showKitSearch, setShowKitSearch] = useState(false);
+  const [showKitRecalculateTooltip, setShowKitRecalculateTooltip] =
+    useState(false);
+
+  const [newItemData, setNewItemData] = useState({
+    name: "",
+    barcode: "",
+    brand_name: "",
+    category_name: "",
+    price: "",
+    quantity: "",
+    client: "",
+    purchase_price: "",
+    plu: "",
+    scale_type: "",
+  });
+
+  const [state, setState] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+    date: new Date().toISOString().split("T")[0],
+    type: "suppliers",
+    llc: "",
+    inn: "",
+    okpo: "",
+    score: "",
+    bik: "",
+    address: "",
+  });
+
+  const [cashData, setCashData] = useState({
+    cashbox: "",
+    type: "expense",
+    name: "",
+    amount: "",
+    source_cashbox_flow_id: "",
+    source_business_operation_id: "Склад",
+    status:
+      company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
+  });
+  const [showInputs, setShowInputs] = useState(false);
+
+  // Состояния для долга
+  const [debt, setDebt] = useState("");
+  const [amount, setAmount] = useState("");
+  const [debtMonths, setDebtMonths] = useState("");
+  const [showDebtForm, setShowDebtForm] = useState(false);
+  const [debtState, setDebtState] = useState({
+    phone: "",
+    dueDate: "",
+  });
+
+  useEffect(() => {
+    dispatch(fetchClientsAsync());
+    dispatch(getCashBoxes());
+    if (isMarketSector) {
+      dispatch(fetchBrandsAsync());
+      dispatch(fetchCategoriesAsync());
+      dispatch(fetchProductsAsync({ page: 1 }));
+    }
+  }, [dispatch, isMarketSector]);
+
+  // Автоматически выбираем первую кассу
+  useEffect(() => {
+    if (cashBoxes && cashBoxes.length > 0 && !selectCashBox) {
+      const firstCashBox = cashBoxes[0];
+      const firstCashBoxId = firstCashBox?.id || firstCashBox?.uuid || "";
+      if (firstCashBoxId) {
+        setSelectCashBox(firstCashBoxId);
+      }
+    }
+  }, [cashBoxes, selectCashBox]);
+
+  useEffect(() => {
+    setCashData((prev) => ({
+      ...prev,
+      cashbox: selectCashBox,
+      name: newItemData.name,
+      amount: newItemData.price,
+    }));
+  }, [newItemData, selectCashBox]);
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleChange = (e) => {
+    const { name, value, type } = e.target;
+    setNewItemData((prevData) => ({
+      ...prevData,
+      [name]: type === "number" ? (value === "" ? "" : parseInt(value)) : value,
+      scale_type:
+        name === "scale_type"
+          ? value
+          : prevData.scale_type || productType === "piece"
+          ? "piece"
+          : "weight",
+    }));
+  };
+
+  const onChangeDebt = (e) => {
+    const { name, value } = e.target;
+    setDebtState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Получаем выбранного поставщика для долга
+  const pickSupplier = useMemo(() => {
+    if (!newItemData.client) return null;
+    return list.find((x) => String(x.id) === String(newItemData.client));
+  }, [list, newItemData.client]);
+
+  // Автоматическое заполнение телефона при выборе поставщика в тарифе "Старт"
+  useEffect(() => {
+    if (company?.subscription_plan?.name === "Старт" && pickSupplier?.phone) {
+      setDebtState((prev) => ({ ...prev, phone: pickSupplier.phone }));
+    }
+  }, [newItemData.client, pickSupplier, company?.subscription_plan?.name]);
+
+  const handleSubmit = async () => {
+    const {
+      name,
+      barcode,
+      brand_name,
+      category_name,
+      price,
+      quantity,
+      client,
+      purchase_price,
+    } = newItemData;
+
+    // Для маркета проверяем другие обязательные поля
+    if (isMarketSector) {
+      if (!name || !barcode) {
+        alert("Пожалуйста, заполните наименование и штрих-код.");
+        return;
+      }
+      if (itemType === "product" && (!price || !purchase_price)) {
+        alert("Пожалуйста, заполните цены для товара.");
+        return;
+      }
+      if (itemType === "service" && !price) {
+        alert("Пожалуйста, заполните цену продажи для услуги.");
+        return;
+      }
+      if (
+        itemType === "kit" &&
+        (!price || marketData.kitProducts.length === 0)
+      ) {
+        alert(
+          "Пожалуйста, заполните цену продажи и добавьте товары в комплект."
+        );
+        return;
+      }
+    } else {
+      // Старая валидация для других секторов
+      if (
+        !name ||
+        !barcode ||
+        price === "" ||
+        quantity === "" ||
+        purchase_price === ""
+      ) {
+        alert("Пожалуйста, заполните все обязательные поля.");
+        return;
+      }
+    }
+
+    // Валидация для долговых операций
+    if (debt && !client) {
+      alert("Выберите поставщика для долговой операции");
+      return;
+    }
+
+    if (debt === "Долги") {
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        alert("Введите корректный срок долга");
+        return;
+      }
+      if (company?.subscription_plan?.name === "Старт") {
+        if (!debtState.dueDate) {
+          alert("Выберите дату оплаты");
+          return;
+        }
+        if (!debtState.phone) {
+          alert("Введите номер телефона поставщика");
+          return;
+        }
+      }
+    }
+
+    if (debt === "Предоплата") {
+      if (!amount || Number(amount) <= 0) {
+        alert("Введите корректную сумму предоплаты");
+        return;
+      }
+      const totalAmount = Number(purchase_price) * Number(quantity);
+      if (Number(amount) > totalAmount) {
+        alert("Сумма предоплаты не может превышать общую сумму");
+        return;
+      }
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        alert("Введите корректный срок долга");
+        return;
+      }
+    }
+
+    // Формируем payload в зависимости от сектора
+    let payload = {
+      name,
+      barcode: barcode || null,
+      brand_name: brand_name || "",
+      category_name: category_name || "",
+      price: price ? price.toString() : "0",
+      client: client || null,
+      plu: newItemData.plu ? Number(newItemData.plu) : null,
+    };
+
+    if (isMarketSector) {
+      // Для маркета формируем payload согласно API схеме
+      const characteristics = {
+        height_cm:
+          marketData.height && marketData.height !== "0"
+            ? marketData.height.toString()
+            : null,
+        width_cm:
+          marketData.width && marketData.width !== "0"
+            ? marketData.width.toString()
+            : null,
+        depth_cm:
+          marketData.depth && marketData.depth !== "0"
+            ? marketData.depth.toString()
+            : null,
+        factual_weight_kg:
+          marketData.weight && marketData.weight !== "0"
+            ? marketData.weight.toString()
+            : null,
+        description: marketData.description || "",
+      };
+
+      // Базовый payload для маркета
+      payload = {
+        name,
+        barcode: barcode || null,
+        brand_name: brand_name || "",
+        category_name: category_name || "",
+        article: marketData.article || "",
+        unit: marketData.unit || "шт",
+        is_weight: itemType === "product" ? marketData.isWeightProduct : false,
+        price: price ? price.toString() : "0",
+        discount_percent: (marketData.discount || "0").toString(),
+        country: marketData.country || "",
+        expiration_date: marketData.expiryDate || null,
+        client: client || null,
+        plu: marketData.plu
+          ? Number(marketData.plu)
+          : newItemData.plu
+          ? Number(newItemData.plu)
+          : null,
+        characteristics,
+      };
+
+      if (itemType === "product") {
+        // Для товара
+        payload = {
+          ...payload,
+          purchase_price: (
+            marketData.purchasePrice ||
+            purchase_price ||
+            "0"
+          ).toString(),
+          markup_percent: (marketData.markup || "0").toString(),
+          quantity: Number(quantity || "0"),
+          stock: true, // Товар есть на складе
+        };
+      } else if (itemType === "service") {
+        // Для услуги
+        payload = {
+          ...payload,
+          purchase_price: "0",
+          markup_percent: "0",
+          quantity: 0,
+          stock: false, // Услуги не имеют остатка
+          is_weight: marketData.isFractionalService, // Дробная услуга
+        };
+      } else if (itemType === "kit") {
+        // Для комплекта - используем item_make_ids для списка товаров в составе
+        // item_make_ids должен содержать UUID товаров, входящих в комплект
+        const kitProductIds = marketData.kitProducts
+          .map((p) => p.id)
+          .filter((id) => id); // Фильтруем пустые значения
+
+        payload = {
+          ...payload,
+          item_make_ids: kitProductIds.length > 0 ? kitProductIds : [],
+          purchase_price: "0", // Комплект не имеет цены закупки
+          markup_percent: "0",
+          quantity: 0, // Комплекты собираются из других товаров
+          stock: false,
+        };
+      }
+    } else {
+      // Старый формат для других секторов
+      payload = {
+        ...payload,
+        price: price.toString(),
+        quantity: Number(quantity),
+        purchase_price,
+        scale_type:
+          newItemData.scale_type ||
+          (productType === "piece" ? "piece" : "weight"),
+      };
+    }
+
+    try {
+      const product = await dispatch(createProductAsync(payload)).unwrap();
+      const totalAmount = Number(product?.purchase_price * product?.quantity);
+
+      // Создание долга, если выбран
+      if (debt === "Долги" && client) {
+        if (company?.subscription_plan?.name === "Старт") {
+          await createDebt({
+            name: pickSupplier?.full_name,
+            phone: debtState.phone,
+            due_date: debtState.dueDate,
+            amount: totalAmount,
+          });
+        }
+
+        // Создание сделки
+        await dispatch(
+          createDeal({
+            clientId: client,
+            title: `Долг ${pickSupplier?.full_name}`,
+            statusRu: debt,
+            amount: totalAmount,
+            debtMonths: Number(debtMonths),
+          })
+        ).unwrap();
+      }
+
+      if (debt === "Предоплата" && client) {
+        await dispatch(
+          createDeal({
+            clientId: client,
+            title: `Предоплата ${pickSupplier?.full_name}`,
+            statusRu: debt,
+            amount: totalAmount,
+            prepayment: Number(amount),
+            debtMonths: Number(debtMonths),
+          })
+        ).unwrap();
+      }
+
+      // Добавление денежного потока только если не долг
+      if (debt !== "Долги") {
+        const amountForCash = debt === "Предоплата" ? amount : totalAmount;
+        await dispatch(
+          addCashFlows({
+            ...cashData,
+            amount: amountForCash,
+            source_cashbox_flow_id: product.id,
+          })
+        ).unwrap();
+      }
+
+      if (client !== "" && !debt) {
+        await dispatch(
+          createDeal({
+            clientId: newItemData?.client,
+            title: newItemData?.name,
+            statusRu: "Продажа",
+            amount: totalAmount,
+          })
+        ).unwrap();
+      }
+
+      // Очищаем данные долга
+      setDebt("");
+      setAmount("");
+      setDebtMonths("");
+      setShowDebtForm(false);
+      setDebtState({
+        phone: "",
+        dueDate: "",
+      });
+
+      alert("Товар успешно добавлен!");
+      navigate("/crm/sklad");
+    } catch (err) {
+      console.error("Failed to create product:", err);
+      alert(
+        `Ошибка при добавлении товара: ${err.message || JSON.stringify(err)}`
+      );
+    }
+  };
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await dispatch(createClientAsync(state)).unwrap();
+      dispatch(fetchClientsAsync());
+      setShowInputs(false);
+    } catch (e) {
+      console.log(e);
+    }
+  };
+  const filterClient = list.filter((item) => item.type === "suppliers");
+
+  // Генерируем штрих-код автоматически если пустой
+  useEffect(() => {
+    if (!newItemData.barcode) {
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 1000);
+      setNewItemData((prev) => ({
+        ...prev,
+        barcode: `${timestamp}${random}`.slice(0, 13),
+      }));
+    }
+  }, []);
+
+  // Генерируем ПЛУ автоматически если пустой
+  useEffect(() => {
+    if (!newItemData.plu) {
+      setNewItemData((prev) => ({
+        ...prev,
+        plu: "0001",
+      }));
+    }
+  }, []);
+
+  // Генерируем код товара для маркета
+  useEffect(() => {
+    if (isMarketSector && !marketData.code) {
+      const lastCode =
+        products.length > 0
+          ? Math.max(...products.map((p) => parseInt(p.code || "0") || 0))
+          : 0;
+      const newCode = String(lastCode + 1).padStart(5, "0");
+      setMarketData((prev) => ({ ...prev, code: newCode }));
+    }
+  }, [isMarketSector, products]);
+
+  // Обработчик изменения данных для маркета
+  const handleMarketDataChange = (field, value) => {
+    setMarketData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Генерация штрих-кода для маркета
+  const generateBarcode = () => {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    const barcode = `${timestamp}${random}`.slice(0, 13);
+    setNewItemData((prev) => ({ ...prev, barcode }));
+  };
+
+  // Поиск товаров для комплекта
+  const handleKitSearch = (searchTerm) => {
+    handleMarketDataChange("kitSearchTerm", searchTerm);
+    if (searchTerm.trim()) {
+      const filtered = products.filter((p) =>
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setKitSearchResults(filtered.slice(0, 10));
+      setShowKitSearch(true);
+    } else {
+      setKitSearchResults([]);
+      setShowKitSearch(false);
+    }
+  };
+
+  // Добавление товара в комплект
+  const addProductToKit = (product) => {
+    if (!marketData.kitProducts.find((p) => p.id === product.id)) {
+      const updatedKitProducts = [
+        ...marketData.kitProducts,
+        { ...product, quantity: 1 },
+      ];
+      setMarketData((prev) => ({
+        ...prev,
+        kitProducts: updatedKitProducts,
+      }));
+      // Цена будет автоматически пересчитана через useEffect
+    }
+    handleMarketDataChange("kitSearchTerm", "");
+    setShowKitSearch(false);
+  };
+
+  // Удаление товара из комплекта
+  const removeProductFromKit = (productId) => {
+    const updatedKitProducts = marketData.kitProducts.filter(
+      (p) => p.id !== productId
+    );
+    setMarketData((prev) => ({
+      ...prev,
+      kitProducts: updatedKitProducts,
+    }));
+    // Цена будет автоматически пересчитана через useEffect
+  };
+
+  // Обновление количества товара в комплекте
+  const handleUpdateKitProductQuantity = (productId, quantity) => {
+    const updatedKitProducts = marketData.kitProducts.map((p) =>
+      p.id === productId ? { ...p, quantity: parseFloat(quantity) || 1 } : p
+    );
+    setMarketData((prev) => ({
+      ...prev,
+      kitProducts: updatedKitProducts,
+    }));
+    // Цена будет автоматически пересчитана через useEffect
+  };
+
+  // Пересчет стоимости комплекта
+  const recalculateKitPrice = () => {
+    const totalCost = marketData.kitProducts.reduce((sum, item) => {
+      // Используем цену продажи товара, если есть, иначе цену закупки
+      const itemPrice = parseFloat(item.price || item.purchase_price || 0);
+      const itemQuantity = parseFloat(item.quantity || 1);
+      return sum + itemPrice * itemQuantity;
+    }, 0);
+    const calculatedPrice = Math.round(totalCost * 100) / 100;
+    handleMarketDataChange("purchasePrice", calculatedPrice.toString());
+    // Устанавливаем цену продажи равной сумме стоимостей товаров
+    setNewItemData((prev) => ({
+      ...prev,
+      price: calculatedPrice.toString(),
+    }));
+  };
+
+  return (
+    <div className="add-product-page">
+      <div className="add-product-page__header">
+        <button
+          className="add-product-page__back"
+          onClick={() => navigate("/crm/sklad")}
+        >
+          <ArrowLeft size={20} />
+          Вернуться к складу
+        </button>
+        <div className="add-product-page__title-section">
+          <div className="add-product-page__icon">
+            <Plus size={24} />
+          </div>
+          <div>
+            <h1 className="add-product-page__title">Добавление товара</h1>
+            <p className="add-product-page__subtitle">
+              Заполните информацию о новом товаре
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="add-product-page__content">
+        {isMarketSector ? (
+          // Форма для маркета с выбором типа товара/услуги/комплекта
+          <MarketProductForm
+            itemType={itemType}
+            setItemType={setItemType}
+            newItemData={newItemData}
+            setNewItemData={setNewItemData}
+            marketData={marketData}
+            handleMarketDataChange={handleMarketDataChange}
+            handleChange={handleChange}
+            brands={brands || []}
+            categories={categories || []}
+            products={products || []}
+            filterClient={list.filter((item) => item.type === "suppliers")}
+            handleSubmit={handleSubmit}
+            creating={creating}
+            navigate={navigate}
+            generateBarcode={generateBarcode}
+            handleKitSearch={handleKitSearch}
+            kitSearchResults={kitSearchResults}
+            showKitSearch={showKitSearch}
+            setShowKitSearch={setShowKitSearch}
+            addProductToKit={addProductToKit}
+            removeProductFromKit={removeProductFromKit}
+            recalculateKitPrice={recalculateKitPrice}
+            handleUpdateKitProductQuantity={handleUpdateKitProductQuantity}
+            showKitRecalculateTooltip={showKitRecalculateTooltip}
+            setShowKitRecalculateTooltip={setShowKitRecalculateTooltip}
+          />
+        ) : (
+          <>
+            {/* Табы для выбора метода ввода */}
+            <div className="add-product-page__tabs">
+              <button
+                className={`add-product-page__tab ${
+                  activeTab === 0 ? "add-product-page__tab--active" : ""
+                }`}
+                onClick={() => setActiveTab(0)}
+              >
+                <Package size={18} />
+                Ввод вручную
+              </button>
+              <button
+                className={`add-product-page__tab ${
+                  activeTab === 1 ? "add-product-page__tab--active" : ""
+                }`}
+                onClick={() => setActiveTab(1)}
+              >
+                <Scan size={18} />
+                Сканирование
+              </button>
+            </div>
+
+            {activeTab === 1 ? (
+              // Вкладка сканирования
+              <div className="add-product-page__scan-section">
+                {!scannedProduct && (
+                  <div className="add-product-page__scan-box">
+                    <Scan size={48} />
+                    <h3>Сканирование товара</h3>
+                    <p>
+                      Отсканируйте штрих-код товара для автоматического
+                      добавления в склад
+                    </p>
+                  </div>
+                )}
+                <AddProductBarcode
+                  onClose={() => navigate("/crm/sklad")}
+                  onShowSuccessAlert={(productName) => {
+                    alert(`Товар "${productName}" успешно добавлен!`);
+                    navigate("/crm/sklad");
+                  }}
+                  onShowErrorAlert={(errorMsg) => {
+                    alert(errorMsg);
+                  }}
+                  selectCashBox={selectCashBox}
+                />
+              </div>
+            ) : (
+              // Вкладка ручного ввода
+              <div className="add-product-page__form">
+                {/* Выбор типа товара */}
+                <div className="add-product-page__section">
+                  <label className="add-product-page__section-label">
+                    Тип товара *
+                  </label>
+                  <div className="add-product-page__type-selector">
+                    <button
+                      className={`add-product-page__type-card ${
+                        productType === "piece"
+                          ? "add-product-page__type-card--active"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setProductType("piece");
+                        setNewItemData((prev) => ({
+                          ...prev,
+                          scale_type: "piece",
+                        }));
+                      }}
+                    >
+                      <Package size={32} />
+                      <span>Штучный товар</span>
+                    </button>
+                    <button
+                      className={`add-product-page__type-card ${
+                        productType === "weight"
+                          ? "add-product-page__type-card--active"
+                          : ""
+                      }`}
+                      onClick={() => {
+                        setProductType("weight");
+                        setNewItemData((prev) => ({
+                          ...prev,
+                          scale_type: "weight",
+                        }));
+                      }}
+                    >
+                      <ShoppingBag size={32} />
+                      <span>Килограммовый товар</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Основная информация */}
+                <div className="add-product-page__section">
+                  <div className="add-product-page__section-header">
+                    <div className="add-product-page__section-number">1</div>
+                    <h3 className="add-product-page__section-title">
+                      Основная информация
+                    </h3>
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Название товара *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      placeholder="Например, Монитор Dell 24 дюйма"
+                      className="add-product-page__input"
+                      value={newItemData.name}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Штрих-код *
+                    </label>
+                    <input
+                      type="text"
+                      name="barcode"
+                      className="add-product-page__input"
+                      value={newItemData.barcode}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
+
+                  {company?.sector?.name !== "Барбершоп" && (
+                    <>
+                      <div className="add-product-page__form-group">
+                        <label className="add-product-page__label">
+                          ПЛУ (номер для весов)
+                        </label>
+                        <input
+                          type="text"
+                          name="plu"
+                          placeholder="0001"
+                          className="add-product-page__input"
+                          value={newItemData.plu}
+                          onChange={handleChange}
+                        />
+                        <span className="add-product-page__hint">
+                          4-значный код для весов
+                        </span>
+                      </div>
+
+                      <div className="add-product-page__form-group">
+                        <label className="add-product-page__label">
+                          Бренд *
+                        </label>
+                        <select
+                          name="brand_name"
+                          className="add-product-page__input"
+                          value={newItemData.brand_name}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Выберите бренд</option>
+                          {brands.map((brand, idx) => (
+                            <option key={brand.id ?? idx} value={brand.name}>
+                              {brand.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="add-product-page__form-group">
+                        <label className="add-product-page__label">
+                          Категория *
+                        </label>
+                        <select
+                          name="category_name"
+                          className="add-product-page__input"
+                          value={newItemData.category_name}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Выберите категорию</option>
+                          {categories.map((category, idx) => (
+                            <option
+                              key={category.id ?? idx}
+                              value={category.name}
+                            >
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Информация о поставщике */}
+                <div className="add-product-page__section">
+                  <div className="add-product-page__section-header">
+                    <div className="add-product-page__section-number">2</div>
+                    <h3 className="add-product-page__section-title">
+                      Информация о поставщике
+                    </h3>
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Поставщик *
+                    </label>
+                    <div className="add-product-page__supplier-row">
+                      <select
+                        name="client"
+                        className="add-product-page__input"
+                        value={newItemData.client}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Выберите поставщика</option>
+                        {filterClient.map((client, idx) => (
+                          <option key={client.id ?? idx} value={client.id}>
+                            {client.full_name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="add-product-page__create-supplier"
+                        onClick={() => setShowInputs(!showInputs)}
+                      >
+                        + Создать поставщика
+                      </button>
+                    </div>
+                    {showInputs && (
+                      <form
+                        className="add-product-page__supplier-form"
+                        onSubmit={onSubmit}
+                      >
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          placeholder="ФИО"
+                          name="full_name"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          name="llc"
+                          placeholder="ОсОО"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          name="inn"
+                          placeholder="ИНН"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          name="okpo"
+                          placeholder="ОКПО"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          name="score"
+                          placeholder="Р/СЧЁТ"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          name="bik"
+                          placeholder="БИК"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          name="address"
+                          placeholder="Адрес"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="text"
+                          name="phone"
+                          placeholder="Телефон"
+                        />
+                        <input
+                          className="add-product-page__input"
+                          onChange={onChange}
+                          type="email"
+                          name="email"
+                          placeholder="Почта"
+                        />
+                        <div className="add-product-page__form-actions">
+                          <button
+                            type="button"
+                            className="add-product-page__cancel-btn"
+                            onClick={() => setShowInputs(false)}
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            type="submit"
+                            className="add-product-page__save-btn"
+                          >
+                            Создать
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    <label className="add-product-page__checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={showDebtForm}
+                        onChange={(e) => setShowDebtForm(e.target.checked)}
+                      />
+                      Добавить долг по этому товару
+                    </label>
+
+                    {showDebtForm && (
+                      <div className="add-product-page__debt-form">
+                        {!newItemData.client && (
+                          <p className="add-product-page__error">
+                            Выберите поставщика в форме выше!
+                          </p>
+                        )}
+                        {company?.subscription_plan?.name === "Старт" &&
+                          newItemData.client && (
+                            <>
+                              <div className="add-product-page__form-group">
+                                <label className="add-product-page__label">
+                                  Телефон поставщика
+                                </label>
+                                <input
+                                  type="text"
+                                  onChange={onChangeDebt}
+                                  name="phone"
+                                  value={debtState.phone}
+                                  className="add-product-page__input"
+                                />
+                              </div>
+                              <div className="add-product-page__form-group">
+                                <label className="add-product-page__label">
+                                  Дата оплаты
+                                </label>
+                                <input
+                                  type="date"
+                                  onChange={onChangeDebt}
+                                  name="dueDate"
+                                  value={debtState.dueDate}
+                                  className="add-product-page__input"
+                                />
+                              </div>
+                            </>
+                          )}
+                        <div className="add-product-page__form-group">
+                          <label className="add-product-page__label">
+                            Тип оплаты
+                          </label>
+                          <select
+                            value={debt}
+                            onChange={(e) => setDebt(e.target.value)}
+                            className="add-product-page__input"
+                          >
+                            <option value="">Тип оплаты</option>
+                            <option value="Предоплата">Предоплата</option>
+                            <option value="Долги">Долг</option>
+                          </select>
+                        </div>
+                        {debt === "Предоплата" && (
+                          <>
+                            <div className="add-product-page__form-group">
+                              <label className="add-product-page__label">
+                                Сумма предоплаты
+                              </label>
+                              <input
+                                type="text"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                className="add-product-page__input"
+                              />
+                            </div>
+                            <div className="add-product-page__form-group">
+                              <label className="add-product-page__label">
+                                Срок долга (мес.)
+                              </label>
+                              <input
+                                type="text"
+                                value={debtMonths}
+                                onChange={(e) => setDebtMonths(e.target.value)}
+                                className="add-product-page__input"
+                              />
+                            </div>
+                          </>
+                        )}
+                        {debt === "Долги" && (
+                          <div className="add-product-page__form-group">
+                            <label className="add-product-page__label">
+                              Срок долга (мес.)
+                            </label>
+                            <input
+                              type="text"
+                              value={debtMonths}
+                              onChange={(e) => setDebtMonths(e.target.value)}
+                              className="add-product-page__input"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Цена и количество */}
+                <div className="add-product-page__section">
+                  <div className="add-product-page__section-header">
+                    <div className="add-product-page__section-number">3</div>
+                    <h3 className="add-product-page__section-title">
+                      Цена и количество
+                    </h3>
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Закупочная цена *
+                    </label>
+                    <div className="add-product-page__price-input">
+                      <input
+                        type="text"
+                        name="purchase_price"
+                        placeholder="0.00"
+                        className="add-product-page__input"
+                        value={newItemData.purchase_price}
+                        onChange={handleChange}
+                        required
+                      />
+                      <span className="add-product-page__currency">P</span>
+                    </div>
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Розничная цена *
+                    </label>
+                    <div className="add-product-page__price-input">
+                      <input
+                        type="text"
+                        name="price"
+                        placeholder="0.00"
+                        className="add-product-page__input"
+                        value={newItemData.price}
+                        onChange={handleChange}
+                        required
+                      />
+                      <span className="add-product-page__currency">P</span>
+                    </div>
+                  </div>
+
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Количество *
+                    </label>
+                    <div className="add-product-page__price-input">
+                      <input
+                        type="text"
+                        name="quantity"
+                        placeholder="0"
+                        className="add-product-page__input"
+                        value={newItemData.quantity}
+                        onChange={handleChange}
+                        required
+                      />
+                      <span className="add-product-page__currency">шт</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Кнопки действий */}
+                <div className="add-product-page__actions">
+                  <button
+                    className="add-product-page__cancel-btn"
+                    onClick={() => navigate("/crm/sklad")}
+                    disabled={creating}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    className="add-product-page__submit-btn"
+                    onClick={handleSubmit}
+                    disabled={creating}
+                  >
+                    {creating ? "Добавление..." : "Добавить товар"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Компонент формы для маркета
+const MarketProductForm = ({
+  itemType,
+  setItemType,
+  newItemData,
+  setNewItemData,
+  marketData,
+  handleMarketDataChange,
+  handleChange,
+  brands,
+  categories,
+  products,
+  filterClient,
+  handleSubmit,
+  creating,
+  navigate,
+  generateBarcode,
+  handleKitSearch,
+  kitSearchResults,
+  showKitSearch,
+  setShowKitSearch,
+  addProductToKit,
+  removeProductFromKit,
+  recalculateKitPrice,
+  handleUpdateKitProductQuantity,
+  showKitRecalculateTooltip,
+  setShowKitRecalculateTooltip,
+}) => {
+  const [showPluTooltip, setShowPluTooltip] = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [countrySearchTerm, setCountrySearchTerm] = useState("");
+  const countryDropdownRef = useRef(null);
+
+  // Закрытие dropdown при клике вне его
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        countryDropdownRef.current &&
+        !countryDropdownRef.current.contains(event.target)
+      ) {
+        setShowCountryDropdown(false);
+        setCountrySearchTerm("");
+      }
+    };
+
+    if (showCountryDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showCountryDropdown]);
+
+  // Добавление новой упаковки
+  const handleAddPackaging = () => {
+    const packaging = {
+      id: Date.now(),
+      name: "",
+      quantity: "1",
+    };
+    const currentPackagings = marketData.packagings || [];
+    handleMarketDataChange("packagings", [...currentPackagings, packaging]);
+  };
+
+  // Обновление упаковки
+  const handleUpdatePackaging = (id, field, value) => {
+    const currentPackagings = marketData.packagings || [];
+    const updatedPackagings = currentPackagings.map((p) =>
+      p.id === id ? { ...p, [field]: value } : p
+    );
+    handleMarketDataChange("packagings", updatedPackagings);
+  };
+
+  // Удаление упаковки
+  const handleRemovePackaging = (id) => {
+    const currentPackagings = marketData.packagings || [];
+    handleMarketDataChange(
+      "packagings",
+      currentPackagings.filter((p) => p.id !== id)
+    );
+  };
+
+  // Фильтрация стран по поисковому запросу
+  const filteredCountries = useMemo(() => {
+    if (!countrySearchTerm.trim()) {
+      return countries;
+    }
+    const searchLower = countrySearchTerm.toLowerCase();
+    return countries.filter((country) =>
+      country.name.toLowerCase().includes(searchLower)
+    );
+  }, [countrySearchTerm]);
+
+  // Выбор страны
+  const handleSelectCountry = (countryName) => {
+    handleMarketDataChange("country", countryName);
+    setShowCountryDropdown(false);
+    setCountrySearchTerm("");
+  };
+
+  // Автоматический расчет цены продажи для комплекта при изменении состава
+  useEffect(() => {
+    if (itemType === "kit") {
+      if (marketData.kitProducts.length > 0) {
+        const totalCost = marketData.kitProducts.reduce((sum, item) => {
+          // Используем цену продажи товара, если есть, иначе цену закупки
+          const itemPrice = parseFloat(item.price || item.purchase_price || 0);
+          const itemQuantity = parseFloat(item.quantity || 1);
+          return sum + itemPrice * itemQuantity;
+        }, 0);
+        const calculatedPrice = Math.round(totalCost * 100) / 100;
+
+        // Всегда автоматически обновляем цену продажи для комплекта
+        setNewItemData((prev) => ({
+          ...prev,
+          price: calculatedPrice.toString(),
+        }));
+      } else {
+        // Если товаров нет, очищаем цену
+        setNewItemData((prev) => ({
+          ...prev,
+          price: "",
+        }));
+      }
+    }
+  }, [marketData.kitProducts, itemType]);
+
+  // Состояние для отслеживания, была ли цена продажи изменена вручную
+  const [isPriceManuallyChanged, setIsPriceManuallyChanged] = useState(false);
+
+  // Автоматический расчет цены продажи на основе цены закупки и наценки
+  useEffect(() => {
+    if (itemType === "product" && !isPriceManuallyChanged) {
+      const purchasePrice = parseFloat(marketData.purchasePrice) || 0;
+      const markup = parseFloat(marketData.markup) || 0;
+
+      if (purchasePrice > 0 && markup >= 0) {
+        const sellingPrice = purchasePrice * (1 + markup / 100);
+        const calculatedPrice = Math.round(sellingPrice * 100) / 100; // Округляем до 2 знаков
+
+        setNewItemData((prev) => ({
+          ...prev,
+          price: calculatedPrice.toString(),
+        }));
+      } else if (purchasePrice === 0 && markup === 0) {
+        setNewItemData((prev) => ({
+          ...prev,
+          price: "",
+        }));
+      }
+    }
+  }, [
+    marketData.purchasePrice,
+    marketData.markup,
+    itemType,
+    isPriceManuallyChanged,
+  ]);
+
+  // Сброс флага ручного изменения при изменении цены закупки или наценки
+  useEffect(() => {
+    if (itemType === "product") {
+      setIsPriceManuallyChanged(false);
+    }
+  }, [marketData.purchasePrice, marketData.markup, itemType]);
+
+  // Обработчик изменения цены продажи вручную
+  const handlePriceChange = (e) => {
+    setIsPriceManuallyChanged(true);
+    handleChange(e);
+  };
+
+  return (
+    <div className="market-product-form">
+      {/* Выбор типа: Товар, Услуга, Комплект */}
+      <div className="market-product-form__type-selector">
+        <button
+          className={`market-product-form__type-card ${
+            itemType === "product"
+              ? "market-product-form__type-card--active"
+              : ""
+          }`}
+          onClick={() => setItemType("product")}
+        >
+          <h3>Товар</h3>
+          <p>Продукт, имеющий остаток, который необходимо восполнять</p>
+        </button>
+        <button
+          className={`market-product-form__type-card ${
+            itemType === "service"
+              ? "market-product-form__type-card--active"
+              : ""
+          }`}
+          onClick={() => setItemType("service")}
+        >
+          <h3>Услуга</h3>
+          <p>Продукт, не имеющий остатка на складе</p>
+        </button>
+        <button
+          className={`market-product-form__type-card ${
+            itemType === "kit" ? "market-product-form__type-card--active" : ""
+          }`}
+          onClick={() => setItemType("kit")}
+        >
+          <h3>Комплект</h3>
+          <p>Продукт, состоящий из нескольких других</p>
+        </button>
+      </div>
+
+      {/* Основная информация */}
+      <div className="market-product-form__section">
+        <h3 className="market-product-form__section-title">
+          Основная информация
+        </h3>
+
+        <div className="market-product-form__form-group">
+          <label className="market-product-form__label">Наименование *</label>
+          <input
+            type="text"
+            name="name"
+            placeholder="Введите наименование"
+            className="market-product-form__input"
+            value={newItemData.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="market-product-form__form-group">
+          <label className="market-product-form__label">
+            {itemType === "service" ? "Код услуги" : "Код товара"}
+          </label>
+          <input
+            type="text"
+            className="market-product-form__input"
+            value={marketData.code}
+            readOnly
+          />
+        </div>
+
+        <div className="market-product-form__form-group">
+          <label className="market-product-form__label">
+            Штрих-код{" "}
+            <button
+              type="button"
+              className="market-product-form__generate-link"
+              onClick={generateBarcode}
+            >
+              (Сгенерировать)
+            </button>
+          </label>
+          <input
+            type="text"
+            name="barcode"
+            placeholder="Введите штрих-код"
+            className="market-product-form__input"
+            value={newItemData.barcode}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="market-product-form__form-group">
+          <label className="market-product-form__label">Артикул</label>
+          <input
+            type="text"
+            placeholder="Введите артикул"
+            className="market-product-form__input"
+            value={marketData.article}
+            onChange={(e) => handleMarketDataChange("article", e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Изображение */}
+      <div className="market-product-form__section">
+        <h3 className="market-product-form__section-title">Изображение</h3>
+        <div className="market-product-form__image-upload">
+          <div className="market-product-form__image-placeholder">
+            <p>Выберите фото для загрузки</p>
+            <p>или перетащите его мышью</p>
+            <button className="market-product-form__image-add-btn">+</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Категория и Бренд */}
+      <div className="market-product-form__section">
+        <div className="market-product-form__two-columns">
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">Категория</label>
+            <input
+              type="text"
+              list="categories-list"
+              placeholder="Выберите из списка или введите новую и нажмите Enter"
+              className="market-product-form__input"
+              value={newItemData.category_name}
+              onChange={handleChange}
+              name="category_name"
+            />
+            <datalist id="categories-list">
+              {categories.map((cat, idx) => (
+                <option key={cat.id || idx} value={cat.name} />
+              ))}
+            </datalist>
+          </div>
+
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">Бренд</label>
+            <input
+              type="text"
+              list="brands-list"
+              placeholder="Выберите из списка или введите новый и нажмите Enter"
+              className="market-product-form__input"
+              value={newItemData.brand_name}
+              onChange={handleChange}
+              name="brand_name"
+            />
+            <datalist id="brands-list">
+              {brands.map((brand, idx) => (
+                <option key={brand.id || idx} value={brand.name} />
+              ))}
+            </datalist>
+          </div>
+        </div>
+      </div>
+
+      {/* Единица измерения */}
+      <div className="market-product-form__section">
+        <div className="market-product-form__unit-row justify-between items-center">
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">
+              Единица измерения
+            </label>
+            <div className="flex items-center gap-2 w-full">
+              <input
+                type="text"
+                className="market-product-form__input"
+                value={marketData.unit}
+                onChange={(e) => handleMarketDataChange("unit", e.target.value)}
+              />
+              <button
+                type="button"
+                className="market-product-form__add-packaging-btn"
+                onClick={handleAddPackaging}
+              >
+                Добавить упаковку
+              </button>
+            </div>
+          </div>
+          <div className="market-product-form__toggle-group">
+            <label className="market-product-form__toggle">
+              <input
+                type="checkbox"
+                checked={
+                  itemType === "product"
+                    ? marketData.isWeightProduct
+                    : marketData.isFractionalService
+                }
+                onChange={(e) =>
+                  handleMarketDataChange(
+                    itemType === "product"
+                      ? "isWeightProduct"
+                      : "isFractionalService",
+                    e.target.checked
+                  )
+                }
+              />
+              <span>
+                {itemType === "product" ? "Весовой товар" : "Дробная услуга"}
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {/* Список упаковок */}
+        {marketData.packagings && marketData.packagings.length > 0 && (
+          <div className="market-product-form__packaging-list">
+            {marketData.packagings.map((packaging) => (
+              <div
+                key={packaging.id}
+                className="market-product-form__packaging-item"
+              >
+                <div className="market-product-form__packaging-item-row">
+                  <div className="market-product-form__form-group">
+                    <label className="market-product-form__label">
+                      Упаковка
+                    </label>
+                    <input
+                      type="text"
+                      className="market-product-form__input"
+                      placeholder="Введите название упаковки"
+                      value={packaging.name}
+                      onChange={(e) =>
+                        handleUpdatePackaging(
+                          packaging.id,
+                          "name",
+                          e.target.value
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="market-product-form__form-group">
+                    <label className="market-product-form__label">
+                      Количество в упаковке
+                    </label>
+                    <div className="market-product-form__packaging-quantity">
+                      <input
+                        type="number"
+                        className="market-product-form__input"
+                        value={packaging.quantity}
+                        onChange={(e) =>
+                          handleUpdatePackaging(
+                            packaging.id,
+                            "quantity",
+                            e.target.value
+                          )
+                        }
+                      />
+                      <span className="market-product-form__unit-label">
+                        ШТ
+                      </span>
+                      <button
+                        type="button"
+                        className="market-product-form__remove-packaging-btn"
+                        onClick={() => handleRemovePackaging(packaging.id)}
+                        title="Удалить упаковку"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Добавить PLU код - показывается только для весового товара */}
+      {itemType === "product" && marketData.isWeightProduct && (
+        <div className="market-product-form__section">
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">
+              Добавить PLU код
+            </label>
+            <div className="market-product-form__plu-input-wrapper">
+              <input
+                type="text"
+                className="market-product-form__input"
+                placeholder="Введите PLU код"
+                value={marketData.plu}
+                onChange={(e) => handleMarketDataChange("plu", e.target.value)}
+              />
+              <div className="market-product-form__help-wrapper">
+                <button
+                  type="button"
+                  className="market-product-form__help-btn"
+                  onMouseEnter={() => setShowPluTooltip(true)}
+                  onMouseLeave={() => setShowPluTooltip(false)}
+                >
+                  <HelpCircle size={20} />
+                </button>
+                {showPluTooltip && (
+                  <div className="market-product-form__tooltip">
+                    <p>
+                      PLU код применяется в весах с печатью этикетки содержащей
+                      информацию о весе товара. Формат штрих-кода для настройки
+                      весов: undefined PPPPP WWWWW S где: PPPPP - PLU код
+                      товара; WWWWW - вес товара в тысячных единицах; S -
+                      контрольная сумма
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Характеристики товара */}
+      <div className="market-product-form__section">
+        <h3 className="market-product-form__section-title">
+          Характеристики товара
+        </h3>
+        <div className="market-product-form__characteristics-grid">
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">Высота, см</label>
+            <input
+              type="number"
+              className="market-product-form__input"
+              value={marketData.height}
+              onChange={(e) => handleMarketDataChange("height", e.target.value)}
+            />
+          </div>
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">Ширина, см</label>
+            <input
+              type="number"
+              className="market-product-form__input"
+              value={marketData.width}
+              onChange={(e) => handleMarketDataChange("width", e.target.value)}
+            />
+          </div>
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">Глубина, см</label>
+            <input
+              type="number"
+              className="market-product-form__input"
+              value={marketData.depth}
+              onChange={(e) => handleMarketDataChange("depth", e.target.value)}
+            />
+          </div>
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">
+              Фактический вес, кг
+            </label>
+            <input
+              type="number"
+              className="market-product-form__input"
+              value={marketData.weight}
+              onChange={(e) => handleMarketDataChange("weight", e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Описание */}
+      <div className="market-product-form__section">
+        <h3 className="market-product-form__section-title">Описание</h3>
+        <textarea
+          className="market-product-form__textarea"
+          placeholder="Введите описание товара"
+          value={marketData.description}
+          onChange={(e) =>
+            handleMarketDataChange("description", e.target.value)
+          }
+        />
+      </div>
+
+      {/* Контент в зависимости от типа */}
+      {itemType === "product" && (
+        <>
+          {/* Страна */}
+          <div className="market-product-form__section">
+            <h3 className="market-product-form__section-title">
+              Страна производства товара
+            </h3>
+            <div
+              className="market-product-form__country-wrapper"
+              ref={countryDropdownRef}
+            >
+              <div
+                className="market-product-form__country-select"
+                onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+              >
+                <div className="market-product-form__country-select-input">
+                  {marketData.country ? (
+                    <span>
+                      {
+                        countries.find((c) => c.name === marketData.country)
+                          ?.flag
+                      }{" "}
+                      {marketData.country}
+                    </span>
+                  ) : (
+                    <span className="market-product-form__country-placeholder">
+                      Выберите страну
+                    </span>
+                  )}
+                </div>
+                <ChevronDown
+                  size={20}
+                  className={`market-product-form__country-chevron ${
+                    showCountryDropdown ? "open" : ""
+                  }`}
+                />
+              </div>
+              {showCountryDropdown && (
+                <div className="market-product-form__country-dropdown">
+                  <div className="market-product-form__country-search">
+                    <Search size={18} />
+                    <input
+                      type="text"
+                      placeholder="Поиск страны..."
+                      value={countrySearchTerm}
+                      onChange={(e) => setCountrySearchTerm(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="market-product-form__country-list">
+                    {filteredCountries.length > 0 ? (
+                      filteredCountries.map((country) => (
+                        <div
+                          key={country.code}
+                          className={`market-product-form__country-item ${
+                            marketData.country === country.name
+                              ? "selected"
+                              : ""
+                          }`}
+                          onClick={() => handleSelectCountry(country.name)}
+                        >
+                          <span className="market-product-form__country-flag">
+                            {country.flag}
+                          </span>
+                          <span className="market-product-form__country-name">
+                            {country.name}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="market-product-form__country-no-results">
+                        Страна не найдена
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Цены для товара */}
+          <div className="market-product-form__section">
+            <h3 className="market-product-form__section-title">Цены</h3>
+            <div className="market-product-form__prices-grid">
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Цена закупки
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    className="market-product-form__input"
+                    value={marketData.purchasePrice}
+                    onChange={(e) =>
+                      handleMarketDataChange("purchasePrice", e.target.value)
+                    }
+                  />
+                  <span className="market-product-form__currency">COM</span>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">Наценка</label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    className="market-product-form__input"
+                    value={marketData.markup}
+                    onChange={(e) =>
+                      handleMarketDataChange("markup", e.target.value)
+                    }
+                  />
+                  <span className="market-product-form__currency">%</span>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Цена продажи
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    name="price"
+                    className="market-product-form__input"
+                    value={newItemData.price}
+                    onChange={handlePriceChange}
+                    placeholder="Рассчитывается автоматически"
+                  />
+                  <span className="market-product-form__currency">COM</span>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">Скидка</label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    className="market-product-form__input"
+                    value={marketData.discount}
+                    onChange={(e) =>
+                      handleMarketDataChange("discount", e.target.value)
+                    }
+                  />
+                  <span className="market-product-form__currency">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Склад для товара */}
+          <div className="market-product-form__section">
+            <h3 className="market-product-form__section-title">Склад</h3>
+            <div className="market-product-form__form-group">
+              <label className="market-product-form__label">
+                Выберите поставщика
+              </label>
+              <select
+                className="market-product-form__input"
+                value={newItemData.client}
+                onChange={handleChange}
+                name="client"
+              >
+                <option value="">Выберите поставщика</option>
+                {filterClient.map((client, idx) => (
+                  <option key={client.id || idx} value={client.id}>
+                    {client.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="market-product-form__form-group">
+              <label className="market-product-form__label">
+                Минимальный остаток
+              </label>
+              <input
+                type="number"
+                className="market-product-form__input"
+                value={marketData.minStock}
+                onChange={(e) =>
+                  handleMarketDataChange("minStock", e.target.value)
+                }
+              />
+            </div>
+          </div>
+
+          {/* Срок годности */}
+          <div className="market-product-form__section">
+            <h3 className="market-product-form__section-title">
+              Срок годности
+            </h3>
+            <div className="market-product-form__form-group">
+              <input
+                type="date"
+                className="market-product-form__input"
+                value={marketData.expiryDate}
+                onChange={(e) =>
+                  handleMarketDataChange("expiryDate", e.target.value)
+                }
+                placeholder="дд. мм. гггг"
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {itemType === "service" && (
+        <>
+          {/* Цены для услуги */}
+          <div className="market-product-form__section">
+            <h3 className="market-product-form__section-title">Цены</h3>
+            <div className="market-product-form__prices-grid">
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Цена продажи
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    name="price"
+                    className="market-product-form__input"
+                    value={newItemData.price}
+                    onChange={handleChange}
+                  />
+                  <span className="market-product-form__currency">COM</span>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">Скидка</label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    className="market-product-form__input"
+                    value={marketData.discount}
+                    onChange={(e) =>
+                      handleMarketDataChange("discount", e.target.value)
+                    }
+                  />
+                  <span className="market-product-form__currency">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {itemType === "kit" && (
+        <>
+          {/* Состав комплекта */}
+          <div className="market-product-form__section">
+            <h3 className="market-product-form__section-title">
+              Состав комплекта
+            </h3>
+            <div className="market-product-form__form-group">
+              <div className="market-product-form__search-wrapper">
+                <Search
+                  className="market-product-form__search-icon"
+                  size={18}
+                />
+                <input
+                  type="text"
+                  className="market-product-form__input"
+                  placeholder="поиск..."
+                  value={marketData.kitSearchTerm}
+                  onChange={(e) => handleKitSearch(e.target.value)}
+                />
+              </div>
+              {showKitSearch && kitSearchResults.length > 0 && (
+                <div className="market-product-form__search-results">
+                  {kitSearchResults.map((product) => (
+                    <div
+                      key={product.id}
+                      className="market-product-form__search-result-item"
+                      onClick={() => addProductToKit(product)}
+                    >
+                      {product.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Список товаров в комплекте */}
+            {marketData.kitProducts.length > 0 && (
+              <div className="market-product-form__kit-products">
+                {marketData.kitProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="market-product-form__kit-product-item"
+                  >
+                    <span>{product.name}</span>
+                    <div className="market-product-form__kit-product-actions">
+                      <input
+                        type="number"
+                        className="market-product-form__kit-quantity-input"
+                        value={product.quantity || 1}
+                        min="1"
+                        onChange={(e) =>
+                          handleUpdateKitProductQuantity(
+                            product.id,
+                            e.target.value
+                          )
+                        }
+                      />
+                      <button
+                        className="market-product-form__remove-kit-btn"
+                        onClick={() => removeProductFromKit(product.id)}
+                        title="Удалить из комплекта"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button className="market-product-form__show-more-btn">
+                  ПОКАЗАТЬ ЕЩЕ
+                </button>
+              </div>
+            )}
+
+            {/* Область для выбранных товаров */}
+            <div className="market-product-form__kit-selection-area">
+              <p>← Выберите товары</p>
+            </div>
+          </div>
+
+          {/* Цены для комплекта */}
+          <div className="market-product-form__section">
+            <h3 className="market-product-form__section-title">Цены</h3>
+            <div className="market-product-form__prices-grid">
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">
+                  Цена продажи
+                </label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    name="price"
+                    className="market-product-form__input"
+                    value={newItemData.price}
+                    onChange={handleChange}
+                  />
+                  <span className="market-product-form__currency">COM</span>
+                  <div className="market-product-form__recalculate-wrapper">
+                    <button
+                      className="market-product-form__recalculate-btn"
+                      onClick={recalculateKitPrice}
+                    >
+                      Пересчитать стоимость
+                    </button>
+                    <div className="market-product-form__help-wrapper">
+                      <button
+                        type="button"
+                        className="market-product-form__help-btn"
+                        onMouseEnter={() => setShowKitRecalculateTooltip(true)}
+                        onMouseLeave={() => setShowKitRecalculateTooltip(false)}
+                      >
+                        <HelpCircle size={20} />
+                      </button>
+                      {showKitRecalculateTooltip && (
+                        <div className="market-product-form__tooltip market-product-form__tooltip--kit">
+                          <p>
+                            Цена продажи комплекта будет пересчитана и равна
+                            сумме стоимостей товаров состава по текущим ценам
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="market-product-form__form-group">
+                <label className="market-product-form__label">Скидка</label>
+                <div className="market-product-form__price-input">
+                  <input
+                    type="number"
+                    className="market-product-form__input"
+                    value={marketData.discount}
+                    onChange={(e) =>
+                      handleMarketDataChange("discount", e.target.value)
+                    }
+                  />
+                  <span className="market-product-form__currency">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Кнопки действий */}
+      <div className="market-product-form__actions">
+        <button
+          className="market-product-form__cancel-btn"
+          onClick={() => navigate("/crm/sklad")}
+          disabled={creating}
+        >
+          Отмена
+        </button>
+        <button
+          className="market-product-form__submit-btn"
+          onClick={handleSubmit}
+          disabled={creating}
+        >
+          {creating ? "Создание..." : "Создать товар"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default AddProductPage;

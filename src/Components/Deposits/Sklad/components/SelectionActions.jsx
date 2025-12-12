@@ -1,3 +1,5 @@
+import "./SelectionActions.scss";
+
 /**
  * Компонент для управления массовым выбором товаров
  */
@@ -13,8 +15,8 @@ const SelectionActions = ({
     pageItems.length > 0 && pageItems.every((i) => selectedIds.has(i.id));
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div className="selection-actions">
+      <label className="selection-actions__checkbox-label">
         <input
           type="checkbox"
           checked={allOnPageChecked}
@@ -25,24 +27,26 @@ const SelectionActions = ({
 
       {selectedIds.size > 0 && (
         <>
-          <span style={{ opacity: 0.75 }}>Выбрано: {selectedIds.size}</span>
-          <button
-            className="sklad__add"
-            style={{ background: "#e53935" }}
-            onClick={onBulkDelete}
-            disabled={bulkDeleting}
-            title="Массовое удаление выбранных товаров"
-          >
-            {bulkDeleting ? "Удаляем..." : "Удалить выбранные"}
-          </button>
-          <button
-            className="sklad__reset"
-            onClick={onClearSelection}
-            style={{ cursor: "pointer" }}
-            title="Снять весь выбор"
-          >
-            Сбросить выбор
-          </button>
+          <span className="selection-actions__count">
+            Выбрано: {selectedIds.size}
+          </span>
+          <div className="selection-actions__actions">
+            <button
+              className="selection-actions__delete-btn"
+              onClick={onBulkDelete}
+              disabled={bulkDeleting}
+              title="Массовое удаление выбранных товаров"
+            >
+              {bulkDeleting ? "Удаляем..." : "Удалить выбранные"}
+            </button>
+            <button
+              className="selection-actions__clear-btn"
+              onClick={onClearSelection}
+              title="Снять весь выбор"
+            >
+              Сбросить выбор
+            </button>
+          </div>
         </>
       )}
     </div>

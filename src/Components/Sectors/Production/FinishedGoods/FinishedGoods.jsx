@@ -56,6 +56,7 @@ import { DEAL_STATUS_RU } from "../../../pages/Sell/Sell";
 import { createDeal } from "../../../../store/creators/saleThunk";
 import api from "../../../../api";
 import FileInput from "./FileInput/FileInput";
+import "../../../Deposits/Sklad/Sklad.scss";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -1251,401 +1252,445 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   }, [dispatch]);
 
   return (
-    <div className="edit-modal sklad">
-      <div className="edit-modal__overlay" onClick={onClose} />
-      <div className="edit-modal__content">
-        <div className="edit-modal__header">
-          <h3>Редактирование товара {item?.name}</h3>
-          <X className="edit-modal__close-icon" size={20} onClick={onClose} />
-        </div>
-
-        {updateError && (
-          <p className="edit-modal__error-message">
-            Ошибка обновления:{" "}
-            {updateError.message || JSON.stringify(updateError)}
-          </p>
-        )}
-        {deleteError && (
-          <p className="edit-modal__error-message">
-            Ошибка удаления:{" "}
-            {deleteError.message || JSON.stringify(deleteError)}
-          </p>
-        )}
-
-        {/* Название */}
-        <div className="edit-modal__section">
-          <label>Название *</label>
-          <input
-            type="text"
-            name="name"
-            value={editedItem.name}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        {/* Штрих код */}
-        <div className="edit-modal__section">
-          <label>Штрих код *</label>
-          <input
-            type="text"
-            name="barcode"
-            value={editedItem.barcode}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        {/* Бренд */}
-        <div className="edit-modal__section">
-          <label>Бренд *</label>
-          <select
-            name="brand_name"
-            value={editedItem.brand_name}
-            onChange={handleChange}
-            required
-          >
-            <option value="">-- Выберите бренд --</option>
-            {brands?.map((brand) => (
-              <option key={brand.id} value={brand.name}>
-                {brand.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Категория */}
-        <div className="edit-modal__section">
-          <label>Категория *</label>
-          <select
-            name="category_name"
-            value={editedItem.category_name}
-            onChange={handleChange}
-            required
-          >
-            <option value="">-- Выберите категорию --</option>
-            {categories?.map((category) => (
-              <option key={category.id} value={category.name}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Поставщик */}
-        <div className="edit-modal__section">
-          <label>Поставщик *</label>
-          <select
-            name="client"
-            value={editedItem.client}
-            onChange={handleChange}
-            required
-          >
-            <option value="">-- Выберите поставщика --</option>
-            {filterClient1?.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.full_name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Розничная цена */}
-        <div className="edit-modal__section">
-          <label>Розничная цена *</label>
-          <input
-            type="number"
-            name="price"
-            value={editedItem.price}
-            onChange={handleChange}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-
-        {/* Закупочная цена */}
-        <div className="edit-modal__section">
-          <label>Закупочная цена *</label>
-          <input
-            type="number"
-            name="purchase_price"
-            value={editedItem.purchase_price}
-            onChange={handleChange}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-
-        {/* Количество */}
-        <div className="edit-modal__section">
-          <label>Количество *</label>
-          <input
-            type="number"
-            name="quantity"
-            value={editedItem.quantity}
-            onChange={handleChange}
-            min="0"
-            required
-          />
-        </div>
-
-        {/* Акционный товар */}
-        <div className="edit-modal__section">
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              cursor: "pointer",
-            }}
-          >
-            <input
-              type="checkbox"
-              name="stock"
-              checked={editedItem.stock}
-              onChange={handleChange}
-              style={{
-                width: "18px",
-                height: "18px",
-                cursor: "pointer",
-              }}
-            />
-            <span>Акционный товар</span>
-          </label>
-        </div>
-
-        {/* Изображения товара */}
-        <div className="edit-modal__section">
-          <label>Изображения товара</label>
-
-          {/* Существующие изображения */}
-          {imagesLoading ? (
-            <p style={{ opacity: 0.7, marginTop: 8 }}>
-              Загрузка изображений...
-            </p>
-          ) : existingImages.length > 0 ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 12,
-                marginTop: 12,
-              }}
+    <div className="product-edit-modal">
+      <div className="product-edit-modal__backdrop" onClick={onClose} />
+      <div className="product-edit-modal__container">
+        <div className="product-edit-modal__wrapper">
+          {/* Header */}
+          <header className="product-edit-modal__header">
+            <h2 className="product-edit-modal__title">Редактирование товара</h2>
+            <button
+              type="button"
+              className="product-edit-modal__close"
+              onClick={onClose}
+              aria-label="Закрыть модальное окно"
             >
-              {existingImages.map((img) => (
-                <div
-                  key={img.id}
-                  style={{
-                    border: "1px solid #ccc",
-                    borderRadius: 8,
-                    padding: 12,
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center",
-                  }}
-                >
-                  {(img.image || img.image_url || img.url) && (
-                    <img
-                      src={img.image || img.image_url || img.url}
-                      alt={img.alt || editedItem.name}
-                      style={{
-                        width: 80,
-                        height: 80,
-                        objectFit: "cover",
-                        borderRadius: 4,
-                      }}
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                      }}
+              <X size={24} />
+            </button>
+          </header>
+
+          {/* Alerts */}
+          {(updateError || deleteError) && (
+            <div className="product-edit-modal__alerts">
+              {updateError && (
+                <div className="product-edit-modal__alert product-edit-modal__alert--error">
+                  <span className="product-edit-modal__alert-icon">⚠️</span>
+                  <div className="product-edit-modal__alert-content">
+                    <strong>Ошибка обновления:</strong>
+                    <span>
+                      {updateError.message || JSON.stringify(updateError)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {deleteError && (
+                <div className="product-edit-modal__alert product-edit-modal__alert--error">
+                  <span className="product-edit-modal__alert-icon">⚠️</span>
+                  <div className="product-edit-modal__alert-content">
+                    <strong>Ошибка удаления:</strong>
+                    <span>
+                      {deleteError.message || JSON.stringify(deleteError)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Form Content */}
+          <div className="product-edit-modal__content">
+            <form
+              className="product-edit-modal__form"
+              onSubmit={(e) => e.preventDefault()}
+            >
+              {/* Основная информация */}
+              <section className="product-edit-modal__group">
+                <h3 className="product-edit-modal__group-title">
+                  Основная информация
+                </h3>
+
+                <div className="product-edit-modal__fields">
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Название товара{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      className="product-edit-modal__input"
+                      value={editedItem.name}
+                      onChange={handleChange}
+                      placeholder="Введите название товара"
+                      required
                     />
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        marginBottom: 6,
-                      }}
-                    >
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          name="existing_primary_image"
-                          checked={Boolean(img.is_primary)}
-                          onChange={() => handleSetPrimaryExisting(img.id)}
-                        />
-                        <span style={{ fontSize: 14 }}>Главная</span>
-                      </label>
-                      {img.is_primary && (
-                        <span
-                          style={{
-                            fontSize: 12,
-                            color: "#28a745",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          (Главное)
-                        </span>
-                      )}
-                    </div>
-                    {img.alt && (
-                      <p style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>
-                        Alt: {img.alt}
-                      </p>
-                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteExistingImage(img.id)}
-                    style={{
-                      padding: "6px 12px",
-                      background: "#ff4444",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 4,
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    Удалить
-                  </button>
+
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Штрих-код{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="barcode"
+                      className="product-edit-modal__input"
+                      value={editedItem.barcode}
+                      onChange={handleChange}
+                      placeholder="Введите штрих-код"
+                      required
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p style={{ opacity: 0.7, marginTop: 8, fontSize: 14 }}>
-              Нет загруженных изображений
-            </p>
-          )}
+              </section>
 
-          {/* Добавление новых изображений */}
-          <button
-            type="button"
-            className="create-client"
-            onClick={addNewImageSlot}
-            style={{ marginTop: 12, marginBottom: 10 }}
-          >
-            + Добавить новое изображение
-          </button>
+              {/* Категория и бренд */}
+              <section className="product-edit-modal__group">
+                <h3 className="product-edit-modal__group-title">
+                  Классификация
+                </h3>
 
-          {newImages.length > 0 && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 12,
-                marginTop: 12,
-              }}
-            >
-              {newImages.map((im, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    border: "1px dashed #ccc",
-                    borderRadius: 8,
-                    padding: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 6,
-                      gap: 8,
-                    }}
-                  >
-                    <span style={{ opacity: 0.8 }}>Новое фото #{idx + 1}</span>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
-                    >
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          cursor: "pointer",
-                        }}
+                <div className="product-edit-modal__fields">
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Бренд{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <div className="product-edit-modal__select-wrapper">
+                      <select
+                        name="brand_name"
+                        className="product-edit-modal__select"
+                        value={editedItem.brand_name}
+                        onChange={handleChange}
+                        required
                       >
-                        <input
-                          type="radio"
-                          name="new_primary_image"
-                          checked={Boolean(im.is_primary)}
-                          onChange={() => handleNewPrimarySelect(idx)}
-                        />
-                        <span style={{ fontSize: 14 }}>Главная</span>
-                      </label>
-                      <button
-                        type="button"
-                        className="select-materials__remove"
-                        onClick={() => removeNewImageSlot(idx)}
-                        aria-label="Удалить изображение"
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          border: "1px solid var(--border,#444)",
-                          background: "transparent",
-                          color: "inherit",
-                          cursor: "pointer",
-                        }}
-                      >
-                        ×
-                      </button>
+                        <option value="">Выберите бренд</option>
+                        {brands?.map((brand) => (
+                          <option key={brand.id} value={brand.name}>
+                            {brand.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                  <FileInput
-                    onChange={(e) =>
-                      handleNewImageChange(idx, e.target.files?.[0] || null)
-                    }
-                    name="image"
-                    label="Изображение"
-                  />
-                  {im.file && (
-                    <div style={{ marginTop: 8 }}>
+
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Категория{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <div className="product-edit-modal__select-wrapper">
+                      <select
+                        name="category_name"
+                        className="product-edit-modal__select"
+                        value={editedItem.category_name}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Выберите категорию</option>
+                        {categories?.map((category) => (
+                          <option key={category.id} value={category.name}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Поставщик{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <div className="product-edit-modal__select-wrapper">
+                      <select
+                        name="client"
+                        className="product-edit-modal__select"
+                        value={editedItem.client}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Выберите поставщика</option>
+                        {filterClient1?.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Цены и количество */}
+              <section className="product-edit-modal__group">
+                <h3 className="product-edit-modal__group-title">
+                  Цены и количество
+                </h3>
+
+                <div className="product-edit-modal__fields product-edit-modal__fields--grid">
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Розничная цена{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <div className="product-edit-modal__input-wrapper">
                       <input
-                        type="text"
-                        placeholder="Alt текст (опционально)"
-                        className="add-modal__input"
-                        value={im.alt}
-                        onChange={(e) =>
-                          handleNewImageAltChange(idx, e.target.value)
-                        }
-                        style={{ width: "100%", marginTop: 8 }}
+                        type="number"
+                        name="price"
+                        className="product-edit-modal__input"
+                        value={editedItem.price}
+                        onChange={handleChange}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        required
                       />
+                      <span className="product-edit-modal__input-suffix">
+                        сом
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  </div>
 
-        <div className="edit-modal__footer">
-          <button
-            className="edit-modal__reset"
-            onClick={handleDelete}
-            disabled={deleting || updating}
-          >
-            {deleting ? "Удаление..." : "Удалить"}
-          </button>
-          <button
-            className="edit-modal__save"
-            onClick={handleSave}
-            disabled={updating || deleting}
-          >
-            {updating ? "Сохранение..." : "Сохранить"}
-          </button>
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Закупочная цена{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <div className="product-edit-modal__input-wrapper">
+                      <input
+                        type="number"
+                        name="purchase_price"
+                        className="product-edit-modal__input"
+                        value={editedItem.purchase_price}
+                        onChange={handleChange}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        required
+                      />
+                      <span className="product-edit-modal__input-suffix">
+                        сом
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="product-edit-modal__field">
+                    <label className="product-edit-modal__label">
+                      Количество{" "}
+                      <span className="product-edit-modal__required">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      name="quantity"
+                      className="product-edit-modal__input"
+                      value={editedItem.quantity}
+                      onChange={handleChange}
+                      min="0"
+                      placeholder="0"
+                      required
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Дополнительные настройки */}
+              <section className="product-edit-modal__group">
+                <h3 className="product-edit-modal__group-title">
+                  Дополнительно
+                </h3>
+
+                <div className="product-edit-modal__field">
+                  <label className="product-edit-modal__checkbox">
+                    <input
+                      type="checkbox"
+                      name="stock"
+                      checked={editedItem.stock}
+                      onChange={handleChange}
+                      className="product-edit-modal__checkbox-input"
+                    />
+                    <span className="product-edit-modal__checkbox-label">
+                      Акционный товар
+                    </span>
+                  </label>
+                </div>
+              </section>
+
+              {/* Изображения */}
+              <section className="product-edit-modal__group product-edit-modal__group--images">
+                <h3 className="product-edit-modal__group-title">
+                  Изображения товара
+                </h3>
+
+                {imagesLoading ? (
+                  <div className="product-edit-modal__images-loading">
+                    <div className="product-edit-modal__spinner" />
+                    <span>Загрузка изображений...</span>
+                  </div>
+                ) : existingImages.length > 0 ? (
+                  <div className="product-edit-modal__images-grid">
+                    {existingImages.map((img) => (
+                      <div
+                        key={img.id}
+                        className="product-edit-modal__image-card"
+                      >
+                        {(img.image || img.image_url || img.url) && (
+                          <div className="product-edit-modal__image-preview">
+                            <img
+                              src={img.image || img.image_url || img.url}
+                              alt={img.alt || editedItem.name}
+                              className="product-edit-modal__image"
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                              }}
+                            />
+                            {img.is_primary && (
+                              <div className="product-edit-modal__image-badge">
+                                Главное
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div className="product-edit-modal__image-actions">
+                          <label className="product-edit-modal__image-radio">
+                            <input
+                              type="radio"
+                              name="existing_primary_image"
+                              checked={Boolean(img.is_primary)}
+                              onChange={() => handleSetPrimaryExisting(img.id)}
+                            />
+                            <span>Сделать главным</span>
+                          </label>
+                          <button
+                            type="button"
+                            className="product-edit-modal__image-delete"
+                            onClick={() => handleDeleteExistingImage(img.id)}
+                            aria-label="Удалить изображение"
+                          >
+                            <X size={16} />
+                            Удалить
+                          </button>
+                        </div>
+                        {img.alt && (
+                          <p className="product-edit-modal__image-alt">
+                            Alt: {img.alt}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="product-edit-modal__images-empty">
+                    <span>Нет загруженных изображений</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="product-edit-modal__add-image"
+                  onClick={addNewImageSlot}
+                >
+                  <Plus size={20} />
+                  Добавить изображение
+                </button>
+
+                {newImages.length > 0 && (
+                  <div className="product-edit-modal__new-images">
+                    {newImages.map((im, idx) => (
+                      <div
+                        key={idx}
+                        className="product-edit-modal__new-image-card"
+                      >
+                        <div className="product-edit-modal__new-image-header">
+                          <span className="product-edit-modal__new-image-number">
+                            Изображение #{idx + 1}
+                          </span>
+                          <div className="product-edit-modal__new-image-controls">
+                            <label className="product-edit-modal__image-radio">
+                              <input
+                                type="radio"
+                                name="new_primary_image"
+                                checked={Boolean(im.is_primary)}
+                                onChange={() => handleNewPrimarySelect(idx)}
+                              />
+                              <span>Главное</span>
+                            </label>
+                            <button
+                              type="button"
+                              className="product-edit-modal__new-image-remove"
+                              onClick={() => removeNewImageSlot(idx)}
+                              aria-label="Удалить"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="product-edit-modal__new-image-upload">
+                          <FileInput
+                            onChange={(e) =>
+                              handleNewImageChange(
+                                idx,
+                                e.target.files?.[0] || null
+                              )
+                            }
+                            name="image"
+                            label="Выберите файл"
+                          />
+                        </div>
+                        {im.file && (
+                          <div className="product-edit-modal__new-image-alt">
+                            <input
+                              type="text"
+                              placeholder="Alt текст (опционально)"
+                              className="product-edit-modal__input"
+                              value={im.alt}
+                              onChange={(e) =>
+                                handleNewImageAltChange(idx, e.target.value)
+                              }
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </form>
+          </div>
+
+          {/* Footer */}
+          <footer className="product-edit-modal__footer">
+            <button
+              type="button"
+              className="product-edit-modal__btn product-edit-modal__btn--danger"
+              onClick={handleDelete}
+              disabled={deleting || updating}
+            >
+              {deleting ? (
+                <>
+                  <span className="product-edit-modal__spinner product-edit-modal__spinner--small" />
+                  Удаление...
+                </>
+              ) : (
+                "Удалить товар"
+              )}
+            </button>
+            <button
+              type="button"
+              className="product-edit-modal__btn product-edit-modal__btn--primary"
+              onClick={handleSave}
+              disabled={updating || deleting}
+            >
+              {updating ? (
+                <>
+                  <span className="product-edit-modal__spinner product-edit-modal__spinner--small" />
+                  Сохранение...
+                </>
+              ) : (
+                "Сохранить изменения"
+              )}
+            </button>
+          </footer>
         </div>
       </div>
     </div>

@@ -1,3 +1,15 @@
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.40);
+  --panel-bg: #ffffff;
+  --text: #111827;
+}
+
+html.dark {
+  --glass-bg: rgba(17, 24, 39, 0.55); 
+  --panel-bg: #111827;               
+  --text: #e5e7eb;
+}
+
 .App {
   position: relative;
   min-height: 100vh;
@@ -81,8 +93,9 @@ html {
   position: absolute;
   top: 20px;
   right: 20px;
-  background: white;
-  border: 1px solid #ccc;
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid;
   border-radius: 5px;
   padding: 10px 20px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -207,7 +220,7 @@ body {
   .header {
     border-radius: 0 0 10px 10px;
     border: none !important;
-    background-color: #ffffff66 !important;
+    background-color: transparent;
   }
   .obzor__panel,
   .obzor__card,
@@ -320,7 +333,7 @@ body {
   .settings__footer,
   .settings__section {
     border-radius: 10px;
-    background: #ffffff66 !important;
+    background: var(--glass-bg) !important;
   }
 
   .vitrina__search,
@@ -453,7 +466,7 @@ body {
   .tables__label,
   .menu__label,
   .orders__label,
-  .rh__label {
+  .rh__label{
     color: #fff !important;
   }
 }
@@ -530,3 +543,5 @@ body {
 //     width: 250px;
 //   }
 // }
+
+

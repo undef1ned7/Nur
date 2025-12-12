@@ -16,6 +16,7 @@ import { fetchClientsAsync } from "../../../store/creators/clientCreators";
 import { useClient } from "../../../store/slices/ClientSlice";
 import { createDeal } from "../../../store/creators/saleThunk";
 import api from "../../../api";
+import "./AddProductBarcode.scss";
 
 // Функция для создания долга
 async function createDebt(payload) {
@@ -389,163 +390,111 @@ const AddProductBarcode = ({
     Number(state.quantity || 0) * Number(state.purchase_price || 0);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h3>Сканирование товара</h3>
-
+    <div className="add-product-barcode">
       {/* Индикатор загрузки сканирования */}
       {scanningProduct && (
-        <div
-          style={{
-            marginBottom: "20px",
-            padding: "10px",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            backgroundColor: "#f5f5f5",
-          }}
-        >
-          Поиск товара...
-        </div>
+        <div className="add-product-barcode__loading">Поиск товара...</div>
       )}
 
       {/* Информация о найденном товаре */}
       {scannedProduct && (
-        <div
-          style={{
-            marginBottom: "20px",
-            padding: "15px",
-            border: "1px solid #ddd",
-            borderRadius: "8px",
-            backgroundColor: "#f9f9f9",
-          }}
-        >
-          <h4>Найденный товар:</h4>
-          <div style={{ marginBottom: "15px" }}>
-            <label style={{ display: "block", marginBottom: "5px" }}>
-              <strong>Название:</strong>
-            </label>
+        <div className="add-product-barcode__product-card">
+          <h3 className="add-product-barcode__product-title">
+            Найденный товар
+          </h3>
+
+          <div className="add-product-barcode__form-group">
+            <label>Название *</label>
             <input
               type="text"
               value={state.name}
               onChange={onChange}
               name="name"
-              style={{
-                padding: "8px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                width: "100%",
-              }}
-            />
-          </div>
-          {scannedProduct.brand && (
-            <div style={{ marginBottom: "10px" }}>
-              <strong>Бренд:</strong> {scannedProduct.brand.name}
-            </div>
-          )}
-          {scannedProduct.category && (
-            <div style={{ marginBottom: "10px" }}>
-              <strong>Категория:</strong> {scannedProduct.category.name}
-            </div>
-          )}
-          <div style={{ marginBottom: "10px" }}>
-            <strong>Штрих-код:</strong> {scannedProduct.barcode}
-          </div>
-          {scannedProduct.price && (
-            <div style={{ marginBottom: "15px" }}>
-              <strong>Цена:</strong> {scannedProduct.price} сом
-            </div>
-          )}
-
-          {/* Поле для ввода количества */}
-          <div style={{ marginBottom: "15px" }}>
-            <label style={{ display: "block", marginBottom: "5px" }}>
-              <strong>Количество:</strong>
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={state.quantity}
-              onChange={onChange}
-              name="quantity"
-              style={{
-                padding: "8px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                width: "100%",
-              }}
-            />
-          </div>
-          <div style={{ marginBottom: "15px" }}>
-            <label style={{ display: "block", marginBottom: "5px" }}>
-              <strong>Закупочная цена:</strong>
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={state.purchase_price}
-              onChange={onChange}
-              name="purchase_price"
-              style={{
-                padding: "8px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                width: "100%",
-              }}
-            />
-          </div>
-          <div style={{ marginBottom: "15px" }}>
-            <label style={{ display: "block", marginBottom: "5px" }}>
-              <strong>Розничная цена:</strong>
-            </label>
-            <input
-              type="number"
-              min="1"
-              name="price"
-              value={state.price}
-              onChange={onChange}
-              style={{
-                padding: "8px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                width: "100%",
-              }}
+              placeholder="Введите название товара"
             />
           </div>
 
-          <div style={{ marginBottom: "15px" }}>
-            <label style={{ display: "block", marginBottom: "5px" }}>
-              <strong>ПЛУ:</strong>
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="2147483647"
-              name="plu"
-              value={state.plu}
-              onChange={onChange}
-              placeholder="Номер ПЛУ для весов (можно не заполнять)"
-              style={{
-                padding: "8px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                width: "100%",
-              }}
-            />
+          <div className="add-product-barcode__grid">
+            {scannedProduct.brand && (
+              <div className="add-product-barcode__info-row">
+                <strong>Бренд:</strong>
+                <span>{scannedProduct.brand.name}</span>
+              </div>
+            )}
+            {scannedProduct.category && (
+              <div className="add-product-barcode__info-row">
+                <strong>Категория:</strong>
+                <span>{scannedProduct.category.name}</span>
+              </div>
+            )}
+            <div className="add-product-barcode__info-row">
+              <strong>Штрих-код:</strong>
+              <span>{scannedProduct.barcode}</span>
+            </div>
+            {scannedProduct.price && (
+              <div className="add-product-barcode__info-row">
+                <strong>Цена:</strong>
+                <span>{scannedProduct.price} сом</span>
+              </div>
+            )}
           </div>
 
-          <div style={{ marginBottom: "15px" }}>
-            <label style={{ display: "block", marginBottom: "5px" }}>
-              <strong>Тип товара для весов:</strong>
-            </label>
+          <div className="add-product-barcode__grid">
+            <div className="add-product-barcode__form-group">
+              <label>Количество *</label>
+              <input
+                type="number"
+                min="1"
+                value={state.quantity}
+                onChange={onChange}
+                name="quantity"
+                placeholder="1"
+              />
+            </div>
+            <div className="add-product-barcode__form-group">
+              <label>Закупочная цена *</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={state.purchase_price}
+                onChange={onChange}
+                name="purchase_price"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="add-product-barcode__form-group">
+              <label>Розничная цена *</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                name="price"
+                value={state.price}
+                onChange={onChange}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="add-product-barcode__form-group">
+              <label>ПЛУ</label>
+              <input
+                type="number"
+                min="0"
+                max="2147483647"
+                name="plu"
+                value={state.plu}
+                onChange={onChange}
+                placeholder="Номер ПЛУ для весов"
+              />
+            </div>
+          </div>
+
+          <div className="add-product-barcode__form-group">
+            <label>Тип товара для весов</label>
             <select
               name="scale_type"
               value={state.scale_type}
               onChange={onChange}
-              style={{
-                padding: "8px",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                width: "100%",
-              }}
             >
               <option value="">-- Выберите тип --</option>
               <option value="piece">Штучный</option>
@@ -554,228 +503,111 @@ const AddProductBarcode = ({
           </div>
 
           {/* Переключатель долга */}
-          <div
-            style={{
-              marginBottom: "15px",
-              padding: "15px",
-              border: "1px solid #ddd",
-              borderRadius: "8px",
-              backgroundColor: "#f9f9f9",
-            }}
-          >
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                cursor: "pointer",
-                marginBottom: showDebtForm ? "15px" : "0",
-              }}
-            >
+          <div className="add-product-barcode__debt-section">
+            <label className="add-product-barcode__debt-checkbox">
               <input
                 type="checkbox"
                 checked={showDebtForm}
                 onChange={(e) => setShowDebtForm(e.target.checked)}
-                style={{ width: "18px", height: "18px", cursor: "pointer" }}
               />
-              <strong style={{ fontSize: "14px" }}>Добавить долг</strong>
+              <strong>Добавить долг по этому товару</strong>
             </label>
 
             {/* Форма долга */}
             {showDebtForm && (
-              <div style={{ marginTop: "15px" }}>
+              <div className="add-product-barcode__debt-form">
                 {clientId === "" && (
                   <>
-                    <p
-                      style={{
-                        margin: "5px 0",
-                        color: "#ff0000",
-                        fontSize: "13px",
-                      }}
-                    >
+                    <p className="add-product-barcode__error-message">
                       Выберите клиента!
                     </p>
-                    <select
-                      onChange={(e) => {
-                        setClientId(e.target.value);
-                      }}
-                      value={clientId}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      <option value="">Выберите клиента</option>
-                      {filterClient.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.full_name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="add-product-barcode__form-group">
+                      <label>Клиент *</label>
+                      <select
+                        onChange={(e) => {
+                          setClientId(e.target.value);
+                        }}
+                        value={clientId}
+                      >
+                        <option value="">Выберите клиента</option>
+                        {filterClient.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </>
                 )}
                 {company?.subscription_plan?.name === "Старт" && clientId && (
-                  <>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      Телефон
-                    </label>
-                    <input
-                      type="text"
-                      onChange={onChangeDebt}
-                      name="phone"
-                      value={debtState.phone}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
-                    />
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      Дата оплаты
-                    </label>
-                    <input
-                      type="date"
-                      onChange={onChangeDebt}
-                      name="dueDate"
-                      value={debtState.dueDate}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
-                    />
-                  </>
+                  <div className="add-product-barcode__grid">
+                    <div className="add-product-barcode__form-group">
+                      <label>Телефон</label>
+                      <input
+                        type="text"
+                        onChange={onChangeDebt}
+                        name="phone"
+                        value={debtState.phone}
+                        placeholder="Номер телефона"
+                      />
+                    </div>
+                    <div className="add-product-barcode__form-group">
+                      <label>Дата оплаты</label>
+                      <input
+                        type="date"
+                        onChange={onChangeDebt}
+                        name="dueDate"
+                        value={debtState.dueDate}
+                      />
+                    </div>
+                  </div>
                 )}
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "5px",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                  }}
-                >
-                  Тип оплаты
-                </label>
-                <select
-                  value={debt}
-                  onChange={(e) => setDebt(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    marginBottom: "10px",
-                  }}
-                >
-                  <option value="">Тип оплаты</option>
-                  <option value="Предоплата">Предоплата</option>
-                  <option value="Долги">Долг</option>
-                </select>
+                <div className="add-product-barcode__form-group">
+                  <label>Тип оплаты</label>
+                  <select
+                    value={debt}
+                    onChange={(e) => setDebt(e.target.value)}
+                  >
+                    <option value="">Тип оплаты</option>
+                    <option value="Предоплата">Предоплата</option>
+                    <option value="Долги">Долг</option>
+                  </select>
+                </div>
                 {debt === "Предоплата" && (
-                  <>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      Сумма предоплаты
-                    </label>
-                    <input
-                      type="text"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
-                    />
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      Срок долга (мес.)
-                    </label>
-                    <input
-                      type="text"
-                      value={debtMonths}
-                      onChange={(e) => setDebtMonths(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
-                    />
-                  </>
+                  <div className="add-product-barcode__grid">
+                    <div className="add-product-barcode__form-group">
+                      <label>Сумма предоплаты</label>
+                      <input
+                        type="text"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="add-product-barcode__form-group">
+                      <label>Срок долга (мес.)</label>
+                      <input
+                        type="text"
+                        value={debtMonths}
+                        onChange={(e) => setDebtMonths(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
                 )}
                 {debt === "Долги" && (
-                  <>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      Срок долга (мес.)
-                    </label>
+                  <div className="add-product-barcode__form-group">
+                    <label>Срок долга (мес.)</label>
                     <input
                       type="text"
                       value={debtMonths}
                       onChange={(e) => setDebtMonths(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
+                      placeholder="0"
                     />
-                  </>
+                  </div>
                 )}
                 {debt && clientId && (
-                  <div
-                    style={{
-                      marginTop: "10px",
-                      padding: "10px",
-                      backgroundColor: "#e8f5e9",
-                      borderRadius: "4px",
-                      fontSize: "13px",
-                    }}
-                  >
+                  <div className="add-product-barcode__debt-summary">
                     <strong>Сумма долга:</strong> {totalAmount.toFixed(2)} сом
                     <br />
                     <strong>Клиент:</strong> {pickClient?.full_name}
@@ -786,35 +618,19 @@ const AddProductBarcode = ({
           </div>
 
           {/* Кнопки действий */}
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div className="add-product-barcode__actions">
             <button
-              onClick={handleAddToWarehouse}
-              disabled={addingToWarehouse}
-              style={{
-                padding: "10px 20px",
-                backgroundColor: "#007bff",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: addingToWarehouse ? "not-allowed" : "pointer",
-                opacity: addingToWarehouse ? 0.6 : 1,
-              }}
-            >
-              {addingToWarehouse ? "Добавление..." : "Добавить в склад"}
-            </button>
-
-            <button
+              className="add-product-barcode__btn add-product-barcode__btn--secondary"
               onClick={handleCancel}
-              style={{
-                padding: "10px 20px",
-                backgroundColor: "#6c757d",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
             >
               Отмена
+            </button>
+            <button
+              className="add-product-barcode__btn add-product-barcode__btn--primary"
+              onClick={handleAddToWarehouse}
+              disabled={addingToWarehouse}
+            >
+              {addingToWarehouse ? "Добавление..." : "Добавить в склад"}
             </button>
           </div>
         </div>
@@ -822,13 +638,7 @@ const AddProductBarcode = ({
 
       {/* Инструкция */}
       {!scannedProduct && !scanningProduct && (
-        <div
-          style={{
-            color: "#666",
-            fontStyle: "italic",
-            marginTop: "20px",
-          }}
-        >
+        <div className="add-product-barcode__instruction">
           Отсканируйте штрих-код товара для добавления в склад
         </div>
       )}

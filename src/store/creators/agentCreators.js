@@ -75,6 +75,7 @@ export const productCheckoutInAgent = createAsyncThunk(
       const { data } = await api.post(`/main/agents/me/carts/${id}/checkout/`, {
         print_receipt: bool,
         client_id: clientId,
+        payment_method: "transfer",
       });
       return data;
     } catch (error) {

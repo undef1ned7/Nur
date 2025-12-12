@@ -9,8 +9,9 @@ const STATUS_LABELS = {
   no_show: "Не пришёл",
 };
 
-const PX_PER_MIN = 56 / 30;
-const MIN_EVENT_H = 104;
+/* компактная шкала */
+const PX_PER_MIN = 32 / 30; // 30 минут ≈ 32px
+const MIN_EVENT_H = 72;     // минимум ~2 слота
 
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21;
@@ -22,7 +23,7 @@ const estimateContentMin = (svc, client, phone) => {
     Math.ceil(String(svc || "").length / wrapLen) +
     Math.ceil(String(client || "").length / wrapLen) +
     (phone ? 1 : 0);
-  return 30 + lines * 20 + 14;
+  return 30 + lines * 18 + 10;
 };
 
 const colorByStatus = (status) => {
@@ -31,37 +32,37 @@ const colorByStatus = (status) => {
       return {
         bg: "#DBEAFF",
         border: "#3B82F6",
-        shadow: "0 6px 18px rgba(59,130,246,.18)",
+        shadow: "0 4px 14px rgba(59,130,246,.18)",
       };
     case "confirmed":
       return {
         bg: "#EDE9FF",
         border: "#7C3AED",
-        shadow: "0 6px 18px rgba(124,58,237,.18)",
+        shadow: "0 4px 14px rgba(124,58,237,.18)",
       };
     case "completed":
       return {
         bg: "#DCFCE7",
         border: "#16A34A",
-        shadow: "0 6px 18px rgba(22,163,74,.18)",
+        shadow: "0 4px 14px rgba(22,163,74,.18)",
       };
     case "canceled":
       return {
         bg: "#FEE2E2",
         border: "#EF4444",
-        shadow: "0 6px 18px rgba(239,68,68,.18)",
+        shadow: "0 4px 14px rgba(239,68,68,.18)",
       };
     case "no_show":
       return {
         bg: "#FEF3C7",
         border: "#F59E0B",
-        shadow: "0 6px 18px rgba(245,158,11,.18)",
+        shadow: "0 4px 14px rgba(245,158,11,.18)",
       };
     default:
       return {
         bg: "#F3F4F6",
         border: "#D1D5DB",
-        shadow: "0 6px 18px rgba(2,6,23,.08)",
+        shadow: "0 4px 14px rgba(2,6,23,.08)",
       };
   }
 };
@@ -98,6 +99,7 @@ const layoutForBarber = (
     };
   });
 
+  // раскладка по "дорожкам" при пересечениях
   const lanes = [];
   items.forEach((it) => {
     let lane = 0;
@@ -113,13 +115,13 @@ const layoutForBarber = (
     it.lanes = lanes.length;
   });
 
-  const GAP = 10;
+  const GAP = 6; // расстояние между пересекающимися карточками
   items.forEach((it) => {
     const widthPct = (100 - (it.lanes - 1) * GAP) / it.lanes;
     const { bg, border, shadow } = colorByStatus(it.r.status);
     it.style = {
       top: `${it.top}px`,
-      height: `${it.height - 6}px`,
+      height: `${it.height - 4}px`,
       left: `calc(${it.lane * (widthPct + GAP)}%)`,
       width: `${widthPct}%`,
       background: bg,
@@ -195,26 +197,18 @@ const RecordaCalendar = ({
             );
 
             return (
-              <section
-                key={b.id}
-                className="barberrecorda__calCol"
-              >
+              <section key={b.id} className="barberrecorda__calCol">
                 <header
                   className="barberrecorda__calHeader"
                   style={{ height: COL_HEADER_H }}
                 >
                   <div className="barberrecorda__colTitle">
-                    <span
-                      className="barberrecorda__avatar"
-                      aria-hidden
-                    >
+                    <span className="barberrecorda__avatar" aria-hidden>
                       {((b.name || "•").trim()[0] || "•")
                         .toUpperCase()
                         .trim()}
                     </span>
-                    <span className="barberrecorda__name">
-                      {b.name}
-                    </span>
+                    <span className="barberrecorda__name">{b.name}</span>
                   </div>
                 </header>
 

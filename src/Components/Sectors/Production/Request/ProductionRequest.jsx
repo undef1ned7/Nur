@@ -159,12 +159,9 @@ const ProductionRequest = () => {
     setShowCart(false);
   };
 
-  // Вычисляем общее количество товаров
+  // Вычисляем количество товаров (позиций) в корзине
   const totalItemsCount = useMemo(() => {
-    return cartItems.reduce(
-      (sum, item) => sum + Number(item.quantity_requested || 0),
-      0
-    );
+    return cartItems ? cartItems.length : 0;
   }, [cartItems]);
 
   const handleNotify = async (type, message) => {
@@ -290,25 +287,26 @@ const ProductionRequest = () => {
 
       {showCart && (
         <div className="cart-modal-overlay" onClick={handleCloseCart}>
-          <div className="cart-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="cart-modal-header">
+          <div className="" onClick={(e) => e.stopPropagation()}>
+            {/* <div className="cart-modal-header">
               <h2>Запрос товаров</h2>
               <button className="close-cart-btn" onClick={handleCloseCart}>
                 ×
               </button>
-            </div>
-            <div className="cart-modal-content">
-              <RequestCart
-                cartId={cartId}
-                items={cartItems}
-                onUpdateQuantity={handleUpdateItemQuantity}
-                onRemoveItem={handleRemoveItem}
-                onNotify={handleNotify}
-                onRefresh={refreshCart}
-                onCreateNewCart={createNewCart}
-              />
-            </div>
+            </div> */}
+            {/* <div className="cart-modal-content"> */}
+            <RequestCart
+              cartId={cartId}
+              items={cartItems}
+              onUpdateQuantity={handleUpdateItemQuantity}
+              onRemoveItem={handleRemoveItem}
+              onNotify={handleNotify}
+              onRefresh={refreshCart}
+              onCreateNewCart={createNewCart}
+              onClose={handleCloseCart}
+            />
           </div>
+          {/* </div> */}
         </div>
       )}
 

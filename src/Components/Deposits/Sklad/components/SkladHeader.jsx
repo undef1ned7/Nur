@@ -1,15 +1,10 @@
-import { Plus, Minus } from "lucide-react";
+import { Plus, Package, Scale } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 /**
- * Компонент заголовка склада с поиском и кнопками
+ * Компонент заголовка склада с иконкой и кнопками
  */
 const SkladHeader = ({
-  searchTerm,
-  onSearchChange,
-  count,
-  productsLength,
-  isFiltered,
-  onResetFilters,
   isBuildingCompany,
   isMarketCompany,
   onShowReceiveModal,
@@ -20,61 +15,43 @@ const SkladHeader = ({
   onAdd,
   onSendToScales,
 }) => {
-  return (
-    <div className="sklad__header">
-      <div className="sklad__left">
-        <input
-          type="text"
-          placeholder="Поиск по названию товара"
-          className="sklad__search"
-          value={searchTerm}
-          onChange={onSearchChange}
-        />
-        <div className="sklad__center">
-          <span>Всего: {count !== null ? count : "-"}</span>
-          <span>Найдено: {productsLength}</span>
-          {isFiltered && (
-            <span
-              className="sklad__reset"
-              onClick={onResetFilters}
-              style={{ cursor: "pointer" }}
-            >
-              Сбросить
-            </span>
-          )}
-        </div>
-      </div>
+  const navigate = useNavigate();
 
-      <div
-      className="flex-col xl:flex-row flex items-center gap-5 flex-wrap "
-        // style={{
-        //   display: "flex",
-        //   alignItems: "center",
-        //   gap: "20px",
-        //   flexWrap: "wrap",
-        // }}
-      >
-        {isBuildingCompany ? (
-          <>
-            <button className="sklad__add" onClick={onShowReceiveModal}>
-              <Plus size={16} style={{ marginRight: "4px" }} /> Принять товар
+  return (
+    <div className="sklad-new">
+      <div className="sklad-new__header-row">
+        <div className="sklad-new__title-section">
+          <div className="sklad-new__icon">
+            <Package size={24} />
+          </div>
+          <div>
+            <h1 className="sklad-new__title">Склад</h1>
+            <p className="sklad-new__subtitle">
+              Управление товарами и запасами
+            </p>
+          </div>
+        </div>
+
+        {/* Кнопки действий справа */}
+        <div className="sklad-new__actions">
+          {isMarketCompany && (
+            <button
+              className="sklad-new__export-btn"
+              onClick={onSendToScales}
+              title="Отправить выбранные товары на весы"
+            >
+              <Scale size={18} />
+              Отправка на весы
             </button>
-            <button onClick={onShowHistoryModal} className="sklad__add">
-              <Minus size={16} style={{ marginRight: "4px" }} /> Отправить товар
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="sklad__add" onClick={onAdd}>
-              <Plus size={16} style={{ marginRight: "4px" }} /> Добавить товар
-            </button>
-            {isMarketCompany && (
-              <button className="sklad__add" onClick={onSendToScales}>
-                Отправить на весы
-              </button>
-            )}
-          </>
-        )}
+          )}
+          <button
+            className="sklad-new__add-btn"
+            onClick={() => navigate("/crm/sklad/add-product")}
+          >
+            <Plus size={18} />
+            Добавить товар
+          </button>
+        </div>
       </div>
     </div>
   );

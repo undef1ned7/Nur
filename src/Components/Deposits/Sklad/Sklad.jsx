@@ -21,6 +21,8 @@ import AlertModal from "../../common/AlertModal/AlertModal";
 import SkladTab from "./components/SkladTab";
 import HistoryTab from "./components/HistoryTab";
 import BarcodePrintTab from "./components/BarcodePrintTab";
+import SkladHeader from "./components/SkladHeader";
+import SkladSearchSection from "./components/SkladSearchSection";
 
 // Модальные окна
 import AddBrandModal from "./components/modals/AddBrandModal";
@@ -188,7 +190,7 @@ export default function Sklad() {
   };
 
   const handleAdd = () => {
-    setShowAddModal(true);
+    // Navigation will be handled by SkladHeader component
   };
 
   const handleSaveSuccess = () => {
@@ -257,13 +259,22 @@ export default function Sklad() {
       };
 
       // Если есть выбранные товары, добавляем их ID
-      if (selectedIds && selectedIds.size > 0) {
+      const selectedCount =
+        selectedIds && selectedIds.size > 0 ? selectedIds.size : 0;
+      if (selectedCount > 0) {
         payload.product_ids = Array.from(selectedIds);
       }
 
       await dispatch(sendProductsToScales(payload)).unwrap();
 
-      setAlertMessage("Товары успешно отправлены на весы");
+      const productCount = selectedCount > 0 ? selectedCount : products.length;
+      const productText =
+        productCount === 1 ? "товар" : productCount < 5 ? "товара" : "товаров";
+      setAlertMessage(
+        selectedCount > 0
+          ? `Выбранные товары (${productCount} ${productText}) успешно отправлены на весы`
+          : `Все товары успешно отправлены на весы`
+      );
       setShowSuccessAlert(true);
     } catch (err) {
       const errorMessage =
@@ -330,6 +341,7 @@ export default function Sklad() {
           onBulkDelete={handleBulkDelete}
           onClearSelection={clearSelection}
           bulkDeleting={bulkDeleting}
+          showHeader={true}
         />
       ),
     },
@@ -367,8 +379,53 @@ export default function Sklad() {
     },
   ];
 
-  // Табы для маркета (три таба)
+  // Табы для маркета (четыре таба)
   const marketTabs = [
+    {
+      label: "Все товары",
+      content: (
+        <SkladTab
+          products={products}
+          loading={loading}
+          error={error}
+          count={count}
+          searchTerm={searchTerm}
+          onSearchChange={handleSearchChangeWithReset}
+          isFiltered={isFiltered}
+          onResetFilters={handleResetAllFiltersWithReset}
+          isBuildingCompany={isBuildingCompany}
+          isMarketCompany={isMarketCompany}
+          onShowReceiveModal={() => setShowReceiveModal(true)}
+          onShowHistoryModal={() => setShowHistoryModal(true)}
+          selectCashBox={selectCashBox}
+          onSelectCashBox={setSelectCashBox}
+          cashBoxes={cashBoxes}
+          onAdd={handleAdd}
+          onSendToScales={handleSendToScales}
+          onShowFilterModal={() => setShowFilterModal(true)}
+          showHeader={false}
+          isSelected={isSelected}
+          toggleRow={toggleRow}
+          toggleSelectAllOnPage={toggleSelectAllOnPage}
+          onEdit={handleEdit}
+          onOpenMarriage={handleOpenMarriage}
+          onOpenAddProduct={handleOpenAddProduct}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          next={next}
+          previous={previous}
+          creating={creating}
+          updating={updating}
+          deleting={deleting}
+          onNextPage={() => handleNextPage(next)}
+          onPreviousPage={() => handlePreviousPage(previous)}
+          selectedIds={selectedIds}
+          onBulkDelete={handleBulkDelete}
+          onClearSelection={clearSelection}
+          bulkDeleting={bulkDeleting}
+        />
+      ),
+    },
     {
       label: "Штучные",
       content: (
@@ -390,6 +447,8 @@ export default function Sklad() {
           cashBoxes={cashBoxes}
           onAdd={handleAdd}
           onSendToScales={handleSendToScales}
+          onShowFilterModal={() => setShowFilterModal(true)}
+          showHeader={false}
           isSelected={isSelected}
           toggleRow={toggleRow}
           toggleSelectAllOnPage={toggleSelectAllOnPage}
@@ -433,6 +492,8 @@ export default function Sklad() {
           cashBoxes={cashBoxes}
           onAdd={handleAdd}
           onSendToScales={handleSendToScales}
+          onShowFilterModal={() => setShowFilterModal(true)}
+          showHeader={false}
           isSelected={isSelected}
           toggleRow={toggleRow}
           toggleSelectAllOnPage={toggleSelectAllOnPage}
@@ -472,27 +533,117 @@ export default function Sklad() {
   const tabs = isMarketCompany ? marketTabs : baseTabs;
 
   return (
-    <div className="sklad">
+    <div className="sklad sklad-market">
       {isStartPlan ? (
-        <>{tabs[0].content}</>
+        <>
+          {/* Для тарифа "старт" показываем заголовок и контент первого таба */}
+          <SkladHeader
+            isBuildingCompany={isBuildingCompany}
+            isMarketCompany={isMarketCompany}
+            onShowReceiveModal={() => setShowReceiveModal(true)}
+            onShowHistoryModal={() => setShowHistoryModal(true)}
+            selectCashBox={selectCashBox}
+            onSelectCashBox={setSelectCashBox}
+            cashBoxes={cashBoxes}
+            onAdd={handleAdd}
+            onSendToScales={handleSendToScales}
+          />
+          {/* Контент первого таба без заголовка (так как он уже показан выше) */}
+          <SkladTab
+            products={products}
+            loading={loading}
+            error={error}
+            count={count}
+            searchTerm={searchTerm}
+            onSearchChange={handleSearchChangeWithReset}
+            isFiltered={isFiltered}
+            onResetFilters={handleResetAllFiltersWithReset}
+            isBuildingCompany={isBuildingCompany}
+            isMarketCompany={isMarketCompany}
+            onShowReceiveModal={() => setShowReceiveModal(true)}
+            onShowHistoryModal={() => setShowHistoryModal(true)}
+            selectCashBox={selectCashBox}
+            onSelectCashBox={setSelectCashBox}
+            cashBoxes={cashBoxes}
+            onAdd={handleAdd}
+            onSendToScales={handleSendToScales}
+            isSelected={isSelected}
+            toggleRow={toggleRow}
+            toggleSelectAllOnPage={toggleSelectAllOnPage}
+            onEdit={handleEdit}
+            onOpenMarriage={handleOpenMarriage}
+            onOpenAddProduct={handleOpenAddProduct}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            next={next}
+            previous={previous}
+            creating={creating}
+            updating={updating}
+            deleting={deleting}
+            onNextPage={() => handleNextPage(next)}
+            onPreviousPage={() => handlePreviousPage(previous)}
+            selectedIds={selectedIds}
+            onBulkDelete={handleBulkDelete}
+            onClearSelection={clearSelection}
+            bulkDeleting={bulkDeleting}
+            showHeader={false}
+          />
+        </>
       ) : isBuildingCompany || isMarketCompany ? (
         <>
-          <div className="vitrina__header" style={{ margin: "15px 0" }}>
-            <div className="vitrina__tabs">
-              {tabs.map((tab, index) => (
-                <span
-                  key={index}
-                  className={`vitrina__tab ${
-                    index === activeTab && "vitrina__tab--active"
-                  }`}
-                  onClick={() => setActiveTab(index)}
-                >
-                  {tab.label}
-                </span>
-              ))}
-            </div>
-          </div>
-          {tabs[activeTab].content}
+          {/* Для маркета: сначала заголовок, потом табы, потом поиск, потом контент */}
+          {isMarketCompany ? (
+            <>
+              {/* Заголовок */}
+              <SkladHeader
+                isBuildingCompany={isBuildingCompany}
+                isMarketCompany={isMarketCompany}
+                onShowReceiveModal={() => setShowReceiveModal(true)}
+                onShowHistoryModal={() => setShowHistoryModal(true)}
+                selectCashBox={selectCashBox}
+                onSelectCashBox={setSelectCashBox}
+                cashBoxes={cashBoxes}
+                onAdd={handleAdd}
+                onSendToScales={handleSendToScales}
+              />
+              {/* Табы после заголовка */}
+              <div className="vitrina__tabs">
+                {tabs.map((tab, index) => (
+                  <button
+                    key={index}
+                    className={`vitrina__tab ${
+                      index === activeTab && "vitrina__tab--active"
+                    }`}
+                    onClick={() => setActiveTab(index)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              {/* Поиск и фильтры после табов */}
+              <SkladSearchSection
+                searchTerm={searchTerm}
+                onSearchChange={handleSearchChangeWithReset}
+                count={count}
+                productsLength={
+                  activeTab === 0
+                    ? products.length
+                    : activeTab === 1
+                    ? pieceProducts.length
+                    : activeTab === 2
+                    ? weightProducts.length
+                    : products.length
+                }
+                isFiltered={isFiltered}
+                onResetFilters={handleResetAllFiltersWithReset}
+                onShowFilterModal={() => setShowFilterModal(true)}
+              />
+              {/* Контент активного таба (без заголовка) */}
+              {tabs[activeTab].content}
+            </>
+          ) : (
+            <>{tabs[activeTab].content}</>
+          )}
         </>
       ) : (
         <>{tabs[0].content}</>
@@ -608,16 +759,22 @@ export default function Sklad() {
         />
       )}
 
-      {/* AlertModal для успешного добавления товара */}
+      {/* AlertModal для успешных операций */}
       <AlertModal
         open={showSuccessAlert}
         type="success"
         title="Успешно!"
-        message={`Товар "${successProductName}" успешно добавлен в склад`}
+        message={
+          alertMessage ||
+          (successProductName
+            ? `Товар "${successProductName}" успешно добавлен в склад`
+            : "Операция выполнена успешно")
+        }
         okText="ОК"
         onClose={() => {
           setShowSuccessAlert(false);
           setSuccessProductName("");
+          setAlertMessage("");
         }}
       />
 
