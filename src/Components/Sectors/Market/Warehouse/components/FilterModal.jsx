@@ -7,6 +7,8 @@ const FilterModal = ({
   currentFilters,
   onApplyFilters,
   onResetFilters,
+  brands = [],
+  categories = [],
 }) => {
   const [filters, setFilters] = useState(() => ({
     itemTypes: {
@@ -64,15 +66,15 @@ const FilterModal = ({
   const handleApply = () => {
     const cleanedFilters = {};
 
-    // Item types
-    if (
-      !filters.itemTypes.product ||
-      !filters.itemTypes.service ||
-      !filters.itemTypes.kit
-    ) {
-      cleanedFilters.item_types = Object.keys(filters.itemTypes)
-        .filter((key) => filters.itemTypes[key])
-        .join(",");
+    // Item types (kind)
+    const selectedTypes = [];
+    if (filters.itemTypes.product) selectedTypes.push("product");
+    if (filters.itemTypes.service) selectedTypes.push("service");
+    if (filters.itemTypes.kit) selectedTypes.push("bundle");
+
+    // Если выбраны не все типы, отправляем фильтр
+    if (selectedTypes.length < 3) {
+      cleanedFilters.kind = selectedTypes.join(",");
     }
 
     // Other filters
@@ -145,6 +147,7 @@ const FilterModal = ({
       },
     });
     onResetFilters();
+    onClose();
   };
 
   return (
@@ -222,6 +225,11 @@ const FilterModal = ({
               }
             >
               <option value="">Выбрать категорию</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -236,6 +244,11 @@ const FilterModal = ({
               }
             >
               <option value="">Выбрать бренд</option>
+              {brands.map((brand) => (
+                <option key={brand.id} value={brand.id}>
+                  {brand.name}
+                </option>
+              ))}
             </select>
           </div>
 

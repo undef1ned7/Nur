@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import {
   X,
   Edit,
@@ -10,39 +11,50 @@ import {
   Globe,
   Box,
   FileText,
+  Plus,
+  AlertTriangle,
 } from "lucide-react";
 import "../Warehouse.scss";
 import MovementHistory from "./MovementHistory";
 import api from "../../../../../api";
+import noImage from "./placeholder.png";
+import AddProductModal from "../../../../Deposits/Sklad/AddProduct/AddProductModal";
+import MarriageModal from "../../../../Deposits/Sklad/MarriageModal";
+import { deleteProductAsync } from "../../../../../store/creators/productCreators";
+import AlertModal from "../../../../common/AlertModal/AlertModal";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("info");
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [showMarriageModal, setShowMarriageModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const fetchProduct = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/main/products/${id}/`);
+      setProduct(response.data);
+    } catch (error) {
+      console.error("Ошибка при загрузке товара:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get(`/main/products/${id}/`);
-        setProduct(response.data);
-      } catch (error) {
-        console.error("Ошибка при загрузке товара:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (id) {
       fetchProduct();
     }
   }, [id]);
 
   const handleEdit = () => {
-    // Navigate to edit page or open edit modal
-    console.log("Edit product");
+    navigate(`/crm/sklad/add-product/${id}`);
   };
 
   const handleDuplicate = () => {
@@ -51,10 +63,26 @@ const ProductDetail = () => {
   };
 
   const handleDelete = () => {
-    if (window.confirm("Вы уверены, что хотите удалить этот товар?")) {
-      // Delete product logic
-      console.log("Delete product");
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await dispatch(deleteProductAsync(product.id)).unwrap();
+      setShowDeleteConfirm(false);
+      navigate(-1); // Возвращаемся назад после удаления
+    } catch (error) {
+      console.error("Ошибка при удалении товара:", error);
+      setShowDeleteConfirm(false);
+      alert(
+        "Ошибка при удалении товара: " +
+          (error.message || JSON.stringify(error))
+      );
     }
+  };
+
+  const handleDeleteConfirm = () => {
+    navigate(-1); // Возвращаемся назад после удаления
   };
 
   const formatPrice = (price) => {
@@ -79,6 +107,28 @@ const ProductDetail = () => {
       "декабря",
     ];
     return `${date.getDate()} ${months[date.getMonth()]}`;
+  };
+
+  // Получаем список изображений
+  const imagesList = Array.isArray(product?.images) ? product.images : [];
+  const hasImages = imagesList.length > 0;
+
+  // Находим индекс основного изображения или используем первое
+  useEffect(() => {
+    if (hasImages) {
+      const primaryIndex = imagesList.findIndex((img) => img.is_primary);
+      setCurrentImageIndex(primaryIndex >= 0 ? primaryIndex : 0);
+    }
+  }, [product?.images]);
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % imagesList.length);
+  };
+
+  const prevImage = () => {
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + imagesList.length) % imagesList.length
+    );
   };
 
   if (loading) {
@@ -114,40 +164,119 @@ const ProductDetail = () => {
           <Trash2 size={16} />
           Удалить
         </button>
+        <button
+          className="product-detail__add-btn"
+          onClick={() => setShowAddProductModal(true)}
+        >
+          <Plus size={16} />
+          Добавить
+        </button>
+        <button
+          className="product-detail__marriage-btn"
+          onClick={() => setShowMarriageModal(true)}
+        >
+          <AlertTriangle size={16} />
+          Брак
+        </button>
       </div>
 
       {/* Main Content */}
       <div className="product-detail__content">
         {/* Image Section */}
-        <div className="product-detail__image-section">
-          <div className="product-detail__image-placeholder">
-            <div className="product-detail__image-icon">📦</div>
-            <button className="product-detail__image-add-btn">+</button>
+        <div className="flex">
+          <div className="product-detail__image-section w-1/2">
+            {hasImages ? (
+              <>
+                <div className="product-detail__main-image">
+                  <img
+                    src={imagesList[currentImageIndex]?.image_url}
+                    alt={product.name || "Товар"}
+                    className="product-detail__image"
+                  />
+                  {imagesList.length > 1 && (
+                    <>
+                      <button
+                        className="product-detail__image-nav product-detail__image-nav--prev"
+                        onClick={prevImage}
+                      >
+                        ‹
+                      </button>
+                      <button
+                        className="product-detail__image-nav product-detail__image-nav--next"
+                        onClick={nextImage}
+                      >
+                        ›
+                      </button>
+                    </>
+                  )}
+                  {imagesList[currentImageIndex]?.is_primary && (
+                    <div className="product-detail__image-primary-badge">
+                      Главное
+                    </div>
+                  )}
+                </div>
+                {imagesList.length > 1 && (
+                  <div className="product-detail__image-thumbnails">
+                    {imagesList.map((image, index) => (
+                      <div
+                        key={image.id || index}
+                        className={`product-detail__thumbnail ${
+                          index === currentImageIndex
+                            ? "product-detail__thumbnail--active"
+                            : ""
+                        }`}
+                        onClick={() => setCurrentImageIndex(index)}
+                      >
+                        <img
+                          src={image.image_url}
+                          alt={`${product.name} ${index + 1}`}
+                        />
+                        {image.is_primary && (
+                          <div className="product-detail__thumbnail-badge">
+                            ★
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="product-detail__image-placeholder">
+                <img
+                  src={noImage}
+                  alt="Нет изображения"
+                  className="product-detail__placeholder-image"
+                />
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Product Info */}
-        <div className="product-detail__info-section">
-          <div className="product-detail__type-badge">товар</div>
-          <h2 className="product-detail__name">{product.name || "—"}</h2>
-          <div className="product-detail__details">
-            <div className="product-detail__detail-item">
-              <span className="product-detail__detail-label">Штрих-код:</span>
-              <span className="product-detail__detail-value">
-                {product.barcode || "—"}
-              </span>
-            </div>
-            <div className="product-detail__detail-item">
-              <span className="product-detail__detail-label">Артикул:</span>
-              <span className="product-detail__detail-value">
-                {product.article || "—"}
-              </span>
-            </div>
-            <div className="product-detail__detail-item">
-              <span className="product-detail__detail-label">Код товара:</span>
-              <span className="product-detail__detail-value">
-                {product.code || "—"}
-              </span>
+          {/* Product Info */}
+          <div className="product-detail__info-section w-1/2">
+            <div className="product-detail__type-badge">товар</div>
+            <h2 className="product-detail__name">{product.name || "—"}</h2>
+            <div className="product-detail__details">
+              <div className="product-detail__detail-item">
+                <span className="product-detail__detail-label">Штрих-код:</span>
+                <span className="product-detail__detail-value">
+                  {product.barcode || "—"}
+                </span>
+              </div>
+              <div className="product-detail__detail-item">
+                <span className="product-detail__detail-label">Артикул:</span>
+                <span className="product-detail__detail-value">
+                  {product.article || "—"}
+                </span>
+              </div>
+              <div className="product-detail__detail-item">
+                <span className="product-detail__detail-label">
+                  Код товара:
+                </span>
+                <span className="product-detail__detail-value">
+                  {product.code || "—"}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -190,7 +319,7 @@ const ProductDetail = () => {
                   <Tag className="product-detail__info-icon" size={18} />
                   <span className="product-detail__info-label">Категория:</span>
                   <span className="product-detail__info-value">
-                    {product.category?.name || "—"}
+                    {product.category || "—"}
                   </span>
                 </div>
                 <div className="product-detail__info-item">
@@ -206,8 +335,8 @@ const ProductDetail = () => {
                     Срок годности:
                   </span>
                   <span className="product-detail__info-value">
-                    {product.expiry_date
-                      ? formatDate(product.expiry_date)
+                    {product.expiration_date
+                      ? formatDate(product.expiration_date)
                       : "—"}
                   </span>
                 </div>
@@ -243,21 +372,13 @@ const ProductDetail = () => {
                 </thead>
                 <tbody>
                   <tr>
+                    <td>{formatPrice(product.total_price)} сом</td>
                     <td>{formatPrice(product.price)} сом</td>
-                    <td>{formatPrice(product.purchase_price)} сом</td>
                     <td>
-                      {formatPrice(product.cost_price)} сом
+                      {formatPrice(product.purchase_price)} сом
                       <span className="product-detail__help-icon">?</span>
                     </td>
-                    <td>
-                      {product.purchase_price
-                        ? `${Math.round(
-                            ((product.price - product.purchase_price) /
-                              product.purchase_price) *
-                              100
-                          )}%`
-                        : "—"}
-                    </td>
+                    <td>{product.markup_percent}%</td>
                     <td>
                       {product.price
                         ? `${Math.round(
@@ -341,6 +462,40 @@ const ProductDetail = () => {
           <MovementHistory productId={id} productCode={product.code} />
         )}
       </div>
+
+      {/* Модальные окна */}
+      {showAddProductModal && (
+        <AddProductModal
+          onClose={() => setShowAddProductModal(false)}
+          onChanged={() => {
+            fetchProduct();
+            setShowAddProductModal(false);
+          }}
+          item={product}
+        />
+      )}
+
+      {showMarriageModal && (
+        <MarriageModal
+          onClose={() => setShowMarriageModal(false)}
+          onChanged={() => {
+            fetchProduct();
+            setShowMarriageModal(false);
+          }}
+          item={product}
+        />
+      )}
+
+      {/* Модалка подтверждения удаления */}
+      <AlertModal
+        open={showDeleteConfirm}
+        type="warning"
+        title="Подтверждение удаления"
+        message="Вы уверены, что хотите удалить этот товар? Это действие нельзя отменить."
+        okText="Удалить"
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };

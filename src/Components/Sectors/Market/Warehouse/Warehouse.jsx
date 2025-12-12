@@ -4,39 +4,44 @@ import { useNavigate } from "react-router-dom";
 import { Search, Filter, Plus } from "lucide-react";
 import "./Warehouse.scss";
 import FilterModal from "./components/FilterModal";
-import { fetchProductsAsync } from "../../../../store/creators/productCreators";
+import {
+  fetchProductsAsync,
+  fetchBrandsAsync,
+  fetchCategoriesAsync,
+} from "../../../../store/creators/productCreators";
 import { useProducts } from "../../../../store/slices/productSlice";
+
+import noImage from "./components/placeholder.png";
 
 const Warehouse = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { list: products, loading, count } = useProducts();
+  const brands = useSelector((state) => state.product.brands || []);
+  const categories = useSelector((state) => state.product.categories || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
   const [selectedRows, setSelectedRows] = useState(new Set());
 
+  // Загрузка брендов и категорий
+  useEffect(() => {
+    dispatch(fetchBrandsAsync());
+    dispatch(fetchCategoriesAsync());
+  }, [dispatch]);
+
   // Загрузка товаров
   useEffect(() => {
     const params = {
       page: 1,
-      search: searchTerm,
+      ...(searchTerm && { search: searchTerm }),
       ...filters,
     };
     dispatch(fetchProductsAsync(params));
   }, [dispatch, searchTerm, filters]);
 
-  // Фильтрация товаров по поиску
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm) return products;
-    const search = searchTerm.toLowerCase();
-    return products.filter(
-      (product) =>
-        product.name?.toLowerCase().includes(search) ||
-        product.code?.toLowerCase().includes(search) ||
-        product.barcode?.toLowerCase().includes(search)
-    );
-  }, [products, searchTerm]);
+  // Используем продукты напрямую, так как фильтрация происходит на сервере
+  const filteredProducts = products;
 
   const handleProductClick = (product) => {
     navigate(`/crm/market/warehouse/${product.id}`);
@@ -79,6 +84,15 @@ const Warehouse = () => {
   const formatStock = (stock) => {
     if (stock === null || stock === undefined) return "—";
     return stock.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  };
+
+  // Получаем главное изображение товара
+  const getPrimaryImage = (product) => {
+    if (!product?.images || !Array.isArray(product.images)) return null;
+    // Ищем изображение с is_primary: true
+    const primaryImage = product.images.find((img) => img.is_primary);
+    // Если нет главного, берем первое изображение
+    return primaryImage || product.images[0] || null;
   };
 
   return (
@@ -186,14 +200,29 @@ const Warehouse = () => {
                   </td>
                   <td>{index + 1}</td>
                   <td className="warehouse-table__name">
-                    {product.name || "—"}
+                    <div className="warehouse-table__name-cell">
+                      {(() => {
+                        const primaryImage = getPrimaryImage(product);
+                        return (
+                          <img
+                            src={primaryImage?.image_url || noImage}
+                            alt={product.name || "Товар"}
+                            className="warehouse-table__product-image"
+                            onError={(e) => {
+                              e.target.src = noImage;
+                            }}
+                          />
+                        );
+                      })()}
+                      <span>{product.name || "—"}</span>
+                    </div>
                   </td>
                   <td>{product.code || "—"}</td>
                   <td>{product.article || "—"}</td>
                   <td>{product.unit || "—"}</td>
                   <td>{formatPrice(product.price)}</td>
-                  <td>{formatPrice(product.discount || 0)}</td>
-                  <td>{formatStock(product.stock)}</td>
+                  <td>{formatPrice(product.discount_percent || 0)}</td>
+                  <td>{formatStock(product.quantity)}</td>
                 </tr>
               ))
             )}
@@ -208,6 +237,8 @@ const Warehouse = () => {
           currentFilters={filters}
           onApplyFilters={handleApplyFilters}
           onResetFilters={handleResetFilters}
+          brands={brands}
+          categories={categories}
         />
       )}
     </div>
