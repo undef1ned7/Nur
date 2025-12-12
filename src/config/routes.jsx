@@ -191,6 +191,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("employ", Masters),
   createProtectedRoute("sklad", Sklad),
   createProtectedRoute("sklad/add-product", AddProductPage),
+  createProtectedRoute("sklad/add-product/:id", AddProductPage),
   createProtectedRoute("sell", Sell),
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),

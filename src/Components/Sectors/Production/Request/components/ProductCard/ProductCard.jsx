@@ -71,7 +71,7 @@ const ProductCard = ({
           <img src={product.images?.[0]?.image_url} alt={product.name} />
         ) : (
           <img
-            src="https://img.icons8.com/ios7/1200/no-image.jpg"
+            src="https://web.cloudshop.ru/images/placeholder.png"
             alt={product.name}
             style={{ objectFit: "contain" }}
           />

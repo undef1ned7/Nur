@@ -424,7 +424,7 @@ const Sell = () => {
                         {kindTranslate[item.status] || item.status}
                       </td>
                       <td data-label="Дата">
-                        {new Date(item.created_at).toLocaleString()}
+                        {new Date(item.created_at).toLocaleDateString()}
                       </td>
                       <td onClick={(e) => e.stopPropagation()} data-label="">
                         {company.sector.name === "Магазин" && (

@@ -73,18 +73,14 @@
     align-items: center;
     gap: 8px;
     padding: 12px 20px;
-    background: #3b82f6;
-    color: white;
+    background: #f7d74f;
+    color: #000;
     border: none;
     border-radius: 10px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-
-    &:hover {
-      background: #2563eb;
-    }
   }
 }
 
@@ -212,6 +208,21 @@
 
   &__name {
     font-weight: 600;
+  }
+
+  &__name-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__product-image {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
   }
 
   &__loading,
@@ -569,6 +580,44 @@
     }
   }
 
+  &__add-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #059669;
+    }
+  }
+
+  &__marriage-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #d97706;
+    }
+  }
+
   &__content {
     display: flex;
     flex-direction: column;
@@ -579,6 +628,120 @@
     margin-bottom: 24px;
   }
 
+  &__main-image {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    aspect-ratio: 4/3;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #f3f4f6;
+    margin-bottom: 16px;
+  }
+
+  &__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &__image-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 2;
+
+    &:hover {
+      background: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    &--prev {
+      left: 12px;
+    }
+
+    &--next {
+      right: 12px;
+    }
+  }
+
+  &__image-primary-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: var(--primary);
+    color: var(--text);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 2;
+  }
+
+  &__image-thumbnails {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    max-width: 500px;
+  }
+
+  &__thumbnail {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+    background: #f3f4f6;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &--active {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(247, 215, 79, 0.3);
+    }
+
+    &:hover {
+      transform: scale(1.05);
+    }
+  }
+
+  &__thumbnail-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--primary);
+    color: var(--text);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
   &__image-placeholder {
     width: 100%;
     max-width: 400px;
@@ -587,6 +750,7 @@
     border: 2px dashed var(--border);
     border-radius: var(--radius);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     position: relative;
@@ -595,6 +759,19 @@
   &__image-icon {
     font-size: 48px;
     color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  &__image-placeholder-text {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  &__placeholder-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   &__image-add-btn {
