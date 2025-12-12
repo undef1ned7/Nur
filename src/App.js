@@ -5,6 +5,8 @@ import AuthGuard from "./Components/Auth/AuthGuard/AuthGuard";
 import Layout from "./Components/Layout/Layout";
 import { ScrollToTop } from "./hooks/ScrollToTop";
 import { publicRoutes, crmRoutes } from "./config/routes";
+import { ThemeModeProvider } from "./theme/ThemeModeProvider";
+import { Box } from "@mui/system";
 
 function App() {
   const [profile, setProfile] = useState(null);
@@ -16,15 +18,19 @@ function App() {
 
   return (
     <AuthGuard onProfileLoaded={handleProfileLoaded}>
-      <BrowserRouter>
-        <ScrollToTop />
-        <Routes>
-          {publicRoutes}
-          <Route path="/crm" element={<Layout />}>
-            {crmRoutes(profile)}
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ThemeModeProvider>
+         <Box sx={{ minHeight: "100vh", bgcolor: "transparent" }}>
+          <BrowserRouter>
+            <ScrollToTop />
+            <Routes>
+              {publicRoutes}
+              <Route path="/crm" element={<Layout />}>
+                {crmRoutes(profile)}
+              </Route>
+            </Routes>
+          </BrowserRouter>
+         </Box>
+      </ThemeModeProvider>
     </AuthGuard>
   );
 }

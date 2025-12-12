@@ -14,6 +14,10 @@ import {
 } from "../../../../store/creators/userCreators";
 import { useNavigate } from "react-router-dom";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
+import { IconButton } from "@mui/material";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import LightModeIcon from "@mui/icons-material/LightMode";
 
 const Settings = () => {
   const dispatch = useDispatch();
@@ -368,6 +372,8 @@ const Settings = () => {
       showAlert("error", `Ошибка: ${errorMessage}`);
     }
   };
+
+  const { mode, toggleMode } = React.useContext(ThemeModeContext);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -1042,6 +1048,15 @@ const Settings = () => {
                     ? "Сайдбар будет автоматически закрываться при каждом переходе на новую страницу."
                     : "Сайдбар будет оставаться открытым при переходах между страницами."}
                 </p>
+              </div>
+
+              <div>
+                <h2 className="mb-3">Режим темы</h2>
+                <div className="flex gap-10">
+                  <IconButton onClick={toggleMode} aria-label="toggle theme">
+                    {mode === "dark" ? <LightModeIcon className="text-black" /> : <DarkModeIcon className="text-black" />}
+                  </IconButton>
+                </div>
               </div>
             </div>
 

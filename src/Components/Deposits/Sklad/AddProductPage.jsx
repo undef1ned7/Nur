@@ -954,9 +954,9 @@ const AddProductPage = () => {
             <ArrowLeft size={20} />
             Вернуться к складу
           </button>
-          <div className="add-product-page__title-section">
-            <div className="add-product-page__icon">
-              <Plus size={24} />
+          <div className="add-product-page__title-section flex-col-reverse md:flex-row">
+            <div className="add-product-page__icon h-[40px] md:h-[64px] md:w-[64px] w-full">
+              <Plus size={24} className="md:w-[24px] w-[16px]" />
             </div>
             <div>
               <h1 className="add-product-page__title">
@@ -983,7 +983,7 @@ const AddProductPage = () => {
           {!isEditMode && !loadingProduct && (
             <div className="add-product-page__tabs">
               <button
-                className={`add-product-page__tab ${
+                className={`add-product-page__tab  text-[12px] md:text-[14px] ${
                   activeTab === 0 ? "add-product-page__tab--active" : ""
                 }`}
                 onClick={() => setActiveTab(0)}
@@ -992,7 +992,7 @@ const AddProductPage = () => {
                 Ввод вручную
               </button>
               <button
-                className={`add-product-page__tab ${
+                className={`add-product-page__tab  text-[12px] md:text-[14px] py-2.5 px-3 md:py-3 md:px-6 ${
                   activeTab === 1 ? "add-product-page__tab--active" : ""
                 }`}
                 onClick={() => setActiveTab(1)}
@@ -1769,8 +1769,8 @@ const MarketProductForm = ({
           />
         </div>
 
-        <div className="flex justify-between gap-4">
-          <div className="market-product-form__form-group w-1/3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="market-product-form__form-group">
             <label className="market-product-form__label">
               {itemType === "service" ? "Код услуги" : "Код товара"}
             </label>
@@ -1783,7 +1783,7 @@ const MarketProductForm = ({
             />
           </div>
 
-          <div className="market-product-form__form-group w-1/3">
+          <div className="market-product-form__form-group">
             <label className="market-product-form__label">
               Штрих-код{" "}
               <button
@@ -1804,7 +1804,7 @@ const MarketProductForm = ({
             />
           </div>
 
-          <div className="market-product-form__form-group w-1/3">
+          <div className="market-product-form__form-group col-span-full xl:col-span-1">
             <label className="market-product-form__label">Артикул</label>
             <input
               type="text"
@@ -1978,7 +1978,7 @@ const MarketProductForm = ({
       {/* Единица измерения и Количество */}
       <div className="market-product-form__section">
         <div className="market-product-form__unit-row justify-between items-center">
-          <div className="market-product-form__form-group">
+          <div className="market-product-form__form-group w-full">
             <label className="market-product-form__label">
               Единица измерения
             </label>
@@ -2155,7 +2155,7 @@ const MarketProductForm = ({
         <h3 className="market-product-form__section-title">
           Характеристики товара
         </h3>
-        <div className="market-product-form__characteristics-grid">
+        <div className="market-product-form__characteristics-grid grid-cols-1 sm:grid-cols-2">
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Высота, см</label>
             <input

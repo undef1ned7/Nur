@@ -142,7 +142,7 @@ const ProductDetail = () => {
   return (
     <div className="product-detail">
       {/* Header */}
-      <div className="product-detail__header">
+      <div className="product-detail__header flex-wrap">
         <button
           className="product-detail__close-btn"
           onClick={() => navigate(-1)}
@@ -183,11 +183,11 @@ const ProductDetail = () => {
       {/* Main Content */}
       <div className="product-detail__content">
         {/* Image Section */}
-        <div className="flex">
-          <div className="product-detail__image-section w-1/2">
+        <div className="block lg:flex gap-3">
+          <div className="product-detail__image-section w-full">
             {hasImages ? (
               <>
-                <div className="product-detail__main-image">
+                <div className="product-detail__main-image ">
                   <img
                     src={imagesList[currentImageIndex]?.image_url}
                     alt={product.name || "Товар"}
@@ -242,7 +242,7 @@ const ProductDetail = () => {
                 )}
               </>
             ) : (
-              <div className="product-detail__image-placeholder">
+              <div className="product-detail__image-placeholder w-full max-w-full lg:max-w-[400px]">
                 <img
                   src={noImage}
                   alt="Нет изображения"
@@ -360,7 +360,7 @@ const ProductDetail = () => {
             {/* Prices Section */}
             <div className="product-detail__section">
               <h3 className="product-detail__section-title">ЦЕНЫ</h3>
-              <table className="product-detail__prices-table">
+              <table className="product-detail__prices-table overflow-auto">
                 <thead>
                   <tr>
                     <th>Цена продажи</th>
