@@ -16,7 +16,7 @@
 
   &__tab {
     font-size: 14px;
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
     padding-bottom: 6px;
 
@@ -109,7 +109,7 @@
         text-align: left;
         padding: 12px;
         font-size: 13px;
-        color: #6b7280;
+        color: #e2e2e2;
       }
     }
 
@@ -154,11 +154,11 @@
   }
 
   &__pagination-info {
-    color: #6b7280;
+    color: #e2e2e2;
   }
 
   &__arrow {
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
   }
 
@@ -492,7 +492,7 @@
 
     &-hint {
       font-size: 11px;
-      color: #6b7280;
+      color: #e2e2e2;
     }
 
     input {
@@ -538,7 +538,7 @@
     background: none;
     border: none;
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
     text-decoration: underline;
   }
@@ -573,7 +573,7 @@
 .form-select {
     width: 100%;
     padding: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid;
     border-radius: 5px;
     font-size: 14px;
     box-sizing: border-box; // Учитываем padding и border в общей ширине
@@ -813,7 +813,7 @@
     .vitrina__modal-input {
         width: calc(100% - 20px); // Adjust for padding
         padding: 10px;
-        border: 1px solid #ddd;
+        border: 1px solid;
         border-radius: 5px;
         font-size: 14px;
         outline: none;

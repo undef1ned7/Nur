@@ -44,7 +44,7 @@
   &__title {
     font-size: 28px;
     font-weight: 600;
-    color: #1a1a1a;
+    // color: #1a1a1a;
     margin: 0;
   }
 
@@ -978,7 +978,7 @@
   &__title {
     font-size: 22px;
     font-weight: 700;
-    color: #111827;
+    // color: #111827;
     margin: 0;
     letter-spacing: -0.02em;
   }
@@ -992,7 +992,7 @@
     border: none;
     border-radius: 10px;
     background: #f3f4f6;
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
     transition: all 0.2s ease;
 
@@ -1167,7 +1167,7 @@
       position: absolute;
       right: 16px;
       font-size: 14px;
-      color: #6b7280;
+      color: #e2e2e2;
       pointer-events: none;
     }
   }
@@ -1229,7 +1229,7 @@
     justify-content: center;
     gap: 12px;
     padding: 40px 20px;
-    color: #6b7280;
+    color: #e2e2e2;
     font-size: 14px;
   }
 
@@ -1325,7 +1325,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
 
     input[type="radio"] {
@@ -1373,7 +1373,7 @@
     background: #fff;
     border: 2px dashed #d1d5db;
     border-radius: 12px;
-    color: #6b7280;
+    color: #e2e2e2;
     font-size: 15px;
     font-weight: 500;
     cursor: pointer;
@@ -1431,7 +1431,7 @@
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     background: #fff;
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
     transition: all 0.2s ease;
 

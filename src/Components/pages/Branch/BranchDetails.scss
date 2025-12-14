@@ -47,12 +47,12 @@
     font-size: 28px;
     font-weight: 700;
     margin: 0;
-    color: #111827;
+    // color: #111827;
   }
 
   &__subtitle {
     font-size: 14px;
-    color: #6b7280;
+    color: #e2e2e2;
     margin: 4px 0 0 0;
   }
 
@@ -75,7 +75,7 @@
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
-    color: #6b7280;
+    color: #e2e2e2;
     transition: all 0.2s;
     margin-bottom: -2px;
 
@@ -135,7 +135,7 @@
     border: 1px solid #e5e7eb;
 
     svg {
-      color: #6b7280;
+      color: #e2e2e2;
       font-size: 14px;
     }
 
@@ -186,7 +186,7 @@
     align-items: center;
     justify-content: center;
     padding: 60px 20px;
-    color: #6b7280;
+    color: #e2e2e2;
 
     .spinner {
       font-size: 32px;
@@ -213,7 +213,7 @@
   &__empty {
     text-align: center;
     padding: 60px 20px;
-    color: #6b7280;
+    color: #e2e2e2;
     font-size: 14px;
   }
 
@@ -328,7 +328,7 @@
 
   &__analytics-label {
     font-size: 12px;
-    color: #6b7280;
+    color: #e2e2e2;
     text-transform: capitalize;
   }
 
@@ -377,7 +377,7 @@
 
   &__analytics-status-label {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     text-transform: capitalize;
   }
 

@@ -1055,7 +1055,7 @@ const KV = ({ k, v }) => (
       alignItems: "start",
     }}
   >
-    <div style={{ color: "#6b7280" }}>{k}</div>
+    <div style={{ color: "#e2e2e2" }}>{k}</div>
     <div style={{ fontWeight: 600 }}>{v || "—"}</div>
   </div>
 );

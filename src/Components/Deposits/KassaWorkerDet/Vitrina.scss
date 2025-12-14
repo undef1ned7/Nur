@@ -15,7 +15,7 @@
 
   &__tab {
     font-size: 14px;
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
     padding-bottom: 6px;
 
@@ -108,7 +108,7 @@
         text-align: left;
         padding: 12px;
         font-size: 13px;
-        color: #6b7280;
+        color: #e2e2e2;
       }
     }
 
@@ -153,11 +153,11 @@
   }
 
   &__pagination-info {
-    color: #6b7280;
+    color: #e2e2e2;
   }
 
   &__arrow {
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
   }
 
@@ -491,7 +491,7 @@
 
     &-hint {
       font-size: 11px;
-      color: #6b7280;
+      color: #e2e2e2;
     }
 
     input {
@@ -537,7 +537,7 @@
     background: none;
     border: none;
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     cursor: pointer;
     text-decoration: underline;
   }
@@ -572,7 +572,7 @@
 .form-select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid;
   border-radius: 5px;
   font-size: 14px;
   box-sizing: border-box; // Учитываем padding и border в общей ширине
@@ -813,7 +813,7 @@
   .vitrina__modal-input {
     width: calc(100% - 20px); // Adjust for padding
     padding: 10px;
-    border: 1px solid #ddd;
+    border: 1px solid;
     border-radius: 5px;
     font-size: 14px;
     outline: none;
@@ -955,7 +955,7 @@
     border-bottom: 2px solid transparent;
     cursor: pointer;
     font-size: 14px;
-    color: #6b7280;
+    color: #e2e2e2;
     font-weight: 500;
     transition: all 0.2s ease;
 
@@ -973,9 +973,9 @@
   &__filters {
     margin-bottom: 20px;
     padding: 20px;
-    background: #f9fafb;
+    // background: #f9fafb;
     border-radius: 8px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid ;
   }
 
   &__filter-group {
@@ -995,7 +995,7 @@
     width: 100%;
     max-width: 300px;
     padding: 12px 16px;
-    border: 2px solid #e5e7eb;
+    border: 2px solid;
     border-radius: 8px;
     font-size: 15px;
     font-weight: 500;
@@ -1051,7 +1051,7 @@
 
   &__summary-label {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     font-weight: 500;
   }
 
@@ -1101,7 +1101,7 @@
 
     span {
       font-size: 14px;
-      color: #6b7280;
+      color: #e2e2e2;
       font-weight: 500;
 
       &:first-child {

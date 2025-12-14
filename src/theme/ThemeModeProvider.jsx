@@ -28,40 +28,29 @@ export function ThemeModeProvider({ children }) {
 
   const theme = createTheme({
     palette: {
-        mode,
-        background: {
+      mode,
+      background: {
         default: mode === "dark" ? "#1d1d1d" : "#ffffff",
-        paper: mode === "dark" ? "#0b1220" : "#ffffff",
+        paper: mode === "dark" ? "#1d1d1d" : "#ffffff",
+      },
     },
     components: {
-        MuiCssBaseline: {
-        styleOverrides: {
-            body: {
-                background: "transparent !important",
-                backgroundColor: "transparent !important",
-                color: "inherit !important",
-            },
-        },
-        },
-    },
-    },
-    components: {
-        MuiCssBaseline: {
+      MuiCssBaseline: {
         styleOverrides: (t) => ({
-            html: {
+          html: {
             backgroundColor: `${t.palette.background.default} !important`,
-            },
-            body: {
+          },
+          body: {
             backgroundColor: `${t.palette.background.default} !important`,
-            },
-            "#root": {
+          },
+          "#root": {
             minHeight: "100vh",
-            backgroundColor: "transparent !important", 
-            },
+            backgroundColor: "transparent !important",
+          },
         }),
-        },
+      },
     },
-    });
+  });
 
   const value = React.useMemo(() => ({ mode, toggleMode, setMode }), [mode, toggleMode]);
 
@@ -69,13 +58,6 @@ export function ThemeModeProvider({ children }) {
     <ThemeModeContext.Provider value={value}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        {/* <GlobalStyles
-            styles={(t) => ({
-            html: { backgroundColor: t.palette.background.default },
-            body: { backgroundColor: t.palette.background.default },
-            "#root": { minHeight: "100vh", backgroundColor: t.palette.background.default },
-            })}
-        /> */}
         {children}
       </ThemeProvider>
     </ThemeModeContext.Provider>

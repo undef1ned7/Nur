@@ -2,7 +2,7 @@
   --primary: #f7d74f;
   --primary-dark: #d4b800;
   --text: #0f172a;
-  --muted: #6b7280;
+  --muted: #e2e2e2;
   --border: #e5e7eb;
   --surface: #fff;
   --radius: 12px;
@@ -419,7 +419,7 @@
 /* инпуты / селекты */
 .edit-modal__section label {
   font-size: 13px;
-  color: #6b7280;
+  color: #e2e2e2;
 }
 .edit-modal__section input,
 .edit-modal__section textarea,

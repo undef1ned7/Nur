@@ -104,7 +104,7 @@
     justify-content: center;
     padding: 80px 20px;
     text-align: center;
-    color: #6b7280;
+    color: #e2e2e2;
 
     svg {
       margin-bottom: 20px;
@@ -121,7 +121,7 @@
 
     p {
       font-size: 15px;
-      color: #6b7280;
+      color: #e2e2e2;
       margin: 0;
     }
   }
@@ -345,7 +345,7 @@
 
   &__summary-text {
     font-size: 14px;
-    color: #6b7280;
+    color: #e2e2e2;
     line-height: 1.5;
   }
 }
@@ -400,7 +400,7 @@
 
       svg {
         flex-shrink: 0;
-        color: #6b7280;
+        color: #e2e2e2;
       }
 
       span {
@@ -413,7 +413,7 @@
       }
 
       .client-phone {
-        color: #6b7280;
+        color: #e2e2e2;
         font-size: 14px;
         font-weight: 400;
       }
@@ -422,7 +422,7 @@
     .chevron {
       flex-shrink: 0;
       transition: transform 0.2s ease;
-      color: #6b7280;
+      color: #e2e2e2;
 
       &.open {
         transform: rotate(180deg);
@@ -472,7 +472,7 @@
 
     svg {
       flex-shrink: 0;
-      color: #6b7280;
+      color: #e2e2e2;
     }
 
     input {
@@ -519,7 +519,7 @@
     padding: 10px 14px;
     border: 1px solid #e5e7eb;
     background: #fff;
-    color: #6b7280;
+    color: #e2e2e2;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
@@ -669,7 +669,7 @@
     .no-clients {
       padding: 24px;
       text-align: center;
-      color: #6b7280;
+      color: #e2e2e2;
       font-size: 14px;
     }
   }
@@ -704,7 +704,7 @@
 
   &__label {
     font-size: 15px;
-    color: #6b7280;
+    color: #e2e2e2;
     line-height: 1.5;
   }
 

@@ -9,7 +9,7 @@ $mountains: url("https://e-cis.info/upload/iblock/4b4/n0n59zv1k5pgk7cc7ai3829cuh
   --primary: #f7d74f;
   --primary-dark: #d4b800;
   --ink: #0f172a;
-  --surface: #ffffff;
+  // --surface: #ffffff;
   --border: #e5e7eb;
 }
 
@@ -92,7 +92,7 @@ $shadow: 0 10px 30px rgba(2, 6, 23, 0.12);
   &__title {
     font-size: clamp(24px, 2.6vw, 32px);
     font-weight: 800;
-    color: var(--ink);
+    // color: var(--ink);
     margin: 2px 0 16px;
     letter-spacing: 0.2px;
   }

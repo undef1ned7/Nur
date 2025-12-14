@@ -3,7 +3,7 @@
   --primary: #f7d74f;
   --primary-dark: #d4b800;
   --text: #0f172a;
-  --muted: #6b7280;
+  --muted: #e2e2e2;
   --border: #e5e7eb;
   --surface: #ffffff;
 
@@ -1006,8 +1006,8 @@ $tap: 44px;
 }
 .Schoolstudents__pageBtn[disabled]{ opacity:.5; cursor:not-allowed; }
 .Schoolstudents__pageBtn--active{ font-weight:700; box-shadow:inset 0 0 0 2px var(--primary,#3b82f6); }
-.Schoolstudents__dots{ padding:0 4px; color:var(--muted,#6b7280); }
-.Schoolstudents__pageInfo{ margin-left:auto; color:var(--muted,#6b7280); }
+.Schoolstudents__dots{ padding:0 4px; color:var(--muted,#e2e2e2); }
+.Schoolstudents__pageInfo{ margin-left:auto; color:var(--muted,#e2e2e2); }
 
 /* confirm modal (свой, вместо window.confirm) */
 .Schoolconfirm{

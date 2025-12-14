@@ -67,7 +67,7 @@ export const extractApiErr = (e, fallback = "Ошибка запроса") => {
 
 export const getDebtStatus = (dueDate) => {
   if (!dueDate)
-    return { status: "no-date", color: "#6b7280", text: "Без срока" };
+    return { status: "no-date", color: "#e2e2e2", text: "Без срока" };
 
   const today = new Date();
   const due = new Date(dueDate);

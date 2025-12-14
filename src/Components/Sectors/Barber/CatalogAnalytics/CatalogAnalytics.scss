@@ -2,7 +2,7 @@
 @import "../styles/barbershop.scss";
 
 .catalog-analytics{
-  display:grid; gap:16px; color:var(--ca-text);
+  display:grid; gap:16px;
 
   &__head{
     display:flex; align-items:center; justify-content:space-between; gap:12px;

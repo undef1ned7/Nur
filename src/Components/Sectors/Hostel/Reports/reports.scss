@@ -2,10 +2,10 @@
 
 /* ===== palette ===== */
 :root{
-  --c-bg:#f6f7fb;
-  --c-surface:#ffffff;
+  // --c-bg:#f6f7fb;
+  // --c-surface:#ffffff;
   --c-ink:#0f172a;
-  --c-muted:#6b7280;
+  --c-muted:#e2e2e2;
   --c-border:#e5e7eb;
   --c-primary:#111827;
   --c-accent:#f7d74f;
@@ -141,7 +141,7 @@
 .reports__receiptIndex{ font-weight:700; min-width:22px; text-align:right; }
 .reports__receiptName{ }
 .reports__receiptRight{ font-weight:600; color:#0f172a; }
-.reports__receiptDots{ border-top:2px dotted #6b7280; margin:12px 0; }
+.reports__receiptDots{ border-top:2px dotted #e2e2e2; margin:12px 0; }
 .reports__receiptTotals{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .reports__receiptTotalLabel{ font-size:18px; }
 .reports__receiptTotalInfo{ display:flex; gap:18px; align-items:center; font-weight:700; }

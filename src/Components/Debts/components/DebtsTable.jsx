@@ -32,7 +32,7 @@ export const DebtsTable = ({
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={7} style={{ padding: 16, color: "#6b7280" }}>
+              <td colSpan={7} style={{ padding: 16, color: "#e2e2e2" }}>
                 Загрузка…
               </td>
             </tr>
@@ -130,7 +130,7 @@ export const DebtsTable = ({
             })
           ) : (
             <tr>
-              <td colSpan={7} style={{ padding: 16, color: "#6b7280" }}>
+              <td colSpan={7} style={{ padding: 16, color: "#e2e2e2" }}>
                 Ничего не найдено
               </td>
             </tr>

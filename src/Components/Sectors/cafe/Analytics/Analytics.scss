@@ -3,7 +3,7 @@
   --primary: #f7d74f;
   --primary-dark: #d4b800;
   --text: #0f172a;
-  --muted: #6b7280;
+  --muted: #e2e2e2;
   --border: #e5e7eb;
   --surface: #ffffff;
   --radius: 12px;
@@ -29,14 +29,14 @@
 
 /* ===== Root ===== */
 .analytics {
-  background: var(--surface);
+  // background: var(--surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  color: var(--text);
+  // color: var(--text);
 
   /* ===== Header ===== */
   &__header {
@@ -51,7 +51,7 @@
     margin: 0;
     font-size: 20px;
     font-weight: 800;
-    color: var(--text);
+    // color: var(--text);
   }
 
   &__subtitle {
@@ -199,10 +199,10 @@
     .analytics__head {
       font-size: 14px;
       font-weight: 800;
-      color: var(--text);
+      // color: var(--text);
       padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      background: #fcfcfd;
+      border-bottom: 1px solid;
+      // background: #fcfcfd;
     }
   }
 }

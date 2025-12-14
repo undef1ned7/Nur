@@ -1020,7 +1020,7 @@ const CafeInventory = () => {
                             <div style={{ flex: 1 }}>
                               <strong>{eq?.title || "Неизвестно"}</strong>
                               {eq?.serial_number && (
-                                <div style={{ fontSize: 12, color: "#6b7280" }}>
+                                <div style={{ fontSize: 12, color: "#e2e2e2" }}>
                                   {eq.serial_number}
                                 </div>
                               )}
@@ -1170,7 +1170,7 @@ const CafeInventory = () => {
                       <div>
                         <strong>{item.equipment_title || "Неизвестно"}</strong>
                         {item.serial_number && (
-                          <div style={{ fontSize: 12, color: "#6b7280" }}>
+                          <div style={{ fontSize: 12, color: "#e2e2e2" }}>
                             {item.serial_number}
                           </div>
                         )}
@@ -1197,7 +1197,7 @@ const CafeInventory = () => {
                           {getConditionLabel(item.condition)}
                         </span>
                         {item.notes && (
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>
+                          <span style={{ fontSize: 12, color: "#e2e2e2" }}>
                             {item.notes}
                           </span>
                         )}
@@ -1321,7 +1321,7 @@ const CafeInventory = () => {
                           <div key={idx} className="inventory__session-item">
                             <div style={{ flex: 1 }}>
                               <strong>{prod?.title || "Неизвестно"}</strong>
-                              <div style={{ fontSize: 12, color: "#6b7280" }}>
+                              <div style={{ fontSize: 12, color: "#e2e2e2" }}>
                                 Ожидается: {qtyExpected} {prod?.unit || "шт"}
                               </div>
                             </div>
@@ -1364,7 +1364,7 @@ const CafeInventory = () => {
                                       ? "#10b981"
                                       : difference < 0
                                       ? "#ef4444"
-                                      : "#6b7280",
+                                      : "#e2e2e2",
                                   fontWeight: "bold",
                                 }}
                               >
@@ -1465,7 +1465,7 @@ const CafeInventory = () => {
                       <div key={idx} className="inventory__session-item-view">
                         <div>
                           <strong>{item.product_title || "Неизвестно"}</strong>
-                          <div style={{ fontSize: 12, color: "#6b7280" }}>
+                          <div style={{ fontSize: 12, color: "#e2e2e2" }}>
                             Ед. измерения: {item.product_unit || "шт"}
                           </div>
                         </div>
@@ -1477,11 +1477,11 @@ const CafeInventory = () => {
                             alignItems: "center",
                           }}
                         >
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>
+                          <span style={{ fontSize: 12, color: "#e2e2e2" }}>
                             <strong>Ожидается:</strong> {qtyExpected}{" "}
                             {item.product_unit || "шт"}
                           </span>
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>
+                          <span style={{ fontSize: 12, color: "#e2e2e2" }}>
                             <strong>Фактически:</strong> {qtyCounted}{" "}
                             {item.product_unit || "шт"}
                           </span>
@@ -1493,7 +1493,7 @@ const CafeInventory = () => {
                                   ? "#10b981"
                                   : difference < 0
                                   ? "#ef4444"
-                                  : "#6b7280",
+                                  : "#e2e2e2",
                               fontWeight: "bold",
                             }}
                           >

@@ -1,12 +1,12 @@
-:root{--primary:#f7d74f;--primary-dark:#d4b800;--text:#0f172a;--muted:#6b7280;--border:#e5e7eb;--surface:#fff;--radius:12px;--shadow:0 4px 16px rgba(0,0,0,.05);}
+:root{--primary:#f7d74f;--primary-dark:#d4b800;--text:#0f172a;--muted:#e2e2e2;--border:#e5e7eb;--surface:#fff;--radius:12px;--shadow:0 4px 16px rgba(0,0,0,.05);}
 
 .reports{background:var(--surface);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:20px;}
 .reports__header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
-.reports__title{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;color:var(--text);margin:0;}
+.reports__title{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;margin:0;}
 .reports__subtitle{font-size:13px;color:var(--muted);}
 .reports__actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 
-.reports__btn{display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;border:1px solid transparent;background:transparent;border:1px solid var(--border);color:var(--text);}
+.reports__btn{display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;border:1px solid transparent;background:transparent;border:1px solid var(--border);}
 .reports__btn:hover{background:#f9fafb;}
 .reports__btn--secondary{}
 
@@ -16,7 +16,7 @@
 .reports__filterIcon{color:var(--muted);}
 .reports__select{padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:#fff;}
 .reports__series{display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
-.reports__check{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--text);}
+.reports__check{display:inline-flex;align-items:center;gap:8px;font-size:14px;}
 .reports__check input{width:16px;height:16px;}
 .reports__dot{width:10px;height:10px;border-radius:50%;display:inline-block;border:2px solid transparent;}
 .reports__dot--revenue{background:var(--primary);border-color:var(--primary-dark);}
@@ -27,7 +27,7 @@
 .reports__kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
 .reports__kpi{border:1px solid var(--border);border-radius:10px;padding:14px;background:#fff;}
 .reports__kpiLabel{font-size:12px;color:var(--muted);margin-bottom:6px;}
-.reports__kpiValue{font-size:18px;font-weight:800;color:var(--text);}
+.reports__kpiValue{font-size:18px;font-weight:800;}
 
 /* Chart */
 .reports__chartCard{border:1px solid var(--border);border-radius:10px;background:#fff;}

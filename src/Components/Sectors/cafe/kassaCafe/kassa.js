@@ -1084,7 +1084,7 @@ const Row = ({ label, value }) => (
       alignItems: "start",
     }}
   >
-    <div style={{ color: "#6b7280" }}>{label}</div>
+    <div style={{ color: "#e2e2e2" }}>{label}</div>
     <div style={{ fontWeight: 600 }}>{value || "—"}</div>
   </div>
 );

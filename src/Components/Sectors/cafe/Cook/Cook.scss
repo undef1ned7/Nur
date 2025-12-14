@@ -3,7 +3,7 @@
   --primary: #f7d74f;
   --primary-dark: #d4b800;
   --text: #0f172a;
-  --muted: #6b7280;
+  --muted: #e2e2e2;
   --border: #e5e7eb;
   --surface: #ffffff;
 }
@@ -181,13 +181,13 @@
 
   &__receiptClient {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     margin-top: 4px;
   }
 
   &__receiptDate {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     line-height: 1.2;
   }
 
@@ -278,13 +278,13 @@
 
   &__receiptWaiter {
     font-size: 12px;
-    color: #6b7280;
+    color: #e2e2e2;
     margin-top: 2px;
   }
 
   &__receiptStatusInfo {
     font-size: 12px;
-    color: #6b7280;
+    color: #e2e2e2;
     margin-top: 4px;
     font-style: italic;
   }

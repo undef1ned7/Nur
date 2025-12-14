@@ -26,7 +26,7 @@
   margin:0;font-weight:800;font-size:20px;
   color:var(--text,#0f172a);display:inline-flex;gap:8px;align-items:center
 }
-.sklad-clients__subtitle{font-size:13px;color:var(--muted,#6b7280)}
+.sklad-clients__subtitle{font-size:13px;color:var(--muted,#e2e2e2)}
 
 /* ===== Адаптивная панель действий (поиск + кнопка) ===== */
 .sklad-clients__actions{
@@ -47,7 +47,7 @@
   background:#fff;
 }
 .sklad-clients__searchInput:focus{outline:none;border-color:var(--primary,#f7d74f)}
-.sklad-clients__searchInput::placeholder{color:var(--muted,#6b7280);opacity:.9}
+.sklad-clients__searchInput::placeholder{color:var(--muted,#e2e2e2);opacity:.9}
 
 /* Кнопки */
 .sklad-clients__btn{
@@ -83,7 +83,7 @@
 
 /* пусто */
 .sklad-clients__empty{
-  text-align:center;color:var(--muted,#6b7280);padding:14px;
+  text-align:center;color:var(--muted,#e2e2e2);padding:14px;
   border:1px dashed var(--border,#e5e7eb);border-radius:12px;background:#fff;
 }
 
@@ -118,7 +118,7 @@
   padding:12px 18px;border-bottom:1px solid var(--border,#e5e7eb)
 }
 .sklad-clients__modalTitle{margin:0;font-size:18px;font-weight:900}
-.sklad-clients__iconBtn{background:none;border:0;color:var(--muted,#6b7280);font-size:18px;cursor:pointer}
+.sklad-clients__iconBtn{background:none;border:0;color:var(--muted,#e2e2e2);font-size:18px;cursor:pointer}
 .sklad-clients__iconBtn:hover{color:var(--text,#0f172a)}
 
 .sklad-clients__form{display:flex;flex-direction:column;min-height:0}
@@ -128,14 +128,14 @@
 }
 .sklad-clients__field{display:grid;gap:6px}
 .sklad-clients__field--full{grid-column:1 / -1}
-.sklad-clients__label{font-size:14px;font-weight:700;color:var(--muted,#6b7280)}
+.sklad-clients__label{font-size:14px;font-weight:700;color:var(--muted,#e2e2e2)}
 .sklad-clients__req{color:#ef4444}
 .sklad-clients__input{
   width:100%; border:1px solid var(--border,#e5e7eb); border-radius:10px;
   padding:10px 12px; font-size:14px; background:#fff;
 }
 .sklad-clients__input:focus{outline:none;border-color:var(--primary,#f7d74f)}
-.sklad-clients__input::placeholder{color:var(--muted,#6b7280);opacity:.85}
+.sklad-clients__input::placeholder{color:var(--muted,#e2e2e2);opacity:.85}
 .sklad-clients__field--invalid .sklad-clients__label{color:#dc2626}
 .sklad-clients__input--invalid{border-color:#dc2626}
 .sklad-clients__alert{

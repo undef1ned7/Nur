@@ -1,7 +1,7 @@
 /* ====== Тема: белый + жёлтый (#ffd600) ====== */
 :root {
-  --c-bg: #ffffff; /* общий фон */
-  --c-surface: #ffffff; /* карточки/панели */
+  // --c-bg: #ffffff; /* общий фон */
+  // --c-surface: #ffffff; /* карточки/панели */
   --c-ink: #0b0b0b; /* основной текст (чёрный) */
   --c-muted: #4b4b4b; /* приглушённый текст */
   --c-border: #f1f1f1; /* тонкие границы/разделители */
@@ -17,23 +17,23 @@
 }
 
 /* фиксируем единую тему (без авто-инверсии) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --c-bg: #ffffff;
-    --c-surface: #ffffff;
-    --c-ink: #0b0b0b;
-    --c-muted: #4b4b4b;
-    --c-border: #f1f1f1;
-    --c-accent: #ffd600;
-  }
-}
+// @media (prefers-color-scheme: dark) {
+//   :root {
+//     --c-bg: #ffffff00;
+//     --c-surface: #ffffff;
+//     --c-ink: #0b0b0b;
+//     --c-muted: #4b4b4b;
+//     --c-border: #f1f1f1;
+//     --c-accent: #ffd600;
+//   }
+// }
 
 /* ===== base ===== */
 .analytics {
   margin-top: 20px;
   min-height: 100vh;
-  background: var(--c-bg);
-  color: var(--c-ink);
+  // background: var(--c-bg);
+  // color: var(--c-ink);
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto,
     "Helvetica Neue", Arial;
   padding: 20px;
@@ -1060,7 +1060,7 @@
     margin: 0 0 8px 0;
     font-size: 24px;
     font-weight: 900;
-    color: #000;
+    // color: #000;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -1239,7 +1239,7 @@
     font-size: 24px;
     font-weight: 600;
     margin: 0 0 8px 0;
-    color: var(--c-ink);
+    // color: var(--c-ink);
   }
 
   &__subtitle {

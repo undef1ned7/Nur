@@ -17,7 +17,7 @@ $bp-xxs: 320px;
   --primary: #f7d74f;
   --primary-dark: #d4b800;
   --ink: #0f172a;
-  --muted: #6b7280;
+  --muted: #e2e2e2;
   --surface: #ffffff;
   --border: #e5e7eb;
   --radius: 14px;
@@ -102,7 +102,7 @@ $bp-xxs: 320px;
   &__title {
     font-size: 24px;
     font-weight: 800;
-    color: var(--ink);
+    // color: var(--ink);
     margin: 0 0 16px;
   }
 

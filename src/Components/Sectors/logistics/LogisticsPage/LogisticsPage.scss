@@ -22,7 +22,7 @@
 
   &__subtitle {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
   }
 
   /* Аналитика */
@@ -32,14 +32,15 @@
     gap: 12px;
   }
   .logistics-page__analytics-card--all {
-    background: #ffffff;
-    border-top: 3px solid #000000;
+    // background: #ffffff;
+    // border-top: 3px solid #000000;
+    border-top: 3px solid;
   }
 
   &__analytics-card {
     padding: 16px 18px;
     border-radius: 12px;
-    background: #ffffff;
+    // background: #ffffff;
     box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
     display: flex;
     flex-direction: column;
@@ -70,13 +71,13 @@
 
   &__analytics-label {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
   }
 
   &__analytics-value {
     font-size: 22px;
     font-weight: 600;
-    color: #111827;
+    // color: #111827;
   }
 
   &__analytics-subvalue {
@@ -123,7 +124,7 @@
 
     &--ghost {
       background: transparent;
-      color: #6b7280;
+      color: #e2e2e2;
       border: 1px solid #e5e7eb;
 
       &:hover {
@@ -365,7 +366,7 @@
 
   &__timeline-subtitle {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
   }
 
   &__timeline {
@@ -434,7 +435,7 @@
 
   &__timeline-step-subtitle {
     font-size: 13px;
-    color: #6b7280;
+    color: #e2e2e2;
     margin-top: 2px;
   }
 
@@ -443,7 +444,7 @@
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: #6b7280;
+    color: #e2e2e2;
     margin-top: 4px;
 
     svg {
@@ -504,7 +505,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    color: #6b7280;
+    color: #e2e2e2;
   }
 
   &__timeline-eta-date {

@@ -1,6 +1,6 @@
 :root {
   --glass-bg: rgba(255, 255, 255, 0.40);
-  --panel-bg: #ffffff;
+  // --panel-bg: #ffffff;
   --text: #111827;
 }
 
@@ -333,7 +333,7 @@ body {
   .settings__footer,
   .settings__section {
     border-radius: 10px;
-    background: var(--glass-bg) !important;
+    // background: var(--glass-bg) !important;
   }
 
   .vitrina__search,
@@ -376,7 +376,7 @@ body {
   .additional-services__social-card,
   .social-modal-content,
   .debts {
-    background: #ffffff66 !important;
+    background: #ffffff00 !important;
   }
 
   .company__input,
@@ -445,16 +445,16 @@ body {
   .date,
   .settings__input {
     &::placeholder {
-      color: #fff !important;
+      color: #ffffff00 !important;
     }
-    border: 1px solid #fff !important;
+    border: 1px solid #ffffff00 !important;
     background-color: transparent !important;
   }
 
   .accessButton,
   .btn,
   .chip {
-    background-color: #ffffff66 !important;
+    background-color: #ffffff00 !important;
     color: #fff !important;
   }
 
