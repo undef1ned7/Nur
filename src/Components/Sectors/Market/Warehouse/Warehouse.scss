@@ -50,8 +50,8 @@
   }
 
   &__title-section {
-    display: flex;
-    flex-direction: column;
+  display: flex;
+  flex-direction: column;
     gap: 4px;
   }
 
@@ -484,7 +484,7 @@
     &:hover {
       background: #fef9e7;
     }
-  }
+    }
 }
 
 /* ============================================
@@ -515,7 +515,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--text);
+      color: var(--text);
     transition: all 0.2s;
 
     &:hover {

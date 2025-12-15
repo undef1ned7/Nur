@@ -1,396 +1,1306 @@
-// src/components/Analytics/Analytics.jsx
-import { useEffect, useMemo, useState } from "react";
-import api from "../../../../api";
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  ArrowLeft,
+  DollarSign,
+  ShoppingCart,
+  BarChart3,
+  Users,
+  Package,
+  TrendingUp,
+  Calendar,
+  HelpCircle,
+} from "lucide-react";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Filler,
+} from "chart.js";
+import { Line, Bar, Doughnut } from "react-chartjs-2";
+import api from "../../../../api/index";
 import "./Analytics.scss";
 
-/* ===== helpers ===== */
-const asArray = (data) =>
-  Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+  Filler
+);
 
-const num = (v) => {
-  const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-const fmtMoney = (v) =>
-  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
-  " с";
+const Analytics = () => {
+  const [activeTab, setActiveTab] = useState("sales");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    return { from, to };
+  });
 
-const fmtDateTime = (iso) => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${day} ${hh}:${mm}`;
-};
+  const currentDate = new Date();
+  const monthName = currentDate.toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  });
 
-const inRange = (iso, start, end) => {
-  if (!iso) return false;
-  const t = new Date(iso).getTime();
-  const sMin = start ? new Date(start).setHours(0, 0, 0, 0) : -Infinity;
-  const eMax = end ? new Date(end).setHours(23, 59, 59, 999) : Infinity;
-  return t >= sMin && t <= eMax;
-};
-
-/* ===== нормализация ===== */
-const normalizeIncome = (x) => ({
-  id: x.id || x.uuid || x.sale_id || String(Math.random()),
-  created_at:
-    x.paid_at || x.created_at || x.created || x.timestamp || x.date || "",
-  amount: num(x.total ?? x.amount ?? x.sum ?? 0),
-  items_count: Number(
-    x.items_count ??
-      x.qty ??
-      (Array.isArray(x.items)
-        ? x.items.reduce((s, it) => s + (Number(it.quantity) || 0), 0)
-        : 0)
-  ),
-  status: x.status || x.state || "",
-});
-
-/* ====== модалка деталей продажи ====== */
-function SaleModal({ id, onClose }) {
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-  const [sale, setSale] = useState(null);
-
-  const load = async () => {
-    try {
-      setErr("");
-      setLoading(true);
-      const { data } = await api.get(`/main/pos/sales/${id}/`);
-      const items = Array.isArray(data.items)
-        ? data.items.map((it, i) => {
-            const unit = Number(it.unit_price) || 0;
-            const qty = Number(it.quantity) || 0;
-            const line = Number(it.line_total ?? unit * qty) || 0;
-            return {
-              id: it.id || String(i),
-              name: it.product_name || it.name_snapshot || "—",
-              barcode: it.barcode_snapshot || it.barcode || "",
-              qty,
-              unit_price: unit,
-              line_total: line,
-            };
-          })
-        : [];
-      setSale({
-        id: data.id,
-        createdAt: data.created_at || data.paid_at || null,
-        total: Number(data.total) || 0,
-        items,
-      });
-    } catch (e) {
-      console.error(e);
-      setErr("Не удалось загрузить детали продажи");
-    } finally {
-      setLoading(false);
-    }
+  // Форматирование даты для API
+  const formatDateForAPI = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+06:00`;
   };
 
-  useEffect(() => {
-    load();
-  }, [id]);
+  // Маппинг внутренних названий вкладок на названия для API
+  // API поддерживает: sales|stock|cashboxes|shifts
+  const mapTabToAPI = (tab) => {
+    const tabMap = {
+      sales: "sales",
+      warehouse: "stock", // "warehouse" -> "stock" для API
+      cashiers: "cashboxes", // "cashiers" -> "cashboxes" для API
+      shifts: "shifts",
+    };
+    return tabMap[tab] || "sales";
+  };
 
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15,23,42,.45)",
-        display: "grid",
-        placeItems: "center",
-        zIndex: 60,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "min(920px, 96vw)",
-          background: "#fff",
-          borderRadius: 12,
-          padding: 16,
-          boxShadow: "0 8px 30px rgba(0,0,0,.12)",
-          maxHeight: "90vh",
-          overflow: "auto",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <div style={{ fontWeight: 800, fontSize: 16 }}>
-            Продажа #{(id || "").slice(0, 8)}…
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Закрыть"
-            style={{ fontSize: 20, lineHeight: 1 }}
-          >
-            ×
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="analytics__skeletonRow">
-            <div className="analytics__skeleton" />
-            <div className="analytics__skeleton" />
-            <div className="analytics__skeleton" />
-          </div>
-        ) : err ? (
-          <div className="analytics__error">{err}</div>
-        ) : sale ? (
-          <>
-            <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
-              <div>
-                <b>Создано:</b>{" "}
-                {sale.createdAt
-                  ? new Date(sale.createdAt).toLocaleString()
-                  : "—"}
-              </div>
-              <div>
-                <b>Итого:</b> {fmtMoney(sale.total)}
-              </div>
-            </div>
-
-            <div className="analytics__panel">
-              <div className="table">
-                <div className="table__head">
-                  <span>Товар</span>
-                  <span>Штрих-код</span>
-                  <span>Сумма</span>
-                </div>
-                <div className="table__body">
-                  {sale.items.length ? (
-                    sale.items.map((it) => (
-                      <div key={it.id} className="table__row">
-                        <span className="ellipsis" title={it.name}>
-                          {it.name} • {it.qty} шт × {fmtMoney(it.unit_price)}
-                        </span>
-                        <span className="ellipsis" title={it.barcode || "—"}>
-                          {it.barcode || "—"}
-                        </span>
-                        <span>{fmtMoney(it.line_total)}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="table__empty">Позиции отсутствуют</div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div
-              style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
-            >
-              <button
-                className="analytics__btn analytics__btn--secondary"
-                onClick={load}
-              >
-                Обновить
-              </button>
-              <button className="analytics__btn" onClick={onClose}>
-                Закрыть
-              </button>
-            </div>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/* ===== основной компонент ===== */
-export default function MarketAnalytics() {
-  const [status, setStatus] = useState(""); // статус чеков: '', new, paid, canceled
-  const [from, setFrom] = useState(""); // YYYY-MM-DD
-  const [to, setTo] = useState("");
-
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-
-  const [incomes, setIncomes] = useState([]);
-  const [openId, setOpenId] = useState(null);
-
-  // загрузка только ПРИХОДА
-  const load = async () => {
-    try {
+  // Загрузка данных аналитики
+  // Используем GET запрос с query параметрами, так как POST не поддерживается сервером (405 Method Not Allowed)
+  // GET запросы используются для получения данных аналитики, POST обычно для создания/изменения данных
+  const fetchAnalytics = React.useCallback(
+    async (tab = "sales") => {
       setLoading(true);
-      setErr("");
-
-      const q = new URLSearchParams();
-      if (status) q.set("status", status);
-      if (from) q.set("start", from);
-      if (to) q.set("end", to);
-
-      let incomeRaw = [];
+      setError(null);
       try {
-        const { data } = await api.get(
-          `/main/pos/sales/${q.toString() ? `?${q}` : ""}`
-        );
-        incomeRaw = asArray(data);
-      } catch {
-        const { data } = await api.get("/main/pos/sales/");
-        incomeRaw = asArray(data);
+        // Преобразуем внутреннее название вкладки в название для API
+        const apiTab = mapTabToAPI(tab);
+        const response = await api.get("/main/analytics/market/", {
+          params: {
+            tab: apiTab,
+            period_from: formatDateForAPI(period.from),
+            period_to: formatDateForAPI(period.to),
+          },
+        });
+        setAnalyticsData(response.data);
+      } catch (err) {
+        console.error("Ошибка при загрузке аналитики:", err);
+        setError(err.response?.data?.detail || "Ошибка при загрузке данных");
+      } finally {
+        setLoading(false);
       }
-
-      setIncomes(incomeRaw.map(normalizeIncome));
-    } catch (e) {
-      console.error(e);
-      setErr("Не удалось загрузить приход");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  // фильтрация по датам/статусу (дополнительно к серверному фильтру)
-  const incomesFiltered = useMemo(
-    () =>
-      incomes.filter(
-        (x) =>
-          inRange(x.created_at, from, to) &&
-          (status ? x.status === status : true)
-      ),
-    [incomes, from, to, status]
+    },
+    [period.from, period.to]
   );
 
-  // сводка
-  const totals = useMemo(() => {
-    const incSum = incomesFiltered.reduce((s, x) => s + num(x.amount), 0);
-    const count = incomesFiltered.length;
-    const avg = count ? Math.round(incSum / count) : 0;
-    return { incSum, count, avg };
-  }, [incomesFiltered]);
+  useEffect(() => {
+    fetchAnalytics(activeTab);
+  }, [activeTab, fetchAnalytics]);
+
+  // Форматирование числа с разделителями
+  const formatNumber = (num) => {
+    if (typeof num === "string") {
+      num = parseFloat(num);
+    }
+    return num.toLocaleString("ru-RU", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
+  // Форматирование даты для графика
+  const formatDateForChart = (dateString) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${day}.${month}`;
+  };
+
+  // Данные для вкладки "Продажи"
+  const salesData = useMemo(() => {
+    if (!analyticsData || activeTab !== "sales") {
+      return {
+        kpis: [
+          {
+            title: "Выручка",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+          {
+            title: "Транзакции",
+            value: "0",
+            icon: ShoppingCart,
+            color: "#f7d617",
+          },
+          {
+            title: "Средний чек",
+            value: "0",
+            currency: "сом",
+            icon: BarChart3,
+            color: "#f7d617",
+          },
+          {
+            title: "Клиенты",
+            value: "0",
+            icon: Users,
+            color: "#f7d617",
+          },
+        ],
+        salesChart: {
+          labels: [],
+          data: [],
+        },
+        topProducts: [],
+        documents: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const charts = analyticsData.charts || {};
+    const tables = analyticsData.tables || {};
+
+    return {
+      kpis: [
+        {
+          title: "Выручка",
+          value: formatNumber(cards.revenue || "0"),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Транзакции",
+          value: formatNumber(cards.transactions || 0),
+          icon: ShoppingCart,
+          color: "#f7d617",
+        },
+        {
+          title: "Средний чек",
+          value: formatNumber(cards.avg_check || "0"),
+          currency: "сом",
+          icon: BarChart3,
+          color: "#f7d617",
+        },
+        {
+          title: "Клиенты",
+          value: formatNumber(cards.clients || 0),
+          icon: Users,
+          color: "#f7d617",
+        },
+      ],
+      salesChart: {
+        labels:
+          charts.sales_dynamics?.map((item) => formatDateForChart(item.date)) ||
+          [],
+        data:
+          charts.sales_dynamics?.map((item) => parseFloat(item.value || 0)) ||
+          [],
+      },
+      topProducts:
+        tables.top_products?.map((product) => ({
+          name: product.name,
+          sold: product.sold || 0,
+          revenue: parseFloat(product.revenue || 0),
+        })) || [],
+      documents:
+        tables.documents?.map((doc) => ({
+          name: doc.name,
+          quantity: doc.count || 0,
+          amount: parseFloat(doc.sum || 0),
+          warehouse: doc.stock ? parseFloat(doc.stock) : 0,
+        })) || [],
+    };
+  }, [analyticsData, activeTab]);
+
+  // Данные для вкладки "Склад"
+  const warehouseData = useMemo(() => {
+    if (!analyticsData || activeTab !== "warehouse") {
+      return {
+        kpis: [
+          {
+            title: "Всего товаров",
+            value: "0",
+            subtitle: "В 0 категориях",
+            icon: Package,
+            color: "#f7d617",
+          },
+          {
+            title: "Стоимость склада",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+          {
+            title: "Заканчиваются",
+            value: "0",
+            subtitle: "Требуют заказа",
+            icon: TrendingUp,
+            color: "#f7d617",
+          },
+          {
+            title: "Оборачиваемость",
+            value: "0 дн.",
+            icon: BarChart3,
+            color: "#f7d617",
+          },
+        ],
+        categoryChart: {
+          labels: [],
+          data: [],
+          colors: [],
+        },
+        movementChart: {
+          labels: [],
+          data: [],
+        },
+        lowStock: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const charts = analyticsData.charts || {};
+    const tables = analyticsData.tables || {};
+
+    // Генерируем цвета для категорий
+    const colors = [
+      "#f7d617",
+      "#f59e0b",
+      "#10b981",
+      "#3b82f6",
+      "#9ca3af",
+      "#8b5cf6",
+      "#ec4899",
+      "#06b6d4",
+    ];
+
+    return {
+      kpis: [
+        {
+          title: "Всего товаров",
+          value: formatNumber(cards.total_products || 0),
+          subtitle: `В ${cards.categories || 0} категориях`,
+          icon: Package,
+          color: "#f7d617",
+        },
+        {
+          title: "Стоимость склада",
+          value: formatNumber(cards.inventory_value || "0"),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Заканчиваются",
+          value: formatNumber(cards.low_stock_count || 0),
+          subtitle: "Требуют заказа",
+          icon: TrendingUp,
+          color: "#f7d617",
+        },
+        {
+          title: "Оборачиваемость",
+          value: `${formatNumber(cards.turnover_days || 0)} дн.`,
+          icon: BarChart3,
+          color: "#f7d617",
+        },
+      ],
+      categoryChart: {
+        labels: charts.category_distribution?.map((item) => item.name) || [],
+        data: charts.category_distribution?.map((item) => item.percent) || [],
+        colors: colors.slice(0, charts.category_distribution?.length || 0),
+      },
+      movementChart: {
+        labels:
+          charts.movement_units?.map((item) => formatDateForChart(item.date)) ||
+          [],
+        data: charts.movement_units?.map((item) => item.units || 0) || [],
+      },
+      lowStock:
+        tables.low_stock?.map((item) => ({
+          name: item.name,
+          stock: item.qty || 0,
+          minimum: item.min || 0,
+          status: item.status === "critical" ? "Критично" : "Низкий",
+          statusType: item.status || "low",
+        })) || [],
+    };
+  }, [analyticsData, activeTab]);
+
+  // Данные для вкладки "Кассы"
+  const cashierData = useMemo(() => {
+    if (!analyticsData || activeTab !== "cashiers") {
+      return {
+        kpis: [
+          {
+            title: "Выручка за день",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+          {
+            title: "Транзакций",
+            value: "0",
+            icon: ShoppingCart,
+            color: "#f7d617",
+          },
+          {
+            title: "Средний чек",
+            value: "0",
+            currency: "сом",
+            icon: BarChart3,
+            color: "#f7d617",
+          },
+          {
+            title: "Наличных в кассе",
+            value: "0",
+            currency: "сом",
+            subtitle: "0% от выручки",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+        ],
+        hourlyChart: {
+          labels: [],
+          data: [],
+        },
+        paymentMethods: {
+          labels: [],
+          data: [],
+          colors: [],
+        },
+        weeklyTransactions: {
+          labels: [],
+          data: [],
+        },
+        paymentDetails: [],
+        peakHours: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const charts = analyticsData.charts || {};
+    const tables = analyticsData.tables || {};
+
+    // Маппинг способов оплаты
+    const paymentMethodLabels = {
+      cash: "Наличные",
+      transfer: "Безналичные",
+      card: "Карта",
+      deferred: "Отсрочка",
+    };
+
+    // Маппинг дней недели
+    const weekdayLabels = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+    return {
+      kpis: [
+        {
+          title: "Выручка за день",
+          value: formatNumber(cards.revenue || "0"),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Транзакций",
+          value: formatNumber(cards.transactions || 0),
+          icon: ShoppingCart,
+          color: "#f7d617",
+        },
+        {
+          title: "Средний чек",
+          value: formatNumber(cards.avg_check || "0"),
+          currency: "сом",
+          icon: BarChart3,
+          color: "#f7d617",
+        },
+        {
+          title: "Наличных в кассе",
+          value: formatNumber(cards.cash_in_box || "0"),
+          currency: "сом",
+          subtitle: `${cards.cash_share_percent || 0}% от выручки`,
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+      ],
+      hourlyChart: {
+        labels:
+          charts.sales_by_hours
+            ?.sort((a, b) => (a.hour || 0) - (b.hour || 0))
+            .map((item) => `${String(item.hour || 0).padStart(2, "0")}:00`) ||
+          [],
+        data:
+          charts.sales_by_hours
+            ?.sort((a, b) => (a.hour || 0) - (b.hour || 0))
+            .map((item) => parseFloat(item.revenue || 0)) || [],
+      },
+      paymentMethods: {
+        labels:
+          charts.payment_methods?.map(
+            (item) => paymentMethodLabels[item.name] || item.name
+          ) || [],
+        data: charts.payment_methods?.map((item) => item.percent) || [],
+        colors: ["#f7d617", "#f59e0b", "#10b981"],
+      },
+      weeklyTransactions: {
+        labels: weekdayLabels,
+        data: charts.transactions_by_weekday
+          ? weekdayLabels.map((_, index) => {
+              const weekday = charts.transactions_by_weekday.find(
+                (item) => item.weekday === index
+              );
+              return weekday?.transactions || 0;
+            })
+          : [],
+      },
+      paymentDetails:
+        tables.payment_detail?.map((item) => ({
+          method: paymentMethodLabels[item.method] || item.method,
+          transactions: item.transactions || 0,
+          amount: parseFloat(item.sum || 0),
+          share: `${item.share || 0}%`,
+        })) || [],
+      peakHours:
+        tables.peak_hours?.map((item) => ({
+          time: `${item.hour}:00`,
+          transactions: item.transactions || 0,
+          revenue: parseFloat(item.revenue || 0),
+          avgCheck: parseFloat(item.avg_check || 0),
+        })) || [],
+    };
+  }, [analyticsData, activeTab]);
+
+  // Данные для вкладки "Смены"
+  const shiftsData = useMemo(() => {
+    if (!analyticsData || activeTab !== "shifts") {
+      return {
+        kpis: [
+          {
+            title: "Активных смен",
+            value: "0",
+            subtitle: "В данный момент",
+            icon: Calendar,
+            color: "#f7d617",
+          },
+          {
+            title: "Смен сегодня",
+            value: "0",
+            subtitle: "Всего открыто",
+            icon: Calendar,
+            color: "#f7d617",
+          },
+          {
+            title: "Средняя длит.",
+            value: "0 ч",
+            subtitle: "На смену",
+            icon: BarChart3,
+            color: "#f7d617",
+          },
+          {
+            title: "Средний доход",
+            value: "0",
+            currency: "сом",
+            subtitle: "За смену",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+        ],
+        shiftsChart: {
+          labels: [],
+          data: [],
+        },
+        activeShifts: [],
+        bestCashiers: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const charts = analyticsData.charts || {};
+    const tables = analyticsData.tables || {};
+
+    // Форматирование времени
+    const formatTime = (dateString) => {
+      if (!dateString) return "-";
+      try {
+        const date = new Date(dateString);
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        return `${hours}:${minutes}`;
+      } catch {
+        return dateString;
+      }
+    };
+
+    return {
+      kpis: [
+        {
+          title: "Активных смен",
+          value: formatNumber(cards.active_shifts || 0),
+          subtitle: "В данный момент",
+          icon: Calendar,
+          color: "#f7d617",
+        },
+        {
+          title: "Смен сегодня",
+          value: formatNumber(cards.shifts_today || 0),
+          subtitle: "Всего открыто",
+          icon: Calendar,
+          color: "#f7d617",
+        },
+        {
+          title: "Средняя длит.",
+          value: `${formatNumber(cards.avg_duration_hours || 0)} ч`,
+          subtitle: "На смену",
+          icon: BarChart3,
+          color: "#f7d617",
+        },
+        {
+          title: "Средний доход",
+          value: formatNumber(cards.avg_revenue_per_shift || "0"),
+          currency: "сом",
+          subtitle: "За смену",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+      ],
+      shiftsChart: {
+        labels: charts.sales_by_shift_bucket?.map((item) => item.name) || [],
+        data:
+          charts.sales_by_shift_bucket?.map((item) =>
+            parseFloat(item.revenue || 0)
+          ) || [],
+      },
+      activeShifts:
+        tables.active_shifts?.map((shift) => ({
+          cashier: shift.cashier || "-",
+          register: shift.cashbox || "-",
+          start: formatTime(shift.opened_at),
+          sales: parseFloat(shift.sales || 0),
+          status: shift.status === "open" ? "Активна" : "Закрыта",
+        })) || [],
+      bestCashiers:
+        tables.best_cashiers?.map((cashier) => ({
+          place: cashier.place || 0,
+          cashier: cashier.cashier || "-",
+          shifts: cashier.shifts || 0,
+          sales: parseFloat(cashier.sales || 0),
+          avgCheck: parseFloat(cashier.avg_check || 0),
+        })) || [],
+    };
+  }, [analyticsData, activeTab]);
+
+  const formatCurrency = (num) => {
+    if (typeof num === "string") {
+      num = parseFloat(num);
+    }
+    return num.toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
 
   return (
-    <section className="analytics">
-      {/* Заголовок + фильтры */}
-      <header className="analytics__header">
+    <div className="analytics-page">
+      <div className="analytics-page__header">
+        <button className="analytics-page__back">
+          <ArrowLeft size={20} />
+        </button>
         <div>
-          <h2 className="analytics__title">Аналитика</h2>
-          <p className="analytics__subtitle">
-            Приход (чеки) за выбранный период
+          <h1 className="analytics-page__title">Аналитика</h1>
+          <p className="analytics-page__subtitle">
+            Статистика и отчеты за {monthName}
           </p>
         </div>
+      </div>
 
-        <div className="analytics__actions" style={{ flexWrap: "wrap" }}>
-          <select
-            className="analytics__select"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            title="Статус чеков"
-          >
-            <option value="">Все</option>
-            <option value="new">Новые</option>
-            <option value="paid">Оплачено</option>
-            <option value="canceled">Отменено</option>
-          </select>
+      <div className="analytics-page__tabs">
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "sales" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("sales")}
+        >
+          Продажи
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "warehouse" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("warehouse")}
+        >
+          Склад
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "cashiers" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("cashiers")}
+        >
+          Кассы
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "shifts" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("shifts")}
+        >
+          Смены
+        </button>
+      </div>
 
-          <input
-            type="date"
-            className="analytics__select"
-            value={from}
-            max={to || undefined}
-            onChange={(e) => setFrom(e.target.value)}
-            title="С"
-          />
-          <input
-            type="date"
-            className="analytics__select"
-            value={to}
-            min={from || undefined}
-            onChange={(e) => setTo(e.target.value)}
-            title="По"
-          />
-
-          <button
-            className="analytics__btn analytics__btn--secondary"
-            onClick={load}
-            disabled={loading}
-          >
-            Обновить
-          </button>
+      {/* Индикатор загрузки */}
+      {loading && (
+        <div className="analytics-page__loading">
+          <p>Загрузка данных...</p>
         </div>
-      </header>
+      )}
 
-      {err && <div className="analytics__error">{err}</div>}
-
-      {/* Сводка (только приход) */}
-      {loading ? (
-        <div className="analytics__skeletonRow">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="analytics__skeleton" />
-          ))}
+      {/* Ошибка */}
+      {error && (
+        <div className="analytics-page__error">
+          <p>Ошибка: {error}</p>
+          <button onClick={() => fetchAnalytics(activeTab)}>Повторить</button>
         </div>
-      ) : (
-        <div className="analytics__summary">
-          <div className="analytics__card">
-            <div className="analytics__value">{fmtMoney(totals.incSum)}</div>
-            <div className="analytics__label">Приход</div>
+      )}
+
+      {/* Вкладка Продажи */}
+      {activeTab === "sales" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {salesData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                  {kpi.change && (
+                    <div className="analytics-page__kpi-change analytics-page__kpi-change--positive">
+                      <TrendingUp size={14} />
+                      {kpi.change}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <div className="analytics__card">
-            <div className="analytics__value">{totals.count}</div>
-            <div className="analytics__label">Чеков</div>
+
+          <div className="analytics-page__chart-card">
+            <h3 className="analytics-page__chart-title">Динамика продаж</h3>
+            <Line
+              data={{
+                labels: salesData.salesChart.labels,
+                datasets: [
+                  {
+                    label: "Выручка (сом)",
+                    data: salesData.salesChart.data,
+                    borderColor: "#f7d617",
+                    backgroundColor: "rgba(247, 214, 23, 0.1)",
+                    fill: true,
+                    tension: 0.4,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: "bottom",
+                  },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      callback: function (value) {
+                        return value.toLocaleString("ru-RU");
+                      },
+                    },
+                  },
+                },
+              }}
+            />
           </div>
-          <div className="analytics__card">
-            <div className="analytics__value">{fmtMoney(totals.avg)}</div>
-            <div className="analytics__label">Средний чек</div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Топ-5 товаров</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th>Продано</th>
+                    <th>Выручка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesData.topProducts.length > 0 ? (
+                    salesData.topProducts.map((product, index) => (
+                      <tr key={index}>
+                        <td>{product.name}</td>
+                        <td>{product.sold} шт</td>
+                        <td>{formatNumber(product.revenue)} сом</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <div className="analytics-page__table-header">
+                <h3 className="analytics-page__table-title">Документы</h3>
+                <button className="analytics-page__date-filter">
+                  <Calendar size={16} />
+                  неделю
+                </button>
+              </div>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Наименование</th>
+                    <th>Кол-во ?</th>
+                    <th>Сумма ?</th>
+                    <th>Склад ?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesData.documents.length > 0 ? (
+                    salesData.documents.map((doc, index) => (
+                      <tr key={index}>
+                        <td>{doc.name}</td>
+                        <td>{doc.quantity}</td>
+                        <td>{formatCurrency(doc.amount)}</td>
+                        <td>
+                          {doc.warehouse ? formatCurrency(doc.warehouse) : "-"}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Список: Приход (чеки) */}
-      <section className="analytics__panel">
-        <div className="analytics__head">Приход (чеки)</div>
-        <div className="table">
-          <div className="table__head">
-            <span>Дата</span>
-            <span>Кол-во</span>
-            <span>Сумма</span>
-          </div>
-          <div className="table__body">
-            {loading ? (
-              <div className="table__empty">Загрузка…</div>
-            ) : incomesFiltered.length ? (
-              incomesFiltered.map((r) => (
-                <div
-                  key={r.id}
-                  className="table__row"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setOpenId(r.id)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" ? setOpenId(r.id) : null
-                  }
-                  style={{ cursor: "pointer" }}
-                  title="Открыть детали"
-                >
-                  <span className="ellipsis" title={r.created_at || "—"}>
-                    {r.created_at ? fmtDateTime(r.created_at) : "—"}
-                  </span>
-                  <span>{r.items_count || 0}</span>
-                  <span>{fmtMoney(r.amount)}</span>
+      {/* Вкладка Склад */}
+      {activeTab === "warehouse" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {warehouseData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                  {kpi.subtitle && (
+                    <div className="analytics-page__kpi-subtitle">
+                      {kpi.subtitle}
+                    </div>
+                  )}
+                  {kpi.change && (
+                    <div className="analytics-page__kpi-change analytics-page__kpi-change--positive">
+                      <TrendingUp size={14} />
+                      {kpi.change}
+                    </div>
+                  )}
                 </div>
-              ))
-            ) : (
-              <div className="table__empty">Нет данных</div>
-            )}
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__chart-card">
+              <h3 className="analytics-page__chart-title">
+                Распределение по категориям
+              </h3>
+              <Doughnut
+                data={{
+                  labels: warehouseData.categoryChart.labels,
+                  datasets: [
+                    {
+                      data: warehouseData.categoryChart.data,
+                      backgroundColor: warehouseData.categoryChart.colors,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: "bottom",
+                    },
+                  },
+                }}
+              />
+            </div>
+
+            <div className="analytics-page__chart-card">
+              <h3 className="analytics-page__chart-title">Движение товаров</h3>
+              <Bar
+                data={{
+                  labels: warehouseData.movementChart.labels,
+                  datasets: [
+                    {
+                      label: "Продано единиц",
+                      data: warehouseData.movementChart.data,
+                      backgroundColor: "#f7d617",
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      display: true,
+                      position: "bottom",
+                    },
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        stepSize: 15,
+                      },
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="analytics-page__table-card">
+            <h3 className="analytics-page__table-title">
+              Товары с низким остатком
+            </h3>
+            <table className="analytics-page__table">
+              <thead>
+                <tr>
+                  <th>Товар</th>
+                  <th>Остаток</th>
+                  <th>Минимум</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {warehouseData.lowStock.map((item, index) => (
+                  <tr key={index}>
+                    <td>{item.name}</td>
+                    <td>{item.stock} шт</td>
+                    <td>{item.minimum} шт</td>
+                    <td>
+                      <span
+                        className={`analytics-page__status analytics-page__status--${item.statusType}`}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-      </section>
+      )}
 
-      {openId && <SaleModal id={openId} onClose={() => setOpenId(null)} />}
-    </section>
+      {/* Вкладка Кассы */}
+      {activeTab === "cashiers" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {cashierData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                  {kpi.subtitle && (
+                    <div className="analytics-page__kpi-subtitle">
+                      {kpi.subtitle}
+                    </div>
+                  )}
+                  {kpi.change && (
+                    <div className="analytics-page__kpi-change analytics-page__kpi-change--positive">
+                      <TrendingUp size={14} />
+                      {kpi.change}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__chart-card analytics-page__chart-card--large">
+            <h3 className="analytics-page__chart-title">Продажи по часам</h3>
+            <Line
+              data={{
+                labels: cashierData.hourlyChart.labels,
+                datasets: [
+                  {
+                    label: "Выручка (сом)",
+                    data: cashierData.hourlyChart.data,
+                    borderColor: "#f7d617",
+                    backgroundColor: "rgba(247, 214, 23, 0.1)",
+                    fill: true,
+                    tension: 0.4,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: "bottom",
+                  },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      stepSize: 30000,
+                      callback: function (value) {
+                        return value.toLocaleString("ru-RU");
+                      },
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__chart-card">
+              <h3 className="analytics-page__chart-title">Способы оплаты</h3>
+              <Doughnut
+                data={{
+                  labels: cashierData.paymentMethods.labels,
+                  datasets: [
+                    {
+                      data: cashierData.paymentMethods.data,
+                      backgroundColor: cashierData.paymentMethods.colors,
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: "bottom",
+                    },
+                  },
+                }}
+              />
+            </div>
+
+            <div className="analytics-page__chart-card">
+              <h3 className="analytics-page__chart-title">
+                Транзакции за неделю
+              </h3>
+              <Bar
+                data={{
+                  labels: cashierData.weeklyTransactions.labels,
+                  datasets: [
+                    {
+                      label: "Транзакции",
+                      data: cashierData.weeklyTransactions.data,
+                      backgroundColor: "#f7d617",
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      display: false,
+                    },
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        stepSize: 35,
+                      },
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Детализация по способам оплаты
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Способ оплаты</th>
+                    <th>Транзакций</th>
+                    <th>Сумма</th>
+                    <th>Доля</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cashierData.paymentDetails.map((detail, index) => (
+                    <tr key={index}>
+                      <td>{detail.method}</td>
+                      <td>{detail.transactions}</td>
+                      <td>{formatNumber(detail.amount)} сом</td>
+                      <td>{detail.share}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Пиковые часы работы
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Время</th>
+                    <th>Транзакций</th>
+                    <th>Выручка</th>
+                    <th>Средний чек</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cashierData.peakHours.map((hour, index) => (
+                    <tr key={index}>
+                      <td>{hour.time}</td>
+                      <td>{hour.transactions}</td>
+                      <td>{formatNumber(hour.revenue)} сом</td>
+                      <td>{formatNumber(hour.avgCheck)} сом</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Вкладка Смены */}
+      {activeTab === "shifts" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {shiftsData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                  {kpi.subtitle && (
+                    <div className="analytics-page__kpi-subtitle">
+                      {kpi.subtitle}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__chart-card">
+            <h3 className="analytics-page__chart-title">Продажи по сменам</h3>
+            <Bar
+              data={{
+                labels: shiftsData.shiftsChart.labels,
+                datasets: [
+                  {
+                    label: "Выручка (сом)",
+                    data: shiftsData.shiftsChart.data,
+                    backgroundColor: "#f7d617",
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: "bottom",
+                  },
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      stepSize: 60000,
+                      callback: function (value) {
+                        return value.toLocaleString("ru-RU");
+                      },
+                    },
+                  },
+                },
+              }}
+            />
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Активные смены</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Кассир</th>
+                    <th>Касса</th>
+                    <th>Начало смены</th>
+                    <th>Продажи</th>
+                    <th>Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shiftsData.activeShifts.map((shift, index) => (
+                    <tr key={index}>
+                      <td>{shift.cashier}</td>
+                      <td>{shift.register}</td>
+                      <td>{shift.start}</td>
+                      <td>{formatNumber(shift.sales)} сом</td>
+                      <td>
+                        <span className="analytics-page__status analytics-page__status--active">
+                          {shift.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Лучшие кассиры за месяц
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Место</th>
+                    <th>Кассир</th>
+                    <th>Смен</th>
+                    <th>Продажи</th>
+                    <th>Средний чек</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shiftsData.bestCashiers.map((cashier, index) => (
+                    <tr key={index}>
+                      <td>
+                        <span
+                          className={`analytics-page__place analytics-page__place--${
+                            cashier.place === 1 ? "first" : "other"
+                          }`}
+                        >
+                          {cashier.place}
+                        </span>
+                      </td>
+                      <td>{cashier.cashier}</td>
+                      <td>{cashier.shifts}</td>
+                      <td>{formatNumber(cashier.sales)} сом</td>
+                      <td>{formatNumber(cashier.avgCheck)} сом</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
-}
+};
+
+export default Analytics;

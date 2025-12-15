@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, Plus, LayoutGrid, Table2 } from "lucide-react";
@@ -33,9 +33,11 @@ const Warehouse = () => {
   const categories = useSelector((state) => state.product.categories || []);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
   const [selectedRows, setSelectedRows] = useState(new Set());
+  const debounceTimerRef = useRef(null);
 
   // view toggle
   const [viewMode, setViewMode] = useState(getInitialViewMode); // "table" | "cards"
@@ -51,15 +53,38 @@ const Warehouse = () => {
     dispatch(fetchCategoriesAsync());
   }, [dispatch]);
 
-  // load products
+  // Debounce для поиска
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Загрузка товаров
   useEffect(() => {
     const params = {
       page: 1,
-      ...(searchTerm && { search: searchTerm }),
       ...filters,
     };
+
+    // Используем параметр search для всех запросов (включая штрих-коды)
+    // API должен обрабатывать поиск по штрих-коду через параметр search
+    if (debouncedSearchTerm) {
+      params.search = debouncedSearchTerm.trim();
+    }
+
     dispatch(fetchProductsAsync(params));
-  }, [dispatch, searchTerm, filters]);
+  }, [dispatch, debouncedSearchTerm, filters]);
 
   const filteredProducts = products;
 

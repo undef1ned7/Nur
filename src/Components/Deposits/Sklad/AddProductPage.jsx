@@ -949,7 +949,7 @@ const AddProductPage = () => {
         <div className="add-product-page__header">
           <button
             className="add-product-page__back"
-            onClick={() => navigate("/crm/sklad")}
+            onClick={() => navigate("/crm/market/warehouse")}
           >
             <ArrowLeft size={20} />
             Вернуться к складу
@@ -1017,7 +1017,7 @@ const AddProductPage = () => {
                 </div>
               )}
               <AddProductBarcode
-                onClose={() => navigate("/crm/sklad")}
+                onClose={() => navigate("/crm/market/warehouse")}
                 onShowSuccessAlert={(productName) => {
                   showAlert(
                     `Товар "${productName}" успешно добавлен!`,
@@ -1025,7 +1025,7 @@ const AddProductPage = () => {
                     "Успех"
                   );
                   setTimeout(() => {
-                    navigate("/crm/sklad");
+                    navigate("/crm/market/warehouse");
                   }, 1500);
                 }}
                 onShowErrorAlert={(errorMsg) => {
@@ -1509,7 +1509,7 @@ const AddProductPage = () => {
                 <div className="add-product-page__actions">
                   <button
                     className="add-product-page__cancel-btn"
-                    onClick={() => navigate("/crm/sklad")}
+                    onClick={() => navigate("/crm/market/warehouse")}
                     disabled={creating}
                   >
                     Отмена
@@ -2601,7 +2601,7 @@ const MarketProductForm = ({
       <div className="market-product-form__actions">
         <button
           className="market-product-form__cancel-btn"
-          onClick={() => navigate("/crm/sklad")}
+          onClick={() => navigate("/crm/market/warehouse")}
           disabled={creating}
         >
           Отмена

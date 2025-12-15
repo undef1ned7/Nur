@@ -118,6 +118,18 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_cafe_inventory",
     },
   ],
+  Магазин: [
+    {
+      value: "Интерфейс кассира",
+      label: "Интерфейс кассира",
+      backendKey: "can_view_cashbox",
+    },
+    {
+      value: "Смены",
+      label: "Смены",
+      backendKey: "can_view_shifts",
+    },
+  ],
   "Строительная компания": [
     {
       value: "Процесс работы",

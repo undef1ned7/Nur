@@ -282,13 +282,6 @@ export const MENU_CONFIG = {
     // Магазин
     market: [
       {
-        label: "Бар",
-        to: "/crm/market/bar",
-        icon: menuIcons.listAlt,
-        permission: "can_view_products",
-        implemented: true,
-      },
-      {
         label: "История",
         to: "/crm/market/history",
         icon: menuIcons.clipboard,
@@ -300,6 +293,20 @@ export const MENU_CONFIG = {
         to: "/crm/market/analytics",
         icon: menuIcons.chartBar,
         permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Смены",
+        to: "/crm/shifts",
+        icon: menuIcons.calendar,
+        permission: "can_view_shifts",
+        implemented: true,
+      },
+      {
+        label: "Склад",
+        to: "/crm/market/warehouse",
+        icon: menuIcons.warehouse,
+        permission: "can_view_products",
         implemented: true,
       },
     ],

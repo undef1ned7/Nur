@@ -346,15 +346,17 @@ const Sell = () => {
                     </button>
                   ) : (
                     <>
-                      <button
-                        className="sell__header-btn"
-                        onClick={() => {
-                          dispatch(startSale());
-                          setShowSellMainStart(true);
-                        }}
-                      >
-                        Продать
-                      </button>
+                      {sectorName === "Магазин" && (
+                        <button
+                          className="sell__header-btn"
+                          onClick={() => {
+                            dispatch(startSale());
+                            setShowSellMainStart(true);
+                          }}
+                        >
+                          Продать
+                        </button>
+                      )}
                       <button
                         className="sell__header-btn"
                         onClick={() => setShowAddCashboxModal(true)}

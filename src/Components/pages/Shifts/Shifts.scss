@@ -1,0 +1,403 @@
+.shifts-page {
+  padding: 24px;
+  background: #f5f5f5;
+  min-height: 100vh;
+
+  &__header {
+    margin-bottom: 24px;
+  }
+
+  &__title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__loading,
+  &__empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6b7280;
+    font-size: 16px;
+  }
+
+  &__list {
+    display: flex;
+    gap: 24px;
+    flex-direction: column;
+    overflow-x: auto;
+    padding-bottom: 8px;
+
+    &::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+
+      &:hover {
+        background: #a8a8a8;
+      }
+    }
+  }
+
+  &__shift-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 400px;
+    flex-shrink: 0;
+
+    &:hover {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      transform: translateY(-2px);
+    }
+  }
+
+  &__shift-cashier-id {
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  &__shift-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  &__shift-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  &__shift-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+
+    &--open {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    &--closed {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+  }
+
+  &__shift-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  &__shift-info-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #6b7280;
+  }
+
+  &__shift-section {
+    margin-bottom: 24px;
+
+    &:last-of-type {
+      margin-bottom: 0;
+    }
+  }
+
+  &__shift-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 12px 0;
+  }
+
+  &__shift-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+  }
+
+  &__shift-metric {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+
+  &__shift-metric-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  &__shift-metric-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  &__shift-cash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  &__shift-cash-item {
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+
+    &--zero {
+      background: #d1fae5;
+      border-color: #10b981;
+    }
+
+    &--positive {
+      background: #d1fae5;
+      border-color: #10b981;
+    }
+
+    &--negative {
+      background: #fee2e2;
+      border-color: #ef4444;
+    }
+  }
+
+  &__shift-cash-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  &__shift-cash-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  &__shift-footer {
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 8px;
+  }
+
+  &__shift-footer-grid {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__shift-footer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #6b7280;
+  }
+
+  &__shift-cashier {
+    font-size: 14px;
+    color: #6b7280;
+  }
+
+  // Планшеты (768px - 1024px)
+  @media (max-width: 1024px) {
+    padding: 20px;
+
+    &__title {
+      font-size: 24px;
+    }
+
+    &__shift-card {
+      padding: 20px;
+      min-width: 100%;
+    }
+
+    &__shift-title {
+      font-size: 18px;
+    }
+
+    &__shift-metrics {
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 12px;
+    }
+
+    &__shift-cash-grid {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    }
+  }
+
+  // Мобильные устройства (до 768px)
+  @media (max-width: 768px) {
+    padding: 16px;
+
+    &__header {
+      margin-bottom: 20px;
+    }
+
+    &__title {
+      font-size: 22px;
+    }
+
+    &__shift-card {
+      padding: 16px;
+      min-width: 100%;
+    }
+
+    &__shift-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    &__shift-title {
+      font-size: 16px;
+    }
+
+    &__shift-status {
+      font-size: 11px;
+      padding: 4px 10px;
+    }
+
+    &__shift-info {
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    &__shift-info-item {
+      font-size: 13px;
+    }
+
+    &__shift-section {
+      margin-bottom: 20px;
+    }
+
+    &__shift-section-title {
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    &__shift-metrics {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    &__shift-metric {
+      padding: 10px;
+    }
+
+    &__shift-metric-label {
+      font-size: 11px;
+    }
+
+    &__shift-metric-value {
+      font-size: 14px;
+    }
+
+    &__shift-cash-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    &__shift-cash-item {
+      padding: 10px;
+    }
+
+    &__shift-cash-label {
+      font-size: 11px;
+    }
+
+    &__shift-cash-value {
+      font-size: 14px;
+    }
+
+    &__shift-footer {
+      padding-top: 12px;
+      margin-top: 6px;
+    }
+
+    &__shift-footer-grid {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    &__shift-footer-item {
+      font-size: 13px;
+    }
+
+    &__shift-cashier {
+      font-size: 13px;
+    }
+
+    &__shift-cashier-id {
+      font-size: 11px;
+    }
+  }
+
+  // Очень маленькие экраны (до 480px)
+  @media (max-width: 480px) {
+    padding: 12px;
+
+    &__title {
+      font-size: 20px;
+    }
+
+    &__shift-card {
+      padding: 12px;
+    }
+
+    &__shift-title {
+      font-size: 14px;
+      gap: 8px;
+    }
+
+    &__shift-metric {
+      padding: 8px;
+      gap: 8px;
+    }
+
+    &__shift-metric-value {
+      font-size: 13px;
+    }
+
+    &__shift-cash-item {
+      padding: 8px;
+    }
+
+    &__shift-cash-value {
+      font-size: 13px;
+    }
+  }
+}

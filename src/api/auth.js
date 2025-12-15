@@ -42,7 +42,8 @@ const getSectorPermissions = (sectorName) => {
       "can_view_school_invoices",
     ],
     Магазин: [
-      // Магазин использует базовые permissions
+      "can_view_cashbox", // Интерфейс кассира
+      "can_view_shifts", // Смены
     ],
     Кафе: [
       "can_view_cafe_menu",

@@ -96,6 +96,15 @@ const saleSlice = createSlice({
       })
       .addCase(manualFilling.fulfilled, (state, { payload }) => {
         state.cart = payload;
+        // Обновляем state.start если payload содержит полные данные продажи
+        if (
+          payload &&
+          payload.id &&
+          state.start &&
+          state.start.id === payload.id
+        ) {
+          state.start = payload;
+        }
         state.loading = false;
       })
       .addCase(manualFilling.rejected, (state, action) => {
@@ -106,7 +115,15 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(updateManualFilling.fulfilled, (state, { payload }) => {
-        // state.cart = payload;
+        // Обновляем state.start если payload содержит полные данные продажи
+        if (
+          payload &&
+          payload.id &&
+          state.start &&
+          state.start.id === payload.id
+        ) {
+          state.start = payload;
+        }
         state.loading = false;
       })
       .addCase(updateManualFilling.rejected, (state, action) => {
@@ -226,6 +243,10 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(historySellProductDetail.fulfilled, (state, { payload }) => {
+        // Обновляем state.start если это текущая активная продажа
+        if (state.start && state.start.id === payload.id) {
+          state.start = payload;
+        }
         state.historyDetail = payload;
         state.loading = false;
       })

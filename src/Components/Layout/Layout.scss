@@ -1,12 +1,12 @@
 :root {
-  --glass-bg: rgba(255, 255, 255, 0.40);
+  --glass-bg: rgba(255, 255, 255, 0.4);
   --panel-bg: #ffffff;
   --text: #111827;
 }
 
 html.dark {
-  --glass-bg: rgba(17, 24, 39, 0.55); 
-  --panel-bg: #111827;               
+  --glass-bg: rgba(17, 24, 39, 0.55);
+  --panel-bg: #111827;
   --text: #e5e7eb;
 }
 
@@ -466,7 +466,7 @@ body {
   .tables__label,
   .menu__label,
   .orders__label,
-  .rh__label{
+  .rh__label {
     color: #fff !important;
   }
 }
@@ -544,4 +544,8 @@ body {
 //   }
 // }
 
-
+.content--full-width {
+  margin-left: 0 !important;
+  width: 100% !important;
+  padding: 0 !important;
+}

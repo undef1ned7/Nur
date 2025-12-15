@@ -29,11 +29,16 @@ const hasPositiveNumber = (v) => Number.isFinite(Number(v)) && Number(v) > 0;
 // ===== POS продажи (товары) =====
 export const startSale = createAsyncThunk(
   "sale/start",
-  async (discount_total, { rejectWithValue }) => {
+  async ({ discount_total = 0, shift = null }, { rejectWithValue }) => {
     try {
-      const { data } = await api.post("/main/pos/sales/start/", {
+      const payload = {
         order_discount_total: discount_total,
-      });
+      };
+      // Если передан shift, добавляем его в payload
+      if (shift) {
+        payload.shift = shift;
+      }
+      const { data } = await api.post("/main/pos/sales/start/", payload);
       return data;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));

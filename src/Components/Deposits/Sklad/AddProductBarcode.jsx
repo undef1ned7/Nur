@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch } from "react-redux";
 import useScanDetection from "use-scan-detection";
 import {
@@ -72,6 +72,19 @@ const AddProductBarcode = ({
   });
   const dispatch = useDispatch();
 
+  // Refs для отслеживания последних обработанных ошибок (чтобы избежать бесконечных циклов)
+  const lastScanErrorRef = useRef(null);
+  const lastAddErrorRef = useRef(null);
+  const lastBarcodeErrorRef = useRef(null);
+  
+  // Ref для хранения функции onShowErrorAlert, чтобы она не менялась при каждом рендере
+  const onShowErrorAlertRef = useRef(onShowErrorAlert);
+  
+  // Обновляем ref при изменении функции
+  useEffect(() => {
+    onShowErrorAlertRef.current = onShowErrorAlert;
+  }, [onShowErrorAlert]);
+
   // Фильтрация клиентов
   const filterClient = useMemo(
     () =>
@@ -143,33 +156,78 @@ const AddProductBarcode = ({
     })();
   }, [barcodeScan, dispatch]);
 
-  // Отслеживаем ошибки из Redux состояния
+  // Отслеживаем ошибки из Redux состояния (с защитой от повторных вызовов)
   useEffect(() => {
-    if (scanProductError && onShowErrorAlert) {
+    if (!scanProductError) {
+      lastScanErrorRef.current = null;
+      return;
+    }
+
+    const errorId = scanProductError?.response?.data?.barcode || scanProductError?.message || String(scanProductError);
+    
+    // Проверяем, не обрабатывали ли мы уже эту ошибку
+    if (lastScanErrorRef.current !== errorId && onShowErrorAlertRef.current) {
+      lastScanErrorRef.current = errorId;
       const errorMsg =
         scanProductError?.response?.data?.barcode ||
         "Произошла ошибка при добавлении товара в склад";
-      onShowErrorAlert(errorMsg);
+      
+      // Используем setTimeout, чтобы избежать синхронных обновлений состояния
+      setTimeout(() => {
+        if (onShowErrorAlertRef.current) {
+          onShowErrorAlertRef.current(errorMsg);
+        }
+      }, 0);
     }
-  }, [scanProductError, onShowErrorAlert]);
+  }, [scanProductError]);
 
   useEffect(() => {
-    if (addToWarehouseError && onShowErrorAlert) {
+    if (!addToWarehouseError) {
+      lastAddErrorRef.current = null;
+      return;
+    }
+
+    const errorId = addToWarehouseError?.response?.data?.barcode || addToWarehouseError?.message || String(addToWarehouseError);
+    
+    // Проверяем, не обрабатывали ли мы уже эту ошибку
+    if (lastAddErrorRef.current !== errorId && onShowErrorAlertRef.current) {
+      lastAddErrorRef.current = errorId;
       const errorMsg =
         addToWarehouseError?.response?.data?.barcode ||
         "Произошла ошибка при добавлении товара в склад";
-      onShowErrorAlert(errorMsg);
+      
+      // Используем setTimeout, чтобы избежать синхронных обновлений состояния
+      setTimeout(() => {
+        if (onShowErrorAlertRef.current) {
+          onShowErrorAlertRef.current(errorMsg);
+        }
+      }, 0);
     }
-  }, [addToWarehouseError, onShowErrorAlert]);
+  }, [addToWarehouseError]);
 
   useEffect(() => {
-    if (barcodeError && onShowErrorAlert) {
+    if (!barcodeError) {
+      lastBarcodeErrorRef.current = null;
+      return;
+    }
+
+    const errorId = barcodeError?.response?.data?.barcode || barcodeError?.message || String(barcodeError);
+    
+    // Проверяем, не обрабатывали ли мы уже эту ошибку
+    if (lastBarcodeErrorRef.current !== errorId && onShowErrorAlertRef.current) {
+      lastBarcodeErrorRef.current = errorId;
       const errorMsg =
         barcodeError?.response?.data?.barcode ||
         "Произошла ошибка при добавлении товара в склад";
-      onShowErrorAlert(errorMsg);
+      
+      // Используем setTimeout, чтобы избежать синхронных обновлений состояния
+      setTimeout(() => {
+        if (onShowErrorAlertRef.current) {
+          onShowErrorAlertRef.current(errorMsg);
+        }
+      }, 0);
     }
-  }, [barcodeError, onShowErrorAlert]);
+  }, [barcodeError]);
 
   // Автоматическое заполнение названия товара при обнаружении
   useEffect(() => {
@@ -350,11 +408,13 @@ const AddProductBarcode = ({
   };
 
   useEffect(() => {
-    setCashData((prev) => ({
-      ...prev,
-      cashbox: selectCashBox,
-    }));
-  }, []);
+    if (selectCashBox) {
+      setCashData((prev) => ({
+        ...prev,
+        cashbox: selectCashBox,
+      }));
+    }
+  }, [selectCashBox]);
 
   const handleCancel = () => {
     dispatch(clearScannedProduct());

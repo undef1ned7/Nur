@@ -24,6 +24,7 @@ import catalogReducer from "./slices/catalogSlice";
 import cartReducer from "./slices/cartSlice";
 import cafeOrdersReducer from "./slices/cafeOrdersSlice";
 import branchReducer from "./slices/branchSlice";
+import shiftReducer from "./slices/shiftSlice";
 import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
@@ -53,6 +54,7 @@ const store = configureStore({
     cart: cartReducer,
     cafeOrders: cafeOrdersReducer,
     branches: branchReducer,
+    shifts: shiftReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
