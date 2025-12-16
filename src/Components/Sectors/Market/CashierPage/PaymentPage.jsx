@@ -36,7 +36,9 @@ const PaymentPage = ({
   const { list: cashBoxes } = useCash();
   const { company } = useUser();
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [amountReceived, setAmountReceived] = useState("");
+  const [amountReceived, setAmountReceived] = useState(
+    total ? total.toFixed(2) : "0.00"
+  );
   const [debtMonths, setDebtMonths] = useState(1); // Количество месяцев для рассрочки
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(customer);
@@ -392,13 +394,11 @@ const PaymentPage = ({
     }
   }, [cashBoxes, selectCashBox]);
 
-  // Автозаполнение суммы при выборе безналичной оплаты
+  // Автозаполнение суммы при выборе способа оплаты и при изменении итоговой суммы
   useEffect(() => {
-    if (paymentMethod === "cashless") {
-      setAmountReceived(total.toFixed(2));
-    } else if (paymentMethod === "cash") {
-      // При переключении на наличные очищаем поле
-      setAmountReceived("");
+    if (paymentMethod === "cashless" || paymentMethod === "cash") {
+      // При переключении на наличные или безналичные устанавливаем итоговую сумму
+      setAmountReceived(total ? total.toFixed(2) : "0.00");
     }
   }, [paymentMethod, total]);
 

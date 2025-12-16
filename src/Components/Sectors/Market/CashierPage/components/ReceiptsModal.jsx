@@ -457,7 +457,7 @@ const ReceiptsModal = ({ onClose }) => {
               ) : filteredReceipts.length === 0 ? (
                 <div className="receipts-modal__empty">Чеки не найдены</div>
               ) : (
-                filteredReceipts.map((receipt) => {
+                filteredReceipts.map((receipt, idx) => {
                   const statusInfo = getStatusInfo(receipt);
                   const total = parseFloat(receipt.total || 0);
 
@@ -465,7 +465,7 @@ const ReceiptsModal = ({ onClose }) => {
                     <div key={receipt.id} className="receipts-modal__receipt">
                       <div className="receipts-modal__receipt-header">
                         <h3 className="receipts-modal__receipt-title">
-                          Продажа #{receipt.id || receipt.sale_id}
+                          Продажа #{idx + 1}
                         </h3>
                         <div className="receipts-modal__receipt-actions">
                           <button

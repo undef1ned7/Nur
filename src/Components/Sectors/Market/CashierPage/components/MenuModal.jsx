@@ -14,11 +14,6 @@ const MenuModal = ({ onClose, onAction }) => {
       icon: Receipt,
       label: "Журнал чеков",
     },
-    {
-      id: "shifts",
-      icon: Calendar,
-      label: "Смены",
-    },
   ];
 
   return (

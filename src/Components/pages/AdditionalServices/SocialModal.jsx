@@ -7,6 +7,7 @@ import {
   FaTelegram,
   FaWhatsapp,
   FaWarehouse,
+  FaBarcode,
 } from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
 
@@ -55,6 +56,18 @@ const SocialModal = ({ isOpen, onClose, selectedSocial }) => {
         icon: <FaWarehouse />,
         // доступен только в консалтинге
         requiresConsulting: true,
+      },
+      "barcode-print": {
+        title: "Печать штрих-кодов",
+        description:
+          "Подключение отдельной страницы для печати штрих-кодов с предпросмотром этикетки и поддержкой принтера.",
+        icon: <FaBarcode />,
+      },
+      scales: {
+        title: "Интеграция с весами",
+        description:
+          "Подключение страницы для отправки товарной номенклатуры на торговые весы.",
+        icon: <FaBarcode />,
       },
     }),
     []

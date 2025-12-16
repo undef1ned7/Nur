@@ -302,13 +302,6 @@ export const MENU_CONFIG = {
         permission: "can_view_shifts",
         implemented: true,
       },
-      {
-        label: "Склад",
-        to: "/crm/market/warehouse",
-        icon: menuIcons.warehouse,
-        permission: "can_view_products",
-        implemented: true,
-      },
     ],
 
     // Кафе
@@ -631,6 +624,20 @@ export const MENU_CONFIG = {
       to: "/crm/documents",
       icon: menuIcons.documentScanner,
       permission: "can_view_documents",
+      implemented: true,
+    },
+    {
+      label: "Печать штрих-кодов",
+      to: "/crm/barcodes",
+      icon: menuIcons.documentScanner,
+      permission: "can_view_barcode_print",
+      implemented: true,
+    },
+    {
+      label: "Интеграция с весами",
+      to: "/crm/scales",
+      icon: menuIcons.scale,
+      permission: "can_view_scales",
       implemented: true,
     },
   ],

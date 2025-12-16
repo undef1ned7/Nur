@@ -117,7 +117,6 @@ export const HIDE_RULES = [
         "/crm/market/bar",
         "/crm/market/history",
         "/crm/raspisanie",
-        "/crm/sklad",
         "/crm/analytics",
       ],
     },

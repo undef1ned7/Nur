@@ -288,7 +288,7 @@
   &__supplier-row {
     display: flex;
     gap: 12px;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
   &__create-supplier {

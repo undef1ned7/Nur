@@ -606,13 +606,13 @@ const Analytics = () => {
     };
   }, [analyticsData, activeTab]);
 
-  const formatCurrency = (num) => {
+  const formatCurrency = (num, decimals = 2) => {
     if (typeof num === "string") {
       num = parseFloat(num);
     }
     return num.toLocaleString("ru-RU", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
     });
   };
 
@@ -798,9 +798,9 @@ const Analytics = () => {
                 <thead>
                   <tr>
                     <th>Наименование</th>
-                    <th>Кол-во ?</th>
-                    <th>Сумма ?</th>
-                    <th>Склад ?</th>
+                    <th>Кол-во</th>
+                    <th>Сумма</th>
+                    <th>Склад</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -809,9 +809,11 @@ const Analytics = () => {
                       <tr key={index}>
                         <td>{doc.name}</td>
                         <td>{doc.quantity}</td>
-                        <td>{formatCurrency(doc.amount)}</td>
+                        <td>{formatCurrency(doc.amount, 0)}</td>
                         <td>
-                          {doc.warehouse ? formatCurrency(doc.warehouse) : "-"}
+                          {doc.warehouse
+                            ? formatCurrency(doc.warehouse, 0)
+                            : "-"}
                         </td>
                       </tr>
                     ))

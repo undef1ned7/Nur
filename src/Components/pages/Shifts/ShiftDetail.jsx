@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -22,8 +22,10 @@ import {
   AlertCircle,
 } from "lucide-react";
 import AlertModal from "../../common/AlertModal/AlertModal";
-import { fetchShiftByIdAsync } from "../../../store/creators/shiftThunk";
-import { historySellProduct } from "../../../store/creators/saleThunk";
+import {
+  fetchShiftByIdAsync,
+  fetchShiftSalesAsync,
+} from "../../../store/creators/shiftThunk";
 import "./ShiftDetail.scss";
 
 const ShiftDetail = () => {
@@ -46,14 +48,14 @@ const ShiftDetail = () => {
   const [moneyLoading, setMoneyLoading] = useState(false);
   const [moneyError, setMoneyError] = useState(null);
   const [filters, setFilters] = useState({
-    shift: id,
     status: "",
-    search: "",
+    payment_method: "",
+    q: "",
   });
   const [moneyFilters, setMoneyFilters] = useState({
-    shift: id,
-    user_display: "",
-    search: "",
+    status: "",
+    payment_method: "",
+    q: "",
   });
 
   const shift = currentShift;
@@ -73,22 +75,27 @@ const ShiftDetail = () => {
       setSalesError(null);
 
       try {
-        const searchParams = {
-          shift: id,
-        };
+        const searchParams = {};
 
         if (filters.status) {
           searchParams.status = filters.status;
         }
 
-        if (filters.search) {
-          searchParams.search = filters.search;
+        if (filters.payment_method) {
+          searchParams.payment_method = filters.payment_method;
+        }
+
+        if (filters.q) {
+          searchParams.q = filters.q;
         }
 
         const result = await dispatch(
-          historySellProduct(searchParams)
+          fetchShiftSalesAsync({
+            shiftId: id,
+            params: searchParams,
+          })
         ).unwrap();
-        setSalesHistory(result || []);
+        setSalesHistory(result?.results || []);
       } catch (error) {
         console.error("Ошибка при загрузке истории продаж:", error);
         setSalesError("Не удалось загрузить историю продаж");
@@ -103,13 +110,13 @@ const ShiftDetail = () => {
       () => {
         loadSalesHistory();
       },
-      filters.search ? 500 : 0
+      filters.q ? 500 : 0
     );
 
     return () => clearTimeout(timeoutId);
-  }, [id, dispatch, filters.status, filters.search]);
+  }, [id, dispatch, filters.status, filters.payment_method, filters.q]);
 
-  // Загрузка движения денег (фильтрация по user_display)
+  // Загрузка движения денег
   useEffect(() => {
     const loadMoneyMovements = async () => {
       if (!id) return;
@@ -118,33 +125,38 @@ const ShiftDetail = () => {
       setMoneyError(null);
 
       try {
-        const searchParams = {
-          shift: id,
-        };
+        const searchParams = {};
 
-        if (moneyFilters.user_display) {
-          searchParams.user_display = moneyFilters.user_display;
+        if (moneyFilters.status) {
+          searchParams.status = moneyFilters.status;
         }
 
-        if (moneyFilters.search) {
-          searchParams.search = moneyFilters.search;
+        if (moneyFilters.payment_method) {
+          searchParams.payment_method = moneyFilters.payment_method;
+        }
+
+        if (moneyFilters.q) {
+          searchParams.q = moneyFilters.q;
         }
 
         const result = await dispatch(
-          historySellProduct(searchParams)
+          fetchShiftSalesAsync({
+            shiftId: id,
+            params: searchParams,
+          })
         ).unwrap();
 
         // Преобразуем продажи в движение денег
-        const movements = (result || []).map((sale) => ({
+        const movements = (result?.results || []).map((sale) => ({
           id: sale.id,
           type: "income",
-          date: sale.created_at || sale.date || sale.opened_at,
-          counterparty: sale.client_name || sale.client || "—",
-          account: sale.cashbox_name || shift?.cashbox_name || "Касса",
+          date: sale.created_at || sale.paid_at,
+          counterparty: sale.client_name || "—",
+          account: shift?.cashbox_name || "Касса",
           tag: "Оплата от клиента",
-          amount: parseFloat(sale.total || sale.amount || 0),
+          amount: parseFloat(sale.total || 0),
           payment_method: sale.payment_method || "—",
-          cashier: sale.cashier_display || sale.user_display || "—",
+          cashier: sale.cashier_display || "—",
         }));
 
         setMoneyMovements(movements);
@@ -162,29 +174,18 @@ const ShiftDetail = () => {
       () => {
         loadMoneyMovements();
       },
-      moneyFilters.search ? 500 : 0
+      moneyFilters.q ? 500 : 0
     );
 
     return () => clearTimeout(timeoutId);
   }, [
     id,
     dispatch,
-    moneyFilters.user_display,
-    moneyFilters.search,
+    moneyFilters.status,
+    moneyFilters.payment_method,
+    moneyFilters.q,
     shift?.cashbox_name,
   ]);
-
-  // Получаем уникальных кассиров для фильтра
-  const uniqueCashiers = useMemo(() => {
-    const cashiers = new Set();
-    salesHistory.forEach((sale) => {
-      const cashier = sale.cashier_display || sale.user_display;
-      if (cashier) {
-        cashiers.add(cashier);
-      }
-    });
-    return Array.from(cashiers).sort();
-  }, [salesHistory]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -214,14 +215,15 @@ const ShiftDetail = () => {
   // Преобразование данных продаж для отображения
   const productMovements = salesHistory.map((sale) => ({
     id: sale.id,
+    docNumber: sale.doc_number,
     type: "sale",
-    date: sale.created_at || sale.date || sale.opened_at,
-    store: sale.branch_name || sale.store || shift?.branch || "—",
-    client: sale.client_name || sale.client || "—",
-    cashier: sale.cashier_display || sale.cashier || "—",
-    status: sale.status || (sale.is_paid ? "paid" : "unpaid"),
-    positions: sale.items_count || sale.positions || 0,
-    amount: parseFloat(sale.total || sale.amount || 0),
+    date: sale.created_at || sale.paid_at,
+    store: sale.branch || shift?.branch || "—",
+    client: sale.client_name || "—",
+    cashier: sale.cashier_display || "—",
+    status: sale.status || "paid",
+    positions: sale.items?.length || 0,
+    amount: parseFloat(sale.total || 0),
   }));
 
   const productList = [
@@ -292,7 +294,18 @@ const ShiftDetail = () => {
             <Wallet size={32} style={{ color: "#f7d617" }} />
             <div>
               <h1 className="shift-detail-page__title">
-                Смена #{shift.id?.slice(0, 8) || "—"}
+                Смена #
+                {shift?.code ||
+                  (() => {
+                    const idStr = shift.id?.toString() || "";
+                    // Извлекаем только цифры из ID
+                    const digitsOnly = idStr.replace(/\D/g, "");
+                    // Если есть достаточно цифр (минимум 4), используем последние 8, иначе используем последние 8 символов без дефисов
+                    return digitsOnly.length >= 4
+                      ? digitsOnly.slice(-8)
+                      : idStr.replace(/-/g, "").slice(-8).toUpperCase();
+                  })() ||
+                  "—"}
               </h1>
               <div className="shift-detail-page__date">
                 <Calendar size={16} />
@@ -604,14 +617,14 @@ const ShiftDetail = () => {
           >
             Движение денег
           </button>
-          <button
+          {/* <button
             className={`shift-detail-page__tab ${
               activeTab === "list" ? "shift-detail-page__tab--active" : ""
             }`}
             onClick={() => setActiveTab("list")}
           >
             Список товара
-          </button>
+          </button> */}
         </div>
 
         {activeTab === "products" && (
@@ -636,15 +649,31 @@ const ShiftDetail = () => {
               </div>
               <div className="shift-detail-page__filter-group">
                 <label className="shift-detail-page__filter-label">
+                  Способ оплаты:
+                </label>
+                <select
+                  className="shift-detail-page__filter-select"
+                  value={filters.payment_method}
+                  onChange={(e) =>
+                    setFilters({ ...filters, payment_method: e.target.value })
+                  }
+                >
+                  <option value="">Все</option>
+                  <option value="cash">Наличные</option>
+                  <option value="transfer">Безнал</option>
+                </select>
+              </div>
+              <div className="shift-detail-page__filter-group">
+                <label className="shift-detail-page__filter-label">
                   Поиск:
                 </label>
                 <input
                   type="text"
                   className="shift-detail-page__filter-input"
-                  placeholder="Поиск по клиенту, кассиру..."
-                  value={filters.search}
+                  placeholder="Поиск по номеру чека"
+                  value={filters.q}
                   onChange={(e) =>
-                    setFilters({ ...filters, search: e.target.value })
+                    setFilters({ ...filters, q: e.target.value })
                   }
                 />
               </div>
@@ -672,7 +701,7 @@ const ShiftDetail = () => {
                     Продажи не найдены
                   </div>
                 ) : (
-                  productMovements.map((movement) => (
+                  productMovements.map((movement, idx) => (
                     <div
                       key={movement.id}
                       className="shift-detail-page__operation"
@@ -680,7 +709,8 @@ const ShiftDetail = () => {
                       <div className="shift-detail-page__operation-indicator shift-detail-page__operation-indicator--blue" />
                       <div className="shift-detail-page__operation-content">
                         <div className="shift-detail-page__operation-title">
-                          Продажа #{movement.id}
+                          Продажа #{idx + 1}
+                          {movement.docNumber || movement.id.slice(0, 8)}
                         </div>
                         <div className="shift-detail-page__operation-info">
                           Магазин {movement.store} &gt; клиент {movement.client}
@@ -730,24 +760,40 @@ const ShiftDetail = () => {
             <div className="shift-detail-page__filters">
               <div className="shift-detail-page__filter-group">
                 <label className="shift-detail-page__filter-label">
-                  Кассир:
+                  Статус:
                 </label>
                 <select
                   className="shift-detail-page__filter-select"
-                  value={moneyFilters.user_display}
+                  value={moneyFilters.status}
                   onChange={(e) =>
                     setMoneyFilters({
                       ...moneyFilters,
-                      user_display: e.target.value,
+                      status: e.target.value,
                     })
                   }
                 >
-                  <option value="">Все кассиры</option>
-                  {uniqueCashiers.map((cashier) => (
-                    <option key={cashier} value={cashier}>
-                      {cashier}
-                    </option>
-                  ))}
+                  <option value="">Все</option>
+                  <option value="paid">Оплаченные</option>
+                  <option value="unpaid">Неоплаченные</option>
+                </select>
+              </div>
+              <div className="shift-detail-page__filter-group">
+                <label className="shift-detail-page__filter-label">
+                  Способ оплаты:
+                </label>
+                <select
+                  className="shift-detail-page__filter-select"
+                  value={moneyFilters.payment_method}
+                  onChange={(e) =>
+                    setMoneyFilters({
+                      ...moneyFilters,
+                      payment_method: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">Все</option>
+                  <option value="cash">Наличные</option>
+                  <option value="transfer">Безнал</option>
                 </select>
               </div>
               <div className="shift-detail-page__filter-group">
@@ -757,10 +803,10 @@ const ShiftDetail = () => {
                 <input
                   type="text"
                   className="shift-detail-page__filter-input"
-                  placeholder="Поиск по контрагенту, кассиру..."
-                  value={moneyFilters.search}
+                  placeholder="Поиск по номеру чека"
+                  value={moneyFilters.q}
                   onChange={(e) =>
-                    setMoneyFilters({ ...moneyFilters, search: e.target.value })
+                    setMoneyFilters({ ...moneyFilters, q: e.target.value })
                   }
                 />
               </div>
@@ -788,7 +834,7 @@ const ShiftDetail = () => {
                     Движение денег не найдено
                   </div>
                 ) : (
-                  moneyMovements.map((movement) => (
+                  moneyMovements.map((movement, idx) => (
                     <div
                       key={movement.id}
                       className="shift-detail-page__operation"
@@ -797,7 +843,7 @@ const ShiftDetail = () => {
                       <div className="shift-detail-page__operation-content">
                         <div className="shift-detail-page__operation-title">
                           <FileText size={16} />
-                          Приход #{movement.id}
+                          Приход #{idx + 1}
                         </div>
                         <div className="shift-detail-page__operation-info">
                           Контрагент: {movement.counterparty}

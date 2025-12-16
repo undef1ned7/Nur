@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ThemeProvider, createTheme, CssBaseline, useMediaQuery, GlobalStyles } from "@mui/material";
+import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 
 const THEME_KEY = "mui-theme-mode";
 
@@ -10,12 +10,11 @@ export const ThemeModeContext = React.createContext({
 });
 
 export function ThemeModeProvider({ children }) {
-  const prefersDark = useMediaQuery("(prefers-color-scheme: dark)");
-
+  // По умолчанию всегда светлая тема, независимо от настроек системы
   const [mode, setMode] = React.useState(() => {
     const saved = localStorage.getItem(THEME_KEY);
     if (saved === "light" || saved === "dark") return saved;
-    return prefersDark ? "dark" : "light";
+    return "light";
   });
 
   React.useEffect(() => {

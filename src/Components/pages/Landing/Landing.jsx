@@ -11,7 +11,9 @@ const Landing = () => {
   useEffect(() => {
     const prev = document.body.style.overflow;
     if (menuOpen) document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [menuOpen]);
 
   return (
@@ -26,9 +28,21 @@ const Landing = () => {
 
             {/* Desktop-набор действий (на md- скрывается) */}
             <nav className="landing__actions" aria-label="Авторизация">
-              <Link to="/login" className="landing__btn landing__btn--secondary">Вход</Link>
-              <Link to="/submit-application" className="landing__btn landing__btn--primary">Оставить заявку</Link>
-              <div className="landing__lang"><Lang /></div>
+              <Link
+                to="/login"
+                className="landing__btn landing__btn--secondary"
+              >
+                Вход
+              </Link>
+              <Link
+                to="/submit-application"
+                className="landing__btn landing__btn--primary"
+              >
+                Оставить заявку
+              </Link>
+              <div className="landing__lang">
+                <Lang />
+              </div>
             </nav>
 
             {/* Бургер — ВСЕГДА справа */}
@@ -37,7 +51,7 @@ const Landing = () => {
               className={`landing__burger ${menuOpen ? "is-open" : ""}`}
               aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
               aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(s => !s)}
+              onClick={() => setMenuOpen((s) => !s)}
             >
               <span className="landing__burger-line" />
             </button>
@@ -46,10 +60,29 @@ const Landing = () => {
       </header>
 
       {/* ===== Off-canvas меню (mobile) ===== */}
-      <div className={`landing__offcanvas ${menuOpen ? "landing__offcanvas--open" : ""}`} aria-hidden={!menuOpen}>
-        <div className="landing__backdrop" onClick={() => setMenuOpen(false)} aria-hidden />
-        <aside className="landing__panel" role="dialog" aria-label="Меню" aria-modal="true">
-          <button type="button" className="landing__close" aria-label="Закрыть меню" onClick={() => setMenuOpen(false)}>
+      <div
+        className={`landing__offcanvas ${
+          menuOpen ? "landing__offcanvas--open" : ""
+        }`}
+        aria-hidden={!menuOpen}
+      >
+        <div
+          className="landing__backdrop"
+          onClick={() => setMenuOpen(false)}
+          aria-hidden
+        />
+        <aside
+          className="landing__panel"
+          role="dialog"
+          aria-label="Меню"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="landing__close"
+            aria-label="Закрыть меню"
+            onClick={() => setMenuOpen(false)}
+          >
             <span />
           </button>
 
@@ -81,13 +114,21 @@ const Landing = () => {
         <section className="landing__hero" aria-label="Введение">
           <div className="landing__container">
             <div className="landing__hero-inner">
-              <h1 className="landing__hero-title">Сила управления в&nbsp;ваших руках</h1>
+              <h1 className="landing__hero-title">
+                Сила управления в&nbsp;ваших руках
+              </h1>
               <p className="landing__hero-text">
-                Премиум-платформа для бизнеса: единый стек для кафе, строй-сферы, маркетов,
-                барбершопов/салонов красоты, школ и гостиниц — красиво, быстро, надёжно.
+                Премиум-платформа для бизнеса: единый стек для кафе,
+                строй-сферы, маркетов, барбершопов/салонов красоты, школ и
+                гостиниц — красиво, быстро, надёжно.
               </p>
               <div className="landing__hero-actions">
-                <Link to="/submit-application" className="landing__btn landing__btn--primary">Попробовать</Link>
+                <Link
+                  to="/submit-application"
+                  className="landing__btn landing__btn--primary"
+                >
+                  Попробовать
+                </Link>
               </div>
 
               <ul className="landing__trust">
@@ -103,21 +144,45 @@ const Landing = () => {
         </section>
 
         {/* ОТРАСЛИ */}
-        <section className="landing__section landing__section--industries" aria-label="Отрасли">
+        <section
+          className="landing__section landing__section--industries"
+          aria-label="Отрасли"
+        >
           <div className="landing__container">
             <h2 className="landing__title">Отрасли</h2>
 
-            <div className="landing__scroller" tabIndex="0" aria-label="Список отраслей">
+            <div
+              className="landing__scroller"
+              tabIndex="0"
+              aria-label="Список отраслей"
+            >
               {[
                 { t: "Кафе", d: "Столы, заказы, кухня/KDS, быстрые оплаты." },
-                { t: "Строй-сфера", d: "Сметы, заявки, объекты, материалы, акты." },
-                { t: "Маркет", d: "Товары, остатки, штрих-коды, касса, скидки." },
-                { t: "Барбершоп/Салон", d: "Записи, мастера, услуги, клиентская база." },
-                { t: "Школа", d: "Лиды, группы, расписания, счета, рассрочки." },
-                { t: "Гостиница", d: "Номера, брони, заселение/выезд, отчёты." }
+                {
+                  t: "Строй-сфера",
+                  d: "Сметы, заявки, объекты, материалы, акты.",
+                },
+                {
+                  t: "Маркет",
+                  d: "Товары, остатки, штрих-коды, касса, скидки.",
+                },
+                {
+                  t: "Барбершоп/Салон",
+                  d: "Записи, мастера, услуги, клиентская база.",
+                },
+                {
+                  t: "Школа",
+                  d: "Лиды, группы, расписания, счета, рассрочки.",
+                },
+                {
+                  t: "Гостиница",
+                  d: "Номера, брони, заселение/выезд, отчёты.",
+                },
               ].map((i, idx) => (
                 <article className="landing__card" key={idx}>
-                  <div className="landing__card-ico" aria-hidden><span className="landing__dot" /></div>
+                  <div className="landing__card-ico" aria-hidden>
+                    <span className="landing__dot" />
+                  </div>
                   <h3 className="landing__card-title">{i.t}</h3>
                   <p className="landing__card-text">{i.d}</p>
                 </article>
@@ -127,27 +192,36 @@ const Landing = () => {
         </section>
 
         {/* ТАРИФЫ */}
-        <section className="landing__section landing__section--pricing" aria-label="Тарифы">
+        <section
+          className="landing__section landing__section--pricing"
+          aria-label="Тарифы"
+        >
           <div className="landing__container">
             <h2 className="landing__title">Тарифы</h2>
 
             <div className="landing__plans">
               <article className="landing__plan">
                 <h3 className="landing__plan-name">Старт</h3>
-                <p className="landing__plan-desc">Минимум функций, максимум пользы</p>
+                <p className="landing__plan-desc">
+                  Минимум функций, максимум пользы
+                </p>
                 <div className="landing__price">500 сом</div>
               </article>
 
               <article className="landing__plan landing__plan--highlight">
                 <div className="landing__badge">Хит</div>
                 <h3 className="landing__plan-name">Стандарт</h3>
-                <p className="landing__plan-desc">Аналитика, отчёты, поддержка 24/7</p>
+                <p className="landing__plan-desc">
+                  Аналитика, отчёты, поддержка 24/7
+                </p>
                 <div className="landing__price">3000 сом / мес</div>
               </article>
 
               <article className="landing__plan">
                 <h3 className="landing__plan-name">Стандарт+</h3>
-                <p className="landing__plan-desc">Полная кастомизация и контроль</p>
+                <p className="landing__plan-desc">
+                  Полная кастомизация и контроль
+                </p>
                 <div className="landing__price">10000 сом / мес</div>
               </article>
             </div>
@@ -158,9 +232,16 @@ const Landing = () => {
         <section className="landing__cta" aria-label="Призыв к действию">
           <div className="landing__container">
             <div className="landing__cta-card">
-              <h3 className="landing__cta-title">Готовы управлять эффективнее?</h3>
-              <p className="landing__cta-text">Подключим вашу отрасль за 1 день и аккуратно перенесём данные.</p>
-              <Link to="/submit-application" className="landing__btn landing__btn--primary">
+              <h3 className="landing__cta-title">
+                Готовы управлять эффективнее?
+              </h3>
+              <p className="landing__cta-text">
+                Подключим вашу отрасль за 1 день и аккуратно перенесём данные.
+              </p>
+              <Link
+                to="/submit-application"
+                className="landing__btn landing__btn--primary"
+              >
                 Получить консультацию
               </Link>
             </div>
@@ -168,7 +249,10 @@ const Landing = () => {
         </section>
 
         {/* КОНТАКТЫ */}
-        <section className="landing__section landing__section--contact" aria-label="Контакты">
+        <section
+          className="landing__section landing__section--contact"
+          aria-label="Контакты"
+        >
           <div className="landing__container">
             <h2 className="landing__title">Связь с нами</h2>
             <p className="landing__text">
@@ -201,7 +285,9 @@ const Landing = () => {
       {/* FOOTER */}
       <footer className="landing__footer">
         <div className="landing__container">
-          <p className="landing__footer-text">© 2025 NUR CRM — Все права защищены.</p>
+          <p className="landing__footer-text">
+            © 2025 NUR CRM — Все права защищены.
+          </p>
         </div>
       </footer>
     </div>

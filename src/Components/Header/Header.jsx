@@ -118,7 +118,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   }, [userProfile]);
 
   // Показывать ли кнопку "Интерфейс кассира"
-  const showCashierButton = isMarketSector && canViewCashier;
+  const showCashierButton = canViewCashier;
 
   const fetchProfile = async () => {
     try {

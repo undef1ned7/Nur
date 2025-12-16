@@ -1,4 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
+import { applyPagination } from "../pagination";
 import {
   fetchProductsAsync,
   createProductAsync,
@@ -93,13 +94,8 @@ const productSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
-        // console.log(action.payload);
-
         state.loading = false;
-        state.list = action.payload.results;
-        state.count = action.payload.count;
-        state.next = action.payload.next;
-        state.previous = action.payload.previous;
+        applyPagination(state, action.payload, "list");
       })
       .addCase(fetchProductsAsync.rejected, (state, action) => {
         state.loading = false;

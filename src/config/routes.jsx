@@ -34,6 +34,8 @@ import Obzor from "../Components/Deposits/Obzor/Obzor";
 import Zakaz from "../Components/Deposits/Zakaz/Zakaz";
 import Raspisanie from "../Components/Deposits/Raspisanie/Raspisanie";
 import Sklad from "../Components/Deposits/Sklad/Sklad";
+import BarcodePrintPage from "../Components/Deposits/Sklad/BarcodePrintPage";
+import ScalesPage from "../Components/Deposits/Sklad/ScalesPage";
 import AddProductPage from "../Components/Deposits/Sklad/AddProductPage";
 import BrandCategoryPage from "../Components/Deposits/BrandCategoryPage/BrandCategoryPage";
 import WarehouseAccounting from "../Components/Deposits/Warehouse/WarehouseAccounting";
@@ -192,9 +194,12 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("obzor", Obzor),
   createProtectedRoute("zakaz", Zakaz),
   createProtectedRoute("employ", Masters),
-  createProtectedRoute("sklad", Sklad),
+  createProtectedRoute("sklad", MarketWarehouse),
+  createProtectedRoute("sklad/:id", MarketProductDetail),
   createProtectedRoute("sklad/add-product", AddProductPage),
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
+  createProtectedRoute("barcodes", BarcodePrintPage),
+  createProtectedRoute("scales", ScalesPage),
   createProtectedRoute("sell", Sell),
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),
@@ -250,8 +255,8 @@ export const crmRoutes = (profile) => [
 
   // Market routes
   createProtectedRoute("market/bar", MarketBar),
-  createProtectedRoute("market/warehouse", MarketWarehouse),
-  createProtectedRoute("market/warehouse/:id", MarketProductDetail),
+  createProtectedRoute("sklad", MarketWarehouse),
+  createProtectedRoute("sklad/:id", MarketProductDetail),
   createProtectedRoute("market/cashier", MarketCashierPage),
   createProtectedRoute("market/categories", MarketCategories),
   createProtectedRoute("clients", MarketClients),

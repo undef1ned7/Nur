@@ -1,45 +1,46 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
 import {
   ArrowLeft,
   Menu,
-  UserPlus,
+  Minus,
+  Plus,
   Search,
   Trash2,
-  Plus,
-  Minus,
-  X,
+  UserPlus,
 } from "lucide-react";
-import { useProducts } from "../../../../store/slices/productSlice";
-import { fetchProductsAsync } from "../../../../store/creators/productCreators";
-import { useClient } from "../../../../store/slices/ClientSlice";
+import React, { useCallback, useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import useScanDetection from "use-scan-detection";
+import { useDebounce } from "../../../../hooks/useDebounce";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
+import { fetchProductsAsync } from "../../../../store/creators/productCreators";
+import {
+  addCustomItem,
+  deleteProductInCart,
+  manualFilling,
+  sendBarCode,
+  startSale,
+  updateManualFilling,
+} from "../../../../store/creators/saleThunk";
+import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
+import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
+import { useClient } from "../../../../store/slices/ClientSlice";
+import { useProducts } from "../../../../store/slices/productSlice";
 import { useSale } from "../../../../store/slices/saleSlice";
 import { useShifts } from "../../../../store/slices/shiftSlice";
-import {
-  fetchShiftsAsync,
-  closeShiftAsync,
-} from "../../../../store/creators/shiftThunk";
-import {
-  startSale,
-  manualFilling,
-  updateManualFilling,
-  deleteProductInCart,
-  addCustomItem,
-} from "../../../../store/creators/saleThunk";
-import useBarcodeToCart from "../../../pages/Sell/useBarcodeToCart";
-import MenuModal from "./components/MenuModal";
-import CustomerModal from "./components/CustomerModal";
-import PaymentPage from "./PaymentPage";
-import ShiftPage from "./ShiftPage";
-import DebtPaymentModal from "./components/DebtPaymentModal";
-import ReceiptsModal from "./components/ReceiptsModal";
+import { useUser } from "../../../../store/slices/userSlice";
+import AlertModal from "../../../common/AlertModal/AlertModal";
 import CustomServiceModal from "../../../pages/Sell/components/CustomServiceModal";
 import DiscountModal from "../../../pages/Sell/components/DiscountModal";
-import AlertModal from "../../../common/AlertModal/AlertModal";
-import { useDebounce } from "../../../../hooks/useDebounce";
 import "./CashierPage.scss";
+import CloseShiftPage from "./CloseShiftPage";
+import CustomerModal from "./components/CustomerModal";
+import DebtPaymentModal from "./components/DebtPaymentModal";
+import MenuModal from "./components/MenuModal";
+import ReceiptsModal from "./components/ReceiptsModal";
+import OpenShiftPage from "./OpenShiftPage";
+import PaymentPage from "./PaymentPage";
+import ShiftPage from "./ShiftPage";
 
 const CashierPage = () => {
   const navigate = useNavigate();
@@ -48,6 +49,8 @@ const CashierPage = () => {
   const { list: clients } = useClient();
   const { start: currentSale, loading: saleLoading } = useSale();
   const { shifts } = useShifts();
+  const { list: cashBoxes } = useCash();
+  const { currentUser, userId } = useUser();
 
   // Получаем текущую открытую смену (мемоизируем, чтобы избежать лишних пересчетов)
   const openShift = React.useMemo(
@@ -60,14 +63,21 @@ const CashierPage = () => {
   const [cart, setCart] = useState([]);
   const cartOrderRef = React.useRef([]); // Сохраняем порядок элементов корзины
   const [cartQuantities, setCartQuantities] = useState({}); // Локальные значения количества для каждого товара
+  const lastSearchInputTime = React.useRef(0); // Время последнего ввода в поле поиска (для защиты от открытия страницы оплаты при сканировании)
+  const searchInputRef = React.useRef(null); // Ref для поля поиска
+  const lastScanTimeRef = React.useRef(0); // Время последнего сканирования (как в SellMainStart.jsx)
+  const isScanningRef = React.useRef(false); // Флаг, указывающий что идет или недавно было сканирование
+  const lastScannedBarcodeRef = React.useRef(""); // Последний отсканированный штрих-код
+  const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
+  const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showPaymentPage, setShowPaymentPage] = useState(false);
   const [showShiftPage, setShowShiftPage] = useState(false);
+  const [showOpenShiftPage, setShowOpenShiftPage] = useState(false);
+  const [showCloseShiftPage, setShowCloseShiftPage] = useState(false);
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [showReceiptsModal, setShowReceiptsModal] = useState(false);
-  const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
-  const [closingCash, setClosingCash] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -100,15 +110,16 @@ const CashierPage = () => {
 
   // Функция для обновления продажи после запросов
   const refreshSale = async () => {
-    if (currentSale?.id) {
+    // Не обновляем продажу, если нет открытой смены
+    if (currentSale?.id && openShiftId) {
       try {
         const currentDiscount = currentSale?.order_discount_total || 0;
         await dispatch(
           startSale({
             discount_total: currentDiscount,
-            shift: openShiftId || null,
+            shift: openShiftId,
           })
-        );
+        ).unwrap();
       } catch (error) {
         console.error("Ошибка при обновлении продажи:", error);
       }
@@ -117,11 +128,12 @@ const CashierPage = () => {
 
   // Debounced функция для обновления общей скидки
   const debouncedDiscount = useDebounce((discount) => {
-    if (!currentSale?.id) return;
+    // Не обновляем скидку, если нет открытой смены или продажи
+    if (!currentSale?.id || !openShiftId) return;
     dispatch(
       startSale({
         discount_total: parseFloat(discount) || 0,
-        shift: openShiftId || null,
+        shift: openShiftId,
       })
     );
   }, 600);
@@ -175,20 +187,126 @@ const CashierPage = () => {
   };
 
   // Автодобавление товара по сканеру штрих-кода
-  const { error: barcodeScanError } = useBarcodeToCart(currentSale?.id, {
-    onError: (msg) => {
-      showAlert(
-        "error",
-        "Ошибка сканирования",
-        msg || "Товар с таким штрих-кодом не найден"
-      );
+  // Отслеживаем сканирование напрямую для автоматического создания продажи
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const barcodeProcessingRef = React.useRef(false);
+
+  useScanDetection({
+    minLength: 3,
+    onComplete: async (barcode) => {
+      if (!barcode || barcode.length < 3) return;
+      if (barcodeProcessingRef.current) return;
+
+      // Запоминаем время сканирования и устанавливаем флаги
+      const scanTime = Date.now();
+      lastScanTimeRef.current = scanTime;
+      isScanningRef.current = true;
+      lastScannedBarcodeRef.current = barcode;
+      setScannedBarcode(barcode);
+
+      // Проверяем наличие открытой смены
+      if (!openShiftId) {
+        showAlert(
+          "warning",
+          "Нет открытой смены",
+          "Для работы с кассой необходимо начать смену"
+        );
+        isScanningRef.current = false;
+        return;
+      }
+
+      barcodeProcessingRef.current = true;
+
+      try {
+        let saleId = currentSale?.id;
+
+        // Если нет продажи, создаем её
+        if (!saleId) {
+          const result = await dispatch(
+            startSale({
+              discount_total: 0,
+              shift: openShiftId,
+            })
+          ).unwrap();
+          saleId = result?.id;
+        }
+
+        if (!saleId) {
+          showAlert("error", "Ошибка", "Не удалось создать продажу");
+          barcodeProcessingRef.current = false;
+          return;
+        }
+
+        // Проверяем наличие товара ПЕРЕД добавлением в корзину
+        // Ищем товар в списке продуктов по штрих-коду
+        const scannedProduct = products.find(
+          (p) => p.barcode === barcode || p.barcode?.toString() === barcode
+        );
+
+        if (scannedProduct) {
+          const availableQuantity = parseFloat(scannedProduct.quantity || 0);
+          const isInStock = availableQuantity > 0;
+
+          if (!isInStock) {
+            showAlert(
+              "warning",
+              "Товар отсутствует",
+              "Товар отсутствует в наличии"
+            );
+            barcodeProcessingRef.current = false;
+            setScannedBarcode("");
+            return;
+          }
+        }
+
+        // Добавляем товар по штрих-коду
+        const res = await dispatch(
+          sendBarCode({ barcode, id: saleId })
+        ).unwrap();
+
+        if (res?.error) {
+          const msg =
+            typeof res.error === "string"
+              ? res.error
+              : "Товар с таким штрих-кодом не найден";
+          showAlert("error", "Ошибка сканирования", msg);
+        } else {
+          // Обновляем продажу после добавления товара
+          await dispatch(
+            startSale({ discount_total: 0, shift: openShiftId })
+          ).unwrap();
+          // Обновляем время последнего сканирования после успешного добавления
+          // Это защитит от открытия страницы оплаты при Enter от сканера
+          lastScanTimeRef.current = Date.now();
+          // Убеждаемся, что флаг сканирования установлен
+          isScanningRef.current = true;
+        }
+      } catch (error) {
+        console.error("Ошибка при сканировании:", error);
+        showAlert(
+          "error",
+          "Ошибка сканирования",
+          error?.message || "Не удалось добавить товар по штрих-коду"
+        );
+      } finally {
+        barcodeProcessingRef.current = false;
+        setScannedBarcode("");
+        // Обновляем время последнего сканирования в любом случае
+        // для защиты от открытия страницы оплаты
+        lastScanTimeRef.current = Date.now();
+        // Помечаем, что поле поиска было очищено после сканирования
+        searchClearedAfterScanRef.current = true;
+        // Убеждаемся, что флаг сканирования установлен (на случай, если он был сброшен)
+        isScanningRef.current = true;
+
+        // Сбрасываем флаг сканирования с задержкой, чтобы Enter от сканера успел обработаться
+        // Задержка 3 секунды гарантирует, что Enter от сканера будет обработан даже при медленном соединении
+        setTimeout(() => {
+          isScanningRef.current = false;
+          searchClearedAfterScanRef.current = false;
+        }, 3000);
+      }
     },
-    onAdded: () => {
-      // Товар успешно добавлен, корзина обновится автоматически через useEffect
-      // Можно добавить визуальную индикацию успешного добавления
-    },
-    discount_total: 0,
-    shift: openShiftId || null,
   });
 
   // Инициализация данных при первой загрузке
@@ -196,19 +314,17 @@ const CashierPage = () => {
     dispatch(fetchProductsAsync({ page: 1 }));
     dispatch(fetchClientsAsync());
     dispatch(fetchShiftsAsync());
+    dispatch(getCashBoxes());
   }, [dispatch]);
 
-  // Начинаем новую продажу, если её еще нет
+  // Закрываем экран открытия смены, если смена открыта или пользователь на странице смены
   useEffect(() => {
-    if (!currentSale && openShiftId !== undefined) {
-      dispatch(
-        startSale({
-          discount_total: 0,
-          shift: openShiftId || null,
-        })
-      );
+    if (showShiftPage || openShift) {
+      setShowOpenShiftPage(false);
     }
-  }, [dispatch, currentSale, openShiftId]);
+  }, [shifts, openShift, showShiftPage]);
+
+  // Продажа создается только при добавлении товара в корзину, а не автоматически при загрузке страницы
 
   // Синхронизируем локальную корзину с данными из API, сохраняя порядок
   useEffect(() => {
@@ -292,6 +408,194 @@ const CashierPage = () => {
     product.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Объявляем handleCheckout до его использования в useEffect
+  const handleCheckout = useCallback(() => {
+    if (cart.length === 0 || !currentSale?.id) return;
+    setShowPaymentPage(true);
+  }, [cart.length, currentSale?.id]);
+
+  // Обновляем время последнего ввода в поле поиска при каждом изменении (для защиты от открытия страницы оплаты при сканировании)
+  // Это делается в onChange поля поиска, но оставляем useEffect как дополнительную защиту
+  useEffect(() => {
+    if (searchTerm) {
+      lastSearchInputTime.current = Date.now();
+    }
+  }, [searchTerm]);
+
+  // Глобальный обработчик Enter для открытия страницы оплаты (с защитой от сканера)
+  useEffect(() => {
+    const handleGlobalEnter = (e) => {
+      const now = Date.now();
+
+      // Детекция сканера по скорости набора символов
+      // Если много символов подряд очень быстро - это похоже на сканер
+      const isChar = e.key.length === 1 && /^[0-9A-Za-z]$/.test(e.key);
+
+      if (isChar) {
+        const dt = now - scanKeysRef.current.lastTime;
+        scanKeysRef.current.count = dt < 50 ? scanKeysRef.current.count + 1 : 1;
+        scanKeysRef.current.lastTime = now;
+
+        if (scanKeysRef.current.count >= 6) {
+          isScanningRef.current = true;
+          lastScanTimeRef.current = now;
+        }
+      }
+
+      // Enter сразу после быстрой последовательности — это почти наверняка Enter сканера
+      if (e.key === "Enter" && scanKeysRef.current.count >= 6) {
+        lastScanTimeRef.current = now;
+        isScanningRef.current = true;
+        scanKeysRef.current.count = 0;
+
+        setTimeout(() => {
+          isScanningRef.current = false;
+        }, 3000);
+
+        return; // НЕ открываем оплату
+      }
+
+      // Пропускаем, если нажатие было в поле ввода или textarea
+      const target = e.target;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        // Если это поле поиска, не обрабатываем здесь (обрабатывается в onKeyDown)
+        if (target.className?.includes("cashier-page__search-input")) {
+          return;
+        }
+        // Если это поле количества, не обрабатываем здесь
+        if (
+          target.className?.includes("cashier-page__cart-item-quantity-input")
+        ) {
+          return;
+        }
+        return;
+      }
+
+      // Пропускаем, если открыты модальные окна или экраны
+      if (
+        showMenuModal ||
+        showCustomerModal ||
+        showPaymentPage ||
+        showShiftPage ||
+        showOpenShiftPage ||
+        showCloseShiftPage ||
+        showDebtModal ||
+        showReceiptsModal ||
+        showCustomServiceModal ||
+        showDiscountModal
+      ) {
+        return;
+      }
+
+      // НОВАЯ НАДЕЖНАЯ ЛОГИКА: НЕ открываем страницу, если было недавнее сканирование
+      const timeSinceLastScan = Date.now() - lastScanTimeRef.current;
+      const timeSinceLastInput = Date.now() - lastSearchInputTime.current;
+
+      // Проверяем, что фокус находится в поле поиска
+      const isSearchInputFocused =
+        document.activeElement === searchInputRef.current ||
+        document.activeElement?.className?.includes(
+          "cashier-page__search-input"
+        );
+
+      // ПРИОРИТЕТ 1: Если идет обработка сканирования, НЕ открываем страницу
+      if (barcodeProcessingRef.current) {
+        return;
+      }
+
+      // ПРИОРИТЕТ 2: Если флаг сканирования установлен, НЕ открываем страницу
+      // Это работает даже если обработка уже завершена, но Enter от сканера еще не обработан
+      if (isScanningRef.current) {
+        // Обновляем время при каждом Enter во время сканирования
+        if (e.key === "Enter") {
+          lastScanTimeRef.current = Date.now();
+        }
+        return;
+      }
+
+      // ПРИОРИТЕТ 3: Если было недавнее сканирование (в течение 5000мс), НЕ открываем страницу
+      if (timeSinceLastScan < 5000) {
+        // Если Enter приходит очень быстро после последнего сканирования (в течение 500мс),
+        // это точно Enter от сканера - обновляем время и не открываем страницу
+        if (e.key === "Enter" && timeSinceLastScan < 500) {
+          lastScanTimeRef.current = Date.now();
+          isScanningRef.current = true; // Устанавливаем флаг на случай повторного Enter
+          // Сбрасываем флаг через 3 секунды
+          setTimeout(() => {
+            isScanningRef.current = false;
+          }, 3000);
+          return;
+        }
+
+        // Если поле поиска было очищено после сканирования, это точно сканер
+        if (searchClearedAfterScanRef.current && e.key === "Enter") {
+          lastScanTimeRef.current = Date.now();
+          isScanningRef.current = true;
+          setTimeout(() => {
+            isScanningRef.current = false;
+            searchClearedAfterScanRef.current = false;
+          }, 3000);
+          return;
+        }
+
+        // Обновляем время последнего сканирования при каждом Enter после сканирования
+        // И устанавливаем флаг, чтобы защитить от открытия страницы при повторных Enter
+        if (e.key === "Enter") {
+          lastScanTimeRef.current = Date.now();
+          isScanningRef.current = true;
+          // Сбрасываем флаг через 3 секунды
+          setTimeout(() => {
+            isScanningRef.current = false;
+          }, 3000);
+        }
+        return; // Не открываем страницу оплаты, если недавно было сканирование
+      }
+
+      // ПРИОРИТЕТ 4: Если был недавний ввод в поле поиска (не сканирование), не открываем страницу
+      if (isSearchInputFocused && timeSinceLastInput < 1000) {
+        // Сбрасываем счетчик, так как это не сканер
+        if (e.key === "Enter") {
+          scanKeysRef.current.count = 0;
+        }
+        return; // Не открываем страницу оплаты, если недавно был ручной ввод в поле поиска
+      }
+
+      // Если корзина не пуста, открываем страницу оплаты
+      if (cart.length > 0 && currentSale?.id && e.key === "Enter") {
+        // Сбрасываем счетчик, так как это обычный Enter (не от сканера)
+        scanKeysRef.current.count = 0;
+        e.preventDefault();
+        handleCheckout();
+      } else if (e.key === "Enter") {
+        // Сбрасываем счетчик для любого другого Enter, который не открывает оплату
+        scanKeysRef.current.count = 0;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalEnter);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalEnter);
+    };
+  }, [
+    cart.length,
+    currentSale?.id,
+    handleCheckout,
+    showMenuModal,
+    showCustomerModal,
+    showPaymentPage,
+    showShiftPage,
+    showOpenShiftPage,
+    showCloseShiftPage,
+    showDebtModal,
+    showReceiptsModal,
+    showCustomServiceModal,
+    showDiscountModal,
+  ]);
+
   const addToCart = async (product) => {
     // Проверяем наличие товара
     // Для весовых товаров stock может быть false, но quantity > 0
@@ -304,12 +608,22 @@ const CashierPage = () => {
     }
 
     try {
+      // Проверяем наличие открытой смены перед добавлением товара
+      if (!openShiftId) {
+        showAlert(
+          "warning",
+          "Нет открытой смены",
+          "Для работы с кассой необходимо начать смену"
+        );
+        return;
+      }
+
       let saleId = currentSale?.id;
 
       // Если продажа еще не создана, создаем её
       if (!saleId) {
         const result = await dispatch(
-          startSale({ discount_total: 0, shift: openShiftId || null })
+          startSale({ discount_total: 0, shift: openShiftId })
         );
         if (result.type === "sale/start/rejected") {
           showAlert(
@@ -561,11 +875,6 @@ const CashierPage = () => {
     parseFloat(currentSale?.total || 0) ||
     cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
 
-  const handleCheckout = () => {
-    if (cart.length === 0 || !currentSale?.id) return;
-    setShowPaymentPage(true);
-  };
-
   const handleMenuAction = (action) => {
     setShowMenuModal(false);
     if (action === "shifts") {
@@ -579,52 +888,48 @@ const CashierPage = () => {
 
   const handleCloseShift = () => {
     if (!openShift?.id) return;
-    // Показываем модальное окно для ввода суммы
-    setClosingCash("");
-    setShowCloseShiftModal(true);
+    // Показываем экран закрытия смены
+    setShowCloseShiftPage(true);
   };
 
-  const confirmCloseShift = async () => {
-    if (!openShift?.id) return;
-
-    // Валидация суммы
-    const cashAmount = parseFloat(closingCash);
-    if (isNaN(cashAmount) || cashAmount < 0) {
-      showAlert("error", "Ошибка", "Пожалуйста, введите корректную сумму");
-      return;
-    }
-
-    setShowCloseShiftModal(false);
-
-    try {
-      await dispatch(
-        closeShiftAsync({
-          shiftId: openShift.id,
-          closingCash: cashAmount,
-        })
-      ).unwrap();
-      showAlert("success", "Успех", "Смена успешно закрыта");
-      // Обновляем список смен
-      dispatch(fetchShiftsAsync());
-      // Обновляем продажу после закрытия смены
-      await refreshSale();
-      // Очищаем корзину и текущую продажу
-      setCart([]);
-      setSelectedCustomer(null);
-    } catch (error) {
-      showAlert(
-        "error",
-        "Ошибка",
-        error?.data?.detail ||
-          error?.data?.closing_cash?.[0] ||
-          error?.message ||
-          "Не удалось закрыть смену"
-      );
-    }
+  // Функция для открытия смены
+  const handleStartShift = () => {
+    // Показываем экран открытия смены
+    setShowOpenShiftPage(true);
   };
 
   if (showShiftPage) {
     return <ShiftPage onBack={() => setShowShiftPage(false)} />;
+  }
+
+  if (showOpenShiftPage) {
+    return (
+      <OpenShiftPage
+        onBack={() => {
+          setShowOpenShiftPage(false);
+          // Обновляем список смен после возврата
+          dispatch(fetchShiftsAsync());
+        }}
+      />
+    );
+  }
+
+  if (showCloseShiftPage) {
+    return (
+      <CloseShiftPage
+        onBack={() => {
+          setShowCloseShiftPage(false);
+          // Обновляем список смен после возврата
+          dispatch(fetchShiftsAsync());
+          // Обновляем продажу после закрытия смены
+          refreshSale();
+          // Очищаем корзину и текущую продажу
+          setCart([]);
+          setSelectedCustomer(null);
+        }}
+        shift={openShift}
+      />
+    );
   }
 
   if (showPaymentPage) {
@@ -642,12 +947,14 @@ const CashierPage = () => {
           setCart([]);
           cartOrderRef.current = []; // Очищаем порядок при завершении продажи
           setSelectedCustomer(null);
-          // Начинаем новую продажу после завершения
-          await dispatch(
-            startSale({ discount_total: 0, shift: openShiftId || null })
-          );
-          // Обновляем продажу после создания новой
-          await refreshSale();
+          // Начинаем новую продажу после завершения (только если есть открытая смена)
+          if (openShiftId) {
+            await dispatch(
+              startSale({ discount_total: 0, shift: openShiftId })
+            );
+            // Обновляем продажу после создания новой
+            await refreshSale();
+          }
         }}
         saleId={currentSale?.id}
         customers={clients}
@@ -671,8 +978,19 @@ const CashierPage = () => {
             <p className="cashier-page__subtitle">
               {openShiftId ? (
                 <>
-                  Смена #{openShift.id?.slice(0, 8) || "—"} •{" "}
-                  {openShift.cashier_display || "—"}
+                  Смена #
+                  {openShift?.code ||
+                    (() => {
+                      const idStr = openShiftId.toString();
+                      // Извлекаем только цифры из ID
+                      const digitsOnly = idStr.replace(/\D/g, "");
+                      // Если есть достаточно цифр (минимум 4), используем последние 8, иначе используем последние 8 символов без дефисов
+                      return digitsOnly.length >= 4
+                        ? digitsOnly.slice(-8)
+                        : idStr.replace(/-/g, "").slice(-8).toUpperCase();
+                    })() ||
+                    "—"}{" "}
+                  • {openShift.cashier_display || "—"}
                 </>
               ) : (
                 "Нет открытой смены"
@@ -681,12 +999,20 @@ const CashierPage = () => {
           </div>
         </div>
         <div className="cashier-page__header-right">
-          {openShiftId && openShift?.status === "open" && (
+          {openShiftId && openShift?.status === "open" ? (
             <button
               className="cashier-page__close-shift-btn"
               onClick={handleCloseShift}
             >
               Завершить смену
+            </button>
+          ) : (
+            <button
+              className="cashier-page__close-shift-btn"
+              onClick={handleStartShift}
+              style={{ backgroundColor: "#22c55e" }}
+            >
+              Начать смену
             </button>
           )}
           <button
@@ -703,16 +1029,49 @@ const CashierPage = () => {
           <div className="cashier-page__search">
             <Search size={20} />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Поиск товаров..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                // Обновляем время последнего ввода при каждом изменении (для защиты от сканера)
+                lastSearchInputTime.current = Date.now();
+                // Если пользователь вводит текст вручную, сбрасываем флаг очистки после сканирования
+                if (e.target.value.length > 0) {
+                  searchClearedAfterScanRef.current = false;
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
+
+                  // Если в поле поиска есть текст и нажат Enter, это может быть сканирование
+                  // Обновляем время сканирования как fallback (на случай, если onScanned еще не сработал)
+                  if (searchTerm.length > 0) {
+                    const timeSinceLastInput =
+                      Date.now() - lastSearchInputTime.current;
+                    // Если ввод был недавно (менее 500мс), считаем это сканированием
+                    if (timeSinceLastInput < 500) {
+                      lastScanTimeRef.current = Date.now();
+                      isScanningRef.current = true;
+                      // Сбрасываем флаг через 2 секунды
+                      setTimeout(() => {
+                        isScanningRef.current = false;
+                      }, 2000);
+                    }
+                  }
+
+                  // Обновляем время последнего ввода (сканер завершает ввод Enter'ом)
+                  lastSearchInputTime.current = Date.now();
+
                   // Если есть найденные товары, добавляем первый в корзину
                   if (filteredProducts.length > 0) {
                     addToCart(filteredProducts[0]);
+                    // Очищаем поле поиска после добавления товара
+                    setSearchTerm("");
+                    // Сбрасываем флаг очистки после сканирования, так как это ручное добавление
+                    searchClearedAfterScanRef.current = false;
                   }
                 }
               }}
@@ -965,7 +1324,6 @@ const CashierPage = () => {
               <button
                 className="cashier-page__checkout-btn"
                 onClick={handleCheckout}
-                autoFocus
               >
                 ОФОРМИТЬ{" "}
                 <span style={{ fontSize: "12px", opacity: 0.7 }}>[ENTER]</span>
@@ -1033,73 +1391,6 @@ const CashierPage = () => {
             setDiscountValue("");
           }}
         />
-      )}
-
-      {/* Модальное окно для ввода суммы закрытия смены */}
-      {showCloseShiftModal && (
-        <div
-          className="cashier-page__close-modal-overlay"
-          onClick={() => setShowCloseShiftModal(false)}
-        >
-          <div
-            className="cashier-page__close-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="cashier-page__close-modal-header">
-              <h2 className="cashier-page__close-modal-title">
-                Завершить смену
-              </h2>
-              <button
-                className="cashier-page__close-modal-close"
-                onClick={() => setShowCloseShiftModal(false)}
-              >
-                <X size={24} />
-              </button>
-            </div>
-            <div className="cashier-page__close-modal-content">
-              <div className="cashier-page__close-modal-info">
-                <div className="cashier-page__close-modal-info-item">
-                  <span>Ожидаемая сумма:</span>
-                  <span>
-                    {openShift?.expected_cash
-                      ? parseFloat(openShift.expected_cash).toFixed(2)
-                      : "0.00"}{" "}
-                    сом
-                  </span>
-                </div>
-              </div>
-              <div className="cashier-page__close-modal-input-wrapper">
-                <label className="cashier-page__close-modal-label">
-                  Фактическая сумма на кассе (сом)
-                </label>
-                <input
-                  type="number"
-                  className="cashier-page__close-modal-input"
-                  value={closingCash}
-                  onChange={(e) => setClosingCash(e.target.value)}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="cashier-page__close-modal-actions">
-              <button
-                className="cashier-page__close-modal-cancel"
-                onClick={() => setShowCloseShiftModal(false)}
-              >
-                Отмена
-              </button>
-              <button
-                className="cashier-page__close-modal-confirm"
-                onClick={confirmCloseShift}
-              >
-                Завершить смену
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       <AlertModal

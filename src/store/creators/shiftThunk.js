@@ -87,3 +87,29 @@ export const closeShiftAsync = createAsyncThunk(
     }
   }
 );
+
+/**
+ * Получить продажи смены
+ * GET /construction/cash/shifts/<id>/sales/
+ * Query params:
+ *   - status: paid, unpaid и т.д.
+ *   - payment_method: cash, transfer и т.д.
+ *   - date_from: YYYY-MM-DD
+ *   - date_to: YYYY-MM-DD
+ *   - ordering: -total (убывание по сумме), total (возрастание)
+ *   - q: поиск по номеру чека
+ */
+export const fetchShiftSalesAsync = createAsyncThunk(
+  "shifts/fetchSales",
+  async ({ shiftId, params = {} }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(
+        `/construction/cash/shifts/${shiftId}/sales/`,
+        { params }
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(plainAxiosError(error));
+    }
+  }
+);
