@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import React, { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { Bell, Menu } from "lucide-react";
+import { Bell, Menu, ShoppingCart } from "lucide-react";
+import { useUser } from "../../store/slices/userSlice";
 import NotificationModal from "../NotificationModal/NotificationModal";
 import "./Header.scss";
 
@@ -85,13 +86,39 @@ const pageTitles = {
 
 const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const title = pageTitles[location.pathname] || "NurCRM";
 
   const { list: notifications } = useSelector((state) => state.notification);
   const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
+  const { company, profile: userProfile } = useUser();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [profile, setProfile] = useState(null);
+
+  // Проверяем, является ли сектор маркетом
+  const isMarketSector = useMemo(() => {
+    if (!company?.sector?.name) return false;
+    const sectorName = company.sector.name.toLowerCase().trim();
+    return (
+      sectorName === "магазин" ||
+      sectorName === "цветочный магазин" ||
+      sectorName.includes("магазин")
+    );
+  }, [company?.sector?.name]);
+
+  // Проверяем разрешение на просмотр кассы (can_view_cashbox)
+  const canViewCashier = useMemo(() => {
+    if (!userProfile) return false;
+    // Проверяем различные варианты разрешений для кассы
+    return (
+      userProfile.can_view_cashbox === true ||
+      userProfile.can_view_cashier === true
+    );
+  }, [userProfile]);
+
+  // Показывать ли кнопку "Интерфейс кассира"
+  const showCashierButton = canViewCashier;
 
   const fetchProfile = async () => {
     try {
@@ -134,6 +161,16 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         <h2 className="header__title">{title}</h2>
       </div>
       <div className="header__right">
+        {showCashierButton && (
+          <button
+            className="header__cashier-btn"
+            onClick={() => navigate("/crm/market/cashier")}
+            title="Интерфейс кассира"
+          >
+            <ShoppingCart size={20} />
+            <span>Интерфейс кассира</span>
+          </button>
+        )}
         <div
           className="header__notification"
           onClick={() => setShowNotifications(true)}

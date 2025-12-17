@@ -8,6 +8,7 @@ import {
 import {
   getCashFlows,
   updateCashFlows,
+  bulkUpdateCashFlowsStatus,
   useCash,
 } from "../../../store/slices/cashSlice";
 import "./Pending.scss";
@@ -130,16 +131,11 @@ const Pending = () => {
     if (!ids.length) return;
     setProcessing(true);
     try {
-      await Promise.all(
-        ids.map((id) =>
-          dispatch(
-            updateCashFlows({
-              productId: id,
-              updatedData: { status: statusValue },
-            })
-          ).unwrap()
-        )
-      );
+      const items = ids.map((id) => ({
+        id,
+        status: statusValue,
+      }));
+      await dispatch(bulkUpdateCashFlowsStatus(items)).unwrap();
       await refresh();
       // очищаем выбранные
       setSelected(new Set());
@@ -161,17 +157,12 @@ const Pending = () => {
         selectedIds.includes(item.id)
       );
 
-      // Обновляем статус всех выбранных элементов
-      await Promise.all(
-        selectedIds.map((id) =>
-          dispatch(
-            updateCashFlows({
-              productId: id,
-              updatedData: { status: "rejected" },
-            })
-          ).unwrap()
-        )
-      );
+      // Обновляем статус всех выбранных элементов через bulk API
+      const items = selectedIds.map((id) => ({
+        id,
+        status: "rejected",
+      }));
+      await dispatch(bulkUpdateCashFlowsStatus(items)).unwrap();
 
       // Применяем логику удаления связанных записей для каждого элемента
       for (const item of selectedItems) {

@@ -20,7 +20,7 @@ export const HIDE_RULES = [
         "Клиенты",
         "Отделы",
         "Аналитика Отделов",
-        "Филиалы"
+        "Филиалы",
       ],
     },
   },
@@ -114,10 +114,10 @@ export const HIDE_RULES = [
       toIncludes: [
         "/crm/obzor",
         "/crm/zakaz",
-        "/crm/market/analytics",
         "/crm/market/bar",
         "/crm/market/history",
         "/crm/raspisanie",
+        "/crm/analytics",
       ],
     },
   },
@@ -190,7 +190,14 @@ export const HIDE_RULES = [
   {
     when: { sector: "Логистика" },
     hide: {
-      toIncludes: ["/crm/debts", "/crm/obzor", "/crm/zakaz", "/crm/sell", "/crm/sklad", "/crm/brand-category"],
+      toIncludes: [
+        "/crm/debts",
+        "/crm/obzor",
+        "/crm/zakaz",
+        "/crm/sell",
+        "/crm/sklad",
+        "/crm/brand-category",
+      ],
     },
   },
 ];

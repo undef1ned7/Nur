@@ -20,7 +20,6 @@ import MarriageModal from "./MarriageModal";
 import AlertModal from "../../common/AlertModal/AlertModal";
 import SkladTab from "./components/SkladTab";
 import HistoryTab from "./components/HistoryTab";
-import BarcodePrintTab from "./components/BarcodePrintTab";
 import SkladHeader from "./components/SkladHeader";
 import SkladSearchSection from "./components/SkladSearchSection";
 
@@ -513,17 +512,6 @@ export default function Sklad() {
           onBulkDelete={handleBulkDelete}
           onClearSelection={clearSelection}
           bulkDeleting={bulkDeleting}
-        />
-      ),
-    },
-    {
-      label: "Печать штрих-кодов",
-      content: (
-        <BarcodePrintTab
-          products={products}
-          loading={loading}
-          searchTerm={searchTerm}
-          onSearchChange={handleSearchChangeWithReset}
         />
       ),
     },

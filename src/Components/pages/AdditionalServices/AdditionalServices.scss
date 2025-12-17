@@ -91,7 +91,8 @@
   &__social-icon {
     font-size: 3rem;
     margin-bottom: 15px;
-    display: block;
+    display: flex;
+    justify-content: center;
     text-align: center;
   }
 

@@ -282,13 +282,6 @@ export const MENU_CONFIG = {
     // Магазин
     market: [
       {
-        label: "Бар",
-        to: "/crm/market/bar",
-        icon: menuIcons.listAlt,
-        permission: "can_view_products",
-        implemented: true,
-      },
-      {
         label: "История",
         to: "/crm/market/history",
         icon: menuIcons.clipboard,
@@ -300,6 +293,13 @@ export const MENU_CONFIG = {
         to: "/crm/market/analytics",
         icon: menuIcons.chartBar,
         permission: "can_view_analytics",
+        implemented: true,
+      },
+      {
+        label: "Смены",
+        to: "/crm/shifts",
+        icon: menuIcons.calendar,
+        permission: "can_view_shifts",
         implemented: true,
       },
     ],
@@ -624,6 +624,20 @@ export const MENU_CONFIG = {
       to: "/crm/documents",
       icon: menuIcons.documentScanner,
       permission: "can_view_documents",
+      implemented: true,
+    },
+    {
+      label: "Печать штрих-кодов",
+      to: "/crm/barcodes",
+      icon: menuIcons.documentScanner,
+      permission: "can_view_barcode_print",
+      implemented: true,
+    },
+    {
+      label: "Интеграция с весами",
+      to: "/crm/scales",
+      icon: menuIcons.scale,
+      permission: "can_view_scales",
       implemented: true,
     },
   ],

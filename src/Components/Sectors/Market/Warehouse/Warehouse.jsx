@@ -1,13 +1,23 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, Plus, LayoutGrid, Table2 } from "lucide-react";
+import {
+  Search,
+  Filter,
+  Plus,
+  LayoutGrid,
+  Table2,
+  Trash2,
+  X,
+} from "lucide-react";
 import "./Warehouse.scss";
 import FilterModal from "./components/FilterModal";
+import AlertModal from "../../../common/AlertModal/AlertModal";
 import {
   fetchProductsAsync,
   fetchBrandsAsync,
   fetchCategoriesAsync,
+  bulkDeleteProductsAsync,
 } from "../../../../store/creators/productCreators";
 import { useProducts } from "../../../../store/slices/productSlice";
 
@@ -28,14 +38,20 @@ const Warehouse = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { list: products, loading, count } = useProducts();
+  const { list: products, loading, count, next, previous } = useProducts();
   const brands = useSelector((state) => state.product.brands || []);
   const categories = useSelector((state) => state.product.categories || []);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
   const [selectedRows, setSelectedRows] = useState(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(0);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const debounceTimerRef = useRef(null);
 
   // view toggle
   const [viewMode, setViewMode] = useState(getInitialViewMode); // "table" | "cards"
@@ -51,20 +67,73 @@ const Warehouse = () => {
     dispatch(fetchCategoriesAsync());
   }, [dispatch]);
 
-  // load products
+  // Debounce для поиска
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Загрузка товаров
   useEffect(() => {
     const params = {
-      page: 1,
-      ...(searchTerm && { search: searchTerm }),
+      page: currentPage,
       ...filters,
     };
+
+    // Используем параметр search для всех запросов (включая штрих-коды)
+    // API должен обрабатывать поиск по штрих-коду через параметр search
+    if (debouncedSearchTerm) {
+      params.search = debouncedSearchTerm.trim();
+    }
+
     dispatch(fetchProductsAsync(params));
-  }, [dispatch, searchTerm, filters]);
+  }, [dispatch, debouncedSearchTerm, filters, currentPage]);
+
+  // Обновляем pageSize при каждой загрузке списка
+  useEffect(() => {
+    if (products && products.length) {
+      setPageSize(products.length);
+    }
+  }, [products]);
+
+  // При смене фильтров / поиска возвращаемся на первую страницу
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, filters]);
 
   const filteredProducts = products;
 
+  const totalPages =
+    pageSize && count
+      ? Math.ceil(count / pageSize)
+      : count && products.length
+      ? Math.ceil(count / products.length)
+      : 1;
+
+  const getRowNumber = (index) => {
+    const effectivePageSize = pageSize || products.length || 1;
+    return (currentPage - 1) * effectivePageSize + index + 1;
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    setSelectedRows(new Set());
+    setCurrentPage(newPage);
+  };
+
   const handleProductClick = (product) => {
-    navigate(`/crm/market/warehouse/${product.id}`);
+    navigate(`/crm/sklad/${product.id}`);
   };
 
   const handleRowSelect = (productId, e) => {
@@ -84,6 +153,45 @@ const Warehouse = () => {
     } else {
       setSelectedRows(new Set(filteredProducts.map((p) => p.id)));
     }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedRows.size === 0) return;
+    setShowDeleteConfirmModal(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    setShowDeleteConfirmModal(false);
+    setBulkDeleting(true);
+    try {
+      await dispatch(
+        bulkDeleteProductsAsync({
+          ids: Array.from(selectedRows),
+          soft: true,
+          require_all: false,
+        })
+      ).unwrap();
+
+      setSelectedRows(new Set());
+
+      // Обновляем список товаров
+      const params = {
+        page: currentPage,
+        ...filters,
+      };
+      if (debouncedSearchTerm) {
+        params.search = debouncedSearchTerm.trim();
+      }
+      dispatch(fetchProductsAsync(params));
+    } catch (e) {
+      alert("Не удалось удалить товары: " + (e.message || e));
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRows(new Set());
   };
 
   const handleApplyFilters = (newFilters) => {
@@ -191,6 +299,48 @@ const Warehouse = () => {
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedRows.size > 0 && (
+        <div className="warehouse-bulk-actions">
+          <div className="warehouse-bulk-actions__content">
+            <div className="warehouse-bulk-actions__info">
+              <div className="warehouse-bulk-actions__badge">
+                <span className="warehouse-bulk-actions__count">
+                  {selectedRows.size}
+                </span>
+                <span className="warehouse-bulk-actions__text">
+                  {selectedRows.size === 1
+                    ? "товар выбран"
+                    : selectedRows.size < 5
+                    ? "товара выбрано"
+                    : "товаров выбрано"}
+                </span>
+              </div>
+            </div>
+            <div className="warehouse-bulk-actions__buttons">
+              <button
+                className="warehouse-bulk-actions__clear-btn"
+                onClick={handleClearSelection}
+                disabled={bulkDeleting}
+                title="Снять выбор"
+              >
+                <X size={16} />
+                Сбросить
+              </button>
+              <button
+                className="warehouse-bulk-actions__delete-btn"
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                title="Удалить выбранные товары"
+              >
+                <Trash2 size={16} />
+                {bulkDeleting ? "Удаление..." : "Удалить выбранные"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Products */}
       <div className="warehouse-table-container w-full">
         {/* ===== TABLE (with overflow-auto) ===== */}
@@ -249,7 +399,7 @@ const Warehouse = () => {
                         />
                       </td>
 
-                      <td>{index + 1}</td>
+                      <td>{getRowNumber(index)}</td>
 
                       <td className="warehouse-table__name">
                         <div className="warehouse-table__name-cell">
@@ -354,7 +504,7 @@ const Warehouse = () => {
 
                         <div className="min-w-0 flex-1">
                           <div className="text-xs text-slate-500">
-                            #{index + 1}
+                            #{getRowNumber(index)}
                           </div>
                           <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
                             {product.name || "—"}
@@ -412,6 +562,32 @@ const Warehouse = () => {
             )}
           </div>
         )}
+        {/* Пагинация */}
+        {count > (pageSize || filteredProducts.length || 0) && (
+          <div className="warehouse-pagination">
+            <button
+              type="button"
+              className="warehouse-pagination__btn"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading || !previous}
+            >
+              Назад
+            </button>
+            <span className="warehouse-pagination__info">
+              Страница {currentPage} из {totalPages || 1} ({count} товаров)
+            </span>
+            <button
+              type="button"
+              className="warehouse-pagination__btn"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={
+                loading || !next || (totalPages && currentPage >= totalPages)
+              }
+            >
+              Вперед
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter Modal */}
@@ -425,6 +601,25 @@ const Warehouse = () => {
           categories={categories}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <AlertModal
+        open={showDeleteConfirmModal}
+        type="warning"
+        title="Подтверждение удаления"
+        message={`Вы уверены, что хотите удалить выбранные ${
+          selectedRows.size
+        } ${
+          selectedRows.size === 1
+            ? "товар"
+            : selectedRows.size < 5
+            ? "товара"
+            : "товаров"
+        }? Это действие нельзя отменить.`}
+        okText="Удалить"
+        onClose={() => setShowDeleteConfirmModal(false)}
+        onConfirm={confirmBulkDelete}
+      />
     </div>
   );
 };

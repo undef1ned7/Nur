@@ -120,6 +120,9 @@ const Layout = () => {
 
   const daysLeft = useAnnouncement(company, setHideAnnouncement);
 
+  // Проверяем, является ли текущий путь страницей кассы
+  const isCashierPage = location.pathname.startsWith("/crm/market/cashier");
+
   return (
     <div className="layout-wrapper">
       <div
@@ -130,10 +133,12 @@ const Layout = () => {
       ></div>
 
       <div className={`App ${!isSidebarOpen ? "sidebar-collapsed" : ""}`}>
-        <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+        {!isCashierPage && (
+          <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+        )}
 
         {/* Overlay для мобильных устройств */}
-        {isSidebarOpen && (
+        {isSidebarOpen && !isCashierPage && (
           <div
             className="sidebar-overlay"
             onClick={closeSidebar}
@@ -143,8 +148,8 @@ const Layout = () => {
 
         <div
           className={`content ${languageFunc()} ${
-            isSidebarOpen ? "content--sidebar-open" : ""
-          }`}
+            isSidebarOpen && !isCashierPage ? "content--sidebar-open" : ""
+          } ${isCashierPage ? "content--full-width" : ""}`}
         >
           {daysLeft !== null && !hideAnnouncement && (
             <div className="announcement">
@@ -167,11 +172,18 @@ const Layout = () => {
             </div>
           )}
 
-          <Header toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-          <hr />
+          {!isCashierPage && (
+            <>
+              <Header
+                toggleSidebar={toggleSidebar}
+                isSidebarOpen={isSidebarOpen}
+              />
+              <hr />
+            </>
+          )}
           <div className="content_content">
             <Outlet />
-            {lan === "ru" && (
+            {lan === "ru" && !isCashierPage && (
               <>
                 <img src={arnament} className="content_image1" alt="" />
                 <img src={arnament2} className="content_image2" alt="" />

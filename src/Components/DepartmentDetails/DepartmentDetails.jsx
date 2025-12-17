@@ -47,7 +47,14 @@ const BASIC_ACCESS_TYPES = [
 
 // Секторные permissions
 const SECTOR_ACCESS_TYPES = {
-  Магазин: [{ value: "Долги", label: "Долги", backendKey: "can_view_debts" }],
+  Магазин: [
+    { value: "Долги", label: "Долги", backendKey: "can_view_debts" },
+    {
+      value: "Интерфейс кассира",
+      label: "Интерфейс кассира",
+      backendKey: "can_view_cashbox",
+    },
+  ],
   Барбершоп: [
     {
       value: "Клиенты Барбершопа",

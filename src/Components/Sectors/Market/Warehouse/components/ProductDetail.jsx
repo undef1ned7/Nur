@@ -184,7 +184,7 @@ const ProductDetail = () => {
       <div className="product-detail__content">
         {/* Image Section */}
         <div className="block lg:flex gap-3">
-          <div className="product-detail__image-section w-full">
+          <div className="product-detail__image-section w-1/2">
             {hasImages ? (
               <>
                 <div className="product-detail__main-image ">
@@ -397,7 +397,7 @@ const ProductDetail = () => {
             </div>
 
             {/* Warehouse Section */}
-            <div className="product-detail__section">
+            {/* <div className="product-detail__section">
               <h3 className="product-detail__section-title">СКЛАД</h3>
               <table className="product-detail__warehouse-table">
                 <thead>
@@ -456,7 +456,7 @@ const ProductDetail = () => {
                   </tr>
                 </tbody>
               </table>
-            </div>
+            </div> */}
           </div>
         ) : (
           <MovementHistory productId={id} productCode={product.code} />

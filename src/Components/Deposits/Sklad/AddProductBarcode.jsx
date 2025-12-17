@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch } from "react-redux";
 import useScanDetection from "use-scan-detection";
 import {
@@ -48,9 +48,12 @@ const AddProductBarcode = ({
     quantity: "1",
     price: "",
     purchase_price: "",
+    markup: "0",
     plu: "",
     scale_type: "",
   });
+  const [isPriceManuallyChanged, setIsPriceManuallyChanged] = useState(false);
+  const [isMarkupManuallyChanged, setIsMarkupManuallyChanged] = useState(false);
   const [debt, setDebt] = useState("");
   const [amount, setAmount] = useState("");
   const [debtMonths, setDebtMonths] = useState("");
@@ -72,11 +75,24 @@ const AddProductBarcode = ({
   });
   const dispatch = useDispatch();
 
+  // Refs для отслеживания последних обработанных ошибок (чтобы избежать бесконечных циклов)
+  const lastScanErrorRef = useRef(null);
+  const lastAddErrorRef = useRef(null);
+  const lastBarcodeErrorRef = useRef(null);
+
+  // Ref для хранения функции onShowErrorAlert, чтобы она не менялась при каждом рендере
+  const onShowErrorAlertRef = useRef(onShowErrorAlert);
+
+  // Обновляем ref при изменении функции
+  useEffect(() => {
+    onShowErrorAlertRef.current = onShowErrorAlert;
+  }, [onShowErrorAlert]);
+
   // Фильтрация клиентов
   const filterClient = useMemo(
     () =>
       (Array.isArray(clients) ? clients : []).filter(
-        (c) => c.type === "client"
+        (c) => c.type === "suppliers"
       ),
     [clients]
   );
@@ -100,11 +116,67 @@ const AddProductBarcode = ({
 
   const onChange = (e) => {
     const { name, value } = e.target;
+
+    // Если меняется наценка, помечаем что она изменена вручную
+    if (name === "markup") {
+      setIsMarkupManuallyChanged(true);
+    }
+
     setState((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
+
+  // Обработчик изменения цены продажи
+  const handlePriceChange = (e) => {
+    const { value } = e.target;
+    setIsPriceManuallyChanged(true);
+    onChange(e);
+
+    // Если пользователь сам НЕ трогал наценку, считаем её из цены закупки и цены продажи
+    if (!isMarkupManuallyChanged) {
+      const purchasePrice = parseFloat(state.purchase_price) || 0;
+      const sellingPrice = parseFloat(value) || 0;
+
+      if (purchasePrice > 0 && sellingPrice > 0) {
+        const markupPercent = (sellingPrice / purchasePrice - 1) * 100;
+        const roundedMarkup = Math.round(markupPercent * 100) / 100;
+        setState((prev) => ({
+          ...prev,
+          markup: roundedMarkup.toString(),
+        }));
+      }
+    }
+  };
+
+  // Автоматический расчет цены продажи на основе цены закупки и наценки
+  useEffect(() => {
+    if (!isPriceManuallyChanged) {
+      const purchasePrice = parseFloat(state.purchase_price) || 0;
+      const markup = parseFloat(state.markup) || 0;
+
+      if (purchasePrice > 0 && markup >= 0) {
+        const sellingPrice = purchasePrice * (1 + markup / 100);
+        const calculatedPrice = Math.round(sellingPrice * 100) / 100;
+
+        setState((prev) => ({
+          ...prev,
+          price: calculatedPrice.toString(),
+        }));
+      } else if (purchasePrice === 0 && markup === 0) {
+        setState((prev) => ({
+          ...prev,
+          price: "",
+        }));
+      }
+    }
+  }, [state.purchase_price, state.markup, isPriceManuallyChanged]);
+
+  // Сброс флага ручного изменения при изменении цены закупки или наценки
+  useEffect(() => {
+    setIsPriceManuallyChanged(false);
+  }, [state.purchase_price, state.markup]);
 
   const onChangeDebt = (e) => {
     const { name, value } = e.target;
@@ -143,33 +215,90 @@ const AddProductBarcode = ({
     })();
   }, [barcodeScan, dispatch]);
 
-  // Отслеживаем ошибки из Redux состояния
+  // Отслеживаем ошибки из Redux состояния (с защитой от повторных вызовов)
   useEffect(() => {
-    if (scanProductError && onShowErrorAlert) {
+    if (!scanProductError) {
+      lastScanErrorRef.current = null;
+      return;
+    }
+
+    const errorId =
+      scanProductError?.response?.data?.barcode ||
+      scanProductError?.message ||
+      String(scanProductError);
+
+    // Проверяем, не обрабатывали ли мы уже эту ошибку
+    if (lastScanErrorRef.current !== errorId && onShowErrorAlertRef.current) {
+      lastScanErrorRef.current = errorId;
       const errorMsg =
         scanProductError?.response?.data?.barcode ||
         "Произошла ошибка при добавлении товара в склад";
-      onShowErrorAlert(errorMsg);
+
+      // Используем setTimeout, чтобы избежать синхронных обновлений состояния
+      setTimeout(() => {
+        if (onShowErrorAlertRef.current) {
+          onShowErrorAlertRef.current(errorMsg);
+        }
+      }, 0);
     }
-  }, [scanProductError, onShowErrorAlert]);
+  }, [scanProductError]);
 
   useEffect(() => {
-    if (addToWarehouseError && onShowErrorAlert) {
+    if (!addToWarehouseError) {
+      lastAddErrorRef.current = null;
+      return;
+    }
+
+    const errorId =
+      addToWarehouseError?.response?.data?.barcode ||
+      addToWarehouseError?.message ||
+      String(addToWarehouseError);
+
+    // Проверяем, не обрабатывали ли мы уже эту ошибку
+    if (lastAddErrorRef.current !== errorId && onShowErrorAlertRef.current) {
+      lastAddErrorRef.current = errorId;
       const errorMsg =
         addToWarehouseError?.response?.data?.barcode ||
         "Произошла ошибка при добавлении товара в склад";
-      onShowErrorAlert(errorMsg);
+
+      // Используем setTimeout, чтобы избежать синхронных обновлений состояния
+      setTimeout(() => {
+        if (onShowErrorAlertRef.current) {
+          onShowErrorAlertRef.current(errorMsg);
+        }
+      }, 0);
     }
-  }, [addToWarehouseError, onShowErrorAlert]);
+  }, [addToWarehouseError]);
 
   useEffect(() => {
-    if (barcodeError && onShowErrorAlert) {
+    if (!barcodeError) {
+      lastBarcodeErrorRef.current = null;
+      return;
+    }
+
+    const errorId =
+      barcodeError?.response?.data?.barcode ||
+      barcodeError?.message ||
+      String(barcodeError);
+
+    // Проверяем, не обрабатывали ли мы уже эту ошибку
+    if (
+      lastBarcodeErrorRef.current !== errorId &&
+      onShowErrorAlertRef.current
+    ) {
+      lastBarcodeErrorRef.current = errorId;
       const errorMsg =
         barcodeError?.response?.data?.barcode ||
         "Произошла ошибка при добавлении товара в склад";
-      onShowErrorAlert(errorMsg);
+
+      // Используем setTimeout, чтобы избежать синхронных обновлений состояния
+      setTimeout(() => {
+        if (onShowErrorAlertRef.current) {
+          onShowErrorAlertRef.current(errorMsg);
+        }
+      }, 0);
     }
-  }, [barcodeError, onShowErrorAlert]);
+  }, [barcodeError]);
 
   // Автоматическое заполнение названия товара при обнаружении
   useEffect(() => {
@@ -236,10 +365,19 @@ const AddProductBarcode = ({
         }
       }
 
+      // Нормализуем наценку: если не заполнена, считаем её 0
+      const normalizedMarkup =
+        state.markup !== undefined &&
+        state.markup !== null &&
+        String(state.markup).trim() !== ""
+          ? String(state.markup)
+          : "0";
+
       const result = await dispatch(
         createProductWithBarcode({
           barcode: scannedProduct.barcode,
           ...state,
+          markup_percent: normalizedMarkup,
           plu: state.plu ? Number(state.plu) : null,
           scale_type: state.scale_type || null,
         })
@@ -306,9 +444,12 @@ const AddProductBarcode = ({
         quantity: "1",
         price: "",
         purchase_price: "",
+        markup: "0",
         plu: "",
         scale_type: "",
       });
+      setIsPriceManuallyChanged(false);
+      setIsMarkupManuallyChanged(false);
       setBarcodeScan("");
       setCashData((prev) => ({
         ...prev,
@@ -350,11 +491,13 @@ const AddProductBarcode = ({
   };
 
   useEffect(() => {
-    setCashData((prev) => ({
-      ...prev,
-      cashbox: selectCashBox,
-    }));
-  }, []);
+    if (selectCashBox) {
+      setCashData((prev) => ({
+        ...prev,
+        cashbox: selectCashBox,
+      }));
+    }
+  }, [selectCashBox]);
 
   const handleCancel = () => {
     dispatch(clearScannedProduct());
@@ -364,9 +507,12 @@ const AddProductBarcode = ({
       quantity: "1",
       price: "",
       purchase_price: "",
+      markup: "0",
       plu: "",
       scale_type: "",
     });
+    setIsPriceManuallyChanged(false);
+    setIsMarkupManuallyChanged(false);
     setBarcodeScan("");
     setCashData((prev) => ({
       ...prev,
@@ -453,27 +599,47 @@ const AddProductBarcode = ({
             </div>
             <div className="add-product-barcode__form-group">
               <label>Закупочная цена *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={state.purchase_price}
-                onChange={onChange}
-                name="purchase_price"
-                placeholder="0.00"
-              />
+              <div className="add-product-page__price-input">
+                <input
+                  type="text"
+                  name="purchase_price"
+                  placeholder="0.00"
+                  className="add-product-page__input"
+                  value={state.purchase_price}
+                  onChange={onChange}
+                  required
+                />
+                <span className="add-product-page__currency">P</span>
+              </div>
+            </div>
+            <div className="add-product-barcode__form-group">
+              <label>Наценка</label>
+              <div className="add-product-page__price-input">
+                <input
+                  type="text"
+                  name="markup"
+                  placeholder="0"
+                  className="add-product-page__input"
+                  value={state.markup}
+                  onChange={onChange}
+                />
+                <span className="add-product-page__currency">%</span>
+              </div>
             </div>
             <div className="add-product-barcode__form-group">
               <label>Розничная цена *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                name="price"
-                value={state.price}
-                onChange={onChange}
-                placeholder="0.00"
-              />
+              <div className="add-product-page__price-input">
+                <input
+                  type="text"
+                  name="price"
+                  placeholder="0.00"
+                  className="add-product-page__input"
+                  value={state.price}
+                  onChange={handlePriceChange}
+                  required
+                />
+                <span className="add-product-page__currency">P</span>
+              </div>
             </div>
             <div className="add-product-barcode__form-group">
               <label>ПЛУ</label>
@@ -519,17 +685,17 @@ const AddProductBarcode = ({
                 {clientId === "" && (
                   <>
                     <p className="add-product-barcode__error-message">
-                      Выберите клиента!
+                      Выберите поставщика!
                     </p>
                     <div className="add-product-barcode__form-group">
-                      <label>Клиент *</label>
+                      <label>Поставщик *</label>
                       <select
                         onChange={(e) => {
                           setClientId(e.target.value);
                         }}
                         value={clientId}
                       >
-                        <option value="">Выберите клиента</option>
+                        <option value="">Выберите поставщика</option>
                         {filterClient.map((client) => (
                           <option key={client.id} value={client.id}>
                             {client.full_name}
@@ -610,7 +776,7 @@ const AddProductBarcode = ({
                   <div className="add-product-barcode__debt-summary">
                     <strong>Сумма долга:</strong> {totalAmount.toFixed(2)} сом
                     <br />
-                    <strong>Клиент:</strong> {pickClient?.full_name}
+                    <strong>Поставщик:</strong> {pickClient?.full_name}
                   </div>
                 )}
               </div>

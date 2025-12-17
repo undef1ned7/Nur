@@ -13,6 +13,8 @@ import { sendBarCode, startSale } from "../../../store/creators/saleThunk";
  * @param {(barcode: string) => void} [opts.onScanned] - Колбэк на успешное сканирование (до запроса)
  * @param {(result: any) => void} [opts.onAdded] - Колбэк после успешного добавления товара
  * @param {number} [opts.minLength] - Минимальная длина штрих‑кода
+ * @param {number} [opts.discount_total] - Скидка для обновления продажи (по умолчанию 0)
+ * @param {string|null} [opts.shift] - ID смены для обновления продажи (по умолчанию null)
  */
 export function useBarcodeToCart(saleId, opts = {}) {
   const dispatch = useDispatch();
@@ -20,7 +22,7 @@ export function useBarcodeToCart(saleId, opts = {}) {
   const [error, setError] = useState("");
   const busyRef = useRef(false);
 
-  const { onError, onScanned, onAdded, minLength = 3 } = opts;
+  const { onError, onScanned, onAdded, minLength = 3, discount_total = 0, shift = null } = opts;
 
   useScanDetection({
     minLength,
@@ -53,7 +55,8 @@ export function useBarcodeToCart(saleId, opts = {}) {
           return;
         }
 
-        await dispatch(startSale()).unwrap();
+        // Обновляем продажу с правильными параметрами
+        await dispatch(startSale({ discount_total, shift })).unwrap();
         if (typeof onAdded === "function") onAdded(res);
       } catch (e) {
         const msg = e?.message || "Не удалось добавить товар по штрих‑коду";
@@ -65,7 +68,7 @@ export function useBarcodeToCart(saleId, opts = {}) {
         busyRef.current = false;
       }
     })();
-  }, [lastBarcode, saleId, dispatch, onError, onAdded]);
+  }, [lastBarcode, saleId, dispatch, onError, onAdded, discount_total, shift]);
 
   return { lastBarcode, error };
 }

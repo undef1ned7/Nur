@@ -26,12 +26,16 @@ import Branch from "../Components/pages/Branch/Branch";
 import BranchDetails from "../Components/pages/Branch/BranchDetails";
 import LogisticsPage from "../Components/Sectors/logistics/LogisticsPage/LogisticsPage";
 import LogisticsAnalytics from "../Components/pages/LogisticsAnalytics/LogisticsAnalytics";
+import Shifts from "../Components/pages/Shifts/Shifts";
+import ShiftDetail from "../Components/pages/Shifts/ShiftDetail";
 
 // Deposits
 import Obzor from "../Components/Deposits/Obzor/Obzor";
 import Zakaz from "../Components/Deposits/Zakaz/Zakaz";
 import Raspisanie from "../Components/Deposits/Raspisanie/Raspisanie";
 import Sklad from "../Components/Deposits/Sklad/Sklad";
+import BarcodePrintPage from "../Components/Deposits/Sklad/BarcodePrintPage";
+import ScalesPage from "../Components/Deposits/Sklad/ScalesPage";
 import AddProductPage from "../Components/Deposits/Sklad/AddProductPage";
 import BrandCategoryPage from "../Components/Deposits/BrandCategoryPage/BrandCategoryPage";
 import WarehouseAccounting from "../Components/Deposits/Warehouse/WarehouseAccounting";
@@ -80,6 +84,7 @@ import SchoolDocuments from "../Components/Sectors/School/Documents/Documents";
 import MarketBar from "../Components/Sectors/Market/Bar/Bar";
 import MarketWarehouse from "../Components/Sectors/Market/Warehouse/Warehouse";
 import MarketProductDetail from "../Components/Sectors/Market/Warehouse/components/ProductDetail";
+import MarketCashierPage from "../Components/Sectors/Market/CashierPage/CashierPage";
 import MarketCategories from "../Components/Sectors/Market/Categories/Categories";
 import MarketClients from "../Components/Sectors/Market/Clients/Clients";
 import MarketClientDetails from "../Components/Sectors/Market/ClientDetails/ClientDetails";
@@ -189,9 +194,12 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("obzor", Obzor),
   createProtectedRoute("zakaz", Zakaz),
   createProtectedRoute("employ", Masters),
-  createProtectedRoute("sklad", Sklad),
+  createProtectedRoute("sklad", MarketWarehouse),
+  createProtectedRoute("sklad/:id", MarketProductDetail),
   createProtectedRoute("sklad/add-product", AddProductPage),
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
+  createProtectedRoute("barcodes", BarcodePrintPage),
+  createProtectedRoute("scales", ScalesPage),
   createProtectedRoute("sell", Sell),
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),
@@ -200,6 +208,8 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("contact", Contact),
   createProtectedRoute("additional-services", AdditionalServices),
   createProtectedRoute("analytics", Analytics),
+  createProtectedRoute("shifts", Shifts),
+  createProtectedRoute("shifts/:id", ShiftDetail),
   createProtectedRoute("departments", Department),
   createProtectedRoute("departments/:id", DepartmentDetails),
   createProtectedRoute("branch", Branch),
@@ -245,8 +255,9 @@ export const crmRoutes = (profile) => [
 
   // Market routes
   createProtectedRoute("market/bar", MarketBar),
-  createProtectedRoute("market/warehouse", MarketWarehouse),
-  createProtectedRoute("market/warehouse/:id", MarketProductDetail),
+  createProtectedRoute("sklad", MarketWarehouse),
+  createProtectedRoute("sklad/:id", MarketProductDetail),
+  createProtectedRoute("market/cashier", MarketCashierPage),
   createProtectedRoute("market/categories", MarketCategories),
   createProtectedRoute("clients", MarketClients),
   createProtectedRoute("clients/:id", MarketClientDetails),

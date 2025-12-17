@@ -65,6 +65,21 @@ export const updateCashFlows = createAsyncThunk(
   }
 );
 
+export const bulkUpdateCashFlowsStatus = createAsyncThunk(
+  "cashFlows/bulkUpdateStatus",
+  async (items, { rejectWithValue }) => {
+    try {
+      const { data: response } = await api.patch(
+        "/construction/cashflows/bulk/status/",
+        { items }
+      );
+      return response;
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error?.message);
+    }
+  }
+);
+
 const cashSlice = createSlice({
   name: "cash",
   initialState,
@@ -88,6 +103,16 @@ const cashSlice = createSlice({
         state.loading = false;
       })
       .addCase(updateCashFlows.rejected, (state, { payload }) => {
+        state.loading = false;
+        state.error = payload;
+      })
+      .addCase(bulkUpdateCashFlowsStatus.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(bulkUpdateCashFlowsStatus.fulfilled, (state, { payload }) => {
+        state.loading = false;
+      })
+      .addCase(bulkUpdateCashFlowsStatus.rejected, (state, { payload }) => {
         state.loading = false;
         state.error = payload;
       })

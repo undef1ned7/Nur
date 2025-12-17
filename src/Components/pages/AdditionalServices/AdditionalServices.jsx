@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useSelector } from "react-redux";
 import SocialModal from "./SocialModal";
 import "./AdditionalServices.scss";
-import { FaInstagram, FaTelegram, FaWhatsapp } from "react-icons/fa";
+import { FaInstagram, FaTelegram, FaWhatsapp, FaBarcode } from "react-icons/fa";
 import { MdDocumentScanner } from "react-icons/md";
 import { useMenuPermissions } from "../../Sidebar/hooks/useMenuPermissions";
 import { getAdditionalServicesForPage } from "../../Sidebar/config/additionalServicesConfig";
@@ -14,6 +14,7 @@ const AdditionalServices = () => {
   const { hasPermission, isAllowed } = useMenuPermissions();
 
   const handleSocialClick = (social) => {
+    // Все доп.услуги (включая печать штрих-кодов) запрашиваются через модалку
     setSelectedSocial(social);
     setIsModalOpen(true);
   };
@@ -53,6 +54,20 @@ const AdditionalServices = () => {
         icon: <MdDocumentScanner />,
         description:
           "Подключите чаты для удобного общения, быстрых автоматических ответов и полной интеграции с вашей CRM-системой.",
+      },
+      {
+        id: "barcode-print",
+        name: "Печать штрих-кодов",
+        icon: <FaBarcode />,
+        description:
+          "Печать штрих-кодов для товаров со склада на отдельной странице с предпросмотром.",
+      },
+      {
+        id: "scales",
+        name: "Интеграция с весами",
+        icon: <FaBarcode />,
+        description:
+          "Отправка товаров со склада на торговые весы для автоматической работы по штрих-кодам.",
       },
     ],
     []

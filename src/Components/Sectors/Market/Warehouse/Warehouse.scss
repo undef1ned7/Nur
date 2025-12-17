@@ -18,7 +18,7 @@
 .warehouse-page {
   font-family: "Montserrat", sans-serif;
   padding: 24px;
-  background: #f9fafb;
+  // background: #f9fafb;
   min-height: 100vh;
 }
 
@@ -1207,6 +1207,166 @@
       font-size: 12px;
       overflow-x: auto;
       display: block;
+    }
+  }
+}
+
+/* ============================================
+   BULK ACTIONS BAR
+   ============================================ */
+.warehouse-bulk-actions {
+  margin-bottom: 20px;
+  animation: slideDown 0.3s ease-out;
+
+  &__content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 24px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 2px solid var(--primary);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(247, 215, 79, 0.15);
+    backdrop-filter: blur(10px);
+  }
+
+  &__info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(247, 215, 79, 0.3);
+  }
+
+  &__count {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  &__text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  &__buttons {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+
+  &__clear-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: transparent;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: "Montserrat", sans-serif;
+
+    &:hover:not(:disabled) {
+      background: #f5f5f5;
+      border-color: #d1d5db;
+      color: var(--text);
+      transform: translateY(-1px);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &__delete-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    font-family: "Montserrat", sans-serif;
+
+    &:hover:not(:disabled) {
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+      box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+      transform: translateY(-2px);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .warehouse-bulk-actions {
+    &__content {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    &__buttons {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    &__clear-btn,
+    &__delete-btn {
+      flex: 1;
+      justify-content: center;
     }
   }
 }

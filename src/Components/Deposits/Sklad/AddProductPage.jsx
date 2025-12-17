@@ -31,6 +31,8 @@ import {
   fetchProductsAsync,
   fetchBrandsAsync,
   fetchCategoriesAsync,
+  createBrandAsync,
+  createCategoryAsync,
 } from "../../../store/creators/productCreators";
 import { countries } from "../../../data/countries";
 import api from "../../../api";
@@ -163,6 +165,14 @@ const AddProductPage = () => {
     address: "",
   });
 
+  const [newBrand, setNewBrand] = useState({
+    name: "",
+  });
+
+  const [newCategory, setNewCategory] = useState({
+    name: "",
+  });
+
   const [cashData, setCashData] = useState({
     cashbox: "",
     type: "expense",
@@ -174,6 +184,11 @@ const AddProductPage = () => {
       company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
   });
   const [showInputs, setShowInputs] = useState(false);
+  const [showBrandInputs, setShowBrandInputs] = useState(false);
+  const [showCategoryInputs, setShowCategoryInputs] = useState(false);
+
+  // Ошибки для обязательных полей
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Состояния для долга
   const [debt, setDebt] = useState("");
@@ -360,48 +375,76 @@ const AddProductPage = () => {
       purchase_price,
     } = newItemData;
 
-    // Для маркета проверяем другие обязательные поля
+    // Сбрасываем предыдущие ошибки
+    const errors = {};
+    setFieldErrors({});
+
+    // Нормализуем наценку: если не заполнена, считаем её 0
+    const normalizedMarkup =
+      marketData.markup !== undefined &&
+      marketData.markup !== null &&
+      String(marketData.markup).trim() !== ""
+        ? String(marketData.markup)
+        : "0";
+
+    // Для маркета проверяем обязательные поля
     if (isMarketSector) {
-      if (!name || !barcode) {
-        showAlert("Пожалуйста, заполните наименование и штрих-код.");
-        return;
+      if (!name || !name.trim()) {
+        errors.name = "Обязательное поле";
       }
-      // Для товара проверяем цену продажи и цену закупки
+      if (!barcode || !barcode.trim()) {
+        errors.barcode = "Обязательное поле";
+      }
+
       const purchasePriceValue = purchase_price ? String(purchase_price) : "";
       const priceValue = price ? String(price) : "";
-      // Проверяем, что оба поля заполнены (не пустые строки)
-      if (
-        itemType === "product" &&
-        (priceValue.trim() === "" || purchasePriceValue.trim() === "")
-      ) {
-        showAlert("Пожалуйста, заполните цены для товара.");
-        return;
+
+      if (itemType === "product") {
+        if (purchasePriceValue.trim() === "") {
+          errors.purchase_price = "Обязательное поле";
+        }
+        if (priceValue.trim() === "") {
+          errors.price = "Обязательное поле";
+        }
       }
-      if (itemType === "service" && !price) {
-        showAlert("Пожалуйста, заполните цену продажи для услуги.");
-        return;
+
+      if (itemType === "service") {
+        if (priceValue.trim() === "") {
+          errors.price = "Обязательное поле";
+        }
       }
-      if (
-        itemType === "kit" &&
-        (!price || marketData.kitProducts.length === 0)
-      ) {
-        showAlert(
-          "Пожалуйста, заполните цену продажи и добавьте товары в комплект."
-        );
-        return;
+
+      if (itemType === "kit") {
+        if (priceValue.trim() === "") {
+          errors.price = "Обязательное поле";
+        }
+        if (!marketData.kitProducts || marketData.kitProducts.length === 0) {
+          errors.kitProducts = "Добавьте хотя бы один товар в комплект";
+        }
       }
     } else {
-      // Старая валидация для других секторов
-      if (
-        !name ||
-        !barcode ||
-        price === "" ||
-        quantity === "" ||
-        purchase_price === ""
-      ) {
-        showAlert("Пожалуйста, заполните все обязательные поля.");
-        return;
+      // Для других секторов
+      if (!name || !name.trim()) {
+        errors.name = "Обязательное поле";
       }
+      if (!barcode || !barcode.trim()) {
+        errors.barcode = "Обязательное поле";
+      }
+      if (price === "" || String(price).trim() === "") {
+        errors.price = "Обязательное поле";
+      }
+      if (quantity === "" || String(quantity).trim() === "") {
+        errors.quantity = "Обязательное поле";
+      }
+      if (purchase_price === "" || String(purchase_price).trim() === "") {
+        errors.purchase_price = "Обязательное поле";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      showAlert("Пожалуйста, заполните обязательные поля.");
+      return;
     }
 
     // Валидация для долговых операций
@@ -551,7 +594,7 @@ const AddProductPage = () => {
         payload = {
           ...payload,
           purchase_price: (purchase_price || "0").toString(),
-          markup_percent: (marketData.markup || "0").toString(),
+          markup_percent: normalizedMarkup,
           quantity: quantityValue,
           stock: true, // Товар есть на складе
         };
@@ -560,7 +603,7 @@ const AddProductPage = () => {
         payload = {
           ...payload,
           purchase_price: "0",
-          markup_percent: "0",
+          markup_percent: normalizedMarkup,
           quantity: 0,
           stock: false, // Услуги не имеют остатка
           is_weight: marketData.isFractionalService, // Дробная услуга
@@ -592,7 +635,7 @@ const AddProductPage = () => {
           ...payload,
           packages_input: allPackages.length > 0 ? allPackages : [], // Отправляем состав комплекта в packages_input
           purchase_price: "0", // Комплект не имеет цены закупки
-          markup_percent: "0",
+          markup_percent: normalizedMarkup,
           quantity: quantityValue, // Используем количество из формы
           stock: false,
         };
@@ -779,11 +822,95 @@ const AddProductPage = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(createClientAsync(state)).unwrap();
+      const client = await dispatch(createClientAsync(state)).unwrap();
       dispatch(fetchClientsAsync());
       setShowInputs(false);
+      // Автоматически выбираем созданного поставщика
+      if (client?.id) {
+        setNewItemData((prev) => ({
+          ...prev,
+          client: String(client.id),
+        }));
+      }
+      setState({
+        full_name: "",
+        phone: "",
+        email: "",
+        date: new Date().toISOString().split("T")[0],
+        type: "suppliers",
+        llc: "",
+        inn: "",
+        okpo: "",
+        score: "",
+        bik: "",
+        address: "",
+      });
+      showAlert("Поставщик успешно создан!", "success", "Успех");
     } catch (e) {
       console.log(e);
+      showAlert(
+        `Ошибка при создании поставщика: ${e.message || JSON.stringify(e)}`,
+        "error",
+        "Ошибка"
+      );
+    }
+  };
+
+  const onSubmitBrand = async (e) => {
+    e.preventDefault();
+    if (!newBrand.name || !newBrand.name.trim()) {
+      showAlert("Введите название бренда", "error", "Ошибка");
+      return;
+    }
+    try {
+      const brand = await dispatch(
+        createBrandAsync({ name: newBrand.name.trim() })
+      ).unwrap();
+      dispatch(fetchBrandsAsync());
+      setShowBrandInputs(false);
+      // Автоматически выбираем созданный бренд
+      setNewItemData((prev) => ({
+        ...prev,
+        brand_name: brand.name || newBrand.name.trim(),
+      }));
+      setNewBrand({ name: "" });
+      showAlert("Бренд успешно создан!", "success", "Успех");
+    } catch (e) {
+      console.log(e);
+      showAlert(
+        `Ошибка при создании бренда: ${e.message || JSON.stringify(e)}`,
+        "error",
+        "Ошибка"
+      );
+    }
+  };
+
+  const onSubmitCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategory.name || !newCategory.name.trim()) {
+      showAlert("Введите название категории", "error", "Ошибка");
+      return;
+    }
+    try {
+      const category = await dispatch(
+        createCategoryAsync({ name: newCategory.name.trim() })
+      ).unwrap();
+      dispatch(fetchCategoriesAsync());
+      setShowCategoryInputs(false);
+      // Автоматически выбираем созданную категорию
+      setNewItemData((prev) => ({
+        ...prev,
+        category_name: category.name || newCategory.name.trim(),
+      }));
+      setNewCategory({ name: "" });
+      showAlert("Категория успешно создана!", "success", "Успех");
+    } catch (e) {
+      console.log(e);
+      showAlert(
+        `Ошибка при создании категории: ${e.message || JSON.stringify(e)}`,
+        "error",
+        "Ошибка"
+      );
     }
   };
   const filterClient = list.filter((item) => item.type === "suppliers");
@@ -1066,6 +1193,35 @@ const AddProductPage = () => {
               setImages={setImages}
               fileInputRef={fileInputRef}
               isEditMode={isEditMode}
+              fieldErrors={fieldErrors}
+              showBrandInputs={showBrandInputs}
+              setShowBrandInputs={setShowBrandInputs}
+              newBrand={newBrand}
+              setNewBrand={setNewBrand}
+              onSubmitBrand={onSubmitBrand}
+              showCategoryInputs={showCategoryInputs}
+              setShowCategoryInputs={setShowCategoryInputs}
+              newCategory={newCategory}
+              setNewCategory={setNewCategory}
+              onSubmitCategory={onSubmitCategory}
+              showInputs={showInputs}
+              setShowInputs={setShowInputs}
+              state={state}
+              setState={setState}
+              onSubmit={onSubmit}
+              debt={debt}
+              setDebt={setDebt}
+              amount={amount}
+              setAmount={setAmount}
+              debtMonths={debtMonths}
+              setDebtMonths={setDebtMonths}
+              showDebtForm={showDebtForm}
+              setShowDebtForm={setShowDebtForm}
+              debtState={debtState}
+              setDebtState={setDebtState}
+              onChangeDebt={onChangeDebt}
+              pickSupplier={pickSupplier}
+              company={company}
             />
           ) : (
             <>
@@ -1136,6 +1292,11 @@ const AddProductPage = () => {
                       onChange={handleChange}
                       required
                     />
+                    {fieldErrors.name && (
+                      <p className="add-product-page__error">
+                        {fieldErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   <div className="add-product-page__form-group">
@@ -1150,6 +1311,11 @@ const AddProductPage = () => {
                       onChange={handleChange}
                       required
                     />
+                    {fieldErrors.barcode && (
+                      <p className="add-product-page__error">
+                        {fieldErrors.barcode}
+                      </p>
+                    )}
                   </div>
 
                   {company?.sector?.name !== "Барбершоп" && (
@@ -1175,43 +1341,141 @@ const AddProductPage = () => {
                         <label className="add-product-page__label">
                           Бренд *
                         </label>
-                        <select
-                          name="brand_name"
-                          className="add-product-page__input"
-                          value={newItemData.brand_name}
-                          onChange={handleChange}
-                          required
-                        >
-                          <option value="">Выберите бренд</option>
-                          {brands.map((brand, idx) => (
-                            <option key={brand.id ?? idx} value={brand.name}>
-                              {brand.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="add-product-page__supplier-row">
+                          <select
+                            name="brand_name"
+                            className="add-product-page__input"
+                            value={newItemData.brand_name}
+                            onChange={handleChange}
+                            required
+                          >
+                            <option value="">Выберите бренд</option>
+                            {brands.map((brand, idx) => (
+                              <option key={brand.id ?? idx} value={brand.name}>
+                                {brand.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="add-product-page__create-supplier"
+                            onClick={() => setShowBrandInputs(!showBrandInputs)}
+                            type="button"
+                          >
+                            + Создать бренд
+                          </button>
+                        </div>
+                        {showBrandInputs && (
+                          <form
+                            className="add-product-page__supplier-form"
+                            onSubmit={onSubmitBrand}
+                          >
+                            <input
+                              className="add-product-page__input"
+                              onChange={(e) =>
+                                setNewBrand({
+                                  ...newBrand,
+                                  name: e.target.value,
+                                })
+                              }
+                              type="text"
+                              placeholder="Название бренда"
+                              name="name"
+                              value={newBrand.name}
+                              required
+                            />
+                            <div className="add-product-page__form-actions">
+                              <button
+                                type="button"
+                                className="add-product-page__cancel-btn"
+                                onClick={() => {
+                                  setShowBrandInputs(false);
+                                  setNewBrand({ name: "" });
+                                }}
+                              >
+                                Отмена
+                              </button>
+                              <button
+                                type="submit"
+                                className="add-product-page__save-btn"
+                              >
+                                Создать
+                              </button>
+                            </div>
+                          </form>
+                        )}
                       </div>
 
                       <div className="add-product-page__form-group">
                         <label className="add-product-page__label">
                           Категория *
                         </label>
-                        <select
-                          name="category_name"
-                          className="add-product-page__input"
-                          value={newItemData.category_name}
-                          onChange={handleChange}
-                          required
-                        >
-                          <option value="">Выберите категорию</option>
-                          {categories.map((category, idx) => (
-                            <option
-                              key={category.id ?? idx}
-                              value={category.name}
-                            >
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="add-product-page__supplier-row">
+                          <select
+                            name="category_name"
+                            className="add-product-page__input"
+                            value={newItemData.category_name}
+                            onChange={handleChange}
+                            required
+                          >
+                            <option value="">Выберите категорию</option>
+                            {categories.map((category, idx) => (
+                              <option
+                                key={category.id ?? idx}
+                                value={category.name}
+                              >
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="add-product-page__create-supplier"
+                            onClick={() =>
+                              setShowCategoryInputs(!showCategoryInputs)
+                            }
+                            type="button"
+                          >
+                            + Создать категорию
+                          </button>
+                        </div>
+                        {showCategoryInputs && (
+                          <form
+                            className="add-product-page__supplier-form"
+                            onSubmit={onSubmitCategory}
+                          >
+                            <input
+                              className="add-product-page__input"
+                              onChange={(e) =>
+                                setNewCategory({
+                                  ...newCategory,
+                                  name: e.target.value,
+                                })
+                              }
+                              type="text"
+                              placeholder="Название категории"
+                              name="name"
+                              value={newCategory.name}
+                              required
+                            />
+                            <div className="add-product-page__form-actions">
+                              <button
+                                type="button"
+                                className="add-product-page__cancel-btn"
+                                onClick={() => {
+                                  setShowCategoryInputs(false);
+                                  setNewCategory({ name: "" });
+                                }}
+                              >
+                                Отмена
+                              </button>
+                              <button
+                                type="submit"
+                                className="add-product-page__save-btn"
+                              >
+                                Создать
+                              </button>
+                            </div>
+                          </form>
+                        )}
                       </div>
                     </>
                   )}
@@ -1466,6 +1730,11 @@ const AddProductPage = () => {
                       />
                       <span className="add-product-page__currency">P</span>
                     </div>
+                    {fieldErrors.purchase_price && (
+                      <p className="add-product-page__error">
+                        {fieldErrors.purchase_price}
+                      </p>
+                    )}
                   </div>
 
                   <div className="add-product-page__form-group">
@@ -1484,6 +1753,11 @@ const AddProductPage = () => {
                       />
                       <span className="add-product-page__currency">P</span>
                     </div>
+                    {fieldErrors.price && (
+                      <p className="add-product-page__error">
+                        {fieldErrors.price}
+                      </p>
+                    )}
                   </div>
 
                   <div className="add-product-page__form-group">
@@ -1502,6 +1776,11 @@ const AddProductPage = () => {
                       />
                       <span className="add-product-page__currency">шт</span>
                     </div>
+                    {fieldErrors.quantity && (
+                      <p className="add-product-page__error">
+                        {fieldErrors.quantity}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1562,6 +1841,35 @@ const MarketProductForm = ({
   setImages,
   fileInputRef,
   isEditMode = false,
+  fieldErrors = {},
+  showBrandInputs,
+  setShowBrandInputs,
+  newBrand,
+  setNewBrand,
+  onSubmitBrand,
+  showCategoryInputs,
+  setShowCategoryInputs,
+  newCategory,
+  setNewCategory,
+  onSubmitCategory,
+  showInputs,
+  setShowInputs,
+  state,
+  setState,
+  onSubmit,
+  debt,
+  setDebt,
+  amount,
+  setAmount,
+  debtMonths,
+  setDebtMonths,
+  showDebtForm,
+  setShowDebtForm,
+  debtState,
+  setDebtState,
+  onChangeDebt,
+  pickSupplier,
+  company,
 }) => {
   const [showPluTooltip, setShowPluTooltip] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
@@ -1665,6 +1973,8 @@ const MarketProductForm = ({
 
   // Состояние для отслеживания, была ли цена продажи изменена вручную
   const [isPriceManuallyChanged, setIsPriceManuallyChanged] = useState(false);
+  // Состояние для отслеживания, была ли наценка изменена вручную
+  const [isMarkupManuallyChanged, setIsMarkupManuallyChanged] = useState(false);
 
   // Автоматический расчет цены продажи на основе цены закупки и наценки
   useEffect(() => {
@@ -1703,8 +2013,21 @@ const MarketProductForm = ({
 
   // Обработчик изменения цены продажи вручную
   const handlePriceChange = (e) => {
+    const { value } = e.target;
     setIsPriceManuallyChanged(true);
     handleChange(e);
+
+    // Если пользователь сам НЕ трогал наценку, считаем её из цены закупки и цены продажи
+    if (itemType === "product" && !isMarkupManuallyChanged) {
+      const purchasePrice = parseFloat(newItemData.purchase_price) || 0;
+      const sellingPrice = parseFloat(value) || 0;
+
+      if (purchasePrice > 0 && sellingPrice > 0) {
+        const markupPercent = (sellingPrice / purchasePrice - 1) * 100;
+        const roundedMarkup = Math.round(markupPercent * 100) / 100;
+        handleMarketDataChange("markup", roundedMarkup.toString());
+      }
+    }
   };
 
   return (
@@ -1767,6 +2090,9 @@ const MarketProductForm = ({
             onChange={handleChange}
             required
           />
+          {fieldErrors.name && (
+            <p className="add-product-page__error">{fieldErrors.name}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1802,6 +2128,9 @@ const MarketProductForm = ({
               value={newItemData.barcode}
               onChange={handleChange}
             />
+            {fieldErrors.barcode && (
+              <p className="add-product-page__error">{fieldErrors.barcode}</p>
+            )}
           </div>
 
           <div className="market-product-form__form-group col-span-full xl:col-span-1">
@@ -1939,38 +2268,122 @@ const MarketProductForm = ({
         <div className="market-product-form__two-columns">
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Категория</label>
-            <select
-              name="category_name"
-              className="market-product-form__input"
-              value={newItemData.category_name}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Выберите категорию</option>
-              {categories.map((category, idx) => (
-                <option key={category.id ?? idx} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+            <div className="add-product-page__supplier-row">
+              <select
+                name="category_name"
+                className="market-product-form__input"
+                value={newItemData.category_name}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Выберите категорию</option>
+                {categories.map((category, idx) => (
+                  <option key={category.id ?? idx} value={category.name}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="add-product-page__create-supplier"
+                onClick={() => setShowCategoryInputs(!showCategoryInputs)}
+                type="button"
+              >
+                + Создать категорию
+              </button>
+            </div>
+            {showCategoryInputs && (
+              <form
+                className="add-product-page__supplier-form"
+                onSubmit={onSubmitCategory}
+              >
+                <input
+                  className="add-product-page__input"
+                  onChange={(e) =>
+                    setNewCategory({ ...newCategory, name: e.target.value })
+                  }
+                  type="text"
+                  placeholder="Название категории"
+                  name="name"
+                  value={newCategory.name}
+                  required
+                />
+                <div className="add-product-page__form-actions">
+                  <button
+                    type="button"
+                    className="add-product-page__cancel-btn"
+                    onClick={() => {
+                      setShowCategoryInputs(false);
+                      setNewCategory({ name: "" });
+                    }}
+                  >
+                    Отмена
+                  </button>
+                  <button type="submit" className="add-product-page__save-btn">
+                    Создать
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Бренд</label>
-            <select
-              name="brand_name"
-              className="market-product-form__input"
-              value={newItemData.brand_name}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Выберите бренд</option>
-              {brands.map((brand, idx) => (
-                <option key={brand.id ?? idx} value={brand.name}>
-                  {brand.name}
-                </option>
-              ))}
-            </select>
+            <div className="add-product-page__supplier-row">
+              <select
+                name="brand_name"
+                className="market-product-form__input"
+                value={newItemData.brand_name}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Выберите бренд</option>
+                {brands.map((brand, idx) => (
+                  <option key={brand.id ?? idx} value={brand.name}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="add-product-page__create-supplier"
+                onClick={() => setShowBrandInputs(!showBrandInputs)}
+                type="button"
+              >
+                + Создать бренд
+              </button>
+            </div>
+            {showBrandInputs && (
+              <form
+                className="add-product-page__supplier-form"
+                onSubmit={onSubmitBrand}
+              >
+                <input
+                  className="add-product-page__input"
+                  onChange={(e) =>
+                    setNewBrand({ ...newBrand, name: e.target.value })
+                  }
+                  type="text"
+                  placeholder="Название бренда"
+                  name="name"
+                  value={newBrand.name}
+                  required
+                />
+                <div className="add-product-page__form-actions">
+                  <button
+                    type="button"
+                    className="add-product-page__cancel-btn"
+                    onClick={() => {
+                      setShowBrandInputs(false);
+                      setNewBrand({ name: "" });
+                    }}
+                  >
+                    Отмена
+                  </button>
+                  <button type="submit" className="add-product-page__save-btn">
+                    Создать
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </div>
@@ -2058,7 +2471,7 @@ const MarketProductForm = ({
                     </label>
                     <div className="market-product-form__packaging-quantity">
                       <input
-                        type="number"
+                        type="text"
                         className="market-product-form__input"
                         value={packaging.quantity}
                         onChange={(e) =>
@@ -2091,7 +2504,7 @@ const MarketProductForm = ({
           <label className="market-product-form__label">Количество *</label>
           <div className="market-product-form__price-input">
             <input
-              type="number"
+              type="text"
               name="quantity"
               className="market-product-form__input"
               value={newItemData.quantity}
@@ -2159,7 +2572,7 @@ const MarketProductForm = ({
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Высота, см</label>
             <input
-              type="number"
+              type="text"
               className="market-product-form__input"
               value={marketData.height}
               onChange={(e) => handleMarketDataChange("height", e.target.value)}
@@ -2168,7 +2581,7 @@ const MarketProductForm = ({
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Ширина, см</label>
             <input
-              type="number"
+              type="text"
               className="market-product-form__input"
               value={marketData.width}
               onChange={(e) => handleMarketDataChange("width", e.target.value)}
@@ -2177,7 +2590,7 @@ const MarketProductForm = ({
           <div className="market-product-form__form-group">
             <label className="market-product-form__label">Глубина, см</label>
             <input
-              type="number"
+              type="text"
               className="market-product-form__input"
               value={marketData.depth}
               onChange={(e) => handleMarketDataChange("depth", e.target.value)}
@@ -2188,7 +2601,7 @@ const MarketProductForm = ({
               Фактический вес, кг
             </label>
             <input
-              type="number"
+              type="text"
               className="market-product-form__input"
               value={marketData.weight}
               onChange={(e) => handleMarketDataChange("weight", e.target.value)}
@@ -2301,7 +2714,7 @@ const MarketProductForm = ({
                 </label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     name="purchase_price"
                     className="market-product-form__input"
                     value={newItemData.purchase_price}
@@ -2309,17 +2722,23 @@ const MarketProductForm = ({
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
+                {fieldErrors.purchase_price && (
+                  <p className="add-product-page__error">
+                    {fieldErrors.purchase_price}
+                  </p>
+                )}
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">Наценка</label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     className="market-product-form__input"
                     value={marketData.markup}
-                    onChange={(e) =>
-                      handleMarketDataChange("markup", e.target.value)
-                    }
+                    onChange={(e) => {
+                      setIsMarkupManuallyChanged(true);
+                      handleMarketDataChange("markup", e.target.value);
+                    }}
                   />
                   <span className="market-product-form__currency">%</span>
                 </div>
@@ -2330,7 +2749,7 @@ const MarketProductForm = ({
                 </label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     name="price"
                     className="market-product-form__input"
                     value={newItemData.price}
@@ -2339,12 +2758,15 @@ const MarketProductForm = ({
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
+                {fieldErrors.price && (
+                  <p className="add-product-page__error">{fieldErrors.price}</p>
+                )}
               </div>
               <div className="market-product-form__form-group">
                 <label className="market-product-form__label">Скидка</label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     className="market-product-form__input"
                     value={marketData.discount}
                     onChange={(e) =>
@@ -2364,26 +2786,266 @@ const MarketProductForm = ({
               <label className="market-product-form__label">
                 Выберите поставщика
               </label>
-              <select
-                className="market-product-form__input"
-                value={newItemData.client}
-                onChange={handleChange}
-                name="client"
-              >
-                <option value="">Выберите поставщика</option>
-                {filterClient.map((client, idx) => (
-                  <option key={client.id || idx} value={client.id}>
-                    {client.full_name}
-                  </option>
-                ))}
-              </select>
+              <div className="add-product-page__supplier-row">
+                <select
+                  className="market-product-form__input"
+                  value={newItemData.client}
+                  onChange={handleChange}
+                  name="client"
+                >
+                  <option value="">Выберите поставщика</option>
+                  {filterClient.map((client, idx) => (
+                    <option key={client.id || idx} value={client.id}>
+                      {client.full_name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="add-product-page__create-supplier"
+                  onClick={() => setShowInputs(!showInputs)}
+                  type="button"
+                >
+                  + Создать поставщика
+                </button>
+              </div>
+              {showInputs && (
+                <form
+                  className="add-product-page__supplier-form"
+                  onSubmit={onSubmit}
+                >
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    placeholder="ФИО"
+                    name="full_name"
+                    value={state.full_name}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    name="llc"
+                    placeholder="ОсОО"
+                    value={state.llc}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    name="inn"
+                    placeholder="ИНН"
+                    value={state.inn}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    name="okpo"
+                    placeholder="ОКПО"
+                    value={state.okpo}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    name="score"
+                    placeholder="Р/СЧЁТ"
+                    value={state.score}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    name="bik"
+                    placeholder="БИК"
+                    value={state.bik}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    name="address"
+                    placeholder="Адрес"
+                    value={state.address}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="text"
+                    name="phone"
+                    placeholder="Телефон"
+                    value={state.phone}
+                  />
+                  <input
+                    className="add-product-page__input"
+                    onChange={(e) =>
+                      setState({ ...state, [e.target.name]: e.target.value })
+                    }
+                    type="email"
+                    name="email"
+                    placeholder="Почта"
+                    value={state.email}
+                  />
+                  <div className="add-product-page__form-actions">
+                    <button
+                      type="button"
+                      className="add-product-page__cancel-btn"
+                      onClick={() => {
+                        setShowInputs(false);
+                        setState({
+                          full_name: "",
+                          phone: "",
+                          email: "",
+                          date: new Date().toISOString().split("T")[0],
+                          type: "suppliers",
+                          llc: "",
+                          inn: "",
+                          okpo: "",
+                          score: "",
+                          bik: "",
+                          address: "",
+                        });
+                      }}
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="submit"
+                      className="add-product-page__save-btn"
+                    >
+                      Создать
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
+
+            {/* Чекбокс для добавления долга */}
+            <label className="add-product-page__checkbox-label">
+              <input
+                type="checkbox"
+                checked={showDebtForm}
+                onChange={(e) => setShowDebtForm(e.target.checked)}
+              />
+              Добавить долг по этому товару
+            </label>
+
+            {/* Форма долга */}
+            {showDebtForm && (
+              <div className="add-product-page__debt-form">
+                {!newItemData.client && (
+                  <p className="add-product-page__error">
+                    Выберите поставщика в форме выше!
+                  </p>
+                )}
+                {company?.subscription_plan?.name === "Старт" &&
+                  newItemData.client && (
+                    <>
+                      <div className="market-product-form__form-group">
+                        <label className="market-product-form__label">
+                          Телефон поставщика
+                        </label>
+                        <input
+                          type="text"
+                          onChange={onChangeDebt}
+                          name="phone"
+                          value={debtState.phone}
+                          className="market-product-form__input"
+                        />
+                      </div>
+                      <div className="market-product-form__form-group">
+                        <label className="market-product-form__label">
+                          Дата оплаты
+                        </label>
+                        <input
+                          type="date"
+                          onChange={onChangeDebt}
+                          name="dueDate"
+                          value={debtState.dueDate}
+                          className="market-product-form__input"
+                        />
+                      </div>
+                    </>
+                  )}
+                <div className="market-product-form__form-group">
+                  <label className="market-product-form__label">
+                    Тип оплаты
+                  </label>
+                  <select
+                    value={debt}
+                    onChange={(e) => setDebt(e.target.value)}
+                    className="market-product-form__input"
+                  >
+                    <option value="">Тип оплаты</option>
+                    <option value="Предоплата">Предоплата</option>
+                    <option value="Долги">Долг</option>
+                  </select>
+                </div>
+                {debt === "Предоплата" && (
+                  <>
+                    <div className="market-product-form__form-group">
+                      <label className="market-product-form__label">
+                        Сумма предоплаты
+                      </label>
+                      <input
+                        type="text"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        className="market-product-form__input"
+                      />
+                    </div>
+                    <div className="market-product-form__form-group">
+                      <label className="market-product-form__label">
+                        Срок долга (мес.)
+                      </label>
+                      <input
+                        type="text"
+                        value={debtMonths}
+                        onChange={(e) => setDebtMonths(e.target.value)}
+                        className="market-product-form__input"
+                      />
+                    </div>
+                  </>
+                )}
+                {debt === "Долги" && (
+                  <div className="market-product-form__form-group">
+                    <label className="market-product-form__label">
+                      Срок долга (мес.)
+                    </label>
+                    <input
+                      type="text"
+                      value={debtMonths}
+                      onChange={(e) => setDebtMonths(e.target.value)}
+                      className="market-product-form__input"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="market-product-form__form-group">
               <label className="market-product-form__label">
                 Минимальный остаток
               </label>
               <input
-                type="number"
+                type="text"
                 className="market-product-form__input"
                 value={marketData.minStock}
                 onChange={(e) =>
@@ -2425,7 +3087,7 @@ const MarketProductForm = ({
                 </label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     name="price"
                     className="market-product-form__input"
                     value={newItemData.price}
@@ -2438,7 +3100,7 @@ const MarketProductForm = ({
                 <label className="market-product-form__label">Скидка</label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     className="market-product-form__input"
                     value={marketData.discount}
                     onChange={(e) =>
@@ -2500,7 +3162,7 @@ const MarketProductForm = ({
                     <span>{product.name}</span>
                     <div className="market-product-form__kit-product-actions">
                       <input
-                        type="number"
+                        type="text"
                         className="market-product-form__kit-quantity-input"
                         value={product.quantity || 1}
                         min="1"
@@ -2543,7 +3205,7 @@ const MarketProductForm = ({
                 </label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     name="price"
                     className="market-product-form__input"
                     value={newItemData.price}
@@ -2582,7 +3244,7 @@ const MarketProductForm = ({
                 <label className="market-product-form__label">Скидка</label>
                 <div className="market-product-form__price-input">
                   <input
-                    type="number"
+                    type="text"
                     className="market-product-form__input"
                     value={marketData.discount}
                     onChange={(e) =>

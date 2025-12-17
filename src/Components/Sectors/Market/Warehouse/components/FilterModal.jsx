@@ -180,6 +180,24 @@ const FilterModal = ({
               }
             >
               <option value="">Выберите</option>
+              <option value="товары_со_скидкой">Товары со скидкой</option>
+              <option value="срок_годности_истекает_7_дней">
+                Срок годности истекает в течение 7 дней
+              </option>
+              <option value="нулевая_себестоимость">
+                Нулевая себестоимость
+              </option>
+              <option value="истек_срок_годности">Истёк срок годности</option>
+              <option value="нет_в_наличии">Нет в наличии</option>
+              <option value="не_продаются_3_месяца">
+                Не продаются 3 месяца
+              </option>
+              <option value="отрицательный_остаток">
+                Отрицательный остаток
+              </option>
+              <option value="общий_остаток_меньше_минимального">
+                Общий остаток меньше минимального
+              </option>
             </select>
           </div>
 
@@ -263,7 +281,10 @@ const FilterModal = ({
                   handleInputChange("price", "type", e.target.value)
                 }
               >
-                <option value="базовая">базовая</option>
+                <option value="базовая">Базовая</option>
+                <option value="цена закупки">Цена закупки</option>
+                <option value="себестоимость">Себестоимость</option>
+                <option value="скидка">Скидка</option>
               </select>
               <select
                 className="warehouse-filter-modal__select-small"
@@ -289,7 +310,7 @@ const FilterModal = ({
           </div>
 
           {/* Остатки */}
-          <div className="warehouse-filter-modal__section">
+          {/* <div className="warehouse-filter-modal__section">
             <label className="warehouse-filter-modal__label">Остатки</label>
             <div className="warehouse-filter-modal__row">
               <select
@@ -322,7 +343,7 @@ const FilterModal = ({
               />
               <button className="warehouse-filter-modal__add-btn">+</button>
             </div>
-          </div>
+          </div> */}
 
           {/* Срок годности */}
           <div className="warehouse-filter-modal__section">
@@ -338,6 +359,7 @@ const FilterModal = ({
                 }
               >
                 <option value="истекает в течение">истекает в течение</option>
+                <option value="истек">истек</option>
               </select>
               <input
                 type="number"
@@ -352,7 +374,7 @@ const FilterModal = ({
           </div>
 
           {/* Изменения товара */}
-          <div className="warehouse-filter-modal__section">
+          {/* <div className="warehouse-filter-modal__section">
             <label className="warehouse-filter-modal__label">
               Изменения товара
             </label>
@@ -380,7 +402,7 @@ const FilterModal = ({
               />
               <span className="warehouse-filter-modal__unit">дней</span>
             </div>
-          </div>
+          </div> */}
 
           {/* Продаваемость */}
           <div className="warehouse-filter-modal__section">
@@ -397,6 +419,9 @@ const FilterModal = ({
               >
                 <option value="продавался в течение">
                   продавался в течение
+                </option>
+                <option value="не продавался в течение">
+                  не продавался в течение
                 </option>
               </select>
               <input

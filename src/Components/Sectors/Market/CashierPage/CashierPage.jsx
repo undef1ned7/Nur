@@ -1,0 +1,1409 @@
+import {
+  ArrowLeft,
+  Menu,
+  Minus,
+  Plus,
+  Search,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import useScanDetection from "use-scan-detection";
+import { useDebounce } from "../../../../hooks/useDebounce";
+import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
+import { fetchProductsAsync } from "../../../../store/creators/productCreators";
+import {
+  addCustomItem,
+  deleteProductInCart,
+  manualFilling,
+  sendBarCode,
+  startSale,
+  updateManualFilling,
+} from "../../../../store/creators/saleThunk";
+import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
+import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
+import { useClient } from "../../../../store/slices/ClientSlice";
+import { useProducts } from "../../../../store/slices/productSlice";
+import { useSale } from "../../../../store/slices/saleSlice";
+import { useShifts } from "../../../../store/slices/shiftSlice";
+import { useUser } from "../../../../store/slices/userSlice";
+import AlertModal from "../../../common/AlertModal/AlertModal";
+import CustomServiceModal from "../../../pages/Sell/components/CustomServiceModal";
+import DiscountModal from "../../../pages/Sell/components/DiscountModal";
+import "./CashierPage.scss";
+import CloseShiftPage from "./CloseShiftPage";
+import CustomerModal from "./components/CustomerModal";
+import DebtPaymentModal from "./components/DebtPaymentModal";
+import MenuModal from "./components/MenuModal";
+import ReceiptsModal from "./components/ReceiptsModal";
+import OpenShiftPage from "./OpenShiftPage";
+import PaymentPage from "./PaymentPage";
+import ShiftPage from "./ShiftPage";
+
+const CashierPage = () => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { list: products } = useProducts();
+  const { list: clients } = useClient();
+  const { start: currentSale, loading: saleLoading } = useSale();
+  const { shifts } = useShifts();
+  const { list: cashBoxes } = useCash();
+  const { currentUser, userId } = useUser();
+
+  // Получаем текущую открытую смену (мемоизируем, чтобы избежать лишних пересчетов)
+  const openShift = React.useMemo(
+    () => shifts.find((s) => s.status === "open"),
+    [shifts]
+  );
+  const openShiftId = openShift?.id;
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [cart, setCart] = useState([]);
+  const cartOrderRef = React.useRef([]); // Сохраняем порядок элементов корзины
+  const [cartQuantities, setCartQuantities] = useState({}); // Локальные значения количества для каждого товара
+  const lastSearchInputTime = React.useRef(0); // Время последнего ввода в поле поиска (для защиты от открытия страницы оплаты при сканировании)
+  const searchInputRef = React.useRef(null); // Ref для поля поиска
+  const lastScanTimeRef = React.useRef(0); // Время последнего сканирования (как в SellMainStart.jsx)
+  const isScanningRef = React.useRef(false); // Флаг, указывающий что идет или недавно было сканирование
+  const lastScannedBarcodeRef = React.useRef(""); // Последний отсканированный штрих-код
+  const searchClearedAfterScanRef = React.useRef(false); // Флаг, что поле поиска было очищено после сканирования
+  const scanKeysRef = React.useRef({ count: 0, lastTime: 0 }); // Отслеживание быстрого набора символов для детекции сканера
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showPaymentPage, setShowPaymentPage] = useState(false);
+  const [showShiftPage, setShowShiftPage] = useState(false);
+  const [showOpenShiftPage, setShowOpenShiftPage] = useState(false);
+  const [showCloseShiftPage, setShowCloseShiftPage] = useState(false);
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [showReceiptsModal, setShowReceiptsModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountValue, setDiscountValue] = useState("");
+  const [customService, setCustomService] = useState({
+    name: "",
+    price: "",
+    quantity: "1",
+  });
+  const [alertModal, setAlertModal] = useState({
+    open: false,
+    type: "error",
+    title: "",
+    message: "",
+  });
+
+  // Функция для показа AlertModal
+  const showAlert = (type, title, message) => {
+    setAlertModal({
+      open: true,
+      type,
+      title,
+      message,
+    });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, open: false }));
+  };
+
+  // Функция для обновления продажи после запросов
+  const refreshSale = async () => {
+    // Не обновляем продажу, если нет открытой смены
+    if (currentSale?.id && openShiftId) {
+      try {
+        const currentDiscount = currentSale?.order_discount_total || 0;
+        await dispatch(
+          startSale({
+            discount_total: currentDiscount,
+            shift: openShiftId,
+          })
+        ).unwrap();
+      } catch (error) {
+        console.error("Ошибка при обновлении продажи:", error);
+      }
+    }
+  };
+
+  // Debounced функция для обновления общей скидки
+  const debouncedDiscount = useDebounce((discount) => {
+    // Не обновляем скидку, если нет открытой смены или продажи
+    if (!currentSale?.id || !openShiftId) return;
+    dispatch(
+      startSale({
+        discount_total: parseFloat(discount) || 0,
+        shift: openShiftId,
+      })
+    );
+  }, 600);
+
+  const handleDiscountChange = (discount) => {
+    const discountNum = parseFloat(discount) || 0;
+    debouncedDiscount(discountNum);
+  };
+
+  // Функция для добавления доп. услуги
+  const handleAddCustomService = async () => {
+    try {
+      if (!customService.name.trim()) {
+        showAlert("error", "Ошибка", "Введите название услуги");
+        return;
+      }
+      if (!customService.price.trim() || Number(customService.price) <= 0) {
+        showAlert("error", "Ошибка", "Введите корректную цену услуги");
+        return;
+      }
+      if (!currentSale?.id) {
+        showAlert(
+          "error",
+          "Ошибка",
+          "Корзина не инициализирована. Пожалуйста, подождите..."
+        );
+        return;
+      }
+      await dispatch(
+        addCustomItem({
+          id: currentSale.id,
+          name: customService.name.trim(),
+          price: customService.price.trim(),
+          quantity: Number(customService.quantity) || 1,
+        })
+      ).unwrap();
+      await refreshSale();
+      setCustomService({ name: "", price: "", quantity: "1" });
+      setShowCustomServiceModal(false);
+      showAlert("success", "Успех", "Дополнительная услуга успешно добавлена!");
+    } catch (error) {
+      console.error("Ошибка при добавлении дополнительной услуги:", error);
+      showAlert(
+        "error",
+        "Ошибка",
+        error?.data?.detail ||
+          error?.message ||
+          "Ошибка при добавлении дополнительной услуги"
+      );
+    }
+  };
+
+  // Автодобавление товара по сканеру штрих-кода
+  // Отслеживаем сканирование напрямую для автоматического создания продажи
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const barcodeProcessingRef = React.useRef(false);
+
+  useScanDetection({
+    minLength: 3,
+    onComplete: async (barcode) => {
+      if (!barcode || barcode.length < 3) return;
+      if (barcodeProcessingRef.current) return;
+
+      // Запоминаем время сканирования и устанавливаем флаги
+      const scanTime = Date.now();
+      lastScanTimeRef.current = scanTime;
+      isScanningRef.current = true;
+      lastScannedBarcodeRef.current = barcode;
+      setScannedBarcode(barcode);
+
+      // Проверяем наличие открытой смены
+      if (!openShiftId) {
+        showAlert(
+          "warning",
+          "Нет открытой смены",
+          "Для работы с кассой необходимо начать смену"
+        );
+        isScanningRef.current = false;
+        return;
+      }
+
+      barcodeProcessingRef.current = true;
+
+      try {
+        let saleId = currentSale?.id;
+
+        // Если нет продажи, создаем её
+        if (!saleId) {
+          const result = await dispatch(
+            startSale({
+              discount_total: 0,
+              shift: openShiftId,
+            })
+          ).unwrap();
+          saleId = result?.id;
+        }
+
+        if (!saleId) {
+          showAlert("error", "Ошибка", "Не удалось создать продажу");
+          barcodeProcessingRef.current = false;
+          return;
+        }
+
+        // Проверяем наличие товара ПЕРЕД добавлением в корзину
+        // Ищем товар в списке продуктов по штрих-коду
+        const scannedProduct = products.find(
+          (p) => p.barcode === barcode || p.barcode?.toString() === barcode
+        );
+
+        if (scannedProduct) {
+          const availableQuantity = parseFloat(scannedProduct.quantity || 0);
+          const isInStock = availableQuantity > 0;
+
+          if (!isInStock) {
+            showAlert(
+              "warning",
+              "Товар отсутствует",
+              "Товар отсутствует в наличии"
+            );
+            barcodeProcessingRef.current = false;
+            setScannedBarcode("");
+            return;
+          }
+        }
+
+        // Добавляем товар по штрих-коду
+        const res = await dispatch(
+          sendBarCode({ barcode, id: saleId })
+        ).unwrap();
+
+        if (res?.error) {
+          const msg =
+            typeof res.error === "string"
+              ? res.error
+              : "Товар с таким штрих-кодом не найден";
+          showAlert("error", "Ошибка сканирования", msg);
+        } else {
+          // Обновляем продажу после добавления товара
+          await dispatch(
+            startSale({ discount_total: 0, shift: openShiftId })
+          ).unwrap();
+          // Обновляем время последнего сканирования после успешного добавления
+          // Это защитит от открытия страницы оплаты при Enter от сканера
+          lastScanTimeRef.current = Date.now();
+          // Убеждаемся, что флаг сканирования установлен
+          isScanningRef.current = true;
+        }
+      } catch (error) {
+        console.error("Ошибка при сканировании:", error);
+        showAlert(
+          "error",
+          "Ошибка сканирования",
+          error?.message || "Не удалось добавить товар по штрих-коду"
+        );
+      } finally {
+        barcodeProcessingRef.current = false;
+        setScannedBarcode("");
+        // Обновляем время последнего сканирования в любом случае
+        // для защиты от открытия страницы оплаты
+        lastScanTimeRef.current = Date.now();
+        // Помечаем, что поле поиска было очищено после сканирования
+        searchClearedAfterScanRef.current = true;
+        // Убеждаемся, что флаг сканирования установлен (на случай, если он был сброшен)
+        isScanningRef.current = true;
+
+        // Сбрасываем флаг сканирования с задержкой, чтобы Enter от сканера успел обработаться
+        // Задержка 3 секунды гарантирует, что Enter от сканера будет обработан даже при медленном соединении
+        setTimeout(() => {
+          isScanningRef.current = false;
+          searchClearedAfterScanRef.current = false;
+        }, 3000);
+      }
+    },
+  });
+
+  // Инициализация данных при первой загрузке
+  useEffect(() => {
+    dispatch(fetchProductsAsync({ page: 1 }));
+    dispatch(fetchClientsAsync());
+    dispatch(fetchShiftsAsync());
+    dispatch(getCashBoxes());
+  }, [dispatch]);
+
+  // Закрываем экран открытия смены, если смена открыта или пользователь на странице смены
+  useEffect(() => {
+    if (showShiftPage || openShift) {
+      setShowOpenShiftPage(false);
+    }
+  }, [shifts, openShift, showShiftPage]);
+
+  // Продажа создается только при добавлении товара в корзину, а не автоматически при загрузке страницы
+
+  // Синхронизируем локальную корзину с данными из API, сохраняя порядок
+  useEffect(() => {
+    if (currentSale) {
+      // startSale возвращает объект с полем items напрямую, а не cart.items
+      const items = currentSale.items || currentSale.cart?.items || [];
+
+      if (items.length > 0) {
+        const apiCart = items.map((item) => ({
+          id: item.product || item.product_id,
+          itemId: item.id, // ID элемента в корзине (для идентификации)
+          name: item.product_name || item.display_name || item.name || "—",
+          price: parseFloat(item.unit_price || item.price || 0),
+          quantity: item.quantity || 0,
+          unit: item.unit || "шт",
+          image:
+            item.primary_image_url ||
+            (item.images && item.images[0]?.image_url) ||
+            null,
+        }));
+
+        // Сохраняем порядок элементов: используем сохраненный порядок
+        // Убираем дубликаты по itemId (уникальный ID элемента в корзине)
+        const seenItemIds = new Set();
+        const uniqueApiCart = apiCart.filter((item) => {
+          if (item.itemId && seenItemIds.has(item.itemId)) {
+            return false; // Пропускаем дубликаты по itemId
+          }
+          if (item.itemId) {
+            seenItemIds.add(item.itemId);
+          }
+          return true;
+        });
+
+        const orderedCart = [];
+        const processedProductIds = new Set();
+
+        // Если у нас есть сохраненный порядок, используем его
+        if (cartOrderRef.current.length > 0) {
+          // Сначала добавляем элементы в сохраненном порядке
+          cartOrderRef.current.forEach((savedProductId) => {
+            const item = uniqueApiCart.find(
+              (cartItem) => cartItem.id === savedProductId
+            );
+            if (item && !processedProductIds.has(item.id)) {
+              orderedCart.push(item);
+              processedProductIds.add(item.id);
+            }
+          });
+        }
+
+        // Затем добавляем новые элементы, которых нет в сохраненном порядке
+        uniqueApiCart.forEach((item) => {
+          if (!processedProductIds.has(item.id)) {
+            orderedCart.push(item);
+            processedProductIds.add(item.id);
+          }
+        });
+
+        // Обновляем сохраненный порядок
+        cartOrderRef.current = orderedCart.map((item) => item.id);
+
+        // Обновляем локальные значения количества
+        const newQuantities = {};
+        orderedCart.forEach((item) => {
+          newQuantities[item.id] = String(item.quantity || 0);
+        });
+        setCartQuantities((prev) => ({ ...prev, ...newQuantities }));
+
+        setCart(orderedCart);
+      } else {
+        // Если корзина пуста
+        setCart([]);
+        cartOrderRef.current = [];
+      }
+    }
+  }, [currentSale]);
+
+  // Объявляем filteredProducts до его использования
+  const filteredProducts = products.filter((product) =>
+    product.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Объявляем handleCheckout до его использования в useEffect
+  const handleCheckout = useCallback(() => {
+    if (cart.length === 0 || !currentSale?.id) return;
+    setShowPaymentPage(true);
+  }, [cart.length, currentSale?.id]);
+
+  // Обновляем время последнего ввода в поле поиска при каждом изменении (для защиты от открытия страницы оплаты при сканировании)
+  // Это делается в onChange поля поиска, но оставляем useEffect как дополнительную защиту
+  useEffect(() => {
+    if (searchTerm) {
+      lastSearchInputTime.current = Date.now();
+    }
+  }, [searchTerm]);
+
+  // Глобальный обработчик Enter для открытия страницы оплаты (с защитой от сканера)
+  useEffect(() => {
+    const handleGlobalEnter = (e) => {
+      const now = Date.now();
+
+      // Детекция сканера по скорости набора символов
+      // Если много символов подряд очень быстро - это похоже на сканер
+      const isChar = e.key.length === 1 && /^[0-9A-Za-z]$/.test(e.key);
+
+      if (isChar) {
+        const dt = now - scanKeysRef.current.lastTime;
+        scanKeysRef.current.count = dt < 50 ? scanKeysRef.current.count + 1 : 1;
+        scanKeysRef.current.lastTime = now;
+
+        if (scanKeysRef.current.count >= 6) {
+          isScanningRef.current = true;
+          lastScanTimeRef.current = now;
+        }
+      }
+
+      // Enter сразу после быстрой последовательности — это почти наверняка Enter сканера
+      if (e.key === "Enter" && scanKeysRef.current.count >= 6) {
+        lastScanTimeRef.current = now;
+        isScanningRef.current = true;
+        scanKeysRef.current.count = 0;
+
+        setTimeout(() => {
+          isScanningRef.current = false;
+        }, 3000);
+
+        return; // НЕ открываем оплату
+      }
+
+      // Пропускаем, если нажатие было в поле ввода или textarea
+      const target = e.target;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        // Если это поле поиска, не обрабатываем здесь (обрабатывается в onKeyDown)
+        if (target.className?.includes("cashier-page__search-input")) {
+          return;
+        }
+        // Если это поле количества, не обрабатываем здесь
+        if (
+          target.className?.includes("cashier-page__cart-item-quantity-input")
+        ) {
+          return;
+        }
+        return;
+      }
+
+      // Пропускаем, если открыты модальные окна или экраны
+      if (
+        showMenuModal ||
+        showCustomerModal ||
+        showPaymentPage ||
+        showShiftPage ||
+        showOpenShiftPage ||
+        showCloseShiftPage ||
+        showDebtModal ||
+        showReceiptsModal ||
+        showCustomServiceModal ||
+        showDiscountModal
+      ) {
+        return;
+      }
+
+      // НОВАЯ НАДЕЖНАЯ ЛОГИКА: НЕ открываем страницу, если было недавнее сканирование
+      const timeSinceLastScan = Date.now() - lastScanTimeRef.current;
+      const timeSinceLastInput = Date.now() - lastSearchInputTime.current;
+
+      // Проверяем, что фокус находится в поле поиска
+      const isSearchInputFocused =
+        document.activeElement === searchInputRef.current ||
+        document.activeElement?.className?.includes(
+          "cashier-page__search-input"
+        );
+
+      // ПРИОРИТЕТ 1: Если идет обработка сканирования, НЕ открываем страницу
+      if (barcodeProcessingRef.current) {
+        return;
+      }
+
+      // ПРИОРИТЕТ 2: Если флаг сканирования установлен, НЕ открываем страницу
+      // Это работает даже если обработка уже завершена, но Enter от сканера еще не обработан
+      if (isScanningRef.current) {
+        // Обновляем время при каждом Enter во время сканирования
+        if (e.key === "Enter") {
+          lastScanTimeRef.current = Date.now();
+        }
+        return;
+      }
+
+      // ПРИОРИТЕТ 3: Если было недавнее сканирование (в течение 5000мс), НЕ открываем страницу
+      if (timeSinceLastScan < 5000) {
+        // Если Enter приходит очень быстро после последнего сканирования (в течение 500мс),
+        // это точно Enter от сканера - обновляем время и не открываем страницу
+        if (e.key === "Enter" && timeSinceLastScan < 500) {
+          lastScanTimeRef.current = Date.now();
+          isScanningRef.current = true; // Устанавливаем флаг на случай повторного Enter
+          // Сбрасываем флаг через 3 секунды
+          setTimeout(() => {
+            isScanningRef.current = false;
+          }, 3000);
+          return;
+        }
+
+        // Если поле поиска было очищено после сканирования, это точно сканер
+        if (searchClearedAfterScanRef.current && e.key === "Enter") {
+          lastScanTimeRef.current = Date.now();
+          isScanningRef.current = true;
+          setTimeout(() => {
+            isScanningRef.current = false;
+            searchClearedAfterScanRef.current = false;
+          }, 3000);
+          return;
+        }
+
+        // Обновляем время последнего сканирования при каждом Enter после сканирования
+        // И устанавливаем флаг, чтобы защитить от открытия страницы при повторных Enter
+        if (e.key === "Enter") {
+          lastScanTimeRef.current = Date.now();
+          isScanningRef.current = true;
+          // Сбрасываем флаг через 3 секунды
+          setTimeout(() => {
+            isScanningRef.current = false;
+          }, 3000);
+        }
+        return; // Не открываем страницу оплаты, если недавно было сканирование
+      }
+
+      // ПРИОРИТЕТ 4: Если был недавний ввод в поле поиска (не сканирование), не открываем страницу
+      if (isSearchInputFocused && timeSinceLastInput < 1000) {
+        // Сбрасываем счетчик, так как это не сканер
+        if (e.key === "Enter") {
+          scanKeysRef.current.count = 0;
+        }
+        return; // Не открываем страницу оплаты, если недавно был ручной ввод в поле поиска
+      }
+
+      // Если корзина не пуста, открываем страницу оплаты
+      if (cart.length > 0 && currentSale?.id && e.key === "Enter") {
+        // Сбрасываем счетчик, так как это обычный Enter (не от сканера)
+        scanKeysRef.current.count = 0;
+        e.preventDefault();
+        handleCheckout();
+      } else if (e.key === "Enter") {
+        // Сбрасываем счетчик для любого другого Enter, который не открывает оплату
+        scanKeysRef.current.count = 0;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalEnter);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalEnter);
+    };
+  }, [
+    cart.length,
+    currentSale?.id,
+    handleCheckout,
+    showMenuModal,
+    showCustomerModal,
+    showPaymentPage,
+    showShiftPage,
+    showOpenShiftPage,
+    showCloseShiftPage,
+    showDebtModal,
+    showReceiptsModal,
+    showCustomServiceModal,
+    showDiscountModal,
+  ]);
+
+  const addToCart = async (product) => {
+    // Проверяем наличие товара
+    // Для весовых товаров stock может быть false, но quantity > 0
+    const availableQuantity = parseFloat(product.quantity || 0);
+    const isInStock = availableQuantity > 0;
+
+    if (!isInStock) {
+      showAlert("warning", "Товар отсутствует", "Товар отсутствует в наличии");
+      return;
+    }
+
+    try {
+      // Проверяем наличие открытой смены перед добавлением товара
+      if (!openShiftId) {
+        showAlert(
+          "warning",
+          "Нет открытой смены",
+          "Для работы с кассой необходимо начать смену"
+        );
+        return;
+      }
+
+      let saleId = currentSale?.id;
+
+      // Если продажа еще не создана, создаем её
+      if (!saleId) {
+        const result = await dispatch(
+          startSale({ discount_total: 0, shift: openShiftId })
+        );
+        if (result.type === "sale/start/rejected") {
+          showAlert(
+            "error",
+            "Ошибка",
+            "Ошибка при создании продажи: " +
+              (result.payload?.message || "Неизвестная ошибка")
+          );
+          return;
+        }
+        saleId = result.payload?.id;
+      }
+
+      if (!saleId) {
+        showAlert("error", "Ошибка", "Не удалось получить ID продажи");
+        return;
+      }
+
+      // Проверяем, есть ли товар уже в корзине
+      // startSale возвращает items напрямую, а не cart.items
+      const items = currentSale?.items || currentSale?.cart?.items || [];
+      const existingItem = items.find(
+        (item) => item.product === product.id || item.product_id === product.id
+      );
+
+      if (existingItem) {
+        // Проверяем, не превышает ли новое количество доступное
+        const newQuantity = existingItem.quantity + 1;
+        if (availableQuantity > 0 && newQuantity > availableQuantity) {
+          alert(`Доступно только ${availableQuantity} ${product.unit || "шт"}`);
+          return;
+        }
+
+        // Обновляем количество
+        await dispatch(
+          updateManualFilling({
+            id: saleId,
+            productId: product.id,
+            quantity: newQuantity,
+            discount_total: 0,
+          })
+        );
+        // Обновляем продажу после успешного обновления
+        await refreshSale();
+      } else {
+        // Добавляем новый товар
+        await dispatch(
+          manualFilling({
+            id: saleId,
+            productId: product.id,
+            quantity: 1,
+            discount_total: 0,
+          })
+        );
+        // Обновляем продажу после успешного добавления
+        // cartOrderRef будет обновлен автоматически в useEffect при обновлении currentSale
+        await refreshSale();
+      }
+    } catch (error) {
+      console.error("Ошибка при добавлении товара в корзину:", error);
+      showAlert(
+        "error",
+        "Ошибка",
+        "Ошибка при добавлении товара: " +
+          (error.message || "Неизвестная ошибка")
+      );
+    }
+  };
+
+  const updateQuantity = async (productId, delta) => {
+    if (!currentSale?.id) return;
+
+    try {
+      // Находим товар в списке продуктов для проверки наличия
+      const product = products.find((p) => p.id === productId);
+      if (!product) return;
+
+      // startSale возвращает items напрямую, а не cart.items
+      const items = currentSale?.items || currentSale?.cart?.items || [];
+      const existingItem = items.find(
+        (item) => item.product === productId || item.product_id === productId
+      );
+
+      if (!existingItem) return;
+
+      const newQuantity = Math.max(0, existingItem.quantity + delta);
+
+      // Проверяем наличие при увеличении количества
+      if (delta > 0) {
+        // Для весовых товаров stock может быть false, но quantity > 0
+        const availableQuantity = parseFloat(product.quantity || 0);
+        const isInStock = availableQuantity > 0;
+
+        if (!isInStock) {
+          showAlert(
+            "warning",
+            "Товар отсутствует",
+            "Товар отсутствует в наличии"
+          );
+          return;
+        }
+
+        if (availableQuantity > 0 && newQuantity > availableQuantity) {
+          showAlert(
+            "warning",
+            "Недостаточно товара",
+            `Доступно только ${availableQuantity} ${product.unit || "шт"}`
+          );
+          return;
+        }
+      }
+
+      if (newQuantity === 0) {
+        // Удаляем товар из корзины
+        await dispatch(
+          deleteProductInCart({
+            id: currentSale.id,
+            productId: productId,
+          })
+        );
+        // Удаляем товар из сохраненного порядка
+        cartOrderRef.current = cartOrderRef.current.filter(
+          (id) => id !== productId
+        );
+        // Удаляем из локальных значений количества
+        setCartQuantities((prev) => {
+          const newQuantities = { ...prev };
+          delete newQuantities[productId];
+          return newQuantities;
+        });
+        // Обновляем продажу после успешного удаления
+        await refreshSale();
+      } else {
+        // Обновляем количество
+        await dispatch(
+          updateManualFilling({
+            id: currentSale.id,
+            productId: productId,
+            quantity: newQuantity,
+            discount_total: 0,
+          })
+        );
+        // Обновляем локальное значение количества
+        setCartQuantities((prev) => ({
+          ...prev,
+          [productId]: String(newQuantity),
+        }));
+        // Обновляем продажу после успешного обновления
+        await refreshSale();
+      }
+    } catch (error) {
+      console.error("Ошибка при обновлении количества:", error);
+      showAlert(
+        "error",
+        "Ошибка",
+        "Ошибка при обновлении количества: " +
+          (error.message || "Неизтвестная ошибка")
+      );
+    }
+  };
+
+  // Функция для обновления количества напрямую (без дельты)
+  const updateQuantityDirect = async (productId, newQuantity) => {
+    if (!currentSale?.id) return;
+
+    try {
+      // Находим товар в списке продуктов для проверки наличия
+      const product = products.find((p) => p.id === productId);
+      if (!product) return;
+
+      const qtyNum = Math.max(0, Math.floor(newQuantity));
+
+      // Проверяем наличие
+      const availableQuantity = parseFloat(product.quantity || 0);
+      if (availableQuantity > 0 && qtyNum > availableQuantity) {
+        showAlert(
+          "warning",
+          "Недостаточно товара",
+          `Доступно только ${availableQuantity} ${product.unit || "шт"}`
+        );
+        return;
+      }
+
+      if (qtyNum === 0) {
+        await removeFromCart(productId);
+      } else {
+        // Обновляем количество
+        await dispatch(
+          updateManualFilling({
+            id: currentSale.id,
+            productId: productId,
+            quantity: qtyNum,
+            discount_total: 0,
+          })
+        );
+        // Обновляем локальное значение количества
+        setCartQuantities((prev) => ({
+          ...prev,
+          [productId]: String(qtyNum),
+        }));
+        // Обновляем продажу после успешного обновления
+        await refreshSale();
+      }
+    } catch (error) {
+      console.error("Ошибка при обновлении количества:", error);
+      showAlert(
+        "error",
+        "Ошибка",
+        "Ошибка при обновлении количества: " +
+          (error.message || "Неизвестная ошибка")
+      );
+    }
+  };
+
+  const removeFromCart = async (productId) => {
+    if (!currentSale?.id) return;
+
+    try {
+      // Удаляем товар из корзины
+      await dispatch(
+        deleteProductInCart({
+          id: currentSale.id,
+          productId: productId,
+        })
+      );
+      // Удаляем товар из сохраненного порядка
+      cartOrderRef.current = cartOrderRef.current.filter(
+        (id) => id !== productId
+      );
+      // Удаляем из локальных значений количества
+      setCartQuantities((prev) => {
+        const newQuantities = { ...prev };
+        delete newQuantities[productId];
+        return newQuantities;
+      });
+      // Обновляем продажу после успешного удаления
+      await refreshSale();
+    } catch (error) {
+      console.error("Ошибка при удалении товара:", error);
+      showAlert(
+        "error",
+        "Ошибка",
+        "Ошибка при удалении товара: " + (error.message || "Неизвестная ошибка")
+      );
+    }
+  };
+
+  const total =
+    parseFloat(currentSale?.total || 0) ||
+    cart.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+
+  const handleMenuAction = (action) => {
+    setShowMenuModal(false);
+    if (action === "shifts") {
+      setShowShiftPage(true);
+    } else if (action === "debt") {
+      setShowDebtModal(true);
+    } else if (action === "receipts") {
+      setShowReceiptsModal(true);
+    }
+  };
+
+  const handleCloseShift = () => {
+    if (!openShift?.id) return;
+    // Показываем экран закрытия смены
+    setShowCloseShiftPage(true);
+  };
+
+  // Функция для открытия смены
+  const handleStartShift = () => {
+    // Показываем экран открытия смены
+    setShowOpenShiftPage(true);
+  };
+
+  if (showShiftPage) {
+    return <ShiftPage onBack={() => setShowShiftPage(false)} />;
+  }
+
+  if (showOpenShiftPage) {
+    return (
+      <OpenShiftPage
+        onBack={() => {
+          setShowOpenShiftPage(false);
+          // Обновляем список смен после возврата
+          dispatch(fetchShiftsAsync());
+        }}
+      />
+    );
+  }
+
+  if (showCloseShiftPage) {
+    return (
+      <CloseShiftPage
+        onBack={() => {
+          setShowCloseShiftPage(false);
+          // Обновляем список смен после возврата
+          dispatch(fetchShiftsAsync());
+          // Обновляем продажу после закрытия смены
+          refreshSale();
+          // Очищаем корзину и текущую продажу
+          setCart([]);
+          setSelectedCustomer(null);
+        }}
+        shift={openShift}
+      />
+    );
+  }
+
+  if (showPaymentPage) {
+    return (
+      <PaymentPage
+        cart={cart}
+        total={total}
+        customer={selectedCustomer}
+        onBack={() => setShowPaymentPage(false)}
+        onSelectCustomer={(customer) => {
+          setSelectedCustomer(customer);
+        }}
+        onComplete={async () => {
+          setShowPaymentPage(false);
+          setCart([]);
+          cartOrderRef.current = []; // Очищаем порядок при завершении продажи
+          setSelectedCustomer(null);
+          // Начинаем новую продажу после завершения (только если есть открытая смена)
+          if (openShiftId) {
+            await dispatch(
+              startSale({ discount_total: 0, shift: openShiftId })
+            );
+            // Обновляем продажу после создания новой
+            await refreshSale();
+          }
+        }}
+        saleId={currentSale?.id}
+        customers={clients}
+        sale={currentSale}
+      />
+    );
+  }
+
+  return (
+    <div className="cashier-page">
+      <div className="cashier-page__header">
+        <div className="cashier-page__header-left">
+          <button
+            className="cashier-page__back-btn"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h1 className="cashier-page__title">Касса</h1>
+            <p className="cashier-page__subtitle">
+              {openShiftId ? (
+                <>
+                  Смена #
+                  {openShift?.code ||
+                    (() => {
+                      const idStr = openShiftId.toString();
+                      // Извлекаем только цифры из ID
+                      const digitsOnly = idStr.replace(/\D/g, "");
+                      // Если есть достаточно цифр (минимум 4), используем последние 8, иначе используем последние 8 символов без дефисов
+                      return digitsOnly.length >= 4
+                        ? digitsOnly.slice(-8)
+                        : idStr.replace(/-/g, "").slice(-8).toUpperCase();
+                    })() ||
+                    "—"}{" "}
+                  • {openShift.cashier_display || "—"}
+                </>
+              ) : (
+                "Нет открытой смены"
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="cashier-page__header-right">
+          {openShiftId && openShift?.status === "open" ? (
+            <button
+              className="cashier-page__close-shift-btn"
+              onClick={handleCloseShift}
+            >
+              Завершить смену
+            </button>
+          ) : (
+            <button
+              className="cashier-page__close-shift-btn"
+              onClick={handleStartShift}
+              style={{ backgroundColor: "#22c55e" }}
+            >
+              Начать смену
+            </button>
+          )}
+          <button
+            className="cashier-page__menu-btn"
+            onClick={() => setShowMenuModal(true)}
+          >
+            <Menu size={24} />
+          </button>
+        </div>
+      </div>
+
+      <div className="cashier-page__content">
+        <div className="cashier-page__products">
+          <div className="cashier-page__search">
+            <Search size={20} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Поиск товаров..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                // Обновляем время последнего ввода при каждом изменении (для защиты от сканера)
+                lastSearchInputTime.current = Date.now();
+                // Если пользователь вводит текст вручную, сбрасываем флаг очистки после сканирования
+                if (e.target.value.length > 0) {
+                  searchClearedAfterScanRef.current = false;
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+
+                  // Если в поле поиска есть текст и нажат Enter, это может быть сканирование
+                  // Обновляем время сканирования как fallback (на случай, если onScanned еще не сработал)
+                  if (searchTerm.length > 0) {
+                    const timeSinceLastInput =
+                      Date.now() - lastSearchInputTime.current;
+                    // Если ввод был недавно (менее 500мс), считаем это сканированием
+                    if (timeSinceLastInput < 500) {
+                      lastScanTimeRef.current = Date.now();
+                      isScanningRef.current = true;
+                      // Сбрасываем флаг через 2 секунды
+                      setTimeout(() => {
+                        isScanningRef.current = false;
+                      }, 2000);
+                    }
+                  }
+
+                  // Обновляем время последнего ввода (сканер завершает ввод Enter'ом)
+                  lastSearchInputTime.current = Date.now();
+
+                  // Если есть найденные товары, добавляем первый в корзину
+                  if (filteredProducts.length > 0) {
+                    addToCart(filteredProducts[0]);
+                    // Очищаем поле поиска после добавления товара
+                    setSearchTerm("");
+                    // Сбрасываем флаг очистки после сканирования, так как это ручное добавление
+                    searchClearedAfterScanRef.current = false;
+                  }
+                }
+              }}
+              className="cashier-page__search-input"
+            />
+          </div>
+
+          <div className="cashier-page__products-grid">
+            {filteredProducts.map((product) => {
+              const cartItem = cart.find((item) => item.id === product.id);
+              return (
+                <div
+                  key={product.id}
+                  className={`cashier-page__product-card ${
+                    cartItem ? "cashier-page__product-card--selected" : ""
+                  }`}
+                  onClick={() => addToCart(product)}
+                >
+                  {cartItem && (
+                    <div className="cashier-page__product-badge">
+                      {cartItem.quantity}
+                    </div>
+                  )}
+                  <div className="cashier-page__product-name">
+                    {product.name || "—"}
+                  </div>
+                  <div className="cashier-page__product-price">
+                    {product.price || 0} сом
+                  </div>
+                  <div className="cashier-page__product-stock">
+                    {product.quantity || 0} {product.unit || "шт"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="cashier-page__cart">
+          <div className="cashier-page__cart-header">
+            <h2 className="cashier-page__cart-title">Корзина</h2>
+            <button
+              className="cashier-page__cart-customer-btn"
+              onClick={() => setShowCustomerModal(true)}
+            >
+              <UserPlus size={20} />
+            </button>
+          </div>
+
+          {/* Кнопки для скидки и доп. услуг */}
+          <div className="cashier-page__cart-actions">
+            <button
+              className="cashier-page__cart-action-btn"
+              onClick={() => {
+                setDiscountValue(currentSale?.order_discount_total || "");
+                setShowDiscountModal(true);
+              }}
+              title="Добавить общую скидку"
+            >
+              Скидка
+            </button>
+            <button
+              className="cashier-page__cart-action-btn"
+              onClick={() => setShowCustomServiceModal(true)}
+              title="Добавить дополнительную услугу"
+            >
+              Доп. услуга
+            </button>
+          </div>
+
+          <div className="cashier-page__cart-items">
+            {cart.length === 0 ? (
+              <div className="cashier-page__cart-empty">Корзина пуста</div>
+            ) : (
+              cart.map((item) => (
+                <div key={item.id} className="cashier-page__cart-item">
+                  <div className="cashier-page__cart-item-info">
+                    <div className="cashier-page__cart-item-name">
+                      {item.name}
+                    </div>
+                    <div className="cashier-page__cart-item-controls">
+                      <button
+                        className="cashier-page__cart-item-btn"
+                        onClick={() => updateQuantity(item.id, -1)}
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <input
+                        type="text"
+                        className="cashier-page__cart-item-quantity-input"
+                        value={cartQuantities[item.id] ?? item.quantity}
+                        onChange={(e) => {
+                          const value = e.target.value;
+
+                          // Если поле пустое, разрешаем ввод (для очистки)
+                          if (value === "" || value === "-") {
+                            setCartQuantities((prev) => ({
+                              ...prev,
+                              [item.id]: value,
+                            }));
+                            return;
+                          }
+
+                          // Проверяем, что введено число
+                          const numValue = parseFloat(value);
+                          if (isNaN(numValue)) {
+                            return; // Не обновляем, если не число
+                          }
+
+                          // Находим товар для проверки максимального количества
+                          const product = products.find(
+                            (p) => p.id === item.id
+                          );
+                          if (product) {
+                            const availableQuantity = parseFloat(
+                              product.quantity || 0
+                            );
+
+                            // Если есть ограничение по количеству, не позволяем ввести больше
+                            if (
+                              availableQuantity > 0 &&
+                              numValue > availableQuantity
+                            ) {
+                              // Ограничиваем максимальным доступным количеством
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: String(availableQuantity),
+                              }));
+                              showAlert(
+                                "warning",
+                                "Недостаточно товара",
+                                `Доступно только ${availableQuantity} ${
+                                  product.unit || "шт"
+                                }`
+                              );
+                              return;
+                            }
+                          }
+
+                          // Разрешаем ввод только положительных чисел
+                          if (numValue < 0) {
+                            setCartQuantities((prev) => ({
+                              ...prev,
+                              [item.id]: "0",
+                            }));
+                            return;
+                          }
+
+                          setCartQuantities((prev) => ({
+                            ...prev,
+                            [item.id]: value,
+                          }));
+                        }}
+                        onBlur={async (e) => {
+                          const value = e.target.value;
+                          const qtyNum = Math.max(
+                            0,
+                            Math.floor(parseFloat(value) || 0)
+                          );
+
+                          // Находим товар для проверки наличия
+                          const product = products.find(
+                            (p) => p.id === item.id
+                          );
+                          if (product) {
+                            const availableQuantity = parseFloat(
+                              product.quantity || 0
+                            );
+                            if (
+                              availableQuantity > 0 &&
+                              qtyNum > availableQuantity
+                            ) {
+                              showAlert(
+                                "warning",
+                                "Недостаточно товара",
+                                `Доступно только ${availableQuantity} ${
+                                  product.unit || "шт"
+                                }`
+                              );
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: String(item.quantity || 0),
+                              }));
+                              return;
+                            }
+                          }
+
+                          if (qtyNum === 0) {
+                            await removeFromCart(item.id);
+                          } else if (qtyNum !== item.quantity) {
+                            await updateQuantityDirect(item.id, qtyNum);
+                          } else {
+                            // Если количество не изменилось, просто обновляем локальное значение
+                            setCartQuantities((prev) => ({
+                              ...prev,
+                              [item.id]: String(item.quantity || 0),
+                            }));
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.target.blur();
+                          }
+                        }}
+                        min="0"
+                        step="1"
+                      />
+                      <button
+                        className="cashier-page__cart-item-btn"
+                        onClick={() => updateQuantity(item.id, 1)}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="cashier-page__cart-item-actions">
+                    <button
+                      className="cashier-page__cart-item-remove"
+                      onClick={() => removeFromCart(item.id)}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <div className="cashier-page__cart-item-price">
+                      {(item.price || 0) * item.quantity} сом
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {cart.length > 0 && (
+            <div className="cashier-page__cart-footer">
+              {currentSale?.order_discount_total > 0 && (
+                <div className="cashier-page__cart-discount">
+                  <span>Скидка:</span>
+                  <span>
+                    -
+                    {parseFloat(currentSale.order_discount_total || 0).toFixed(
+                      2
+                    )}{" "}
+                    сом
+                  </span>
+                </div>
+              )}
+              <div className="cashier-page__cart-total">
+                <span>Итого:</span>
+                <span>{total.toFixed(2)} сом</span>
+              </div>
+              <button
+                className="cashier-page__checkout-btn"
+                onClick={handleCheckout}
+              >
+                ОФОРМИТЬ{" "}
+                <span style={{ fontSize: "12px", opacity: 0.7 }}>[ENTER]</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showMenuModal && (
+        <MenuModal
+          onClose={() => setShowMenuModal(false)}
+          onAction={handleMenuAction}
+        />
+      )}
+
+      {showCustomerModal && (
+        <CustomerModal
+          onClose={() => setShowCustomerModal(false)}
+          onSelect={(customer) => {
+            setSelectedCustomer(customer);
+            setShowCustomerModal(false);
+          }}
+          customers={clients}
+        />
+      )}
+
+      {showDebtModal && (
+        <DebtPaymentModal
+          onClose={() => setShowDebtModal(false)}
+          customers={clients}
+        />
+      )}
+
+      {showReceiptsModal && (
+        <ReceiptsModal onClose={() => setShowReceiptsModal(false)} />
+      )}
+
+      {showCustomServiceModal && (
+        <CustomServiceModal
+          show={showCustomServiceModal}
+          onClose={() => {
+            setShowCustomServiceModal(false);
+            setCustomService({ name: "", price: "", quantity: "1" });
+          }}
+          customService={customService}
+          setCustomService={setCustomService}
+          onAdd={handleAddCustomService}
+        />
+      )}
+
+      {showDiscountModal && (
+        <DiscountModal
+          show={showDiscountModal}
+          onClose={() => {
+            setShowDiscountModal(false);
+            setDiscountValue("");
+          }}
+          discountValue={discountValue}
+          setDiscountValue={setDiscountValue}
+          currentSubtotal={currentSale?.subtotal || 0}
+          onApply={(discount) => {
+            handleDiscountChange(discount);
+            setShowDiscountModal(false);
+            setDiscountValue("");
+          }}
+        />
+      )}
+
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        okText="ОК"
+        onClose={closeAlert}
+        onConfirm={closeAlert}
+      />
+    </div>
+  );
+};
+
+export default CashierPage;
