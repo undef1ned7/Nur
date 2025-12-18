@@ -53,7 +53,6 @@ const ExportModal = ({ open, onClose, onExport }) => {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
-              <div className="recordarates__exportHint">Это конечная дата отчёта.</div>
             </div>
 
             {mode === "weeks" ? (
@@ -68,9 +67,6 @@ const ExportModal = ({ open, onClose, onExport }) => {
                   onChange={(e) => setWeeks(e.target.value)}
                   placeholder="1"
                 />
-                <div className="recordarates__exportHint">
-                  1 = последняя неделя, 2 = последние 2 недели и т.д.
-                </div>
               </div>
             ) : (
               <div className="recordarates__exportField" />

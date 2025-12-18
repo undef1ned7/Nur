@@ -532,27 +532,33 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
         items.forEach(addItem);
       }
 
-      if (!hadItems) {
-        const ids = take(periodSales.map((s) => s.id), 60);
-        for (const id of ids) {
-          try {
-            const d1 = await dispatch(
-              historySellProductDetail(id)
-            ).unwrap();
-            (Array.isArray(d1?.items) ? d1.items : []).forEach(addItem);
-          } catch (e) {
-            console.error(e);
-          }
-          try {
-            const d2 = await dispatch(
-              historySellObjectDetail(id)
-            ).unwrap();
-            (Array.isArray(d2?.items) ? d2.items : []).forEach(addItem);
-          } catch (e) {
-            console.error(e);
-          }
-        }
+if (!hadItems) {
+  const ids = take(periodSales.map((s) => s.id), 60);
+
+  for (const id of ids) {
+    const sale = periodSales.find((x) => String(x.id) === String(id));
+
+    // если это object-sale (из historyObjects) — грузим только object detail
+    if (sale && (sale.object || sale.object_name || sale.object_sale === true)) {
+      try {
+        const d2 = await dispatch(historySellObjectDetail(id)).unwrap();
+        (Array.isArray(d2?.items) ? d2.items : []).forEach(addItem);
+      } catch (e) {
+        console.error(e);
       }
+      continue;
+    }
+
+    // иначе считаем что это product-sale — грузим только product detail
+    try {
+      const d1 = await dispatch(historySellProductDetail(id)).unwrap();
+      (Array.isArray(d1?.items) ? d1.items : []).forEach(addItem);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+
 
       if (!cancelled) {
         const rows = Array.from(m, ([k, v]) => ({

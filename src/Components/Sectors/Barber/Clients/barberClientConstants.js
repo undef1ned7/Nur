@@ -19,12 +19,6 @@ export const STATUS_OPTIONS_UI = Object.keys(UI_TO_API_STATUS);
 export const STATUS_FILTER_ALL = "Все статусы";
 export const STATUS_FILTER_OPTIONS = [STATUS_FILTER_ALL, ...STATUS_OPTIONS_UI];
 
-/*
-  ранги групп для сортировки:
-   0 — верх: Активен и VIP
-   1 — середина: Неактивен
-   2 — низ: В черном списке
-*/
 const STATUS_RANK = {
   Активен: 0,
   VIP: 0,

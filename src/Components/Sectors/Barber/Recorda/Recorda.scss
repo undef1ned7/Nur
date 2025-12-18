@@ -384,6 +384,7 @@ $col-header-h: 60px;
     cursor: pointer;
     min-height: 44px;
     line-height: 1.1;
+      pointer-events: auto;
 
     &:hover {
       background: #f9fafb;
@@ -754,6 +755,18 @@ $col-header-h: 60px;
     }
   }
 
+  .barberrecorda__fieldRow,
+.barberrecorda__svcField {
+  pointer-events: none; // отключаем клики на контейнере
+}
+
+.barberrecorda__comboTrigger,
+.barberrecorda__svcSearch,
+.barberrecorda__comboPopup,
+.barberrecorda__svcDropdown,
+.barberrecorda__btn {
+  pointer-events: auto; // возвращаем клики только нужным элементам
+}
   /* ===== услуги ===== */
   &__svcField {
     display: flex;
@@ -982,6 +995,13 @@ $col-header-h: 60px;
     text-transform: uppercase;
   }
 
+  .barberrecorda__comboTrigger,
+.barberrecorda__svcSearch,
+.barberrecorda__input {
+  cursor: pointer;
+}
+
+
   &__totalValue {
     margin-top: 4px;
     font-size: 24px;
@@ -1082,6 +1102,7 @@ $col-header-h: 60px;
     display: grid;
     gap: 6px;
     min-height: unset;
+    cursor: default; // чтобы не казалось кликабельным всё поле
   }
 
   &__mini .barberrecorda__label {
@@ -1151,6 +1172,8 @@ $col-header-h: 60px;
     border-color: #dc2626;
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
   }
+
+
 
   /* ===== responsive ===== */
   @media (max-width: 767.98px) {
