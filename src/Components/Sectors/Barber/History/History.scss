@@ -268,6 +268,24 @@
     color: var(--bh-muted);
   }
 
+
+
+  &__input--date {
+  appearance: none;
+  -webkit-appearance: none;
+
+  /* прячем встроенную иконку календаря (у нас своя кнопка) */
+  &::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    display: none;
+  }
+
+  &::-webkit-inner-spin-button {
+    display: none;
+  }
+}
+
+
   /* ===== адаптив ===== */
 
   /* планшеты и ниже */
