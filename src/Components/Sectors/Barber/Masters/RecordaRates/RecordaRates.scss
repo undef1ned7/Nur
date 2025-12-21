@@ -472,6 +472,32 @@
     }
   }
 
+
+
+  &__exportBody {
+    padding: 16px 18px 18px;
+  }
+
+  &__exportGrid {
+    display: grid;
+    grid-template-columns: 260px 360px 320px;
+    gap: 14px 18px;
+    align-items: end;
+  }
+
+  &__exportField {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  @media (max-width: 980px) {
+    &__exportGrid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   /* ===== адаптив ===== */
 
   @media (max-width: 960px) {

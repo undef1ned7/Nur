@@ -10,8 +10,8 @@ const STATUS_LABELS = {
 };
 
 /* компактная шкала */
-const PX_PER_MIN = 32 / 30; // 30 минут ≈ 32px
-const MIN_EVENT_H = 72;     // минимум ~2 слота
+const PX_PER_MIN = 32 / 30;
+const MIN_EVENT_H = 72;
 
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21;

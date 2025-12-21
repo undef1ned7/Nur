@@ -20,7 +20,6 @@
 //   CLOSE_HOUR,
 // } from "./RecordaUtils";
 
-// import RecordaComboBox from "./RecordaComboBox";
 // import RecordaTimeField from "./RecordaTimeField";
 // import RecordaServicesPicker from "./RecordaServicesPicker";
 // import RecordaMiniClientModal from "./RecordaMiniClientModal";
@@ -55,6 +54,7 @@
 
 //   const [discountInput, setDiscountInput] = useState("");
 //   const [priceInput, setPriceInput] = useState("");
+//   const [isManualPrice, setIsManualPrice] = useState(false);
 
 //   // мини-клиент
 //   const [miniOpen, setMiniOpen] = useState(false);
@@ -82,10 +82,13 @@
 //       setStartTime(
 //         clampToRange(rec.start_at ? rec.start_at.slice(11, 16) : "")
 //       );
-//       setEndTime(
-//         clampToRange(rec.end_at ? rec.end_at.slice(11, 16) : "")
-//       );
-//       setAutoEnd(false);
+//       setEndTime(clampToRange(rec.end_at ? rec.end_at.slice(11, 16) : ""));
+
+//       // 🔥 РАНЬШЕ БЫЛО: setAutoEnd(false);
+//       // Теперь при открытии существующей записи "Авто" остаётся включённым,
+//       // пока пользователь сам не начнёт менять конец/время вручную.
+//       setAutoEnd(true);
+
 //       setSelBarber(String(rec.barber || ""));
 //       setStatus(rec.status || "booked");
 //       setComment(rec.comment || "");
@@ -95,10 +98,11 @@
 //           : ""
 //       );
 //       setPriceInput(
-//         rec.price !== null && rec.price !== undefined
-//           ? String(rec.price)
-//           : ""
+//         rec.price !== null && rec.price !== undefined ? String(rec.price) : ""
 //       );
+//       const hasSavedPrice = rec.price !== null && rec.price !== undefined && String(rec.price) !== "";
+// setIsManualPrice(hasSavedPrice);
+
 //     } else {
 //       setSelClient("");
 //       setStartDate(defaultDate);
@@ -114,6 +118,8 @@
 //       setComment("");
 //       setDiscountInput("");
 //       setPriceInput("");
+//       setIsManualPrice(false);
+
 //     }
 //   }, [isOpen, currentRecord, defaultDate]);
 
@@ -128,22 +134,20 @@
 //     [clients]
 //   );
 
-//   const serviceItems = useMemo(
-//     () =>
-//       services
-//         .filter((s) => s.active)
-//         .map((s) => ({
-//           id: String(s.id),
-//           label: s.name,
-//           search: `${s.name} ${s.time || ""} ${s.price || ""} ${
-//             s.category_name || ""
-//           }`,
-//           price: Number.isFinite(s.price) ? Number(s.price) : null,
-//           minutes: s.minutes || s.time || 0,
-//           categoryName: s.category_name || "",
-//         })),
-//     [services]
-//   );
+// const serviceItems = useMemo(
+//   () =>
+//     services
+//       .filter((s) => s.active)
+//       .map((s) => ({
+//         id: String(s.id),
+//         label: s.name,
+//         search: `${s.name} ${s.time || ""} ${s.price || ""} ${s.category_name || ""}`,
+//         price: Number.isFinite(Number(s.price)) ? Number(s.price) : null,
+//         minutes: Number(s.minutes ?? s.time ?? 0),
+//         categoryName: s.category_name || "",
+//       })),
+//   [services]
+// );
 
 //   const statusItems = useMemo(
 //     () =>
@@ -188,38 +192,46 @@
 //   }, [startTime, servicesSummary.totalMinutes, autoEnd]);
 
 //   /* перерасчёт цены по услугам и скидке (для поля ввода) */
-//   useEffect(() => {
-//     if (!isOpen) return;
-//     if (!basePrice) {
-//       setPriceInput("");
-//       return;
-//     }
-//     const d = parsePercent(discountInput);
-//     const final = calcFinalPrice(basePrice, d);
-//     if (final == null) {
-//       setPriceInput(String(basePrice));
-//     } else {
-//       setPriceInput(String(final));
-//     }
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, [basePrice, discountInput, isOpen]);
+// useEffect(() => {
+//   if (!isOpen) return;
+
+//   const hasSavedPrice =
+//     currentRecord?.price !== null &&
+//     currentRecord?.price !== undefined &&
+//     String(currentRecord.price).trim() !== "";
+
+//   // если цена сохранена — не трогаем
+//   if (hasSavedPrice) return;
+
+//   // если услуг нет/не посчитались — тоже не трогаем
+//   if (!basePrice) return;
+
+//   // если пользователь вручную вводил цену — не трогаем
+//   if (isManualPrice) return;
+
+//   // иначе подставляем авто-цену
+//   const d = parsePercent(discountInput);
+//   const final = calcFinalPrice(basePrice, d);
+//   setPriceInput(String(final == null ? basePrice : final));
+// }, [isOpen, currentRecord?.price, basePrice, discountInput, isManualPrice]);
+
 
 //   const discountPercent = useMemo(
 //     () => parsePercent(discountInput),
 //     [discountInput]
 //   );
 
-//   const uiFinalPrice = useMemo(() => {
-//     const raw = String(priceInput || "").trim();
-//     if (raw !== "") {
-//       const n = Number(raw.replace(/[^\d.-]/g, ""));
-//       if (Number.isFinite(n) && n >= 0) return n;
-//     }
-//     if (!basePrice) return 0;
-//     const final = calcFinalPrice(basePrice, discountPercent);
-//     if (final == null) return basePrice;
-//     return final;
-//   }, [priceInput, basePrice, discountPercent]);
+// const uiFinalPrice = useMemo(() => {
+//   const raw = String(priceInput || "").trim();
+//   const n = Number(raw.replace(/[^\d.-]/g, ""));
+//   if (Number.isFinite(n) && n >= 0) return n; // ручная цена => скидку не считаем
+
+//   if (!basePrice) return 0;
+//   const d = parsePercent(discountInput);
+//   const final = calcFinalPrice(basePrice, d);
+//   return final == null ? basePrice : final;
+// }, [priceInput, basePrice, discountInput]);
+
 
 //   /* занятость мастеров */
 //   const selectedStartISO = useMemo(
@@ -248,7 +260,13 @@
 //       }
 //     });
 //     return set;
-//   }, [appointments, selectedStartISO, selectedEndISO, startDate, currentRecord]);
+//   }, [
+//     appointments,
+//     selectedStartISO,
+//     selectedEndISO,
+//     startDate,
+//     currentRecord,
+//   ]);
 
 //   const barberItems = useMemo(() => {
 //     const busy = busyBarbersOnInterval;
@@ -293,7 +311,7 @@
 //       vv = `${pad(H)}:${pad(H === CLOSE_HOUR ? 0 : M)}`;
 //     }
 //     setEndTime(vv);
-//     setAutoEnd(false);
+//     setAutoEnd(false); // ручное изменение конца выключает "Авто"
 //   };
 
 //   /* валидация */
@@ -391,11 +409,56 @@
 //     return { alerts, errs, startISO, endISO };
 //   };
 
+//    // ✅ ВОТ СЮДА ВСТАВЬ
+//   const createClientFromSearch = async (name) => {
+//     const clean = String(name || "").trim();
+//     if (!clean) return null;
+
+//     try {
+//       const payload = {
+//         full_name: clean,
+//         phone: null,
+//         status: "active",
+//         notes: null,
+//         company: localStorage.getItem("company"),
+//       };
+
+//       const { data } = await api.post("/barbershop/clients/", payload);
+//       const newId = data?.id;
+
+//       const cl = await api.get("/barbershop/clients/");
+//       const arr = Array.isArray(cl.data?.results)
+//         ? cl.data.results
+//         : Array.isArray(cl.data)
+//         ? cl.data
+//         : [];
+
+//       const nextClients = arr
+//         .map((c) => ({
+//           id: c.id,
+//           name: c.full_name || c.name || "",
+//           phone: c.phone || c.phone_number || "",
+//           status: c.status || "active",
+//         }))
+//         .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+
+//       onClientsChange?.(nextClients);
+
+//       if (newId) setSelClient(String(newId));
+//       return newId || null;
+//     } catch (e) {
+//       setFormAlerts(["Не удалось создать клиента."]);
+//       return null;
+//     }
+//   };
+
 //   const handleSubmit = async (e) => {
 //     e.preventDefault();
 //     setSaving(true);
 //     setFormAlerts([]);
 //     setFieldErrs({});
+
+    
 
 //     const { alerts, errs, startISO, endISO } = validate();
 
@@ -406,7 +469,7 @@
 //       return;
 //     }
 
-//     const discountVal = parsePercent(discountInput);
+// const discountVal = isManualPrice ? null : parsePercent(discountInput);
 
 //     let finalPrice = null;
 //     const rawPrice = String(priceInput || "").trim();
@@ -534,12 +597,29 @@
 //                 >
 //                   <span className="barberrecorda__label">Клиент</span>
 //                   <div className="barberrecorda__fieldRow">
-//                     <RecordaComboBox
+//                     {/* <RecordaServicesPicker
+//                       mode="single"
 //                       items={activeClientItems}
-//                       value={selClient}
+//                       selectedId={selClient}
 //                       onChange={(id) => setSelClient(String(id))}
-//                       placeholder="Выберите клиента"
-//                     />
+//                       placeholder="Поиск клиента..."
+//                       placeholderSelected="Выберите клиента"
+//                       renderMeta={false}
+//                     /> */}
+
+//                     <RecordaServicesPicker
+//   mode="single"
+//   items={activeClientItems}
+//   selectedId={selClient}
+//   onChange={(id) => setSelClient(String(id))}
+//   placeholder="Поиск клиента..."
+//   placeholderSelected="Выберите клиента"
+//   renderMeta={false}
+//   allowCreate
+//   createLabel="Создать"
+//   onCreate={createClientFromSearch}
+// />
+
 //                     <button
 //                       type="button"
 //                       className="barberrecorda__btn barberrecorda__btn--primary barberrecorda__btn--square"
@@ -572,9 +652,7 @@
 //                   </div>
 //                 </label>
 
-
-
-//                                 {/* Услуги */}
+//                 {/* Услуги */}
 //                 <label
 //                   className={`barberrecorda__field barberrecorda__field--full barberrecorda__field--services ${
 //                     fieldErrs.services ? "is-invalid" : ""
@@ -591,7 +669,7 @@
 //                   />
 //                 </label>
 
-//                                 {/* Начало / Конец */}
+//                 {/* Начало / Конец */}
 //                 <div className="barberrecorda__row barberrecorda__row--2">
 //                   <label
 //                     className={`barberrecorda__field ${
@@ -620,9 +698,7 @@
 //                           id="autoEnd"
 //                           type="checkbox"
 //                           checked={autoEnd}
-//                           onChange={(e) =>
-//                             setAutoEnd(e.target.checked)
-//                           }
+//                           onChange={(e) => setAutoEnd(e.target.checked)}
 //                         />
 //                         <label htmlFor="autoEnd">Авто</label>
 //                       </span>
@@ -635,8 +711,6 @@
 //                   </label>
 //                 </div>
 
-
-
 //                 {/* Сотрудник */}
 //                 <label
 //                   className={`barberrecorda__field barberrecorda__field--full ${
@@ -646,23 +720,21 @@
 //                   <span className="barberrecorda__label">
 //                     Сотрудник <b className="barberrecorda__req">*</b>
 //                   </span>
-//                   <RecordaComboBox
+//                   <RecordaServicesPicker
+//                     mode="single"
 //                     items={barberItems}
-//                     value={selBarber}
+//                     selectedId={selBarber}
 //                     onChange={(id) => setSelBarber(String(id))}
-//                     placeholder="Выберите сотрудника"
+//                     placeholder="Поиск сотрудника..."
+//                     placeholderSelected="Выберите сотрудника"
+//                     renderMeta={false}
 //                   />
 //                   <div className="barberrecorda__availHint">
 //                     {selectedStartISO && selectedEndISO ? (
 //                       <>
 //                         Свободны:{" "}
-//                         <b>
-//                           {
-//                             barberItems.filter((i) => !i.disabled)
-//                               .length
-//                           }
-//                         </b>{" "}
-//                         из <b>{barberItems.length}</b>
+//                         <b>{barberItems.filter((i) => !i.disabled).length}</b> /{" "}
+//                         <b>{barberItems.length}</b>
 //                       </>
 //                     ) : (
 //                       "Выберите дату, услуги и время, чтобы увидеть доступность"
@@ -675,52 +747,49 @@
 //                   <span className="barberrecorda__label">
 //                     Статус <b className="barberrecorda__req">*</b>
 //                   </span>
-//                   <RecordaComboBox
+//                   <RecordaServicesPicker
+//                     mode="single"
 //                     items={statusItems}
-//                     value={status}
+//                     selectedId={status}
 //                     onChange={(id) => setStatus(String(id))}
-//                     placeholder="Выберите статус"
+//                     placeholder="Поиск статуса..."
+//                     placeholderSelected="Выберите статус"
+//                     renderMeta={false}
 //                   />
 //                 </label>
-
-
 
 //                 {/* Скидка / Цена */}
 //                 <div className="barberrecorda__row barberrecorda__row--2">
 //                   <label className="barberrecorda__field">
-//                     <span className="barberrecorda__label">
-//                       Скидка, %
-//                     </span>
+//                     <span className="barberrecorda__label">Скидка, %</span>
 //                     <input
 //                       type="text"
 //                       className="barberrecorda__input"
 //                       value={discountInput}
-//                       onChange={(e) =>
-//                         setDiscountInput(e.target.value)
-//                       }
+//                       onChange={(e) => setDiscountInput(e.target.value)}
 //                       placeholder="0"
 //                     />
 //                   </label>
 
 //                   <label className="barberrecorda__field">
 //                     <span className="barberrecorda__label">Цена</span>
-//                     <input
-//                       type="text"
-//                       className="barberrecorda__input"
-//                       value={priceInput}
-//                       onChange={(e) =>
-//                         setPriceInput(e.target.value)
-//                       }
-//                       placeholder="Сумма по услугам"
-//                     />
+// <input
+//   type="text"
+//   className="barberrecorda__input"
+//   value={priceInput}
+//   onChange={(e) => {
+//     setPriceInput(e.target.value);
+//     setIsManualPrice(true);
+//   }}
+//   placeholder="Сумма по услугам"
+// />
+
 //                   </label>
 //                 </div>
 
 //                 {/* К ОПЛАТЕ */}
 //                 <div className="barberrecorda__totalCard">
-//                   <div className="barberrecorda__totalLabel">
-//                     К ОПЛАТЕ
-//                   </div>
+//                   <div className="barberrecorda__totalLabel">К ОПЛАТЕ</div>
 //                   <div className="barberrecorda__totalValue">
 //                     {uiFinalPrice
 //                       ? `${uiFinalPrice.toLocaleString("ru-RU")} СОМ`
@@ -730,15 +799,11 @@
 
 //                 {/* Комментарий */}
 //                 <label className="barberrecorda__field barberrecorda__field--full">
-//                   <span className="barberrecorda__label">
-//                     Комментарий
-//                   </span>
+//                   <span className="barberrecorda__label">Комментарий</span>
 //                   <textarea
 //                     className="barberrecorda__textarea"
 //                     value={comment}
-//                     onChange={(e) =>
-//                       setComment(e.target.value)
-//                     }
+//                     onChange={(e) => setComment(e.target.value)}
 //                     placeholder="Добавьте заметку или особые пожелания…"
 //                   />
 //                 </label>
@@ -821,7 +886,6 @@ import {
   CLOSE_HOUR,
 } from "./RecordaUtils";
 
-import RecordaComboBox from "./RecordaComboBox";
 import RecordaTimeField from "./RecordaTimeField";
 import RecordaServicesPicker from "./RecordaServicesPicker";
 import RecordaMiniClientModal from "./RecordaMiniClientModal";
@@ -856,6 +920,7 @@ const RecordaModal = ({
 
   const [discountInput, setDiscountInput] = useState("");
   const [priceInput, setPriceInput] = useState("");
+  const [isManualPrice, setIsManualPrice] = useState(false);
 
   // мини-клиент
   const [miniOpen, setMiniOpen] = useState(false);
@@ -880,12 +945,8 @@ const RecordaModal = ({
         : [];
       setSelServices(recSvcs);
       setStartDate(toDate(rec.start_at));
-      setStartTime(
-        clampToRange(rec.start_at ? rec.start_at.slice(11, 16) : "")
-      );
-      setEndTime(
-        clampToRange(rec.end_at ? rec.end_at.slice(11, 16) : "")
-      );
+      setStartTime(clampToRange(rec.start_at ? rec.start_at.slice(11, 16) : ""));
+      setEndTime(clampToRange(rec.end_at ? rec.end_at.slice(11, 16) : ""));
 
       // 🔥 РАНЬШЕ БЫЛО: setAutoEnd(false);
       // Теперь при открытии существующей записи "Авто" остаётся включённым,
@@ -901,10 +962,14 @@ const RecordaModal = ({
           : ""
       );
       setPriceInput(
-        rec.price !== null && rec.price !== undefined
-          ? String(rec.price)
-          : ""
+        rec.price !== null && rec.price !== undefined ? String(rec.price) : ""
       );
+
+      const hasSavedPrice =
+        rec.price !== null &&
+        rec.price !== undefined &&
+        String(rec.price) !== "";
+      setIsManualPrice(hasSavedPrice);
     } else {
       setSelClient("");
       setStartDate(defaultDate);
@@ -920,6 +985,7 @@ const RecordaModal = ({
       setComment("");
       setDiscountInput("");
       setPriceInput("");
+      setIsManualPrice(false);
     }
   }, [isOpen, currentRecord, defaultDate]);
 
@@ -944,8 +1010,8 @@ const RecordaModal = ({
           search: `${s.name} ${s.time || ""} ${s.price || ""} ${
             s.category_name || ""
           }`,
-          price: Number.isFinite(s.price) ? Number(s.price) : null,
-          minutes: s.minutes || s.time || 0,
+          price: Number.isFinite(Number(s.price)) ? Number(s.price) : null,
+          minutes: Number(s.minutes ?? s.time ?? 0),
           categoryName: s.category_name || "",
         })),
     [services]
@@ -996,36 +1062,39 @@ const RecordaModal = ({
   /* перерасчёт цены по услугам и скидке (для поля ввода) */
   useEffect(() => {
     if (!isOpen) return;
-    if (!basePrice) {
-      setPriceInput("");
-      return;
-    }
+
+    const hasSavedPrice =
+      currentRecord?.price !== null &&
+      currentRecord?.price !== undefined &&
+      String(currentRecord.price).trim() !== "";
+
+    // если цена сохранена — не трогаем
+    if (hasSavedPrice) return;
+
+    // если услуг нет/не посчитались — тоже не трогаем
+    if (!basePrice) return;
+
+    // если пользователь вручную вводил цену — не трогаем
+    if (isManualPrice) return;
+
+    // иначе подставляем авто-цену
     const d = parsePercent(discountInput);
     const final = calcFinalPrice(basePrice, d);
-    if (final == null) {
-      setPriceInput(String(basePrice));
-    } else {
-      setPriceInput(String(final));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basePrice, discountInput, isOpen]);
+    setPriceInput(String(final == null ? basePrice : final));
+  }, [isOpen, currentRecord?.price, basePrice, discountInput, isManualPrice]);
 
-  const discountPercent = useMemo(
-    () => parsePercent(discountInput),
-    [discountInput]
-  );
+  const discountPercent = useMemo(() => parsePercent(discountInput), [discountInput]);
 
   const uiFinalPrice = useMemo(() => {
     const raw = String(priceInput || "").trim();
-    if (raw !== "") {
-      const n = Number(raw.replace(/[^\d.-]/g, ""));
-      if (Number.isFinite(n) && n >= 0) return n;
-    }
+    const n = Number(raw.replace(/[^\d.-]/g, ""));
+    if (Number.isFinite(n) && n >= 0) return n; // ручная цена => скидку не считаем
+
     if (!basePrice) return 0;
-    const final = calcFinalPrice(basePrice, discountPercent);
-    if (final == null) return basePrice;
-    return final;
-  }, [priceInput, basePrice, discountPercent]);
+    const d = parsePercent(discountInput);
+    const final = calcFinalPrice(basePrice, d);
+    return final == null ? basePrice : final;
+  }, [priceInput, basePrice, discountInput]);
 
   /* занятость мастеров */
   const selectedStartISO = useMemo(
@@ -1212,7 +1281,7 @@ const RecordaModal = ({
       return;
     }
 
-    const discountVal = parsePercent(discountInput);
+    const discountVal = isManualPrice ? null : parsePercent(discountInput);
 
     let finalPrice = null;
     const rawPrice = String(priceInput || "").trim();
@@ -1238,8 +1307,7 @@ const RecordaModal = ({
         status,
         comment: comment?.trim() || null,
         company: localStorage.getItem("company"),
-        price:
-          finalPrice !== null && finalPrice !== undefined ? finalPrice : null,
+        price: finalPrice !== null && finalPrice !== undefined ? finalPrice : null,
       };
 
       if (discountVal !== null && discountVal !== undefined) {
@@ -1247,10 +1315,7 @@ const RecordaModal = ({
       }
 
       if (currentRecord?.id) {
-        await api.patch(
-          `/barbershop/appointments/${currentRecord.id}/`,
-          payload
-        );
+        await api.patch(`/barbershop/appointments/${currentRecord.id}/`, payload);
       } else {
         await api.post("/barbershop/appointments/", payload);
       }
@@ -1277,13 +1342,8 @@ const RecordaModal = ({
   };
 
   /* мини-клиент */
-  const openMini = () => {
-    setMiniOpen(true);
-  };
-
-  const closeMini = () => {
-    setMiniOpen(false);
-  };
+  const openMini = () => setMiniOpen(true);
+  const closeMini = () => setMiniOpen(false);
 
   if (!isOpen) return null;
 
@@ -1325,11 +1385,7 @@ const RecordaModal = ({
             </div>
           )}
 
-          <form
-            className="barberrecorda__form"
-            onSubmit={handleSubmit}
-            noValidate
-          >
+          <form className="barberrecorda__form" onSubmit={handleSubmit} noValidate>
             <div className="barberrecorda__grid">
               <div className="barberrecorda__gridMain">
                 {/* Клиент (без *) */}
@@ -1340,12 +1396,18 @@ const RecordaModal = ({
                 >
                   <span className="barberrecorda__label">Клиент</span>
                   <div className="barberrecorda__fieldRow">
-                    <RecordaComboBox
+                    {/* ✅ только поиск/выбор, без создания через поиск */}
+                    <RecordaServicesPicker
+                      mode="single"
                       items={activeClientItems}
-                      value={selClient}
+                      selectedId={selClient}
                       onChange={(id) => setSelClient(String(id))}
-                      placeholder="Выберите клиента"
+                      placeholder="Поиск клиента..."
+                      placeholderSelected="Выберите клиента"
+                      renderMeta={false}
                     />
+
+                    {/* ✅ создание только через модалку */}
                     <button
                       type="button"
                       className="barberrecorda__btn barberrecorda__btn--primary barberrecorda__btn--square"
@@ -1446,23 +1508,21 @@ const RecordaModal = ({
                   <span className="barberrecorda__label">
                     Сотрудник <b className="barberrecorda__req">*</b>
                   </span>
-                  <RecordaComboBox
+                  <RecordaServicesPicker
+                    mode="single"
                     items={barberItems}
-                    value={selBarber}
+                    selectedId={selBarber}
                     onChange={(id) => setSelBarber(String(id))}
-                    placeholder="Выберите сотрудника"
+                    placeholder="Поиск сотрудника..."
+                    placeholderSelected="Выберите сотрудника"
+                    renderMeta={false}
                   />
                   <div className="barberrecorda__availHint">
                     {selectedStartISO && selectedEndISO ? (
                       <>
                         Свободны:{" "}
-                        <b>
-                          {
-                            barberItems.filter((i) => !i.disabled)
-                              .length
-                          }
-                        </b>{" "}
-                        из <b>{barberItems.length}</b>
+                        <b>{barberItems.filter((i) => !i.disabled).length}</b> /{" "}
+                        <b>{barberItems.length}</b>
                       </>
                     ) : (
                       "Выберите дату, услуги и время, чтобы увидеть доступность"
@@ -1475,27 +1535,26 @@ const RecordaModal = ({
                   <span className="barberrecorda__label">
                     Статус <b className="barberrecorda__req">*</b>
                   </span>
-                  <RecordaComboBox
+                  <RecordaServicesPicker
+                    mode="single"
                     items={statusItems}
-                    value={status}
+                    selectedId={status}
                     onChange={(id) => setStatus(String(id))}
-                    placeholder="Выберите статус"
+                    placeholder="Поиск статуса..."
+                    placeholderSelected="Выберите статус"
+                    renderMeta={false}
                   />
                 </label>
 
                 {/* Скидка / Цена */}
                 <div className="barberrecorda__row barberrecorda__row--2">
                   <label className="barberrecorda__field">
-                    <span className="barberrecorda__label">
-                      Скидка, %
-                    </span>
+                    <span className="barberrecorda__label">Скидка, %</span>
                     <input
                       type="text"
                       className="barberrecorda__input"
                       value={discountInput}
-                      onChange={(e) =>
-                        setDiscountInput(e.target.value)
-                      }
+                      onChange={(e) => setDiscountInput(e.target.value)}
                       placeholder="0"
                     />
                   </label>
@@ -1506,9 +1565,10 @@ const RecordaModal = ({
                       type="text"
                       className="barberrecorda__input"
                       value={priceInput}
-                      onChange={(e) =>
-                        setPriceInput(e.target.value)
-                      }
+                      onChange={(e) => {
+                        setPriceInput(e.target.value);
+                        setIsManualPrice(true);
+                      }}
                       placeholder="Сумма по услугам"
                     />
                   </label>
@@ -1516,9 +1576,7 @@ const RecordaModal = ({
 
                 {/* К ОПЛАТЕ */}
                 <div className="barberrecorda__totalCard">
-                  <div className="barberrecorda__totalLabel">
-                    К ОПЛАТЕ
-                  </div>
+                  <div className="barberrecorda__totalLabel">К ОПЛАТЕ</div>
                   <div className="barberrecorda__totalValue">
                     {uiFinalPrice
                       ? `${uiFinalPrice.toLocaleString("ru-RU")} СОМ`
@@ -1528,15 +1586,11 @@ const RecordaModal = ({
 
                 {/* Комментарий */}
                 <label className="barberrecorda__field barberrecorda__field--full">
-                  <span className="barberrecorda__label">
-                    Комментарий
-                  </span>
+                  <span className="barberrecorda__label">Комментарий</span>
                   <textarea
                     className="barberrecorda__textarea"
                     value={comment}
-                    onChange={(e) =>
-                      setComment(e.target.value)
-                    }
+                    onChange={(e) => setComment(e.target.value)}
                     placeholder="Добавьте заметку или особые пожелания…"
                   />
                 </label>
