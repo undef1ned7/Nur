@@ -68,9 +68,7 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
     const loadDebtors = async () => {
       try {
         setLoading(true);
-        const allDebtors = await fetchAllPages(
-          "/main/clients/clients/with-debts/"
-        );
+        const allDebtors = await fetchAllPages("/main/clients/with-debts/");
         setDebtors(allDebtors);
 
         // Загружаем deals для каждого клиента, чтобы получить сумму долга
@@ -79,15 +77,13 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
         const debtPromises = allDebtors.map(async (client) => {
           try {
             const deals = await fetchAllPages(
-              `/main/clients/${client.id}/deals/`
+              `/main/clients/${client.id}/deals/?kind=debt`
             );
             // Суммируем remaining_debt из всех deals типа "debt"
-            const totalDebt = deals
-              .filter((deal) => deal.kind === "debt")
-              .reduce((sum, deal) => {
-                const remainingDebt = parseFloat(deal.remaining_debt || 0);
-                return sum + remainingDebt;
-              }, 0);
+            const totalDebt = deals.reduce((sum, deal) => {
+              const remainingDebt = parseFloat(deal.remaining_debt || 0);
+              return sum + remainingDebt;
+            }, 0);
             if (totalDebt > 0) {
               debtsMap.set(client.id, totalDebt);
             }
@@ -190,11 +186,13 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
   const loadClientDeals = async (clientId) => {
     try {
       setLoadingDeals(true);
-      const deals = await fetchAllPages(`/main/clients/${clientId}/deals/`);
-      // Фильтруем только deals типа "debt" с remaining_debt > 0
+      // Используем query параметр kind=debt для фильтрации на сервере
+      const deals = await fetchAllPages(
+        `/main/clients/${clientId}/deals/?kind=debt`
+      );
+      // Фильтруем только deals с remaining_debt > 0
       const debtDeals = deals.filter(
-        (deal) =>
-          deal.kind === "debt" && parseFloat(deal.remaining_debt || 0) > 0
+        (deal) => parseFloat(deal.remaining_debt || 0) > 0
       );
       setClientDeals(debtDeals);
     } catch (error) {
@@ -260,13 +258,26 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
 
     try {
       const paymentData = {
-        installment_number: installment.number,
-        date: new Date().toISOString().split("T")[0],
+        idempotency_key: crypto.randomUUID(),
+        installment_id: installment.id, // Используем ID взноса вместо номера
         amount: paymentAmount.toFixed(2),
+        date: new Date().toISOString().split("T")[0],
+        note: "",
       };
 
       // Погашаем долг
-      await dispatch(payDebtDeal({ id: deal.id, data: paymentData })).unwrap();
+      const updatedDeal = await dispatch(
+        payDebtDeal({
+          id: deal.id,
+          clientId: selectedClient.id,
+          data: paymentData,
+        })
+      ).unwrap();
+
+      // Обновляем локальное состояние сделки из ответа API
+      setClientDeals((prev) =>
+        prev.map((d) => (d.id === deal.id ? updatedDeal : d))
+      );
 
       // Добавляем денежный поток
       try {
@@ -289,19 +300,15 @@ const DebtPaymentModal = ({ onClose, customers = [] }) => {
         // Не блокируем успешное погашение, если ошибка с кассой
       }
 
-      // Обновляем deals
-      await loadClientDeals(selectedClient.id);
-
-      // Обновляем общий долг клиента
-      const updatedDeals = await fetchAllPages(
-        `/main/clients/${selectedClient.id}/deals/`
+      // Обновляем общий долг клиента из обновленной сделки
+      const allDeals = clientDeals.map((d) =>
+        d.id === deal.id ? updatedDeal : d
       );
-      const updatedTotalDebt = updatedDeals
-        .filter((d) => d.kind === "debt")
-        .reduce((sum, d) => {
-          const remainingDebt = parseFloat(d.remaining_debt || 0);
-          return sum + remainingDebt;
-        }, 0);
+      const updatedTotalDebt = allDeals.reduce((sum, d) => {
+        const remainingDebt = parseFloat(d.remaining_debt || 0);
+        return sum + remainingDebt;
+      }, 0);
+
       setClientDebts((prev) => {
         const next = new Map(prev);
         if (updatedTotalDebt > 0) {

@@ -84,7 +84,7 @@ const Warehouse = () => {
     };
   }, [searchTerm]);
 
-  // Загрузка товаров
+  // Загрузка товаровф
   useEffect(() => {
     const params = {
       page: currentPage,

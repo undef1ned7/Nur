@@ -160,7 +160,7 @@ const CloseShiftPage = ({ onBack, shift: initialShift }) => {
               Фактическая сумма на кассе (сом) *
             </label>
             <input
-              type="number"
+              type="text"
               className="close-shift-page__input"
               value={closingCash}
               onChange={(e) => setClosingCash(e.target.value)}
@@ -228,4 +228,3 @@ const CloseShiftPage = ({ onBack, shift: initialShift }) => {
 };
 
 export default CloseShiftPage;
-

@@ -183,12 +183,22 @@ const DebtModal = ({ id, onClose, onChanged }) => {
 
   const onPayDeal = async (data) => {
     try {
-      const alreadyPaid = installments.some(
-        (i) => i.number === data.installment_number && i.paid_on
-      );
-      if (alreadyPaid) return;
+      // Проверяем, не оплачен ли уже взнос
+      if (data.installment_id) {
+        const installment = installments.find((i) => i.id === data.installment_id);
+        if (installment && installment.paid_on) {
+          return; // Взнос уже полностью оплачен
+        }
+      }
 
-      await dispatch(payDebtDeal({ id, data })).unwrap();
+      // Добавляем idempotency_key если его нет
+      if (!data.idempotency_key) {
+        data.idempotency_key = crypto.randomUUID();
+      }
+
+      await dispatch(
+        payDebtDeal({ id, clientId, data })
+      ).unwrap();
       onChanged?.();
       dispatch(getClientDealDetail({ clientId, dealId: id }));
     } catch (e) {
@@ -552,8 +562,10 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                     )} сом?`,
                                     onConfirm: () => {
                                         const paymentData = {
-                                        installment_number: p.number,
+                                        idempotency_key: crypto.randomUUID(),
+                                        installment_id: p.id, // Используем ID взноса
                                         date: toYYYYMMDD(new Date()),
+                                        note: "",
                                         };
 
                                         if (shouldSendAmount) {

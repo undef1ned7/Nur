@@ -57,6 +57,7 @@ import { createDeal } from "../../../../store/creators/saleThunk";
 import api from "../../../../api";
 import FileInput from "./FileInput/FileInput";
 import "../../../Deposits/Sklad/Sklad.scss";
+import "./finishedGoods.scss";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -415,28 +416,31 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
   /* ------------------------ Верстка ------------------------ */
   return (
-    <div className="add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content">
-        <div className="add-modal__header">
+    <div className="finished-goods-add-modal">
+      <div className="finished-goods-add-modal__overlay" onClick={onClose} />
+      <div className="finished-goods-add-modal__content">
+        <div className="finished-goods-add-modal__header">
           <h3>Добавление товара</h3>
-          <button className="add-modal__close-icon" onClick={onClose}>
-            ✕
+          <button
+            className="finished-goods-add-modal__close-icon"
+            onClick={onClose}
+          >
+            <X size={20} />
           </button>
         </div>
 
         {createError && (
-          <p className="add-modal__error-message">
+          <p className="finished-goods-add-modal__error-message">
             Ошибка добавления: {createError.message || "ошибка"}
           </p>
         )}
 
         {/* Основные поля */}
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Название *</label>
           <input
             name="name"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             placeholder="Например, Буханка хлеба"
             value={product.name}
             onChange={onProductChange}
@@ -444,11 +448,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           />
         </div>
 
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Штрих код *</label>
           <input
             name="barcode"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             placeholder="Штрих код"
             value={product.barcode}
             onChange={onProductChange}
@@ -456,11 +460,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           />
         </div>
 
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Бренд *</label>
           <select
             name="brand_name"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             value={product.brand_name}
             onChange={onProductChange}
             required
@@ -475,11 +479,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           </select>
         </div>
 
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Категория *</label>
           <select
             name="category_name"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             value={product.category_name}
             onChange={onProductChange}
             required
@@ -494,11 +498,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         </div>
 
         {/* Поставщик + быстрое создание */}
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Поставщик *</label>
           <select
             name="client"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             value={product.client}
             onChange={onProductChange}
             required
@@ -528,63 +532,63 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               onSubmit={createSupplier}
             >
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 placeholder="ФИО"
                 name="full_name"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 name="llc"
                 placeholder="ОсОО"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 name="inn"
                 placeholder="ИНН"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 name="okpo"
                 placeholder="ОКПО"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 name="score"
                 placeholder="Р/СЧЁТ"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 name="bik"
                 placeholder="БИК"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 name="address"
                 placeholder="Адрес"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="text"
                 name="phone"
                 placeholder="Телефон"
               />
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 onChange={onSupplierChange}
                 type="email"
                 name="email"
@@ -604,11 +608,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           )}
         </div>
 
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Тип оплаты *</label>
           <select
             name="category_name"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             value={dealStatus}
             onChange={(e) => setDealStatus(e.target.value)}
             required
@@ -623,10 +627,10 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         </div>
 
         {dealStatus === "Долги" && (
-          <div style={{ display: "grid", gap: 8 }}>
+          <div className="finished-goods-add-modal__section">
             <label>Срок долга</label>
             <input
-              className="add-modal__input"
+              className="finished-goods-add-modal__input"
               type="number"
               min={1}
               step={1}
@@ -639,10 +643,10 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
         {dealStatus === "Предоплата" && (
           <>
-            <div className="sale__field sale__field--full">
-              <label className="sale__label">Предоплата</label>
+            <div className="finished-goods-add-modal__section">
+              <label>Предоплата</label>
               <input
-                className="sale__input"
+                className="finished-goods-add-modal__input"
                 type="number"
                 min={1}
                 step={1}
@@ -651,10 +655,10 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                 placeholder="Сумма предоплаты"
               />
             </div>
-            <div className="sale__field sale__field--full">
-              <label className="sale__label">Срок долга</label>
+            <div className="finished-goods-add-modal__section">
+              <label>Срок долга</label>
               <input
-                className="sale__input"
+                className="finished-goods-add-modal__input"
                 type="number"
                 min={1}
                 step={1}
@@ -667,12 +671,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         )}
 
         {/* Цена и количество */}
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Розничная цена *</label>
           <input
             type="number"
             name="price"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             placeholder="120"
             value={product.price}
             onChange={onProductChange}
@@ -684,12 +688,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
         {/* Фото (динамические) */}
 
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Закупочная цена *</label>
           <input
             type="number"
             name="purchase_price"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             placeholder="110"
             value={product.purchase_price}
             onChange={onProductChange}
@@ -699,12 +703,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           />
         </div>
 
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Количество *</label>
           <input
             type="number"
             name="quantity"
-            className="add-modal__input"
+            className="finished-goods-add-modal__input"
             placeholder="100"
             value={product.quantity}
             onChange={onProductChange}
@@ -713,7 +717,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           />
         </div>
 
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label
             style={{
               display: "flex",
@@ -736,7 +740,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             <span>Акционный товар</span>
           </label>
         </div>
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <label>Фото товара</label>
           <button
             type="button"
@@ -813,7 +817,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                   {/* <input
                     type="file"
                     accept="image/*"
-                    className="add-modal__input"
+                    className="finished-goods-add-modal__input"
                     onChange={(e) =>
                       handleImageChange(idx, e.target.files?.[0] || null)
                     }
@@ -832,7 +836,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         </div>
 
         {/* Состав (сырьё) */}
-        <div className="add-modal__section">
+        <div className="finished-goods-add-modal__section">
           <div
             className="select-materials__head"
             style={{
@@ -863,7 +867,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               style={{ marginTop: 8 }}
             >
               <input
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 name="materialQuery"
                 placeholder="Поиск сырья"
                 value={materialQuery}
@@ -1013,16 +1017,16 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         </div>
 
         {/* Кнопки */}
-        <div className="add-modal__footer">
+        <div className="finished-goods-add-modal__footer">
           <button
-            className="add-modal__cancel"
+            className="finished-goods-add-modal__cancel"
             onClick={onClose}
             disabled={creating}
           >
             Отмена
           </button>
           <button
-            className="add-modal__save"
+            className="finished-goods-add-modal__save"
             onClick={handleSubmit}
             disabled={creating || materialsLoading}
           >
@@ -1880,7 +1884,7 @@ const TransferProductModal = ({
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <label>Агент *</label>
             <select
               style={{ width: "100%" }}
@@ -1901,7 +1905,7 @@ const TransferProductModal = ({
             </select>
           </div>
 
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <h4>Выбор товаров для передачи</h4>
 
             {/* Поиск товаров */}
@@ -1909,7 +1913,7 @@ const TransferProductModal = ({
               <input
                 type="text"
                 placeholder="Поиск товаров..."
-                className="add-modal__input"
+                className="finished-goods-add-modal__input"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: "100%" }}
@@ -2194,7 +2198,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <label>Агент *</label>
             <select
               style={{ marginTop: 15, width: "100%" }}
@@ -2215,7 +2219,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
             </select>
           </div>
 
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <label>Касса *</label>
             <select
               style={{ marginTop: 15, width: "100%" }}
@@ -2236,7 +2240,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
             </select>
           </div>
 
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <h4>Товар: {item?.name}</h4>
             <p style={{ opacity: 0.7, margin: "5px 0" }}>
               Текущее количество на складе:{" "}
@@ -2247,7 +2251,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
             </p>
           </div>
 
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <label>Количество *</label>
             <input
               style={{ marginTop: 15, width: "100%" }}
@@ -2388,7 +2392,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <h4>Товар: {item?.name}</h4>
             <p style={{ opacity: 0.7, margin: "5px 0" }}>
               Текущее количество у агента:{" "}
@@ -2396,7 +2400,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
             </p>
           </div>
 
-          <div className="add-modal__section">
+          <div className="finished-goods-add-modal__section">
             <label>Количество для возврата *</label>
             <input
               style={{ marginTop: 15, width: "100%" }}

@@ -82,10 +82,13 @@ export const createDeals = createAsyncThunk(
 
 export const getClientDeals = createAsyncThunk(
   "client/getClientDeals",
-  async (clientId, { rejectWithValue }) => {
+  async ({ clientId, params = {} }, { rejectWithValue }) => {
     try {
-      const { data } = await api.get(`/main/clients/${clientId}/deals/`);
-      return data.results;
+      const { data } = await api.get(`/main/clients/${clientId}/deals/`, {
+        params,
+      });
+      // Поддерживаем как пагинацию, так и простой массив
+      return Array.isArray(data) ? data : data.results || [];
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -123,12 +126,19 @@ export const updateDealDetail = createAsyncThunk(
 
 export const payDebtDeal = createAsyncThunk(
   "client/payDebtDeal",
-  async ({ id, data }, { rejectWithValue }) => {
+  async ({ id, data, clientId }, { rejectWithValue }) => {
     try {
-      const { data: response } = await api.post(
-        `/main/clientdeals/${id}/pay/`,
-        data
-      );
+      // Генерируем idempotency_key если его нет
+      if (!data.idempotency_key) {
+        data.idempotency_key = crypto.randomUUID();
+      }
+      
+      // Используем nested endpoint если есть clientId, иначе flat
+      const url = clientId
+        ? `/main/clients/${clientId}/deals/${id}/pay/`
+        : `/main/clientdeals/${id}/pay/`;
+      
+      const { data: response } = await api.post(url, data);
       return response;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
@@ -136,11 +146,44 @@ export const payDebtDeal = createAsyncThunk(
   }
 );
 
+// Возврат платежа (refund)
+export const refundDeal = createAsyncThunk(
+  "client/refundDeal",
+  async ({ id, data, clientId }, { rejectWithValue }) => {
+    try {
+      // Генерируем idempotency_key если его нет
+      if (!data.idempotency_key) {
+        data.idempotency_key = crypto.randomUUID();
+      }
+      
+      // Используем nested endpoint если есть clientId, иначе flat
+      const url = clientId
+        ? `/main/clients/${clientId}/deals/${id}/refund/`
+        : `/main/clientdeals/${id}/refund/`;
+      
+      const { data: response } = await api.post(url, data);
+      return response;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+// Legacy unpay (использует refund)
 export const onPayDebtDeal = createAsyncThunk(
   "client/onPayDebtDeal",
-  async (id, { rejectWithValue }) => {
+  async ({ id, clientId }, { rejectWithValue }) => {
     try {
-      const { data: response } = await api.post(`/main/deals/${id}/unpay/`);
+      // Используем refund с пустым amount для возврата всего
+      const data = {
+        idempotency_key: crypto.randomUUID(),
+      };
+      
+      const url = clientId
+        ? `/main/clients/${clientId}/deals/${id}/refund/`
+        : `/main/clientdeals/${id}/refund/`;
+      
+      const { data: response } = await api.post(url, data);
       return response;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);

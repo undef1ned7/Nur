@@ -43,11 +43,6 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     const currentSector = sector || company?.sector?.name;
     if (!currentSector) return [];
 
-    // Для тарифа "Старт" не показываем секторные пункты меню
-    if (tariff === "Старт") {
-      return [];
-    }
-
     const sectorName = currentSector.toLowerCase();
     const sectorKey = sectorName.replace(/\s+/g, "_");
 
@@ -71,6 +66,18 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
 
     const configKey = sectorMapping[sectorKey] || sectorKey;
     const sectorConfig = MENU_CONFIG.sector[configKey] || [];
+
+    // Для тарифа "Старт" показываем только аналитику маркета
+    if (tariff === "Старт") {
+      const filteredItems = sectorConfig.filter((item) => {
+        // Показываем только аналитику маркета
+        if (item.to === "/crm/market/analytics") {
+          return hasPermission(item.permission);
+        }
+        return false;
+      });
+      return filteredItems;
+    }
 
     const filteredItems = sectorConfig.filter((item) =>
       hasPermission(item.permission)

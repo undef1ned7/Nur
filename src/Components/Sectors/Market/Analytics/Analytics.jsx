@@ -9,6 +9,8 @@ import {
   TrendingUp,
   Calendar,
   HelpCircle,
+  Filter,
+  X,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -23,7 +25,12 @@ import {
   Filler,
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
+import { useDispatch, useSelector } from "react-redux";
 import api from "../../../../api/index";
+import { useUser } from "../../../../store/slices/userSlice";
+import { useCash } from "../../../../store/slices/cashSlice";
+import { fetchBranchesAsync } from "../../../../store/creators/branchCreators";
+import { getCashBoxes } from "../../../../store/slices/cashSlice";
 import "./Analytics.scss";
 
 ChartJS.register(
@@ -39,15 +46,43 @@ ChartJS.register(
 );
 
 const Analytics = () => {
+  const dispatch = useDispatch();
+  const { company, currentUser } = useUser();
+  const { list: cashBoxes } = useCash();
+  const { list: branches } = useSelector(
+    (state) => state.branches || { list: [] }
+  );
   const [activeTab, setActiveTab] = useState("sales");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
   const [period, setPeriod] = useState(() => {
     const now = new Date();
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
     const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
     return { from, to };
+  });
+
+  // Фильтры для всех вкладок
+  const [filters, setFilters] = useState({
+    branch: "",
+    include_global: false,
+    // Sales filters
+    cashbox: "",
+    shift: "",
+    cashier: "",
+    payment_method: "",
+    min_total: "",
+    max_total: "",
+    // Stock filters
+    product: "",
+    category: "",
+    kind: "",
+    low_only: false,
+    // Cashboxes filters (используются те же что и sales)
+    // Shifts filters
+    status: "",
   });
 
   const currentDate = new Date();
@@ -56,15 +91,24 @@ const Analytics = () => {
     year: "numeric",
   });
 
-  // Форматирование даты для API
-  const formatDateForAPI = (date) => {
+  // Загрузка данных для фильтров
+  useEffect(() => {
+    dispatch(fetchBranchesAsync());
+    dispatch(getCashBoxes());
+  }, [dispatch]);
+
+  // Форматирование даты для API (YYYY-MM-DD или YYYY-MM-DDTHH:MM:SS)
+  const formatDateForAPI = (date, includeTime = true) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
+    if (!includeTime) {
+      return `${year}-${month}-${day}`;
+    }
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     const seconds = String(date.getSeconds()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+06:00`;
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
   };
 
   // Маппинг внутренних названий вкладок на названия для API
@@ -80,8 +124,6 @@ const Analytics = () => {
   };
 
   // Загрузка данных аналитики
-  // Используем GET запрос с query параметрами, так как POST не поддерживается сервером (405 Method Not Allowed)
-  // GET запросы используются для получения данных аналитики, POST обычно для создания/изменения данных
   const fetchAnalytics = React.useCallback(
     async (tab = "sales") => {
       setLoading(true);
@@ -89,13 +131,45 @@ const Analytics = () => {
       try {
         // Преобразуем внутреннее название вкладки в название для API
         const apiTab = mapTabToAPI(tab);
-        const response = await api.get("/main/analytics/market/", {
-          params: {
-            tab: apiTab,
-            period_from: formatDateForAPI(period.from),
-            period_to: formatDateForAPI(period.to),
-          },
-        });
+        const params = {
+          tab: apiTab,
+          date_from: formatDateForAPI(period.from, false),
+          date_to: formatDateForAPI(period.to, false),
+        };
+
+        // Добавляем branch и include_global если branch выбран
+        if (filters.branch) {
+          params.branch = filters.branch;
+          if (filters.include_global) {
+            params.include_global = "1";
+          }
+        }
+
+        // Добавляем фильтры в зависимости от вкладки
+        if (tab === "sales" || tab === "cashiers") {
+          if (filters.cashbox) params.cashbox = filters.cashbox;
+          if (filters.shift) params.shift = filters.shift;
+          if (filters.cashier) params.cashier = filters.cashier;
+          if (filters.payment_method)
+            params.payment_method = filters.payment_method;
+          if (filters.min_total) params.min_total = filters.min_total;
+          if (filters.max_total) params.max_total = filters.max_total;
+        }
+
+        if (tab === "warehouse") {
+          if (filters.product) params.product = filters.product;
+          if (filters.category) params.category = filters.category;
+          if (filters.kind) params.kind = filters.kind;
+          if (filters.low_only) params.low_only = "1";
+        }
+
+        if (tab === "shifts") {
+          if (filters.status) params.status = filters.status;
+          if (filters.cashbox) params.cashbox = filters.cashbox;
+          if (filters.cashier) params.cashier = filters.cashier;
+        }
+
+        const response = await api.get("/main/analytics/market/", { params });
         setAnalyticsData(response.data);
       } catch (err) {
         console.error("Ошибка при загрузке аналитики:", err);
@@ -104,12 +178,36 @@ const Analytics = () => {
         setLoading(false);
       }
     },
-    [period.from, period.to]
+    [period.from, period.to, filters]
   );
 
   useEffect(() => {
     fetchAnalytics(activeTab);
   }, [activeTab, fetchAnalytics]);
+
+  // Функция для сброса фильтров
+  const resetFilters = () => {
+    setFilters({
+      branch: "",
+      include_global: false,
+      cashbox: "",
+      shift: "",
+      cashier: "",
+      payment_method: "",
+      min_total: "",
+      max_total: "",
+      product: "",
+      category: "",
+      kind: "",
+      low_only: false,
+      status: "",
+    });
+  };
+
+  // Функция для обновления фильтра
+  const updateFilter = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
   // Форматирование числа с разделителями
   const formatNumber = (num) => {
@@ -619,16 +717,231 @@ const Analytics = () => {
   return (
     <div className="analytics-page">
       <div className="analytics-page__header">
-        <button className="analytics-page__back">
+        {/* <button className="analytics-page__back">
           <ArrowLeft size={20} />
-        </button>
+        </button> */}
         <div>
           <h1 className="analytics-page__title">Аналитика</h1>
           <p className="analytics-page__subtitle">
             Статистика и отчеты за {monthName}
           </p>
         </div>
+        <button
+          className="analytics-page__filter-btn"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <Filter size={20} />
+          Фильтры
+        </button>
       </div>
+
+      {/* Панель фильтров */}
+      {showFilters && (
+        <div className="analytics-page__filters">
+          <div className="analytics-page__filters-header">
+            <h3>Фильтры</h3>
+            <button
+              className="analytics-page__filters-close"
+              onClick={() => setShowFilters(false)}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="analytics-page__filters-content">
+            {/* Период */}
+            <div className="analytics-page__filter-group">
+              <label>Период</label>
+              <div className="analytics-page__filter-row">
+                <input
+                  type="date"
+                  value={formatDateForAPI(period.from, false)}
+                  onChange={(e) => {
+                    const date = new Date(e.target.value);
+                    setPeriod((prev) => ({ ...prev, from: date }));
+                  }}
+                />
+                <span>—</span>
+                <input
+                  type="date"
+                  value={formatDateForAPI(period.to, false)}
+                  onChange={(e) => {
+                    const date = new Date(e.target.value);
+                    date.setHours(23, 59, 59);
+                    setPeriod((prev) => ({ ...prev, to: date }));
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Фильтры для Sales и Cashiers */}
+            {(activeTab === "sales" || activeTab === "cashiers") && (
+              <>
+                <div className="analytics-page__filter-group">
+                  <label>Касса</label>
+                  <select
+                    value={filters.cashbox}
+                    onChange={(e) => updateFilter("cashbox", e.target.value)}
+                  >
+                    <option value="">Все кассы</option>
+                    {cashBoxes.map((box) => (
+                      <option key={box.id} value={box.id}>
+                        {box.name || box.department_name || box.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="analytics-page__filter-group">
+                  <label>Способ оплаты</label>
+                  <select
+                    value={filters.payment_method}
+                    onChange={(e) =>
+                      updateFilter("payment_method", e.target.value)
+                    }
+                  >
+                    <option value="">Все способы</option>
+                    <option value="cash">Наличные</option>
+                    <option value="transfer">Безналичные</option>
+                  </select>
+                </div>
+
+                <div className="analytics-page__filter-group">
+                  <label>Сумма от</label>
+                  <input
+                    type="number"
+                    value={filters.min_total}
+                    onChange={(e) => updateFilter("min_total", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="analytics-page__filter-group">
+                  <label>Сумма до</label>
+                  <input
+                    type="number"
+                    value={filters.max_total}
+                    onChange={(e) => updateFilter("max_total", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Филиал (только для owner/admin) - показываем после основных фильтров */}
+            {(currentUser?.role === "owner" ||
+              currentUser?.role === "admin") && (
+              <div className="analytics-page__filter-group">
+                <label>Филиал</label>
+                <select
+                  value={filters.branch}
+                  onChange={(e) => updateFilter("branch", e.target.value)}
+                >
+                  <option value="">Все филиалы</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+                {filters.branch && (
+                  <label className="analytics-page__filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={filters.include_global}
+                      onChange={(e) =>
+                        updateFilter("include_global", e.target.checked)
+                      }
+                    />
+                    Включить глобальные записи
+                  </label>
+                )}
+              </div>
+            )}
+
+            {/* Фильтры для Warehouse */}
+            {activeTab === "warehouse" && (
+              <>
+                <div className="analytics-page__filter-group">
+                  <label>Тип товара</label>
+                  <select
+                    value={filters.kind}
+                    onChange={(e) => updateFilter("kind", e.target.value)}
+                  >
+                    <option value="">Все типы</option>
+                    <option value="product">Товар</option>
+                    <option value="service">Услуга</option>
+                    <option value="bundle">Комплект</option>
+                  </select>
+                </div>
+
+                <div className="analytics-page__filter-group">
+                  <label className="analytics-page__filter-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={filters.low_only}
+                      onChange={(e) =>
+                        updateFilter("low_only", e.target.checked)
+                      }
+                    />
+                    Только товары с низким остатком
+                  </label>
+                </div>
+              </>
+            )}
+
+            {/* Фильтры для Shifts */}
+            {activeTab === "shifts" && (
+              <>
+                <div className="analytics-page__filter-group">
+                  <label>Статус</label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => updateFilter("status", e.target.value)}
+                  >
+                    <option value="">Все статусы</option>
+                    <option value="open">Открыта</option>
+                    <option value="closed">Закрыта</option>
+                  </select>
+                </div>
+
+                <div className="analytics-page__filter-group">
+                  <label>Касса</label>
+                  <select
+                    value={filters.cashbox}
+                    onChange={(e) => updateFilter("cashbox", e.target.value)}
+                  >
+                    <option value="">Все кассы</option>
+                    {cashBoxes.map((box) => (
+                      <option key={box.id} value={box.id}>
+                        {box.name || box.department_name || box.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            <div className="analytics-page__filters-actions">
+              <button
+                className="analytics-page__filter-reset"
+                onClick={resetFilters}
+              >
+                Сбросить
+              </button>
+              <button
+                className="analytics-page__filter-apply"
+                onClick={() => {
+                  fetchAnalytics(activeTab);
+                  setShowFilters(false);
+                }}
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="analytics-page__tabs">
         <button
@@ -789,10 +1102,10 @@ const Analytics = () => {
             <div className="analytics-page__table-card">
               <div className="analytics-page__table-header">
                 <h3 className="analytics-page__table-title">Документы</h3>
-                <button className="analytics-page__date-filter">
+                {/* <button className="analytics-page__date-filter">
                   <Calendar size={16} />
                   неделю
-                </button>
+                </button> */}
               </div>
               <table className="analytics-page__table">
                 <thead>

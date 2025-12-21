@@ -137,8 +137,8 @@ const Sell = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (showSellModal) dispatch(startSale());
-    if (showSellMainStart) dispatch(startSale());
+    if (showSellModal) dispatch(startSale({ discount_total: 0 }));
+    if (showSellMainStart) dispatch(startSale({ discount_total: 0 }));
   }, [showSellModal, showSellMainStart, dispatch]);
 
   useEffect(() => {
@@ -315,7 +315,7 @@ const Sell = () => {
 
   return (
     <div>
-      {start && showSellMainStart ? (
+      {showSellMainStart ? (
         <SellMainStart
           show={showSellMainStart}
           setShow={setShowSellMainStart}
@@ -346,11 +346,11 @@ const Sell = () => {
                     </button>
                   ) : (
                     <>
-                      {sectorName === "Магазин" && (
+                      {sectorName !== "магазин" && (
                         <button
                           className="sell__header-btn"
                           onClick={() => {
-                            dispatch(startSale());
+                            dispatch(startSale({ discount_total: 0 }));
                             setShowSellMainStart(true);
                           }}
                         >

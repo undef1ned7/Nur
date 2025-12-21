@@ -221,8 +221,8 @@ const CashboxList = () => {
                   <td>
                     <b>{r.department_name || r.name || "—"}</b>
                   </td>
-                  <td>{money(r.analytics?.income?.total || 0)}</td>
-                  <td>{money(r.analytics?.expense?.total || 0)}</td>
+                  <td>{money(r.analytics?.income_total || 0)}</td>
+                  <td>{money(r.analytics?.expense_total || 0)}</td>
                   <td>
                     <button
                       className="kassa__btn kassa__btn--secondary"

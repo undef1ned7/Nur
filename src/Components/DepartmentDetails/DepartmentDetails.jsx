@@ -52,7 +52,7 @@ const SECTOR_ACCESS_TYPES = {
     {
       value: "Интерфейс кассира",
       label: "Интерфейс кассира",
-      backendKey: "can_view_cashbox",
+      backendKey: "can_view_cashier",
     },
   ],
   Барбершоп: [

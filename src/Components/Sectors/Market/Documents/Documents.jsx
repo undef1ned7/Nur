@@ -1,1041 +1,537 @@
-// src/components/Documents/Documents.jsx
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import styles from "./Documents.module.scss";
-import api from "../../../../api";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Search, Filter, Calendar, Eye, Pencil, Printer } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  fetchDocuments,
+  getReceiptJson,
+  getProductInvoice,
+} from "../../../../store/creators/saleThunk";
+import {
+  handleCheckoutResponseForPrinting,
+  checkPrinterConnection,
+} from "../../../pages/Sell/services/printService";
+import ReconciliationModal from "./components/ReconciliationModal";
+import ReceiptPreviewModal from "./components/ReceiptPreviewModal";
+import ReceiptEditModal from "./components/ReceiptEditModal";
+import InvoicePreviewModal from "./components/InvoicePreviewModal";
+import "./Documents.scss";
 
-/* ========== helpers ========== */
-function normalizeResp(data) {
-  return Array.isArray(data)
-    ? { results: data, next: null, previous: null, count: data.length }
-    : {
-        results: data?.results || [],
-        next: data?.next || null,
-        previous: data?.previous || null,
-        count: typeof data?.count === "number" ? data.count : null,
-      };
-}
+const Documents = () => {
+  const dispatch = useDispatch();
+  const {
+    documents,
+    documentsCount,
+    documentsNext,
+    documentsPrevious,
+    documentsLoading,
+  } = useSelector((state) => state.sale);
 
-function extFromUrl(u = "") {
-  try {
-    const p = new URL(u, window.location.origin);
-    const last = p.pathname.split("/").filter(Boolean).pop() || "";
-    return (last.split(".").pop() || "").toLowerCase();
-  } catch {
-    const last = (u || "").split("/").filter(Boolean).pop() || "";
-    return (last.split(".").pop() || "").toLowerCase();
-  }
-}
+  const [activeTab, setActiveTab] = useState("receipts");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showReconciliationModal, setShowReconciliationModal] = useState(false);
+  const [previewReceiptId, setPreviewReceiptId] = useState(null);
+  const [previewInvoiceId, setPreviewInvoiceId] = useState(null);
+  const [editReceiptId, setEditReceiptId] = useState(null);
+  const [editReceiptData, setEditReceiptData] = useState(null);
+  const debounceTimerRef = useRef(null);
 
-function guessMime(url = "") {
-  const ext = extFromUrl(url);
-  if (["png", "jpg", "jpeg", "gif", "webp", "bmp"].includes(ext))
-    return `image/${ext === "jpg" ? "jpeg" : ext}`;
-  if (ext === "pdf") return "application/pdf";
-  if (["doc", "docx"].includes(ext)) return "application/msword";
-  if (["xls", "xlsx"].includes(ext)) return "application/vnd.ms-excel";
-  if (["ppt", "pptx"].includes(ext)) return "application/vnd.ms-powerpoint";
-  if (["txt", "md"].includes(ext)) return "text/plain";
-  return "";
-}
-
-function fileEmoji(type, url) {
-  const t = type || guessMime(url) || "";
-  if (t.startsWith("image/")) return "🖼️";
-  if (t === "application/pdf") return "📕";
-  if (t.includes("sheet") || t.includes("excel") || /\.xlsx?$/i.test(url)) return "📊";
-  if (t.includes("word") || /\.docx?$/i.test(url)) return "📃";
-  if (t.includes("presentation") || /\.pptx?$/i.test(url)) return "🖥️";
-  if (/\.zip|\.rar|\.7z/i.test(url)) return "🗜️";
-  return "📄";
-}
-
-function fmtISO(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const dd = `${d.getDate()}`.padStart(2, "0");
-  const mm = `${d.getMonth() + 1}`.padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = `${d.getHours()}`.padStart(2, "0");
-  const mi = `${d.getMinutes()}`.padStart(2, "0");
-  return `${dd}.${mm}.${yyyy} ${hh}:${mi}`;
-}
-
-/* ========== component ========== */
-function MarketDocuments() {
-  const [tab, setTab] = useState("folders"); // "folders" | "docs"
-
-  /* ----- FOLDERS ----- */
-  const [foldRows, setFoldRows] = useState([]);
-  const [foldLoading, setFoldLoading] = useState(false);
-  const [foldErr, setFoldErr] = useState("");
-  const [foldNext, setFoldNext] = useState(null);
-  const [foldPrev, setFoldPrev] = useState(null);
-
-  const [folderQ, setFolderQ] = useState("");
-  const [selectedFolderId, setSelectedFolderId] = useState("");
-  const [folderDetail, setFolderDetail] = useState(null);
-  const [folderDetailLoading, setFolderDetailLoading] = useState(false);
-
-  const [createFolderOpen, setCreateFolderOpen] = useState(false);
-  const [createFolderName, setCreateFolderName] = useState("");
-  const [createFolderBusy, setCreateFolderBusy] = useState(false);
-
-  const [editFolderOpen, setEditFolderOpen] = useState(false);
-  const [editFolderId, setEditFolderId] = useState("");
-  const [editFolderName, setEditFolderName] = useState("");
-  const [editFolderBusy, setEditFolderBusy] = useState(false);
-
-  const [allFoldersForSelect, setAllFoldersForSelect] = useState([]);
-  const nameRef = useRef(null);
-
-  const loadFolders = useCallback(async (url = "/booking/folders/") => {
-    setFoldLoading(true);
-    setFoldErr("");
-    try {
-      const { data } = await api.get(url);
-      const n = normalizeResp(data);
-      setFoldRows(n.results);
-      setFoldNext(n.next);
-      setFoldPrev(n.previous);
-      if (n.results?.[0]) {
-        setSelectedFolderId((prev) => prev || n.results[0].id);
-      } else {
-        setSelectedFolderId("");
-        setFolderDetail(null);
-      }
-    } catch (e) {
-      setFoldErr(e?.response?.data?.detail || "Не удалось загрузить папки");
-    } finally {
-      setFoldLoading(false);
-    }
-  }, []);
-
-  const loadFolderDetail = useCallback(async (id) => {
-    if (!id) {
-      setFolderDetail(null);
-      return;
-    }
-    setFolderDetailLoading(true);
-    try {
-      const { data } = await api.get(`/booking/folders/${id}/`);
-      setFolderDetail(data);
-      setFoldRows((prev) => prev.map((x) => (x.id === id ? data : x)));
-    } finally {
-      setFolderDetailLoading(false);
-    }
-  }, []);
-
-  const fetchAllFoldersForSelect = useCallback(async () => {
-    const acc = [];
-    let next = "/booking/folders/";
-    try {
-      while (next) {
-        const { data } = await api.get(next);
-        const n = normalizeResp(data);
-        acc.push(...n.results);
-        next = n.next;
-      }
-      acc.sort((a, b) => (a.name || "").localeCompare(b.name || "", "ru"));
-      setAllFoldersForSelect(acc);
-    } catch {
-      setAllFoldersForSelect([]);
-    }
-  }, []);
-
-  const onCreateFolder = useCallback(
-    async (e) => {
-      e.preventDefault();
-      const name = (createFolderName || "").trim();
-      if (!name) return alert("Название папки обязательно");
-      if (name.length > 255) return alert("Макс. длина названия — 255");
-
-      setCreateFolderBusy(true);
-      setFoldErr("");
-      try {
-        const { data } = await api.post("/booking/folders/", { name });
-        await loadFolders();
-        if (data?.id) setSelectedFolderId(data.id);
-        setCreateFolderOpen(false);
-        setCreateFolderName("");
-      } catch (e2) {
-        setFoldErr(e2?.response?.data?.detail || "Не удалось создать папку");
-      } finally {
-        setCreateFolderBusy(false);
-      }
-    },
-    [createFolderName, loadFolders]
-  );
-
-  const openEditFolder = useCallback((f) => {
-    setEditFolderId(f.id);
-    setEditFolderName(f.name || "");
-    setEditFolderOpen(true);
-    setTimeout(() => nameRef.current?.focus(), 0);
-  }, []);
-
-  const onEditFolder = useCallback(
-    async (e) => {
-      e.preventDefault();
-      const name = (editFolderName || "").trim();
-      if (!name) return alert("Название папки обязательно");
-
-      setEditFolderBusy(true);
-      setFoldErr("");
-      try {
-        await api.patch(`/booking/folders/${editFolderId}/`, { name });
-        await loadFolders();
-        setEditFolderOpen(false);
-        if (selectedFolderId === editFolderId) loadFolderDetail(editFolderId);
-      } catch (e2) {
-        setFoldErr(e2?.response?.data?.detail || "Не удалось изменить папку");
-      } finally {
-        setEditFolderBusy(false);
-      }
-    },
-    [editFolderId, editFolderName, loadFolders, loadFolderDetail, selectedFolderId]
-  );
-
-  const onDeleteFolder = useCallback(
-    async (f) => {
-      if (!window.confirm(`Удалить папку «${f.name || "Без названия"}»?`)) return;
-      setFoldErr("");
-      try {
-        await api.delete(`/booking/folders/${f.id}/`);
-        await loadFolders();
-        if (selectedFolderId === f.id) {
-          setSelectedFolderId("");
-          setFolderDetail(null);
-        }
-      } catch (e2) {
-        setFoldErr(
-          e2?.response?.data?.detail ||
-            "Не удалось удалить папку. Убедитесь, что в папке нет документов."
-        );
-      }
-    },
-    [loadFolders, selectedFolderId]
-  );
-
+  // Debounce для поиска
   useEffect(() => {
-    loadFolders();
-  }, [loadFolders]);
-
-  useEffect(() => {
-    if (selectedFolderId) loadFolderDetail(selectedFolderId);
-  }, [selectedFolderId, loadFolderDetail]);
-
-  const foldFiltered = useMemo(() => {
-    const s = folderQ.trim().toLowerCase();
-    if (!s) return foldRows;
-    return foldRows.filter((r) => `${r.name || ""}`.toLowerCase().includes(s));
-  }, [foldRows, folderQ]);
-
-  /* ----- DOCUMENTS ----- */
-  const [docRows, setDocRows] = useState([]);
-  const [docLoading, setDocLoading] = useState(false);
-  const [docErr, setDocErr] = useState("");
-  const [docNext, setDocNext] = useState(null);
-  const [docPrev, setDocPrev] = useState(null);
-
-  const [docQ, setDocQ] = useState("");
-  const [docFolderFilter, setDocFolderFilter] = useState(""); // '' = все, иначе UUID
-  const [selectedDocId, setSelectedDocId] = useState("");
-  const [docViewerUrl, setDocViewerUrl] = useState("");
-
-  const [createDocOpen, setCreateDocOpen] = useState(false);
-  const [createDocName, setCreateDocName] = useState("");
-  const [createDocFolder, setCreateDocFolder] = useState("");
-  const [createDocFile, setCreateDocFile] = useState(null);
-  const [createDocBusy, setCreateDocBusy] = useState(false);
-
-  const [editDocOpen, setEditDocOpen] = useState(false);
-  const [editDocId, setEditDocId] = useState("");
-  const [editDocName, setEditDocName] = useState("");
-  const [editDocFolder, setEditDocFolder] = useState("");
-  const [editDocFile, setEditDocFile] = useState(null);
-  const [editDocBusy, setEditDocBusy] = useState(false);
-
-  const loadDocs = useCallback(async (url = "/booking/documents/") => {
-    setDocLoading(true);
-    setDocErr("");
-    try {
-      const { data } = await api.get(url);
-      const n = normalizeResp(data);
-      setDocRows(n.results);
-      setDocNext(n.next);
-      setDocPrev(n.previous);
-      if (n.results?.[0]) {
-        setSelectedDocId((prev) => prev || n.results[0].id);
-        setDocViewerUrl(n.results[0].file || "");
-      } else {
-        setSelectedDocId("");
-        setDocViewerUrl("");
-      }
-    } catch (e) {
-      setDocErr(e?.response?.data?.detail || "Не удалось загрузить документы");
-    } finally {
-      setDocLoading(false);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
-  }, []);
 
-  const loadDocDetail = useCallback(async (id) => {
-    if (!id) return;
-    try {
-      const { data } = await api.get(`/booking/documents/${id}/`);
-      setDocRows((prev) => prev.map((x) => (x.id === id ? data : x)));
-      setDocViewerUrl(data.file || "");
-    } catch {
-      /* ignore */
-    }
-  }, []);
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1); // Сбрасываем на первую страницу при изменении поиска
+    }, 300);
 
-  const onCreateDoc = useCallback(
-    async (e) => {
-      e.preventDefault();
-      if (!createDocFolder.trim()) return alert("Выберите папку");
-      if (!createDocFile) return alert("Выберите файл");
-
-      setCreateDocBusy(true);
-      setDocErr("");
-      try {
-        const fd = new FormData();
-        fd.append("folder", createDocFolder.trim());
-        if (createDocName.trim()) fd.append("name", createDocName.trim());
-        fd.append("file", createDocFile);
-
-        const { data } = await api.post("/booking/documents/", fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-
-        await loadDocs();
-        if (data?.id) {
-          setSelectedDocId(data.id);
-          setDocViewerUrl(data.file || "");
-        }
-        setCreateDocOpen(false);
-        setCreateDocName("");
-        setCreateDocFolder(docFolderFilter || selectedFolderId || "");
-        setCreateDocFile(null);
-      } catch (e2) {
-        setDocErr(e2?.response?.data?.detail || "Не удалось создать документ");
-      } finally {
-        setCreateDocBusy(false);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
-    },
-    [createDocFolder, createDocFile, createDocName, docFolderFilter, selectedFolderId, loadDocs]
-  );
+    };
+  }, [searchTerm]);
 
-  const onEditDocSubmit = useCallback(
-    async (e) => {
-      e.preventDefault();
-      if (!editDocFolder.trim()) return alert("Выберите папку");
+  // Функция для генерации порядкового номера чека/накладной
+  // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
+  const PAGE_SIZE = 20;
+  const getDocumentNumber = (index, prefix = "ЧЕК") => {
+    const sequentialNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
+    return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
+  };
 
-      setEditDocBusy(true);
-      setDocErr("");
-      try {
-        if (editDocFile) {
-          const fd = new FormData();
-          fd.append("folder", editDocFolder.trim());
-          fd.append("name", (editDocName || "").trim());
-          fd.append("file", editDocFile);
-          await api.patch(`/booking/documents/${editDocId}/`, fd, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-        } else {
-          await api.patch(`/booking/documents/${editDocId}/`, {
-            name: (editDocName || "").trim(),
-            folder: editDocFolder.trim(),
-          });
-        }
-        await loadDocs();
-        setEditDocOpen(false);
-        if (selectedDocId === editDocId) loadDocDetail(editDocId);
-      } catch (e2) {
-        setDocErr(e2?.response?.data?.detail || "Не удалось изменить документ");
-      } finally {
-        setEditDocBusy(false);
-      }
-    },
-    [editDocId, editDocFile, editDocFolder, editDocName, loadDocs, loadDocDetail, selectedDocId]
-  );
+  // Маппинг данных из Redux в формат для отображения
+  const receiptsData = useMemo(() => {
+    if (activeTab !== "receipts") return [];
+    return (documents || []).map((sale, index) => ({
+      id: sale.id,
+      number: getDocumentNumber(index, "ЧЕК"),
+      date: sale.created_at
+        ? new Date(sale.created_at).toLocaleString("ru-RU", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "—",
+      client:
+        sale.client?.full_name ||
+        sale.client_name ||
+        sale.client ||
+        "Без клиента",
+      products: sale.items?.length || 0,
+      amount: sale.total || "0.00",
+      status: sale.status === "paid" ? "Проведен" : "Черновик",
+      statusType: sale.status === "paid" ? "approved" : "draft",
+    }));
+  }, [documents, activeTab, currentPage]);
 
-  const onDeleteDoc = useCallback(
-    async (d) => {
-      if (!window.confirm(`Удалить документ «${d.name || "Без названия"}»?`)) return;
-      setDocErr("");
-      try {
-        await api.delete(`/booking/documents/${d.id}/`);
-        await loadDocs();
-        if (selectedDocId === d.id) {
-          setSelectedDocId("");
-          setDocViewerUrl("");
-        }
-      } catch (e2) {
-        setDocErr(e2?.response?.data?.detail || "Не удалось удалить документ");
-      }
-    },
-    [loadDocs, selectedDocId]
-  );
+  const invoicesData = useMemo(() => {
+    if (activeTab !== "invoices") return [];
+    return (documents || []).map((sale, index) => ({
+      id: sale.id,
+      number: getDocumentNumber(index, "НАКЛ"),
+      date: sale.created_at
+        ? new Date(sale.created_at).toLocaleDateString("ru-RU", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "—",
+      counterparty:
+        sale.client?.full_name ||
+        sale.client_name ||
+        sale.client ||
+        "Без контрагента",
+      positions: sale.items?.length || 0,
+      amount: sale.total || "0.00",
+      status: sale.status === "paid" ? "Проведен" : "Черновик",
+      statusType: sale.status === "paid" ? "approved" : "draft",
+    }));
+  }, [documents, activeTab, currentPage]);
 
-  const openEditDoc = useCallback(
-    (d) => {
-      setEditDocId(d.id);
-      setEditDocName(d.name || "");
-      setEditDocFolder(d.folder || "");
-      setEditDocFile(null);
-      setEditDocOpen(true);
-      if (!allFoldersForSelect.length) fetchAllFoldersForSelect();
-    },
-    [allFoldersForSelect.length, fetchAllFoldersForSelect]
-  );
-
+  // Сброс страницы при смене таба
   useEffect(() => {
-    if (tab === "docs") {
-      loadDocs();
-      fetchAllFoldersForSelect();
-      if (selectedFolderId) setDocFolderFilter(selectedFolderId);
-    }
-  }, [tab, loadDocs, fetchAllFoldersForSelect, selectedFolderId]);
+    setCurrentPage(1);
+  }, [activeTab]);
 
+  // Загрузка данных через Redux при изменении таба, страницы или поиска
   useEffect(() => {
-    if (tab === "docs" && selectedFolderId) setDocFolderFilter(selectedFolderId);
-  }, [tab, selectedFolderId]);
+    if (activeTab === "receipts" || activeTab === "invoices") {
+      dispatch(
+        fetchDocuments({
+          page: currentPage,
+          search: debouncedSearchTerm,
+        })
+      );
+    }
+  }, [dispatch, activeTab, currentPage, debouncedSearchTerm]);
 
-  const docFiltered = useMemo(() => {
-    const s = docQ.trim().toLowerCase();
-    return docRows.filter((r) => {
-      const okFolder = docFolderFilter ? r.folder === docFolderFilter : true;
-      if (!okFolder) return false;
-      if (!s) return true;
-      const fname = (r.file || "").split("/").pop() || "";
-      const hay = `${r.name || ""} ${r.folder_name || ""} ${fname}`.toLowerCase();
-      return hay.includes(s);
+  const getCurrentData = () => {
+    switch (activeTab) {
+      case "receipts":
+        return receiptsData;
+      case "invoices":
+        return invoicesData;
+      default:
+        return [];
+    }
+  };
+
+  // Расчет пагинации
+  const pageSize = getCurrentData().length || 1;
+  const totalPages =
+    documentsCount && pageSize ? Math.ceil(documentsCount / pageSize) : 1;
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    setCurrentPage(newPage);
+  };
+
+  const handleView = (item) => {
+    if (activeTab === "receipts") {
+      setPreviewReceiptId(item.id);
+    } else if (activeTab === "invoices") {
+      setPreviewInvoiceId(item.id);
+    }
+  };
+
+  const handleEdit = (item) => {
+    setEditReceiptId(item.id);
+    setEditReceiptData({
+      ...item,
+      documentType: activeTab === "invoices" ? "invoice" : "receipt",
     });
-  }, [docRows, docQ, docFolderFilter]);
+  };
 
-  const currentDoc = useMemo(
-    () => docFiltered.find((r) => r.id === selectedDocId) || null,
-    [docFiltered, selectedDocId]
-  );
+  const handleEditFromPreview = (receiptData) => {
+    setPreviewReceiptId(null);
+    setPreviewInvoiceId(null);
+    setEditReceiptId(receiptData.id);
+    setEditReceiptData({
+      ...receiptData,
+      documentType: activeTab === "invoices" ? "invoice" : "receipt",
+    });
+  };
 
-  async function onSelectDoc(row) {
-    setSelectedDocId(row.id);
-    setDocViewerUrl(row.file || "");
-    await loadDocDetail(row.id);
-  }
+  const handleSaved = () => {
+    // Перезагружаем документы после сохранения
+    if (activeTab === "receipts" || activeTab === "invoices") {
+      dispatch(
+        fetchDocuments({
+          page: currentPage,
+          search: debouncedSearchTerm,
+        })
+      );
+    }
+  };
 
-  /* ----- RENDER ----- */
+  const handlePrint = async (item) => {
+    if (!item?.id) return;
+
+    try {
+      if (activeTab === "invoices") {
+        // Для накладной скачиваем PDF
+        const result = await dispatch(getProductInvoice(item.id));
+        if (getProductInvoice.fulfilled.match(result)) {
+          const pdfBlob = result.payload;
+
+          if (pdfBlob instanceof Blob) {
+            // Убеждаемся, что blob имеет правильный MIME type
+            const blob =
+              pdfBlob.type === "application/pdf"
+                ? pdfBlob
+                : new Blob([pdfBlob], { type: "application/pdf" });
+
+            // Скачиваем файл
+            const url = window.URL.createObjectURL(blob);
+            const a = window.document.createElement("a");
+            a.href = url;
+            a.download = `invoice_${item.id}.pdf`;
+            window.document.body.appendChild(a);
+            a.click();
+            window.document.body.removeChild(a);
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+          } else {
+            throw new Error("Получен неверный формат PDF");
+          }
+        } else {
+          throw new Error("Не удалось загрузить PDF накладной");
+        }
+      } else {
+        // Для чека печатаем через USB принтер
+        const isPrinterConnected = await checkPrinterConnection();
+
+        if (!isPrinterConnected) {
+          alert(
+            "Принтер не подключен. Пожалуйста, подключите принтер перед печатью."
+          );
+          return;
+        }
+
+        const result = await dispatch(getReceiptJson(item.id));
+        if (result.type === "products/getReceiptJson/fulfilled") {
+          const documentData = result.payload;
+
+          if (documentData && Array.isArray(documentData.items)) {
+            // Преобразуем данные в формат для печати
+            const printData = {
+              items: documentData.items.map((item) => ({
+                name: item.name,
+                qty: parseFloat(item.qty),
+                price: parseFloat(item.unit_price),
+                total: parseFloat(item.total),
+              })),
+              total: parseFloat(documentData.totals?.total || 0),
+              subtotal: parseFloat(documentData.totals?.subtotal || 0),
+              discount_total: parseFloat(
+                documentData.totals?.discount_total || 0
+              ),
+              company: documentData.company?.name || "",
+              payment: documentData.payment || {},
+            };
+            await handleCheckoutResponseForPrinting(printData);
+          } else {
+            throw new Error("Нет данных для печати");
+          }
+        } else {
+          throw new Error("Не удалось загрузить данные чека для печати");
+        }
+      }
+    } catch (printError) {
+      console.error("Ошибка при печати:", printError);
+      alert(
+        "Ошибка при печати: " + (printError.message || "Неизвестная ошибка")
+      );
+    }
+  };
+
+  const formatAmount = (amount) => {
+    return parseFloat(amount || 0).toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   return (
-    <div className={styles["docs"]}>
-      {/* Header */}
-      <div className={styles["docs__header"]}>
-        <div>
-          <h3 className={styles["docs__title"]}>Документы и папки</h3>
-          <div className={styles["docs__subtitle"]}>Управляйте папками и файлами</div>
+    <div className="documents">
+      {/* Header with search and filters */}
+      <div className="documents__header">
+        <div className="documents__search">
+          <Search size={20} className="documents__search-icon" />
+          <input
+            type="text"
+            className="documents__search-input"
+            placeholder="Поиск по номеру или контрагенту..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-
-        <div className={styles["docs__actions"]}>
-          <div className={styles["docs__tabs"]}>
-            <button
-              className={`${styles["tab"]} ${tab === "folders" ? styles["tab--active"] : ""}`}
-              onClick={() => setTab("folders")}
-            >
-              Папки
-            </button>
-            <button
-              className={`${styles["tab"]} ${tab === "docs" ? styles["tab--active"] : ""}`}
-              onClick={() => setTab("docs")}
-            >
-              Документы
-            </button>
-          </div>
+        <div className="documents__header-actions">
+          <button
+            className="documents__filter-btn"
+            onClick={() => setShowReconciliationModal(true)}
+            style={{ marginRight: 10 }}
+          >
+            Создать акт сверки
+          </button>
+          <button className="documents__filter-btn">
+            <Filter size={18} />
+            Фильтры
+          </button>
+          <button className="documents__period-btn">
+            <Calendar size={18} />
+            Период
+          </button>
         </div>
       </div>
 
-      {/* ===== FOLDERS TAB ===== */}
-      {tab === "folders" && (
-        <>
-          <div className={styles["docs__serverBar"]}>
-            <div className={styles["docs__search"]}>
-              <span className={styles["docs__searchIcon"]}>🔎</span>
-              <input
-                className={styles["docs__searchInput"]}
-                placeholder="Поиск по папкам…"
-                value={folderQ}
-                onChange={(e) => setFolderQ(e.target.value)}
-              />
-            </div>
-            {foldErr ? <span className={styles["docs__error"]}>{foldErr}</span> : null}
-            <div className={styles["docs__barActions"]}>
-              <button className={styles["btn"]} disabled={foldLoading} onClick={() => loadFolders()}>
-                Обновить
-              </button>
-              <button
-                className={`${styles["btn"]} ${styles["btn--primary"]}`}
-                onClick={() => {
-                  setCreateFolderOpen(true);
-                  setTimeout(() => nameRef.current?.focus(), 0);
-                }}
-              >
-                + Папка
-              </button>
-            </div>
-          </div>
+      {/* Tabs */}
+      <div className="documents__tabs">
+        <button
+          className={`documents__tab ${
+            activeTab === "receipts" ? "documents__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("receipts")}
+        >
+          Чеки
+        </button>
+        <button
+          className={`documents__tab ${
+            activeTab === "invoices" ? "documents__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("invoices")}
+        >
+          Накладные
+        </button>
+      </div>
 
-          <div className={styles["docs__grid"]}>
-            {/* List */}
-            <section className={styles["docs__list"]}>
-              {foldFiltered.length === 0 ? (
-                <div className={styles["docs__empty"]}>
-                  {foldLoading ? "Загрузка…" : "Ничего не найдено"}
-                </div>
-              ) : (
+      {/* Table */}
+      <div className="documents__table-wrapper">
+        <table className="documents__table">
+          <thead>
+            <tr>
+              {activeTab === "receipts" && (
                 <>
-                  <ul className={styles["docs__cards"]}>
-                    {foldFiltered.map((f) => (
-                      <li
-                        key={f.id}
-                        className={`${styles["docs__card"]} ${
-                          f.id === selectedFolderId ? styles["docs__card--active"] : ""
-                        }`}
-                        onDoubleClick={() => setSelectedFolderId(f.id)}
-                      >
-                        <div className={styles["docs__cardMain"]}>
-                          <div className={styles["docs__name"]}>📁 {f.name || "Без названия"}</div>
-                        </div>
-                        <div className={styles["docs__cardActions"]}>
-                          <button
-                            className={`${styles["btn"]} ${styles["btn--secondary"]}`}
-                            onClick={() => setSelectedFolderId(f.id)}
-                          >
-                            Открыть
-                          </button>
-                          <button className={styles["btn"]} onClick={() => openEditFolder(f)}>
-                            Изменить
-                          </button>
-                          <button
-                            className={`${styles["btn"]} ${styles["btn--danger"]}`}
-                            onClick={() => onDeleteFolder(f)}
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className={styles["docs__pager"]}>
-                    <button
-                      className={styles["btn"]}
-                      disabled={!foldPrev || foldLoading}
-                      onClick={() => loadFolders(foldPrev)}
-                    >
-                      ← Назад
-                    </button>
-                    <button
-                      className={styles["btn"]}
-                      disabled={!foldNext || foldLoading}
-                      onClick={() => loadFolders(foldNext)}
-                    >
-                      Вперёд →
-                    </button>
-                  </div>
+                  <th>Номер</th>
+                  <th>Дата и время</th>
+                  <th>Клиент</th>
+                  <th>Товаров</th>
+                  <th>Сумма</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
                 </>
               )}
-            </section>
-
-            {/* Viewer */}
-            <section className={styles["docs__viewer"]}>
-              {!selectedFolderId ? (
-                <div className={styles["docs__placeholder"]}>Выберите папку</div>
-              ) : folderDetailLoading ? (
-                <div className={styles["docs__placeholder"]}>Загрузка…</div>
-              ) : !folderDetail ? (
-                <div className={styles["docs__placeholder"]}>Данные недоступны</div>
-              ) : (
-                <div className={styles["docs__previewWrap"]}>
-                  <div className={styles["docs__previewHeader"]}>
-                    <div className={styles["docs__previewTitle"]}>
-                      📁 {folderDetail.name || "Без названия"}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* Create Folder Modal */}
-          {createFolderOpen && (
-            <div className={styles["docs__modalOverlay"]}>
-              <div className={styles["docs__modal"]}>
-                <div className={styles["docs__modalHeader"]}>
-                  <div className={styles["docs__modalTitle"]}>Новая папка</div>
-                  <button
-                    className={styles["docs__iconBtn"]}
-                    onClick={() => setCreateFolderOpen(false)}
-                    aria-label="Закрыть"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <form className={styles["docs__form"]} onSubmit={onCreateFolder}>
-                  <div className={styles["docs__formGrid"]}>
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>
-                        Название <span className={styles["docs__req"]}>*</span>
-                      </label>
-                      <input
-                        ref={nameRef}
-                        className={styles["docs__input"]}
-                        value={createFolderName}
-                        onChange={(e) => setCreateFolderName(e.target.value)}
-                        placeholder="Например: Договоры"
-                        maxLength={255}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles["docs__formActions"]}>
-                    <button
-                      type="button"
-                      className={styles["btn"]}
-                      onClick={() => setCreateFolderOpen(false)}
-                      disabled={createFolderBusy}
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="submit"
-                      className={`${styles["btn"]} ${styles["btn--primary"]}`}
-                      disabled={createFolderBusy || !createFolderName.trim()}
-                    >
-                      Создать
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Edit Folder Modal */}
-          {editFolderOpen && (
-            <div className={styles["docs__modalOverlay"]}>
-              <div className={styles["docs__modal"]}>
-                <div className={styles["docs__modalHeader"]}>
-                  <div className={styles["docs__modalTitle"]}>Изменить папку</div>
-                  <button
-                    className={styles["docs__iconBtn"]}
-                    onClick={() => setEditFolderOpen(false)}
-                    aria-label="Закрыть"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <form className={styles["docs__form"]} onSubmit={onEditFolder}>
-                  <div className={styles["docs__formGrid"]}>
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>
-                        Название <span className={styles["docs__req"]}>*</span>
-                      </label>
-                      <input
-                        ref={nameRef}
-                        className={styles["docs__input"]}
-                        value={editFolderName}
-                        onChange={(e) => setEditFolderName(e.target.value)}
-                        placeholder="Например: Договоры"
-                        maxLength={255}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles["docs__formActions"]}>
-                    <button
-                      type="button"
-                      className={styles["btn"]}
-                      onClick={() => setEditFolderOpen(false)}
-                      disabled={editFolderBusy}
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="submit"
-                      className={`${styles["btn"]} ${styles["btn--primary"]}`}
-                      disabled={editFolderBusy || !editFolderName.trim()}
-                    >
-                      Сохранить
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ===== DOCUMENTS TAB ===== */}
-      {tab === "docs" && (
-        <>
-          <div className={styles["docs__serverBar"]}>
-            <div className={styles["docs__search"]}>
-              <span className={styles["docs__searchIcon"]}>🔎</span>
-              <input
-                className={styles["docs__searchInput"]}
-                placeholder="Поиск по документам…"
-                value={docQ}
-                onChange={(e) => setDocQ(e.target.value)}
-              />
-            </div>
-
-            <div className={styles["docs__filter"]}>
-              <label className={styles["docs__filterLabel"]}>Папка</label>
-              <select
-                className={styles["docs__select"]}
-                value={docFolderFilter}
-                onChange={(e) => setDocFolderFilter(e.target.value)}
-              >
-                <option value="">Все</option>
-                {allFoldersForSelect.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name || "Без названия"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {docErr ? <span className={styles["docs__error"]}>{docErr}</span> : null}
-
-            <div className={styles["docs__barActions"]}>
-              <button className={styles["btn"]} disabled={docLoading} onClick={() => loadDocs()}>
-                Обновить
-              </button>
-              <button
-                className={`${styles["btn"]} ${styles["btn--primary"]}`}
-                onClick={() => {
-                  setCreateDocOpen(true);
-                  setCreateDocFolder(docFolderFilter || selectedFolderId || "");
-                  setCreateDocFile(null);
-                  if (!allFoldersForSelect.length) fetchAllFoldersForSelect();
-                }}
-              >
-                + Документ
-              </button>
-            </div>
-          </div>
-
-          <div className={styles["docs__grid"]}>
-            {/* List */}
-            <section className={styles["docs__list"]}>
-              {docFiltered.length === 0 ? (
-                <div className={styles["docs__empty"]}>
-                  {docLoading ? "Загрузка…" : "Ничего не найдено"}
-                </div>
-              ) : (
+              {activeTab === "invoices" && (
                 <>
-                  <ul className={styles["docs__cards"]}>
-                    {docFiltered.map((d) => {
-                      const fileName = (d.file || "").split("/").pop() || "";
-                      const mime = guessMime(d.file);
-                      return (
-                        <li
-                          key={d.id}
-                          className={`${styles["docs__card"]} ${
-                            d.id === selectedDocId ? styles["docs__card--active"] : ""
-                          }`}
-                          onDoubleClick={() => onSelectDoc(d)}
+                  <th>Номер</th>
+                  <th>Дата</th>
+                  <th>Контрагент</th>
+                  <th>Позиций</th>
+                  <th>Сумма</th>
+                  <th>Статус</th>
+                  <th>Действия</th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {documentsLoading ? (
+              <tr>
+                <td colSpan={7} className="documents__empty">
+                  Загрузка...
+                </td>
+              </tr>
+            ) : getCurrentData().length === 0 ? (
+              <tr>
+                <td colSpan={7} className="documents__empty">
+                  Документы не найдены
+                </td>
+              </tr>
+            ) : (
+              getCurrentData().map((item, idx) => (
+                <tr key={item.id}>
+                  {activeTab === "receipts" && (
+                    <>
+                      <td>{item.number}</td>
+                      <td>{item.date}</td>
+                      <td>{item.client}</td>
+                      <td>{item.products}</td>
+                      <td>{formatAmount(item.amount)} сом</td>
+                      <td>
+                        <span
+                          className={`documents__status documents__status--${item.statusType}`}
                         >
-                          <div className={styles["docs__cardMain"]}>
-                            <div className={styles["docs__name"]}>
-                              <span className={styles["docs__emoji"]}>
-                                {fileEmoji(mime, d.file)}
-                              </span>
-                              {d.name || "Без названия"}
-                            </div>
-
-                            <div className={styles["docs__meta"]}>
-                              <span className={styles["docs__filename"]} title={fileName}>
-                                {fileName || "—"}
-                              </span>
-                              <span>•</span>
-                              <span>{d.folder_name || "—"}</span>
-                            </div>
-
-                            <div className={styles["docs__meta"]}>
-                              <span>Создан: {fmtISO(d.created_at)}</span>
-                              <span>•</span>
-                              <span>Изменён: {fmtISO(d.updated_at)}</span>
-                            </div>
-                          </div>
-
-                          <div className={styles["docs__cardActions"]}>
-                            <button
-                              className={`${styles["btn"]} ${styles["btn--secondary"]}`}
-                              onClick={() => onSelectDoc(d)}
-                            >
-                              Открыть
-                            </button>
-                            <button className={styles["btn"]} onClick={() => openEditDoc(d)}>
-                              Изменить
-                            </button>
-                            <button
-                              className={`${styles["btn"]} ${styles["btn--danger"]}`}
-                              onClick={() => onDeleteDoc(d)}
-                            >
-                              Удалить
-                            </button>
-                            {d.file ? (
-                              <a
-                                className={`${styles["btn"]} ${styles["btn--secondary"]}`}
-                                href={d.file}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                Скачать
-                              </a>
-                            ) : null}
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-
-                  <div className={styles["docs__pager"]}>
-                    <button
-                      className={styles["btn"]}
-                      disabled={!docPrev || docLoading}
-                      onClick={() => loadDocs(docPrev)}
-                    >
-                      ← Назад
-                    </button>
-                    <button
-                      className={styles["btn"]}
-                      disabled={!docNext || docLoading}
-                      onClick={() => loadDocs(docNext)}
-                    >
-                      Вперёд →
-                    </button>
-                  </div>
-                </>
-              )}
-            </section>
-
-            {/* Viewer */}
-            <section className={styles["docs__viewer"]}>
-              {!currentDoc ? (
-                <div className={styles["docs__placeholder"]}>Выберите документ</div>
-              ) : docViewerUrl ? (
-                <Preview
-                  url={docViewerUrl}
-                  name={currentDoc.name}
-                  folderName={currentDoc.folder_name}
-                />
-              ) : (
-                <div className={styles["docs__placeholder"]}>Файл не прикреплён</div>
-              )}
-            </section>
-          </div>
-
-          {/* Create Document Modal */}
-          {createDocOpen && (
-            <div className={styles["docs__modalOverlay"]}>
-              <div className={styles["docs__modal"]}>
-                <div className={styles["docs__modalHeader"]}>
-                  <div className={styles["docs__modalTitle"]}>Новый документ</div>
-                  <button
-                    className={styles["docs__iconBtn"]}
-                    onClick={() => setCreateDocOpen(false)}
-                    aria-label="Закрыть"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <form className={styles["docs__form"]} onSubmit={onCreateDoc}>
-                  <div className={styles["docs__formGrid"]}>
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>Название</label>
-                      <input
-                        className={styles["docs__input"]}
-                        value={createDocName}
-                        onChange={(e) => setCreateDocName(e.target.value)}
-                        placeholder="Например: Договор №12"
-                        maxLength={255}
-                      />
-                    </div>
-
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>
-                        Папка <span className={styles["docs__req"]}>*</span>
-                      </label>
-                      <select
-                        className={styles["docs__select"]}
-                        value={createDocFolder}
-                        onChange={(e) => setCreateDocFolder(e.target.value)}
-                        required
-                      >
-                        <option value="">Выберите папку</option>
-                        {allFoldersForSelect.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name || "Без названия"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>
-                        Файл <span className={styles["docs__req"]}>*</span>
-                      </label>
-                      <input
-                        className={styles["docs__input"]}
-                        type="file"
-                        onChange={(e) => setCreateDocFile(e.target.files?.[0] || null)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles["docs__formActions"]}>
-                    <button
-                      type="button"
-                      className={styles["btn"]}
-                      onClick={() => setCreateDocOpen(false)}
-                      disabled={createDocBusy}
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="submit"
-                      className={`${styles["btn"]} ${styles["btn--primary"]}`}
-                      disabled={createDocBusy || !createDocFolder.trim() || !createDocFile}
-                    >
-                      Создать
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Edit Document Modal */}
-          {editDocOpen && (
-            <div className={styles["docs__modalOverlay"]}>
-              <div className={styles["docs__modal"]}>
-                <div className={styles["docs__modalHeader"]}>
-                  <div className={styles["docs__modalTitle"]}>Изменить документ</div>
-                  <button
-                    className={styles["docs__iconBtn"]}
-                    onClick={() => setEditDocOpen(false)}
-                    aria-label="Закрыть"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <form className={styles["docs__form"]} onSubmit={onEditDocSubmit}>
-                  <div className={styles["docs__formGrid"]}>
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>Название</label>
-                      <input
-                        className={styles["docs__input"]}
-                        value={editDocName}
-                        onChange={(e) => setEditDocName(e.target.value)}
-                        placeholder="Например: Договор №12"
-                        maxLength={255}
-                      />
-                    </div>
-
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>
-                        Папка <span className={styles["docs__req"]}>*</span>
-                      </label>
-                      <select
-                        className={styles["docs__select"]}
-                        value={editDocFolder}
-                        onChange={(e) => setEditDocFolder(e.target.value)}
-                        required
-                      >
-                        <option value="">Выберите папку</option>
-                        {allFoldersForSelect.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name || "Без названия"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className={styles["docs__field"]}>
-                      <label className={styles["docs__label"]}>Заменить файл (необязательно)</label>
-                      <input
-                        className={styles["docs__input"]}
-                        type="file"
-                        onChange={(e) => setEditDocFile(e.target.files?.[0] || null)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className={styles["docs__formActions"]}>
-                    <button
-                      type="button"
-                      className={styles["btn"]}
-                      onClick={() => setEditDocOpen(false)}
-                      disabled={editDocBusy}
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="submit"
-                      className={`${styles["btn"]} ${styles["btn--primary"]}`}
-                      disabled={editDocBusy || !editDocFolder.trim()}
-                    >
-                      Сохранить
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ===== file preview ===== */
-function Preview({ url, name, folderName }) {
-  const mime = guessMime(url);
-  const isImg = mime.startsWith("image/");
-  const isPdf = mime === "application/pdf";
-
-  return (
-    <div className={styles["docs__previewWrap"]}>
-      <div className={styles["docs__previewHeader"]}>
-        <div className={styles["docs__previewTitle"]}>{name || "Без названия"}</div>
-        <div className={styles["docs__previewSub"]}>
-          {folderName || "—"} • {mime || "—"}
-        </div>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="documents__actions">
+                          <button
+                            className="documents__action-btn"
+                            onClick={() => handleView(item)}
+                            title="Просмотр"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          <button
+                            className="documents__action-btn"
+                            onClick={() => handleEdit(item)}
+                            title="Редактировать"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                          <button
+                            className="documents__action-btn"
+                            onClick={() => handlePrint(item)}
+                            title="Печать"
+                          >
+                            <Printer size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                  {activeTab === "invoices" && (
+                    <>
+                      <td>{item.number}</td>
+                      <td>{item.date}</td>
+                      <td>{item.counterparty}</td>
+                      <td>{item.positions}</td>
+                      <td>{formatAmount(item.amount)} сом</td>
+                      <td>
+                        <span
+                          className={`documents__status documents__status--${item.statusType}`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="documents__actions">
+                          <button
+                            className="documents__action-btn"
+                            onClick={() => handleView(item)}
+                            title="Просмотр"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          <button
+                            className="documents__action-btn"
+                            onClick={() => handleEdit(item)}
+                            title="Редактировать"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                          <button
+                            className="documents__action-btn"
+                            onClick={() => handlePrint(item)}
+                            title="Печать"
+                          >
+                            <Printer size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {isImg ? (
-        <img src={url} alt="" className={styles["docs__previewMedia"]} />
-      ) : isPdf ? (
-        <iframe src={url} title="preview" className={styles["docs__previewFrame"]} />
-      ) : url ? (
-        <div className={styles["docs__placeholder"]}>
-          Предпросмотр недоступен.{" "}
-          <a href={url} target="_blank" rel="noreferrer">
-            Открыть в новой вкладке
-          </a>
-        </div>
-      ) : (
-        <div className={styles["docs__placeholder"]}>Нет файла для предпросмотра</div>
+      {/* Пагинация для чеков и накладных */}
+      {(activeTab === "receipts" || activeTab === "invoices") &&
+        totalPages > 1 && (
+          <div className="documents__pagination">
+            <button
+              type="button"
+              className="documents__pagination-btn"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={
+                currentPage === 1 || documentsLoading || !documentsPrevious
+              }
+            >
+              Назад
+            </button>
+            <span className="documents__pagination-info">
+              Страница {currentPage} из {totalPages || 1}
+              {documentsCount && ` (${documentsCount} документов)`}
+            </span>
+            <button
+              type="button"
+              className="documents__pagination-btn"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={
+                documentsLoading ||
+                !documentsNext ||
+                (totalPages && currentPage >= totalPages)
+              }
+            >
+              Вперед
+            </button>
+          </div>
+        )}
+
+      <ReconciliationModal
+        open={showReconciliationModal}
+        onClose={() => setShowReconciliationModal(false)}
+      />
+
+      {previewReceiptId && (
+        <ReceiptPreviewModal
+          receiptId={previewReceiptId}
+          onClose={() => setPreviewReceiptId(null)}
+          onEdit={handleEditFromPreview}
+        />
+      )}
+
+      {previewInvoiceId && (
+        <InvoicePreviewModal
+          invoiceId={previewInvoiceId}
+          onClose={() => setPreviewInvoiceId(null)}
+          onEdit={handleEditFromPreview}
+        />
+      )}
+
+      {editReceiptId && (
+        <ReceiptEditModal
+          receiptId={editReceiptId}
+          receiptData={editReceiptData}
+          documentType={activeTab === "invoices" ? "invoice" : "receipt"}
+          onClose={() => {
+            setEditReceiptId(null);
+            setEditReceiptData(null);
+          }}
+          onSaved={handleSaved}
+        />
       )}
     </div>
   );
-}
+};
 
-export default MarketDocuments;
+export default Documents;

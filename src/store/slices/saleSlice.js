@@ -23,6 +23,7 @@ import {
   updateManualFilling,
   updateSellProduct,
   deleteSale, // <-- обработаем статусы создания сделок
+  fetchDocuments,
 } from "../creators/saleThunk";
 
 const initialState = {
@@ -43,6 +44,12 @@ const initialState = {
   lastDeal: null,
   historyObjects: [],
   historyObjectDetail: null,
+  // Состояние для документов
+  documents: [],
+  documentsCount: 0,
+  documentsNext: null,
+  documentsPrevious: null,
+  documentsLoading: false,
 };
 
 const ensureError = (action) =>
@@ -265,6 +272,21 @@ const saleSlice = createSlice({
       .addCase(historySellObjectDetail.rejected, (state, action) => {
         state.error = ensureError(action);
         state.loading = false;
+      })
+
+      .addCase(fetchDocuments.pending, (state) => {
+        state.documentsLoading = true;
+      })
+      .addCase(fetchDocuments.fulfilled, (state, { payload }) => {
+        state.documents = payload?.results || [];
+        state.documentsCount = payload?.count || 0;
+        state.documentsNext = payload?.next || null;
+        state.documentsPrevious = payload?.previous || null;
+        state.documentsLoading = false;
+      })
+      .addCase(fetchDocuments.rejected, (state, action) => {
+        state.error = ensureError(action);
+        state.documentsLoading = false;
       })
 
       .addCase(productCheckout.pending, (state) => {

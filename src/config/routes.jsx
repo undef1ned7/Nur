@@ -219,10 +219,10 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-        createProtectedRoute("kassa*", Kassa),
+        createProtectedRoute("kassa/*", Kassa),
         createProtectedRoute("kassa/:id", KassaDet),
       ]
-    : [createProtectedRoute("kassa*", KassWorker)]),
+    : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
   createProtectedRoute("barber/services", BarberServices),
@@ -242,7 +242,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("hostel/documents", HostelDocuments),
   createProtectedRoute("hostel/warehouse", HostelWarehouse),
   createProtectedRoute("hostel/analytics", AnalyticsPage),
-  createProtectedRoute("hostel/kassa*", HostelKassa),
+  createProtectedRoute("hostel/kassa/*", HostelKassa),
 
   // School routes
   createProtectedRoute("school/students", SchoolStudents),
@@ -278,7 +278,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("cafe/reservations", CafeReservations),
   createProtectedRoute("cafe/staff", CafeStaff),
   createProtectedRoute("cafe/stock", CafeStock),
-  createProtectedRoute("cafe/kassa*", CafeKassa),
+  createProtectedRoute("cafe/kassa/*", CafeKassa),
   createProtectedRoute("cafe/clients", CafeClients),
   createProtectedRoute("cafe/tables", CafeTables),
 
@@ -289,7 +289,7 @@ export const crmRoutes = (profile) => [
   // Consulting routes
   createProtectedRoute("consulting/client", ConsultingClients),
   createProtectedRoute("consulting/client-requests", ConsultingClientRequests),
-  createProtectedRoute("consulting/kassa*", ConsultingCafeKassa),
+  createProtectedRoute("consulting/kassa/*", ConsultingCafeKassa),
   createProtectedRoute("consulting/teachers", ConsultingSchoolTeachers),
   createProtectedRoute("consulting/analytics", ConsultingAnalytics),
   createProtectedRoute("consulting/bookings", ConsultingBookings),

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
@@ -47,6 +47,7 @@ async function createDebt(payload) {
 
 const AddProductPage = () => {
   const { id: productId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { list } = useClient();
@@ -305,6 +306,87 @@ const AddProductPage = () => {
       loadProduct();
     }
   }, [isEditMode, productId, isMarketSector]);
+
+  // Обработка дублирования товара
+  useEffect(() => {
+    const duplicateData = location.state?.duplicate
+      ? location.state.productData
+      : null;
+    if (duplicateData && !isEditMode) {
+      const product = duplicateData;
+
+      // Определяем тип товара на основе kind
+      let detectedItemType = "product";
+      if (product.kind === "service") {
+        detectedItemType = "service";
+      } else if (product.kind === "bundle") {
+        detectedItemType = "kit";
+      }
+      setItemType(detectedItemType);
+
+      // Заполняем основные данные (очищаем ID, штрих-код и количество для нового товара)
+      setNewItemData({
+        name: product.name || "",
+        barcode: "", // Очищаем штрих-код для нового товара
+        brand_name: product.brand_name || "",
+        category_name: product.category_name || "",
+        price: product.price || "",
+        quantity: "", // Очищаем количество для нового товара
+        client: product.client || "",
+        purchase_price: product.purchase_price || "",
+        plu: product.plu || "",
+        scale_type: product.scale_type || "",
+      });
+
+      // Заполняем данные для маркета
+      if (isMarketSector) {
+        setMarketData({
+          code: product.code || "",
+          article: product.article || "",
+          unit: product.unit || "шт",
+          isWeightProduct: product.is_weight || false,
+          isFractionalService: product.is_weight || false,
+          plu: product.plu ? String(product.plu) : "",
+          height: product.characteristics?.height_cm || "0",
+          width: product.characteristics?.width_cm || "0",
+          depth: product.characteristics?.depth_cm || "0",
+          weight: product.characteristics?.factual_weight_kg || "0",
+          description: product.characteristics?.description || "",
+          country: product.country || "",
+          purchasePrice: product.purchase_price || "",
+          markup: product.markup_percent || "0",
+          discount: product.discount_percent || "0",
+          supplier: product.client || "",
+          minStock: "0",
+          expiryDate: product.expiration_date || "",
+          kitProducts: [], // Для комплекта можно будет доработать
+          kitSearchTerm: "",
+          packagings: (product.packages || []).map((pkg, idx) => ({
+            id: Date.now() + idx,
+            name: pkg.name || "",
+            quantity: String(pkg.quantity_in_package || 1),
+          })),
+        });
+
+        // Загружаем изображения (копируем ссылки, но не файлы)
+        if (product.images && product.images.length > 0) {
+          const loadedImages = product.images.map((img) => ({
+            file: null, // Файл не копируем, только URL для предпросмотра
+            alt: img.alt || "",
+            is_primary: img.is_primary || false,
+            preview: img.image_url || img.image || "",
+            id: img.id,
+          }));
+          setImages(loadedImages);
+        }
+      }
+
+      // Очищаем state после использования, чтобы при возврате назад не дублировалось снова
+      if (location.state) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+  }, [location.state, isEditMode, isMarketSector, navigate, location.pathname]);
 
   // Автоматически выбираем первую кассу
   useEffect(() => {
@@ -806,9 +888,9 @@ const AddProductPage = () => {
         "success",
         "Успех"
       );
-      // setTimeout(() => {
-      //   navigate("/crm/sklad");
-      // }, 1500);
+      setTimeout(() => {
+        navigate("/crm/sklad");
+      }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
       showAlert(

@@ -741,6 +741,7 @@ const ProductionCatalog = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
   const [showFilters, setShowFilters] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -752,6 +753,7 @@ const ProductionCatalog = () => {
   const [alertMessage, setAlertMessage] = useState("");
   const [agentProducts, setAgentProducts] = useState([]);
   const [agentProductsMap, setAgentProductsMap] = useState(new Map());
+  const debounceTimerRef = useRef(null);
 
   // Функция для получения товаров из корзины и обновления счетчика
   const refreshCartItems = useCallback(async () => {
@@ -824,10 +826,36 @@ const ProductionCatalog = () => {
     else setPage(1);
   }, [products]);
 
-  // Загружаем товары при монтировании компонента
+  // Debounce для поиска
   useEffect(() => {
-    dispatch(fetchProducts());
-  }, [dispatch]);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Загружаем товары с параметрами поиска
+  useEffect(() => {
+    const params = {};
+    if (debouncedSearchQuery.trim()) {
+      params.search = debouncedSearchQuery.trim();
+    }
+    // Сохраняем текущие фильтры
+    if (filters) {
+      Object.assign(params, filters);
+    }
+    dispatch(fetchProducts(params));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchQuery, filters]);
 
   // Загружаем данные агентских продуктов для получения количества
   useEffect(() => {
@@ -951,26 +979,30 @@ const ProductionCatalog = () => {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      dispatch(setFilters({ search: searchQuery.trim() }));
-      dispatch(fetchProducts({ search: searchQuery.trim() }));
-    }
+    // Поиск обрабатывается через debounce и useEffect
   };
 
   const handleClearSearch = () => {
     setSearchQuery("");
+    setDebouncedSearchQuery("");
     dispatch(clearFilters());
     dispatch(fetchProducts());
   };
 
   const handleFilterChange = (filterType, value) => {
-    dispatch(setFilters({ [filterType]: value }));
-    dispatch(fetchProducts({ [filterType]: value }));
+    const newFilters = { ...filters, [filterType]: value };
+    dispatch(setFilters(newFilters));
+    const params = { ...newFilters };
+    if (debouncedSearchQuery.trim()) {
+      params.search = debouncedSearchQuery.trim();
+    }
+    dispatch(fetchProducts(params));
   };
 
   const clearAllFilters = () => {
     dispatch(clearFilters());
     setSearchQuery("");
+    setDebouncedSearchQuery("");
     dispatch(fetchProducts());
   };
 

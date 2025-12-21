@@ -107,18 +107,12 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     );
   }, [company?.sector?.name]);
 
-  // Проверяем разрешение на просмотр кассы (can_view_cashbox)
-  const canViewCashier = useMemo(() => {
+  // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
+  const showCashierButton = useMemo(() => {
     if (!userProfile) return false;
-    // Проверяем различные варианты разрешений для кассы
-    return (
-      userProfile.can_view_cashbox === true ||
-      userProfile.can_view_cashier === true
-    );
+    // Кнопка появляется только когда can_view_cashier === true
+    return userProfile.can_view_cashier === true;
   }, [userProfile]);
-
-  // Показывать ли кнопку "Интерфейс кассира"
-  const showCashierButton = canViewCashier;
 
   const fetchProfile = async () => {
     try {

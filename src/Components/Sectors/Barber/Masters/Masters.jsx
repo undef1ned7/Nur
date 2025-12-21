@@ -745,6 +745,23 @@ const Masters = () => {
       ];
 
       const SECTOR_ACCESS_TYPES = {
+        Магазин: [
+          {
+            value: "Интерфейс кассира",
+            label: "Интерфейс кассира",
+            backendKey: "can_view_cashier",
+          },
+          {
+            value: "Смены",
+            label: "Смены",
+            backendKey: "can_view_shifts",
+          },
+          {
+            value: "Документы",
+            label: "Документы",
+            backendKey: "can_view_document",
+          },
+        ],
         Барбершоп: [
           {
             value: "Клиенты Барбершопа",

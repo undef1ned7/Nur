@@ -44,7 +44,7 @@ const AddModal = ({ onClose }) => {
     e.preventDefault();
     try {
       await dispatch(createDeals({ clientId: client.id, ...form })).unwrap();
-      dispatch(getClientDeals(client.id));
+      dispatch(getClientDeals({ clientId: client.id }));
       onClose();
     } catch {
       alert("Ошибка");
@@ -209,7 +209,7 @@ const ClientDetail = () => {
 
   useEffect(() => {
     dispatch(getItemClient(id));
-    dispatch(getClientDeals(id));
+    dispatch(getClientDeals({ clientId: id }));
   }, [id]);
   return (
     <div className="clientDetail">

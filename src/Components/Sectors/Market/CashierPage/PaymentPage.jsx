@@ -19,6 +19,7 @@ import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
 } from "../../../pages/Sell/services/printService";
+import api from "../../../../api";
 import "./PaymentPage.scss";
 
 const PaymentPage = ({
@@ -147,21 +148,22 @@ const PaymentPage = ({
 
     try {
       // Маппинг способов оплаты
-      // При отсрочке отправляем как наличные, но создаем долг
       let paymentMethodApi = "cash";
       if (paymentMethod === "cashless") {
         paymentMethodApi = "transfer";
       } else if (paymentMethod === "deferred") {
-        paymentMethodApi = "cash"; // Отправляем как наличные даже при отсрочке
+        paymentMethodApi = "debt"; // Отправляем как долг
       }
 
+      // Проверяем подключение принтера ДО выполнения checkout
+      const isPrinterConnected = await checkPrinterConnection();
+
       // Выполняем checkout
-      // По умолчанию пытаемся печатать чек (bool: true)
-      // При отсрочке отправляем как наличные, поэтому cash_received обязателен
+      // Передаем bool: true только если принтер подключен
       const result = await dispatch(
         productCheckout({
           id: saleId,
-          bool: true, // print_receipt - по умолчанию пытаемся печатать
+          bool: isPrinterConnected, // print_receipt - только если принтер подключен
           clientId: selectedCustomer?.id || null,
           payment_method: paymentMethodApi,
           cash_received:
@@ -175,6 +177,42 @@ const PaymentPage = ({
         // Создаем долг при отсрочке
         if (paymentMethod === "deferred" && selectedCustomer?.id) {
           try {
+            // Для тарифа "Старт" создаем запись в /main/debts/
+            if (company?.subscription_plan?.name === "Старт") {
+              // Вычисляем дату платежа: добавляем debtMonths месяцев к текущей дате
+              const currentDate = new Date();
+              const dueDate = new Date(
+                currentDate.getFullYear(),
+                currentDate.getMonth() + (typeof debtMonths === "number" ? debtMonths : 1),
+                currentDate.getDate()
+              );
+              const dueDateString = dueDate.toISOString().split("T")[0]; // Формат YYYY-MM-DD
+
+              try {
+                await api.post("/main/debts/", {
+                  name:
+                    selectedCustomer.full_name ||
+                    selectedCustomer.name ||
+                    "Клиент",
+                  phone: selectedCustomer.phone || "",
+                  due_date: dueDateString,
+                  amount: typeof total === "number" ? total.toFixed(2) : String(total),
+                });
+              } catch (startDebtError) {
+                console.warn("Ошибка при создании долга для тарифа Старт:", startDebtError);
+                // Не блокируем успешную оплату, если ошибка с долгом
+                showAlert(
+                  "warning",
+                  "Предупреждение",
+                  "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. " +
+                    (startDebtError?.response?.data?.detail ||
+                      startDebtError?.message ||
+                      "Проверьте данные клиента.")
+                );
+              }
+            }
+
+            // Создаем сделку через createDeal
             await dispatch(
               createDeal({
                 clientId: selectedCustomer.id,
@@ -185,7 +223,7 @@ const PaymentPage = ({
                 }`,
                 statusRu: "Долги",
                 amount: total,
-                debtMonths: debtMonths || 1, // Количество месяцев для рассрочки
+                debtMonths: typeof debtMonths === "number" ? debtMonths : 1, // Количество месяцев для рассрочки
                 first_due_date: null, // Можно добавить поле для выбора даты
               })
             ).unwrap();
@@ -229,12 +267,8 @@ const PaymentPage = ({
         const saleIdForReceipt =
           result.payload?.sale_id || result.payload?.id || saleId;
 
-        // Пытаемся автоматически распечатать чек
-        // Сначала проверяем, подключен ли принтер
-        const isPrinterConnected = await checkPrinterConnection();
-
+        // Пытаемся автоматически распечатать чек только если принтер подключен
         if (isPrinterConnected) {
-          // Если принтер подключен, пытаемся распечатать
           try {
             const receiptResult = await dispatch(
               getProductCheckout(saleIdForReceipt)
@@ -265,9 +299,6 @@ const PaymentPage = ({
             console.warn("Не удалось получить чек для печати:", receiptError);
             // Не показываем ошибку пользователю, только логируем
           }
-        } else {
-          // Принтер не подключен, просто логируем
-          console.log("Принтер не подключен, пропускаем автоматическую печать");
         }
 
         // Показываем модалку успеха с возможностью повторной печати
@@ -402,7 +433,7 @@ const PaymentPage = ({
     }
   }, [paymentMethod, total]);
 
-  // Обработка нажатия Enter для закрытия модалки
+  // Обработка нажатия Enter для закрытия модалки успеха
   useEffect(() => {
     const handleKeyPress = (e) => {
       if (showSuccessModal && e.key === "Enter") {
@@ -416,6 +447,49 @@ const PaymentPage = ({
       return () => window.removeEventListener("keydown", handleKeyPress);
     }
   }, [showSuccessModal, onComplete]);
+
+  // Обработка нажатия Enter для принятия оплаты
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      // Пропускаем, если открыты модалки
+      if (showSuccessModal || showCustomerModal || alertModal.open) {
+        return;
+      }
+
+      // Пропускаем, если фокус в поле ввода суммы
+      const activeElement = document.activeElement;
+      if (
+        activeElement &&
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA")
+      ) {
+        // Если это поле ввода суммы, разрешаем Enter для принятия оплаты
+        if (
+          activeElement.className?.includes("payment-page__amount-input") ||
+          activeElement.className?.includes("payment-page__debt-months-input")
+        ) {
+          // Enter в поле ввода суммы также принимает оплату
+          if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            handleAcceptPayment();
+          }
+        } else {
+          // Для других полей ввода не обрабатываем Enter
+          return;
+        }
+      }
+
+      // Если нажали Enter и нет открытых модалок
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        handleAcceptPayment();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSuccessModal, showCustomerModal, alertModal.open]);
 
   // Расчет сдачи (только для наличных)
   const change =
@@ -584,12 +658,28 @@ const PaymentPage = ({
                   Срок рассрочки (месяцев):
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   className="payment-page__debt-months-input"
                   value={debtMonths}
                   onChange={(e) => {
-                    const value = parseInt(e.target.value, 10) || 1;
-                    setDebtMonths(Math.max(1, value));
+                    const value = e.target.value;
+                    // Разрешаем пустое значение во время ввода
+                    if (value === "") {
+                      setDebtMonths("");
+                      return;
+                    }
+                    const numValue = parseInt(value, 10);
+                    // Если это валидное число, устанавливаем его (минимум 1)
+                    if (!isNaN(numValue)) {
+                      setDebtMonths(Math.max(1, numValue));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // При потере фокуса валидируем значение
+                    const value = parseInt(e.target.value, 10);
+                    if (isNaN(value) || value < 1) {
+                      setDebtMonths(1);
+                    }
                   }}
                   min="1"
                   step="1"
@@ -613,7 +703,7 @@ const PaymentPage = ({
               </h3>
               <div className="payment-page__amount-input-wrapper">
                 <input
-                  type="number"
+                  type="text"
                   className="payment-page__amount-input"
                   value={amountReceived}
                   onChange={(e) => setAmountReceived(e.target.value)}
@@ -664,7 +754,7 @@ const PaymentPage = ({
               className="payment-page__accept-btn"
               onClick={handleAcceptPayment}
             >
-              ПРИНЯТЬ ОПЛАТУ
+              ПРИНЯТЬ ОПЛАТУ [ENTER]
             </button>
             <button className="payment-page__cancel-btn" onClick={onBack}>
               Отмена [ESC]

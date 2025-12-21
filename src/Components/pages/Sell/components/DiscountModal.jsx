@@ -23,7 +23,7 @@ const DiscountModal = ({
           <label>Сумма скидки</label>
           <input
             className="sell__header-input"
-            type="number"
+            type="text"
             min="0"
             step="0.01"
             value={discountValue}

@@ -730,5 +730,49 @@
     &__search-input {
       font-size: 14px;
     }
+
+    &__products-loading,
+    &__products-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+      font-size: 16px;
+    }
+
+    &__pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 16px;
+      margin-top: 16px;
+      border-top: 1px solid #e5e5e5;
+
+      &-btn {
+        padding: 8px 16px;
+        border: 1px solid #e5e5e5;
+        background: white;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+
+        &:hover:not(:disabled) {
+          background: #f5f5f5;
+          border-color: #d5d5d5;
+        }
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+      }
+
+      &-info {
+        font-size: 14px;
+        color: #666;
+      }
+    }
   }
 }

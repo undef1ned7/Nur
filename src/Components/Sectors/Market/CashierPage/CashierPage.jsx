@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
@@ -45,7 +45,13 @@ import ShiftPage from "./ShiftPage";
 const CashierPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { list: products } = useProducts();
+  const {
+    list: products,
+    count,
+    next,
+    previous,
+    loading: productsLoading,
+  } = useProducts();
   const { list: clients } = useClient();
   const { start: currentSale, loading: saleLoading } = useSale();
   const { shifts } = useShifts();
@@ -59,7 +65,12 @@ const CashierPage = () => {
   );
   const openShiftId = openShift?.id;
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
+  const debounceTimerRef = React.useRef(null);
   const [cart, setCart] = useState([]);
   const cartOrderRef = React.useRef([]); // Сохраняем порядок элементов корзины
   const [cartQuantities, setCartQuantities] = useState({}); // Локальные значения количества для каждого товара
@@ -126,9 +137,7 @@ const CashierPage = () => {
     }
   };
 
-  // Debounced функция для обновления общей скидки
   const debouncedDiscount = useDebounce((discount) => {
-    // Не обновляем скидку, если нет открытой смены или продажи
     if (!currentSale?.id || !openShiftId) return;
     dispatch(
       startSale({
@@ -196,6 +205,56 @@ const CashierPage = () => {
     onComplete: async (barcode) => {
       if (!barcode || barcode.length < 3) return;
       if (barcodeProcessingRef.current) return;
+
+      // Валидация штрих-кода: проверяем, что он не содержит служебные символы
+      // Сканер не должен отправлять Backspace, Delete и другие служебные клавиши
+      const invalidPatterns = [
+        "Backspace",
+        "Delete",
+        "Enter",
+        "Tab",
+        "Escape",
+        "Arrow",
+        "Control",
+        "Alt",
+        "Meta",
+        "Shift",
+        "Home",
+        "End",
+        "PageUp",
+        "PageDown",
+        "Insert",
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+      ];
+
+      // Проверяем наличие служебных символов в штрих-коде
+      const hasInvalidPattern = invalidPatterns.some((pattern) =>
+        barcode.includes(pattern)
+      );
+
+      // Проверяем, что штрих-код содержит только допустимые символы
+      // Допустимые: буквы (латиница, кириллица), цифры, дефисы, подчеркивания, точки
+      const isValidFormat = /^[a-zA-Zа-яА-ЯёЁ0-9\-_.]+$/.test(barcode);
+
+      if (hasInvalidPattern || !isValidFormat) {
+        // Это не валидный штрих-код, игнорируем
+        console.warn(
+          "Некорректный штрих-код (содержит служебные символы):",
+          barcode
+        );
+        return;
+      }
 
       // Запоминаем время сканирования и устанавливаем флаги
       const scanTime = Date.now();
@@ -309,9 +368,61 @@ const CashierPage = () => {
     },
   });
 
+  // Обновление URL только при изменении страницы (без поиска)
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    // Обновляем URL только если параметры действительно изменились
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  // Debounce для поиска
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Загрузка товаров с пагинацией и поиском
+  useEffect(() => {
+    const params = {
+      page: currentPage,
+    };
+    if (debouncedSearchTerm && typeof debouncedSearchTerm === "string") {
+      const trimmed = debouncedSearchTerm.trim();
+      if (trimmed) {
+        params.search = trimmed;
+      }
+    }
+    dispatch(fetchProductsAsync(params));
+  }, [dispatch, debouncedSearchTerm, currentPage]);
+
+  // При изменении поиска возвращаемся на первую страницу
+  useEffect(() => {
+    if (debouncedSearchTerm) {
+      setCurrentPage(1);
+    }
+  }, [debouncedSearchTerm]);
+
   // Инициализация данных при первой загрузке
   useEffect(() => {
-    dispatch(fetchProductsAsync({ page: 1 }));
     dispatch(fetchClientsAsync());
     dispatch(fetchShiftsAsync());
     dispatch(getCashBoxes());
@@ -403,10 +514,17 @@ const CashierPage = () => {
     }
   }, [currentSale]);
 
-  // Объявляем filteredProducts до его использования
-  const filteredProducts = products.filter((product) =>
-    product.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Товары уже отфильтрованы на сервере через query params
+  const filteredProducts = products;
+
+  // Расчет пагинации
+  const pageSize = products.length || 1;
+  const totalPages = count && pageSize ? Math.ceil(count / pageSize) : 1;
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    setCurrentPage(newPage);
+  };
 
   // Объявляем handleCheckout до его использования в useEffect
   const handleCheckout = useCallback(() => {
@@ -426,12 +544,19 @@ const CashierPage = () => {
   useEffect(() => {
     const handleGlobalEnter = (e) => {
       const now = Date.now();
+      const target = e.target;
+
+      // Проверяем, что фокус находится в поле поиска
+      const isSearchInputFocused =
+        target === searchInputRef.current ||
+        target?.className?.includes("cashier-page__search-input");
 
       // Детекция сканера по скорости набора символов
-      // Если много символов подряд очень быстро - это похоже на сканер
+      // Сканер работает ТОЛЬКО в поле поиска, поэтому учитываем это
       const isChar = e.key.length === 1 && /^[0-9A-Za-z]$/.test(e.key);
 
-      if (isChar) {
+      if (isChar && isSearchInputFocused) {
+        // Сканер: символы вводятся в поле поиска очень быстро
         const dt = now - scanKeysRef.current.lastTime;
         scanKeysRef.current.count = dt < 50 ? scanKeysRef.current.count + 1 : 1;
         scanKeysRef.current.lastTime = now;
@@ -440,10 +565,20 @@ const CashierPage = () => {
           isScanningRef.current = true;
           lastScanTimeRef.current = now;
         }
+      } else if (isChar && !isSearchInputFocused) {
+        // Ручной ввод вне поля поиска - сбрасываем счетчик
+        scanKeysRef.current.count = 0;
+      } else if (!isChar && !isSearchInputFocused) {
+        // Любой другой символ вне поля поиска - сбрасываем счетчик
+        scanKeysRef.current.count = 0;
       }
 
-      // Enter сразу после быстрой последовательности — это почти наверняка Enter сканера
-      if (e.key === "Enter" && scanKeysRef.current.count >= 6) {
+      // Enter сразу после быстрой последовательности В ПОЛЕ ПОИСКА — это почти наверняка Enter сканера
+      if (
+        e.key === "Enter" &&
+        scanKeysRef.current.count >= 6 &&
+        isSearchInputFocused
+      ) {
         lastScanTimeRef.current = now;
         isScanningRef.current = true;
         scanKeysRef.current.count = 0;
@@ -456,7 +591,6 @@ const CashierPage = () => {
       }
 
       // Пропускаем, если нажатие было в поле ввода или textarea
-      const target = e.target;
       if (
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
@@ -495,13 +629,6 @@ const CashierPage = () => {
       const timeSinceLastScan = Date.now() - lastScanTimeRef.current;
       const timeSinceLastInput = Date.now() - lastSearchInputTime.current;
 
-      // Проверяем, что фокус находится в поле поиска
-      const isSearchInputFocused =
-        document.activeElement === searchInputRef.current ||
-        document.activeElement?.className?.includes(
-          "cashier-page__search-input"
-        );
-
       // ПРИОРИТЕТ 1: Если идет обработка сканирования, НЕ открываем страницу
       if (barcodeProcessingRef.current) {
         return;
@@ -517,17 +644,18 @@ const CashierPage = () => {
         return;
       }
 
-      // ПРИОРИТЕТ 3: Если было недавнее сканирование (в течение 5000мс), НЕ открываем страницу
-      if (timeSinceLastScan < 5000) {
+      // ПРИОРИТЕТ 3: Если было недавнее сканирование (в течение 2000мс), НЕ открываем страницу
+      // Уменьшили время с 5000мс до 2000мс, чтобы не блокировать обычный Enter слишком долго
+      if (timeSinceLastScan < 2000 && isScanningRef.current) {
         // Если Enter приходит очень быстро после последнего сканирования (в течение 500мс),
         // это точно Enter от сканера - обновляем время и не открываем страницу
         if (e.key === "Enter" && timeSinceLastScan < 500) {
           lastScanTimeRef.current = Date.now();
           isScanningRef.current = true; // Устанавливаем флаг на случай повторного Enter
-          // Сбрасываем флаг через 3 секунды
+          // Сбрасываем флаг через 2 секунды
           setTimeout(() => {
             isScanningRef.current = false;
-          }, 3000);
+          }, 2000);
           return;
         }
 
@@ -538,21 +666,26 @@ const CashierPage = () => {
           setTimeout(() => {
             isScanningRef.current = false;
             searchClearedAfterScanRef.current = false;
-          }, 3000);
+          }, 2000);
           return;
         }
 
-        // Обновляем время последнего сканирования при каждом Enter после сканирования
-        // И устанавливаем флаг, чтобы защитить от открытия страницы при повторных Enter
-        if (e.key === "Enter") {
-          lastScanTimeRef.current = Date.now();
-          isScanningRef.current = true;
-          // Сбрасываем флаг через 3 секунды
+        // Если флаг сканирования установлен и Enter приходит в течение 2 секунд после сканирования
+        // это может быть Enter от сканера - не открываем страницу
+        if (e.key === "Enter" && timeSinceLastScan < 2000) {
+          // Но только если счетчик сканера был высоким (>= 6), иначе это может быть обычный Enter
+          // Сбрасываем флаг через 2 секунды
           setTimeout(() => {
             isScanningRef.current = false;
-          }, 3000);
+          }, 2000);
+          return;
         }
-        return; // Не открываем страницу оплаты, если недавно было сканирование
+      }
+
+      // Если флаг сканирования установлен, но прошло больше 2 секунд - сбрасываем его
+      if (isScanningRef.current && timeSinceLastScan >= 2000) {
+        isScanningRef.current = false;
+        scanKeysRef.current.count = 0;
       }
 
       // ПРИОРИТЕТ 4: Если был недавний ввод в поле поиска (не сканирование), не открываем страницу
@@ -947,13 +1080,24 @@ const CashierPage = () => {
           setCart([]);
           cartOrderRef.current = []; // Очищаем порядок при завершении продажи
           setSelectedCustomer(null);
+          setDiscountValue(""); // Сбрасываем скидку
           // Начинаем новую продажу после завершения (только если есть открытая смена)
+          // Важно: создаем новую корзину БЕЗ скидки (discount_total: 0)
           if (openShiftId) {
             await dispatch(
               startSale({ discount_total: 0, shift: openShiftId })
             );
-            // Обновляем продажу после создания новой
-            await refreshSale();
+            // Не вызываем refreshSale() здесь, так как он использует старую скидку из currentSale
+            // startSale уже обновляет состояние продажи
+          }
+          // После завершения продажи обновляем список товаров (остатки)
+          try {
+            await dispatch(fetchProductsAsync({ page: 1 })).unwrap();
+          } catch (e) {
+            console.error(
+              "Не удалось обновить список товаров после продажи:",
+              e
+            );
           }
         }}
         saleId={currentSale?.id}
@@ -1034,11 +1178,33 @@ const CashierPage = () => {
               placeholder="Поиск товаров..."
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value);
+                const newValue = e.target.value;
+                const oldValue = searchTerm;
+                setSearchTerm(newValue);
+
                 // Обновляем время последнего ввода при каждом изменении (для защиты от сканера)
-                lastSearchInputTime.current = Date.now();
+                const now = Date.now();
+                const timeSinceLastInput = now - lastSearchInputTime.current;
+                lastSearchInputTime.current = now;
+
+                // Если длина уменьшилась, значит пользователь удаляет символы (Backspace/Delete)
+                // Это точно ручной ввод - сбрасываем все флаги сканера
+                if (newValue.length < oldValue.length) {
+                  scanKeysRef.current.count = 0;
+                  scanKeysRef.current.lastTime = 0;
+                  isScanningRef.current = false;
+                  lastScanTimeRef.current = 0;
+                  searchClearedAfterScanRef.current = false;
+                }
+
+                // Если ввод медленный (больше 100мс между символами), это ручной ввод - сбрасываем счетчик сканера
+                if (timeSinceLastInput > 100) {
+                  scanKeysRef.current.count = 0;
+                  isScanningRef.current = false;
+                }
+
                 // Если пользователь вводит текст вручную, сбрасываем флаг очистки после сканирования
-                if (e.target.value.length > 0) {
+                if (newValue.length > 0) {
                   searchClearedAfterScanRef.current = false;
                 }
               }}
@@ -1080,34 +1246,74 @@ const CashierPage = () => {
           </div>
 
           <div className="cashier-page__products-grid">
-            {filteredProducts.map((product) => {
-              const cartItem = cart.find((item) => item.id === product.id);
-              return (
-                <div
-                  key={product.id}
-                  className={`cashier-page__product-card ${
-                    cartItem ? "cashier-page__product-card--selected" : ""
-                  }`}
-                  onClick={() => addToCart(product)}
-                >
-                  {cartItem && (
-                    <div className="cashier-page__product-badge">
-                      {cartItem.quantity}
+            {productsLoading ? (
+              <div className="cashier-page__products-loading">
+                Загрузка товаров...
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="cashier-page__products-empty">
+                Товары не найдены
+              </div>
+            ) : (
+              filteredProducts.map((product) => {
+                const cartItem = cart.find((item) => item.id === product.id);
+                return (
+                  <div
+                    key={product.id}
+                    className={`cashier-page__product-card ${
+                      cartItem ? "cashier-page__product-card--selected" : ""
+                    }`}
+                    onClick={() => addToCart(product)}
+                  >
+                    {cartItem && (
+                      <div className="cashier-page__product-badge">
+                        {cartItem.quantity}
+                      </div>
+                    )}
+                    <div className="cashier-page__product-name">
+                      {product.name || "—"}
                     </div>
-                  )}
-                  <div className="cashier-page__product-name">
-                    {product.name || "—"}
+                    <div className="cashier-page__product-price">
+                      {product.price || 0} сом
+                    </div>
+                    <div className="cashier-page__product-stock">
+                      {product.quantity || 0} {product.unit || "шт"}
+                    </div>
                   </div>
-                  <div className="cashier-page__product-price">
-                    {product.price || 0} сом
-                  </div>
-                  <div className="cashier-page__product-stock">
-                    {product.quantity || 0} {product.unit || "шт"}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
+
+          {/* Пагинация */}
+          {totalPages > 1 && (
+            <div className="cashier-page__pagination">
+              <button
+                type="button"
+                className="cashier-page__pagination-btn"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1 || productsLoading || !previous}
+              >
+                Назад
+              </button>
+              <span className="cashier-page__pagination-info">
+                Страница {currentPage} из {totalPages || 1}
+                {count && ` (${count} товаров)`}
+              </span>
+              <button
+                type="button"
+                className="cashier-page__pagination-btn"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={
+                  productsLoading ||
+                  !next ||
+                  (totalPages && currentPage >= totalPages)
+                }
+              >
+                Вперед
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="cashier-page__cart">
@@ -1326,7 +1532,6 @@ const CashierPage = () => {
                 onClick={handleCheckout}
               >
                 ОФОРМИТЬ{" "}
-                <span style={{ fontSize: "12px", opacity: 0.7 }}>[ENTER]</span>
               </button>
             </div>
           )}

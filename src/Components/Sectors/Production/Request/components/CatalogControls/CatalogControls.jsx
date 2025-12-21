@@ -1,5 +1,6 @@
 import React from "react";
 import { Search, ShoppingCart, Grid, List, X } from "lucide-react";
+import { useUser } from "../../../../../../store/slices/userSlice";
 import "./CatalogControls.scss";
 
 const CatalogControls = ({
@@ -14,6 +15,10 @@ const CatalogControls = ({
   onOpenCart,
   totalItemsCount,
 }) => {
+  const { profile } = useUser();
+  // Проверяем, является ли пользователь сотрудником (не владельцем)
+  const isEmployee = profile?.role !== "owner";
+
   const handleSearch = (e) => {
     e.preventDefault();
     // Поиск работает через useMemo фильтрацию
@@ -67,13 +72,15 @@ const CatalogControls = ({
       )}
 
       <div className="controls-right">
-        <button className="request-cart-btn" onClick={onOpenCart}>
-          <ShoppingCart size={20} />
-          Запросы
-          {totalItemsCount > 0 && (
-            <span className="cart-badge">{totalItemsCount}</span>
-          )}
-        </button>
+        {isEmployee && (
+          <button className="request-cart-btn" onClick={onOpenCart}>
+            <ShoppingCart size={20} />
+            Запросы
+            {totalItemsCount > 0 && (
+              <span className="cart-badge">{totalItemsCount}</span>
+            )}
+          </button>
+        )}
 
         <div className="view-mode-toggle">
           <button

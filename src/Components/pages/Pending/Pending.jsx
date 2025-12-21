@@ -12,13 +12,14 @@ import {
   useCash,
 } from "../../../store/slices/cashSlice";
 import "./Pending.scss";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { HeaderTabs } from "../../Sectors/Hostel/kassa/kassa";
 import { deleteSale } from "../../../store/creators/saleThunk";
 import { onPayDebtDeal } from "../../../store/creators/clientCreators";
 
 const Pending = () => {
   const location = useLocation();
+  const { id: cashboxId } = useParams(); // UUID кассы из URL
   const dispatch = useDispatch();
   const { cashFlows } = useCash();
   const { loading } = useSelector((s) => s.product);
@@ -27,7 +28,16 @@ const Pending = () => {
   const [selected, setSelected] = useState(() => new Set());
   const [processing, setProcessing] = useState(false);
 
-  // pending-база (только со статусом false)
+  // Формируем параметры для API запроса (только фильтрация по кассе через UUID из URL)
+  const apiParams = useMemo(() => {
+    const params = {};
+    if (cashboxId) {
+      params.cashbox = cashboxId;
+    }
+    return params;
+  }, [cashboxId]);
+
+  // Фильтрация по статусу на фронте
   const basePending = useMemo(
     () =>
       (cashFlows || []).filter(
@@ -36,12 +46,7 @@ const Pending = () => {
     [cashFlows]
   );
 
-  const norm = (s) =>
-    String(s ?? "")
-      .trim()
-      .toLowerCase();
-
-  // фильтр по названию кассы (если передан cashName)
+  // pending - финальный список (уже отфильтрован по статусу на фронте)
   const pending = useMemo(() => {
     return basePending;
   }, [basePending]);
@@ -60,7 +65,7 @@ const Pending = () => {
 
   // гарантированное обновление стора + колбэк родителя
   const refresh = () => {
-    dispatch(getCashFlows());
+    dispatch(getCashFlows(apiParams));
   };
 
   const mapType = (t) =>
@@ -221,8 +226,8 @@ const Pending = () => {
   };
 
   useEffect(() => {
-    dispatch(getCashFlows());
-  }, [dispatch]);
+    dispatch(getCashFlows(apiParams));
+  }, [dispatch, apiParams]);
 
   return (
     <div className="pending-page">
@@ -341,7 +346,7 @@ const Pending = () => {
           )}
           <button
             className="pending-page__button pending-page__button--refresh"
-            onClick={() => dispatch(getCashFlows({}))}
+            onClick={() => dispatch(getCashFlows(apiParams))}
             disabled={processing}
           >
             Обновить список

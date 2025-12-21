@@ -13,8 +13,19 @@ import {
   updateProductAsync,
 } from "../../../../store/creators/productCreators";
 import api from "../../../../api";
-import { X } from "lucide-react";
+import {
+  X,
+  Search,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Package,
+} from "lucide-react";
 import { useProducts } from "../../../../store/slices/productSlice";
+import "./PendingModal.scss";
+import AlertModal from "../../../common/AlertModal/AlertModal";
 import {
   fetchTransfersAsync,
   createAcceptanceAsync,
@@ -123,6 +134,31 @@ const PendingModal = ({ onClose, onChanged }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [acceptingReturn, setAcceptingReturn] = useState(null);
   const [activeTab, setActiveTab] = useState(1);
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  const [alertModal, setAlertModal] = useState({
+    open: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  // Сброс поиска при переключении вкладок
+  const handleTabChange = (index) => {
+    setActiveTab(index);
+    setSearchQuery("");
+    setExpandedRows(new Set());
+  };
+
+  // Переключение расширения строки
+  const toggleRowExpansion = (cartId) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(cartId)) {
+      newExpanded.delete(cartId);
+    } else {
+      newExpanded.add(cartId);
+    }
+    setExpandedRows(newExpanded);
+  };
 
   // ---------------- ФИЛЬТРАЦИЯ ТОЛЬКО PENDING ----------------
   const filterReturns = returns.filter((item) => item.status === "pending");
@@ -140,22 +176,39 @@ const PendingModal = ({ onClose, onChanged }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
 
-  const handleAcceptReturn = async (returnItem) => {
-    setAcceptingReturn(returnItem.id);
+  const handleAcceptReturn = async (agentId) => {
+    const group = groupedReturns.find((g) => g.agentId === agentId);
+    if (!group) return;
+
+    setAcceptingReturn(agentId);
     try {
-      await dispatch(approveReturnAsync(returnItem.id)).unwrap();
-      alert(
-        `Возврат "${returnItem.product}" успешно принят!\nКоличество: ${returnItem.qty}`
+      // Принимаем все возвраты агента
+      const promises = group.returns.map((returnItem) =>
+        dispatch(approveReturnAsync(returnItem.id)).unwrap()
       );
+      await Promise.all(promises);
+
+      setAlertModal({
+        open: true,
+        type: "success",
+        title: "Успешно",
+        message: `Все возвраты агента "${group.agentName}" успешно приняты! Всего: ${group.returns.length} возвратов, количество: ${group.totalQty}`,
+      });
       onChanged?.();
-      onClose?.();
+      dispatch(fetchReturnsAsync());
+      setTimeout(() => {
+        onClose?.();
+      }, 1500);
     } catch (error) {
-      console.error("Accept return failed:", error);
-      alert(
-        `Ошибка при принятии возврата: ${
+      console.error("Accept returns failed:", error);
+      setAlertModal({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message: `Ошибка при принятии возвратов: ${
           error?.message || "неизвестная ошибка"
-        }`
-      );
+        }`,
+      });
     } finally {
       setAcceptingReturn(null);
     }
@@ -180,20 +233,156 @@ const PendingModal = ({ onClose, onChanged }) => {
     load();
   }, []);
 
-  const handleApprove = async (id) => {
-    setActionLoadingId(id);
-    try {
-      // Получаем данные корзины перед одобрением, чтобы знать какие товары и в каком количестве
-      const cart = rows.find((c) => c.id === id);
-      if (!cart || !cart.items || !Array.isArray(cart.items)) {
-        throw new Error("Не удалось найти данные корзины");
+  // const { employees } = useDepartments();
+  // const [selectedAgent, setSelectedAgent] = useState("");
+  // const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    dispatch(getEmployees());
+  }, []);
+
+  // Группировка возвратов по агенту
+  const groupedReturns = useMemo(() => {
+    const grouped = new Map();
+
+    filterReturns.forEach((returnItem) => {
+      const agentId = returnItem.agent || returnItem.agent_id || "unknown";
+      const agentName =
+        returnItem.agent_name || returnItem.agent || "Неизвестный агент";
+
+      if (!grouped.has(agentId)) {
+        grouped.set(agentId, {
+          agentId,
+          agentName,
+          returns: [],
+          totalQty: 0,
+          earliestDate: null,
+        });
       }
 
-      // Одобряем корзину
-      await dispatch(approveAgentCartAsync(id)).unwrap();
+      const group = grouped.get(agentId);
+      group.returns.push(returnItem);
+      group.totalQty += Number(returnItem.qty || 0);
 
-      // Уменьшаем количество товаров на складе для каждого товара в корзине
-      for (const item of cart.items) {
+      if (returnItem.returned_at) {
+        const date = new Date(returnItem.returned_at);
+        if (!group.earliestDate || date < group.earliestDate) {
+          group.earliestDate = date;
+        }
+      }
+    });
+
+    return Array.from(grouped.values());
+  }, [filterReturns]);
+
+  // Фильтрация сгруппированных возвратов по поисковому запросу
+  const filteredReturns = useMemo(() => {
+    if (!searchQuery.trim()) return groupedReturns;
+    const q = searchQuery.toLowerCase().trim();
+    return groupedReturns.filter(
+      (group) =>
+        String(group.agentName || "")
+          .toLowerCase()
+          .includes(q) ||
+        group.returns.some((item) =>
+          String(item.product || "")
+            .toLowerCase()
+            .includes(q)
+        )
+    );
+  }, [groupedReturns, searchQuery]);
+
+  // Группировка корзин по агенту
+  const groupedCarts = useMemo(() => {
+    const grouped = new Map();
+
+    (rows || []).forEach((cart) => {
+      const agentId = cart?.agent?.id || cart?.agent_id || "unknown";
+      const agentName =
+        cart?.agent_name ||
+        [cart?.agent?.first_name, cart?.agent?.last_name]
+          .filter(Boolean)
+          .join(" ") ||
+        "Неизвестный агент";
+
+      if (!grouped.has(agentId)) {
+        grouped.set(agentId, {
+          agentId,
+          agentName,
+          carts: [],
+          totalItems: 0,
+          allItems: [],
+          earliestDate: null,
+        });
+      }
+
+      const group = grouped.get(agentId);
+      group.carts.push(cart);
+      group.totalItems += Array.isArray(cart?.items) ? cart.items.length : 0;
+
+      // Собираем все товары из всех корзин агента
+      if (Array.isArray(cart?.items)) {
+        group.allItems.push(...cart.items);
+      }
+
+      if (cart?.submitted_at) {
+        const date = new Date(cart.submitted_at);
+        if (!group.earliestDate || date < group.earliestDate) {
+          group.earliestDate = date;
+        }
+      }
+    });
+
+    return Array.from(grouped.values());
+  }, [rows]);
+
+  // Фильтрация сгруппированных корзин
+  const filteredRows = useMemo(() => {
+    let filtered = groupedCarts;
+
+    if (selectedAgent) {
+      filtered = filtered.filter(
+        (group) => String(group.agentId) === String(selectedAgent)
+      );
+    }
+
+    const q = String(searchQuery || "")
+      .toLowerCase()
+      .trim();
+    if (q) {
+      filtered = filtered.filter((group) => {
+        const agentName = String(group.agentName || "").toLowerCase();
+        const hasMatchingClient = group.carts.some((cart) =>
+          String(cart?.client_name || cart?.client?.full_name || "")
+            .toLowerCase()
+            .includes(q)
+        );
+        const hasMatchingProduct = group.allItems.some((item) =>
+          String(item?.product_name || item?.name || "")
+            .toLowerCase()
+            .includes(q)
+        );
+        return agentName.includes(q) || hasMatchingClient || hasMatchingProduct;
+      });
+    }
+
+    return filtered;
+  }, [groupedCarts, selectedAgent, searchQuery]);
+
+  const handleApprove = async (agentId) => {
+    const group = groupedCarts.find((g) => g.agentId === agentId);
+    if (!group) return;
+
+    setActionLoadingId(agentId);
+    try {
+      // Одобряем все корзины агента
+      const approvePromises = group.carts.map((cart) =>
+        dispatch(approveAgentCartAsync(cart.id)).unwrap()
+      );
+      await Promise.all(approvePromises);
+
+      // Уменьшаем количество товаров на складе для всех товаров всех корзин
+      for (const item of group.allItems) {
         const productId = item.product;
         const quantityToDeduct = Number(
           item.quantity_requested || item.total_quantity || 0
@@ -233,7 +422,12 @@ const PendingModal = ({ onClose, onChanged }) => {
         }
       }
 
-      alert("Корзина одобрена");
+      setAlertModal({
+        open: true,
+        type: "success",
+        title: "Успешно",
+        message: `Все корзины агента "${group.agentName}" одобрены! Всего: ${group.carts.length} корзин`,
+      });
       // Обновляем список корзин
       await load();
       // Обновляем список товаров на складе, чтобы отобразить актуальные количества
@@ -241,115 +435,95 @@ const PendingModal = ({ onClose, onChanged }) => {
       // Вызываем callback для обновления данных в родительском компоненте
       onChanged?.();
     } catch (e) {
-      console.error("Ошибка при одобрении корзины:", e);
-      alert(
-        `Ошибка при одобрении корзины: ${e?.message || "неизвестная ошибка"}`
-      );
+      console.error("Ошибка при одобрении корзин:", e);
+      setAlertModal({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message: `Ошибка при одобрении корзин: ${
+          e?.message || "неизвестная ошибка"
+        }`,
+      });
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const handleReject = async (id) => {
-    setActionLoadingId(id);
+  const handleReject = async (agentId) => {
+    const group = groupedCarts.find((g) => g.agentId === agentId);
+    if (!group) return;
+
+    setActionLoadingId(agentId);
     try {
-      await dispatch(rejectAgentCartAsync({ id })).unwrap();
-      alert("Корзина отклонена");
+      // Отклоняем все корзины агента
+      const rejectPromises = group.carts.map((cart) =>
+        dispatch(rejectAgentCartAsync({ id: cart.id })).unwrap()
+      );
+      await Promise.all(rejectPromises);
+
+      setAlertModal({
+        open: true,
+        type: "success",
+        title: "Успешно",
+        message: `Все корзины агента "${group.agentName}" отклонены! Всего: ${group.carts.length} корзин`,
+      });
       await load();
     } catch (e) {
-      alert("Ошибка при отклонении корзины");
+      setAlertModal({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message: "Ошибка при отклонении корзин",
+      });
     } finally {
       setActionLoadingId(null);
     }
   };
-
-  // const { employees } = useDepartments();
-  // const [selectedAgent, setSelectedAgent] = useState("");
-  // const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredRows = (rows || []).filter((cart) => {
-    // agent filter by id if available
-    const agId = cart?.agent?.id || cart?.agent_id || "";
-    if (selectedAgent && String(agId) !== String(selectedAgent)) return false;
-    const agentName =
-      cart?.agent_name ||
-      [cart?.agent?.first_name, cart?.agent?.last_name]
-        .filter(Boolean)
-        .join(" ");
-    const clientName = cart?.client_name || cart?.client?.full_name || "";
-    const q = String(searchQuery || "")
-      .toLowerCase()
-      .trim();
-    if (!q) return true;
-    return (
-      String(agentName || "")
-        .toLowerCase()
-        .includes(q) ||
-      String(clientName || "")
-        .toLowerCase()
-        .includes(q)
-    );
-  });
-
-  useEffect(() => {
-    dispatch(getEmployees());
-  }, []);
 
   const tabs = [
     {
       label: "Возвращенные товары",
       content: (
-        <>
-          <div className="add-modal__header">
-            <h3>Возвращенные товары (ожидают принятия)</h3>
-            <X className="add-modal__close-icon" size={20} onClick={onClose} />
-          </div>
-
+        <div className="pending-modal__content">
           {/* Фильтры */}
-          <div
-            className="add-modal__section"
-            style={{ display: "flex", gap: "10px", marginBottom: "15px" }}
-          >
-            {/* <select
-              className="add-modal__input"
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              style={{ width: "240px" }}
-            >
-              <option value="">Все агенты</option>
-              {employees?.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.first_name} {employee.last_name}
-                </option>
-              ))}
-            </select> */}
-
-            <input
-              type="text"
-              placeholder="Поиск по товару или агенту"
-              className="add-modal__input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: 1 }}
-            />
+          <div className="pending-modal__filters">
+            <div style={{ position: "relative", flex: 1 }}>
+              <Search
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#9ca3af",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Поиск по товару или агенту"
+                className="pending-modal__search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ paddingLeft: "40px" }}
+              />
+            </div>
           </div>
 
           {returnsLoading ? (
-            <div className="add-modal__section">Загрузка возвратов…</div>
-          ) : filterReturns.length === 0 ? (
-            <div className="add-modal__section">
-              Нет возвратов в статусе “pending”.
+            <div className="pending-modal__loading">Загрузка возвратов…</div>
+          ) : filteredReturns.length === 0 ? (
+            <div className="pending-modal__empty">
+              {searchQuery
+                ? "По запросу ничего не найдено"
+                : "Нет возвратов в статусе pending"}
             </div>
           ) : (
-            <div
-              className="table-wrapper"
-              style={{ maxHeight: 400, overflow: "auto" }}
-            >
-              <table className="sklad__table">
+            <div className="pending-modal__table-wrapper">
+              <table className="pending-modal__table">
                 <thead>
                   <tr>
                     <th>№</th>
-                    <th>Товар</th>
+                    <th>Товары</th>
                     <th>Агент</th>
                     <th>Кол-во</th>
                     <th>Дата возврата</th>
@@ -357,113 +531,181 @@ const PendingModal = ({ onClose, onChanged }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filterReturns.map((returnItem, idx) => (
-                    <tr key={returnItem.id}>
-                      <td data-label="№">{idx + 1}</td>
-                      <td data-label="Товар">{returnItem.product || "—"}</td>
-                      <td data-label="Агент">{returnItem.agent || "—"}</td>
-                      <td data-label="Кол-во">{returnItem.qty || 0}</td>
-                      <td data-label="Дата возврата">
-                        {returnItem.returned_at
-                          ? new Date(returnItem.returned_at).toLocaleString(
-                              "ru-RU",
-                              {
-                                timeZone: "Asia/Bishkek",
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }
-                            )
-                          : "—"}
-                      </td>
-                      <td data-label="">
-                        <button
-                          className="add-modal__save"
-                          style={{ marginRight: 8 }}
-                          title="Принять возврат"
-                          onClick={() => handleAcceptReturn(returnItem)}
-                          disabled={acceptingReturn === returnItem.id}
+                  {filteredReturns.map((group, idx) => {
+                    const isExpanded = expandedRows.has(group.agentId);
+                    return (
+                      <React.Fragment key={group.agentId}>
+                        <tr
+                          style={{ cursor: "pointer" }}
+                          onClick={() => toggleRowExpansion(group.agentId)}
                         >
-                          {acceptingReturn === returnItem.id
-                            ? "Принятие..."
-                            : "Принять"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <td data-label="№">
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp
+                                  size={16}
+                                  style={{ color: "#6b7280" }}
+                                />
+                              ) : (
+                                <ChevronDown
+                                  size={16}
+                                  style={{ color: "#6b7280" }}
+                                />
+                              )}
+                              {idx + 1}
+                            </div>
+                          </td>
+                          <td data-label="Товары">
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                              }}
+                            >
+                              <Package size={14} style={{ color: "#6b7280" }} />
+                              {group.returns.length} возвратов
+                            </div>
+                          </td>
+                          <td data-label="Агент">{group.agentName}</td>
+                          <td data-label="Кол-во">{group.totalQty}</td>
+                          <td data-label="Дата возврата">
+                            {group.earliestDate
+                              ? group.earliestDate.toLocaleString("ru-RU", {
+                                  timeZone: "Asia/Bishkek",
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : "—"}
+                          </td>
+                          <td
+                            data-label="Действия"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              className="pending-modal__btn pending-modal__btn--primary"
+                              onClick={() => handleAcceptReturn(group.agentId)}
+                              disabled={acceptingReturn === group.agentId}
+                              title="Принять все возвраты агента"
+                            >
+                              <CheckCircle
+                                size={16}
+                                style={{ marginRight: "6px" }}
+                              />
+                              {acceptingReturn === group.agentId
+                                ? "Принятие..."
+                                : "Принять все"}
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && group.returns.length > 0 && (
+                          <tr className="pending-modal__expanded-row">
+                            <td colSpan={6}>
+                              <div className="pending-modal__items-list">
+                                <div className="pending-modal__items-header">
+                                  <Package size={16} />
+                                  <span>
+                                    Возвраты агента ({group.returns.length})
+                                  </span>
+                                </div>
+                                <div className="pending-modal__items-grid">
+                                  {group.returns.map((returnItem, itemIdx) => (
+                                    <div
+                                      key={returnItem.id || itemIdx}
+                                      className="pending-modal__item-card"
+                                    >
+                                      <div className="pending-modal__item-name">
+                                        {returnItem.product ||
+                                          "Товар без названия"}
+                                      </div>
+                                      <div className="pending-modal__item-details">
+                                        <span className="pending-modal__item-quantity">
+                                          Количество:{" "}
+                                          <strong>{returnItem.qty || 0}</strong>
+                                        </span>
+                                        {returnItem.returned_at && (
+                                          <span className="pending-modal__item-price">
+                                            Дата:{" "}
+                                            <strong>
+                                              {new Date(
+                                                returnItem.returned_at
+                                              ).toLocaleString("ru-RU", {
+                                                timeZone: "Asia/Bishkek",
+                                                day: "2-digit",
+                                                month: "2-digit",
+                                                year: "numeric",
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                              })}
+                                            </strong>
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
-
-          <div className="add-modal__footer" style={{ marginTop: "15px" }}>
-            <button className="add-modal__cancel" onClick={onClose}>
-              Закрыть
-            </button>
-            <button
-              className="add-modal__save"
-              onClick={() => {
-                dispatch(fetchReturnsAsync());
-                onChanged?.();
-              }}
-            >
-              Обновить список
-            </button>
-          </div>
-        </>
+        </div>
       ),
     },
     {
       label: "Запрос на передачу",
       content: (
-        <>
-          <div className="add-modal__header">
-            <h3>Корзины на подтверждение</h3>
-            <X className="add-modal__close-icon" size={20} onClick={onClose} />
-          </div>
-
-          <div
-            className="add-modal__section"
-            style={{ display: "flex", gap: "10px", marginBottom: "15px" }}
-          >
-            {/* <select
-              className="add-modal__input"
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              style={{ width: "240px" }}
-            >
-              <option value="">Все агенты</option>
-              {(employees || []).map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.first_name} {employee.last_name}
-                </option>
-              ))}
-            </select> */}
-
-            <input
-              type="text"
-              placeholder="Поиск по агенту или клиенту"
-              className="add-modal__input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: 1 }}
-            />
+        <div className="pending-modal__content">
+          {/* Фильтры */}
+          <div className="pending-modal__filters">
+            <div style={{ position: "relative", flex: 1 }}>
+              <Search
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#9ca3af",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Поиск по агенту или клиенту"
+                className="pending-modal__search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ paddingLeft: "40px" }}
+              />
+            </div>
           </div>
 
           {loading ? (
-            <div className="add-modal__section">Загрузка…</div>
+            <div className="pending-modal__loading">Загрузка…</div>
           ) : filteredRows.length === 0 ? (
-            <div className="add-modal__section">
-              Нет корзин в статусе submitted.
+            <div className="pending-modal__empty">
+              {searchQuery
+                ? "По запросу ничего не найдено"
+                : "Нет корзин в статусе submitted"}
             </div>
           ) : (
-            <div
-              className="table-wrapper"
-              style={{ maxHeight: 420, overflow: "auto" }}
-            >
-              <table className="sklad__table">
+            <div className="pending-modal__table-wrapper">
+              <table className="pending-modal__table">
                 <thead>
                   <tr>
                     <th>№</th>
@@ -476,95 +718,246 @@ const PendingModal = ({ onClose, onChanged }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRows.map((cart, idx) => (
-                    <tr key={cart.id}>
-                      <td data-label="№">{idx + 1}</td>
-                      <td data-label="Агент">
-                        {cart?.agent_name ||
-                          `${cart?.agent?.first_name || ""} ${
-                            cart?.agent?.last_name || ""
-                          }`}
-                      </td>
-                      <td data-label="Клиент">
-                        {cart?.client_name || cart?.client?.full_name || "—"}
-                      </td>
-                      <td data-label="Комментарий">{cart?.note || "—"}</td>
-                      <td data-label="Отправлено">
-                        {cart?.submitted_at
-                          ? new Date(cart.submitted_at).toLocaleString("ru-RU")
-                          : "—"}
-                      </td>
-                      <td data-label="Позиций">
-                        {Array.isArray(cart?.items) ? cart.items.length : 0}
-                      </td>
-                      <td data-label="">
-                        <button
-                          className="add-modal__save"
-                          style={{ marginRight: 8 }}
-                          onClick={() => handleApprove(cart.id)}
-                          disabled={actionLoadingId === cart.id}
-                          title="Одобрить корзину"
+                  {filteredRows.map((group, idx) => {
+                    const isExpanded = expandedRows.has(group.agentId);
+                    const allClients = Array.from(
+                      new Set(
+                        group.carts
+                          .map(
+                            (cart) =>
+                              cart?.client_name || cart?.client?.full_name
+                          )
+                          .filter(Boolean)
+                      )
+                    );
+
+                    return (
+                      <React.Fragment key={group.agentId}>
+                        <tr
+                          style={{ cursor: "pointer" }}
+                          onClick={() => toggleRowExpansion(group.agentId)}
                         >
-                          {actionLoadingId === cart.id ? "…" : "Одобрить"}
-                        </button>
-                        <button
-                          className="add-modal__cancel"
-                          onClick={() => handleReject(cart.id)}
-                          disabled={actionLoadingId === cart.id}
-                          title="Отклонить корзину"
-                        >
-                          Отклонить
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <td data-label="№">
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp
+                                  size={16}
+                                  style={{ color: "#6b7280" }}
+                                />
+                              ) : (
+                                <ChevronDown
+                                  size={16}
+                                  style={{ color: "#6b7280" }}
+                                />
+                              )}
+                              {idx + 1}
+                            </div>
+                          </td>
+                          <td data-label="Агент">{group.agentName}</td>
+                          <td data-label="Клиенты">
+                            {allClients.length > 0
+                              ? allClients.length === 1
+                                ? allClients[0]
+                                : `${allClients.length} клиентов`
+                              : "—"}
+                          </td>
+                          <td data-label="Комментарий">
+                            {group.carts.length} корзин
+                          </td>
+                          <td data-label="Отправлено">
+                            {group.earliestDate
+                              ? group.earliestDate.toLocaleString("ru-RU")
+                              : "—"}
+                          </td>
+                          <td data-label="Позиций">
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                              }}
+                            >
+                              <Package size={14} style={{ color: "#6b7280" }} />
+                              {group.allItems.length}
+                            </div>
+                          </td>
+                          <td
+                            data-label="Действия"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "8px",
+                                alignItems: "center",
+                              }}
+                            >
+                              <button
+                                className="pending-modal__btn pending-modal__btn--primary"
+                                onClick={() => handleApprove(group.agentId)}
+                                disabled={actionLoadingId === group.agentId}
+                                title="Одобрить все корзины агента"
+                              >
+                                <CheckCircle
+                                  size={16}
+                                  style={{ marginRight: "6px" }}
+                                />
+                                {actionLoadingId === group.agentId
+                                  ? "…"
+                                  : "Одобрить все"}
+                              </button>
+                              <button
+                                className="pending-modal__btn pending-modal__btn--secondary"
+                                onClick={() => handleReject(group.agentId)}
+                                disabled={actionLoadingId === group.agentId}
+                                title="Отклонить все корзины агента"
+                              >
+                                <XCircle
+                                  size={16}
+                                  style={{ marginRight: "6px" }}
+                                />
+                                Отклонить все
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && group.allItems.length > 0 && (
+                          <tr className="pending-modal__expanded-row">
+                            <td colSpan={7}>
+                              <div className="pending-modal__items-list">
+                                <div className="pending-modal__items-header">
+                                  <Package size={16} />
+                                  <span>
+                                    Товары агента ({group.allItems.length} из{" "}
+                                    {group.carts.length} корзин)
+                                  </span>
+                                </div>
+                                <div className="pending-modal__items-grid">
+                                  {group.allItems.map((item, itemIdx) => (
+                                    <div
+                                      key={item.id || itemIdx}
+                                      className="pending-modal__item-card"
+                                    >
+                                      <div className="pending-modal__item-name">
+                                        {item.product_name ||
+                                          item.name ||
+                                          "Товар без названия"}
+                                      </div>
+                                      <div className="pending-modal__item-details">
+                                        <span className="pending-modal__item-quantity">
+                                          Количество:{" "}
+                                          <strong>
+                                            {item.quantity_requested ||
+                                              item.total_quantity ||
+                                              item.quantity ||
+                                              0}
+                                          </strong>
+                                        </span>
+                                        {item.unit_price && (
+                                          <span className="pending-modal__item-price">
+                                            Цена:{" "}
+                                            <strong>
+                                              {Number(item.unit_price).toFixed(
+                                                2
+                                              )}
+                                            </strong>
+                                          </span>
+                                        )}
+                                        {item.total && (
+                                          <span className="pending-modal__item-total">
+                                            Итого:{" "}
+                                            <strong>
+                                              {Number(item.total).toFixed(2)}
+                                            </strong>
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
-
-          <div className="add-modal__footer" style={{ marginTop: "15px" }}>
-            <button className="add-modal__cancel" onClick={onClose}>
-              Закрыть
-            </button>
-            <button className="add-modal__save" onClick={load}>
-              Обновить список
-            </button>
-          </div>
-        </>
+        </div>
       ),
     },
   ];
 
   return (
-    <div className="add-modal accept">
-      <div className="add-modal__overlay" onClick={onClose} />
-
+    <div className="pending-modal-overlay" onClick={onClose}>
       <div
-        className="add-modal__content"
+        className="pending-modal"
+        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        style={{ height: "500px", overflow: "auto" }}
       >
-        <div className="vitrina__header" style={{ marginBottom: "15px" }}>
-          <div className="vitrina__tabs">
-            {tabs.map((tab, index) => {
-              return (
-                <span
-                  className={`vitrina__tab ${
-                    index === activeTab && "vitrina__tab--active"
-                  }`}
-                  onClick={() => setActiveTab(index)}
-                >
-                  {tab.label}
-                </span>
-                // <button onClick={() => setActiveTab(index)}>{tab.label}</button>
-              );
-            })}
-          </div>
+        <div className="pending-modal__header">
+          <h2 className="pending-modal__title">Запросы</h2>
+          <button className="pending-modal__close" onClick={onClose}>
+            <X size={24} />
+          </button>
         </div>
+
+        <div className="pending-modal__tabs">
+          {tabs.map((tab, index) => (
+            <button
+              key={index}
+              className={`pending-modal__tab ${
+                index === activeTab ? "pending-modal__tab--active" : ""
+              }`}
+              onClick={() => handleTabChange(index)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {tabs[activeTab].content}
+
+        <div className="pending-modal__actions">
+          <button
+            className="pending-modal__btn pending-modal__btn--secondary"
+            onClick={onClose}
+          >
+            Закрыть
+          </button>
+          <button
+            className="pending-modal__btn pending-modal__btn--primary"
+            onClick={() => {
+              if (activeTab === 0) {
+                dispatch(fetchReturnsAsync());
+              } else {
+                load();
+              }
+              onChanged?.();
+            }}
+          >
+            <RefreshCw size={16} style={{ marginRight: "6px" }} />
+            Обновить список
+          </button>
+        </div>
       </div>
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        onClose={() => setAlertModal({ ...alertModal, open: false })}
+      />
     </div>
   );
 };
@@ -666,6 +1059,12 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [alertModal, setAlertModal] = useState({
+    open: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
 
   const load = async () => {
     setLoading(true);
@@ -739,7 +1138,12 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
         }
       }
 
-      alert("Корзина одобрена");
+      setAlertModal({
+        open: true,
+        type: "success",
+        title: "Успешно",
+        message: "Корзина одобрена",
+      });
       // Обновляем список корзин
       await load();
       // Обновляем список товаров на складе, чтобы отобразить актуальные количества
@@ -748,9 +1152,14 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
       onChanged?.();
     } catch (e) {
       console.error("Ошибка при одобрении корзины:", e);
-      alert(
-        `Ошибка при одобрении корзины: ${e?.message || "неизвестная ошибка"}`
-      );
+      setAlertModal({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message: `Ошибка при одобрении корзины: ${
+          e?.message || "неизвестная ошибка"
+        }`,
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -760,10 +1169,20 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
     setActionLoadingId(id);
     try {
       await dispatch(rejectAgentCartAsync({ id })).unwrap();
-      alert("Корзина отклонена");
+      setAlertModal({
+        open: true,
+        type: "success",
+        title: "Успешно",
+        message: "Корзина отклонена",
+      });
       await load();
     } catch (e) {
-      alert("Ошибка при отклонении корзины");
+      setAlertModal({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message: "Ошибка при отклонении корзины",
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -919,6 +1338,13 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
           </button>
         </div>
       </div>
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        onClose={() => setAlertModal({ ...alertModal, open: false })}
+      />
     </div>
   );
 };

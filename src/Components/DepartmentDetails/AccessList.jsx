@@ -122,12 +122,17 @@ const SECTOR_ACCESS_TYPES = {
     {
       value: "Интерфейс кассира",
       label: "Интерфейс кассира",
-      backendKey: "can_view_cashbox",
+      backendKey: "can_view_cashier",
     },
     {
       value: "Смены",
       label: "Смены",
       backendKey: "can_view_shifts",
+    },
+    {
+      value: "Документы",
+      label: "Документы",
+      backendKey: "can_view_document",
     },
   ],
   "Строительная компания": [
@@ -321,6 +326,19 @@ const AccessList = ({
         });
       }
     });
+
+    // Для сектора "Магазин" явно добавляем permission интерфейса кассира,
+    // так как он может не иметь собственного пункта меню, но должен отображаться в списке доступов
+    if (sectorName) {
+      const sectorNameLower = sectorName.toLowerCase().trim();
+      if (
+        sectorNameLower === "магазин" ||
+        sectorNameLower === "цветочный магазин" ||
+        sectorNameLower.includes("магазин")
+      ) {
+        allMenuPermissions.add("can_view_cashier");
+      }
+    }
 
     // Маппим permissions обратно в доступы из BASIC_ACCESS_TYPES и SECTOR_ACCESS_TYPES
     const result = [];

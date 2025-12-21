@@ -106,7 +106,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 toggleSidebar={toggleSidebar}
               />
             ))}
-          <Lang />
+          {/* <Lang /> */}
         </ul>
       </div>
     </div>

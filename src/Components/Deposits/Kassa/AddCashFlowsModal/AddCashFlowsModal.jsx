@@ -71,7 +71,7 @@ const AddCashFlowsModal = ({ onClose }) => {
         <div className="vitrina__modal-section">
           <label>Сумма</label>
           <input
-            type="number"
+            type="text"
             placeholder="Например, 10000"
             className="vitrina__modal-input"
             name="amount"

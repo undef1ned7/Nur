@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import { createAgentCartItem } from "../../../../api/agentCarts";
 import { useCart } from "./hooks/useCart";
-import { useProductFilter } from "./hooks/useProductFilter";
 import ProductCard from "./components/ProductCard/ProductCard";
 import ProductDetailModal from "./components/ProductDetailModal/ProductDetailModal";
 import CatalogControls from "./components/CatalogControls/CatalogControls";
@@ -27,12 +26,14 @@ const ProductionRequest = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [viewMode, setViewMode] = useState("grid");
   const [showCart, setShowCart] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertType, setAlertType] = useState("success");
   const [alertMessage, setAlertMessage] = useState("");
+  const debounceTimerRef = useRef(null);
 
   // Хук для работы с корзиной
   const {
@@ -50,17 +51,34 @@ const ProductionRequest = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Фильтрация товаров
-  const filteredProducts = useProductFilter(
-    products,
-    searchQuery,
-    categoryFilter
-  );
-
-  // Загружаем товары при монтировании
+  // Debounce для поиска
   useEffect(() => {
-    dispatch(fetchProductsAsync());
-  }, [dispatch]);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Загружаем товары с параметрами поиска и категории
+  useEffect(() => {
+    const params = {};
+    if (debouncedSearchQuery.trim()) {
+      params.search = debouncedSearchQuery.trim();
+    }
+    if (categoryFilter) {
+      params.category = categoryFilter;
+    }
+    dispatch(fetchProductsAsync(params));
+  }, [dispatch, debouncedSearchQuery, categoryFilter]);
 
   // Обработчики событий
   const handleViewProduct = (product) => {
@@ -266,7 +284,7 @@ const ProductionRequest = () => {
 
       {!loading && !error && (
         <ProductsGrid
-          products={filteredProducts}
+          products={products || []}
           viewMode={viewMode}
           onViewProduct={handleViewProduct}
           onDragStart={handleDragStart}

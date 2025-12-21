@@ -163,6 +163,24 @@ export const historySellProduct = createAsyncThunk(
   }
 );
 
+// Thunk для загрузки документов (чеков) с пагинацией
+export const fetchDocuments = createAsyncThunk(
+  "documents/fetchDocuments",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`/main/pos/sales/`, {
+        params: {
+          page: params.page || 1,
+          search: params.search || "",
+        },
+      });
+      return data; // Возвращаем полный объект с пагинацией
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 export const updateSellProduct = createAsyncThunk(
   "products/updateSellProduct",
   async ({ updatedData, id }, { rejectWithValue }) => {
@@ -261,6 +279,32 @@ export const getProductInvoice = createAsyncThunk(
       const { data } = await api.get(`/main/sales/${id}/invoice/`, {
         responseType: "blob",
       });
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Получение JSON данных накладной
+export const getInvoiceJson = createAsyncThunk(
+  "products/getInvoiceJson",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`/main/sales/json/${id}/invoice/`);
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Получение JSON данных чека
+export const getReceiptJson = createAsyncThunk(
+  "products/getReceiptJson",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`/main/sales/json/${id}/receipt/`);
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -381,10 +425,13 @@ export const createDeal = createAsyncThunk(
           }
         }
 
-        // 3) Дата первого платежа (день месяца)
+        // 3) Дата первого платежа (YYYY-MM-DD)
         if (first_due_date) {
-          payload.first_due_date = first_due_date; // "YYYY-MM-DD"
+          payload.first_due_date = first_due_date;
         }
+
+        // 4) Автоматическое планирование графика — всегда включено
+        payload.auto_schedule = true;
       }
 
       const { data } = await api.post(

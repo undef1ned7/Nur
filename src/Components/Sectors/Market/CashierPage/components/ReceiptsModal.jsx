@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Search, Calendar, User, Store, ChevronDown } from "lucide-react";
+import { X, Search, Calendar, User, Store, ChevronDown, Eye } from "lucide-react";
 import { useDispatch } from "react-redux";
 import api from "../../../../../api";
 import { getProductCheckout } from "../../../../../store/creators/saleThunk";
-import { handleCheckoutResponseForPrinting } from "../../../../pages/Sell/services/printService";
 import { useClient } from "../../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../../store/slices/productSlice";
+import ReceiptPreviewModal from "./ReceiptPreviewModal";
 import "./ReceiptsModal.scss";
 
 const ReceiptsModal = ({ onClose }) => {
@@ -14,7 +14,8 @@ const ReceiptsModal = ({ onClose }) => {
   const { list: products } = useProducts();
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [printingReceipts, setPrintingReceipts] = useState(new Set());
+  const [previewReceiptId, setPreviewReceiptId] = useState(null);
+  const [previewReceiptData, setPreviewReceiptData] = useState(null);
 
   // Фильтры
   const [selectedDate, setSelectedDate] = useState(
@@ -243,36 +244,49 @@ const ReceiptsModal = ({ onClose }) => {
     };
   };
 
-  const handlePrintReceipt = async (receiptId) => {
-    if (printingReceipts.has(receiptId)) {
-      return; // Уже печатается
+  const handlePreviewReceipt = async (receiptId) => {
+    setPreviewReceiptId(receiptId);
+    
+    // Загружаем детали чека, если их еще нет
+    let receiptData = receiptsDetails.get(receiptId);
+    if (!receiptData) {
+      receiptData = await loadReceiptDetails(receiptId);
     }
-
-    setPrintingReceipts((prev) => new Set(prev).add(receiptId));
-
+    
+    // Также загружаем данные для печати (Blob с JSON)
     try {
-      // Загружаем чек с сервера
-      const receiptResult = await dispatch(getProductCheckout(receiptId));
-
-      if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-        // Используем сервис печати для обработки ответа
-        await handleCheckoutResponseForPrinting(receiptResult.payload);
-      } else {
-        console.error("Ошибка при загрузке чека:", receiptResult.payload);
-        alert("Не удалось загрузить чек для печати");
+      const result = await dispatch(getProductCheckout(receiptId));
+      if (result.type === "products/getProductCheckout/fulfilled") {
+        const blob = result.payload;
+        // Пытаемся извлечь JSON из Blob
+        try {
+          const text = await blob.text();
+          const json = JSON.parse(text);
+          if (json && Array.isArray(json.items)) {
+            // Объединяем данные из деталей продажи с данными из чека
+            setPreviewReceiptData({
+              ...receiptData,
+              ...json,
+              // Используем items из JSON, если они есть
+              items: json.items || receiptData?.items || [],
+            });
+            return;
+          }
+        } catch (e) {
+          // Если не JSON, используем данные из receiptData
+        }
       }
     } catch (error) {
-      console.error("Ошибка при печати чека:", error);
-      alert(
-        "Ошибка при печати чека: " + (error.message || "Неизвестная ошибка")
-      );
-    } finally {
-      setPrintingReceipts((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(receiptId);
-        return newSet;
-      });
+      console.warn("Ошибка при загрузке данных чека:", error);
     }
+    
+    // Используем данные из деталей продажи
+    setPreviewReceiptData(receiptData);
+  };
+
+  const handleClosePreview = () => {
+    setPreviewReceiptId(null);
+    setPreviewReceiptData(null);
   };
 
   // Обработка нажатия ESC
@@ -472,13 +486,11 @@ const ReceiptsModal = ({ onClose }) => {
                             className="receipts-modal__action-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handlePrintReceipt(receipt.id);
+                              handlePreviewReceipt(receipt.id);
                             }}
-                            disabled={printingReceipts.has(receipt.id)}
                           >
-                            {printingReceipts.has(receipt.id)
-                              ? "Печать..."
-                              : "ПЕЧАТЬ"}
+                            <Eye size={16} />
+                            ПРОСМОТР
                           </button>
                           {/* <button className="receipts-modal__action-btn">
                             ВОЗВРАТ
@@ -551,6 +563,14 @@ const ReceiptsModal = ({ onClose }) => {
           </div>
         </div>
       </div>
+
+      {previewReceiptId && (
+        <ReceiptPreviewModal
+          receiptId={previewReceiptId}
+          receiptData={previewReceiptData}
+          onClose={handleClosePreview}
+        />
+      )}
     </div>
   );
 };

@@ -58,8 +58,13 @@ const ProductDetail = () => {
   };
 
   const handleDuplicate = () => {
-    // Duplicate product logic
-    console.log("Duplicate product");
+    // Переходим на страницу создания товара с данными для дублирования
+    navigate("/crm/sklad/add-product", {
+      state: {
+        duplicate: true,
+        productData: product,
+      },
+    });
   };
 
   const handleDelete = () => {
@@ -365,21 +370,21 @@ const ProductDetail = () => {
                   <tr>
                     <th>Цена продажи</th>
                     <th>Цена закупки</th>
-                    <th>Себестоимость</th>
+                    {/* <th>Себестоимость</th> */}
                     <th>Наценка</th>
-                    <th>Маржинальность</th>
+                    {/* <th>Маржинальность</th> */}
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>{formatPrice(product.total_price)} сом</td>
                     <td>{formatPrice(product.price)} сом</td>
-                    <td>
+                    <td>{formatPrice(product.purchase_price)} сом</td>
+                    {/* <td>
                       {formatPrice(product.purchase_price)} сом
                       <span className="product-detail__help-icon">?</span>
-                    </td>
+                    </td> */}
                     <td>{product.markup_percent}%</td>
-                    <td>
+                    {/* <td>
                       {product.price
                         ? `${Math.round(
                             ((product.price -
@@ -390,7 +395,7 @@ const ProductDetail = () => {
                               100
                           )}%`
                         : "—"}
-                    </td>
+                    </td> */}
                   </tr>
                 </tbody>
               </table>

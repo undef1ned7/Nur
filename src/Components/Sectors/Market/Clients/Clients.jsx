@@ -700,7 +700,7 @@ export default function MarketClients() {
 
       // ───── отдельный запрос для ДОЛЖНИКОВ ─────
       if (activeTab === "debtors") {
-        const res = await api.get("/main/clients/clients/with-debts/");
+        const res = await api.get("/main/clients/with-debts/");
         const list = listFrom(res);
         console.log(res);
 

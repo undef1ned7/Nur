@@ -273,6 +273,9 @@
   }
 
   &__action-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding: 8px 16px;
     background: #f9fafb;
     border: 1px solid #e5e7eb;
@@ -286,6 +289,10 @@
     &:hover {
       background: #f3f4f6;
       border-color: #d1d5db;
+    }
+
+    svg {
+      flex-shrink: 0;
     }
   }
 

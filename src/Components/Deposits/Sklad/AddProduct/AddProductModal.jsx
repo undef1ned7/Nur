@@ -7,6 +7,8 @@ import {
   useCash,
 } from "../../../../store/slices/cashSlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import { useClient } from "../../../../store/slices/ClientSlice";
+import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { updateProductAsync } from "../../../../store/creators/productCreators";
 
 const toNum = (v) => {
@@ -18,6 +20,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
   const dispatch = useDispatch();
   const { list: cashBoxes } = useCash();
   const { company } = useUser();
+  const { list: clients } = useClient();
 
   // если item не передан — блокируем форму
   const itemId = item?.id;
@@ -31,7 +34,16 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
     item?.price != null ? String(item.price) : ""
   );
   const [selectCashBox, setSelectCashBox] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState(
+    item?.client || ""
+  );
   const [error, setError] = useState("");
+
+  // Фильтруем поставщиков из списка клиентов
+  const suppliers = useMemo(
+    () => clients.filter((client) => client.type === "suppliers"),
+    [clients]
+  );
 
   const stockQty = useMemo(() => toNum(item?.quantity), [item]);
 
@@ -43,6 +55,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
 
   useEffect(() => {
     dispatch(getCashBoxes());
+    dispatch(fetchClientsAsync());
   }, [dispatch]);
 
   // Автоматически выбираем первую кассу по индексу
@@ -99,6 +112,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
             quantity: stockQty + q,
             purchase_price: pp,
             price: rp,
+            client: selectedSupplier || null,
           },
         })
       ).unwrap();
@@ -195,6 +209,25 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
             step="0.01"
             disabled={!itemId}
           />
+
+          <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
+            Поставщик
+          </label>
+
+          <select
+            style={{ width: "100%" }}
+            className="debt__input"
+            value={selectedSupplier}
+            onChange={(e) => setSelectedSupplier(e.target.value)}
+            disabled={!itemId}
+          >
+            <option value="">Выберите поставщика</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.full_name || supplier.name}
+              </option>
+            ))}
+          </select>
 
           {/* касса автоматически выбирается - скрыто от пользователя */}
 

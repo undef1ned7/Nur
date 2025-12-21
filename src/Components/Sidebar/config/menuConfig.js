@@ -302,6 +302,13 @@ export const MENU_CONFIG = {
         permission: "can_view_shifts",
         implemented: true,
       },
+      {
+        label: "Документы",
+        to: "/crm/market/documents",
+        icon: menuIcons.documentScanner,
+        permission: "can_view_document",
+        implemented: true,
+      },
     ],
 
     // Кафе
