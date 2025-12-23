@@ -199,6 +199,16 @@
   }
 }
 
+/* ============ Изображения товаров ============ */
+.sklad__product-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--fg-border);
+  flex-shrink: 0;
+}
+
 // Адаптивность для warehouseP контейнера
 .warehouseP {
   @media (max-width: 768px) {

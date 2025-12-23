@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   Eye,
   Heart,
@@ -731,13 +731,6 @@ const ProductionCatalog = () => {
 
   const cartItemsCount = useSelector(selectCartItemsCount);
 
-  // Получаем массив продуктов из results
-  const productsList = Array.isArray(products?.results)
-    ? products.results
-    : Array.isArray(products)
-    ? products
-    : [];
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -754,6 +747,37 @@ const ProductionCatalog = () => {
   const [agentProducts, setAgentProducts] = useState([]);
   const [agentProductsMap, setAgentProductsMap] = useState(new Map());
   const debounceTimerRef = useRef(null);
+
+  // Получаем массив продуктов из results
+  const rawProductsList = Array.isArray(products?.results)
+    ? products.results
+    : Array.isArray(products)
+    ? products
+    : [];
+
+  // Сортируем товары: сначала те, что в наличии
+  const productsList = useMemo(() => {
+    return [...rawProductsList].sort((a, b) => {
+      // Проверяем наличие товара в агентских продуктах
+      const aHasInAgent = agentProductsMap.has(a.id);
+      const bHasInAgent = agentProductsMap.has(b.id);
+      
+      // Получаем количество
+      const aQty = aHasInAgent ? (agentProductsMap.get(a.id) ?? 0) : 0;
+      const bQty = bHasInAgent ? (agentProductsMap.get(b.id) ?? 0) : 0;
+      
+      // Товар в наличии, если есть в агентских продуктах и количество > 0
+      const aInStock = aHasInAgent && aQty > 0;
+      const bInStock = bHasInAgent && bQty > 0;
+      
+      // Сначала товары в наличии (true идет первым)
+      if (aInStock && !bInStock) return -1;
+      if (!aInStock && bInStock) return 1;
+      
+      // Если оба в наличии или оба не в наличии, сохраняем исходный порядок
+      return 0;
+    });
+  }, [rawProductsList, agentProductsMap]);
 
   // Функция для получения товаров из корзины и обновления счетчика
   const refreshCartItems = useCallback(async () => {

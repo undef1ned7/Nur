@@ -58,6 +58,7 @@ import api from "../../../../api";
 import FileInput from "./FileInput/FileInput";
 import "../../../Deposits/Sklad/Sklad.scss";
 import "./finishedGoods.scss";
+import noImage from "../../Market/Warehouse/components/placeholder.png";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -2827,6 +2828,13 @@ const FinishedGoods = ({ products, onChanged }) => {
     setShowEdit(true);
   };
 
+  // get primary image
+  const getPrimaryImage = (product) => {
+    if (!product?.images || !Array.isArray(product.images)) return null;
+    const primaryImage = product.images.find((img) => img.is_primary);
+    return primaryImage || product.images[0] || null;
+  };
+
   return (
     <div className="sklad__warehouse">
       <div className="sklad__header">
@@ -2929,6 +2937,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                 </th>
                 <th></th>
                 <th>№</th>
+                <th></th>
                 <th>Название</th>
                 <th>Поставщик</th>
                 <th>Цена</th>
@@ -2961,6 +2970,25 @@ const FinishedGoods = ({ products, onChanged }) => {
                     </button>
                   </td>
                   <td>{idx + 1}</td>
+                  <td>
+                    {(() => {
+                      const primaryImage = getPrimaryImage(item);
+                      return (
+                        <img
+                          src={
+                            primaryImage?.image_url ||
+                            primaryImage?.image ||
+                            noImage
+                          }
+                          alt={primaryImage?.alt || item.name || "Товар"}
+                          className="sklad__product-image"
+                          onError={(e) => {
+                            e.currentTarget.src = noImage;
+                          }}
+                        />
+                      );
+                    })()}
+                  </td>
                   <td>
                     <strong>
                       {item.name.length > 12
