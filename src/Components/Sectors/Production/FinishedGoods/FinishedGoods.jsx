@@ -2644,8 +2644,9 @@ const FinishedGoods = ({ products, onChanged }) => {
             alignItems: "center",
             gap: 20,
             flexWrap: "wrap-reverse",
-            justifyContent: "end",
+            justifyContent: "center",
           }}
+          className="mx-auto"
         >
           <button
             className="sklad__add"

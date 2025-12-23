@@ -6,7 +6,7 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
-  max-height: 90vh;
+  max-height: 60vh;
   overflow: hidden;
 
   &__container {
@@ -861,7 +861,7 @@
 @media screen and (max-width: 480px) {
   .request-cart {
     border-radius: 0;
-    max-height: 100vh;
+    max-height: 90vh;
 
     &__header {
       padding: 16px 20px;
@@ -876,7 +876,7 @@
     }
 
     &__sidebar {
-      max-height: 40vh;
+      height: 100vh;
     }
   }
 

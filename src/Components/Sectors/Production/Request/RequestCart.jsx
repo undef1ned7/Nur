@@ -217,7 +217,7 @@ const RequestSummary = ({ items, onSubmit, submitting }) => {
 
       <button
         type="button"
-        className="request-summary__submit"
+        className="request-summary__submit mb-20"
         onClick={onSubmit}
         disabled={submitting || !items || items.length === 0}
       >
@@ -445,6 +445,7 @@ const RequestCart = ({
   // Для этого нужно проверить статус корзины, но пока что предполагаем, что это всегда draft
   const isEditable = true; // TODO: проверять статус корзины
 
+  const [choose, setChoose] = useState(false);
   return (
     <div className="request-cart">
       <div className="request-cart__container">
@@ -463,7 +464,7 @@ const RequestCart = ({
         </header>
 
         <div className="request-cart__body">
-          <div className="request-cart__items">
+          <div className="request-cart__items max-h-[50vh] overflow-auto">
             {(items || []).length === 0 ? (
               <div className="request-cart__empty">
                 <ShoppingCart size={64} />
@@ -483,7 +484,11 @@ const RequestCart = ({
             )}
           </div>
 
-          <aside className="request-cart__sidebar">
+          <div onClick={() => setChoose(prev => !prev)} className="block md:hidden text-center m-2">
+            {choose ? 'Скрыть' : 'Раскрыть'}
+          </div>
+
+          <aside className={`request-cart__sidebar min-h-[100vh] md:block ${choose ? 'block' : 'hidden'} `}>
             <div className="client-selector">
               <label className="selector-label">Выберите клиента</label>
               <div className="selector-dropdown">
@@ -557,7 +562,7 @@ const RequestCart = ({
                     {isCreateMode && (
                       <div
                         className="create-client-form"
-                        style={{ display: "grid", gap: 8, marginBottom: 12 }}
+                        style={{ display: "grid", gap: 8, marginBottom: 60 }}
                       >
                         <input
                           type="text"
@@ -662,7 +667,7 @@ const RequestCart = ({
                     )}
 
                     {!isCreateMode && (
-                      <div className="clients-list">
+                      <div className="clients-list mb-20">
                         {clientsLoading ? (
                           <div className="loading">Загрузка клиентов...</div>
                         ) : filteredClients.length === 0 ? (

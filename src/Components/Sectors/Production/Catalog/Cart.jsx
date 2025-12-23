@@ -989,8 +989,8 @@ const Cart = ({ agentCartId: agentCartIdProp = null, onNotify, onClose }) => {
           )}
         </div>
 
-        <div className="cart-content">
-          <div className="cart-items-section">
+        <div className="cart-content overflow-auto">
+          <div className="cart-items-section max-h-[50vh] overflow-auto">
             {(agentItems || []).length === 0 &&
             (cartItemsLocal || []).length === 0 ? (
               <div className="empty-cart">
