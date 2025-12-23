@@ -993,7 +993,7 @@ const ProductionWarehouse = () => {
   return (
     <section className="warehouseP sklad">
       <div className="vitrina__header" style={{ margin: "15px 0" }}>
-        <div className="vitrina__tabs">
+        <div className="vitrina__tabs flex-wrap">
           {tabs.map((tab, index) => {
             return (
               <span

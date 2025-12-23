@@ -17,15 +17,18 @@ const ProductCard = ({
   const maxQuantity = 999; // Для запросов нет ограничений по количеству на складе
   const available = true; // Все товары доступны для запроса
 
-  const handleQuantityChange = (newQuantity) => {
-    const qty = Math.max(1, Math.min(maxQuantity || 999, newQuantity));
-    setQuantity(qty);
+  const handleQuantityChange = (e) => {
+    const value = e.target.value;
+
+    if ((value === "" || !isNaN(value)) && (value === "" || Number(value) <= 999)) {
+      setQuantity(value);
+    }
   };
 
   const handleIncrement = (e) => {
     e.stopPropagation();
     if (available && quantity < maxQuantity) {
-      setQuantity(quantity + 1);
+      setQuantity((+quantity) + 1);
     }
   };
 
@@ -132,9 +135,7 @@ const ProductCard = ({
                         min="1"
                         max={maxQuantity || 999}
                         value={quantity}
-                        onChange={(e) =>
-                          handleQuantityChange(Number(e.target.value))
-                        }
+                        onChange={handleQuantityChange}
                         className="quantity-input-small"
                       />
                       <button
