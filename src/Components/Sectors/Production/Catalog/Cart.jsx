@@ -978,7 +978,7 @@ const Cart = ({ agentCartId: agentCartIdProp = null, onNotify, onClose }) => {
   console.log(agentCart, "agent");
 
   return (
-    <div className="cart-page">
+    <div className="cart-page overflow-auto h-full">
       <div className="cart-container">
         <div className="cart-header flex justify-between align-center">
           <h1>Корзина</h1>
