@@ -78,7 +78,10 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(updateSale.fulfilled, (state, { payload }) => {
-        state.startObject = payload;
+        // Обновляем state.start если это текущая активная продажа
+        if (state.start && payload && payload.id === state.start.id) {
+          state.start = payload;
+        }
         state.loading = false;
       })
       .addCase(updateSale.rejected, (state, action) => {

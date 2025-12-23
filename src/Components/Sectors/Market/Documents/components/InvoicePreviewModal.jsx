@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { X, Printer } from "lucide-react";
 import { useDispatch } from "react-redux";
-import {
-  getInvoiceJson,
-  getProductInvoice,
-} from "../../../../../store/creators/saleThunk";
+import { pdf } from "@react-pdf/renderer";
+
+import { getInvoiceJson } from "../../../../../store/creators/saleThunk";
+import InvoicePdfDocument from "./InvoicePdfDocument";
+
 import "./InvoicePreviewModal.scss";
 
 const InvoicePreviewModal = ({
@@ -71,30 +72,31 @@ const InvoicePreviewModal = ({
 
     setPrinting(true);
     try {
-      // Загружаем PDF накладной
-      const result = await dispatch(getProductInvoice(invoiceId));
-      if (getProductInvoice.fulfilled.match(result)) {
-        const pdfBlob = result.payload;
+      // Берём уже загруженный JSON
+      let data = invoiceData;
 
-        if (pdfBlob instanceof Blob) {
-          // Убеждаемся, что blob имеет правильный MIME type
-          const blob =
-            pdfBlob.type === "application/pdf"
-              ? pdfBlob
-              : new Blob([pdfBlob], { type: "application/pdf" });
-
-          // Скачиваем файл используя вспомогательную функцию
-          downloadBlob(blob, `invoice_${invoiceId}.pdf`);
+      // Если по какой-то причине данных нет — подгружаем
+      if (!data) {
+        const result = await dispatch(getInvoiceJson(invoiceId));
+        if (result.type === "products/getInvoiceJson/fulfilled") {
+          data = result.payload;
+          setInvoiceData(result.payload);
         } else {
-          throw new Error("Получен неверный формат PDF");
+          throw new Error("Не удалось загрузить накладную (JSON)");
         }
-      } else {
-        throw new Error("Не удалось загрузить PDF накладной");
       }
+
+      if (!data) throw new Error("Нет данных для генерации PDF");
+
+      // Генерация PDF из JSON
+      const blob = await pdf(<InvoicePdfDocument data={data} />).toBlob();
+
+      const fileName = `invoice_${data?.document?.number || invoiceId}.pdf`;
+      downloadBlob(blob, fileName);
     } catch (printError) {
-      console.error("Ошибка при скачивании накладной:", printError);
+      console.error("Ошибка при генерации PDF:", printError);
       alert(
-        "Ошибка при скачивании накладной: " +
+        "Ошибка при генерации PDF: " +
           (printError.message || "Неизвестная ошибка")
       );
     } finally {
@@ -396,6 +398,7 @@ const InvoicePreviewModal = ({
                     Сумма
                   </div>
                 </div>
+
                 {items.length > 0 ? (
                   items.map((item, index) => (
                     <div

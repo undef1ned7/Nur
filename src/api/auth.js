@@ -42,8 +42,9 @@ const getSectorPermissions = (sectorName) => {
       "can_view_school_invoices",
     ],
     Магазин: [
-      "can_view_cashbox", // Интерфейс кассира
+      "can_view_cashbox", // Касса
       "can_view_shifts", // Смены
+      "can_view_cashier", // Интерфейс кассира
     ],
     Кафе: [
       "can_view_cafe_menu",

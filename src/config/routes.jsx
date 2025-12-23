@@ -90,6 +90,7 @@ import MarketClients from "../Components/Sectors/Market/Clients/Clients";
 import MarketClientDetails from "../Components/Sectors/Market/ClientDetails/ClientDetails";
 import MarketHistory from "../Components/Sectors/Market/History/History";
 import MarketDocuments from "../Components/Sectors/Market/Documents/Documents";
+import CreateSaleDocument from "../Components/Sectors/Market/Documents/CreateSaleDocument";
 import MarketAnalytics from "../Components/Sectors/Market/Analytics/Analytics";
 
 // Cafe
@@ -141,6 +142,7 @@ import ProductionAgents from "../Components/Sectors/Production/ProductionAgents/
 import ProductionCatalog from "../Components/Sectors/Production/Catalog/ProductionCatalog";
 import ProductionRequest from "../Components/Sectors/Production/Request/ProductionRequest";
 import AgentAnalytics from "../Components/Sectors/Production/Analytics/AgentAnalytics";
+import ProductionAnalytics from "../Components/Sectors/Production/Analytics/ProductionAnalytics";
 
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
@@ -263,6 +265,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("clients/:id", MarketClientDetails),
   createProtectedRoute("market/history", MarketHistory),
   createProtectedRoute("market/documents", MarketDocuments),
+  createProtectedRoute("market/documents/create", CreateSaleDocument),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
   // Cafe routes
@@ -309,6 +312,7 @@ export const crmRoutes = (profile) => [
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),
+  createProtectedRoute("production/analytics", ProductionAnalytics),
   createProtectedRoute("production/agents/:agentId/analytics", AgentAnalytics),
   createProtectedRoute("production/agents", ProductionAgents),
   createProtectedRoute("production/catalog", ProductionCatalog),

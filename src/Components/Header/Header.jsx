@@ -76,6 +76,7 @@ const pageTitles = {
   "/crm/cafe/kassa": "Касса",
 
   "/crm/production/warehouse": "Склад",
+  "/crm/production/analytics": "Аналитика",
 
   // Доп. услуги
   "/crm/instagram": "Instagram",

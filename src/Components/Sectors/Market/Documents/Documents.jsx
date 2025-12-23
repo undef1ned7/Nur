@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, Filter, Calendar, Eye, Pencil, Printer } from "lucide-react";
+import {
+  Search,
+  Filter,
+  Calendar,
+  Eye,
+  Pencil,
+  Printer,
+  Plus,
+} from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   fetchDocuments,
   getReceiptJson,
@@ -18,6 +27,7 @@ import "./Documents.scss";
 
 const Documents = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const {
     documents,
     documentsCount,
@@ -293,6 +303,13 @@ const Documents = () => {
         </div>
         <div className="documents__header-actions">
           <button
+            className="documents__create-btn"
+            onClick={() => navigate("/crm/market/documents/create")}
+          >
+            <Plus size={18} />
+            Создать
+          </button>
+          <button
             className="documents__filter-btn"
             onClick={() => setShowReconciliationModal(true)}
             style={{ marginRight: 10 }}
@@ -303,10 +320,10 @@ const Documents = () => {
             <Filter size={18} />
             Фильтры
           </button>
-          <button className="documents__period-btn">
+          {/* <button className="documents__period-btn">
             <Calendar size={18} />
             Период
-          </button>
+          </button> */}
         </div>
       </div>
 
