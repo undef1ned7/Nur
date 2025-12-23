@@ -214,12 +214,23 @@ function fmtDate(dt) {
 }
 
 function numToWords(num) {
-  // Простая функция для преобразования числа в слова (базовая версия)
-  // Можно расширить для полной поддержки
+  // Функция для преобразования числа в слова с поддержкой тысяч
   const ones = [
     "",
     "один",
     "два",
+    "три",
+    "четыре",
+    "пять",
+    "шесть",
+    "семь",
+    "восемь",
+    "девять",
+  ];
+  const onesFeminine = [
+    "",
+    "одна",
+    "две",
     "три",
     "четыре",
     "пять",
@@ -266,44 +277,76 @@ function numToWords(num) {
   ];
 
   if (num === 0) return "ноль";
-  if (num < 10) return ones[num];
-  if (num < 20) {
-    return teens[num - 10];
-  }
 
   const n = Math.floor(num);
   const kopecks = Math.round((num - n) * 100);
 
   let result = "";
-  if (n >= 100) {
-    result += hundreds[Math.floor(n / 100)] + " ";
-  }
-  if (n % 100 >= 20) {
-    result += tens[Math.floor((n % 100) / 10)] + " ";
-    if (n % 10 > 0) result += ones[n % 10] + " ";
-  } else if (n % 100 >= 10) {
-    result += teens[(n % 100) - 10] + " ";
-  } else if (n % 10 > 0) {
-    result += ones[n % 10] + " ";
+
+  // Обработка тысяч
+  if (n >= 1000) {
+    const thousands = Math.floor(n / 1000);
+    if (thousands >= 100) {
+      result += hundreds[Math.floor(thousands / 100)] + " ";
+    }
+    const thousandsRemainder = thousands % 100;
+    if (thousandsRemainder >= 20) {
+      result += tens[Math.floor(thousandsRemainder / 10)] + " ";
+      if (thousandsRemainder % 10 > 0) {
+        result += onesFeminine[thousandsRemainder % 10] + " ";
+      }
+    } else if (thousandsRemainder >= 10) {
+      result += teens[thousandsRemainder - 10] + " ";
+    } else if (thousandsRemainder > 0) {
+      result += onesFeminine[thousandsRemainder] + " ";
+    }
+
+    // Окончание для тысяч
+    const lastThousandDigit = thousands % 10;
+    const lastTwoThousandDigits = thousands % 100;
+    if (lastTwoThousandDigits >= 11 && lastTwoThousandDigits <= 19) {
+      result += "тысяч ";
+    } else if (lastThousandDigit === 1) {
+      result += "тысяча ";
+    } else if (lastThousandDigit >= 2 && lastThousandDigit <= 4) {
+      result += "тысячи ";
+    } else {
+      result += "тысяч ";
+    }
   }
 
-  // Определяем правильное окончание для рублей
+  // Обработка сотен, десятков и единиц
+  const remainder = n % 1000;
+  if (remainder >= 100) {
+    result += hundreds[Math.floor(remainder / 100)] + " ";
+  }
+  const remainder100 = remainder % 100;
+  if (remainder100 >= 20) {
+    result += tens[Math.floor(remainder100 / 10)] + " ";
+    if (remainder100 % 10 > 0) result += ones[remainder100 % 10] + " ";
+  } else if (remainder100 >= 10) {
+    result += teens[remainder100 - 10] + " ";
+  } else if (remainder100 > 0) {
+    result += ones[remainder100] + " ";
+  }
+
+  // Определяем правильное окончание для сомов
   const lastDigit = n % 10;
   const lastTwoDigits = n % 100;
   if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-    result += "рублей";
+    result += "сом";
   } else if (lastDigit === 1) {
-    result += "рубль";
+    result += "сом";
   } else if (lastDigit >= 2 && lastDigit <= 4) {
-    result += "рубля";
+    result += "сома";
   } else {
-    result += "рублей";
+    result += "сом";
   }
 
   if (kopecks > 0) {
-    result += ` ${kopecks} копеек`;
+    result += ` ${kopecks}`;
   } else {
-    result += " 00 копеек";
+    result += " 00";
   }
 
   return result.trim();
@@ -442,14 +485,8 @@ export default function InvoicePdfDocument({ data }) {
           </View>
 
           {/* Строки товаров */}
-          {(items.length > 0 ? items : []).map((it, idx, arr) => (
-            <View
-              key={it.id || idx}
-              style={[
-                s.tableRow,
-                idx === arr.length - 1 ? s.tableRowLast : null,
-              ]}
-            >
+          {(items.length > 0 ? items : []).map((it, idx) => (
+            <View key={it.id || idx} style={s.tableRow}>
               <View style={[s.tableCell, s.colNo]}>
                 <Text>{idx + 1}</Text>
               </View>
@@ -473,6 +510,35 @@ export default function InvoicePdfDocument({ data }) {
               </View>
             </View>
           ))}
+
+          {/* Строка "Итого:" */}
+          <View style={[s.tableRow, s.tableRowLast, s.tableHeader]}>
+            <View style={[s.tableCell, s.colNo]}>
+              <Text></Text>
+            </View>
+            <View style={[s.tableCell, s.colName]}>
+              <Text style={{ fontWeight: "bold" }}>Итого:</Text>
+            </View>
+            <View style={[s.tableCell, { width: "10%" }]}>
+              <Text></Text>
+            </View>
+            <View style={[s.tableCell, s.colUnit]}>
+              <Text></Text>
+            </View>
+            <View style={[s.tableCell, s.colQty]}>
+              <Text style={{ textAlign: "right", fontWeight: "bold" }}>
+                {n2(items.reduce((sum, it) => sum + Number(it.qty || 0), 0))}
+              </Text>
+            </View>
+            <View style={[s.tableCell, s.colPrice]}>
+              <Text></Text>
+            </View>
+            <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
+              <Text style={{ textAlign: "right", fontWeight: "bold" }}>
+                {n2(total)}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Итоги */}
@@ -481,6 +547,20 @@ export default function InvoicePdfDocument({ data }) {
             <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
             <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>
           </View>
+        </View>
+
+        {/* Текст с количеством наименований и суммой */}
+        <View style={{ marginTop: 8, fontSize: 9 }}>
+          <Text style={{ fontSize: 9 }}>
+            Всего наименований {items.length}, на сумму {n2(total)} KGS
+          </Text>
+        </View>
+
+        {/* Сумма прописью */}
+        <View style={{ marginTop: 4, fontSize: 9 }}>
+          <Text style={{ fontSize: 9, textTransform: "capitalize" }}>
+            {numToWords(total)}
+          </Text>
         </View>
 
         {/* Подписи */}

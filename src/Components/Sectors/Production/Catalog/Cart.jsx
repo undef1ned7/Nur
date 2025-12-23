@@ -252,7 +252,7 @@ const CartItem = ({
             </button>
           </div>
 
-          <div className="quantity-controls" style={{ marginLeft: 12 }}>
+          {/* <div className="quantity-controls" style={{ marginLeft: 12 }}>
             <button
               className="quantity-btn"
               onClick={handleGiftDecrement}
@@ -272,7 +272,7 @@ const CartItem = ({
             >
               <Plus size={16} />
             </button>
-          </div>
+          </div> */}
 
           <button
             className="remove-btn"
