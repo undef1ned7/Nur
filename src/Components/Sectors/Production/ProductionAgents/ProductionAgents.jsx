@@ -882,7 +882,7 @@ const ProductionAgents = () => {
                     </button>
                   )}
 
-                  <button
+                  {/* <button
                     className="sklad__add"
                     onClick={() => {
                       dispatch(startSaleInAgent());
@@ -891,7 +891,7 @@ const ProductionAgents = () => {
                   >
                     <Plus size={16} style={{ marginRight: 4 }} />
                     Продажа товара
-                  </button>
+                  </button> */}
                 </div>
               </div>
 

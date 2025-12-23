@@ -222,6 +222,64 @@
     margin-top: auto;
   }
 
+  &__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px 0;
+    margin-top: 20px;
+    border-top: 1px solid #e5e7eb;
+
+    &-btn {
+      padding: 10px 20px;
+      border: 1px solid #d1d5db;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+      transition: all 0.2s;
+      min-width: 100px;
+
+      &:hover:not(:disabled) {
+        background: #f9fafb;
+        border-color: #f7d617;
+        color: #111827;
+      }
+
+      &:active:not(:disabled) {
+        transform: scale(0.98);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #f5f5f5;
+        border-color: #e5e7eb;
+        color: #9ca3af;
+      }
+    }
+
+    &-info {
+      font-size: 14px;
+      font-weight: 500;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+  }
+
+  &__products-loading,
+  &__products-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: #6b7280;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
   &__cart {
     width: 400px;
     display: flex;
@@ -741,37 +799,18 @@
     }
 
     &__pagination {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      padding: 16px;
-      margin-top: 16px;
-      border-top: 1px solid #e5e5e5;
+      gap: 12px;
+      padding: 12px 0;
+      margin-top: 12px;
 
       &-btn {
         padding: 8px 16px;
-        border: 1px solid #e5e5e5;
-        background: white;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.2s;
-
-        &:hover:not(:disabled) {
-          background: #f5f5f5;
-          border-color: #d5d5d5;
-        }
-
-        &:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
+        min-width: 80px;
+        font-size: 13px;
       }
 
       &-info {
-        font-size: 14px;
-        color: #666;
+        font-size: 13px;
       }
     }
   }

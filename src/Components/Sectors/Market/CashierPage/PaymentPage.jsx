@@ -183,7 +183,8 @@ const PaymentPage = ({
               const currentDate = new Date();
               const dueDate = new Date(
                 currentDate.getFullYear(),
-                currentDate.getMonth() + (typeof debtMonths === "number" ? debtMonths : 1),
+                currentDate.getMonth() +
+                  (typeof debtMonths === "number" ? debtMonths : 1),
                 currentDate.getDate()
               );
               const dueDateString = dueDate.toISOString().split("T")[0]; // Формат YYYY-MM-DD
@@ -196,10 +197,16 @@ const PaymentPage = ({
                     "Клиент",
                   phone: selectedCustomer.phone || "",
                   due_date: dueDateString,
-                  amount: typeof total === "number" ? total.toFixed(2) : String(total),
+                  amount:
+                    typeof total === "number"
+                      ? total.toFixed(2)
+                      : String(total),
                 });
               } catch (startDebtError) {
-                console.warn("Ошибка при создании долга для тарифа Старт:", startDebtError);
+                console.warn(
+                  "Ошибка при создании долга для тарифа Старт:",
+                  startDebtError
+                );
                 // Не блокируем успешную оплату, если ошибка с долгом
                 showAlert(
                   "warning",
@@ -783,6 +790,7 @@ const PaymentPage = ({
           deferredAmount={paymentAmounts.deferred}
           amountReceived={parseFloat(amountReceived) || 0}
           change={change}
+          saleId={receiptData?.saleId}
         />
       )}
 

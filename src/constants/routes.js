@@ -4,6 +4,7 @@ export const ALLOWED_PATHS_WITHOUT_TOKEN = [
   "/register",
   "/",
   "/submit-application",
+  "/get-application-list",
 ];
 
 // Публичные пути, на которые нужно редиректить если токен валиден

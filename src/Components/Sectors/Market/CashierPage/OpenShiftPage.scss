@@ -153,3 +153,343 @@
     }
   }
 }
+
+// Адаптивные стили для устройств с маленькой высотой экрана
+@media (max-height: 850px) {
+  .open-shift-page {
+    &__header {
+      padding: 12px 20px;
+      flex-shrink: 0;
+    }
+
+    &__content {
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__content {
+      padding: 16px 24px;
+      align-items: flex-start;
+      // justify-content: flex-start; // TODO: remove this
+      overflow-y: auto;
+    }
+
+    &__card {
+      padding: 20px;
+      gap: 16px;
+    }
+
+    &__icon {
+      width: 56px;
+      height: 56px;
+
+      svg {
+        width: 28px;
+        height: 28px;
+      }
+    }
+
+    &__card-title {
+      font-size: 18px;
+    }
+
+    &__card-description {
+      font-size: 12px;
+    }
+
+    &__input-wrapper {
+      gap: 6px;
+    }
+
+    &__label {
+      font-size: 12px;
+    }
+
+    &__input {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+
+    &__submit-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+  }
+}
+
+// Адаптивные стили
+@media (max-width: 768px) {
+  .open-shift-page {
+    &__header {
+      padding: 16px 20px;
+    }
+
+    &__title {
+      font-size: 20px;
+    }
+
+    &__content {
+      padding: 24px 16px;
+      align-items: flex-start;
+      // justify-content: flex-start;
+      overflow-y: auto;
+    }
+
+    &__card {
+      max-width: 100%;
+      padding: 24px 20px;
+      gap: 20px;
+      border-radius: 12px;
+    }
+
+    &__icon {
+      width: 64px;
+      height: 64px;
+
+      svg {
+        width: 32px;
+        height: 32px;
+      }
+    }
+
+    &__card-title {
+      font-size: 20px;
+    }
+
+    &__card-description {
+      font-size: 13px;
+    }
+
+    &__input-wrapper {
+      gap: 6px;
+    }
+
+    &__label {
+      font-size: 13px;
+    }
+
+    &__input {
+      padding: 10px 14px;
+      font-size: 15px;
+    }
+
+    &__submit-btn {
+      padding: 12px 20px;
+      font-size: 15px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .open-shift-page {
+    &__header {
+      padding: 12px 16px;
+    }
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__back-btn {
+      width: 36px;
+      height: 36px;
+    }
+
+    &__content {
+      padding: 16px 12px;
+    }
+
+    &__card {
+      padding: 20px 16px;
+      gap: 16px;
+      border-radius: 10px;
+    }
+
+    &__icon {
+      width: 56px;
+      height: 56px;
+
+      svg {
+        width: 28px;
+        height: 28px;
+      }
+    }
+
+    &__card-title {
+      font-size: 18px;
+    }
+
+    &__card-description {
+      font-size: 12px;
+    }
+
+    &__label {
+      font-size: 12px;
+    }
+
+    &__input {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    &__submit-btn {
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+  }
+}
+
+// Комбинированные медиа-запросы для маленьких экранов (ширина и высота)
+@media (max-width: 768px) and (max-height: 850px) {
+  .open-shift-page {
+    &__header {
+      padding: 10px 16px;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__content {
+      padding: 12px 16px;
+    }
+
+    &__card {
+      padding: 16px;
+      gap: 12px;
+    }
+
+    &__icon {
+      width: 48px;
+      height: 48px;
+
+      svg {
+        width: 24px;
+        height: 24px;
+      }
+    }
+
+    &__card-title {
+      font-size: 16px;
+    }
+
+    &__card-description {
+      font-size: 11px;
+    }
+
+    &__input {
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    &__submit-btn {
+      padding: 10px 16px;
+      font-size: 13px;
+    }
+  }
+}
+
+// Для очень маленькой высоты (ландшафтный режим на мобильных)
+@media (max-height: 500px) {
+  .open-shift-page {
+    &__header {
+      padding: 8px 16px;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__content {
+      padding: 8px 16px;
+    }
+
+    &__card {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    &__icon {
+      width: 40px;
+      height: 40px;
+
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    &__card-title {
+      font-size: 16px;
+    }
+
+    &__card-description {
+      font-size: 10px;
+      display: none; // Скрываем описание на очень маленьких экранах
+    }
+
+    &__input {
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    &__submit-btn {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+  }
+}
+
+@media (max-width: 480px) and (max-height: 850px) {
+  .open-shift-page {
+    &__header {
+      padding: 8px 12px;
+    }
+
+    &__title {
+      font-size: 14px;
+    }
+
+    &__content {
+      padding: 8px 12px;
+    }
+
+    &__card {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    &__icon {
+      width: 40px;
+      height: 40px;
+
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    &__card-title {
+      font-size: 14px;
+    }
+
+    &__card-description {
+      font-size: 10px;
+    }
+
+    &__input {
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    &__submit-btn {
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+  }
+}

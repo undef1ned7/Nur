@@ -23,3 +23,11 @@ export const getAgentAnalytics = async (agentId, period = "month") => {
 
   return response.data;
 };
+
+export const getProductionAnalytics = async (params = {}) => {
+  const response = await api.get("/main/owners/analytics/", {
+    params: params,
+  });
+
+  return response.data;
+};

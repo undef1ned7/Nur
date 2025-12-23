@@ -229,6 +229,41 @@
     }
   }
 
+  &__download-btn {
+    width: 100%;
+    padding: 16px;
+    background: #3b82f6;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    &:hover:not(:disabled) {
+      background: #2563eb;
+    }
+
+    &:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    &:focus {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
   &__close-btn {
     width: 100%;
     padding: 16px;
@@ -287,6 +322,11 @@
       font-size: 36px;
     }
 
+    &__download-btn {
+      padding: 14px;
+      font-size: 16px;
+    }
+
     &__close-btn {
       padding: 14px;
       font-size: 16px;
@@ -334,6 +374,11 @@
 
     &__change-value {
       font-size: 32px;
+    }
+
+    &__download-btn {
+      padding: 12px;
+      font-size: 15px;
     }
 
     &__close-btn {

@@ -174,20 +174,28 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   // Карта выбранных материалов
   const recipeMap = useMemo(() => {
     const m = new Map();
-    recipeItems.forEach((it) =>
-      m.set(String(it.materialId), String(it.quantity ?? ""))
-    );
+    recipeItems.forEach((it) => {
+      // Пропускаем элементы с отсутствующими ID
+      if (it.materialId != null) {
+        m.set(String(it.materialId), String(it.quantity ?? ""));
+      }
+    });
     return m;
   }, [recipeItems]);
 
   // Фильтрация сырья
   const filteredMaterials = useMemo(() => {
-    const list = Array.isArray(materials) ? materials : [];
+    // Фильтруем только материалы с валидными ID
+    const list = (Array.isArray(materials) ? materials : []).filter(
+      (m) => m && m.id != null
+    );
     const q = materialQuery.trim().toLowerCase();
     if (!q) return list;
-    return list.filter((m) =>
-      (m.name || m.title || "").toLowerCase().includes(q)
-    );
+    // Фильтруем по имени (даже если имя пустое, материал все равно показывается если нет поиска)
+    return list.filter((m) => {
+      const name = (m.name || m.title || "").toLowerCase();
+      return name.includes(q);
+    });
   }, [materials, materialQuery]);
 
   // Подгрузка в модалке
@@ -240,22 +248,95 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   };
 
   // Рецепт — выбор/изменение/удаление
+  // ВАЖНО: Добавление сырья ВСЕГДА разрешено, независимо от:
+  // - количества сырья на складе (даже если 0)
+  // - количества товара (можно добавить до указания количества)
+  // - недостаточности сырья (показывается предупреждение, но не блокируется)
   const toggleRecipeItem = (materialId) => {
+    // Защита от отсутствия ID
+    if (materialId === null || materialId === undefined || materialId === "") {
+      return;
+    }
+
+    // Всегда используем строковое представление для консистентности
     const key = String(materialId);
     const exists = recipeMap.has(key);
+
     if (exists) {
+      // Удаление из списка
       setRecipeItems((prev) =>
         prev.filter((it) => String(it.materialId) !== key)
       );
     } else {
-      // НОВОЕ: при добавлении сразу ставим количество как у товара
-      const syncedQty = String(product.quantity ?? "");
+      // ДОБАВЛЕНИЕ: всегда разрешено
+      // При добавлении ставим количество как у товара, или "1" если количество товара не указано
+      const syncedQty = String(product.quantity || "1");
+      const material = (Array.isArray(materials) ? materials : []).find(
+        (m) => m && m.id != null && String(m.id) === key
+      );
+
+      // Добавляем сырье (всегда разрешено, даже если материал не найден в списке)
+      // Сохраняем materialId как есть (может быть строкой или UUID), но при сравнении всегда используем строку
       setRecipeItems((prev) => [...prev, { materialId, quantity: syncedQty }]);
+
+      // Предупреждаем, если сырья может быть недостаточно (но НЕ блокируем добавление)
+      if (material) {
+        const availableQty = Number(material.quantity || 0);
+        const requestedQty = Number(syncedQty || 0);
+        const units = Number(product.quantity || 0);
+        const totalNeeded = requestedQty * units;
+
+        // Показываем предупреждение только если:
+        // 1. Количество товара указано (units > 0)
+        // 2. Требуется больше, чем доступно
+        // Но добавление НЕ блокируется!
+        if (units > 0 && totalNeeded > availableQty) {
+          setTimeout(() => {
+            alert(
+              `Внимание: может быть недостаточно сырья "${
+                material.name || material.title || `#${material.id}`
+              }"!\n` +
+                `Доступно: ${availableQty}\n` +
+                `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+                `Вы можете изменить количество сырья в списке выбранных материалов.`
+            );
+          }, 100);
+        }
+      }
     }
   };
 
   const changeRecipeQty = (materialId, qty) => {
+    // Защита от отсутствия ID
+    if (materialId === null || materialId === undefined || materialId === "") {
+      return;
+    }
+
     const key = String(materialId);
+    const material = (Array.isArray(materials) ? materials : []).find(
+      (m) => m && m.id != null && String(m.id) === key
+    );
+
+    // Проверка доступного количества (только если указано количество товара)
+    const availableQty = Number(material?.quantity || 0);
+    const requestedQty = Number(qty || 0);
+    const units = Number(product.quantity || 0);
+    const totalNeeded = requestedQty * units;
+
+    // Блокируем только если количество товара указано и сырья действительно недостаточно
+    if (material && units > 0 && totalNeeded > availableQty) {
+      alert(
+        `Недостаточно сырья "${
+          material.name || material.title || `#${material.id}`
+        }"!\n` +
+          `Доступно: ${availableQty}\n` +
+          `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+          `Пожалуйста, уменьшите количество сырья или количество товара.`
+      );
+      return;
+    }
+
+    // Разрешаем изменение, если количество товара не указано (пользователь может указать позже)
     setRecipeItems((prev) =>
       prev.map((it) =>
         String(it.materialId) === key ? { ...it, quantity: qty } : it
@@ -294,6 +375,37 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       alert("Пожалуйста, заполните все обязательные поля.");
       return false;
     }
+
+    // Проверка количества сырья
+    const units = Number(product.quantity || 0);
+    if (recipeItems.length > 0 && units > 0) {
+      for (const recipeItem of recipeItems) {
+        const material = (Array.isArray(materials) ? materials : []).find(
+          (m) => String(m.id) === String(recipeItem.materialId)
+        );
+
+        if (!material) {
+          alert(`Сырьё с ID ${recipeItem.materialId} не найдено.`);
+          return false;
+        }
+
+        const availableQty = Number(material.quantity || 0);
+        const requestedQty = Number(recipeItem.quantity || 0);
+        const totalNeeded = requestedQty * units;
+
+        if (totalNeeded > availableQty) {
+          alert(
+            `Недостаточно сырья "${
+              material.name || material.title || `#${material.id}`
+            }"!\n` +
+              `Доступно: ${availableQty}\n` +
+              `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)`
+          );
+          return false;
+        }
+      }
+    }
+
     return true;
   };
 
@@ -889,54 +1001,130 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                 padding: 8,
               }}
             >
-              {filteredMaterials?.map((m) => {
-                const checked = recipeMap.has(String(m.id));
-                const qty = recipeMap.get(String(m.id)) ?? "";
+              {
+                filteredMaterials
+                  ?.filter((m) => {
+                    // Фильтруем только материалы с валидными ID
+                    if (!m || m.id == null || m.id === "") {
+                      return false;
+                    }
+                    return true;
+                  })
+                  .map((m) => {
+                    try {
+                      const materialId = m.id;
+                      const materialKey = String(materialId);
+                      const checked = recipeMap.has(materialKey);
+                      const qty = recipeMap.get(materialKey) ?? "";
+                      const availableQty = Number(m.quantity || 0);
+                      const requestedQty = Number(qty || 0);
+                      const units = Number(product.quantity || 0);
+                      const totalNeeded = requestedQty * units;
+                      const isInsufficient =
+                        checked && totalNeeded > availableQty;
 
-                return (
-                  <div
-                    key={m.id}
-                    className="select-materials__item"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "auto 1fr 160px",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 4px",
-                    }}
-                  >
-                    <Checkbox
-                      icon={<CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />}
-                      checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
-                      checked={checked}
-                      onChange={() => toggleRecipeItem(m.id)}
-                      sx={{
-                        color: "#000",
-                        "&.Mui-checked": { color: "#f9cf00" },
-                      }}
-                    />
-                    <p
-                      title={m.name ?? m.title ?? `#${m.id}`}
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {m.name ?? m.title ?? `#${m.id}`}
-                    </p>
-                    <TextField
-                      size="small"
-                      placeholder="Кол-во"
-                      type="number"
-                      inputProps={{ step: "0.0001", min: "0" }}
-                      disabled={!checked}
-                      value={qty}
-                      onChange={(e) => changeRecipeQty(m.id, e.target.value)}
-                    />
-                  </div>
-                );
-              })}
+                      return (
+                        <div
+                          key={materialId}
+                          className="select-materials__item"
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "auto 1fr 160px",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "6px 4px",
+                            backgroundColor: isInsufficient
+                              ? "#ffebee"
+                              : "transparent",
+                          }}
+                        >
+                          <Checkbox
+                            icon={
+                              <CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />
+                            }
+                            checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
+                            checked={checked}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleRecipeItem(materialId);
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                            sx={{
+                              color: "#000",
+                              "&.Mui-checked": { color: "#f9cf00" },
+                            }}
+                          />
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                            }}
+                          >
+                            <p
+                              title={m.name || m.title || `#${materialId}`}
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                margin: 0,
+                              }}
+                            >
+                              {m.name || m.title || `#${materialId}`}
+                            </p>
+                            <small
+                              style={{
+                                fontSize: "11px",
+                                opacity: 0.7,
+                                color: isInsufficient ? "#d32f2f" : "inherit",
+                              }}
+                            >
+                              Доступно: {availableQty}
+                              {checked && units > 0 && (
+                                <span
+                                  style={{
+                                    color: isInsufficient ? "#d32f2f" : "#666",
+                                  }}
+                                >
+                                  {" "}
+                                  | Нужно: {totalNeeded}
+                                  {isInsufficient && " ⚠️"}
+                                </span>
+                              )}
+                            </small>
+                          </div>
+                          <TextField
+                            size="small"
+                            placeholder="Кол-во"
+                            type="number"
+                            inputProps={{
+                              step: "0.0001",
+                              min: "0",
+                              max: units > 0 ? availableQty / units : undefined,
+                            }}
+                            disabled={!checked}
+                            value={qty}
+                            onChange={(e) =>
+                              changeRecipeQty(materialId, e.target.value)
+                            }
+                            error={isInsufficient}
+                            helperText={
+                              isInsufficient
+                                ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
+                                : ""
+                            }
+                          />
+                        </div>
+                      );
+                    } catch (error) {
+                      // Пропускаем проблемный материал, но не блокируем остальные
+                      return null;
+                    }
+                  })
+                  .filter((item) => item !== null) // Удаляем null элементы
+              }
 
               {(!filteredMaterials || filteredMaterials.length === 0) &&
                 !materialsLoading && (
@@ -956,6 +1144,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                 const mat = (Array.isArray(materials) ? materials : []).find(
                   (m) => String(m.id) === String(it.materialId)
                 );
+                const availableQty = Number(mat?.quantity || 0);
+                const requestedQty = Number(it.quantity || 0);
+                const units = Number(product.quantity || 0);
+                const totalNeeded = requestedQty * units;
+                const isInsufficient = totalNeeded > availableQty;
+
                 return (
                   <div
                     key={it.materialId}
@@ -967,29 +1161,77 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                       gap: 8,
                       padding: "6px 0",
                       borderBottom: "1px dashed var(--border,#444)",
+                      backgroundColor: isInsufficient
+                        ? "#ffebee"
+                        : "transparent",
                     }}
                   >
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                      }}
                     >
-                      <Checkbox
-                        checked
-                        onChange={() => removeRecipeItem(it.materialId)}
-                        sx={{
-                          color: "#000",
-                          "&.Mui-checked": { color: "#f9cf00" },
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
                         }}
-                      />
-                      <p>{mat?.name ?? mat?.title ?? `ID ${it.materialId}`}</p>
+                      >
+                        <Checkbox
+                          checked
+                          onChange={() => removeRecipeItem(it.materialId)}
+                          sx={{
+                            color: "#000",
+                            "&.Mui-checked": { color: "#f9cf00" },
+                          }}
+                        />
+                        <p style={{ margin: 0 }}>
+                          {mat?.name ?? mat?.title ?? `ID ${it.materialId}`}
+                        </p>
+                      </div>
+                      <small
+                        style={{
+                          fontSize: "11px",
+                          opacity: 0.7,
+                          color: isInsufficient ? "#d32f2f" : "inherit",
+                          marginLeft: "40px",
+                        }}
+                      >
+                        Доступно: {availableQty}
+                        {units > 0 && (
+                          <span
+                            style={{
+                              color: isInsufficient ? "#d32f2f" : "#666",
+                            }}
+                          >
+                            {" "}
+                            | Нужно: {totalNeeded}
+                            {isInsufficient && " ⚠️ Недостаточно!"}
+                          </span>
+                        )}
+                      </small>
                     </div>
                     <TextField
                       size="small"
                       placeholder="Кол-во"
                       type="number"
-                      inputProps={{ step: "0.0001", min: "0" }}
+                      inputProps={{
+                        step: "0.0001",
+                        min: "0",
+                        max: availableQty / (units || 1),
+                      }}
                       value={it.quantity}
                       onChange={(e) =>
                         changeRecipeQty(it.materialId, e.target.value)
+                      }
+                      error={isInsufficient}
+                      helperText={
+                        isInsufficient
+                          ? `Нужно ${totalNeeded}, есть ${availableQty}`
+                          : ""
                       }
                     />
                     <button

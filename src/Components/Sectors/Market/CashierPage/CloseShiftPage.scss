@@ -225,3 +225,464 @@
     color: #ef4444;
   }
 }
+
+// Адаптивные стили для устройств с маленькой высотой экрана
+@media (max-height: 850px) {
+  .close-shift-page {
+    &__header {
+      padding: 12px 20px;
+      flex-shrink: 0;
+    }
+
+    &__content {
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__content {
+      padding: 16px 24px;
+      align-items: flex-start;
+      // justify-content: flex-start;
+      overflow-y: auto;
+    }
+
+    &__card {
+      padding: 20px;
+      gap: 16px;
+    }
+
+    &__icon {
+      width: 56px;
+      height: 56px;
+
+      svg {
+        width: 28px;
+        height: 28px;
+      }
+    }
+
+    &__card-title {
+      font-size: 18px;
+    }
+
+    &__info-section {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    &__info-label {
+      font-size: 12px;
+    }
+
+    &__info-value {
+      font-size: 14px;
+    }
+
+    &__input-wrapper {
+      gap: 6px;
+    }
+
+    &__label {
+      font-size: 12px;
+    }
+
+    &__input {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+
+    &__diff-section {
+      padding: 12px;
+      gap: 8px;
+    }
+
+    &__diff-label {
+      font-size: 12px;
+    }
+
+    &__diff-value {
+      font-size: 20px;
+      padding: 10px 16px;
+      gap: 6px;
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    &__submit-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+  }
+}
+
+// Адаптивные стили
+@media (max-width: 768px) {
+  .close-shift-page {
+    &__header {
+      padding: 16px 20px;
+    }
+
+    &__title {
+      font-size: 20px;
+    }
+
+    &__content {
+      padding: 24px 16px;
+      align-items: flex-start;
+      justify-content: flex-start;
+      overflow-y: auto;
+    }
+
+    &__card {
+      max-width: 100%;
+      padding: 24px 20px;
+      gap: 20px;
+      border-radius: 12px;
+    }
+
+    &__icon {
+      width: 64px;
+      height: 64px;
+
+      svg {
+        width: 32px;
+        height: 32px;
+      }
+    }
+
+    &__card-title {
+      font-size: 20px;
+    }
+
+    &__info-section {
+      padding: 16px;
+      gap: 12px;
+    }
+
+    &__info-label {
+      font-size: 13px;
+    }
+
+    &__info-value {
+      font-size: 15px;
+    }
+
+    &__input-wrapper {
+      gap: 6px;
+    }
+
+    &__label {
+      font-size: 13px;
+    }
+
+    &__input {
+      padding: 10px 14px;
+      font-size: 15px;
+    }
+
+    &__diff-section {
+      padding: 16px;
+      gap: 10px;
+    }
+
+    &__diff-label {
+      font-size: 13px;
+    }
+
+    &__diff-value {
+      font-size: 24px;
+      padding: 12px 20px;
+      gap: 6px;
+
+      svg {
+        width: 18px;
+        height: 18px;
+      }
+    }
+
+    &__submit-btn {
+      padding: 12px 20px;
+      font-size: 15px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .close-shift-page {
+    &__header {
+      padding: 12px 16px;
+    }
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__back-btn {
+      width: 36px;
+      height: 36px;
+    }
+
+    &__content {
+      padding: 16px 12px;
+    }
+
+    &__card {
+      padding: 20px 16px;
+      gap: 16px;
+      border-radius: 10px;
+    }
+
+    &__icon {
+      width: 56px;
+      height: 56px;
+
+      svg {
+        width: 28px;
+        height: 28px;
+      }
+    }
+
+    &__card-title {
+      font-size: 18px;
+    }
+
+    &__info-section {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    &__info-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    &__info-label {
+      font-size: 12px;
+    }
+
+    &__info-value {
+      font-size: 14px;
+    }
+
+    &__label {
+      font-size: 12px;
+    }
+
+    &__input {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    &__diff-section {
+      padding: 12px;
+    }
+
+    &__diff-label {
+      font-size: 12px;
+    }
+
+    &__diff-value {
+      font-size: 20px;
+      padding: 10px 16px;
+      flex-direction: column;
+      gap: 4px;
+
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    &__submit-btn {
+      padding: 12px 16px;
+      font-size: 14px;
+    }
+  }
+}
+
+// Комбинированные медиа-запросы для маленьких экранов (ширина и высота)
+@media (max-width: 768px) and (max-height: 850px) {
+  .close-shift-page {
+    &__header {
+      padding: 10px 16px;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__content {
+      padding: 12px 16px;
+    }
+
+    &__card {
+      padding: 16px;
+      gap: 12px;
+    }
+
+    &__icon {
+      width: 48px;
+      height: 48px;
+
+      svg {
+        width: 24px;
+        height: 24px;
+      }
+    }
+
+    &__card-title {
+      font-size: 16px;
+    }
+
+    &__info-section {
+      padding: 10px;
+      gap: 8px;
+    }
+
+    &__diff-section {
+      padding: 10px;
+    }
+
+    &__diff-value {
+      font-size: 18px;
+      padding: 8px 12px;
+    }
+  }
+}
+
+// Для очень маленькой высоты (ландшафтный режим на мобильных)
+@media (max-height: 500px) {
+  .close-shift-page {
+    &__header {
+      padding: 8px 16px;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__content {
+      padding: 8px 16px;
+    }
+
+    &__card {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    &__icon {
+      width: 40px;
+      height: 40px;
+
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    &__card-title {
+      font-size: 16px;
+    }
+
+    &__info-section {
+      padding: 8px;
+      gap: 6px;
+    }
+
+    &__info-label {
+      font-size: 11px;
+    }
+
+    &__info-value {
+      font-size: 12px;
+    }
+
+    &__input {
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    &__diff-section {
+      padding: 8px;
+    }
+
+    &__diff-value {
+      font-size: 16px;
+      padding: 6px 10px;
+    }
+
+    &__submit-btn {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+  }
+}
+
+@media (max-width: 480px) and (max-height: 850px) {
+  .close-shift-page {
+    &__header {
+      padding: 8px 12px;
+    }
+
+    &__title {
+      font-size: 14px;
+    }
+
+    &__content {
+      padding: 8px 12px;
+    }
+
+    &__card {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    &__icon {
+      width: 40px;
+      height: 40px;
+
+      svg {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    &__card-title {
+      font-size: 14px;
+    }
+
+    &__info-section {
+      padding: 8px;
+      gap: 6px;
+    }
+
+    &__info-label,
+    &__info-value {
+      font-size: 11px;
+    }
+
+    &__input {
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    &__diff-value {
+      font-size: 16px;
+      padding: 6px 10px;
+    }
+
+    &__submit-btn {
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+  }
+}

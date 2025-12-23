@@ -48,10 +48,10 @@ export const startSale = createAsyncThunk(
 
 export const updateSale = createAsyncThunk(
   "sale/update",
-  async (_, { rejectWithValue }) => {
+  async ({ id, data }, { rejectWithValue }) => {
     try {
-      const { data } = await api.get(`/main/pos/sales/start/`);
-      return data;
+      const { data: response } = await api.patch(`/main/pos/sales/${id}/`, data);
+      return response;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }

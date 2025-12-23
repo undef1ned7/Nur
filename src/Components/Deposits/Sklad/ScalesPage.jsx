@@ -12,7 +12,11 @@ import "./ScalesPage.scss";
  */
 const ScalesPage = () => {
   const dispatch = useDispatch();
-  const { list: products, loading } = useSelector((state) => state.product);
+  const {
+    list: products,
+    loading,
+    count,
+  } = useSelector((state) => state.product);
   const [isSending, setIsSending] = useState(false);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [showErrorAlert, setShowErrorAlert] = useState(false);
@@ -36,7 +40,7 @@ const ScalesPage = () => {
 
       await dispatch(sendProductsToScales(payload)).unwrap();
 
-      const productCount = products.length;
+      const productCount = count || 0;
       const productText =
         productCount === 1 ? "товар" : productCount < 5 ? "товара" : "товаров";
 
@@ -81,7 +85,7 @@ const ScalesPage = () => {
                 <div className="scales-page__stat-label">
                   Товаров для выгрузки
                 </div>
-                <div className="scales-page__stat-value">{products.length}</div>
+                <div className="scales-page__stat-value">{count || 0}</div>
               </div>
             </div>
 
@@ -89,7 +93,7 @@ const ScalesPage = () => {
               type="button"
               className="scales-page__send-btn"
               onClick={handleSendAllToScales}
-              disabled={loading || isSending || products.length === 0}
+              disabled={loading || isSending || (count || 0) === 0}
             >
               {isSending ? "Отправка..." : "Отправить все товары на весы"}
             </button>

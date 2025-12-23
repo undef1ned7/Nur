@@ -215,7 +215,7 @@ const SECTOR_ACCESS_TYPES = {
   ],
 
   Производство: [
-    { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
+    { value: "Передача", label: "Передача", backendKey: "can_view_agent" },
     { value: "Каталог", label: "Каталог", backendKey: "can_view_catalog" },
     { value: "Запросы", label: "Запросы", backendKey: "can_view_request" },
   ],

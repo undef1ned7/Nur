@@ -518,8 +518,16 @@ const CashierPage = () => {
   const filteredProducts = products;
 
   // Расчет пагинации
-  const pageSize = products.length || 1;
-  const totalPages = count && pageSize ? Math.ceil(count / pageSize) : 1;
+  // Используем фиксированный размер страницы
+  // Если есть next или previous, значит есть еще страницы
+  const PAGE_SIZE = 100; // Размер страницы для API
+  const hasNextPage = !!next;
+  const hasPrevPage = !!previous;
+  
+  // Если есть следующая страница, значит текущая не последняя
+  // Если есть предыдущая страница, значит текущая не первая
+  // Рассчитываем общее количество страниц на основе count и размера страницы
+  const totalPages = count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1;
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || (totalPages && newPage > totalPages)) return;

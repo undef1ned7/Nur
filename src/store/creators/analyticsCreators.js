@@ -1,5 +1,9 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { getOrderAnalytics, getAgentAnalytics } from "../../api/analytics";
+import {
+  getOrderAnalytics,
+  getAgentAnalytics,
+  getProductionAnalytics,
+} from "../../api/analytics";
 
 export const fetchOrderAnalytics = createAsyncThunk(
   "orderAnalytics/fetchOrderAnalytics",
@@ -21,6 +25,25 @@ export const fetchAgentAnalytics = createAsyncThunk(
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+export const fetchProductionAnalytics = createAsyncThunk(
+  "orderAnalytics/fetchProductionAnalytics",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const data = await getProductionAnalytics(params);
+      return data;
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.message ||
+        "Не удалось загрузить аналитику производства";
+      return rejectWithValue({
+        message: errorMessage,
+        status: error.response?.status,
+      });
     }
   }
 );
