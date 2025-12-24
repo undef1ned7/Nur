@@ -129,12 +129,14 @@ const s = StyleSheet.create({
   tableCellLast: {
     borderRightWidth: 0,
   },
-  colNo: { width: "5%" },
-  colName: { width: "35%" },
-  colUnit: { width: "10%" },
-  colQty: { width: "10%", textAlign: "right" },
-  colPrice: { width: "15%", textAlign: "right" },
-  colSum: { width: "15%", textAlign: "right" },
+  colNo: { width: "4%" },
+  colName: { width: "25%" },
+  colUnit: { width: "8%" },
+  colQty: { width: "8%", textAlign: "right" },
+  colPriceNoDiscount: { width: "12%", textAlign: "right" },
+  colDiscount: { width: "8%", textAlign: "right" },
+  colPrice: { width: "12%", textAlign: "right" },
+  colSum: { width: "13%", textAlign: "right" },
 
   // Итоги
   totalsSection: {
@@ -357,28 +359,95 @@ export default function InvoicePdfDocument({ data }) {
   const seller = data?.seller || {};
   const buyer = data?.buyer || null;
 
+  const totals = data?.totals || {};
+  const subtotal = Number(totals.subtotal || 0);
+  const discountTotal = Number(totals.discount_total || 0);
+  const tax = Number(totals.tax_total || 0);
+  const total = Number(totals.total || 0);
+
+  // Скидка на уровне документа (может быть в процентах или абсолютном значении)
+  const documentDiscount = Number(
+    doc.order_discount_total ??
+      doc.discount_total ??
+      doc.discount_percent ??
+      data.order_discount_total ??
+      0
+  );
+
+  // Вычисляем процент скидки документа, если он не указан напрямую
+  let documentDiscountPercent = 0;
+  if (documentDiscount > 0 && subtotal > 0) {
+    // Если скидка больше 100, считаем её абсолютным значением
+    if (documentDiscount > 100) {
+      documentDiscountPercent = (documentDiscount / subtotal) * 100;
+    } else {
+      documentDiscountPercent = documentDiscount;
+    }
+  }
+
   // Поддержка обоих форматов: unit_price (API) и price (если где-то уже нормализовали)
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
         const qty = Number(it.qty || it.quantity || 0);
         const unit = Number(it.unit_price ?? it.price ?? 0);
         const total = Number(it.total ?? qty * unit);
+
+        // Скидка на уровне товара (если есть) - используем discount_percent в процентах
+        const itemDiscountPercent = Number(it.discount_percent ?? 0);
+
+        // Цена без скидки товара (если есть original_price или price_before_discount)
+        let priceNoDiscount = Number(
+          it.original_price ??
+            it.price_before_discount ??
+            it.price_without_discount ??
+            0
+        );
+
+        // Если цена без скидки не указана, вычисляем её из текущей цены и скидок
+        if (priceNoDiscount === 0 || priceNoDiscount === unit) {
+          // Если есть скидка на товар, вычисляем цену без скидки товара
+          if (itemDiscountPercent > 0) {
+            priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
+          } else if (documentDiscountPercent > 0) {
+            // Если есть скидка на документ, вычисляем цену без скидки документа
+            priceNoDiscount = unit / (1 - documentDiscountPercent / 100);
+          } else {
+            // Если скидок нет, цена без скидки = текущая цена
+            priceNoDiscount = unit;
+          }
+        }
+
+        // Общая скидка для товара (скидка товара + скидка документа)
+        let finalDiscountPercent = itemDiscountPercent;
+        if (documentDiscountPercent > 0 && itemDiscountPercent === 0) {
+          // Если есть только скидка документа, используем её
+          finalDiscountPercent = documentDiscountPercent;
+        } else if (documentDiscountPercent > 0 && itemDiscountPercent > 0) {
+          // Если есть обе скидки, вычисляем общую эффективную скидку
+          const itemPriceBeforeDiscount = priceNoDiscount;
+          const itemPriceAfterItemDiscount =
+            itemPriceBeforeDiscount * (1 - itemDiscountPercent / 100);
+          const itemPriceAfterDocumentDiscount =
+            itemPriceAfterItemDiscount * (1 - documentDiscountPercent / 100);
+          finalDiscountPercent =
+            ((itemPriceBeforeDiscount - itemPriceAfterDocumentDiscount) /
+              itemPriceBeforeDiscount) *
+            100;
+        }
+
         return {
           id: it.id,
           name: it.name || it.product_name || "Товар",
           qty,
           unit_price: unit,
+          price_no_discount: priceNoDiscount,
+          discount: finalDiscountPercent,
           total,
           unit: it.unit || "ШТ",
+          article: it.article || "",
         };
       })
     : [];
-
-  const totals = data?.totals || {};
-  const subtotal = Number(totals.subtotal || 0);
-  const discount = Number(totals.discount_total || 0);
-  const tax = Number(totals.tax_total || 0);
-  const total = Number(totals.total || 0);
 
   const invoiceNumber = doc.number || "";
   const invoiceDate = doc.datetime || doc.date || "";
@@ -414,38 +483,41 @@ export default function InvoicePdfDocument({ data }) {
         </View>
 
         {/* Автор */}
-        {seller?.name && (
+        {/* {seller?.name && (
           <Text style={{ fontSize: 9, textAlign: "right", marginBottom: 12 }}>
             Автор: {safe(seller.name)}
           </Text>
-        )}
+        )} */}
 
         {/* Поставщик и Покупатель */}
-        <View style={s.partiesRow}>
-          <View style={s.partyBox}>
-            <Text style={s.partyTitle}>Поставщик</Text>
-            <View style={s.partyField}>
-              <Text style={s.partyValue}>{safe(seller.name)}</Text>
-            </View>
+        <View
+          style={{
+            flexDirection: "column",
+            gap: 8,
+            marginTop: 12,
+            marginBottom: 12,
+          }}
+        >
+          <View style={{ flexDirection: "row", fontSize: 10 }}>
+            <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+              Поставщик:{" "}
+            </Text>
+            <Text style={{ fontSize: 10 }}>{safe(seller.name)}</Text>
             {seller.address && (
-              <View style={s.partyField}>
-                <Text style={s.partyValue}>{safe(seller.address)}</Text>
-              </View>
+              <Text style={{ fontSize: 10 }}> {safe(seller.address)}</Text>
             )}
           </View>
 
-          <View style={s.partyBox}>
-            <Text style={s.partyTitle}>Покупатель</Text>
+          <View style={{ flexDirection: "row", fontSize: 10 }}>
+            <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+              Покупатель:{" "}
+            </Text>
             {buyer ? (
-              <View style={s.partyField}>
-                <Text style={s.partyValue}>
-                  {safe(buyer.name || buyer.full_name)}
-                </Text>
-              </View>
+              <Text style={{ fontSize: 10 }}>
+                {safe(buyer.name || buyer.full_name)}
+              </Text>
             ) : (
-              <View style={s.partyField}>
-                <Text style={s.partyValue}>—</Text>
-              </View>
+              <Text style={{ fontSize: 10 }}>—</Text>
             )}
           </View>
         </View>
@@ -467,7 +539,7 @@ export default function InvoicePdfDocument({ data }) {
             <View style={[s.tableCell, s.colName]}>
               <Text>Наименование</Text>
             </View>
-            <View style={[s.tableCell, { width: "10%" }]}>
+            <View style={[s.tableCell, { width: "8%" }]}>
               <Text>Арт.</Text>
             </View>
             <View style={[s.tableCell, s.colUnit]}>
@@ -475,6 +547,12 @@ export default function InvoicePdfDocument({ data }) {
             </View>
             <View style={[s.tableCell, s.colQty]}>
               <Text style={{ textAlign: "right" }}>Кол-во</Text>
+            </View>
+            <View style={[s.tableCell, s.colPriceNoDiscount]}>
+              <Text style={{ textAlign: "right" }}>Цена без скидки</Text>
+            </View>
+            <View style={[s.tableCell, s.colDiscount]}>
+              <Text style={{ textAlign: "right" }}>Скидка</Text>
             </View>
             <View style={[s.tableCell, s.colPrice]}>
               <Text style={{ textAlign: "right" }}>Цена</Text>
@@ -493,14 +571,24 @@ export default function InvoicePdfDocument({ data }) {
               <View style={[s.tableCell, s.colName]}>
                 <Text>{it.name}</Text>
               </View>
-              <View style={[s.tableCell, { width: "10%" }]}>
-                <Text>—</Text>
+              <View style={[s.tableCell, { width: "8%" }]}>
+                <Text>{it.article || "—"}</Text>
               </View>
               <View style={[s.tableCell, s.colUnit]}>
-                <Text>{it.unit || "ШТ"}</Text>
+                <Text style={{ textAlign: "right" }}>{it.unit || "ШТ"}</Text>
               </View>
               <View style={[s.tableCell, s.colQty]}>
                 <Text style={{ textAlign: "right" }}>{n2(it.qty)}</Text>
+              </View>
+              <View style={[s.tableCell, s.colPriceNoDiscount]}>
+                <Text style={{ textAlign: "right" }}>
+                  {n2(it.price_no_discount)}
+                </Text>
+              </View>
+              <View style={[s.tableCell, s.colDiscount]}>
+                <Text style={{ textAlign: "right" }}>
+                  {it.discount > 0 ? `${n2(it.discount)}%` : "—"}
+                </Text>
               </View>
               <View style={[s.tableCell, s.colPrice]}>
                 <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
@@ -519,7 +607,7 @@ export default function InvoicePdfDocument({ data }) {
             <View style={[s.tableCell, s.colName]}>
               <Text style={{ fontWeight: "bold" }}>Итого:</Text>
             </View>
-            <View style={[s.tableCell, { width: "10%" }]}>
+            <View style={[s.tableCell, { width: "8%" }]}>
               <Text></Text>
             </View>
             <View style={[s.tableCell, s.colUnit]}>
@@ -529,6 +617,12 @@ export default function InvoicePdfDocument({ data }) {
               <Text style={{ textAlign: "right", fontWeight: "bold" }}>
                 {n2(items.reduce((sum, it) => sum + Number(it.qty || 0), 0))}
               </Text>
+            </View>
+            <View style={[s.tableCell, s.colPriceNoDiscount]}>
+              <Text></Text>
+            </View>
+            <View style={[s.tableCell, s.colDiscount]}>
+              <Text></Text>
             </View>
             <View style={[s.tableCell, s.colPrice]}>
               <Text></Text>

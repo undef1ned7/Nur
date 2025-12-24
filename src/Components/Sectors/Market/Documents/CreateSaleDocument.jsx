@@ -231,6 +231,7 @@ const CreateSaleDocument = () => {
           unit: product.unit || "шт",
           discount: 0,
           discount_percent: 0,
+          article: product.article || "",
         };
         setCartItems((prev) => [...prev, newItem]);
       }
@@ -321,6 +322,8 @@ const CreateSaleDocument = () => {
           unit_price: String(itemPrice.toFixed(2)),
           total: String(itemTotal.toFixed(2)),
           unit: item.unit || "ШТ",
+          article: item.article || "",
+          discount_percent: itemDiscount,
         };
       });
 
@@ -716,7 +719,7 @@ const CreateSaleDocument = () => {
                               <td>{item.unit || "шт"}</td>
                               <td>
                                 <input
-                                  type="number"
+                                  type="text"
                                   min="0"
                                   value={itemQuantity}
                                   onChange={(e) =>

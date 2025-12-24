@@ -1,6 +1,13 @@
 // src/pages/Warehouse/FinishedGoods/FinishedGoods.jsx
-import { MoreVertical, Plus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  MoreVertical,
+  Plus,
+  X,
+  Search,
+  LayoutGrid,
+  Table2,
+} from "lucide-react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 /* ---- Thunks / Creators ---- */
@@ -2025,14 +2032,18 @@ const TransferProductModal = ({
   // Проверяем, что товар существует и есть в наличии
   if (!item) {
     return (
-      <div className="add-modal">
-        <div className="add-modal__overlay" onClick={onClose} />
-        <div className="add-modal__content">
-          <div className="add-modal__header">
+      <div className="finished-goods-modal">
+        <div className="finished-goods-modal__overlay" onClick={onClose} />
+        <div className="finished-goods-modal__content">
+          <div className="finished-goods-modal__header">
             <h3>Ошибка</h3>
-            <X className="add-modal__close-icon" size={20} onClick={onClose} />
+            <X
+              className="finished-goods-modal__close-icon"
+              size={20}
+              onClick={onClose}
+            />
           </div>
-          <p className="add-modal__error-message">
+          <p className="finished-goods-modal__error-message">
             Товар не найден или недоступен для передачи
           </p>
         </div>
@@ -2109,31 +2120,36 @@ const TransferProductModal = ({
   };
 
   return (
-    <div className="add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content">
-        <div className="add-modal__header">
+    <div className="finished-goods-modal">
+      <div className="finished-goods-modal__overlay" onClick={onClose} />
+      <div className="finished-goods-modal__content">
+        <div className="finished-goods-modal__header">
           <h3>Передать товар</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+          <X
+            className="finished-goods-modal__close-icon"
+            size={20}
+            onClick={onClose}
+          />
         </div>
 
         {createError && (
-          <p className="add-modal__error-message">
+          <p className="finished-goods-modal__error-message">
             Ошибка создания передачи: {createError?.message || "ошибка"}
           </p>
         )}
         {validationError && (
-          <p className="add-modal__error-message">{validationError}</p>
+          <p className="finished-goods-modal__error-message">
+            {validationError}
+          </p>
         )}
 
         <form onSubmit={handleSubmit}>
           <div className="finished-goods-add-modal__section">
             <label>Агент *</label>
             <select
-              style={{ width: "100%" }}
+              className="finished-goods-add-modal__input"
               onChange={onChange}
               name="agent"
-              className="debt__input"
               value={state.agent}
               required
             >
@@ -2149,66 +2165,52 @@ const TransferProductModal = ({
           </div>
 
           <div className="finished-goods-add-modal__section">
-            <h4>Выбор товаров для передачи</h4>
+            <h4
+              style={{
+                margin: "0 0 16px 0",
+                fontSize: "18px",
+                fontWeight: "600",
+                color: "var(--text)",
+              }}
+            >
+              Выбор товаров для передачи
+            </h4>
 
             {/* Поиск товаров */}
-            <div style={{ marginBottom: "15px" }}>
+            <div className="finished-goods-modal__search-wrapper">
               <input
                 type="text"
                 placeholder="Поиск товаров..."
                 className="finished-goods-add-modal__input"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ width: "100%" }}
               />
             </div>
 
             {/* Список доступных товаров */}
-            <div
-              style={{
-                maxHeight: "200px",
-                overflow: "auto",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                padding: "10px",
-              }}
-            >
+            <div className="finished-goods-modal__products-list">
               {filteredProducts.map((product) => (
                 <div
                   key={product.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "8px 0",
-                    borderBottom: "1px solid #eee",
-                  }}
+                  className="finished-goods-modal__product-item"
                 >
-                  <div>
+                  <div className="finished-goods-modal__product-info">
                     <strong>{product.name}</strong>
-                    <br />
                     <small>Доступно: {product.quantity}</small>
                   </div>
                   <button
                     type="button"
+                    className={`finished-goods-modal__add-product-btn ${
+                      selectedProducts.find((p) => p.id === product.id) ||
+                      product.quantity <= 0
+                        ? "finished-goods-modal__add-product-btn--disabled"
+                        : ""
+                    }`}
                     onClick={() => addProductToTransfer(product)}
                     disabled={
                       selectedProducts.find((p) => p.id === product.id) ||
                       product.quantity <= 0
                     }
-                    style={{
-                      padding: "5px 10px",
-                      background: selectedProducts.find(
-                        (p) => p.id === product.id
-                      )
-                        ? "#ccc"
-                        : "#f9cf00",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: selectedProducts.find((p) => p.id === product.id)
-                        ? "not-allowed"
-                        : "pointer",
-                    }}
                   >
                     {selectedProducts.find((p) => p.id === product.id)
                       ? "Добавлен"
@@ -2220,31 +2222,18 @@ const TransferProductModal = ({
 
             {/* Выбранные товары */}
             {selectedProducts.length > 0 && (
-              <div style={{ marginTop: "15px" }}>
+              <div className="finished-goods-modal__selected-products">
                 <h5>Выбранные товары:</h5>
                 {selectedProducts.map((product) => (
                   <div
                     key={product.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "8px 0",
-                      borderBottom: "1px solid #eee",
-                    }}
+                    className="finished-goods-modal__selected-item"
                   >
-                    <div>
+                    <div className="finished-goods-modal__product-info">
                       <strong>{product.name}</strong>
-                      <br />
                       <small>Доступно: {product.quantity}</small>
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
+                    <div className="finished-goods-modal__selected-controls">
                       <input
                         type="number"
                         min="1"
@@ -2253,19 +2242,12 @@ const TransferProductModal = ({
                         onChange={(e) =>
                           updateProductQuantity(product.id, e.target.value)
                         }
-                        style={{ width: "80px", padding: "5px" }}
+                        className="finished-goods-modal__quantity-input"
                       />
                       <button
                         type="button"
+                        className="finished-goods-modal__remove-btn"
                         onClick={() => removeProductFromTransfer(product.id)}
-                        style={{
-                          padding: "5px 10px",
-                          background: "#ff4444",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                        }}
                       >
                         Удалить
                       </button>
@@ -2277,12 +2259,7 @@ const TransferProductModal = ({
           </div>
 
           <button
-            style={{
-              marginTop: 15,
-              width: "100%",
-              justifyContent: "center",
-            }}
-            className="btn edit-btn"
+            className="finished-goods-modal__submit-btn"
             type="submit"
             disabled={creating}
           >
@@ -2327,14 +2304,18 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
   // Проверяем, что товар существует
   if (!item) {
     return (
-      <div className="add-modal">
-        <div className="add-modal__overlay" onClick={onClose} />
-        <div className="add-modal__content" style={{ height: "auto" }}>
-          <div className="add-modal__header">
+      <div className="finished-goods-modal">
+        <div className="finished-goods-modal__overlay" onClick={onClose} />
+        <div className="finished-goods-modal__content">
+          <div className="finished-goods-modal__header">
             <h3>Ошибка</h3>
-            <X className="add-modal__close-icon" size={20} onClick={onClose} />
+            <X
+              className="finished-goods-modal__close-icon"
+              size={20}
+              onClick={onClose}
+            />
           </div>
-          <p className="add-modal__error-message">
+          <p className="finished-goods-modal__error-message">
             Товар не найден или недоступен для приёмки
           </p>
         </div>
@@ -2422,32 +2403,37 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
   };
 
   return (
-    <div className="add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ height: "auto" }}>
-        <div className="add-modal__header">
+    <div className="finished-goods-modal">
+      <div className="finished-goods-modal__overlay" onClick={onClose} />
+      <div className="finished-goods-modal__content">
+        <div className="finished-goods-modal__header">
           <h3>Принять товар</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+          <X
+            className="finished-goods-modal__close-icon"
+            size={20}
+            onClick={onClose}
+          />
         </div>
 
         {acceptInlineError && (
-          <p className="add-modal__error-message">
+          <p className="finished-goods-modal__error-message">
             Ошибка приёмки: {acceptInlineError?.message || "ошибка"}
           </p>
         )}
 
         {validationError && (
-          <p className="add-modal__error-message">{validationError}</p>
+          <p className="finished-goods-modal__error-message">
+            {validationError}
+          </p>
         )}
 
         <form onSubmit={handleSubmit}>
           <div className="finished-goods-add-modal__section">
             <label>Агент *</label>
             <select
-              style={{ marginTop: 15, width: "100%" }}
+              className="finished-goods-add-modal__input"
               onChange={onChange}
               name="agent_id"
-              className="debt__input"
               value={state.agent_id}
               required
             >
@@ -2465,10 +2451,9 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
           <div className="finished-goods-add-modal__section">
             <label>Касса *</label>
             <select
-              style={{ marginTop: 15, width: "100%" }}
+              className="finished-goods-add-modal__input"
               onChange={(e) => setSelectedCashBox(e.target.value)}
               name="cashbox_id"
-              className="debt__input"
               value={selectedCashBox}
               required
             >
@@ -2485,11 +2470,11 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
 
           <div className="finished-goods-add-modal__section">
             <h4>Товар: {item?.name}</h4>
-            <p style={{ opacity: 0.7, margin: "5px 0" }}>
+            <p className="finished-goods-modal__info-text">
               Текущее количество на складе:{" "}
               <strong>{item?.quantity || 0}</strong>
             </p>
-            <p style={{ opacity: 0.7, margin: "5px 0" }}>
+            <p className="finished-goods-modal__info-text">
               Закупочная цена: <strong>{item?.purchase_price || 0} сом</strong>
             </p>
           </div>
@@ -2497,18 +2482,17 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
           <div className="finished-goods-add-modal__section">
             <label>Количество *</label>
             <input
-              style={{ marginTop: 15, width: "100%" }}
               type="number"
               name="qty"
               placeholder="Количество"
-              className="debt__input"
+              className="finished-goods-add-modal__input"
               value={state.qty}
               onChange={onChange}
               min={1}
               step={1}
               required
             />
-            <small style={{ opacity: 0.7, marginTop: 5, display: "block" }}>
+            <small className="finished-goods-modal__hint">
               Сумма к зачислению:{" "}
               {state.qty && item?.purchase_price
                 ? (Number(state.qty) * Number(item.purchase_price)).toFixed(1)
@@ -2518,12 +2502,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
           </div>
 
           <button
-            style={{
-              marginTop: 15,
-              width: "100%",
-              justifyContent: "center",
-            }}
-            className="btn edit-btn"
+            className="finished-goods-modal__submit-btn"
             type="submit"
             disabled={acceptingInline}
           >
@@ -2557,14 +2536,18 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
   // Проверяем, что товар существует
   if (!item) {
     return (
-      <div className="add-modal">
-        <div className="add-modal__overlay" onClick={onClose} />
-        <div className="add-modal__content" style={{ height: "auto" }}>
-          <div className="add-modal__header">
+      <div className="finished-goods-modal">
+        <div className="finished-goods-modal__overlay" onClick={onClose} />
+        <div className="finished-goods-modal__content">
+          <div className="finished-goods-modal__header">
             <h3>Ошибка</h3>
-            <X className="add-modal__close-icon" size={20} onClick={onClose} />
+            <X
+              className="finished-goods-modal__close-icon"
+              size={20}
+              onClick={onClose}
+            />
           </div>
-          <p className="add-modal__error-message">
+          <p className="finished-goods-modal__error-message">
             Товар не найден или недоступен для возврата
           </p>
         </div>
@@ -2616,28 +2599,34 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
   };
 
   return (
-    <div className="add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ height: "auto" }}>
-        <div className="add-modal__header">
+    <div className="finished-goods-modal">
+      <div className="finished-goods-modal__overlay" onClick={onClose} />
+      <div className="finished-goods-modal__content">
+        <div className="finished-goods-modal__header">
           <h3>Вернуть товар</h3>
-          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+          <X
+            className="finished-goods-modal__close-icon"
+            size={20}
+            onClick={onClose}
+          />
         </div>
 
         {createError && (
-          <p className="add-modal__error-message">
+          <p className="finished-goods-modal__error-message">
             Ошибка создания возврата: {createError?.message || "ошибка"}
           </p>
         )}
 
         {validationError && (
-          <p className="add-modal__error-message">{validationError}</p>
+          <p className="finished-goods-modal__error-message">
+            {validationError}
+          </p>
         )}
 
         <form onSubmit={handleSubmit}>
           <div className="finished-goods-add-modal__section">
             <h4>Товар: {item?.name}</h4>
-            <p style={{ opacity: 0.7, margin: "5px 0" }}>
+            <p className="finished-goods-modal__info-text">
               Текущее количество у агента:{" "}
               <strong>{item?.qty_on_agent || 0}</strong>
             </p>
@@ -2646,11 +2635,10 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
           <div className="finished-goods-add-modal__section">
             <label>Количество для возврата *</label>
             <input
-              style={{ marginTop: 15, width: "100%" }}
               type="number"
               name="qty"
               placeholder="Количество"
-              className="debt__input"
+              className="finished-goods-add-modal__input"
               value={state.qty}
               onChange={onChange}
               min={1}
@@ -2658,18 +2646,13 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
               step={1}
               required
             />
-            <small style={{ opacity: 0.7, marginTop: 5, display: "block" }}>
+            <small className="finished-goods-modal__hint">
               Максимум: {item?.qty_on_agent || 0}
             </small>
           </div>
 
           <button
-            style={{
-              marginTop: 15,
-              width: "100%",
-              justifyContent: "center",
-            }}
-            className="btn edit-btn"
+            className="finished-goods-modal__submit-btn"
             type="submit"
             disabled={creating}
           >
@@ -2724,11 +2707,48 @@ const FinishedGoods = ({ products, onChanged }) => {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
   // Фильтр по дате
   const [dateFrom, setDateFrom] = useState(""); // YYYY-MM-DD
   const [dateTo, setDateTo] = useState(""); // YYYY-MM-DD
+
+  // View mode (table/cards) - сохраняем в localStorage
+  const STORAGE_KEY = "finished_goods_view_mode";
+  const getInitialViewMode = () => {
+    if (typeof window === "undefined") return "table";
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === "table" || saved === "cards") return saved;
+    const isSmall = window.matchMedia("(max-width: 1199px)").matches;
+    return isSmall ? "cards" : "table";
+  };
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
+  const debounceTimerRef = useRef(null);
+
+  // Сохраняем режим просмотра в localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, viewMode);
+    }
+  }, [viewMode]);
+
+  // Debounce для поиска
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [search]);
 
   useEffect(() => {
     dispatch(fetchCategoriesAsync());
@@ -2795,7 +2815,7 @@ const FinishedGoods = ({ products, onChanged }) => {
 
   // Фильтрация по названию, категории и ДАТЕ created_at
   const viewProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     const from = dateFrom ? toStartOfDay(dateFrom) : null;
     const to = dateTo ? toEndOfDay(dateTo) : null;
 
@@ -2821,7 +2841,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     return filteredProducts.sort(
       (a, b) => new Date(b.created_at) - new Date(a.created_at)
     );
-  }, [products, search, categoryFilter, dateFrom, dateTo]);
+  }, [products, debouncedSearch, categoryFilter, dateFrom, dateTo]);
 
   const openEdit = (product) => {
     setSelectedItem(product);
@@ -2835,225 +2855,440 @@ const FinishedGoods = ({ products, onChanged }) => {
     return primaryImage || product.images[0] || null;
   };
 
+  // get image URL with fallback
+  const getImageUrl = (image) => {
+    if (!image) return noImage;
+    // Поддержка разных форматов URL изображений
+    const url = image.image_url || image.image || image.url || image.preview;
+    if (!url || url === "null" || url === "undefined") return noImage;
+    // Если URL относительный, добавляем базовый URL API
+    if (url.startsWith("/")) {
+      return url;
+    }
+    return url;
+  };
+
+  const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
+
   return (
-    <div className="sklad__warehouse">
-      <div className="sklad__header">
-        <div
-          className="sklad__left"
-          style={{
-            display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Поиск по названию товара"
-            className="sklad__search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {/* Новый блок фильтра по дате */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <label style={{ opacity: 0.7 }}>От</label>
-            <input
-              type="date"
-              className="employee__search-wrapper"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-            <label style={{ opacity: 0.7 }}>До</label>
-            <input
-              type="date"
-              className="employee__search-wrapper"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-            <button
-              type="button"
-              className="sklad__add"
-              style={{ padding: "6px 10px" }}
-              onClick={resetFilters}
-            >
-              Сбросить
-            </button>
+    <div className="warehouse-page">
+      {/* Header */}
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon">
+            <div className="warehouse-header__icon-box">📦</div>
+          </div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">Склад готовой продукции</h1>
+            <p className="warehouse-header__subtitle">
+              Управление готовыми товарами
+            </p>
           </div>
         </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 20,
-            flexWrap: "wrap-reverse",
-            justifyContent: "center",
-          }}
-          className="mx-auto"
-        >
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <button
-            className="sklad__add"
+            className="warehouse-header__create-btn"
             onClick={() => setShowAdd(true)}
-            // onClick={handleAdd}
           >
-            <Plus size={16} style={{ marginRight: 4 }} />
+            <Plus size={16} />
             Добавить товар
           </button>
           <button
-            className="sklad__add"
+            className="warehouse-header__create-btn"
             onClick={() => setShowTransferProductModal(true)}
           >
-            <Plus size={16} style={{ marginRight: 4 }} />
+            <Plus size={16} />
             Передать товар
           </button>
         </div>
       </div>
 
-      <div style={{ margin: "8px 0", opacity: 0.8 }}>
-        Найдено: {viewProducts.length}
-        {products?.length ? ` из ${products.length}` : ""}
+      {/* Search and Filters */}
+      <div className="warehouse-search-section">
+        <div className="warehouse-search">
+          <Search className="warehouse-search__icon" size={18} />
+          <input
+            type="text"
+            className="warehouse-search__input"
+            placeholder="Поиск по названию товара..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="warehouse-search__info flex flex-wrap items-center gap-2">
+          <span>
+            Всего: {products?.length || 0} • Найдено: {viewProducts.length}
+          </span>
+
+          {/* Date filters */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-sm text-slate-600">От:</label>
+            <input
+              type="date"
+              className="warehouse-search__input"
+              style={{ width: "auto", minWidth: "140px" }}
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+            <label className="text-sm text-slate-600">До:</label>
+            <input
+              type="date"
+              className="warehouse-search__input"
+              style={{ width: "auto", minWidth: "140px" }}
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+            {(dateFrom || dateTo || search || categoryFilter) && (
+              <button
+                type="button"
+                className="warehouse-search__filter-btn"
+                onClick={resetFilters}
+              >
+                Сбросить
+              </button>
+            )}
+          </div>
+
+          {/* View toggle */}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                viewMode === "table"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <Table2 size={16} />
+              Таблица
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                viewMode === "cards"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <LayoutGrid size={16} />
+              Карточки
+            </button>
+          </div>
+        </div>
       </div>
 
-      {loading ? (
-        <p className="sklad__loading-message">Загрузка товаров...</p>
-      ) : error ? (
-        <p className="sklad__error-message">Ошибка загрузки</p>
-      ) : viewProducts.length === 0 ? (
-        <p className="sklad__no-products-message">Нет доступных товаров.</p>
-      ) : (
-        <div className="table-wrapper">
-          <table className="sklad__table">
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" />
-                </th>
-                <th></th>
-                <th>№</th>
-                <th></th>
-                <th>Название</th>
-                <th>Поставщик</th>
-                <th>Цена</th>
-                <th>Дата</th>
-                <th>Количество / У агентов</th>
-                <th>Категория</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {viewProducts.map((item, idx) => (
-                <tr key={item.id}>
-                  <td>
-                    <input type="checkbox" />
-                  </td>
-                  <td>
-                    {/* Кнопка для открытия модалки редактирования */}
-                    <button
-                      type="button"
-                      title="Редактировать"
+      {/* Products */}
+      <div className="warehouse-table-container w-full">
+        {/* ===== TABLE ===== */}
+        {viewMode === "table" && (
+          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="warehouse-table w-full min-w-[1100px]">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>№</th>
+                  <th></th>
+                  <th>Название</th>
+                  <th>Поставщик</th>
+                  <th>Цена</th>
+                  <th>Дата</th>
+                  <th>Количество / У агентов</th>
+                  <th>Категория</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="warehouse-table__loading">
+                      Загрузка...
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={10} className="warehouse-table__empty">
+                      Ошибка загрузки
+                    </td>
+                  </tr>
+                ) : viewProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="warehouse-table__empty">
+                      Товары не найдены
+                    </td>
+                  </tr>
+                ) : (
+                  viewProducts.map((item, idx) => {
+                    const primaryImage = getPrimaryImage(item);
+                    return (
+                      <tr
+                        key={item.id}
+                        className="warehouse-table__row"
+                        onClick={() => openEdit(item)}
+                      >
+                        <td>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(item);
+                            }}
+                            className="warehouse-table__edit-btn"
+                            title="Редактировать"
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                        </td>
+
+                        <td>{idx + 1}</td>
+
+                        <td>
+                          <img
+                            src={getImageUrl(primaryImage)}
+                            alt={primaryImage?.alt || item.name || "Товар"}
+                            className="warehouse-table__product-image"
+                            onError={(e) => {
+                              e.currentTarget.src = noImage;
+                            }}
+                            loading="lazy"
+                          />
+                        </td>
+
+                        <td className="warehouse-table__name">
+                          <div className="warehouse-table__name-cell">
+                            <span>{item.name || "—"}</span>
+                          </div>
+                        </td>
+
+                        <td>{item.client_name || "—"}</td>
+                        <td>{formatPrice(item.price)}</td>
+                        <td>
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </td>
+                        <td>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "4px",
+                            }}
+                          >
+                            <div>На складе: {item.quantity || 0}</div>
+                            {item.qty_on_agent > 0 && (
+                              <div style={{ fontSize: "12px", color: "#666" }}>
+                                У агентов: {item.qty_on_agent}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>{item.category || item.category_name || "—"}</td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <button
+                              className="warehouse-header__create-btn"
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "12px",
+                                background: "#f59e0b",
+                                color: "white",
+                              }}
+                              onClick={() => handleOpen(item)}
+                            >
+                              В брак
+                            </button>
+                            <button
+                              className="warehouse-header__create-btn"
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "12px",
+                                background: "#10b981",
+                                color: "white",
+                              }}
+                              onClick={() => handleOpen1(item)}
+                            >
+                              Добавить
+                            </button>
+                            {item.qty_on_agent > 0 && (
+                              <button
+                                className="warehouse-header__create-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  background: "#3b82f6",
+                                  color: "white",
+                                }}
+                                onClick={() => handleOpen3(item)}
+                              >
+                                Принять возврат
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ===== CARDS ===== */}
+        {viewMode === "cards" && (
+          <div className="block">
+            {loading ? (
+              <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                Загрузка...
+              </div>
+            ) : error ? (
+              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                Ошибка загрузки
+              </div>
+            ) : viewProducts.length === 0 ? (
+              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                Товары не найдены
+              </div>
+            ) : (
+              <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {viewProducts.map((item, idx) => {
+                  const primaryImage = getPrimaryImage(item);
+                  return (
+                    <div
+                      key={item.id}
+                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
                       onClick={() => openEdit(item)}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                      }}
                     >
-                      <MoreVertical size={16} />
-                    </button>
-                  </td>
-                  <td>{idx + 1}</td>
-                  <td>
-                    {(() => {
-                      const primaryImage = getPrimaryImage(item);
-                      return (
+                      <div className="flex items-start gap-3">
                         <img
-                          src={
-                            primaryImage?.image_url ||
-                            primaryImage?.image ||
-                            noImage
-                          }
-                          alt={primaryImage?.alt || item.name || "Товар"}
-                          className="sklad__product-image"
+                          src={getImageUrl(primaryImage)}
+                          alt={item.name || "Товар"}
+                          className="warehouse-table__product-image h-12 w-12 flex-none rounded-xl border border-slate-200 object-cover"
                           onError={(e) => {
                             e.currentTarget.src = noImage;
                           }}
+                          loading="lazy"
                         />
-                      );
-                    })()}
-                  </td>
-                  <td>
-                    <strong>
-                      {item.name.length > 12
-                        ? item.name.slice(0, 12) + "..."
-                        : item.name}
-                    </strong>
-                  </td>
-                  <td>{item.client_name || "-"}</td>
-                  <td>{item.price}</td>
-                  <td>{new Date(item.created_at).toLocaleString()}</td>
-                  <td>
-                    <div>
-                      <div>На складе: {item.quantity}</div>
-                      {item.qty_on_agent > 0 && (
-                        <div style={{ fontSize: "12px", color: "#28a745" }}>
-                          У агентов: {item.qty_on_agent}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs text-slate-500">
+                            #{idx + 1}
+                          </div>
+                          <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
+                            {item.name || "—"}
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                            <span className="whitespace-nowrap">
+                              Поставщик:{" "}
+                              <span className="font-medium">
+                                {item.client_name || "—"}
+                              </span>
+                            </span>
+                            <span className="whitespace-nowrap">
+                              Категория:{" "}
+                              <span className="font-medium">
+                                {item.category || item.category_name || "—"}
+                              </span>
+                            </span>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </td>
-                  <td>{item.category || item.category_name || "-"}</td>
-                  <td>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "5px",
-                        // flexDirection: "column",
-                      }}
-                    >
-                      <button
-                        className="btn edit-btn"
-                        onClick={() => handleOpen(item)}
-                        style={{ fontSize: "12px", padding: "4px 8px" }}
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Цена</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {formatPrice(item.price)}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Дата</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <div className="col-span-2 rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Количество</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            На складе: {item.quantity || 0}
+                            {item.qty_on_agent > 0 && (
+                              <span className="ml-2 text-xs text-slate-600">
+                                • У агентов: {item.qty_on_agent}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className="mt-4 flex flex-wrap gap-2"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        В брак
-                      </button>
-                      <button
-                        className="btn edit-btn"
-                        style={{ marginRight: 10 }}
-                        onClick={() => handleOpen1(item)}
-                      >
-                        Добавить
-                      </button>
-                      {item.qty_on_agent > 0 && (
                         <button
-                          className="btn edit-btn"
-                          onClick={() => handleOpen3(item)}
+                          className="warehouse-header__create-btn"
                           style={{
+                            padding: "6px 12px",
                             fontSize: "12px",
-                            padding: "4px 8px",
-                            background: "#28a745",
+                            background: "#f59e0b",
                             color: "white",
+                            flex: "1",
+                            minWidth: "80px",
                           }}
+                          onClick={() => handleOpen(item)}
                         >
-                          Принять возврат
+                          В брак
                         </button>
-                      )}
+                        <button
+                          className="warehouse-header__create-btn"
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            background: "#10b981",
+                            color: "white",
+                            flex: "1",
+                            minWidth: "80px",
+                          }}
+                          onClick={() => handleOpen1(item)}
+                        >
+                          Добавить
+                        </button>
+                        {item.qty_on_agent > 0 && (
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              background: "#3b82f6",
+                              color: "white",
+                              flex: "1",
+                              minWidth: "80px",
+                            }}
+                            onClick={() => handleOpen3(item)}
+                          >
+                            Принять возврат
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {showAdd && (
         <AddModal

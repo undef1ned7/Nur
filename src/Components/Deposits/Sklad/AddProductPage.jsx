@@ -60,6 +60,7 @@ const AddProductPage = () => {
     scannedProduct,
     list: products,
     count,
+    weightProductsCount,
   } = useProducts();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
@@ -207,7 +208,8 @@ const AddProductPage = () => {
     if (isMarketSector) {
       dispatch(fetchBrandsAsync());
       dispatch(fetchCategoriesAsync());
-      dispatch(fetchProductsAsync({ page: 1 }));
+      // Загружаем все товары для точного подсчета весовых товаров
+      dispatch(fetchProductsAsync({ page_size: 10000 }));
     }
   }, [dispatch, isMarketSector]);
 
@@ -627,12 +629,9 @@ const AddProductPage = () => {
         } else if (newItemData.plu && newItemData.plu.trim() !== "") {
           pluValue = Number(newItemData.plu);
         } else {
-          // Генерируем PLU автоматически: находим максимальный PLU среди всех товаров и добавляем 1
-          const maxPlu =
-            products.length > 0
-              ? Math.max(...products.map((p) => parseInt(p.plu || "0") || 0))
-              : 0;
-          pluValue = maxPlu + 1;
+          // Генерируем PLU автоматически на основе количества весовых товаров
+          // Используем weightProductsCount из store, который считается в fetchProductsAsync
+          pluValue = weightProductsCount + 1;
         }
       }
 
@@ -1050,6 +1049,34 @@ const AddProductPage = () => {
       setMarketData((prev) => ({ ...prev, code: newCode }));
     }
   }, [isMarketSector, isEditMode, count, marketData.code]);
+
+  // Автоматическая генерация PLU для весового товара или дробной услуги
+  useEffect(() => {
+    if (isMarketSector) {
+      const isWeight =
+        (itemType === "product" && marketData.isWeightProduct) ||
+        (itemType === "service" && marketData.isFractionalService);
+
+      // Генерируем PLU только если:
+      // 1. Товар/услуга весовой/дробный
+      // 2. PLU еще не заполнен вручную
+      // 3. weightProductsCount доступен
+      if (isWeight && (!marketData.plu || marketData.plu.trim() === "")) {
+        const generatedPlu = weightProductsCount + 1;
+        setMarketData((prev) => ({ ...prev, plu: String(generatedPlu) }));
+      } else if (!isWeight && marketData.plu) {
+        // Если весовой режим выключен, очищаем PLU
+        setMarketData((prev) => ({ ...prev, plu: "" }));
+      }
+    }
+  }, [
+    isMarketSector,
+    itemType,
+    marketData.isWeightProduct,
+    marketData.isFractionalService,
+    weightProductsCount,
+    marketData.plu,
+  ]);
 
   // Обработчик изменения данных для маркета
   const handleMarketDataChange = (field, value) => {

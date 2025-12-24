@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
   Filter,
@@ -42,13 +42,14 @@ const Warehouse = () => {
   const brands = useSelector((state) => state.product.brands || []);
   const categories = useSelector((state) => state.product.categories || []);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
   const [selectedRows, setSelectedRows] = useState(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(0);
+  const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const debounceTimerRef = useRef(null);
@@ -84,7 +85,22 @@ const Warehouse = () => {
     };
   }, [searchTerm]);
 
-  // Загрузка товаровф
+  // Обновление URL только при изменении страницы (без поиска)
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    // Обновляем URL только если параметры действительно изменились
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  // Загрузка товаров
   useEffect(() => {
     const params = {
       page: currentPage,
@@ -93,36 +109,39 @@ const Warehouse = () => {
 
     // Используем параметр search для всех запросов (включая штрих-коды)
     // API должен обрабатывать поиск по штрих-коду через параметр search
-    if (debouncedSearchTerm) {
-      params.search = debouncedSearchTerm.trim();
+    if (debouncedSearchTerm && typeof debouncedSearchTerm === "string") {
+      const trimmed = debouncedSearchTerm.trim();
+      if (trimmed) {
+        params.search = trimmed;
+      }
     }
 
     dispatch(fetchProductsAsync(params));
   }, [dispatch, debouncedSearchTerm, filters, currentPage]);
 
-  // Обновляем pageSize при каждой загрузке списка
+  // При изменении поиска возвращаемся на первую страницу
   useEffect(() => {
-    if (products && products.length) {
-      setPageSize(products.length);
+    if (debouncedSearchTerm) {
+      setCurrentPage(1);
     }
-  }, [products]);
-
-  // При смене фильтров / поиска возвращаемся на первую страницу
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchTerm, filters]);
+  }, [debouncedSearchTerm]);
 
   const filteredProducts = products;
 
-  const totalPages =
-    pageSize && count
-      ? Math.ceil(count / pageSize)
-      : count && products.length
-      ? Math.ceil(count / products.length)
-      : 1;
+  // Расчет пагинации
+  // Используем фиксированный размер страницы
+  // Если есть next или previous, значит есть еще страницы
+  const PAGE_SIZE = 100; // Размер страницы для API
+  const hasNextPage = !!next;
+  const hasPrevPage = !!previous;
+
+  // Если есть следующая страница, значит текущая не последняя
+  // Если есть предыдущая страница, значит текущая не первая
+  // Рассчитываем общее количество страниц на основе count и размера страницы
+  const totalPages = count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1;
 
   const getRowNumber = (index) => {
-    const effectivePageSize = pageSize || products.length || 1;
+    const effectivePageSize = PAGE_SIZE || products.length || 1;
     return (currentPage - 1) * effectivePageSize + index + 1;
   };
 
@@ -563,7 +582,7 @@ const Warehouse = () => {
           </div>
         )}
         {/* Пагинация */}
-        {count > (pageSize || filteredProducts.length || 0) && (
+        {totalPages > 1 && (
           <div className="warehouse-pagination">
             <button
               type="button"
@@ -574,14 +593,17 @@ const Warehouse = () => {
               Назад
             </button>
             <span className="warehouse-pagination__info">
-              Страница {currentPage} из {totalPages || 1} ({count} товаров)
+              Страница {currentPage} из {totalPages || 1}
+              {count && ` (${count} товаров)`}
             </span>
             <button
               type="button"
               className="warehouse-pagination__btn"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={
-                loading || !next || (totalPages && currentPage >= totalPages)
+                loading ||
+                !next ||
+                (totalPages && currentPage >= totalPages)
               }
             >
               Вперед

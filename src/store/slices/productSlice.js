@@ -68,6 +68,9 @@ const initialState = {
   // Warehouse operations
   addingToWarehouse: false,
   addToWarehouseError: null,
+
+  // Weight products count
+  weightProductsCount: 0,
 };
 
 const productSlice = createSlice({
@@ -92,10 +95,27 @@ const productSlice = createSlice({
       .addCase(fetchProductsAsync.pending, (state) => {
         state.loading = true;
         state.error = null;
+        // Сбрасываем счетчик при начале новой загрузки
+        state.weightProductsCount = 0;
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
         state.loading = false;
         applyPagination(state, action.payload, "list");
+        
+        // Подсчет товаров с is_weight: true используя цикл
+        const products = Array.isArray(action.payload.results)
+          ? action.payload.results
+          : Array.isArray(action.payload)
+          ? action.payload
+          : [];
+        
+        let weightCount = 0;
+        for (let i = 0; i < products.length; i++) {
+          if (products[i].is_weight === true) {
+            weightCount++;
+          }
+        }
+        state.weightProductsCount = weightCount;
       })
       .addCase(fetchProductsAsync.rejected, (state, action) => {
         state.loading = false;

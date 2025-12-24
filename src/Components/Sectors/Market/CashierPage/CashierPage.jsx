@@ -58,6 +58,52 @@ const CashierPage = () => {
   const { list: cashBoxes } = useCash();
   const { currentUser, userId } = useUser();
 
+  // Функция для форматирования количества (убирает лишние нули)
+  const formatQuantity = (qty) => {
+    if (qty === null || qty === undefined || qty === "") return "0";
+    const num = parseFloat(qty);
+    if (isNaN(num)) return "0";
+    // Если целое число, возвращаем без десятичной части
+    if (num % 1 === 0) return String(num);
+    // Иначе убираем лишние нули в конце
+    return String(num).replace(/\.?0+$/, "");
+  };
+
+  // Функция для нормализации количества перед отправкой на сервер
+  const normalizeQuantity = (qty) => {
+    if (qty === null || qty === undefined || qty === "") return 0;
+    const num = parseFloat(qty);
+    if (isNaN(num)) return 0;
+    // Округляем до 4 знаков после запятой, чтобы убрать ошибки округления
+    const rounded = Math.round(num * 10000) / 10000;
+    // Если результат целое число, возвращаем целое
+    if (rounded % 1 === 0) return Math.floor(rounded);
+    return rounded;
+  };
+
+  // Функция для нормализации цены перед отправкой на сервер
+  const normalizePrice = (price) => {
+    if (price === null || price === undefined || price === "") return 0;
+    const num = parseFloat(price);
+    if (isNaN(num)) return 0;
+    // Округляем до 2 знаков после запятой для цены
+    const rounded = Math.round(num * 100) / 100;
+    // Если результат целое число, возвращаем целое
+    if (rounded % 1 === 0) return Math.floor(rounded);
+    return rounded;
+  };
+
+  // Функция для форматирования цены для отображения (убирает лишние нули)
+  const formatPrice = (price) => {
+    if (price === null || price === undefined || price === "") return "0";
+    const num = parseFloat(price);
+    if (isNaN(num)) return "0";
+    // Если целое число, возвращаем без десятичной части
+    if (num % 1 === 0) return String(num);
+    // Иначе убираем лишние нули в конце
+    return String(num).replace(/\.?0+$/, "");
+  };
+
   // Получаем текущую открытую смену (мемоизируем, чтобы избежать лишних пересчетов)
   const openShift = React.useMemo(
     () => shifts.find((s) => s.status === "open"),
@@ -124,7 +170,9 @@ const CashierPage = () => {
     // Не обновляем продажу, если нет открытой смены
     if (currentSale?.id && openShiftId) {
       try {
-        const currentDiscount = currentSale?.order_discount_total || 0;
+        const currentDiscount = normalizePrice(
+          currentSale?.order_discount_total || 0
+        );
         await dispatch(
           startSale({
             discount_total: currentDiscount,
@@ -141,7 +189,7 @@ const CashierPage = () => {
     if (!currentSale?.id || !openShiftId) return;
     dispatch(
       startSale({
-        discount_total: parseFloat(discount) || 0,
+        discount_total: normalizePrice(parseFloat(discount) || 0),
         shift: openShiftId,
       })
     );
@@ -175,8 +223,8 @@ const CashierPage = () => {
         addCustomItem({
           id: currentSale.id,
           name: customService.name.trim(),
-          price: customService.price.trim(),
-          quantity: Number(customService.quantity) || 1,
+          price: normalizePrice(customService.price.trim()),
+          quantity: normalizeQuantity(Number(customService.quantity) || 1),
         })
       ).unwrap();
       await refreshSale();
@@ -444,18 +492,24 @@ const CashierPage = () => {
       const items = currentSale.items || currentSale.cart?.items || [];
 
       if (items.length > 0) {
-        const apiCart = items.map((item) => ({
-          id: item.product || item.product_id,
-          itemId: item.id, // ID элемента в корзине (для идентификации)
-          name: item.product_name || item.display_name || item.name || "—",
-          price: parseFloat(item.unit_price || item.price || 0),
-          quantity: item.quantity || 0,
-          unit: item.unit || "шт",
-          image:
-            item.primary_image_url ||
-            (item.images && item.images[0]?.image_url) ||
-            null,
-        }));
+        const apiCart = items.map((item) => {
+          const qty = normalizeQuantity(parseFloat(item.quantity || 0));
+          const price = normalizePrice(
+            parseFloat(item.unit_price || item.price || 0)
+          );
+          return {
+            id: item.product || item.product_id,
+            itemId: item.id, // ID элемента в корзине (для идентификации)
+            name: item.product_name || item.display_name || item.name || "—",
+            price: price,
+            quantity: qty,
+            unit: item.unit || "шт",
+            image:
+              item.primary_image_url ||
+              (item.images && item.images[0]?.image_url) ||
+              null,
+          };
+        });
 
         // Сохраняем порядок элементов: используем сохраненный порядок
         // Убираем дубликаты по itemId (уникальный ID элемента в корзине)
@@ -501,7 +555,7 @@ const CashierPage = () => {
         // Обновляем локальные значения количества
         const newQuantities = {};
         orderedCart.forEach((item) => {
-          newQuantities[item.id] = String(item.quantity || 0);
+          newQuantities[item.id] = formatQuantity(item.quantity || 0);
         });
         setCartQuantities((prev) => ({ ...prev, ...newQuantities }));
 
@@ -523,7 +577,7 @@ const CashierPage = () => {
   const PAGE_SIZE = 100; // Размер страницы для API
   const hasNextPage = !!next;
   const hasPrevPage = !!previous;
-  
+
   // Если есть следующая страница, значит текущая не последняя
   // Если есть предыдущая страница, значит текущая не первая
   // Рассчитываем общее количество страниц на основе count и размера страницы
@@ -792,7 +846,8 @@ const CashierPage = () => {
 
       if (existingItem) {
         // Проверяем, не превышает ли новое количество доступное
-        const newQuantity = existingItem.quantity + 1;
+        const currentQty = normalizeQuantity(existingItem.quantity);
+        const newQuantity = normalizeQuantity(currentQty + 1);
         if (availableQuantity > 0 && newQuantity > availableQuantity) {
           alert(`Доступно только ${availableQuantity} ${product.unit || "шт"}`);
           return;
@@ -815,7 +870,7 @@ const CashierPage = () => {
           manualFilling({
             id: saleId,
             productId: product.id,
-            quantity: 1,
+            quantity: normalizeQuantity(1),
             discount_total: 0,
           })
         );
@@ -850,7 +905,8 @@ const CashierPage = () => {
 
       if (!existingItem) return;
 
-      const newQuantity = Math.max(0, existingItem.quantity + delta);
+      const currentQty = normalizeQuantity(existingItem.quantity);
+      const newQuantity = normalizeQuantity(Math.max(0, currentQty + delta));
 
       // Проверяем наличие при увеличении количества
       if (delta > 0) {
@@ -935,7 +991,9 @@ const CashierPage = () => {
       const product = products.find((p) => p.id === productId);
       if (!product) return;
 
-      const qtyNum = Math.max(0, Math.floor(newQuantity));
+      const qtyNum = normalizeQuantity(
+        Math.max(0, parseFloat(newQuantity) || 0)
+      );
 
       // Проверяем наличие
       const availableQuantity = parseFloat(product.quantity || 0);
@@ -1282,7 +1340,7 @@ const CashierPage = () => {
                       {product.name || "—"}
                     </div>
                     <div className="cashier-page__product-price">
-                      {product.price || 0} сом
+                      {formatPrice(product.price || 0)} сом
                     </div>
                     <div className="cashier-page__product-stock">
                       {product.quantity || 0} {product.unit || "шт"}
@@ -1376,7 +1434,10 @@ const CashierPage = () => {
                       <input
                         type="text"
                         className="cashier-page__cart-item-quantity-input"
-                        value={cartQuantities[item.id] ?? item.quantity}
+                        value={
+                          cartQuantities[item.id] ??
+                          formatQuantity(item.quantity || 0)
+                        }
                         onChange={(e) => {
                           const value = e.target.value;
 
@@ -1441,9 +1502,8 @@ const CashierPage = () => {
                         }}
                         onBlur={async (e) => {
                           const value = e.target.value;
-                          const qtyNum = Math.max(
-                            0,
-                            Math.floor(parseFloat(value) || 0)
+                          const qtyNum = normalizeQuantity(
+                            Math.max(0, parseFloat(value) || 0)
                           );
 
                           // Находим товар для проверки наличия
@@ -1467,7 +1527,7 @@ const CashierPage = () => {
                               );
                               setCartQuantities((prev) => ({
                                 ...prev,
-                                [item.id]: String(item.quantity || 0),
+                                [item.id]: formatQuantity(item.quantity || 0),
                               }));
                               return;
                             }
@@ -1481,7 +1541,7 @@ const CashierPage = () => {
                             // Если количество не изменилось, просто обновляем локальное значение
                             setCartQuantities((prev) => ({
                               ...prev,
-                              [item.id]: String(item.quantity || 0),
+                              [item.id]: formatQuantity(item.quantity || 0),
                             }));
                           }
                         }}
@@ -1509,7 +1569,7 @@ const CashierPage = () => {
                       <Trash2 size={18} />
                     </button>
                     <div className="cashier-page__cart-item-price">
-                      {(item.price || 0) * item.quantity} сом
+                      {formatPrice((item.price || 0) * item.quantity)} сом
                     </div>
                   </div>
                 </div>
@@ -1523,17 +1583,13 @@ const CashierPage = () => {
                 <div className="cashier-page__cart-discount">
                   <span>Скидка:</span>
                   <span>
-                    -
-                    {parseFloat(currentSale.order_discount_total || 0).toFixed(
-                      2
-                    )}{" "}
-                    сом
+                    -{formatPrice(currentSale.order_discount_total || 0)} сом
                   </span>
                 </div>
               )}
               <div className="cashier-page__cart-total">
                 <span>Итого:</span>
-                <span>{total.toFixed(2)} сом</span>
+                <span>{formatPrice(total)} сом</span>
               </div>
               <button
                 className="cashier-page__checkout-btn"
