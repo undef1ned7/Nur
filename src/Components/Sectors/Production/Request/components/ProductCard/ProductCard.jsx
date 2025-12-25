@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, ShoppingCart, Plus, Minus } from "lucide-react";
+import { Eye, ShoppingCart, Plus, Minus, Send } from "lucide-react";
 import "./ProductCard.scss";
 
 const ProductCard = ({
@@ -8,7 +8,8 @@ const ProductCard = ({
   onDragStart,
   onDragEnd,
   isDragging,
-  onRequestProduct,
+  onRequestWithCart,
+  onRequestWithoutCart,
   isOwner = false,
 }) => {
   const [quantity, setQuantity] = useState(1);
@@ -39,19 +40,35 @@ const ProductCard = ({
     }
   };
 
-  const handleRequestClick = (e) => {
+  const handleRequestWithCart = (e) => {
     e.stopPropagation();
-    if (available && quantity > 0 && onRequestProduct) {
-      onRequestProduct(product, quantity);
+    if (available && quantity > 0 && onRequestWithCart) {
+      onRequestWithCart(product, quantity);
       setQuantity(1);
       setShowQuantityControls(false);
     }
   };
 
-  const handleQuickRequest = (e) => {
+  const handleRequestWithoutCart = (e) => {
     e.stopPropagation();
-    if (available && onRequestProduct) {
-      onRequestProduct(product, 1);
+    if (available && quantity > 0 && onRequestWithoutCart) {
+      onRequestWithoutCart(product, quantity);
+      setQuantity(1);
+      setShowQuantityControls(false);
+    }
+  };
+
+  const handleQuickRequestWithCart = (e) => {
+    e.stopPropagation();
+    if (available && onRequestWithCart) {
+      onRequestWithCart(product, 1);
+    }
+  };
+
+  const handleQuickRequestWithoutCart = (e) => {
+    e.stopPropagation();
+    if (available && onRequestWithoutCart) {
+      onRequestWithoutCart(product, 1);
     }
   };
 
@@ -103,14 +120,26 @@ const ProductCard = ({
               <>
                 {!showQuantityControls ? (
                   <div className="product-cart-controls">
-                    <button
-                      className="add-to-cart-btn"
-                      onClick={handleQuickRequest}
-                      disabled={!available}
-                    >
-                      <ShoppingCart size={16} />
-                      Быстро запросить
-                    </button>
+                    <div className="request-buttons-row">
+                      <button
+                        className="request-without-cart-btn"
+                        onClick={handleQuickRequestWithoutCart}
+                        disabled={!available}
+                        title="Создать корзину и отправить"
+                      >
+                        <Send size={14} />
+                        Без корзины
+                      </button>
+                      <button
+                        className="request-with-cart-btn"
+                        onClick={handleQuickRequestWithCart}
+                        disabled={!available}
+                        title="Добавить в корзину"
+                      >
+                        <ShoppingCart size={14} />
+                        В корзину
+                      </button>
+                    </div>
                     <button
                       className="select-quantity-btn"
                       onClick={handleToggleQuantityControls}
@@ -147,14 +176,26 @@ const ProductCard = ({
                         <Plus size={14} />
                       </button>
                     </div>
-                    <button
-                      className="add-to-cart-btn"
-                      onClick={handleRequestClick}
-                      disabled={!available || quantity <= 0}
-                    >
-                      <ShoppingCart size={16} />
-                      Запросить ({quantity})
-                    </button>
+                    <div className="request-buttons-row">
+                      <button
+                        className="request-without-cart-btn"
+                        onClick={handleRequestWithoutCart}
+                        disabled={!available || quantity <= 0}
+                        title="Создать корзину и отправить"
+                      >
+                        <Send size={14} />
+                        Без корзины ({quantity})
+                      </button>
+                      <button
+                        className="request-with-cart-btn"
+                        onClick={handleRequestWithCart}
+                        disabled={!available || quantity <= 0}
+                        title="Добавить в корзину"
+                      >
+                        <ShoppingCart size={14} />
+                        В корзину ({quantity})
+                      </button>
+                    </div>
                     <button
                       className="cancel-quantity-btn"
                       onClick={(e) => {

@@ -112,22 +112,36 @@ export default function ReconciliationModal({ open, clientId, onClose }) {
   };
 
   return (
-    <div className="modal-overlay">
+    <div
+      className="reconciliation-modal__overlay modal-overlay"
+      onClick={onClose}
+    >
       <div
-        className="modal"
+        className="reconciliation-modal modal"
+        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        style={{ maxWidth: "90vw", maxHeight: "90vh", overflow: "auto" }}
       >
-        <h3>Акт сверки с клиентом</h3>
+        <div className="reconciliation-modal__header">
+          <h3 className="reconciliation-modal__title">Акт сверки с клиентом</h3>
+          <button
+            className="reconciliation-modal__close"
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
 
-        <div className="filters panel" style={{ marginBottom: 20 }}>
-          <div className="rows">
-            <div className="row">
-              <div className="label">Дата с</div>
-              <div className="value">
+        <div className="reconciliation-modal__content">
+          <div className="reconciliation-modal__filters">
+            <div className="reconciliation-modal__filters-grid">
+              <div className="reconciliation-modal__filter-item">
+                <label className="reconciliation-modal__filter-label">
+                  Дата с
+                </label>
                 <input
-                  className="analytics-sales__input"
+                  className="reconciliation-modal__filter-input analytics-sales__input"
                   type="date"
                   value={filters.start}
                   onChange={(e) =>
@@ -135,12 +149,12 @@ export default function ReconciliationModal({ open, clientId, onClose }) {
                   }
                 />
               </div>
-            </div>
-            <div className="row">
-              <div className="label">Дата по</div>
-              <div className="value">
+              <div className="reconciliation-modal__filter-item">
+                <label className="reconciliation-modal__filter-label">
+                  Дата по
+                </label>
                 <input
-                  className="analytics-sales__input"
+                  className="reconciliation-modal__filter-input analytics-sales__input"
                   type="date"
                   value={filters.end}
                   onChange={(e) =>
@@ -150,29 +164,29 @@ export default function ReconciliationModal({ open, clientId, onClose }) {
               </div>
             </div>
 
-            <div className="row">
-              <div className="label">Действия</div>
-              <div className="value">
-                <button
-                  className="btn btn--primary"
-                  onClick={fetchReconciliation}
-                  disabled={loading}
-                >
-                  {loading ? "Загрузка..." : "Загрузить акт"}
-                </button>
-              </div>
+            <div className="reconciliation-modal__actions-top">
+              <button
+                className="reconciliation-modal__btn reconciliation-modal__btn--primary btn btn--primary"
+                onClick={fetchReconciliation}
+                disabled={loading}
+              >
+                {loading ? "Загрузка..." : "Загрузить акт"}
+              </button>
             </div>
           </div>
+
+          {err && (
+            <div className="reconciliation-modal__alert alert alert--error">
+              {err}
+            </div>
+          )}
         </div>
 
-        {err && (
-          <div className="alert alert--error" style={{ marginBottom: 16 }}>
-            {err}
-          </div>
-        )}
-
-        <div className="modal-actions">
-          <button className="btn btn--ghost" onClick={onClose}>
+        <div className="reconciliation-modal__actions modal-actions">
+          <button
+            className="reconciliation-modal__btn reconciliation-modal__btn--secondary btn btn--ghost"
+            onClick={onClose}
+          >
             Закрыть
           </button>
         </div>

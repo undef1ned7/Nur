@@ -3,7 +3,10 @@ import { useDispatch } from "react-redux";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useUser } from "../../../../store/slices/userSlice";
-import { createAgentCartItem } from "../../../../api/agentCarts";
+import {
+  createAgentCartItem,
+  submitAgentCartById,
+} from "../../../../api/agentCarts";
 import { useCart } from "./hooks/useCart";
 import ProductCard from "./components/ProductCard/ProductCard";
 import ProductDetailModal from "./components/ProductDetailModal/ProductDetailModal";
@@ -105,7 +108,8 @@ const ProductionRequest = () => {
     setCategoryFilter("");
   };
 
-  const handleRequestProduct = async (product, quantity = 1) => {
+  // Запрос с корзиной (обычная функция)
+  const handleRequestWithCart = async (product, quantity = 1) => {
     if (!product || !product.id || quantity <= 0) return;
     if (!cartId) {
       setAlertType("error");
@@ -163,6 +167,47 @@ const ProductionRequest = () => {
         error?.response?.data?.message ||
         error?.message ||
         "Не удалось добавить товар в запрос";
+      setAlertType("error");
+      setAlertMessage(errorMessage);
+      setAlertOpen(true);
+    }
+  };
+
+  // Запрос без корзины (создать корзину, добавить товар, отправить)
+  const handleRequestWithoutCart = async (product, quantity = 1) => {
+    if (!product || !product.id || quantity <= 0) return;
+
+    try {
+      // Создаем новую корзину
+      const newCart = await createNewCart();
+      const tempCartId = newCart.id;
+
+      // Добавляем товар в корзину
+      await createAgentCartItem({
+        cart: tempCartId,
+        product: product.id,
+        quantity_requested: quantity,
+      });
+
+      // Отправляем корзину
+      await submitAgentCartById(tempCartId);
+
+      // Показываем уведомление об успешной отправке
+      setAlertType("success");
+      setAlertMessage(
+        `Запрос на товар "${product.name}" (${quantity} шт.) успешно отправлен!`
+      );
+      setAlertOpen(true);
+
+      // Обновляем текущую корзину (создаем новую пустую)
+      await loadOrCreateCart();
+    } catch (error) {
+      console.error("Error requesting without cart:", error);
+      const errorMessage =
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Не удалось отправить запрос";
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
@@ -290,7 +335,8 @@ const ProductionRequest = () => {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           draggedItem={draggedItem}
-          onRequestProduct={handleRequestProduct}
+          onRequestWithCart={handleRequestWithCart}
+          onRequestWithoutCart={handleRequestWithoutCart}
           onClearSearch={handleClearSearch}
           isOwner={isOwner}
         />
@@ -300,7 +346,8 @@ const ProductionRequest = () => {
         product={selectedProduct}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onRequestProduct={handleRequestProduct}
+        onRequestWithCart={handleRequestWithCart}
+        onRequestWithoutCart={handleRequestWithoutCart}
       />
 
       {showCart && (

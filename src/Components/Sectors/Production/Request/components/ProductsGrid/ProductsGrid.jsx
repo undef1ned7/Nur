@@ -9,7 +9,8 @@ const ProductsGrid = ({
   onDragStart,
   onDragEnd,
   draggedItem,
-  onRequestProduct,
+  onRequestWithCart,
+  onRequestWithoutCart,
   onClearSearch,
   isOwner = false,
 }) => {
@@ -36,7 +37,8 @@ const ProductsGrid = ({
                 onDragStart={(e) => onDragStart(e, product.id)}
                 onDragEnd={onDragEnd}
                 isDragging={draggedItem === product.id}
-                onRequestProduct={onRequestProduct}
+                onRequestWithCart={onRequestWithCart}
+                onRequestWithoutCart={onRequestWithoutCart}
                 isOwner={isOwner}
               />
             </div>

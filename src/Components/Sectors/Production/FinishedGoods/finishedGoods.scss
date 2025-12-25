@@ -133,8 +133,7 @@
     border-radius: 10px;
     font-size: 14px;
     background: white;
-
-    &:focus {
+    F &:focus {
       outline: none;
       border-color: var(--primary);
     }
@@ -163,7 +162,7 @@
     transition: all 0.2s;
 
     &:hover {
-      background: #f9fafb;
+      background: #000;
       border-color: var(--primary);
     }
   }
@@ -290,6 +289,7 @@
 
   &:hover {
     background: #f9fafb;
+    color: #000;
     border-color: var(--primary);
   }
 }

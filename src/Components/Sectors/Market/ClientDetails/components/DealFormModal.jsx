@@ -182,93 +182,123 @@ export default function DealFormModal({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <h3>{editingDeal ? "Редактировать сделку" : "Новая сделка"}</h3>
-
-        <label className="field">
-          <span>
-            Название сделки <b className="req">*</b>
-          </span>
-          <input
-            type="text"
-            value={dealName}
-            onChange={(e) => setDealName(e.target.value)}
-            placeholder="Например: Продажа напитков"
-          />
-        </label>
-
-        <label className="field">
-          <span>
-            Сумма <b className="req">*</b>
-          </span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            value={dealBudget}
-            onChange={(e) => setDealBudget(e.target.value)}
-            onBlur={() => setDealBudget(toDecimalString(dealBudget))}
-            placeholder="0.00"
-          />
-        </label>
-
-        <label className="field">
-          <span>
-            Статус <b className="req">*</b>
-          </span>
-          <select
-            value={dealStatus}
-            onChange={(e) => setDealStatus(e.target.value)}
+    <div
+      className="deal-form-modal__overlay modal-overlay"
+      onClick={handleClose}
+    >
+      <div
+        className="deal-form-modal modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="deal-form-modal__header">
+          <h3 className="deal-form-modal__title">
+            {editingDeal ? "Редактировать сделку" : "Новая сделка"}
+          </h3>
+          <button
+            className="deal-form-modal__close"
+            onClick={handleClose}
+            aria-label="Закрыть"
           >
-            <option>Продажа</option>
-            <option>Долг</option>
-            <option>Аванс</option>
-            <option>Предоплата</option>
-          </select>
-        </label>
+            ×
+          </button>
+        </div>
 
-        {isDebtSelected && (
-          <>
-            <label className="field">
-              <span>
-                Срок долга (мес.) <b className="req">*</b>
+        <div className="deal-form-modal__content">
+          <div className="deal-form-modal__fields">
+            <label className="deal-form-modal__field field">
+              <span className="deal-form-modal__label">
+                Название сделки <b className="req">*</b>
+              </span>
+              <input
+                type="text"
+                className="deal-form-modal__input"
+                value={dealName}
+                onChange={(e) => setDealName(e.target.value)}
+                placeholder="Например: Продажа напитков"
+              />
+            </label>
+
+            <label className="deal-form-modal__field field">
+              <span className="deal-form-modal__label">
+                Сумма <b className="req">*</b>
               </span>
               <input
                 type="number"
-                inputMode="numeric"
-                step="1"
-                min="1"
-                value={dealDebtMonths}
-                onChange={(e) => setDealDebtMonths(e.target.value)}
-                onBlur={() => {
-                  const n = parseInt(dealDebtMonths || "0", 10);
-                  setDealDebtMonths(
-                    Number.isFinite(n) && n > 0 ? String(n) : ""
-                  );
-                }}
-                placeholder="Например: 6"
+                inputMode="decimal"
+                step="0.01"
+                className="deal-form-modal__input"
+                value={dealBudget}
+                onChange={(e) => setDealBudget(e.target.value)}
+                onBlur={() => setDealBudget(toDecimalString(dealBudget))}
+                placeholder="0.00"
               />
             </label>
-            <label className="field">
-              <span>Дата первого платежа</span>
-              <input
-                type="date"
-                value={dealFirstDueDate}
-                onChange={(e) => setDealFirstDueDate(e.target.value)}
-                placeholder="Выберите дату"
-              />
-              <div className="hint">
-                График платежей будет формироваться с этой даты (того же числа
-                каждого месяца)
-              </div>
-            </label>
-          </>
-        )}
 
-        <div className="modal-actions" style={{ flexWrap: "wrap" }}>
+            <label className="deal-form-modal__field field">
+              <span className="deal-form-modal__label">
+                Статус <b className="req">*</b>
+              </span>
+              <select
+                className="deal-form-modal__input deal-form-modal__select"
+                value={dealStatus}
+                onChange={(e) => setDealStatus(e.target.value)}
+              >
+                <option>Продажа</option>
+                <option>Долг</option>
+                <option>Аванс</option>
+                <option>Предоплата</option>
+              </select>
+            </label>
+
+            {isDebtSelected && (
+              <>
+                <label className="deal-form-modal__field field">
+                  <span className="deal-form-modal__label">
+                    Срок долга (мес.) <b className="req">*</b>
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="1"
+                    className="deal-form-modal__input"
+                    value={dealDebtMonths}
+                    onChange={(e) => setDealDebtMonths(e.target.value)}
+                    onBlur={() => {
+                      const n = parseInt(dealDebtMonths || "0", 10);
+                      setDealDebtMonths(
+                        Number.isFinite(n) && n > 0 ? String(n) : ""
+                      );
+                    }}
+                    placeholder="Например: 6"
+                  />
+                </label>
+                <label className="deal-form-modal__field field">
+                  <span className="deal-form-modal__label">
+                    Дата первого платежа
+                  </span>
+                  <input
+                    type="date"
+                    className="deal-form-modal__input"
+                    value={dealFirstDueDate}
+                    onChange={(e) => setDealFirstDueDate(e.target.value)}
+                    placeholder="Выберите дату"
+                  />
+                  <div className="deal-form-modal__hint hint">
+                    График платежей будет формироваться с этой даты (того же
+                    числа каждого месяца)
+                  </div>
+                </label>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="deal-form-modal__actions modal-actions">
           <button
-            className="btn btn--yellow"
+            className="deal-form-modal__btn deal-form-modal__btn--primary btn btn--yellow"
             onClick={handleSave}
             disabled={!canSaveDeal}
             title={
@@ -282,11 +312,17 @@ export default function DealFormModal({
             {editingDeal ? "Сохранить" : "Добавить"}
           </button>
           {editingDeal && (
-            <button className="btn btn--red" onClick={handleDelete}>
+            <button
+              className="deal-form-modal__btn deal-form-modal__btn--danger btn btn--red"
+              onClick={handleDelete}
+            >
               Удалить
             </button>
           )}
-          <button className="btn btn--ghost" onClick={handleClose}>
+          <button
+            className="deal-form-modal__btn deal-form-modal__btn--secondary btn btn--ghost"
+            onClick={handleClose}
+          >
             Отмена
           </button>
         </div>

@@ -1,0 +1,119 @@
+// Стили для модального окна с таблицей передач
+.add-modal.accept {
+  .table-wrapper {
+    @media screen and (max-width: 768px) {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 0;
+      padding: 0;
+    }
+  }
+
+  .sklad__table {
+    @media screen and (max-width: 768px) {
+      font-size: 13px;
+      min-width: 100%;
+
+      thead {
+        display: none; // Скрываем заголовки на мобильных
+      }
+
+      tbody {
+        tr {
+          display: block;
+          position: relative;
+          margin-bottom: 16px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 12px;
+          background: #f9fafb;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          transition: box-shadow 0.2s ease;
+
+          &:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+          }
+        }
+
+        td {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 0;
+          border-bottom: 1px solid #e5e7eb;
+          text-align: right;
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          // Для ячеек с действиями (кнопки)
+          &[data-label="Действия"] {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+            padding-top: 12px;
+            border-top: 2px solid #e5e7eb;
+
+            &::before {
+              display: none;
+            }
+          }
+
+          &::before {
+            content: attr(data-label);
+            font-weight: 600;
+            text-align: left;
+            margin-right: 12px;
+            flex-shrink: 0;
+            color: #6b7280;
+            font-size: 12px;
+            min-width: 120px;
+          }
+        }
+      }
+    }
+
+    @media (max-width: 480px) {
+      font-size: 12px;
+
+      tbody {
+        tr {
+          padding: 10px;
+          margin-bottom: 12px;
+          border-radius: 10px;
+        }
+
+        td {
+          padding: 8px 0;
+          font-size: 12px;
+
+          &::before {
+            font-size: 11px;
+            margin-right: 10px;
+            min-width: 100px;
+          }
+        }
+      }
+    }
+  }
+
+  // Кнопки в таблице на мобильных
+  .sklad__table .add-modal__save {
+    @media screen and (max-width: 768px) {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0 !important;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+    }
+  }
+}
+

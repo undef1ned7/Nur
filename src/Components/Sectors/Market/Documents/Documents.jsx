@@ -9,7 +9,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   fetchDocuments,
   getReceiptJson,
@@ -36,10 +36,13 @@ const Documents = () => {
     documentsLoading,
   } = useSelector((state) => state.sale);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
+
   const [activeTab, setActiveTab] = useState("receipts");
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
   const [showReconciliationModal, setShowReconciliationModal] = useState(false);
   const [previewReceiptId, setPreviewReceiptId] = useState(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState(null);
@@ -67,7 +70,7 @@ const Documents = () => {
 
   // Функция для генерации порядкового номера чека/накладной
   // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 100;
   const getDocumentNumber = (index, prefix = "ЧЕК") => {
     const sequentialNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
     return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
@@ -124,6 +127,21 @@ const Documents = () => {
     }));
   }, [documents, activeTab, currentPage]);
 
+  // Обновление URL только при изменении страницы (без поиска)
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    // Обновляем URL только если параметры действительно изменились
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
   // Сброс страницы при смене таба
   useEffect(() => {
     setCurrentPage(1);
@@ -153,9 +171,16 @@ const Documents = () => {
   };
 
   // Расчет пагинации
-  const pageSize = getCurrentData().length || 1;
+  // Используем фиксированный размер страницы
+  // Если есть next или previous, значит есть еще страницы
+  const hasNextPage = !!documentsNext;
+  const hasPrevPage = !!documentsPrevious;
+
+  // Если есть следующая страница, значит текущая не последняя
+  // Если есть предыдущая страница, значит текущая не первая
+  // Рассчитываем общее количество страниц на основе count и размера страницы
   const totalPages =
-    documentsCount && pageSize ? Math.ceil(documentsCount / pageSize) : 1;
+    documentsCount && PAGE_SIZE ? Math.ceil(documentsCount / PAGE_SIZE) : 1;
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || (totalPages && newPage > totalPages)) return;
@@ -316,10 +341,10 @@ const Documents = () => {
           >
             Создать акт сверки
           </button>
-          <button className="documents__filter-btn">
+          {/* <button className="documents__filter-btn">
             <Filter size={18} />
             Фильтры
-          </button>
+          </button> */}
           {/* <button className="documents__period-btn">
             <Calendar size={18} />
             Период
@@ -415,13 +440,13 @@ const Documents = () => {
                           >
                             <Eye size={18} />
                           </button>
-                          <button
+                          {/* <button
                             className="documents__action-btn"
                             onClick={() => handleEdit(item)}
                             title="Редактировать"
                           >
                             <Pencil size={18} />
-                          </button>
+                          </button> */}
                           <button
                             className="documents__action-btn"
                             onClick={() => handlePrint(item)}
@@ -456,13 +481,13 @@ const Documents = () => {
                           >
                             <Eye size={18} />
                           </button>
-                          <button
+                          {/* <button
                             className="documents__action-btn"
                             onClick={() => handleEdit(item)}
                             title="Редактировать"
                           >
                             <Pencil size={18} />
-                          </button>
+                          </button> */}
                           <button
                             className="documents__action-btn"
                             onClick={() => handlePrint(item)}
@@ -482,37 +507,36 @@ const Documents = () => {
       </div>
 
       {/* Пагинация для чеков и накладных */}
-      {(activeTab === "receipts" || activeTab === "invoices") &&
-        totalPages > 1 && (
-          <div className="documents__pagination">
-            <button
-              type="button"
-              className="documents__pagination-btn"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={
-                currentPage === 1 || documentsLoading || !documentsPrevious
-              }
-            >
-              Назад
-            </button>
-            <span className="documents__pagination-info">
-              Страница {currentPage} из {totalPages || 1}
-              {documentsCount && ` (${documentsCount} документов)`}
-            </span>
-            <button
-              type="button"
-              className="documents__pagination-btn"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={
-                documentsLoading ||
-                !documentsNext ||
-                (totalPages && currentPage >= totalPages)
-              }
-            >
-              Вперед
-            </button>
-          </div>
-        )}
+      {totalPages > 1 && (
+        <div className="documents__pagination">
+          <button
+            type="button"
+            className="documents__pagination-btn"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={
+              currentPage === 1 || documentsLoading || !documentsPrevious
+            }
+          >
+            Назад
+          </button>
+          <span className="documents__pagination-info">
+            Страница {currentPage} из {totalPages || 1}
+            {documentsCount && ` (${documentsCount} документов)`}
+          </span>
+          <button
+            type="button"
+            className="documents__pagination-btn"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={
+              documentsLoading ||
+              !documentsNext ||
+              (totalPages && currentPage >= totalPages)
+            }
+          >
+            Вперед
+          </button>
+        </div>
+      )}
 
       <ReconciliationModal
         open={showReconciliationModal}

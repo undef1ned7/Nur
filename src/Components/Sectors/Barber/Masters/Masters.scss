@@ -699,6 +699,15 @@
   background: #f1f5f9;
   padding: 4px;
   border-radius: 12px;
+  flex-wrap: nowrap;
+  min-width: 0;
+
+  .barbermasters__btn {
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 14px;
+  }
 }
 
 /* Кнопки */
@@ -1515,39 +1524,11 @@
 }
 
 /* ====== Адаптив ====== */
-@media (max-width: 1024px) {
+@media (max-width: 1300px) {
   .barbermasters {
-    &__actions {
-      grid-template-columns: auto minmax(200px, 1fr) minmax(200px, 1fr) auto;
-      gap: 10px;
-    }
-
-    &__card {
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    &__cardActions {
-      width: 100%;
-      justify-content: flex-start;
-      margin-left: 0;
-      margin-top: 8px;
-    }
-  }
-}
-
-@media (max-width: 900px) {
-  .barbermasters {
-    padding: 20px;
-    gap: 16px;
-
     &__header {
       grid-template-columns: 1fr;
-      gap: 16px;
-    }
-
-    &__title {
-      font-size: 22px;
+      gap: 14px;
     }
 
     &__actions {
@@ -1564,6 +1545,25 @@
       grid-area: tabs;
       width: 100%;
       justify-content: center;
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 0 10px;
+        font-size: 13px;
+        height: 38px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    &__roleFilter {
+      grid-area: role;
+      width: 100%;
+      min-width: 100%;
     }
 
     &__select {
@@ -1582,6 +1582,126 @@
       justify-self: stretch;
       width: 100%;
       max-width: 100%;
+      height: 40px;
+      min-width: 40px;
+    }
+  }
+}
+
+@media (max-width: 1200px) {
+  .barbermasters {
+    &__tabs {
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        padding: 0 10px;
+        font-size: 13px;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      height: 40px;
+    }
+  }
+}
+
+@media (max-width: 1024px) {
+  .barbermasters {
+    padding: 20px;
+    gap: 18px;
+
+    &__header {
+      gap: 14px;
+    }
+
+    &__title {
+      font-size: 22px;
+    }
+
+    &__subtitle {
+      font-size: 13px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__tabs {
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        padding: 0 10px;
+        font-size: 13px;
+        height: 38px;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      height: 40px;
+    }
+
+    &__card {
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 16px 18px;
+    }
+
+    &__cardActions {
+      width: 100%;
+      justify-content: flex-start;
+      margin-left: 0;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    &__modal {
+      width: min(90vw, 600px);
+    }
+
+    &__content {
+      padding: 14px var(--padX);
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .barbermasters {
+    padding: 18px;
+    gap: 16px;
+
+    &__header {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    &__title {
+      font-size: 21px;
+    }
+
+    &__subtitle {
+      font-size: 13px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__tabs {
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        padding: 0 10px;
+        font-size: 13px;
+        height: 38px;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      height: 40px;
     }
 
     &__list {
@@ -1636,14 +1756,26 @@
       border-radius: 16px;
     }
 
+    &__modalHeader {
+      padding: 18px var(--padX);
+    }
+
     &__grid {
       grid-template-columns: 1fr;
       gap: 12px;
       padding: 12px var(--padX);
     }
 
+    &__content {
+      padding: 14px var(--padX);
+    }
+
     &__overlay {
       padding: 12px;
+    }
+
+    &__selectMenu {
+      max-height: 300px;
     }
   }
 }
@@ -1688,8 +1820,27 @@
     }
 
     &__tabs {
-      gap: 6px;
+      gap: 4px;
       padding: 3px;
+      width: 100%;
+
+      .barbermasters__btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 0 10px;
+        font-size: 12px;
+        height: 38px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 40px;
+      min-width: 40px;
     }
 
     &__searchInput {
@@ -1802,6 +1953,49 @@
     &__selectMenu {
       max-height: 280px;
     }
+
+    &__selectSearch {
+      padding: 10px;
+    }
+
+    &__selectSearchInput {
+      padding: 8px 10px 8px 32px;
+      font-size: 13px;
+    }
+
+    &__selectSearchIcon {
+      left: 20px;
+      font-size: 13px;
+    }
+
+    &__selectItem {
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .barbermasters {
+    &__actions {
+      gap: 10px;
+    }
+
+    &__btn {
+      height: 40px;
+      padding: 0 14px;
+      font-size: 13px;
+    }
+
+    &__searchInput {
+      height: 40px;
+      padding: 8px 14px 8px 38px;
+    }
+
+    &__selectControl {
+      height: 40px;
+      font-size: 13px;
+    }
   }
 }
 
@@ -1820,6 +2014,25 @@
 
     &__actions {
       gap: 10px;
+    }
+
+    &__tabs {
+      gap: 4px;
+      padding: 2px;
+
+      .barbermasters__btn {
+        padding: 0 8px;
+        font-size: 12px;
+        height: 36px;
+        min-width: 0;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 38px;
+      min-width: 38px;
     }
 
     &__btn {
@@ -1897,6 +2110,41 @@
       flex: 1 1 auto;
       min-width: 40px;
     }
+
+    &__selectMenu {
+      max-height: 250px;
+      border-radius: 12px;
+    }
+
+    &__selectSearch {
+      padding: 8px;
+    }
+
+    &__selectSearchInput {
+      padding: 8px 10px 8px 30px;
+      font-size: 13px;
+    }
+
+    &__selectSearchIcon {
+      left: 18px;
+      font-size: 12px;
+    }
+
+    &__selectItem {
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    &__content {
+      padding: 12px var(--padX);
+      row-gap: 10px;
+    }
+
+    &__iconBtn {
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
+    }
   }
 }
 
@@ -1911,6 +2159,25 @@
 
     &__subtitle {
       font-size: 11px;
+    }
+
+    &__tabs {
+      gap: 3px;
+      padding: 2px;
+
+      .barbermasters__btn {
+        padding: 0 6px;
+        font-size: 11px;
+        height: 34px;
+        min-width: 0;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 36px;
+      min-width: 36px;
     }
 
     &__btn {
@@ -1958,6 +2225,34 @@
     &__overlay {
       padding: 0;
     }
+
+    &__selectMenu {
+      max-height: 220px;
+      border-radius: 10px;
+    }
+
+    &__selectSearch {
+      padding: 6px;
+    }
+
+    &__selectSearchInput {
+      padding: 6px 8px 6px 28px;
+      font-size: 12px;
+    }
+
+    &__selectSearchIcon {
+      left: 16px;
+      font-size: 11px;
+    }
+
+    &__selectItem {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    &__selectList {
+      max-height: 180px;
+    }
   }
 }
 
@@ -1976,6 +2271,25 @@
       height: 36px;
     }
 
+    &__tabs {
+      gap: 2px;
+      padding: 2px;
+
+      .barbermasters__btn {
+        padding: 0 4px;
+        font-size: 10px;
+        height: 32px;
+        min-width: 0;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 34px;
+      min-width: 34px;
+    }
+
     &__btn {
       height: 34px;
       padding: 0 8px;
@@ -1992,6 +2306,306 @@
       font-size: 12px;
       min-width: 32px;
     }
+
+    &__selectMenu {
+      max-height: 200px;
+      border-radius: 8px;
+    }
+
+    &__selectSearch {
+      padding: 4px;
+    }
+
+    &__selectSearchInput {
+      padding: 6px 8px 6px 26px;
+      font-size: 12px;
+    }
+
+    &__selectSearchIcon {
+      left: 14px;
+      font-size: 11px;
+    }
+
+    &__selectItem {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    &__selectList {
+      max-height: 160px;
+      padding: 4px 0;
+    }
+
+    &__selectEmpty {
+      padding: 12px;
+      font-size: 12px;
+    }
+  }
+}
+
+/* Дополнительные адаптивные улучшения для модального окна доступов */
+@media (max-width: 900px) {
+  .barbermasters__modal--taller {
+    max-height: 92dvh;
+    width: 95vw !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 16px var(--padX) !important;
+  }
+
+  .barbermasters__form {
+    padding: 16px var(--padX) !important;
+    max-height: calc(92dvh - 100px) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .barbermasters__modal--taller {
+    max-height: 90dvh;
+    width: 96vw !important;
+    max-width: 96vw !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 14px var(--padX) !important;
+  }
+
+  .barbermasters__modalTitle {
+    font-size: 18px !important;
+    line-height: 1.3;
+  }
+
+  .barbermasters__form {
+    padding: 14px var(--padX) !important;
+    max-height: calc(90dvh - 90px) !important;
+  }
+
+  .barbermasters__iconBtn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 16px !important;
+    top: 12px !important;
+    right: 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .barbermasters__modal--taller {
+    max-height: 95dvh;
+    width: 98vw !important;
+    max-width: 98vw !important;
+    border-radius: 12px !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 12px var(--padX) !important;
+  }
+
+  .barbermasters__modalTitle {
+    font-size: 16px !important;
+    padding-right: 40px;
+  }
+
+  .barbermasters__form {
+    padding: 12px var(--padX) !important;
+    max-height: calc(95dvh - 80px) !important;
+  }
+
+  .barbermasters__iconBtn {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 14px !important;
+    top: 10px !important;
+    right: 10px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .barbermasters__modal--taller {
+    max-height: 100dvh;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    border-radius: 0 !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 10px var(--padX) !important;
+  }
+
+  .barbermasters__modalTitle {
+    font-size: 15px !important;
+    padding-right: 36px;
+  }
+
+  .barbermasters__form {
+    padding: 10px var(--padX) !important;
+    max-height: calc(100dvh - 70px) !important;
+  }
+
+  .barbermasters__iconBtn {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 13px !important;
+    top: 8px !important;
+    right: 8px !important;
+  }
+}
+
+/* Улучшения для скролла на мобильных устройствах */
+@media (max-width: 900px) {
+  .barbermasters {
+    &__list {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    &__grid {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    &__selectList {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    &__form {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+  }
+}
+
+/* Дополнительные улучшения для таблиц и контента */
+@media (max-width: 768px) {
+  .barbermasters {
+    &__titleWrap {
+      gap: 4px;
+    }
+
+    &__subtitle {
+      flex-wrap: wrap;
+    }
+
+    &__meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+
+      .bm-item + .bm-item::before {
+        display: none;
+      }
+    }
+
+    &__avatar {
+      flex-shrink: 0;
+    }
+
+    &__name {
+      word-break: break-word;
+    }
+  }
+}
+
+/* Улучшения для горизонтальной ориентации на мобильных */
+@media (max-width: 900px) and (orientation: landscape) {
+  .barbermasters {
+    &__list {
+      max-height: 50dvh;
+    }
+
+    &__modal {
+      max-height: 85dvh;
+    }
+
+    &__modal--taller {
+      max-height: 85dvh !important;
+    }
+
+    &__form {
+      max-height: calc(85dvh - 100px) !important;
+    }
+  }
+}
+
+/* Улучшения для очень маленьких экранов в альбомной ориентации */
+@media (max-width: 600px) and (orientation: landscape) {
+  .barbermasters {
+    &__list {
+      max-height: 45dvh;
+    }
+
+    &__modal {
+      max-height: 80dvh;
+    }
+
+    &__modal--taller {
+      max-height: 80dvh !important;
+    }
+
+    &__form {
+      max-height: calc(80dvh - 80px) !important;
+    }
+  }
+}
+
+/* Улучшения для touch-устройств */
+@media (hover: none) and (pointer: coarse) {
+  .barbermasters {
+    &__btn {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    &__cardActions .barbermasters__btn {
+      min-height: 44px;
+    }
+
+    &__pageBtn {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    &__selectItem {
+      min-height: 44px;
+      padding: 12px 16px;
+    }
+
+    &__iconBtn {
+      min-width: 44px;
+      min-height: 44px;
+    }
+  }
+}
+
+/* Улучшения для высоких экранов */
+@media (min-height: 900px) {
+  .barbermasters {
+    &__list {
+      max-height: 70dvh;
+    }
+  }
+}
+
+/* Улучшения для низких экранов */
+@media (max-height: 600px) {
+  .barbermasters {
+    &__list {
+      max-height: 40dvh;
+    }
+
+    &__modal {
+      max-height: 85dvh;
+    }
+
+    &__modal--taller {
+      max-height: 85dvh !important;
+    }
+
+    &__form {
+      max-height: calc(85dvh - 100px) !important;
+    }
   }
 }
 
@@ -2003,6 +2617,22 @@
     }
     .barbermasters__btn {
       transition: none !important;
+    }
+
+    &__card {
+      transition: none !important;
+    }
+
+    &__modal {
+      animation: none !important;
+    }
+
+    &__overlay {
+      animation: none !important;
+    }
+
+    &__selectMenu {
+      animation: none !important;
     }
   }
 }

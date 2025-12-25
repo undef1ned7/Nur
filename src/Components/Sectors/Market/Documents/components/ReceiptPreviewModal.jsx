@@ -104,6 +104,20 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
     if (!dateString) return "";
     try {
       const date = new Date(dateString);
+      return date.toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
       return date.toLocaleString("ru-RU", {
         day: "2-digit",
         month: "2-digit",
@@ -154,12 +168,18 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
   const items = Array.isArray(receiptData?.items)
     ? receiptData.items.map((item) => ({
         id: item.id,
-        name: item.name || "Товар",
-        qty: parseFloat(item.qty || 0),
-        price: parseFloat(item.unit_price || 0),
+        name: item.name || item.product_name || "Товар",
+        qty: parseFloat(item.qty || item.quantity || 0),
+        price: parseFloat(item.unit_price || item.price || 0),
         total: parseFloat(item.total || 0),
+        unit: item.unit || "ШТ",
       }))
     : [];
+
+  const doc = receiptData?.document || receiptData?.sale || {};
+  const company = receiptData?.company || {};
+  const cashier = receiptData?.cashier || {};
+  const client = receiptData?.client || null;
 
   const subtotal = parseFloat(receiptData?.totals?.subtotal || 0);
   const discount = parseFloat(receiptData?.totals?.discount_total || 0);
@@ -183,69 +203,124 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
 
         <div className="receipt-preview-modal__content">
           <div className="receipt-preview-modal__receipt">
+            {/* Дата и время создания */}
+            <div className="receipt-preview-modal__created-date">
+              {formatDate(new Date().toISOString())}
+            </div>
+
             {/* Заголовок чека */}
             <div className="receipt-preview-modal__receipt-header">
-              {receiptData?.company?.name && (
-                <div className="receipt-preview-modal__company">
-                  {receiptData.company.name}
-                </div>
-              )}
-              {receiptData?.sale?.doc_no && (
-                <div className="receipt-preview-modal__doc-no">
-                  ЧЕК № {receiptData.sale.doc_no}
-                </div>
-              )}
-              <div className="receipt-preview-modal__divider"></div>
+              <div className="receipt-preview-modal__doc-title">
+                ТОВАРНЫЙ ЧЕК №{doc.number || doc.doc_no || ""} от{" "}
+                {formatDate(doc.date || doc.created_at)}
+              </div>
             </div>
 
-            {/* Информация о дате и кассире */}
-            <div className="receipt-preview-modal__receipt-info">
-              {receiptData?.sale?.created_at && (
-                <div className="receipt-preview-modal__info-row">
-                  <span>Дата:</span>
-                  <span>{formatDate(receiptData.sale.created_at)}</span>
+            {/* Информация о продавце */}
+            <div className="receipt-preview-modal__company-info">
+              <div className="receipt-preview-modal__company-name">
+                {company?.name || "market"}
+              </div>
+              {company?.address && (
+                <div className="receipt-preview-modal__company-address">
+                  {company.address}
                 </div>
               )}
-              {receiptData?.cashier?.name && (
-                <div className="receipt-preview-modal__info-row">
-                  <span>Кассир:</span>
-                  <span>{receiptData.cashier.name}</span>
-                </div>
-              )}
-              {receiptData?.client?.full_name && (
-                <div className="receipt-preview-modal__info-row">
-                  <span>Покупатель:</span>
-                  <span>{receiptData.client.full_name}</span>
-                </div>
-              )}
-              <div className="receipt-preview-modal__divider"></div>
             </div>
 
-            {/* Товары */}
-            <div className="receipt-preview-modal__receipt-items">
+            {/* Таблица товаров */}
+            <div className="receipt-preview-modal__table">
+              {/* Заголовок таблицы */}
+              <div className="receipt-preview-modal__table-header">
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--no">
+                  №
+                </div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name">
+                  Наименование
+                </div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--unit">
+                  Ед. изм.
+                </div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--qty">
+                  Кол-во
+                </div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--price">
+                  Цена
+                </div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--sum">
+                  Сумма
+                </div>
+              </div>
+
+              {/* Строки товаров */}
               {items.length > 0 ? (
                 items.map((item, index) => (
-                  <div key={item.id || index} className="receipt-preview-modal__item">
-                    <div className="receipt-preview-modal__item-name">
+                  <div
+                    key={item.id || index}
+                    className="receipt-preview-modal__table-row"
+                  >
+                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--no">
+                      {index + 1}
+                    </div>
+                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name">
                       {item.name}
                     </div>
-                    <div className="receipt-preview-modal__item-details">
-                      <span>
-                        {item.qty} x {formatMoney(item.price)}
-                      </span>
-                      <span className="receipt-preview-modal__item-total">
-                        {formatMoney(item.qty * item.price)}
-                      </span>
+                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--unit">
+                      {item.unit}
+                    </div>
+                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--qty">
+                      {formatMoney(item.qty)}
+                    </div>
+                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--price">
+                      {formatMoney(item.price)}
+                    </div>
+                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--sum">
+                      {formatMoney(item.total)}
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="receipt-preview-modal__item">
-                  <div className="receipt-preview-modal__item-name">Нет товаров</div>
+                <div className="receipt-preview-modal__table-row">
+                  <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name" style={{ gridColumn: "1 / -1" }}>
+                    Нет товаров
+                  </div>
                 </div>
               )}
-              <div className="receipt-preview-modal__divider"></div>
+
+              {/* Строка "Итого:" */}
+              <div className="receipt-preview-modal__table-row receipt-preview-modal__table-row--total">
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--no"></div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name">
+                  Итого:
+                </div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--unit"></div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--qty">
+                  {formatMoney(items.reduce((sum, it) => sum + it.qty, 0))}
+                </div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--price"></div>
+                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--sum">
+                  {formatMoney(total)}
+                </div>
+              </div>
             </div>
+
+            {/* Информация о кассире и клиенте */}
+            {(cashier?.name || client?.full_name) && (
+              <div className="receipt-preview-modal__receipt-info">
+                {cashier?.name && (
+                  <div className="receipt-preview-modal__info-row">
+                    <span>Кассир:</span>
+                    <span>{cashier.name}</span>
+                  </div>
+                )}
+                {client?.full_name && (
+                  <div className="receipt-preview-modal__info-row">
+                    <span>Покупатель:</span>
+                    <span>{client.full_name}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Итоги */}
             <div className="receipt-preview-modal__receipt-totals">

@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { ShoppingCart, Plus, Minus } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { ShoppingCart, Plus, Minus, Send } from "lucide-react";
 import "./ProductDetailModal.scss";
 
-const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
+const ProductDetailModal = ({
+  product,
+  isOpen,
+  onClose,
+  onRequestWithCart,
+  onRequestWithoutCart,
+}) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
+  // безопасно считаем заранее
   const imagesList = Array.isArray(product?.images) ? product.images : [];
   const hasImages = imagesList.length > 0;
+
   const maxQuantity = 999;
   const available = true;
 
@@ -28,24 +37,86 @@ const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
     }
   };
 
-  const handleRequestClick = () => {
-    if (available && quantity > 0 && onRequestProduct) {
-      onRequestProduct(product, quantity);
+  const handleRequestWithCart = () => {
+    if (available && quantity > 0 && onRequestWithCart) {
+      onRequestWithCart(product, quantity);
       setQuantity(1);
     }
   };
 
-  const handleQuickRequest = () => {
-    if (available && onRequestProduct) {
-      onRequestProduct(product, 1);
+  const handleRequestWithoutCart = () => {
+    if (available && quantity > 0 && onRequestWithoutCart) {
+      onRequestWithoutCart(product, quantity);
+      setQuantity(1);
     }
   };
 
+  // Определяем функции до использования в useEffect
+  const handleCloseFullScreen = useCallback(() => {
+    setIsFullScreen(false);
+  }, []);
+
+  const handleFullScreenNext = useCallback(
+    (e) => {
+      if (e && e.stopPropagation) {
+        e.stopPropagation();
+      }
+      if (hasImages && imagesList.length > 0) {
+        setCurrentImageIndex((prev) =>
+          prev === imagesList.length - 1 ? 0 : prev + 1
+        );
+      }
+    },
+    [hasImages, imagesList.length]
+  );
+
+  const handleFullScreenPrev = useCallback(
+    (e) => {
+      if (e && e.stopPropagation) {
+        e.stopPropagation();
+      }
+      if (hasImages && imagesList.length > 0) {
+        setCurrentImageIndex((prev) =>
+          prev === 0 ? imagesList.length - 1 : prev - 1
+        );
+      }
+    },
+    [hasImages, imagesList.length]
+  );
+
+  // ХУКИ — всегда до любых return
   useEffect(() => {
     setCurrentImageIndex(0);
+    setIsFullScreen(false);
     setQuantity(1);
   }, [product?.id]);
 
+  // Обработка клавиатуры для полноэкранного просмотра
+  useEffect(() => {
+    if (!isFullScreen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        handleCloseFullScreen();
+      } else if (e.key === "ArrowLeft") {
+        handleFullScreenPrev({ stopPropagation: () => {} });
+      } else if (e.key === "ArrowRight") {
+        handleFullScreenNext({ stopPropagation: () => {} });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    isFullScreen,
+    handleCloseFullScreen,
+    handleFullScreenPrev,
+    handleFullScreenNext,
+  ]);
+
+  // после хуков можно делать ранний выход
   if (!isOpen || !product) return null;
 
   const nextImage = () => {
@@ -60,6 +131,17 @@ const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
     setCurrentImageIndex((prev) =>
       prev === 0 ? imagesList.length - 1 : prev - 1
     );
+  };
+
+  const handleImageClick = () => {
+    if (hasImages) {
+      setIsFullScreen(true);
+    }
+  };
+
+  const handleFullScreenThumbnailClick = (e, index) => {
+    e.stopPropagation();
+    setCurrentImageIndex(index);
   };
 
   return (
@@ -84,6 +166,8 @@ const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
                   "https://via.placeholder.com/300x200"
                 }
                 alt={product.name}
+                onClick={handleImageClick}
+                style={{ cursor: "pointer" }}
               />
               {hasImages && imagesList.length > 1 && (
                 <>
@@ -94,6 +178,11 @@ const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
                     ›
                   </button>
                 </>
+              )}
+              {hasImages && (
+                <div className="fullscreen-hint" onClick={handleImageClick}>
+                  Нажмите для просмотра в полном размере
+                </div>
               )}
             </div>
 
@@ -114,6 +203,72 @@ const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
             )}
           </div>
 
+          {/* Полноэкранный просмотр изображения */}
+          {isFullScreen && hasImages && (
+            <div
+              className="fullscreen-image-overlay"
+              onClick={handleCloseFullScreen}
+            >
+              <div
+                className="fullscreen-image-container"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  className="fullscreen-close-btn"
+                  onClick={handleCloseFullScreen}
+                >
+                  ×
+                </button>
+                {imagesList.length > 1 && (
+                  <>
+                    <button
+                      className="fullscreen-nav-btn prev"
+                      onClick={handleFullScreenPrev}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      className="fullscreen-nav-btn next"
+                      onClick={handleFullScreenNext}
+                    >
+                      ›
+                    </button>
+                  </>
+                )}
+                <img
+                  src={
+                    imagesList[currentImageIndex]?.image_url ||
+                    "https://via.placeholder.com/300x200"
+                  }
+                  alt={product.name}
+                  className="fullscreen-image"
+                />
+                {imagesList.length > 1 && (
+                  <div className="fullscreen-thumbnails">
+                    {imagesList.map((image, index) => (
+                      <img
+                        key={image.id || index}
+                        src={
+                          image.image_url || "https://via.placeholder.com/100"
+                        }
+                        alt={`${product.name} ${index + 1}`}
+                        className={`fullscreen-thumbnail ${
+                          index === currentImageIndex ? "active" : ""
+                        }`}
+                        onClick={(e) =>
+                          handleFullScreenThumbnailClick(e, index)
+                        }
+                      />
+                    ))}
+                  </div>
+                )}
+                <div className="fullscreen-image-info">
+                  {currentImageIndex + 1} / {imagesList.length}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="product-details">
             <h2
               className="title"
@@ -130,6 +285,16 @@ const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
               {product?.stock === true && (
                 <span className="price-discount-label">со скидкой</span>
               )}
+            </div>
+            <div
+              className="stock-status"
+              style={{
+                margin: 0,
+                color: "#4CAF50",
+                fontWeight: "500",
+              }}
+            >
+              Доступно для запроса
             </div>
 
             <div className="modal-quantity-controls">
@@ -189,19 +354,20 @@ const ProductDetailModal = ({ product, isOpen, onClose, onRequestProduct }) => {
                 }}
               >
                 <button
-                  className="add-to-cart-btn"
-                  onClick={handleRequestClick}
+                  className="request-without-cart-btn-modal"
+                  onClick={handleRequestWithoutCart}
                   disabled={!available || quantity <= 0}
                 >
-                  <ShoppingCart size={20} />
-                  Запросить товар ({quantity} шт.)
+                  <Send size={18} />
+                  Запросить без корзины ({quantity} шт.)
                 </button>
                 <button
-                  className="quick-add-btn"
-                  onClick={handleQuickRequest}
-                  disabled={!available}
+                  className="request-with-cart-btn-modal"
+                  onClick={handleRequestWithCart}
+                  disabled={!available || quantity <= 0}
                 >
-                  Быстро запросить (1 шт.)
+                  <ShoppingCart size={18} />
+                  Запросить с корзиной ({quantity} шт.)
                 </button>
               </div>
             </div>

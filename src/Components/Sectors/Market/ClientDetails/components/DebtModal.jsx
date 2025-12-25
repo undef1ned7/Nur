@@ -227,121 +227,159 @@ const DebtModal = ({ id, onClose, onChanged }) => {
   if (!id) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div
+      className="debt-modal__overlay modal-overlay"
+      onClick={onClose}
+    >
       <div
-        className="modal clientModal"
+        className="debt-modal modal clientModal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <h3>Долг клиента</h3>
-
-        <div className="row">
-          <div className="label">ФИО</div>
-          <div className="value">{dealDetail?.client_full_name ?? "—"}</div>
+        <div className="debt-modal__header">
+          <h3 className="debt-modal__title">Долг клиента</h3>
+          <button
+            className="debt-modal__close"
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
         </div>
 
-        <div className="row">
-          <div className="label">Название сделки</div>
-          <div className="value">{dealDetail?.title ?? "—"}</div>
-        </div>
+        <div className="debt-modal__content">
 
-        <div className="row">
-            <label className="label" htmlFor="amount">
-            Размер долга
-            </label>
-            {isEditing ? (
-            <input
-                id="amount"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                name="amount"
-                className="debt__input"
-                value={state.amount}
-                onChange={onChange}
-            />
-            ) : (
-            <div className="value">
-                {dealDetail?.debt_amount ?? dealDetail?.amount ?? "—"}
+          <div className="debt-modal__info-grid">
+            <div className="debt-modal__info-item">
+              <div className="debt-modal__info-label">ФИО</div>
+              <div className="debt-modal__info-value">
+                {dealDetail?.client_full_name ?? "—"}
+              </div>
             </div>
+
+            <div className="debt-modal__info-item">
+              <div className="debt-modal__info-label">Название сделки</div>
+              <div className="debt-modal__info-value">
+                {dealDetail?.title ?? "—"}
+              </div>
+            </div>
+
+            <div className="debt-modal__info-item">
+              <label
+                className="debt-modal__info-label"
+                htmlFor="debt-modal-amount"
+              >
+                Размер долга
+              </label>
+              {isEditing ? (
+                <input
+                  id="debt-modal-amount"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  name="amount"
+                  className="debt-modal__input debt__input"
+                  value={state.amount}
+                  onChange={onChange}
+                />
+              ) : (
+                <div className="debt-modal__info-value">
+                  {dealDetail?.debt_amount ?? dealDetail?.amount ?? "—"}
+                </div>
+              )}
+            </div>
+
+            <div className="debt-modal__info-item">
+              <label
+                className="debt-modal__info-label"
+                htmlFor="debt-modal-debt_months"
+              >
+                Срок продления (мес.)
+              </label>
+              {isEditing ? (
+                <input
+                  id="debt-modal-debt_months"
+                  type="number"
+                  inputMode="numeric"
+                  className="debt-modal__input debt__input"
+                  step="1"
+                  min="1"
+                  name="debt_months"
+                  value={state.debt_months}
+                  onChange={onChange}
+                />
+              ) : (
+                <div className="debt-modal__info-value">
+                  {dealDetail?.debt_months ?? "—"}
+                </div>
+              )}
+            </div>
+
+            <div className="debt-modal__info-item">
+              <label
+                className="debt-modal__info-label"
+                htmlFor="debt-modal-first_due_date"
+              >
+                Дата первого платежа
+              </label>
+              {isEditing ? (
+                <input
+                  id="debt-modal-first_due_date"
+                  type="date"
+                  className="debt-modal__input debt__input"
+                  name="first_due_date"
+                  value={state.first_due_date}
+                  onChange={onChange}
+                />
+              ) : (
+                <div className="debt-modal__info-value">
+                  {dealDetail?.first_due_date
+                    ? formatDateDDMMYYYY(dealDetail.first_due_date)
+                    : "—"}
+                </div>
+              )}
+            </div>
+
+            {dealDetail?.prepayment !== "0.00" && (
+              <div className="debt-modal__info-item">
+                <div className="debt-modal__info-label">Предоплата</div>
+                <div className="debt-modal__info-value">
+                  {dealDetail?.prepayment ?? "—"}
+                </div>
+              </div>
             )}
-        </div>
 
-        <div className="row">
-            <label className="label" htmlFor="debt_months">
-            Срок продления (мес.)
-            </label>
-            {isEditing ? (
-            <input
-                id="debt_months"
-                type="number"
-                inputMode="numeric"
-                className="debt__input"
-                step="1"
-                min="1"
-                name="debt_months"
-                value={state.debt_months}
-                onChange={onChange}
-            />
-            ) : (
-            <div className="value">{dealDetail?.debt_months ?? "—"}</div>
+            <div className="debt-modal__info-item">
+              <div className="debt-modal__info-label">Ежемесячный платёж</div>
+              <div className="debt-modal__info-value">{monthly}</div>
+            </div>
+
+            <div className="debt-modal__info-item">
+              <div className="debt-modal__info-label">Остаток долга</div>
+              <div className="debt-modal__info-value">
+                {dealDetail?.remaining_debt ?? "—"}
+              </div>
+            </div>
+
+            {dealDetail?.note && (
+              <div className="debt-modal__info-item">
+                <div className="debt-modal__info-label">Заметки</div>
+                <div className="debt-modal__info-value">{dealDetail.note}</div>
+              </div>
             )}
-        </div>
+          </div>
 
-        <div className="row">
-            <label className="label" htmlFor="first_due_date">
-            Дата первого платежа
-            </label>
-            {isEditing ? (
-            <input
-                id="first_due_date"
-                type="date"
-                className="debt__input"
-                name="first_due_date"
-                value={state.first_due_date}
-                onChange={onChange}
-            />
-            ) : (
-            <div className="value">
-                {dealDetail?.first_due_date
-                ? formatDateDDMMYYYY(dealDetail.first_due_date)
-                : "—"}
-            </div>
-            )}
-        </div>
-
-        {dealDetail?.prepayment !== "0.00" && (
-            <div className="row">
-            <div className="label">Предоплата</div>
-            <div className="value">{dealDetail?.prepayment ?? "—"}</div>
-            </div>
-        )}
-        <div className="row">
-            <div className="label">Ежемесячный платёж</div>
-            <div className="value">{monthly}</div>
-        </div>
-
-        <div className="row">
-            <div className="label">Остаток долга</div>
-            <div className="value">{dealDetail?.remaining_debt ?? "—"}</div>
-        </div>
-
-        {dealDetail?.note && (
-            <div className="row">
-            <div className="label">Заметки</div>
-            <div className="value">{dealDetail.note}</div>
-            </div>
-        )}
-
-        {/* ===== График платежей (с сервера) ===== */}
-        {installments.length > 0 && (
-            <section className="schedule">
-            <div className="row3">
-                <div className="label">График платежей</div>
-                <div className="value" aria-live="polite">
-                <table className="schedule__table" role="table">
+          {/* ===== График платежей (с сервера) ===== */}
+          {installments.length > 0 && (
+            <section className="debt-modal__schedule schedule">
+              <div className="debt-modal__schedule-header">
+                <div className="debt-modal__schedule-title">График платежей</div>
+              </div>
+              <div className="debt-modal__schedule-content" aria-live="polite">
+                <div className="debt-modal__schedule-table-wrapper">
+                  <table className="debt-modal__schedule-table schedule__table" role="table">
                     <thead>
                     <tr>
                         <th style={{ textAlign: "left" }}>№</th>
@@ -371,7 +409,11 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                         return (
                         <tr
                             key={p.number}
-                            className={paid ? "schedule__row--paid" : undefined}
+                            className={
+                              paid
+                                ? "debt-modal__schedule-row--paid schedule__row--paid"
+                                : undefined
+                            }
                             aria-checked={paid}
                         >
                             <td style={{ textAlign: "left" }}>{p.number}</td>
@@ -381,7 +423,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                             {isEditing ? (
                                 <input
                                 type="date"
-                                className="debt__input"
+                                className="debt-modal__input debt__input"
                                 value={dueDateInputValue || ""}
                                 onChange={(e) =>
                                     setInstallmentEdits((prev) => ({
@@ -406,7 +448,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                className="debt__input"
+                                className="debt-modal__input debt__input"
                                 value={amountInputValue}
                                 onChange={(e) =>
                                     setInstallmentEdits((prev) => ({
@@ -493,12 +535,7 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                                 </span>
                             ) : (
                                 <button
-                                className="schedule__pay-btn"
-                                style={{
-                                    background: "transparent",
-                                    border: "none",
-                                    cursor: "pointer",
-                                }}
+                                className="debt-modal__pay-btn schedule__pay-btn"
                                 onClick={() => {
                                     const userEnteredAmount =
                                     paymentAmounts[p.number] !== undefined &&
@@ -624,57 +661,71 @@ const DebtModal = ({ id, onClose, onChanged }) => {
                     </tfoot>
                 </table>
                 {firstDueDate && (
-                    <p className="schedule__hint">
+                  <p className="debt-modal__schedule-hint schedule__hint">
                     Первый платёж: {formatDateDDMMYYYY(firstDueDate)}.
-                    </p>
+                  </p>
                 )}
-                </div>
+              </div>
             </div>
-            </section>
-        )}
+          </section>
+          )}
+        </div>
 
-        {!isEditing ? (
-            <div className="actions">
-            <button className="btn edit-btn" onClick={() => setIsEditing(true)}>
+        <div className="debt-modal__actions">
+          {!isEditing ? (
+            <>
+              <button
+                className="debt-modal__btn debt-modal__btn--primary btn edit-btn"
+                onClick={() => setIsEditing(true)}
+              >
                 Редактировать
-            </button>
-            <button
-                className="btn edit-btn"
+              </button>
+              <button
+                className="debt-modal__btn debt-modal__btn--danger btn edit-btn"
                 onClick={() => onDeleteDebts(dealDetail?.id)}
-            >
+              >
                 Удалить
-            </button>
-            <button className="btn edit-btn" onClick={onClose}>
+              </button>
+              <button
+                className="debt-modal__btn debt-modal__btn--secondary btn edit-btn"
+                onClick={onClose}
+              >
                 Отмена
-            </button>
-            </div>
-        ) : (
-            <div className="actions">
-            <button className="btn edit-btn" onClick={onSubmit}>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="debt-modal__btn debt-modal__btn--primary btn edit-btn"
+                onClick={onSubmit}
+              >
                 Сохранить
-            </button>
-            <button
-                className="btn edit-btn"
+              </button>
+              <button
+                className="debt-modal__btn debt-modal__btn--secondary btn edit-btn"
                 onClick={() => {
-                setState({
+                  setState({
                     amount:
-                    dealDetail?.amount != null ? String(dealDetail.amount) : "",
+                      dealDetail?.amount != null
+                        ? String(dealDetail.amount)
+                        : "",
                     debt_months:
-                    dealDetail?.debt_months != null
+                      dealDetail?.debt_months != null
                         ? String(dealDetail.debt_months)
                         : "",
                     first_due_date: dealDetail?.first_due_date
-                    ? toYYYYMMDD(dealDetail.first_due_date)
-                    : "",
-                });
-                setInstallmentEdits({});
-                setIsEditing(false);
+                      ? toYYYYMMDD(dealDetail.first_due_date)
+                      : "",
+                  });
+                  setInstallmentEdits({});
+                  setIsEditing(false);
                 }}
-            >
+              >
                 Отмена
-            </button>
-            </div>
-        )}
+              </button>
+            </>
+          )}
+        </div>
 
         <AlertModal
           open={alert.open}

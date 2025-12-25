@@ -104,8 +104,8 @@
     padding: 12px 16px;
     border-radius: 10px;
     border: none;
-    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-    color: #ffffff;
+    background: #f7d74f;
+    color: #000000;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
@@ -117,7 +117,8 @@
 
     &:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 10px 25px rgba(22, 163, 74, 0.3);
+      box-shadow: 0 10px 25px rgba(247, 215, 79, 0.3);
+      background: #d4b800;
     }
 
     &:disabled {
@@ -152,5 +153,3 @@
     }
   }
 }
-
-

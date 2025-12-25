@@ -573,13 +573,24 @@
 //   );
 // }
 
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Search, Plus, LayoutGrid, Table2 } from "lucide-react";
 import "./Clients.scss";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 
 const HostelClients = lazy(() => import("../../Hostel/Clients/Clients"));
+
+const STORAGE_KEY = "clients_view_mode";
+
+const getInitialViewMode = () => {
+  if (typeof window === "undefined") return "table";
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved === "table" || saved === "cards") return saved;
+  const isSmall = window.matchMedia("(max-width: 1199px)").matches;
+  return isSmall ? "cards" : "table";
+};
 
 /* ===== helpers ===== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -680,7 +691,10 @@ export default function MarketClients() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [date, setDate] = useState(todayStr());
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
+  const debounceTimerRef = useRef(null);
 
   const [acceptedTypeByTab, setAcceptedTypeByTab] = useState({
     ...PRIMARY_TYPE_BY_TAB,
@@ -752,6 +766,27 @@ export default function MarketClients() {
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, viewMode);
+    }
+  }, [viewMode]);
+
+  // Debounce для поиска
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [search]);
+
+  useEffect(() => {
     if (activeTab === "clientsBooking") return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -780,8 +815,8 @@ export default function MarketClients() {
       return tab === activeTab;
     });
 
-    if (!search) return onlyThisTab;
-    const s = search.toLowerCase();
+    if (!debouncedSearch) return onlyThisTab;
+    const s = debouncedSearch.toLowerCase();
     return onlyThisTab.filter(
       (c) =>
         String(c.full_name || c.fio || "")
@@ -791,7 +826,7 @@ export default function MarketClients() {
           .toLowerCase()
           .includes(s)
     );
-  }, [rows, search, activeTab]);
+  }, [rows, debouncedSearch, activeTab]);
 
   /* ===== переходы ТОЛЬКО абсолютные ===== */
   const openCard = (row) => navigate(`${CARD_BASE}${row.id}`, { state: row });
@@ -947,15 +982,15 @@ export default function MarketClients() {
 
   // ───────────────────────── остальные вкладки
   return (
-    <section
-      className="clients overflow-scroll maxw-full"
-      style={{ maxWidth: "100%" }}
-    >
-      <nav className="tabs" aria-label="Секции">
+    <div className="clients-page">
+      {/* Tabs */}
+      <nav className="clients-tabs" aria-label="Секции">
         {TABS.map((t) => (
           <button
             key={t.key}
-            className={`tab ${activeTab === t.key ? "tabActive" : ""}`}
+            className={`clients-tabs__tab ${
+              activeTab === t.key ? "clients-tabs__tab--active" : ""
+            }`}
             onClick={() => setActiveTab(t.key)}
             type="button"
           >
@@ -964,103 +999,209 @@ export default function MarketClients() {
         ))}
       </nav>
 
-      <header className="header">
-        <div>
-          <h2 className="title">{title}</h2>
-          <p className="subtitle">
-            Список {title.toLowerCase()} и быстрый переход в карточку
-          </p>
+      {/* Header */}
+      <div className="clients-header">
+        <div className="clients-header__left">
+          <div className="clients-header__icon">
+            <div className="clients-header__icon-box">👥</div>
+          </div>
+          <div className="clients-header__title-section">
+            <h1 className="clients-header__title">{title}</h1>
+            <p className="clients-header__subtitle">
+              Список {title.toLowerCase()} и быстрый переход в карточку
+            </p>
+          </div>
         </div>
-        <div className="actions">
+        {activeTab !== "debtors" && (
+          <button
+            className="clients-header__create-btn"
+            onClick={() => setIsAddOpen(true)}
+          >
+            <Plus size={16} />
+            {activeTab === "clients"
+              ? "Новый клиент"
+              : activeTab === "suppliers"
+              ? "Новый поставщик"
+              : sectorName === "Строительная компания"
+              ? "Новый подрядчик"
+              : "Новый реализатор"}
+          </button>
+        )}
+      </div>
+
+      {/* Search and Filters */}
+      <div className="clients-search-section">
+        <div className="clients-search">
+          <Search className="clients-search__icon" size={18} />
           <input
-            className="search"
-            placeholder="Поиск по ФИО или телефону"
+            type="text"
+            className="clients-search__input"
+            placeholder="Поиск по ФИО или телефону..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <input
-            type="date"
-            className="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-          <button className="btn" onClick={load} disabled={loading}>
-            Обновить
-          </button>
+        </div>
 
-          {/* На вкладке должников кнопку добавления скрываем */}
-          {activeTab !== "debtors" && (
-            <button className="btn" onClick={() => setIsAddOpen(true)}>
-              {activeTab === "clients"
-                ? "Новый клиент"
-                : activeTab === "suppliers"
-                ? "Новый поставщик"
-                : sectorName === "Строительная компания"
-                ? "Новый подрядчик"
-                : "Новый реализатор"}
+        <div className="clients-search__info">
+          <span>
+            Всего: {rows.length} • Найдено: {filtered.length}
+          </span>
+
+          {/* View toggle */}
+          <div className="clients-search__view-toggle">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`clients-view-btn ${
+                viewMode === "table" ? "clients-view-btn--active" : ""
+              }`}
+            >
+              <Table2 size={16} />
+              Таблица
             </button>
-          )}
-        </div>
-      </header>
 
-      {error && <div className="error">{error}</div>}
-
-      {loading ? (
-        <div className="skeletonRow">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="skeleton" />
-          ))}
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`clients-view-btn ${
+                viewMode === "cards" ? "clients-view-btn--active" : ""
+              }`}
+            >
+              <LayoutGrid size={16} />
+              Карточки
+            </button>
+          </div>
         </div>
-      ) : (
-        <div className="overflow-auto">
-          <div className="tableContainer w-[full]">
-            <div className="table w-full">
-              <div className="thead">
-                <span>ФИО</span>
-                <span>Телефон</span>
-                <span>Тип</span>
-                <span>Дата</span>
-                <span></span>
-              </div>
-              <div className="tbody ">
-                {filtered.map((c) => (
-                  <div
-                    className="row grid grid-cols-[2fr_1.3fr_1fr_1fr_100px]"
-                    key={c.id}
-                    onClick={() => openCard(c)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && openCard(c)}
-                  >
-                    <span
-                      className="ellipsis"
-                      title={c.full_name || c.fio || "—"}
+      </div>
+
+      {error && <div className="clients-error">{error}</div>}
+
+      {/* Table/Cards Container */}
+      <div className="clients-table-container">
+        {viewMode === "table" && (
+          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="clients-table w-full min-w-[800px]">
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>ФИО</th>
+                  <th>Телефон</th>
+                  <th>Тип</th>
+                  <th>Дата</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="clients-table__loading">
+                      Загрузка...
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="clients-table__empty">
+                      {search ? "Ничего не найдено" : "Нет данных"}
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((c, index) => (
+                    <tr
+                      key={c.id}
+                      className="clients-table__row"
+                      onClick={() => openCard(c)}
                     >
-                      {c.full_name || c.fio || "—"}
-                    </span>
-                    <span>{c.phone || "—"}</span>
-                    <span>{ctxTypeLabel(c.type)}</span>
-                    <span>{c.date || "—"}</span>
-                    <span className="linkCell">
+                      <td data-label="№">{index + 1}</td>
+                      <td data-label="ФИО" className="clients-table__name">
+                        {c.full_name || c.fio || "—"}
+                      </td>
+                      <td data-label="Телефон">{c.phone || "—"}</td>
+                      <td data-label="Тип">{ctxTypeLabel(c.type)}</td>
+                      <td data-label="Дата">{c.date || "—"}</td>
+                      <td
+                        data-label="Действия"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Link
+                          to={`${CARD_BASE}${c.id}`}
+                          state={c}
+                          className="clients-table__link"
+                        >
+                          Открыть
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Cards View */}
+        {viewMode === "cards" && (
+          <div className="block">
+            {loading ? (
+              <div className="clients-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                Загрузка...
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="clients-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                {debouncedSearch ? "Ничего не найдено" : "Нет данных"}
+              </div>
+            ) : (
+              <div className="clients-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filtered.map((c, index) => (
+                  <div
+                    key={c.id}
+                    className="clients-card"
+                    onClick={() => openCard(c)}
+                  >
+                    <div className="clients-card__field">
+                      <span className="clients-card__label">№</span>
+                      <span className="clients-card__value">{index + 1}</span>
+                    </div>
+                    <div className="clients-card__field">
+                      <span className="clients-card__label">ФИО</span>
+                      <span className="clients-card__value">
+                        {c.full_name || c.fio || "—"}
+                      </span>
+                    </div>
+                    <div className="clients-card__field">
+                      <span className="clients-card__label">Телефон</span>
+                      <span className="clients-card__value">
+                        {c.phone || "—"}
+                      </span>
+                    </div>
+                    <div className="clients-card__field">
+                      <span className="clients-card__label">Тип</span>
+                      <span className="clients-card__value">
+                        {ctxTypeLabel(c.type)}
+                      </span>
+                    </div>
+                    <div className="clients-card__field">
+                      <span className="clients-card__label">Дата</span>
+                      <span className="clients-card__value">
+                        {c.date || "—"}
+                      </span>
+                    </div>
+                    <div className="clients-card__actions">
                       <Link
-                        to={`${CARD_BASE}${c.id}`} // абсолютный путь
+                        to={`${CARD_BASE}${c.id}`}
                         state={c}
                         onClick={(e) => e.stopPropagation()}
-                        className="link"
+                        className="clients-card__link"
                       >
                         Открыть
                       </Link>
-                    </span>
+                    </div>
                   </div>
                 ))}
-                {filtered.length === 0 && (
-                  <div className="empty">Ничего не найдено</div>
-                )}
               </div>
-            </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ===== Add Modal ===== */}
       {isAddOpen && (
@@ -1143,6 +1284,6 @@ export default function MarketClients() {
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }

@@ -343,7 +343,7 @@ const Settings = () => {
           .writeText(tokenString)
           .then(() => {
             copyBtn.textContent = "Скопировано!";
-            copyBtn.style.background = "#10b981";
+            copyBtn.style.background = "#f7d74f";
             setTimeout(() => {
               copyBtn.textContent = "Копировать";
               copyBtn.style.background = "#2563eb";

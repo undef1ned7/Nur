@@ -3111,8 +3111,8 @@ const FinishedGoods = ({ products, onChanged }) => {
                               style={{
                                 padding: "6px 12px",
                                 fontSize: "12px",
-                                background: "#10b981",
-                                color: "white",
+                                background: "#f7d74f",
+                                color: "black",
                               }}
                               onClick={() => handleOpen1(item)}
                             >
@@ -3255,8 +3255,8 @@ const FinishedGoods = ({ products, onChanged }) => {
                           style={{
                             padding: "6px 12px",
                             fontSize: "12px",
-                            background: "#10b981",
-                            color: "white",
+                            background: "#f7d74f",
+                            color: "black",
                             flex: "1",
                             minWidth: "80px",
                           }}

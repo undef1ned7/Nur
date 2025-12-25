@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useDispatch } from "react-redux";
 import {
@@ -15,10 +15,11 @@ import {
   getCashBoxes,
   useCash,
 } from "../../../../store/slices/cashSlice";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Search, LayoutGrid, Table2 } from "lucide-react";
 import { useUser } from "../../../../store/slices/userSlice";
 import AddProductModal from "../../../Deposits/Sklad/AddProduct/AddProductModal";
 import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
+import "../../Market/Warehouse/Warehouse.scss";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -342,9 +343,46 @@ const RawMaterialsWarehouse = () => {
   const [showAddProductModal, setShowAddProductModal] = useState(false);
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  // View mode (table/cards)
+  const STORAGE_KEY = "raw_materials_view_mode";
+  const getInitialViewMode = () => {
+    if (typeof window === "undefined") return "table";
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === "table" || saved === "cards") return saved;
+    const isSmall = window.matchMedia("(max-width: 1199px)").matches;
+    return isSmall ? "cards" : "table";
+  };
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
+  const debounceTimerRef = useRef(null);
+
+  // Debounce для поиска
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [search]);
+
+  // Сохраняем режим просмотра в localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, viewMode);
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     dispatch(fetchProductsAsync());
@@ -372,7 +410,7 @@ const RawMaterialsWarehouse = () => {
   const filtered = useMemo(() => {
     const from = dateFrom ? toStartOfDay(dateFrom) : null;
     const to = dateTo ? toEndOfDay(dateTo) : null;
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
 
     return (products || [])
       .filter((p) => {
@@ -395,7 +433,9 @@ const RawMaterialsWarehouse = () => {
         return true;
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }, [products, search, categoryId, dateFrom, dateTo]);
+  }, [products, debouncedSearch, categoryId, dateFrom, dateTo]);
+
+  const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
 
   const handleOpen = (id) => {
     setShowAddProductModal(true);
@@ -415,27 +455,51 @@ const RawMaterialsWarehouse = () => {
   };
 
   return (
-    <div className="sklad__warehouse">
-      <div className="sklad__header">
-        <div
-          className="sklad__left"
-          style={{
-            gap: 12,
-            display: "flex",
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
+    <div className="warehouse-page">
+      {/* Header */}
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon">
+            <div className="warehouse-header__icon-box">📦</div>
+          </div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">Склад сырья</h1>
+            <p className="warehouse-header__subtitle">
+              Управление сырьем и материалами
+            </p>
+          </div>
+        </div>
+        <button
+          className="warehouse-header__create-btn"
+          onClick={() => setShowAddModal(true)}
         >
+          <Plus size={16} />
+          Добавить сырье
+        </button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="warehouse-search-section">
+        <div className="warehouse-search">
+          <Search className="warehouse-search__icon" size={18} />
           <input
             type="text"
-            placeholder="Поиск по названию товара"
-            className="sklad__search"
+            className="warehouse-search__input"
+            placeholder="Поиск по названию сырья..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
 
+        <div className="warehouse-search__info flex flex-wrap items-center gap-2">
+          <span>
+            Всего: {products?.length || 0} • Найдено: {filtered.length}
+          </span>
+
+          {/* Category filter */}
           <select
-            className="employee__search-wrapper"
+            className="warehouse-search__input"
+            style={{ width: "auto", minWidth: "180px" }}
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
           >
@@ -447,123 +511,289 @@ const RawMaterialsWarehouse = () => {
             ))}
           </select>
 
-          {/* Дата ОТ / ДО */}
+          {/* Date filters */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-sm text-slate-600">От:</label>
+            <input
+              type="date"
+              className="warehouse-search__input"
+              style={{ width: "auto", minWidth: "140px" }}
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+            <label className="text-sm text-slate-600">До:</label>
+            <input
+              type="date"
+              className="warehouse-search__input"
+              style={{ width: "auto", minWidth: "140px" }}
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+            {(dateFrom || dateTo || search || categoryId) && (
+              <button
+                type="button"
+                className="warehouse-search__filter-btn"
+                onClick={resetFilters}
+              >
+                Сбросить
+              </button>
+            )}
+          </div>
+
+          {/* View toggle */}
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                viewMode === "table"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
+              }`}
+            >
+              <Table2 size={16} />
+              Таблица
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                viewMode === "cards"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
+              }`}
+            >
+              <LayoutGrid size={16} />
+              Карточки
+            </button>
+          </div>
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <button className="sklad__add" onClick={() => setShowAddModal(true)}>
-            <Plus size={16} style={{ marginRight: 4 }} /> Добавить товар
-          </button>
-        </div>
       </div>
 
-      <div
-        className="date-filter"
-        style={{
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          marginTop: "15px",
-        }}
-      >
-        <label style={{ opacity: 0.7 }}>От</label>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="employee__search-wrapper"
-        />
-        <label style={{ opacity: 0.7 }}>До</label>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="employee__search-wrapper"
-        />
-        <button
-          type="button"
-          onClick={resetFilters}
-          className="sklad__add"
-          style={{ padding: "6px 10px" }}
-        >
-          Сбросить
-        </button>
-      </div>
-
-      {/* Итоговая строка */}
-      <div style={{ margin: "8px 0", opacity: 0.8 }}>
-        Найдено: {filtered.length}
-        {products?.length ? ` из ${products.length}` : ""}
-      </div>
-
-      {loading ? (
-        <p className="sklad__loading-message">Загрузка товаров...</p>
-      ) : error ? (
-        <p className="sklad__error-message">Ошибка загрузки:</p>
-      ) : filtered.length === 0 ? (
-        <p className="sklad__no-products-message">
-          Нет товаров по заданным фильтрам.
-        </p>
-      ) : (
-        <div className="table-wrapper">
-          <table className="sklad__table">
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" />
-                </th>
-                <th>№</th>
-                <th>Название</th>
-                <th>Ед.</th>
-                <th>Дата</th>
-                <th>Цена</th>
-                <th>Количество</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((item, index) => (
-                <tr key={item.id}>
-                  <td>
-                    <input type="checkbox" />
-                  </td>
-                  <td>{index + 1}</td>
-                  <td>
-                    <strong>{item.name}</strong>
-                  </td>
-                  <td>{item.unit || "-"}</td>
-                  <td>{new Date(item.created_at).toLocaleString()}</td>
-                  <td>{item.price}</td>
-                  <td>
-                    {item.quantity === 0 ? (
-                      <span className="sell__badge--danger">Нет в наличии</span>
-                    ) : (
-                      item.quantity
-                    )}
-                  </td>
-                  <td>
-                    <button
-                      className="btn edit-btn"
-                      style={{ marginRight: 10 }}
-                      onClick={() => handleOpen(item)}
-                    >
-                      Добавить
-                    </button>
-                    <button
-                      type="button"
-                      className="btn edit-btn"
-                      // style={{ padding: "4px 8px" }}
-                      onClick={() => openEdit(item)}
-                    >
-                      Редактировать
-                    </button>
-                  </td>
+      {/* Products */}
+      <div className="warehouse-table-container w-full">
+        {/* ===== TABLE ===== */}
+        {viewMode === "table" && (
+          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="warehouse-table w-full min-w-[900px]">
+              <thead>
+                <tr>
+                  <th>№</th>
+                  <th>Название</th>
+                  <th>Ед.</th>
+                  <th>Дата</th>
+                  <th>Цена</th>
+                  <th>Количество</th>
+                  <th>Действия</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="warehouse-table__loading">
+                      Загрузка...
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={7} className="warehouse-table__empty">
+                      Ошибка загрузки
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="warehouse-table__empty">
+                      Сырье не найдено
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item, index) => (
+                    <tr key={item.id} className="warehouse-table__row">
+                      <td>{index + 1}</td>
+                      <td className="warehouse-table__name">
+                        <div className="warehouse-table__name-cell">
+                          <span>{item.name || "—"}</span>
+                        </div>
+                      </td>
+                      <td>{item.unit || "—"}</td>
+                      <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                      <td>{formatPrice(item.price)}</td>
+                      <td>
+                        {item.quantity === 0 ? (
+                          <span
+                            style={{
+                              padding: "4px 8px",
+                              background: "#fee2e2",
+                              color: "#dc2626",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                            }}
+                          >
+                            Нет в наличии
+                          </span>
+                        ) : (
+                          item.quantity
+                        )}
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              background: "#f7d74f",
+                              color: "black",
+                            }}
+                            onClick={() => handleOpen(item)}
+                          >
+                            Добавить
+                          </button>
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              // background: "#3b82f6",
+                              // color: "#fff",
+                            }}
+                            onClick={() => openEdit(item)}
+                          >
+                            Редактировать
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ===== CARDS ===== */}
+        {viewMode === "cards" && (
+          <div className="block">
+            {loading ? (
+              <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                Загрузка...
+              </div>
+            ) : error ? (
+              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                Ошибка загрузки
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                Сырье не найдено
+              </div>
+            ) : (
+              <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filtered.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs text-slate-500">#{idx + 1}</div>
+                      <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
+                        {item.name || "—"}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                        <span className="whitespace-nowrap">
+                          Ед. изм:{" "}
+                          <span className="font-medium">
+                            {item.unit || "—"}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-xl bg-slate-50 p-2">
+                        <div className="text-slate-500">Цена</div>
+                        <div className="mt-0.5 font-semibold text-slate-900">
+                          {formatPrice(item.price)}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-50 p-2">
+                        <div className="text-slate-500">Дата</div>
+                        <div className="mt-0.5 font-semibold text-slate-900">
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </div>
+                      </div>
+
+                      <div className="col-span-2 rounded-xl bg-slate-50 p-2">
+                        <div className="text-slate-500">Количество</div>
+                        <div className="mt-0.5 font-semibold text-slate-900">
+                          {item.quantity === 0 ? (
+                            <span
+                              style={{
+                                padding: "2px 6px",
+                                background: "#fee2e2",
+                                color: "#dc2626",
+                                borderRadius: "4px",
+                                fontSize: "11px",
+                              }}
+                            >
+                              Нет в наличии
+                            </span>
+                          ) : (
+                            item.quantity
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="mt-4 flex flex-wrap gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        className="warehouse-header__create-btn"
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          background: "#f7d74f",
+                          color: "black",
+                          flex: "1",
+                          minWidth: "80px",
+                        }}
+                        onClick={() => handleOpen(item)}
+                      >
+                        Добавить
+                      </button>
+                      <button
+                        className="warehouse-header__create-btn"
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: "12px",
+                          // background: "#3b82f6",
+                          color: "#000",
+                          flex: "1",
+                          minWidth: "80px",
+                        }}
+                        onClick={() => openEdit(item)}
+                      >
+                        Редактировать
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {showAddModal && (
         <AddModal

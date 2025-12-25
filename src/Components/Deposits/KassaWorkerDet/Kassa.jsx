@@ -591,12 +591,14 @@ const KassaDet = () => {
                           <tbody>
                             {data.flows.map((flow) => (
                               <tr key={flow.id}>
-                                <td>
+                                <td data-label="Тип">
                                   {flow.type === "income" ? "Приход" : "Расход"}
                                 </td>
-                                <td>{flow.name || flow.title}</td>
-                                <td>{flow.amount}</td>
-                                <td>
+                                <td data-label="Наименование">
+                                  {flow.name || flow.title}
+                                </td>
+                                <td data-label="Сумма">{flow.amount}</td>
+                                <td data-label="Время">
                                   {new Date(flow.created_at).toLocaleTimeString(
                                     "ru-RU",
                                     {
@@ -627,12 +629,14 @@ const KassaDet = () => {
                       <tbody>
                         {reportData.flows.map((flow) => (
                           <tr key={flow.id}>
-                            <td>
+                            <td data-label="Тип">
                               {flow.type === "income" ? "Приход" : "Расход"}
                             </td>
-                            <td>{flow.name || flow.title}</td>
-                            <td>{flow.amount}</td>
-                            <td>
+                            <td data-label="Наименование">
+                              {flow.name || flow.title}
+                            </td>
+                            <td data-label="Сумма">{flow.amount}</td>
+                            <td data-label="Время">
                               {new Date(flow.created_at).toLocaleTimeString(
                                 "ru-RU",
                                 {

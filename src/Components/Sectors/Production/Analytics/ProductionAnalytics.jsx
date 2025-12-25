@@ -962,56 +962,56 @@ const ProductionAnalytics = () => {
 
       {/* Таблицы: топы по товарам и пользователям */}
       <div className="agent-analytics__section">
-        <div className="agent-analytics__charts">
-          <div className="agent-analytics__table-card">
-            <h3 className="agent-analytics__table-title">
-              Топ товаров по продажам
-            </h3>
-            <div className="agent-analytics__table">
-              <table>
-                <thead>
+        {/* <div className="agent-analytics__charts"> */}
+        <div className="agent-analytics__table-card">
+          <h3 className="agent-analytics__table-title">
+            Топ товаров по продажам
+          </h3>
+          <div className="agent-analytics__table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Товар</th>
+                  <th>Количество</th>
+                  <th>Сумма (сом)</th>
+                  <th>% от общего</th>
+                </tr>
+              </thead>
+              <tbody>
+                {charts.top_products_by_sales?.length > 0 ? (
+                  charts.top_products_by_sales.map((product, index) => {
+                    const totalAmount = charts.top_products_by_sales.reduce(
+                      (sum, p) => sum + parseFloat(p.amount || 0),
+                      0
+                    );
+                    const percent =
+                      totalAmount > 0
+                        ? (
+                            (parseFloat(product.amount || 0) / totalAmount) *
+                            100
+                          ).toFixed(1)
+                        : 0;
+                    return (
+                      <tr key={index}>
+                        <td>{product.product_name || "—"}</td>
+                        <td>{formatNumber(product.qty || 0)} шт</td>
+                        <td>{formatMoney(product.amount || 0)} сом</td>
+                        <td>{percent}%</td>
+                      </tr>
+                    );
+                  })
+                ) : (
                   <tr>
-                    <th>Товар</th>
-                    <th>Количество</th>
-                    <th>Сумма (сом)</th>
-                    <th>% от общего</th>
+                    <td colSpan={4} style={{ textAlign: "center" }}>
+                      Нет данных
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {charts.top_products_by_sales?.length > 0 ? (
-                    charts.top_products_by_sales.map((product, index) => {
-                      const totalAmount = charts.top_products_by_sales.reduce(
-                        (sum, p) => sum + parseFloat(p.amount || 0),
-                        0
-                      );
-                      const percent =
-                        totalAmount > 0
-                          ? (
-                              (parseFloat(product.amount || 0) / totalAmount) *
-                              100
-                            ).toFixed(1)
-                          : 0;
-                      return (
-                        <tr key={index}>
-                          <td>{product.product_name || "—"}</td>
-                          <td>{formatNumber(product.qty || 0)} шт</td>
-                          <td>{formatMoney(product.amount || 0)} сом</td>
-                          <td>{percent}%</td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} style={{ textAlign: "center" }}>
-                        Нет данных
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
+        {/* </div> */}
       </div>
 
       <div className="agent-analytics__section">

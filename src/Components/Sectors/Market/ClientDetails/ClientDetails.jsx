@@ -13,7 +13,6 @@ import "./ClientDetails.scss";
 import { useUser } from "../../../../store/slices/userSlice";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 
-
 import {
   listFrom,
   toDecimalString,
@@ -259,7 +258,8 @@ export default function MarketClientDetails() {
 
   return (
     <div className="client-details">
-      <div className="details-top">
+      {/* Header */}
+      <div className="client-details__header details-top">
         <button
           onClick={() =>
             navigate(
@@ -268,43 +268,48 @@ export default function MarketClientDetails() {
                 : "/crm/clients"
             )
           }
-          className="btn btn--ghost"
+          className="client-details__back-btn btn btn--ghost"
         >
           ← Назад
         </button>
-        <div>
-          <button className="primary" onClick={() => openDealForm()}>
+        <div className="client-details__header-actions">
+          <button
+            className="client-details__btn client-details__btn--primary primary"
+            onClick={() => openDealForm()}
+          >
             Быстрое добавление сделки
           </button>
           <button
-            className="btn btn--secondary"
+            className="client-details__btn client-details__btn--secondary btn btn--secondary"
             onClick={() => setShowReconciliation(true)}
-            style={{ marginLeft: 10 }}
           >
             Акт сверки
           </button>
         </div>
       </div>
 
-      <div className="panel">
-        <h2 className="title">{clientName}</h2>
+      {/* Client Info Panel */}
+      <div className="client-details__panel panel">
+        <div className="client-details__panel-header">
+          <h2 className="client-details__title title">{clientName}</h2>
+        </div>
         {clientErr && (
-          <div className="alert alert--error" style={{ marginTop: 8 }}>
+          <div className="client-details__alert alert alert--error">
             {clientErr}
           </div>
         )}
-        <div className="divider"></div>
+        <div className="client-details__divider divider"></div>
 
-        <div className="content-wrapper">
-          <div className="rows">
-            <div className="row">
-              <div className="label">ФИО</div>
-              <div className="value">{clientName}</div>
+        <div className="client-details__content content-wrapper">
+          <div className="client-details__info-grid">
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">ФИО</div>
+              <div className="client-details__info-value">{clientName}</div>
             </div>
 
-            <div className="row">
-              <div className="label">Телефон</div>
-              <div className="value">
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">Телефон</div>
+              <div className="client-details__info-value">
                 {client?.phone ? (
                   <a href={`tel:${String(client.phone).replace(/\D/g, "")}`}>
                     {client.phone}
@@ -315,138 +320,139 @@ export default function MarketClientDetails() {
               </div>
             </div>
 
-            <div className="row">
-              <div className="label">Тип</div>
-              <div className="value">{clientTypeLabel}</div>
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">Тип</div>
+              <div className="client-details__info-value">
+                {clientTypeLabel}
+              </div>
             </div>
 
-            <div className="row">
-              <div className="label">Статус</div>
-              <div className="value">
-                {kindTranslate[client?.status] || client?.status}
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">Статус</div>
+              <div className="client-details__info-value">
+                {kindTranslate[client?.status] || client?.status || "—"}
               </div>
-              <button className="btn edit-btn" onClick={openClientForm}>
+              <button
+                className="client-details__edit-btn btn edit-btn"
+                onClick={openClientForm}
+              >
                 Редактировать
               </button>
             </div>
           </div>
 
-          <div className="debts-wrapper">
-            <div className="debts debts--red">
-              <div className="debts-title">
+          <div className="client-details__stats debts-wrapper">
+            <div className="client-details__stat-card client-details__stat-card--red debts debts--red">
+              <div className="client-details__stat-title debts-title">
                 {sectorName === "Строительная компания"
                   ? "Сумма договора"
                   : "Долг"}
               </div>
-              <div className="debts-amount">
+              <div className="client-details__stat-amount debts-amount">
                 {sectorName === "Строительная компания"
                   ? (totals.sale ?? 0).toFixed(2)
-                  : (totals.debt ?? 0).toFixed(2)}{" "}
-                сом
+                  : (totals.debt ?? 0).toFixed(2)}
+                <span className="client-details__stat-currency">сом</span>
               </div>
             </div>
 
-            <div className="debts debts--green">
-              <div className="debts-title">
+            <div className="client-details__stat-card client-details__stat-card--green debts debts--green">
+              <div className="client-details__stat-title debts-title">
                 {sectorName === "Строительная компания"
                   ? "Предоплата"
                   : "Аванс"}
               </div>
-              <div className="debts-amount">
-                {(totals.prepayment ?? 0).toFixed(2)} сом
+              <div className="client-details__stat-amount debts-amount">
+                {(totals.prepayment ?? 0).toFixed(2)}
+                <span className="client-details__stat-currency">сом</span>
               </div>
             </div>
 
-            <div className="debts debts--orange">
-              <div className="debts-title">
+            <div className="client-details__stat-card client-details__stat-card--orange debts debts--orange">
+              <div className="client-details__stat-title debts-title">
                 {sectorName === "Строительная компания"
                   ? "Остаток долга"
                   : "Продажа"}
               </div>
-              <div className="debts-amount">
+              <div className="client-details__stat-amount debts-amount">
                 {sectorName === "Строительная компания"
                   ? (totals.debt ?? 0).toFixed(2)
-                  : (totals.sale ?? 0).toFixed(2)}{" "}
-                сом
+                  : (totals.sale ?? 0).toFixed(2)}
+                <span className="client-details__stat-currency">сом</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="filters panel" style={{ marginTop: 12 }}>
-        <div className="rows">
-          <div className="row">
-            <div className="label">Дата с</div>
-            <div className="value">
-              <input
-                className="analytics-sales__input"
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
+      {/* Filters Panel */}
+      <div className="client-details__filters filters panel">
+        <div className="client-details__filters-grid">
+          <div className="client-details__filter-item">
+            <label className="client-details__filter-label">Дата с</label>
+            <input
+              className="client-details__filter-input analytics-sales__input"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
           </div>
-          <div className="row">
-            <div className="label">Дата по</div>
-            <div className="value">
-              <input
-                className="analytics-sales__input"
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="label">Быстрый выбор</div>
-            <div
-              className="value"
-              style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
-            >
-              <button
-                className="btn btn--ghost"
-                onClick={() => applyPreset("today")}
-              >
-                Сегодня
-              </button>
-              <button
-                className="btn btn--ghost"
-                onClick={() => applyPreset("week")}
-              >
-                Неделя
-              </button>
-              <button
-                className="btn btn--ghost"
-                onClick={() => applyPreset("month")}
-              >
-                Месяц
-              </button>
-              <button className="btn" onClick={() => applyPreset("clear")}>
-                Очистить
-              </button>
-            </div>
+          <div className="client-details__filter-item">
+            <label className="client-details__filter-label">Дата по</label>
+            <input
+              className="client-details__filter-input analytics-sales__input"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
           </div>
         </div>
-        <div className="muted">
+        <div className="client-details__quick-filters">
+          <button
+            className="client-details__quick-filter-btn btn btn--ghost"
+            onClick={() => applyPreset("today")}
+          >
+            Сегодня
+          </button>
+          <button
+            className="client-details__quick-filter-btn btn btn--ghost"
+            onClick={() => applyPreset("week")}
+          >
+            Неделя
+          </button>
+          <button
+            className="client-details__quick-filter-btn btn btn--ghost"
+            onClick={() => applyPreset("month")}
+          >
+            Месяц
+          </button>
+          <button
+            className="client-details__clear-btn btn"
+            onClick={() => applyPreset("clear")}
+          >
+            Очистить
+          </button>
+        </div>
+        <div className="client-details__filter-info muted">
           Показано: <b>{filteredDeals.length}</b> из {deals.length}
         </div>
       </div>
 
-      <div className="deals-list">
-        <h3>Сделки</h3>
+      {/* Deals List */}
+      <div className="client-details__deals deals-list">
+        <div className="client-details__deals-header">
+          <h3 className="client-details__deals-title">Сделки</h3>
+        </div>
         {dealsLoading && (
-          <div className="muted" style={{ padding: "8px 0" }}>
-            Загрузка…
-          </div>
+          <div className="client-details__deals-loading muted">Загрузка…</div>
         )}
         {dealsErr && (
-          <div className="alert alert--error" style={{ marginBottom: 8 }}>
+          <div className="client-details__alert alert alert--error">
             {dealsErr}
           </div>
         )}
         {!dealsLoading && filteredDeals.length === 0 && (
-          <div className="muted">Сделок нет</div>
+          <div className="client-details__deals-empty muted">Сделок нет</div>
         )}
 
         {filteredDeals.map((deal) => (
@@ -455,22 +461,26 @@ export default function MarketClientDetails() {
             onClick={() => {
               deal.kind === "debt" && dataTransmission(deal.id);
             }}
-            className="deal-item"
+            className="client-details__deal-item deal-item"
           >
-            <span className="deal-name">{deal.title}</span>
-            <span className="deal-budget">
+            <span className="client-details__deal-name deal-name">
+              {deal.title}
+            </span>
+            <span className="client-details__deal-amount deal-budget">
               {Number(deal.amount || 0).toFixed(2)}
             </span>
-            <span className="deal-status">
+            <span className="client-details__deal-status deal-status">
               {deal.kind === "debt" && Number(deal.prepayment || 0) !== 0
                 ? "Предоплата"
                 : kindLabel(deal.kind)}
             </span>
-            <span className="deal-tasks">Нет задач</span>
+            <span className="client-details__deal-tasks deal-tasks">
+              Нет задач
+            </span>
             <div onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => openDealForm(deal)}
-                className="btn edit-btn"
+                className="client-details__edit-btn btn edit-btn"
               >
                 Редактировать
               </button>

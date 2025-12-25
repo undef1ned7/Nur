@@ -179,15 +179,45 @@ const InvoicePreviewModal = ({
     );
   }
 
-  // Нормализация данных из нового формата API
+  // Нормализация данных из нового формата API (как в PDF)
   const items = Array.isArray(invoiceData?.items)
-    ? invoiceData.items.map((item) => ({
-        id: item.id,
-        name: item.name || "Товар",
-        qty: parseFloat(item.qty || 0),
-        price: parseFloat(item.unit_price || 0),
-        total: parseFloat(item.total || 0),
-      }))
+    ? invoiceData.items.map((it) => {
+        const qty = Number(it.qty || it.quantity || 0);
+        const unit = Number(it.unit_price ?? it.price ?? 0);
+        const total = Number(it.total ?? qty * unit);
+
+        // Скидка на уровне товара
+        const itemDiscountPercent = Number(it.discount_percent ?? 0);
+
+        // Цена без скидки товара
+        let priceNoDiscount = Number(
+          it.original_price ??
+            it.price_before_discount ??
+            it.price_without_discount ??
+            0
+        );
+
+        // Если цена без скидки не указана, вычисляем её
+        if (priceNoDiscount === 0 || priceNoDiscount === unit) {
+          if (itemDiscountPercent > 0) {
+            priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
+          } else {
+            priceNoDiscount = unit;
+          }
+        }
+
+        return {
+          id: it.id,
+          name: it.name || it.product_name || "Товар",
+          qty,
+          unit_price: unit,
+          price_no_discount: priceNoDiscount,
+          discount: itemDiscountPercent,
+          total,
+          unit: it.unit || "ШТ",
+          article: it.article || "",
+        };
+      })
     : [];
 
   const subtotal = parseFloat(invoiceData?.totals?.subtotal || 0);
@@ -236,231 +266,177 @@ const InvoicePreviewModal = ({
 
         <div className="invoice-preview-modal__content">
           <div className="invoice-preview-modal__invoice">
+            {/* Дата и время создания */}
+            <div className="invoice-preview-modal__created-date">
+              {formatDateTime(new Date().toISOString())}
+            </div>
+
             {/* Заголовок накладной */}
             <div className="invoice-preview-modal__invoice-header">
               <div className="invoice-preview-modal__invoice-title">
-                НАКЛАДНАЯ № {invoiceNumber}
-              </div>
-              {invoiceDate && (
-                <div className="invoice-preview-modal__invoice-date">
-                  от {formatDateTime(invoiceDate)}
-                </div>
-              )}
-            </div>
-
-            {/* Секция КОМПАНИЯ (Продавец) */}
-            <div className="flex gap-4">
-              <div className="invoice-preview-modal__section w-1/ ">
-                <div className="invoice-preview-modal__section-title">
-                  КОМПАНИЯ
-                </div>
-                <div className="invoice-preview-modal__section-content">
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      Название:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {companyName || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      ИНН:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {companyInn || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      ОКПО:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {companyOkpo || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      P/c:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {companyScore || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      БИК:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {companyBik || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      Адрес:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {companyAddress || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      Тел.:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {companyPhone || "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Секция ПОКУПАТЕЛЬ */}
-              <div className="invoice-preview-modal__section w-1/2">
-                <div className="invoice-preview-modal__section-title">
-                  ПОКУПАТЕЛЬ
-                </div>
-                <div className="invoice-preview-modal__section-content">
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      Название:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {clientName || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      ИНН:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {clientInn || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      ОКПО:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {clientOkpo || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      P/c:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {clientScore || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      БИК:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {clientBik || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      Адрес:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {clientAddress || "—"}
-                    </span>
-                  </div>
-                  <div className="invoice-preview-modal__field">
-                    <span className="invoice-preview-modal__field-label">
-                      Тел.:
-                    </span>
-                    <span className="invoice-preview-modal__field-value">
-                      {clientPhone || "—"}
-                    </span>
-                  </div>
-                </div>
+                Расходная накладная № {invoiceNumber || "—"} от{" "}
+                {formatDate(invoiceDate)}
               </div>
             </div>
+
+            {/* Поставщик и Покупатель */}
+            <div className="invoice-preview-modal__parties">
+              <div className="invoice-preview-modal__party">
+                <span className="invoice-preview-modal__party-label">
+                  Поставщик:{" "}
+                </span>
+                <span className="invoice-preview-modal__party-value">
+                  {seller?.name || "—"}
+                </span>
+                {seller?.address && (
+                  <span className="invoice-preview-modal__party-value">
+                    {" "}
+                    {seller.address}
+                  </span>
+                )}
+              </div>
+              <div className="invoice-preview-modal__party">
+                <span className="invoice-preview-modal__party-label">
+                  Покупатель:{" "}
+                </span>
+                <span className="invoice-preview-modal__party-value">
+                  {buyer ? buyer.name || buyer.full_name || "—" : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Склад */}
+            {invoiceData?.warehouse && (
+              <div className="invoice-preview-modal__warehouse">
+                Склад: «{invoiceData.warehouse}»
+              </div>
+            )}
 
             {/* Таблица товаров */}
-            <div className="invoice-preview-modal__goods-section">
-              <div className="invoice-preview-modal__goods-title">Товар</div>
-              <div className="invoice-preview-modal__goods-table">
-                <div className="invoice-preview-modal__goods-header">
-                  <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--name">
-                    Наименование
+            <div className="invoice-preview-modal__table">
+              {/* Заголовок таблицы */}
+              <div className="invoice-preview-modal__table-header">
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--no">
+                  №
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name">
+                  Наименование
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--article">
+                  Арт.
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--unit">
+                  Ед. изм.
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--qty">
+                  Кол-во
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price-no-discount">
+                  Цена без скидки
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--discount">
+                  Скидка
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price">
+                  Цена
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--sum">
+                  Сумма
+                </div>
+              </div>
+
+              {/* Строки товаров */}
+              {items.length > 0 ? (
+                items.map((item, index) => (
+                  <div
+                    key={item.id || index}
+                    className="invoice-preview-modal__table-row"
+                  >
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--no">
+                      {index + 1}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name">
+                      {item.name}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--article">
+                      {item.article || "—"}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--unit">
+                      {item.unit || "ШТ"}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--qty">
+                      {formatMoney(item.qty)}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price-no-discount">
+                      {formatMoney(item.price_no_discount)}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--discount">
+                      {item.discount > 0 ? `${formatMoney(item.discount)}%` : "—"}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price">
+                      {formatMoney(item.unit_price)}
+                    </div>
+                    <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--sum">
+                      {formatMoney(item.total)}
+                    </div>
                   </div>
-                  <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--qty">
-                    Кол-во
-                  </div>
-                  <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--price">
-                    Цена
-                  </div>
-                  <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--amount">
-                    Сумма
+                ))
+              ) : (
+                <div className="invoice-preview-modal__table-row">
+                  <div
+                    className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name"
+                    style={{ gridColumn: "1 / -1" }}
+                  >
+                    Нет товаров
                   </div>
                 </div>
+              )}
 
-                {items.length > 0 ? (
-                  items.map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      className="invoice-preview-modal__goods-row"
-                    >
-                      <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--name">
-                        {item.name}
-                      </div>
-                      <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--qty">
-                        {item.qty}
-                      </div>
-                      <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--price">
-                        {formatMoney(item.price)}
-                      </div>
-                      <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--amount">
-                        {formatMoney(item.qty * item.price)}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="invoice-preview-modal__goods-row">
-                    <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--name">
-                      Нет товаров
-                    </div>
-                    <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--qty">
-                      —
-                    </div>
-                    <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--price">
-                      —
-                    </div>
-                    <div className="invoice-preview-modal__goods-col invoice-preview-modal__goods-col--amount">
-                      —
-                    </div>
-                  </div>
-                )}
+              {/* Строка "Итого:" */}
+              <div className="invoice-preview-modal__table-row invoice-preview-modal__table-row--total">
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--no"></div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--name">
+                  Итого:
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--article"></div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--unit"></div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--qty">
+                  {formatMoney(items.reduce((sum, it) => sum + it.qty, 0))}
+                </div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price-no-discount"></div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--discount"></div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--price"></div>
+                <div className="invoice-preview-modal__table-col invoice-preview-modal__table-col--sum">
+                  {formatMoney(total)}
+                </div>
               </div>
             </div>
 
             {/* Итоги */}
             <div className="invoice-preview-modal__totals">
-              <div className="invoice-preview-modal__total-row">
-                <span>СУММА (без скидок):</span>
-                <span>{formatMoney(subtotal)}</span>
-              </div>
               <div className="invoice-preview-modal__total-row invoice-preview-modal__total-row--bold">
-                <span>ИТОГО К ОПЛАТЕ:</span>
+                <span>ИТОГО:</span>
                 <span>{formatMoney(total)}</span>
               </div>
+            </div>
+
+            {/* Текст с количеством наименований и суммой */}
+            <div className="invoice-preview-modal__items-info">
+              Всего наименований {items.length}, на сумму {formatMoney(total)}{" "}
+              KGS
             </div>
 
             {/* Подписи */}
             <div className="invoice-preview-modal__signatures">
               <div className="invoice-preview-modal__signature">
                 <div className="invoice-preview-modal__signature-label">
-                  Продавец:
+                  Отпустил
                 </div>
                 <div className="invoice-preview-modal__signature-line"></div>
               </div>
               <div className="invoice-preview-modal__signature">
                 <div className="invoice-preview-modal__signature-label">
-                  Покупатель:
+                  Получил
                 </div>
                 <div className="invoice-preview-modal__signature-line"></div>
               </div>

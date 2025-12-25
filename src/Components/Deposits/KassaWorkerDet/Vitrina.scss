@@ -1125,4 +1125,644 @@
     border-radius: 8px;
     padding: 20px;
   }
+
+  // Адаптивность для таблиц в отчетах
+  .vitrina__table {
+    @media screen and (max-width: 768px) {
+      font-size: 13px;
+      min-width: 100%;
+
+      thead {
+        display: none; // Скрываем заголовки на мобильных
+      }
+
+      tbody {
+        tr {
+          display: block;
+          position: relative;
+          margin-bottom: 16px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          padding: 12px;
+          background: #f9fafb;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          transition: box-shadow 0.2s ease;
+
+          &:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+          }
+        }
+
+        td {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 0;
+          border-bottom: 1px solid #e5e7eb;
+          text-align: right;
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          &::before {
+            content: attr(data-label);
+            font-weight: 600;
+            text-align: left;
+            margin-right: 12px;
+            flex-shrink: 0;
+            color: #6b7280;
+            font-size: 12px;
+            min-width: 120px;
+          }
+        }
+      }
+    }
+
+    @media (max-width: 480px) {
+      font-size: 12px;
+
+      tbody {
+        tr {
+          padding: 10px;
+          margin-bottom: 12px;
+          border-radius: 10px;
+        }
+
+        td {
+          padding: 8px 0;
+          font-size: 12px;
+
+          &::before {
+            font-size: 11px;
+            margin-right: 10px;
+            min-width: 100px;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Стили для детального просмотра кассы
+.cashbox-detail-view {
+  margin-top: 20px;
+
+  @media (max-width: 768px) {
+    margin-top: 15px;
+  }
+
+  @media (max-width: 480px) {
+    margin-top: 12px;
+  }
+}
+
+.vitrina__actions-bottom {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+
+  @media (max-width: 768px) {
+    margin-top: 15px;
+    padding-top: 15px;
+  }
+
+  @media (max-width: 480px) {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+}
+
+// Адаптивность
+@media (max-width: 1024px) {
+  .vitrina {
+    padding: 12px;
+
+    &__header {
+      padding-bottom: 10px;
+    }
+
+    &__tabs {
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    &__tab {
+      font-size: 13px;
+      padding-bottom: 4px;
+    }
+
+    &__toolbar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+
+      &-div {
+        width: 100%;
+      }
+    }
+
+    &__search-wrapper {
+      width: 100%;
+    }
+
+    &__table {
+      font-size: 12px;
+
+      thead th {
+        padding: 10px 8px;
+        font-size: 12px;
+      }
+
+      tbody td {
+        padding: 10px 8px;
+        font-size: 12px;
+      }
+    }
+  }
+
+  .cashbox-reports {
+    &__summary {
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    &__summary-item {
+      min-width: 100%;
+    }
+
+    &__day-totals {
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+
+  .vitrina__modal {
+    max-width: 90%;
+    padding: 20px;
+  }
+
+  .vitrina__filter-modal {
+    max-width: 90%;
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .vitrina {
+    padding: 10px;
+
+    &__header {
+      padding-bottom: 8px;
+    }
+
+    &__tabs {
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    &__tab {
+      font-size: 12px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+
+      &--active {
+        background: #fef3c7;
+        border-color: #facc15;
+      }
+    }
+
+    &__toolbar {
+      margin: 12px 0;
+      gap: 8px;
+    }
+
+    &__search-wrapper {
+      height: 32px;
+      padding: 4px 8px;
+    }
+
+    &__search {
+      font-size: 13px;
+    }
+
+    &__filter-button {
+      padding: 4px;
+    }
+
+    &__table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      font-size: 11px;
+
+      thead {
+        display: none;
+      }
+
+      tbody {
+        display: block;
+      }
+
+      tr {
+        display: block;
+        margin-bottom: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px;
+        background: #fff;
+      }
+
+      td {
+        display: block;
+        padding: 6px 0;
+        text-align: left;
+        border: none;
+        font-size: 13px;
+
+        &:before {
+          content: attr(data-label) ": ";
+          font-weight: 600;
+          color: #6b7280;
+          display: inline-block;
+          min-width: 100px;
+        }
+      }
+    }
+
+    &__pagination {
+      justify-content: center;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+  }
+
+  .cashbox-reports {
+    padding: 15px 0;
+
+    &__tabs {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    &__tab {
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    &__filters {
+      padding: 15px;
+    }
+
+    &__filter-group {
+      gap: 8px;
+    }
+
+    &__date-input {
+      max-width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    &__summary {
+      padding: 15px;
+      gap: 12px;
+    }
+
+    &__summary-item {
+      min-width: 100%;
+    }
+
+    &__summary-label {
+      font-size: 12px;
+    }
+
+    &__summary-value {
+      font-size: 18px;
+    }
+
+    &__day-group {
+      padding: 15px;
+    }
+
+    &__day-header {
+      margin-bottom: 15px;
+      padding-bottom: 12px;
+
+      h4 {
+        font-size: 16px;
+      }
+    }
+
+    &__day-totals {
+      flex-direction: column;
+      gap: 6px;
+
+      span {
+        font-size: 13px;
+      }
+    }
+
+    &__daily {
+      padding: 15px;
+    }
+  }
+
+  .vitrina__modal {
+    max-width: 95%;
+    padding: 15px;
+    margin: 10px;
+  }
+
+  .vitrina__modal-header {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+
+    h3 {
+      font-size: 16px;
+    }
+  }
+
+  .vitrina__modal-section {
+    margin-bottom: 12px;
+
+    label {
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .vitrina__modal-input {
+      padding: 8px;
+      font-size: 13px;
+    }
+  }
+
+  .vitrina__modal-footer {
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 12px;
+    margin-top: 15px;
+
+    .vitrina__button {
+      width: 100%;
+      padding: 12px;
+      font-size: 14px;
+    }
+  }
+
+  .vitrina__filter-modal {
+    max-width: 95%;
+    padding: 15px;
+    margin: 10px;
+  }
+
+  .vitrina__filter-header {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+
+    h3 {
+      font-size: 16px;
+    }
+  }
+
+  .vitrina__filter-section {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 480px) {
+  .vitrina {
+    padding: 8px;
+
+    &__header {
+      padding-bottom: 6px;
+    }
+
+    &__tabs {
+      gap: 6px;
+    }
+
+    &__tab {
+      font-size: 11px;
+      padding: 5px 6px;
+    }
+
+    &__toolbar {
+      margin: 10px 0;
+      gap: 6px;
+    }
+
+    &__search-wrapper {
+      height: 30px;
+      padding: 3px 6px;
+    }
+
+    &__search {
+      font-size: 12px;
+    }
+
+    &__add-expense-button {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+    }
+  }
+
+  .cashbox-reports {
+    padding: 10px 0;
+
+    &__tabs {
+      gap: 6px;
+    }
+
+    &__tab {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    &__filters {
+      padding: 12px;
+    }
+
+    &__date-input {
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    &__summary {
+      padding: 12px;
+      gap: 10px;
+    }
+
+    &__summary-value {
+      font-size: 16px;
+    }
+
+    &__day-group {
+      padding: 12px;
+    }
+
+    &__day-header {
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+
+      h4 {
+        font-size: 14px;
+      }
+    }
+
+    &__daily {
+      padding: 12px;
+    }
+  }
+
+  .vitrina__modal {
+    max-width: 100%;
+    padding: 12px;
+    margin: 0;
+    border-radius: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .vitrina__modal-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+
+    h3 {
+      font-size: 15px;
+    }
+  }
+
+  .vitrina__modal-section {
+    margin-bottom: 10px;
+
+    label {
+      font-size: 11px;
+    }
+
+    .vitrina__modal-input {
+      padding: 6px;
+      font-size: 12px;
+    }
+  }
+
+  .vitrina__filter-modal {
+    max-width: 100%;
+    padding: 12px;
+    margin: 0;
+    border-radius: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+
+  .vitrina__filter-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+
+    h3 {
+      font-size: 15px;
+    }
+  }
+
+  .table-wrapper {
+    margin: 0 -8px;
+    padding: 0 8px;
+  }
+
+  .vitrina__table {
+    min-width: 600px;
+  }
+}
+
+// Стили для улучшения отображения таблицы на мобильных
+@media (max-width: 768px) {
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -10px;
+    padding: 0 10px;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 3px;
+
+      &:hover {
+        background: #a8a8a8;
+      }
+    }
+  }
+
+  // Стили для обычных таблиц (не в отчетах)
+  .vitrina__table:not(.cashbox-reports .vitrina__table) {
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+
+    thead {
+      display: table-header-group;
+    }
+
+    tbody {
+      display: table-row-group;
+    }
+
+    tr {
+      display: table-row;
+      border: none;
+      padding: 0;
+      background: transparent;
+    }
+
+    td {
+      display: table-cell;
+      padding: 10px 8px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+
+      &:before {
+        display: none;
+      }
+    }
+  }
+}
+
+// Адаптивность для модальных окон на очень маленьких экранах
+@media (max-width: 360px) {
+  .vitrina__modal {
+    padding: 10px;
+  }
+
+  .vitrina__modal-header {
+    h3 {
+      font-size: 14px;
+    }
+  }
+
+  .vitrina__filter-modal {
+    padding: 10px;
+  }
+
+  .vitrina__filter-header {
+    h3 {
+      font-size: 14px;
+    }
+  }
 }

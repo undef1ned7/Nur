@@ -106,82 +106,109 @@ export default function ClientEditModal({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal" role="dialog" aria-modal="true">
-        <h3>Редактировать клиента</h3>
+    <div className="client-edit-modal__overlay modal-overlay" onClick={onClose}>
+      <div
+        className="client-edit-modal modal"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="client-edit-modal__header">
+          <h3 className="client-edit-modal__title">Редактировать клиента</h3>
+          <button
+            className="client-edit-modal__close"
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
 
-        {saveClientErr && (
-          <div className="alert alert--error" style={{ marginTop: 8 }}>
-            {saveClientErr}
+        <div className="client-edit-modal__content">
+          {saveClientErr && (
+            <div className="client-edit-modal__alert alert alert--error">
+              {saveClientErr}
+            </div>
+          )}
+
+          <div className="client-edit-modal__fields">
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">
+                ФИО <b className="req">*</b>
+              </span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editFio}
+                onChange={(e) => setEditFio(e.target.value)}
+                placeholder="Иванов Иван"
+                autoFocus
+                required
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">
+                Телефон <b className="req">*</b>
+              </span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                placeholder="+996 700 00-00-00"
+                required
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">Email</span>
+              <input
+                type="email"
+                className="client-edit-modal__input"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="user@mail.com"
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">Дата</span>
+              <input
+                type="date"
+                className="client-edit-modal__input"
+                value={editDate || ""}
+                onChange={(e) => setEditDate(e.target.value)}
+              />
+              <div className="client-edit-modal__hint hint">
+                Например: <b>21.08.2025</b> (сохранится как 2025-08-21)
+              </div>
+            </label>
           </div>
-        )}
+        </div>
 
-        <label className="field">
-          <span>
-            ФИО <b className="req">*</b>
-          </span>
-          <input
-            type="text"
-            value={editFio}
-            onChange={(e) => setEditFio(e.target.value)}
-            placeholder="Иванов Иван"
-            autoFocus
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span>
-            Телефон <b className="req">*</b>
-          </span>
-          <input
-            type="text"
-            value={editPhone}
-            onChange={(e) => setEditPhone(e.target.value)}
-            placeholder="+996 700 00-00-00"
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span>Email</span>
-          <input
-            type="email"
-            value={editEmail}
-            onChange={(e) => setEditEmail(e.target.value)}
-            placeholder="user@mail.com"
-          />
-        </label>
-
-        <label className="field">
-          <span>Дата</span>
-          <input
-            type="date"
-            value={editDate || ""}
-            onChange={(e) => setEditDate(e.target.value)}
-          />
-          <div className="hint">
-            Например: <b>21.08.2025</b> (сохранится как 2025-08-21)
-          </div>
-        </label>
-
-        <div
-          className="modal-actions"
-          style={{ justifyContent: "см-space-between" }}
-        >
-          <button className="btn btn--red" onClick={handleDelete}>
+        <div className="client-edit-modal__actions modal-actions">
+          <button
+            className="client-edit-modal__btn client-edit-modal__btn--danger btn btn--red"
+            onClick={handleDelete}
+            disabled={savingClient}
+          >
             Удалить
           </button>
-          <div>
+          <div className="client-edit-modal__actions-right">
             <button
-              className="btn btn--yellow"
+              className="client-edit-modal__btn client-edit-modal__btn--primary btn btn--yellow"
               onClick={handleSave}
               disabled={!requiredOk || savingClient}
               title={!requiredOk ? "Заполните обязательные поля" : ""}
             >
               {savingClient ? "Сохранение…" : "Сохранить"}
             </button>
-            <button className="btn btn--ghost" onClick={onClose}>
+            <button
+              className="client-edit-modal__btn client-edit-modal__btn--secondary btn btn--ghost"
+              onClick={onClose}
+              disabled={savingClient}
+            >
               Отмена
             </button>
           </div>

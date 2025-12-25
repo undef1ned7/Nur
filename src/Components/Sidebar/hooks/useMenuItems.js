@@ -109,15 +109,54 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     const groupAllowed = isAllowedForPerm("can_view_additional_services");
 
     // Фильтруем дочерние пункты по совокупному правилу
-    let children = MENU_CONFIG.additional.filter((item) =>
-      isAllowedForPerm(item.permission)
-    );
+    let children = MENU_CONFIG.additional.filter((item) => {
+      // Для "Печать штрих-кодов" и "Интеграция с весами" проверяем ТОЛЬКО права пользователя (profile)
+      // они должны отображаться только если can_view === true у пользователя
+      if (
+        item.permission === "can_view_market_label" ||
+        item.permission === "can_view_market_scales"
+      ) {
+        // Проверяем ТОЛЬКО права пользователя (profile), игнорируя настройки компании
+        return hasPermission(item.permission) === true;
+      }
+      // Для WhatsApp, Instagram, Telegram, Документы проверяем ТОЛЬКО права компании
+      // их разрешения находятся в company, а не в profile
+      if (
+        item.permission === "can_view_whatsapp" ||
+        item.permission === "can_view_instagram" ||
+        item.permission === "can_view_telegram" ||
+        item.permission === "can_view_documents"
+      ) {
+        // Проверяем ТОЛЬКО права компании
+        return companyAllows(item.permission) === true;
+      }
+      // Для остальных используем стандартную проверку (пользователь ИЛИ компания)
+      return isAllowedForPerm(item.permission);
+    });
 
     // Если нет ни одного индивидуально доступного, но есть групповое право
     if (children.length === 0 && groupAllowed) {
-      children = MENU_CONFIG.additional.filter(
-        (item) => companyAllows(item.permission) !== false
-      );
+      children = MENU_CONFIG.additional.filter((item) => {
+        // Для "Печать штрих-кодов" и "Интеграция с весами" НЕ используем fallback
+        // они должны проверяться только через hasPermission (profile)
+        if (
+          item.permission === "can_view_market_label" ||
+          item.permission === "can_view_market_scales"
+        ) {
+          return false; // Исключаем из fallback
+        }
+        // Для WhatsApp, Instagram, Telegram, Документы проверяем компанию в fallback
+        if (
+          item.permission === "can_view_whatsapp" ||
+          item.permission === "can_view_instagram" ||
+          item.permission === "can_view_telegram" ||
+          item.permission === "can_view_documents"
+        ) {
+          return companyAllows(item.permission) === true;
+        }
+        // Для остальных используем fallback: показываем если компания не запретила
+        return companyAllows(item.permission) !== false;
+      });
     }
 
     // Получаем динамические дополнительные услуги из конфигурации
