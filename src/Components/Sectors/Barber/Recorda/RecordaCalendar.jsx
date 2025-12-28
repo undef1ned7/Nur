@@ -94,7 +94,7 @@ const layoutForBarber = (
       r,
       tStart: startM,
       tEnd: endM,
-      top: topMin * PX_PER_MIN + COL_HEADER_H,
+top: topMin * PX_PER_MIN,
       height: Math.max(MIN_EVENT_H, heightByTime, heightByText),
     };
   });
@@ -225,10 +225,11 @@ const RecordaCalendar = ({
                   ))}
                 </div>
 
-                <div
-                  className="barberrecorda__eventsArea"
-                  style={{ height: calendarHeight }}
-                >
+<div
+  className="barberrecorda__eventsArea"
+  style={{ height: calendarHeight - COL_HEADER_H }}
+>
+
                   {layout.length === 0 && !loading && (
                     <div className="barberrecorda__emptyInCol">
                       Свободно

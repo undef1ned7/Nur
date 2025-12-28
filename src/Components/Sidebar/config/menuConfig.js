@@ -136,6 +136,13 @@ export const MENU_CONFIG = {
 
     // Барбершоп
     barber: [
+            {
+        label: "Аналитика",
+        to: "/crm/barber/cash-reports",
+        icon: menuIcons.chartBar,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
       {
         label: "Клиенты",
         to: "/crm/barber/clients",
@@ -148,20 +155,6 @@ export const MENU_CONFIG = {
         to: "/crm/barber/services",
         icon: menuIcons.tags,
         permission: "can_view_barber_services",
-        implemented: true,
-      },
-      {
-        label: "Склад",
-        to: "/crm/barber/warehouse",
-        icon: menuIcons.warehouse,
-        permission: "can_view_products",
-        implemented: true,
-      },
-      {
-        label: "Сотрудники",
-        to: "/crm/barber/masters",
-        icon: menuIcons.user,
-        permission: "can_view_employees",
         implemented: true,
       },
       {
@@ -178,11 +171,18 @@ export const MENU_CONFIG = {
         permission: "can_view_barber_records",
         implemented: true,
       },
-      {
-        label: "Аналитика",
-        to: "/crm/barber/cash-reports",
-        icon: menuIcons.chartBar,
-        permission: "can_view_cashbox",
+            {
+        label: "Сотрудники",
+        to: "/crm/barber/masters",
+        icon: menuIcons.user,
+        permission: "can_view_employees",
+        implemented: true,
+      },
+            {
+        label: "Склад",
+        to: "/crm/barber/warehouse",
+        icon: menuIcons.warehouse,
+        permission: "can_view_products",
         implemented: true,
       },
     ],

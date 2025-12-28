@@ -11,18 +11,25 @@ import RecordaModal from "./RecordaModal.jsx";
 const pad = (n) => String(n).padStart(2, "0");
 
 const toDate = (iso) => {
-  if (!iso) return "";
+  const s = String(iso || "");
+  if (s.length >= 10 && s[4] === "-" && s[7] === "-") return s.slice(0, 10);
+
   const d = new Date(iso);
   if (Number.isNaN(d)) return "";
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
+
 const toTime = (iso) => {
-  if (!iso) return "";
+  const s = String(iso || "");
+  const m = s.match(/T(\d{2}):(\d{2})/);
+  if (m) return `${m[1]}:${m[2]}`;
+
   const d = new Date(iso);
   if (Number.isNaN(d)) return "";
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
+
 
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
@@ -33,7 +40,7 @@ const ts = (iso) => new Date(iso).getTime();
 const SLOT_MIN = 30;      // шаг 30 минут
 const SLOT_PX = 32;       // высота слота ~32px
 const COL_HEADER_H = 60;  // высота шапки мастера
-const SAFE_PAD = 40;      // безопасный отступ снизу
+const SAFE_PAD = 150;      // безопасный отступ снизу
 
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21;
