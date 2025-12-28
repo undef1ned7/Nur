@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-  background: #f5f7fb;
+  // background: #f5f7fb;
   min-height: 100%;
 
   &__header {
@@ -88,6 +88,7 @@
   &__actions {
     display: flex;
     justify-content: flex-end;
+    gap: 10px;
   }
 
   &__btn {
@@ -262,11 +263,8 @@
     color: #111827;
   }
 
-  &__table-wrapper {
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
-    overflow: hidden;
-    background: #ffffff;
+  &__table-container {
+    width: 100%;
   }
 
   &__table {
@@ -276,19 +274,42 @@
 
     th,
     td {
-      padding: 8px 10px;
+      padding: 12px 16px;
+      text-align: left;
       border-bottom: 1px solid #e5e7eb;
     }
 
     th {
-      text-align: left;
       background: #f9fafb;
-      font-weight: 500;
-      color: #4b5563;
+      font-weight: 600;
+      color: #374151;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
-    tr:last-child td {
+    tbody tr {
+      transition: background-color 0.15s ease;
+    }
+
+    tbody tr:last-child td {
       border-bottom: none;
+    }
+
+    &-row {
+      cursor: pointer;
+
+      &:hover {
+        background-color: #f9fafb;
+      }
+    }
+
+    &-loading,
+    &-empty {
+      padding: 48px 24px;
+      text-align: center;
+      font-size: 14px;
+      color: #6b7280;
     }
   }
 
@@ -324,10 +345,73 @@
     margin-top: 16px;
   }
 
+  &__orders-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
   &__orders-title {
     font-size: 16px;
     font-weight: 600;
     color: #111827;
+  }
+
+  &__view-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &--active {
+      background: #1f2937;
+      color: #ffffff;
+      border-color: #1f2937;
+
+      &:hover {
+        background: #111827;
+      }
+    }
+  }
+
+  &__cards {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 16px;
+
+    @media (min-width: 768px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (min-width: 1280px) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
   }
 
   &__order-actions {

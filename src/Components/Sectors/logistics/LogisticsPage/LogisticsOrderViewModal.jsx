@@ -185,7 +185,7 @@ const LogisticsOrderViewModal = ({ order, onClose, getClientName, onStatusChange
               <span>Ожидаемое прибытие:</span>
             </div>
             <div className="logistics-page__timeline-eta-date">
-              {formatDate(order.arrivalDate || order.time)}
+              {order.arrivalDate || order.arrival_date || "—"}
             </div>
           </div>
 
