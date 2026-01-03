@@ -31,6 +31,14 @@ import {
   checkoutAgentCart,
   addProductToAgentCart,
 } from "../../../../store/creators/agentCartCreators";
+import { createDeal } from "../../../../store/creators/saleThunk";
+import { useUser } from "../../../../store/slices/userSlice";
+import {
+  openShiftAsync,
+  fetchShiftsAsync,
+} from "../../../../store/creators/shiftThunk";
+import { useShifts } from "../../../../store/slices/shiftSlice";
+import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
 // Alert is handled by parent (ProductionCatalog) via onNotify
 import "./Cart.scss";
 
@@ -91,22 +99,17 @@ const CartItem = ({
     // Обновляем только если значения действительно изменились
     setQuantity((prev) => {
       if (prev !== newQuantity) {
-        console.log("CartItem: syncing quantity", {
-          old: prev,
-          new: newQuantity,
-          itemId: item.id,
-        });
+        // console.log("CartItem: syncing quantity", {
+        //   old: prev,
+        //   new: newQuantity,
+        //   itemId: item.id,
+        // });
         return newQuantity;
       }
       return prev;
     });
     setGiftQty((prev) => {
       if (prev !== newGiftQty) {
-        console.log("CartItem: syncing giftQty", {
-          old: prev,
-          new: newGiftQty,
-          itemId: item.id,
-        });
         return newGiftQty;
       }
       return prev;
@@ -310,6 +313,7 @@ const ClientSelector = ({
   clients,
   loading,
   onRefresh,
+  onClose,
 }) => {
   const dispatch = useDispatch();
   const { creating, error } = useClient();
@@ -394,7 +398,19 @@ const ClientSelector = ({
 
   return (
     <div className="client-selector">
-      <label className="selector-label">Выберите клиента</label>
+      <div className="selector-label-container">
+        <label className="selector-label">Выберите клиента</label>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="close-order-section-btn"
+            type="button"
+            title="Закрыть"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </div>
       <div className="selector-dropdown">
         <button
           className="selector-trigger"
@@ -405,8 +421,8 @@ const ClientSelector = ({
             {selectedClient ? (
               <>
                 <span>{getClientName(selectedClient)}</span>
-                {selectedClient?.phone && (
-                  <span className="client-phone">{selectedClient.phone}</span>
+                {selectedClient?.address && (
+                  <span className="client-phone">{selectedClient.address}</span>
                 )}
               </>
             ) : (
@@ -571,14 +587,14 @@ const ClientSelector = ({
                     const name = getClientName(client);
                     return (
                       <button
-                        key={client?.id ?? `${name}-${client?.phone ?? ""}`}
+                        key={client?.id ?? `${name}-${client?.address ?? ""}`}
                         className={`client-option ${
                           selectedClient?.id && client?.id
                             ? selectedClient.id === client.id
                               ? "selected"
                               : ""
                             : getClientName(selectedClient) === name &&
-                              selectedClient?.phone === client?.phone
+                              selectedClient?.address === client?.address
                             ? "selected"
                             : ""
                         }`}
@@ -592,8 +608,10 @@ const ClientSelector = ({
                           <span className="client-name">
                             {name || "Без имени"}
                           </span>
-                          {client?.phone && (
-                            <span className="client-phone">{client.phone}</span>
+                          {client?.address && (
+                            <span className="client-phone">
+                              {client.address}
+                            </span>
                           )}
                         </div>
                       </button>
@@ -615,6 +633,14 @@ const OrderSummary = ({
   status,
   onSubmit,
   submitting,
+  paymentType,
+  onPaymentTypeChange,
+  debtMonths,
+  onDebtMonthsChange,
+  firstDueDate,
+  onFirstDueDateChange,
+  prepaymentAmount,
+  onPrepaymentAmountChange,
 }) => {
   const cartItems = useSelector(selectCartItems);
   const totalQuantityLocal = useSelector(selectCartItemsCount);
@@ -673,6 +699,121 @@ const OrderSummary = ({
         <span>К оплате: {total.toLocaleString()}.00 KGS</span>
       </div>
 
+      {/* Выбор типа оплаты */}
+      {isEditable && selectedClient && (
+        <div className="payment-type-section" style={{ marginTop: "16px" }}>
+          <label
+            style={{ display: "block", marginBottom: "8px", fontWeight: 500 }}
+          >
+            Тип оплаты:
+          </label>
+          <select
+            value={paymentType || ""}
+            onChange={(e) => onPaymentTypeChange(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "8px",
+              borderRadius: "8px",
+              border: "1px solid #e5e7eb",
+              fontSize: "14px",
+            }}
+          >
+            <option value="">Наличные</option>
+            <option value="Долги">Долг</option>
+            <option value="Предоплата">Предоплата</option>
+          </select>
+
+          {/* Поля для долга */}
+          {(paymentType === "Долги" || paymentType === "Предоплата") && (
+            <div
+              style={{
+                marginTop: "12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "4px",
+                    fontSize: "13px",
+                  }}
+                >
+                  Количество месяцев:
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={debtMonths || ""}
+                  onChange={(e) => onDebtMonthsChange(e.target.value)}
+                  placeholder="0"
+                  style={{
+                    width: "100%",
+                    padding: "6px",
+                    borderRadius: "6px",
+                    border: "1px solid #e5e7eb",
+                    fontSize: "13px",
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "4px",
+                    fontSize: "13px",
+                  }}
+                >
+                  Дата первого платежа:
+                </label>
+                <input
+                  type="date"
+                  value={firstDueDate || ""}
+                  onChange={(e) => onFirstDueDateChange(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "6px",
+                    borderRadius: "6px",
+                    border: "1px solid #e5e7eb",
+                    fontSize: "13px",
+                  }}
+                />
+              </div>
+              {paymentType === "Предоплата" && (
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "4px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Сумма предоплаты:
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={total}
+                    value={prepaymentAmount || ""}
+                    onChange={(e) => onPrepaymentAmountChange(e.target.value)}
+                    placeholder="0"
+                    style={{
+                      width: "100%",
+                      padding: "6px",
+                      borderRadius: "6px",
+                      border: "1px solid #e5e7eb",
+                      fontSize: "13px",
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <button
         className="buy-btn"
         onClick={onSubmit}
@@ -682,6 +823,7 @@ const OrderSummary = ({
           // (!usingServer && (cartItems || []).length === 0) ||
           !isEditable
         }
+        style={{ marginTop: "16px" }}
       >
         <ShoppingCart size={20} />
         {isSubmitted
@@ -697,9 +839,19 @@ const OrderSummary = ({
   );
 };
 
-const Cart = ({ agentCartId: agentCartIdProp = null, onNotify, onClose }) => {
+const Cart = ({
+  agentCartId: agentCartIdProp = null,
+  onNotify,
+  onClose,
+  isOpen = false,
+  onOpenChange,
+  totalItemsCount = 0,
+}) => {
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
+  const { shifts, currentShift } = useShifts();
+  const { list: cashBoxes } = useCash();
+  const { profile, currentUser, userId } = useUser();
 
   // Redux селекторы
   const cartItemsLocal = useSelector(selectCartItems);
@@ -712,6 +864,13 @@ const Cart = ({ agentCartId: agentCartIdProp = null, onNotify, onClose }) => {
 
   const [loadingAgentItems, setLoadingAgentItems] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Состояние для долга
+  const [paymentType, setPaymentType] = useState(""); // "", "Долги", "Предоплата"
+  const [debtMonths, setDebtMonths] = useState("");
+  const [firstDueDate, setFirstDueDate] = useState("");
+  const [prepaymentAmount, setPrepaymentAmount] = useState("");
+
   // Alerts delegated to parent
 
   // Загружаем клиентов при монтировании
@@ -938,10 +1097,124 @@ const Cart = ({ agentCartId: agentCartIdProp = null, onNotify, onClose }) => {
     }
   };
 
+  // Загружаем смены и кассы при монтировании
+  useEffect(() => {
+    dispatch(fetchShiftsAsync());
+    dispatch(getCashBoxes());
+  }, [dispatch]);
+
+  // Функция для проверки и открытия смены
+  const ensureShiftIsOpen = async () => {
+    // Проверяем наличие открытой смены
+    const openShift = shifts.find((s) => s.status === "open") || currentShift;
+
+    if (openShift) {
+      return; // Смена уже открыта
+    }
+
+    // Если смены нет, открываем её
+    let availableCashBoxes = cashBoxes;
+    if (!availableCashBoxes || availableCashBoxes.length === 0) {
+      // Загружаем кассы, если их нет
+      availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
+      if (!availableCashBoxes || availableCashBoxes.length === 0) {
+        throw new Error(
+          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены."
+        );
+      }
+    }
+
+    const firstCashBox = availableCashBoxes[0];
+    const cashboxId = firstCashBox?.id;
+
+    if (!cashboxId) {
+      throw new Error("Не удалось определить кассу");
+    }
+
+    const cashierId = currentUser?.id || userId || profile?.id;
+
+    if (!cashierId) {
+      throw new Error("Не удалось определить кассира");
+    }
+
+    // Открываем смену с нулевой суммой
+    await dispatch(
+      openShiftAsync({
+        cashbox: cashboxId,
+        cashier: cashierId,
+        opening_cash: "0",
+      })
+    ).unwrap();
+
+    // Обновляем список смен
+    await dispatch(fetchShiftsAsync());
+  };
+
   const handleSubmit = async () => {
     if (!agentCartId || !selectedClient) return;
     setSubmitting(true);
     try {
+      // Проверяем и открываем смену перед оформлением заказа
+      await ensureShiftIsOpen();
+
+      // Вычисляем общую сумму заказа
+      let totalAmount = 0;
+      for (const it of agentItems) {
+        const price = Number(it?.unit_price || it?.price_snapshot || 0);
+        const baseQty = Number(it?.quantity || it?.quantity_requested || 0);
+        totalAmount += price * baseQty;
+      }
+
+      // Если выбран долг или предоплата, создаем сделку
+      if (paymentType === "Долги" || paymentType === "Предоплата") {
+        if (!debtMonths || Number(debtMonths) < 0) {
+          onNotify &&
+            onNotify("error", "Введите корректное количество месяцев");
+          setSubmitting(false);
+          return;
+        }
+        if (!firstDueDate) {
+          onNotify && onNotify("error", "Выберите дату первого платежа");
+          setSubmitting(false);
+          return;
+        }
+        if (paymentType === "Предоплата") {
+          if (!prepaymentAmount || Number(prepaymentAmount) <= 0) {
+            onNotify &&
+              onNotify("error", "Введите корректную сумму предоплаты");
+            setSubmitting(false);
+            return;
+          }
+          if (Number(prepaymentAmount) > totalAmount) {
+            onNotify &&
+              onNotify(
+                "error",
+                "Сумма предоплаты не может превышать общую сумму"
+              );
+            setSubmitting(false);
+            return;
+          }
+        }
+
+        // Создаем сделку
+        const dealPayload = {
+          clientId: selectedClient.id,
+          title: `${paymentType} ${
+            selectedClient.full_name || selectedClient.phone || "Клиент"
+          }`,
+          statusRu: paymentType,
+          amount: totalAmount,
+          debtMonths: Number(debtMonths || 0),
+          first_due_date: firstDueDate,
+        };
+
+        if (paymentType === "Предоплата") {
+          dealPayload.prepayment = Number(prepaymentAmount);
+        }
+
+        await dispatch(createDeal(dealPayload)).unwrap();
+      }
+
       // Используем checkoutAgentCart для чекаута корзины
       const res = await dispatch(
         checkoutAgentCart({
@@ -962,95 +1235,587 @@ const Cart = ({ agentCartId: agentCartIdProp = null, onNotify, onClose }) => {
       // Clear persisted id so next session creates a new draft
       localStorage.removeItem("agentCartId");
       // Keep agentCartId in state to reflect submitted status; new draft will be created on next page load
-      onNotify && onNotify("success", "Заказ успешно оформлен");
+      onNotify &&
+        onNotify(
+          "success",
+          paymentType ? `Долг успешно создан` : "Заказ успешно оформлен"
+        );
       // Clear local state so next open uses a new draft id from parent
       setAgentCartId(null);
       setAgentCart(null);
       setAgentItems([]);
+
+      // Очищаем поля долга
+      setPaymentType("");
+      setDebtMonths("");
+      setFirstDueDate("");
+      setPrepaymentAmount("");
     } catch (e) {
       console.error("Error submitting cart:", e);
-      onNotify &&
-        onNotify("error", "Не удалось оформить заказ. Попробуйте ещё раз.");
+      const errorMessage =
+        e?.response?.data?.shift_id?.[0] ||
+        e?.message ||
+        "Не удалось оформить заказ. Попробуйте ещё раз.";
+      onNotify && onNotify("error", errorMessage);
     } finally {
       setSubmitting(false);
     }
   };
   console.log(agentCart, "agent");
 
+  // Состояние для секции заказа внизу (мобильная/планшетная версия)
+  const [isOrderSectionOpen, setIsOrderSectionOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [touchStart, setTouchStart] = useState(null);
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  const [orderTouchStart, setOrderTouchStart] = useState(null); // number | null
+  const [orderSwipeProgress, setOrderSwipeProgress] = useState(0);
+
+  const minSwipeDistance = 50;
+
+  // Обработка свайпа вверх для открытия секции заказа
+  const handleTouchStart = (e) => {
+    // Сохраняем начальную позицию касания
+    const touch = e.targetTouches[0];
+    setTouchStart(touch.clientY);
+    setSwipeProgress(0);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStart) return;
+
+    // Проверяем, что касание все еще на кнопке или рядом с ней
+    const button = e.target.closest(".cart-trigger-btn");
+    if (!button) {
+      // Если палец ушел с кнопки, сбрасываем состояние и разрешаем прокрутку
+      setTouchStart(null);
+      setSwipeProgress(0);
+      return;
+    }
+
+    const currentY = e.targetTouches[0].clientY;
+    const distance = touchStart - currentY; // Положительное значение = свайп вверх
+
+    // Если свайп вниз (отрицательное расстояние), это прокрутка страницы - не блокируем
+    if (distance < 0) {
+      setTouchStart(null);
+      setSwipeProgress(0);
+      return; // Позволяем прокрутку страницы
+    }
+
+    // Если свайп вверх, но небольшой - показываем индикатор, но НЕ блокируем прокрутку
+    // Это позволяет пользователю прокручивать страницу, если он случайно начал касание на кнопке
+    if (distance > 0 && distance < minSwipeDistance) {
+      const progress = Math.min((distance / minSwipeDistance) * 100, 100);
+      setSwipeProgress(progress);
+      // НЕ вызываем preventDefault() - позволяем прокрутку страницы
+    } else if (distance >= minSwipeDistance) {
+      // Если свайп достаточный вверх - это явное намерение открыть секцию
+      // Только здесь блокируем прокрутку
+      e.preventDefault();
+      setSwipeProgress(100);
+    } else {
+      setSwipeProgress(0);
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStart) {
+      setTouchStart(null);
+      setSwipeProgress(0);
+      return;
+    }
+
+    const currentY = e.changedTouches[0].clientY;
+    const distance = touchStart - currentY;
+
+    // Открываем секцию только если был достаточный свайп вверх
+    if (distance > minSwipeDistance) {
+      setIsOrderSectionOpen(true);
+    }
+
+    setTouchStart(null);
+    setSwipeProgress(0);
+  };
+
+  // Обработка свайпа для открытия/закрытия секции заказа
+  const handleOrderTouchStart = (e) => {
+    // Сохраняем начальную позицию касания
+    const touch = e.targetTouches[0];
+    setOrderTouchStart(touch.clientY);
+    setOrderSwipeProgress(0);
+
+    // Если секция открыта и контент в начале - предотвращаем pull-to-refresh
+    if (isOrderSectionOpen) {
+      const contentElement = e.target.closest(".mobile-order-section-content");
+      const isAtTop = !contentElement || contentElement.scrollTop <= 0;
+      if (isAtTop && window.scrollY <= 0) {
+        // Предотвращаем pull-to-refresh при начале касания в начале страницы
+        e.preventDefault();
+      }
+    }
+  };
+
+  const handleOrderTouchMove = (e) => {
+    if (!orderTouchStart) return;
+
+    // Проверяем, что касание в области секции заказа или кнопки корзины
+    const section = e.target.closest(".mobile-order-section");
+    const button = e.target.closest(".cart-trigger-btn");
+    const container = e.target.closest(".cart-trigger-container");
+
+    // Если касание не в области секции или кнопки, сбрасываем
+    if (!section && !button && !container) {
+      setOrderTouchStart(null);
+      setOrderSwipeProgress(0);
+      return;
+    }
+
+    const currentY = e.targetTouches[0].clientY;
+    const distance = currentY - orderTouchStart; // Положительное значение = свайп вниз, отрицательное = свайп вверх
+
+    // Если секция закрыта - обрабатываем свайп вверх для открытия
+    if (!isOrderSectionOpen) {
+      const swipeUp = -distance; // Инвертируем для свайпа вверх
+
+      // Если свайп вниз, это прокрутка страницы - не блокируем
+      if (distance > 0) {
+        setOrderTouchStart(null);
+        setOrderSwipeProgress(0);
+        return; // Позволяем прокрутку страницы
+      }
+
+      // Если свайп вверх, но небольшой - показываем индикатор, но НЕ блокируем прокрутку
+      if (swipeUp > 0 && swipeUp < minSwipeDistance) {
+        const progress = Math.min((swipeUp / minSwipeDistance) * 100, 100);
+        setOrderSwipeProgress(progress);
+        // НЕ вызываем preventDefault() - позволяем прокрутку страницы
+      } else if (swipeUp >= minSwipeDistance) {
+        // Если свайп достаточный вверх - это явное намерение открыть секцию
+        // Только здесь блокируем прокрутку
+        e.preventDefault();
+        setOrderSwipeProgress(100);
+      } else {
+        setOrderSwipeProgress(0);
+      }
+      return;
+    }
+
+    // Если секция открыта - обрабатываем свайп вниз для закрытия
+    // Сначала проверяем, где именно происходит касание
+    const contentElement = e.target.closest(".mobile-order-section-content");
+    const isInsideContent = !!contentElement;
+
+    // Если касание внутри контента - проверяем, можно ли скроллить
+    if (isInsideContent) {
+      const scrollTop = contentElement.scrollTop;
+      const scrollHeight = contentElement.scrollHeight;
+      const clientHeight = contentElement.clientHeight;
+      const isAtTop = scrollTop <= 0;
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1; // Небольшой допуск для округления
+
+      // Если свайп вверх (отрицательное расстояние) - это скролл контента вверх
+      if (distance < 0) {
+        setOrderSwipeProgress(0);
+        return; // Позволяем скролл контента
+      }
+
+      // Если свайп вниз и контент НЕ в начале - это скролл контента вниз
+      if (distance > 0 && !isAtTop) {
+        setOrderSwipeProgress(0);
+        return; // Позволяем скролл контента
+      }
+
+      // Если свайп вниз и контент в начале - это может быть закрытие секции
+      // Но только если свайп достаточно большой и явно направлен вниз
+      if (distance > 0 && isAtTop) {
+        // Проверяем, что это действительно свайп для закрытия, а не случайное движение
+        // Блокируем только если свайп достаточно большой
+        if (distance >= minSwipeDistance) {
+          e.preventDefault(); // Предотвращаем pull-to-refresh
+          setOrderSwipeProgress(100);
+        } else {
+          // Небольшой свайп - показываем индикатор, но не блокируем скролл
+          const progress = Math.min((distance / minSwipeDistance) * 100, 100);
+          setOrderSwipeProgress(progress);
+        }
+        return;
+      }
+    } else {
+      // Если касание не внутри контента (например, на границе секции)
+      // Если свайп вверх (отрицательное расстояние), это прокрутка контента секции - не блокируем
+      if (distance < 0) {
+        setOrderSwipeProgress(0);
+        return;
+      }
+
+      // Если свайп вниз - проверяем, прокручен ли контент
+      const contentEl = section?.querySelector(".mobile-order-section-content");
+      const isAtTop = !contentEl || contentEl.scrollTop <= 0;
+
+      // Если контент прокручен вниз, разрешаем прокрутку
+      if (!isAtTop) {
+        setOrderSwipeProgress(0);
+        return; // Позволяем прокрутку контента
+      }
+
+      // Если секция открыта и контент в начале - предотвращаем pull-to-refresh
+      if (distance > 0) {
+        e.preventDefault(); // Предотвращаем pull-to-refresh и прокрутку страницы
+
+        // Если свайп небольшой - показываем индикатор
+        if (distance < minSwipeDistance) {
+          const progress = Math.min((distance / minSwipeDistance) * 100, 100);
+          setOrderSwipeProgress(progress);
+        } else {
+          // Если свайп достаточный вниз - это явное намерение закрыть секцию
+          setOrderSwipeProgress(100);
+        }
+      } else {
+        setOrderSwipeProgress(0);
+      }
+    }
+  };
+
+  const handleOrderTouchEnd = (e) => {
+    if (!orderTouchStart) {
+      setOrderTouchStart(null);
+      setOrderSwipeProgress(0);
+      return;
+    }
+
+    const currentY = e.changedTouches[0].clientY;
+    const distance = currentY - orderTouchStart;
+
+    // Если секция закрыта - открываем при свайпе вверх
+    if (!isOrderSectionOpen) {
+      const swipeUp = -distance; // Инвертируем для свайпа вверх
+      if (swipeUp > minSwipeDistance) {
+        setIsOrderSectionOpen(true);
+      }
+    } else {
+      // Если секция открыта - закрываем при свайпе вниз
+      if (distance > minSwipeDistance) {
+        handleCloseOrderSection();
+      }
+    }
+
+    setOrderTouchStart(null);
+    setOrderSwipeProgress(0);
+  };
+
+  const handleCloseOrderSection = () => {
+    if (!isOrderSectionOpen) return; // Если уже закрыта, ничего не делаем
+
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsOrderSectionOpen(false);
+      setIsClosing(false);
+      // Восстанавливаем прокрутку страницы после закрытия
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+    }, 300);
+  };
+
+  // Проверяем, мобильное ли это устройство
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+
+    return () => {
+      window.removeEventListener("resize", checkIsMobile);
+    };
+  }, []);
+
+  // Предотвращаем pull-to-refresh когда секция открыта и восстанавливаем прокрутку при закрытии
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const preventPullToRefresh = (e) => {
+      // Если секция открыта и пользователь свайпает вниз в начале страницы
+      if (isOrderSectionOpen && window.scrollY <= 0) {
+        const touch = e.touches?.[0];
+        if (touch) {
+          // Проверяем, что касание в области секции заказа
+          const section = e.target.closest?.(".mobile-order-section");
+          const button = e.target.closest?.(".cart-trigger-btn");
+          const container = e.target.closest?.(".cart-trigger-container");
+
+          // Если касание в области секции или кнопки - предотвращаем pull-to-refresh
+          if (section || button || container) {
+            // Если свайп вниз (начальная позиция выше текущей)
+            const startY = orderTouchStart;
+            if (startY && touch.clientY > startY) {
+              e.preventDefault();
+            }
+          }
+        }
+      }
+    };
+
+    if (isOrderSectionOpen) {
+      // Блокируем pull-to-refresh когда секция открыта
+      // НЕ блокируем прокрутку страницы, только предотвращаем pull-to-refresh
+      document.body.style.overscrollBehaviorY = "contain";
+      // Добавляем обработчик для предотвращения pull-to-refresh
+      document.addEventListener("touchmove", preventPullToRefresh, {
+        passive: false,
+      });
+    } else {
+      // Восстанавливаем нормальное поведение когда секция закрыта
+      document.body.style.overscrollBehaviorY = "";
+      // Убеждаемся, что прокрутка страницы восстановлена
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      // Удаляем обработчик
+      document.removeEventListener("touchmove", preventPullToRefresh);
+    }
+
+    return () => {
+      // Очистка при размонтировании
+      document.body.style.overscrollBehaviorY = "";
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.removeEventListener("touchmove", preventPullToRefresh);
+    };
+  }, [isOrderSectionOpen, isMobile, orderTouchStart]);
+
+  // Секция заказа (выбор клиента + итог) - всегда рендерится для мобильных/планшетов
+  const orderSectionContent = (
+    <div className="cart-column cart-order-column">
+      <ClientSelector
+        selectedClient={selectedClient}
+        onClientSelect={handleClientSelect}
+        clients={clients || []}
+        loading={clientsLoading}
+        onRefresh={() => dispatch(fetchClientsAsync())}
+        onClose={isMobile ? handleCloseOrderSection : undefined}
+      />
+
+      <OrderSummary
+        selectedClient={selectedClient}
+        items={agentItems}
+        status={agentCart?.status || "draft"}
+        onSubmit={handleSubmit}
+        submitting={submitting}
+        paymentType={paymentType}
+        onPaymentTypeChange={setPaymentType}
+        debtMonths={debtMonths}
+        onDebtMonthsChange={setDebtMonths}
+        firstDueDate={firstDueDate}
+        onFirstDueDateChange={setFirstDueDate}
+        prepaymentAmount={prepaymentAmount}
+        onPrepaymentAmountChange={setPrepaymentAmount}
+      />
+    </div>
+  );
+
   return (
-    <div className="cart-page overflow-auto h-full">
-      <div className="cart-container">
-        <div className="cart-header flex justify-between align-center">
-          <h1>Корзина</h1>
-          {onClose && (
-            <button className="close-cart-btn" onClick={onClose}>
-              <X size={20} />
-            </button>
+    <>
+      {/* Модалка корзины - открывается при нажатии на кнопку корзины в ProductionCatalog */}
+      {isOpen && (
+        <div
+          className="cart-modal-overlay"
+          onClick={(e) => {
+            // Закрываем модалку только при клике на overlay, а не на контент
+            if (e.target === e.currentTarget) {
+              if (onClose) {
+                onClose();
+              } else if (onOpenChange) {
+                onOpenChange(false);
+              }
+            }
+          }}
+        >
+          <div
+            className="cart-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cart-page overflow-auto h-full">
+              <div className="cart-container">
+                <div className="cart-header flex justify-between align-center">
+                  <h1>Корзина</h1>
+                  {onClose && (
+                    <button className="close-cart-btn" onClick={onClose}>
+                      <X size={20} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="cart-content">
+                  {/* Левая колонка - товары в корзине */}
+                  <div className="cart-column cart-items-column">
+                    <div className="cart-items-section">
+                      {(agentItems || []).length === 0 &&
+                      (cartItemsLocal || []).length === 0 ? (
+                        <div className="empty-cart">
+                          <ShoppingCart size={64} />
+                          <h3>Корзина пуста</h3>
+                          <p>Добавьте товары в корзину</p>
+                        </div>
+                      ) : (
+                        (agentItems && agentItems.length > 0
+                          ? agentItems
+                          : cartItemsLocal || []
+                        ).map((item) => {
+                          // Корзина редактируема, если статус "draft" или "active" (не отправлена/одобрена/отклонена)
+                          const cartStatus = agentCart?.status;
+                          const isEditable =
+                            !agentCart ||
+                            cartStatus === "draft" ||
+                            cartStatus === "active";
+                          console.log("Cart: rendering item", {
+                            id: item.id,
+                            name: item.product_name,
+                            quantity: item.quantity,
+                            editable: isEditable,
+                            cartStatus: cartStatus,
+                          });
+                          return (
+                            <CartItem
+                              key={item.id}
+                              item={item}
+                              onUpdateQuantity={handleUpdateQuantity}
+                              onUpdateGift={handleUpdateGift}
+                              onRemoveItem={handleRemoveItem}
+                              editable={isEditable}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Правая колонка - выбор клиента и итог (только для десктопа) */}
+                  {!isMobile && (
+                    <div className="cart-column cart-order-column desktop-only">
+                      {orderSectionContent}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Секция заказа внизу экрана - для мобильных/планшетов */}
+      {isMobile && (
+        <div
+          className={`mobile-order-section ${
+            isOrderSectionOpen ? "open" : ""
+          } ${isClosing ? "closing" : ""}`}
+          onTouchStart={handleOrderTouchStart}
+          onTouchMove={handleOrderTouchMove}
+          onTouchEnd={handleOrderTouchEnd}
+          style={{
+            transform: (() => {
+              // Если секция закрыта и нет прогресса свайпа - полностью скрыта
+              if (
+                !isOrderSectionOpen &&
+                !isClosing &&
+                orderSwipeProgress === 0
+              ) {
+                return "translateY(100%)";
+              }
+
+              // Если секция закрыта и свайп вверх - показываем прогресс открытия
+              if (!isOrderSectionOpen && !isClosing && orderSwipeProgress > 0) {
+                const progress = orderSwipeProgress / 100;
+                const maxHeight = window.innerHeight * 0.85 - 70; // 85vh - 70px для кнопки
+                return `translateY(${maxHeight * (1 - progress)}px)`;
+              }
+
+              // Если секция открыта и нет прогресса свайпа - полностью видна
+              if (
+                isOrderSectionOpen &&
+                !isClosing &&
+                orderSwipeProgress === 0
+              ) {
+                return "translateY(0)";
+              }
+
+              // Если секция открыта и свайп вниз - показываем прогресс закрытия
+              if (isOrderSectionOpen && !isClosing && orderSwipeProgress > 0) {
+                return `translateY(${Math.min(
+                  orderSwipeProgress * 0.5,
+                  50
+                )}px)`;
+              }
+
+              // По умолчанию
+              return isOrderSectionOpen ? "translateY(0)" : "translateY(100%)";
+            })(),
+            transition:
+              orderSwipeProgress === 0 && !isClosing
+                ? "transform 0.3s ease-out"
+                : "none",
+          }}
+        >
+          {isOrderSectionOpen && !isClosing && (
+            <div className="mobile-order-section-content">
+              {orderSectionContent}
+            </div>
           )}
         </div>
+      )}
 
-        <div className="cart-content overflow-auto">
-          <div className="cart-items-section max-h-[50vh] overflow-auto">
-            {(agentItems || []).length === 0 &&
-            (cartItemsLocal || []).length === 0 ? (
-              <div className="empty-cart">
-                <ShoppingCart size={64} />
-                <h3>Корзина пуста</h3>
-                <p>Добавьте товары в корзину</p>
-              </div>
-            ) : (
-              (agentItems && agentItems.length > 0
-                ? agentItems
-                : cartItemsLocal || []
-              ).map((item) => {
-                // Корзина редактируема, если статус "draft" или "active" (не отправлена/одобрена/отклонена)
-                const cartStatus = agentCart?.status;
-                const isEditable =
-                  !agentCart ||
-                  cartStatus === "draft" ||
-                  cartStatus === "active";
-                console.log("Cart: rendering item", {
-                  id: item.id,
-                  name: item.product_name,
-                  quantity: item.quantity,
-                  editable: isEditable,
-                  cartStatus: cartStatus,
-                });
-                return (
-                  <CartItem
-                    key={item.id}
-                    item={item}
-                    onUpdateQuantity={handleUpdateQuantity}
-                    onUpdateGift={handleUpdateGift}
-                    onRemoveItem={handleRemoveItem}
-                    editable={isEditable}
-                  />
-                );
-              })
+      {/* Кнопка корзины внизу экрана - для мобильных/планшетов */}
+      {isMobile && (
+        <div className="cart-trigger-container">
+          <button
+            className="cart-trigger-btn"
+            onClick={() => {
+              if (!isOrderSectionOpen) {
+                setIsOrderSectionOpen(true);
+              }
+            }}
+            onTouchStart={!isOrderSectionOpen ? handleTouchStart : undefined}
+            onTouchMove={!isOrderSectionOpen ? handleTouchMove : undefined}
+            onTouchEnd={!isOrderSectionOpen ? handleTouchEnd : undefined}
+            type="button"
+            style={{
+              transform:
+                !isOrderSectionOpen && swipeProgress > 0
+                  ? `translateY(-${Math.min(swipeProgress * 0.5, 20)}px)`
+                  : "translateY(0)",
+              transition: swipeProgress === 0 ? "transform 0.2s ease" : "none",
+            }}
+          >
+            <ShoppingCart size={20} />
+            <span>Корзина</span>
+            {totalItemsCount > 0 && (
+              <span className="cart-badge">{totalItemsCount}</span>
             )}
-          </div>
-
-          <div className="order-section">
-            <ClientSelector
-              selectedClient={selectedClient}
-              onClientSelect={handleClientSelect}
-              clients={clients || []}
-              loading={clientsLoading}
-              onRefresh={() => dispatch(fetchClientsAsync())}
-            />
-
-            <OrderSummary
-              selectedClient={selectedClient}
-              items={agentItems}
-              status={agentCart?.status || "draft"}
-              onSubmit={handleSubmit}
-              submitting={submitting}
-            />
-          </div>
+            {!isOrderSectionOpen && swipeProgress > 0 && (
+              <div className="swipe-indicator">
+                <ChevronDown
+                  size={16}
+                  style={{
+                    transform: `rotate(180deg) translateY(${
+                      swipeProgress * 0.3
+                    }px)`,
+                    opacity: Math.min(swipeProgress / 50, 1),
+                  }}
+                />
+              </div>
+            )}
+          </button>
         </div>
-      </div>
-      {/* Alert rendered by parent */}
-    </div>
+      )}
+    </>
   );
 };
 

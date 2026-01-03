@@ -198,6 +198,7 @@ export const HIDE_RULES = [
         "/crm/sell",
         "/crm/sklad",
         "/crm/brand-category",
+        "/crm/analytics",
       ],
     },
   },
