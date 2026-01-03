@@ -8,6 +8,7 @@ import {
   User,
   Search,
   ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   submitAgentCartById,
@@ -464,6 +465,16 @@ const RequestCart = ({
     const touch = e.targetTouches[0];
     setOrderTouchStart(touch.clientY);
     setOrderSwipeProgress(0);
+    
+    // Если секция открыта и контент в начале - предотвращаем pull-to-refresh
+    if (isOrderSectionOpen) {
+      const contentElement = e.target.closest(".mobile-order-section-content");
+      const isAtTop = !contentElement || contentElement.scrollTop <= 0;
+      if (isAtTop && window.scrollY <= 0) {
+        // Предотвращаем pull-to-refresh при начале касания в начале страницы
+        e.preventDefault();
+      }
+    }
   };
 
   const handleOrderTouchMove = (e) => {
@@ -512,35 +523,78 @@ const RequestCart = ({
     }
 
     // Если секция открыта - обрабатываем свайп вниз для закрытия
-    // Если свайп вверх (отрицательное расстояние), это прокрутка контента секции - не блокируем
-    if (distance < 0) {
-      // Позволяем прокрутку контента секции
-      setOrderSwipeProgress(0);
-      return;
-    }
-
-    // Проверяем, прокручен ли контент вверх (находится ли в начале)
+    // Сначала проверяем, где именно происходит касание
     const contentElement = e.target.closest(".mobile-order-section-content");
-    const isAtTop = !contentElement || contentElement.scrollTop <= 0;
-
-    // Если контент прокручен вниз, разрешаем прокрутку
-    if (!isAtTop) {
-      setOrderSwipeProgress(0);
-      return; // Позволяем прокрутку контента
-    }
-
-    // Если свайп вниз и контент в начале, но небольшой - показываем индикатор, но НЕ блокируем прокрутку
-    if (distance > 0 && distance < minSwipeDistance) {
-      const progress = Math.min((distance / minSwipeDistance) * 100, 100);
-      setOrderSwipeProgress(progress);
-      // НЕ вызываем preventDefault() - позволяем прокрутку контента
-    } else if (distance >= minSwipeDistance) {
-      // Если свайп достаточный вниз и контент в начале - это явное намерение закрыть секцию
-      // Только здесь блокируем прокрутку
-      e.preventDefault();
-      setOrderSwipeProgress(100);
+    const isInsideContent = !!contentElement;
+    
+    // Если касание внутри контента - проверяем, можно ли скроллить
+    if (isInsideContent) {
+      const scrollTop = contentElement.scrollTop;
+      const scrollHeight = contentElement.scrollHeight;
+      const clientHeight = contentElement.clientHeight;
+      const isAtTop = scrollTop <= 0;
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1; // Небольшой допуск для округления
+      
+      // Если свайп вверх (отрицательное расстояние) - это скролл контента вверх
+      if (distance < 0) {
+        setOrderSwipeProgress(0);
+        return; // Позволяем скролл контента
+      }
+      
+      // Если свайп вниз и контент НЕ в начале - это скролл контента вниз
+      if (distance > 0 && !isAtTop) {
+        setOrderSwipeProgress(0);
+        return; // Позволяем скролл контента
+      }
+      
+      // Если свайп вниз и контент в начале - это может быть закрытие секции
+      // Но только если свайп достаточно большой и явно направлен вниз
+      if (distance > 0 && isAtTop) {
+        // Проверяем, что это действительно свайп для закрытия, а не случайное движение
+        // Блокируем только если свайп достаточно большой
+        if (distance >= minSwipeDistance) {
+          e.preventDefault(); // Предотвращаем pull-to-refresh
+          setOrderSwipeProgress(100);
+        } else {
+          // Небольшой свайп - показываем индикатор, но не блокируем скролл
+          const progress = Math.min((distance / minSwipeDistance) * 100, 100);
+          setOrderSwipeProgress(progress);
+        }
+        return;
+      }
     } else {
-      setOrderSwipeProgress(0);
+      // Если касание не внутри контента (например, на границе секции)
+      // Если свайп вверх (отрицательное расстояние), это прокрутка контента секции - не блокируем
+      if (distance < 0) {
+        setOrderSwipeProgress(0);
+        return;
+      }
+      
+      // Если свайп вниз - проверяем, прокручен ли контент
+      const contentEl = section?.querySelector(".mobile-order-section-content");
+      const isAtTop = !contentEl || contentEl.scrollTop <= 0;
+      
+      // Если контент прокручен вниз, разрешаем прокрутку
+      if (!isAtTop) {
+        setOrderSwipeProgress(0);
+        return; // Позволяем прокрутку контента
+      }
+      
+      // Если секция открыта и контент в начале - предотвращаем pull-to-refresh
+      if (distance > 0) {
+        e.preventDefault(); // Предотвращаем pull-to-refresh и прокрутку страницы
+        
+        // Если свайп небольшой - показываем индикатор
+        if (distance < minSwipeDistance) {
+          const progress = Math.min((distance / minSwipeDistance) * 100, 100);
+          setOrderSwipeProgress(progress);
+        } else {
+          // Если свайп достаточный вниз - это явное намерение закрыть секцию
+          setOrderSwipeProgress(100);
+        }
+      } else {
+        setOrderSwipeProgress(0);
+      }
     }
   };
 
@@ -578,6 +632,11 @@ const RequestCart = ({
     setTimeout(() => {
       setIsOrderSectionOpen(false);
       setIsClosing(false);
+      // Восстанавливаем прокрутку страницы после закрытия
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
     }, 300);
   };
 
@@ -596,6 +655,43 @@ const RequestCart = ({
       window.removeEventListener("resize", checkIsMobile);
     };
   }, []);
+
+  // Блокируем задний фон и прокрутку когда секция открыта
+  useEffect(() => {
+    if (!isMobile) return;
+
+    if (isOrderSectionOpen) {
+      // Сохраняем текущую позицию прокрутки
+      const scrollY = window.scrollY;
+      // Блокируем прокрутку страницы
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
+      // Блокируем pull-to-refresh
+      document.body.style.overscrollBehaviorY = "contain";
+    } else {
+      // Восстанавливаем прокрутку
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+      document.body.style.overscrollBehaviorY = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
+    }
+
+    return () => {
+      // Очистка при размонтировании
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+      document.body.style.overscrollBehaviorY = "";
+    };
+  }, [isOrderSectionOpen, isMobile]);
   
   const [clientFormState, setClientFormState] = useState({
     full_name: "",
@@ -843,6 +939,11 @@ const RequestCart = ({
             ? `Долг успешно создан и запрос на ${items.length} товар(ов) отправлен!`
             : `Запрос на ${items.length} товар(ов) успешно отправлен!`
         );
+
+      // Закрываем мобильную секцию заказа после успешной отправки
+      if (isMobile && isOrderSectionOpen) {
+        setIsOrderSectionOpen(false);
+      }
     } catch (e) {
       console.error("Error submitting request:", e);
       const errorMessage =
@@ -1109,11 +1210,48 @@ const RequestCart = ({
   // Для этого нужно проверить статус корзины, но пока что предполагаем, что это всегда draft
   const isEditable = true; // TODO: проверять статус корзины
 
+  // Список товаров в корзине (переиспользуемый компонент)
+  const cartItemsList = (
+    <div className="cart-column cart-items-column">
+      <div className="cart-items-section">
+        {(items || []).length === 0 ? (
+          <div className="empty-cart">
+            <ShoppingCart size={64} />
+            <h3>Запрос пуст</h3>
+            <p>Добавьте товары в запрос</p>
+          </div>
+        ) : (
+          items.map((item) => (
+            <CartItem
+              key={item.id}
+              item={item}
+              onUpdateQuantity={handleUpdateQuantityLocal}
+              onRemoveItem={handleRemoveItemLocal}
+              editable={isEditable}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
       {/* Модалка корзины - открывается при нажатии на кнопку корзины в ProductionRequest */}
       {isOpen && (
-        <div className="cart-modal-overlay" onClick={onClose}>
+        <div 
+          className="cart-modal-overlay" 
+          onClick={(e) => {
+            // Закрываем модалку только при клике на overlay, а не на контент
+            if (e.target === e.currentTarget) {
+              if (onClose) {
+                onClose();
+              } else if (onOpenChange) {
+                onOpenChange(false);
+              }
+            }
+          }}
+        >
           <div
             className="cart-modal-content"
             onClick={(e) => e.stopPropagation()}
@@ -1131,27 +1269,7 @@ const RequestCart = ({
 
                 <div className="cart-content">
                   {/* Левая колонка - товары в корзине */}
-                  <div className="cart-column cart-items-column">
-                    <div className="cart-items-section">
-                      {(items || []).length === 0 ? (
-                        <div className="empty-cart">
-                          <ShoppingCart size={64} />
-                          <h3>Запрос пуст</h3>
-                          <p>Добавьте товары в запрос</p>
-                        </div>
-                      ) : (
-                        items.map((item) => (
-                          <CartItem
-                            key={item.id}
-                            item={item}
-                            onUpdateQuantity={handleUpdateQuantityLocal}
-                            onRemoveItem={handleRemoveItemLocal}
-                            editable={isEditable}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </div>
+                  {cartItemsList}
 
                   {/* Правая колонка - выбор клиента и итог (только для десктопа) */}
                   {!isMobile && (
@@ -1164,6 +1282,14 @@ const RequestCart = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Overlay для блокировки заднего фона - для мобильных/планшетов */}
+      {isMobile && isOrderSectionOpen && !isClosing && (
+        <div
+          className="mobile-order-overlay"
+          onClick={handleCloseOrderSection}
+        />
       )}
 
       {/* Секция заказа внизу экрана - для мобильных/планшетов */}
@@ -1208,6 +1334,57 @@ const RequestCart = ({
         >
           {isOrderSectionOpen && !isClosing && (
             <div className="mobile-order-section-content">
+              {/* Кнопка закрытия в самом верху */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignContent: "center",
+                  marginBottom: "16px",
+                }}
+              >
+                <h2
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: "24px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Запрос товаров
+                </h2>
+                <button
+                  onClick={handleCloseOrderSection}
+                  className="close-order-section-btn"
+                  type="button"
+                  title="Закрыть"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "4px",
+                    transition: "background 0.2s ease",
+                    color: "#666",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#f0f0f0";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "none";
+                  }}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Товары в корзине */}
+              {cartItemsList}
+
+              {/* Выбор клиента и итог */}
               {orderSectionContent}
             </div>
           )}
@@ -1215,48 +1392,70 @@ const RequestCart = ({
       )}
 
       {/* Кнопка корзины внизу экрана - для мобильных/планшетов */}
-      {isMobile && (
-        <div className="cart-trigger-container">
-          <button
-            className="cart-trigger-btn"
-            onClick={() => {
-              if (!isOrderSectionOpen) {
-                setIsOrderSectionOpen(true);
-              }
-            }}
-            onTouchStart={!isOrderSectionOpen ? handleTouchStart : undefined}
-            onTouchMove={!isOrderSectionOpen ? handleTouchMove : undefined}
-            onTouchEnd={!isOrderSectionOpen ? handleTouchEnd : undefined}
-            type="button"
-            style={{
-              transform:
-                !isOrderSectionOpen && swipeProgress > 0
-                  ? `translateY(-${Math.min(swipeProgress * 0.5, 20)}px)`
-                  : "translateY(0)",
-              transition: swipeProgress === 0 ? "transform 0.2s ease" : "none",
-            }}
-          >
-            <ShoppingCart size={20} />
-            <span>Запрос</span>
-            {totalItemsCount > 0 && (
-              <span className="cart-badge">{totalItemsCount}</span>
-            )}
-            {!isOrderSectionOpen && swipeProgress > 0 && (
-              <div className="swipe-indicator">
-                <ChevronDown
-                  size={16}
-                  style={{
-                    transform: `rotate(180deg) translateY(${
-                      swipeProgress * 0.3
-                    }px)`,
-                    opacity: Math.min(swipeProgress / 50, 1),
-                  }}
-                />
+      {isMobile && (() => {
+        // Вычисляем итог запроса по той же логике, что и в RequestSummary
+        let total = 0;
+        
+        if (Array.isArray(items) && items.length > 0) {
+          for (const it of items) {
+            const price = Number(it?.price_snapshot || it?.unit_price || 0);
+            const baseQty = Number(it?.quantity_requested || it?.quantity || 0);
+            total += price * baseQty;
+          }
+        }
+
+        return (
+          <div className="cart-trigger-container">
+            <button
+              className="cart-trigger-btn"
+              onClick={() => {
+                if (!isOrderSectionOpen) {
+                  setIsOrderSectionOpen(true);
+                }
+              }}
+              onTouchStart={!isOrderSectionOpen ? handleTouchStart : undefined}
+              onTouchMove={!isOrderSectionOpen ? handleTouchMove : undefined}
+              onTouchEnd={!isOrderSectionOpen ? handleTouchEnd : undefined}
+              type="button"
+              style={{
+                transform:
+                  !isOrderSectionOpen && swipeProgress > 0
+                    ? `translateY(-${Math.min(swipeProgress * 0.5, 20)}px)`
+                    : "translateY(0)",
+                transition: swipeProgress === 0 ? "transform 0.2s ease" : "none",
+              }}
+            >
+              <div className="cart-trigger-left">
+                <ShoppingCart size={20} />
+                <div className="cart-trigger-info">
+                  <span className="cart-trigger-label">Запрос</span>
+                  {total > 0 && (
+                    <span className="cart-trigger-total">
+                      К оплате: {total.toLocaleString()}.00 сом
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
-          </button>
-        </div>
-      )}
+              <div className="cart-trigger-right">
+                {totalItemsCount > 0 && (
+                  <span className="cart-badge">{totalItemsCount}</span>
+                )}
+                {!isOrderSectionOpen && (
+                  <ChevronUp 
+                    size={20} 
+                    className="swipe-hint-icon"
+                    style={{
+                      opacity: swipeProgress > 0 ? Math.min(swipeProgress / 50, 1) : 0.6,
+                      transform: swipeProgress > 0 ? `translateY(-${swipeProgress * 0.2}px)` : "translateY(0)",
+                      transition: swipeProgress === 0 ? "opacity 0.2s ease, transform 0.2s ease" : "none",
+                    }}
+                  />
+                )}
+              </div>
+            </button>
+          </div>
+        );
+      })()}
     </>
   );
 };

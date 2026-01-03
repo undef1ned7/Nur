@@ -194,10 +194,11 @@
   .cart-trigger-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 24px;
-    background: #007bff;
-    color: white;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #ffd600;
+    color: #000;
     border: none;
     border-radius: 24px;
     font-size: 1rem;
@@ -208,19 +209,70 @@
     position: relative;
     user-select: none;
     -webkit-user-select: none;
+    width: 100%;
+    max-width: 100%;
 
     &:hover {
-      background: #0056b3;
+      background: #ffd600;
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+      box-shadow: 0 4px 12px rgba(255, 214, 0, 0.4);
     }
 
     &:active {
       transform: translateY(0);
     }
 
-    svg {
+    .cart-trigger-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0; // Позволяет тексту обрезаться
+
+      svg {
+        flex-shrink: 0;
+      }
+
+      .cart-trigger-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        flex: 1;
+
+        .cart-trigger-label {
+          font-size: 1rem;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+
+        .cart-trigger-total {
+          font-size: 0.85rem;
+          font-weight: 500;
+          opacity: 0.95;
+          white-space: nowrap;
+        }
+      }
+    }
+
+    .cart-trigger-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       flex-shrink: 0;
+
+      .cart-badge {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+
+      .swipe-hint-icon {
+        flex-shrink: 0;
+        pointer-events: none;
+      }
     }
 
     .cart-badge {
@@ -465,6 +517,31 @@
   }
 }
 
+// Overlay для блокировки заднего фона
+.mobile-order-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    display: none !important;
+  }
+}
+
 // Секция заказа внизу экрана - для мобильных/планшетов
 .mobile-order-section {
   position: fixed;
@@ -539,245 +616,265 @@
     max-height: calc(85vh - 130px);
     overflow-y: auto;
     transition: opacity 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    // Стили для списка товаров в мобильной секции
+    .cart-items-column {
+      width: 100%;
+      margin-bottom: 0;
+    }
+
+    .cart-items-section {
+      max-height: none;
+      overflow-y: visible;
+    }
+
+    // Стили для секции заказа в мобильной версии
+    .cart-order-column {
+      width: 100%;
+      margin-top: 20px;
+    }
   }
 }
 
 // Стили для клиент-селектора и итога (используются и в модалке, и в мобильной секции)
 .client-selector {
-    margin-bottom: 30px;
+  margin-bottom: 30px;
 
-    .selector-label {
-      display: block;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 10px;
-      font-size: 1.1rem;
-    }
+  .selector-label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+  }
 
-    .selector-dropdown {
-      position: relative;
+  .selector-dropdown {
+    position: relative;
 
-      .selector-trigger {
-        width: 100%;
-        padding: 15px;
-        border: 2px solid #e9ecef;
-        border-radius: 8px;
-        background: white;
-        cursor: pointer;
+    .selector-trigger {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: border-color 0.3s ease;
+
+      &:hover {
+        border-color: #ffd600;
+      }
+
+      .selected-client {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        transition: border-color 0.3s ease;
+        gap: 10px;
+        flex: 1;
 
-        &:hover {
-          border-color: #ffd600;
-        }
-
-        .selected-client {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex: 1;
-
-          .client-phone {
-            color: #666;
-            font-size: 0.9rem;
-          }
-        }
-
-        .chevron {
-          transition: transform 0.3s ease;
-
-          &.open {
-            transform: rotate(180deg);
-          }
+        .client-phone {
+          color: #666;
+          font-size: 0.9rem;
         }
       }
 
-      .selector-dropdown-content {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 2px solid #e9ecef;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        z-index: 1000;
-        max-height: 300px;
-        overflow-y: auto;
+      .chevron {
+        transition: transform 0.3s ease;
 
-        .search-box {
-          padding: 15px;
-          border-bottom: 1px solid #e9ecef;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-
-          input {
-            flex: 1;
-            border: none;
-            outline: none;
-            font-size: 1rem;
-
-            &::placeholder {
-              color: #999;
-            }
-          }
-        }
-
-        .actions-row {
-          padding: 0 15px 10px 15px;
-
-          .create-client-btn {
-            margin-top: 10px;
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px dashed #ffd600;
-            background: #fffbea;
-            color: #8a6d00;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s ease;
-
-            &:hover {
-              background: #fff3bf;
-            }
-          }
-
-          .clear-client-btn {
-            margin-top: 10px;
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e9ecef;
-            background: white;
-            color: #666;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-
-            &:hover {
-              background: #f8f9fa;
-            }
-          }
-        }
-
-        .create-client-form {
-          padding: 12px 15px 15px 15px;
-          border-bottom: 1px solid #f8f9fa;
-
-          input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            outline: none;
-            transition: border-color 0.2s ease;
-
-            &:focus {
-              border-color: #ffd600;
-            }
-
-            &::placeholder {
-              color: #999;
-            }
-          }
-
-          .error {
-            margin-top: 4px;
-          }
-
-          .save-client-btn {
-            padding: 10px 14px;
-            background: #28a745;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
-
-            &:hover:not(:disabled) {
-              background: #218838;
-            }
-
-            &:disabled {
-              opacity: 0.7;
-              cursor: not-allowed;
-            }
-          }
-
-          .cancel-create-btn {
-            padding: 10px 14px;
-            background: #f1f3f5;
-            color: #333;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
-
-            &:hover:not(:disabled) {
-              background: #e9ecef;
-            }
-
-            &:disabled {
-              opacity: 0.7;
-              cursor: not-allowed;
-            }
-          }
-        }
-
-        .clients-list {
-          .client-option {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            background: none;
-            text-align: left;
-            cursor: pointer;
-            transition: background 0.3s ease;
-            border-bottom: 1px solid #f8f9fa;
-
-            &:hover {
-              background: #f8f9fa;
-            }
-
-            &.selected {
-              background: #ffd600;
-              color: white;
-            }
-
-            .client-info {
-              display: flex;
-              flex-direction: column;
-              gap: 4px;
-
-              .client-name {
-                font-weight: 600;
-                font-size: 1rem;
-              }
-
-              .client-phone {
-                font-size: 0.9rem;
-                opacity: 0.8;
-              }
-            }
-          }
-
-          .loading,
-          .no-clients {
-            padding: 20px;
-            text-align: center;
-            color: #666;
-          }
+        &.open {
+          transform: rotate(180deg);
         }
       }
     }
+
+    .selector-dropdown-content {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 2px solid #e9ecef;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      max-height: 300px;
+      overflow-y: auto;
+
+      .search-box {
+        padding: 15px;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        input {
+          flex: 1;
+          border: none;
+          outline: none;
+          font-size: 1rem;
+
+          &::placeholder {
+            color: #999;
+          }
+        }
+      }
+
+      .actions-row {
+        padding: 0 15px 10px 15px;
+
+        .create-client-btn {
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px dashed #ffd600;
+          background: #fffbea;
+          color: #8a6d00;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: #fff3bf;
+          }
+        }
+
+        .clear-client-btn {
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #e9ecef;
+          background: white;
+          color: #666;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: #f8f9fa;
+          }
+        }
+      }
+
+      .create-client-form {
+        padding: 12px 15px 15px 15px;
+        border-bottom: 1px solid #f8f9fa;
+
+        input {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #e9ecef;
+          border-radius: 8px;
+          font-size: 0.95rem;
+          outline: none;
+          transition: border-color 0.2s ease;
+
+          &:focus {
+            border-color: #ffd600;
+          }
+
+          &::placeholder {
+            color: #999;
+          }
+        }
+
+        .error {
+          margin-top: 4px;
+        }
+
+        .save-client-btn {
+          padding: 10px 14px;
+          background: #28a745;
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease;
+
+          &:hover:not(:disabled) {
+            background: #218838;
+          }
+
+          &:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+        }
+
+        .cancel-create-btn {
+          padding: 10px 14px;
+          background: #f1f3f5;
+          color: #333;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease;
+
+          &:hover:not(:disabled) {
+            background: #e9ecef;
+          }
+
+          &:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+        }
+      }
+
+      .clients-list {
+        .client-option {
+          width: 100%;
+          padding: 15px;
+          border: none;
+          background: none;
+          text-align: left;
+          cursor: pointer;
+          transition: background 0.3s ease;
+          border-bottom: 1px solid #f8f9fa;
+
+          &:hover {
+            background: #f8f9fa;
+          }
+
+          &.selected {
+            background: #ffd600;
+            color: white;
+          }
+
+          .client-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            .client-name {
+              font-weight: 600;
+              font-size: 1rem;
+            }
+
+            .client-phone {
+              font-size: 0.9rem;
+              opacity: 0.8;
+            }
+          }
+        }
+
+        .loading,
+        .no-clients {
+          padding: 20px;
+          text-align: center;
+          color: #666;
+        }
+      }
+    }
+  }
 }
 
 // Стили для итога заказа (используются и в модалке, и в мобильной секции)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   X,
@@ -8,6 +8,7 @@ import {
   User,
   Search,
   ChevronDown,
+  ChevronUp,
   Heart,
   Star,
 } from "lucide-react";
@@ -400,16 +401,6 @@ const ClientSelector = ({
     <div className="client-selector">
       <div className="selector-label-container">
         <label className="selector-label">Выберите клиента</label>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="close-order-section-btn"
-            type="button"
-            title="Закрыть"
-          >
-            <X size={20} />
-          </button>
-        )}
       </div>
       <div className="selector-dropdown">
         <button
@@ -856,6 +847,7 @@ const Cart = ({
   // Redux селекторы
   const cartItemsLocal = useSelector(selectCartItems);
   const selectedClient = useSelector(selectSelectedClient);
+  const subtotalLocal = useSelector(selectCartTotal);
 
   // Server-backed agent cart state
   const [agentCartId, setAgentCartId] = useState(agentCartIdProp);
@@ -871,12 +863,39 @@ const Cart = ({
   const [firstDueDate, setFirstDueDate] = useState("");
   const [prepaymentAmount, setPrepaymentAmount] = useState("");
 
+  // Проверяем, мобильное ли это устройство
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Состояние для секции заказа внизу (мобильная/планшетная версия)
+  const [isOrderSectionOpen, setIsOrderSectionOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [touchStart, setTouchStart] = useState(null);
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  const [orderTouchStart, setOrderTouchStart] = useState(null); // number | null
+  const [orderSwipeProgress, setOrderSwipeProgress] = useState(0);
+
+  const minSwipeDistance = 50;
+
   // Alerts delegated to parent
 
   // Загружаем клиентов при монтировании
   useEffect(() => {
     dispatch(fetchClientsAsync());
   }, [dispatch]);
+
+  // Проверяем, мобильное ли это устройство
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+
+    return () => {
+      window.removeEventListener("resize", checkIsMobile);
+    };
+  }, []);
 
   // Load items for provided or discovered draft cart; do not create here
   useEffect(() => {
@@ -1081,6 +1100,49 @@ const Cart = ({
     }
   }, [agentCartId, agentCartIdProp, dispatch]);
 
+  // Функция для обновления корзины
+  const refreshCart = useCallback(async () => {
+    try {
+      setLoadingAgentItems(true);
+      // Проверяем актуальный ID корзины из localStorage
+      const storedCartId = localStorage.getItem("agentCartId");
+      const cartIdToUse = storedCartId || agentCartId || agentCartIdProp;
+
+      if (cartIdToUse) {
+        const cart = await dispatch(
+          getAgentCart({ agent: null, order_discount_total: "0.00" })
+        ).unwrap();
+        if (cart?.id) {
+          setAgentCart(cart);
+          setAgentItems(Array.isArray(cart.items) ? cart.items : []);
+          // Обновляем ID корзины если он изменился
+          if (cart.id !== agentCartId) {
+            setAgentCartId(cart.id);
+            localStorage.setItem("agentCartId", cart.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error refreshing cart:", e);
+    } finally {
+      setLoadingAgentItems(false);
+    }
+  }, [agentCartId, agentCartIdProp, dispatch]);
+
+  // Обновляем корзину при открытии модалки, чтобы получить актуальные данные
+  useEffect(() => {
+    if (isOpen) {
+      refreshCart();
+    }
+  }, [isOpen, refreshCart]);
+
+  // Обновляем корзину при открытии мобильной секции заказа
+  useEffect(() => {
+    if (isMobile && isOrderSectionOpen) {
+      refreshCart();
+    }
+  }, [isMobile, isOrderSectionOpen, refreshCart]);
+
   const handleClientSelect = async (client) => {
     dispatch(selectClient(client));
     if (agentCartId && client?.id) {
@@ -1250,6 +1312,11 @@ const Cart = ({
       setDebtMonths("");
       setFirstDueDate("");
       setPrepaymentAmount("");
+
+      // Закрываем мобильную секцию заказа после успешной продажи
+      if (isMobile && isOrderSectionOpen) {
+        setIsOrderSectionOpen(false);
+      }
     } catch (e) {
       console.error("Error submitting cart:", e);
       const errorMessage =
@@ -1262,16 +1329,6 @@ const Cart = ({
     }
   };
   console.log(agentCart, "agent");
-
-  // Состояние для секции заказа внизу (мобильная/планшетная версия)
-  const [isOrderSectionOpen, setIsOrderSectionOpen] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const [touchStart, setTouchStart] = useState(null);
-  const [swipeProgress, setSwipeProgress] = useState(0);
-  const [orderTouchStart, setOrderTouchStart] = useState(null); // number | null
-  const [orderSwipeProgress, setOrderSwipeProgress] = useState(0);
-
-  const minSwipeDistance = 50;
 
   // Обработка свайпа вверх для открытия секции заказа
   const handleTouchStart = (e) => {
@@ -1519,78 +1576,78 @@ const Cart = ({
     }, 300);
   };
 
-  // Проверяем, мобильное ли это устройство
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-
-    checkIsMobile();
-    window.addEventListener("resize", checkIsMobile);
-
-    return () => {
-      window.removeEventListener("resize", checkIsMobile);
-    };
-  }, []);
-
-  // Предотвращаем pull-to-refresh когда секция открыта и восстанавливаем прокрутку при закрытии
+  // Блокируем задний фон и прокрутку когда секция открыта
   useEffect(() => {
     if (!isMobile) return;
 
-    const preventPullToRefresh = (e) => {
-      // Если секция открыта и пользователь свайпает вниз в начале страницы
-      if (isOrderSectionOpen && window.scrollY <= 0) {
-        const touch = e.touches?.[0];
-        if (touch) {
-          // Проверяем, что касание в области секции заказа
-          const section = e.target.closest?.(".mobile-order-section");
-          const button = e.target.closest?.(".cart-trigger-btn");
-          const container = e.target.closest?.(".cart-trigger-container");
-
-          // Если касание в области секции или кнопки - предотвращаем pull-to-refresh
-          if (section || button || container) {
-            // Если свайп вниз (начальная позиция выше текущей)
-            const startY = orderTouchStart;
-            if (startY && touch.clientY > startY) {
-              e.preventDefault();
-            }
-          }
-        }
-      }
-    };
-
     if (isOrderSectionOpen) {
-      // Блокируем pull-to-refresh когда секция открыта
-      // НЕ блокируем прокрутку страницы, только предотвращаем pull-to-refresh
+      // Сохраняем текущую позицию прокрутки
+      const scrollY = window.scrollY;
+      // Блокируем прокрутку страницы
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
+      // Блокируем pull-to-refresh
       document.body.style.overscrollBehaviorY = "contain";
-      // Добавляем обработчик для предотвращения pull-to-refresh
-      document.addEventListener("touchmove", preventPullToRefresh, {
-        passive: false,
-      });
     } else {
-      // Восстанавливаем нормальное поведение когда секция закрыта
-      document.body.style.overscrollBehaviorY = "";
-      // Убеждаемся, что прокрутка страницы восстановлена
-      document.body.style.overflow = "";
+      // Восстанавливаем прокрутку
+      const scrollY = document.body.style.top;
       document.body.style.position = "";
       document.body.style.top = "";
       document.body.style.width = "";
-      // Удаляем обработчик
-      document.removeEventListener("touchmove", preventPullToRefresh);
+      document.body.style.overflow = "";
+      document.body.style.overscrollBehaviorY = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
     }
 
     return () => {
       // Очистка при размонтировании
-      document.body.style.overscrollBehaviorY = "";
-      document.body.style.overflow = "";
       document.body.style.position = "";
       document.body.style.top = "";
       document.body.style.width = "";
-      document.removeEventListener("touchmove", preventPullToRefresh);
+      document.body.style.overflow = "";
+      document.body.style.overscrollBehaviorY = "";
     };
-  }, [isOrderSectionOpen, isMobile, orderTouchStart]);
+  }, [isOrderSectionOpen, isMobile]);
+
+  // Список товаров в корзине (переиспользуемый компонент)
+  const cartItemsList = (
+    <div className="cart-column cart-items-column">
+      <div className="cart-items-section">
+        {(agentItems || []).length === 0 &&
+        (cartItemsLocal || []).length === 0 ? (
+          <div className="empty-cart">
+            <ShoppingCart size={64} />
+            <h3>Корзина пуста</h3>
+            <p>Добавьте товары в корзину</p>
+          </div>
+        ) : (
+          (agentItems && agentItems.length > 0
+            ? agentItems
+            : cartItemsLocal || []
+          ).map((item) => {
+            // Корзина редактируема, если статус "draft" или "active" (не отправлена/одобрена/отклонена)
+            const cartStatus = agentCart?.status;
+            const isEditable =
+              !agentCart || cartStatus === "draft" || cartStatus === "active";
+            return (
+              <CartItem
+                key={item.id}
+                item={item}
+                onUpdateQuantity={handleUpdateQuantity}
+                onUpdateGift={handleUpdateGift}
+                onRemoveItem={handleRemoveItem}
+                editable={isEditable}
+              />
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 
   // Секция заказа (выбор клиента + итог) - всегда рендерится для мобильных/планшетов
   const orderSectionContent = (
@@ -1601,7 +1658,6 @@ const Cart = ({
         clients={clients || []}
         loading={clientsLoading}
         onRefresh={() => dispatch(fetchClientsAsync())}
-        onClose={isMobile ? handleCloseOrderSection : undefined}
       />
 
       <OrderSummary
@@ -1656,47 +1712,7 @@ const Cart = ({
 
                 <div className="cart-content">
                   {/* Левая колонка - товары в корзине */}
-                  <div className="cart-column cart-items-column">
-                    <div className="cart-items-section">
-                      {(agentItems || []).length === 0 &&
-                      (cartItemsLocal || []).length === 0 ? (
-                        <div className="empty-cart">
-                          <ShoppingCart size={64} />
-                          <h3>Корзина пуста</h3>
-                          <p>Добавьте товары в корзину</p>
-                        </div>
-                      ) : (
-                        (agentItems && agentItems.length > 0
-                          ? agentItems
-                          : cartItemsLocal || []
-                        ).map((item) => {
-                          // Корзина редактируема, если статус "draft" или "active" (не отправлена/одобрена/отклонена)
-                          const cartStatus = agentCart?.status;
-                          const isEditable =
-                            !agentCart ||
-                            cartStatus === "draft" ||
-                            cartStatus === "active";
-                          console.log("Cart: rendering item", {
-                            id: item.id,
-                            name: item.product_name,
-                            quantity: item.quantity,
-                            editable: isEditable,
-                            cartStatus: cartStatus,
-                          });
-                          return (
-                            <CartItem
-                              key={item.id}
-                              item={item}
-                              onUpdateQuantity={handleUpdateQuantity}
-                              onUpdateGift={handleUpdateGift}
-                              onRemoveItem={handleRemoveItem}
-                              editable={isEditable}
-                            />
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
+                  {cartItemsList}
 
                   {/* Правая колонка - выбор клиента и итог (только для десктопа) */}
                   {!isMobile && (
@@ -1709,6 +1725,14 @@ const Cart = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Overlay для блокировки заднего фона - для мобильных/планшетов */}
+      {isMobile && isOrderSectionOpen && !isClosing && (
+        <div
+          className="mobile-order-overlay"
+          onClick={handleCloseOrderSection}
+        />
       )}
 
       {/* Секция заказа внизу экрана - для мобильных/планшетов */}
@@ -1766,6 +1790,57 @@ const Cart = ({
         >
           {isOrderSectionOpen && !isClosing && (
             <div className="mobile-order-section-content">
+              {/* Кнопка закрытия в самом верху */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignContent: "center",
+                  marginBottom: "16px",
+                }}
+              >
+                <h2
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: "24px",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Корзина
+                </h2>
+                <button
+                  onClick={handleCloseOrderSection}
+                  className="close-order-section-btn"
+                  type="button"
+                  title="Закрыть"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "4px",
+                    transition: "background 0.2s ease",
+                    color: "#666",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#f0f0f0";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "none";
+                  }}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Товары в корзине */}
+              {cartItemsList}
+
+              {/* Выбор клиента и итог */}
               {orderSectionContent}
             </div>
           )}
@@ -1773,48 +1848,89 @@ const Cart = ({
       )}
 
       {/* Кнопка корзины внизу экрана - для мобильных/планшетов */}
-      {isMobile && (
-        <div className="cart-trigger-container">
-          <button
-            className="cart-trigger-btn"
-            onClick={() => {
-              if (!isOrderSectionOpen) {
-                setIsOrderSectionOpen(true);
-              }
-            }}
-            onTouchStart={!isOrderSectionOpen ? handleTouchStart : undefined}
-            onTouchMove={!isOrderSectionOpen ? handleTouchMove : undefined}
-            onTouchEnd={!isOrderSectionOpen ? handleTouchEnd : undefined}
-            type="button"
-            style={{
-              transform:
-                !isOrderSectionOpen && swipeProgress > 0
-                  ? `translateY(-${Math.min(swipeProgress * 0.5, 20)}px)`
-                  : "translateY(0)",
-              transition: swipeProgress === 0 ? "transform 0.2s ease" : "none",
-            }}
-          >
-            <ShoppingCart size={20} />
-            <span>Корзина</span>
-            {totalItemsCount > 0 && (
-              <span className="cart-badge">{totalItemsCount}</span>
-            )}
-            {!isOrderSectionOpen && swipeProgress > 0 && (
-              <div className="swipe-indicator">
-                <ChevronDown
-                  size={16}
-                  style={{
-                    transform: `rotate(180deg) translateY(${
-                      swipeProgress * 0.3
-                    }px)`,
-                    opacity: Math.min(swipeProgress / 50, 1),
-                  }}
-                />
-              </div>
-            )}
-          </button>
-        </div>
-      )}
+      {isMobile &&
+        (() => {
+          // Вычисляем итог корзины по той же логике, что и в OrderSummary
+          const usingServer =
+            Array.isArray(agentItems) && agentItems.length > 0;
+          let total = 0;
+
+          if (usingServer) {
+            for (const it of agentItems) {
+              const price = Number(it?.unit_price || it?.price_snapshot || 0);
+              const baseQty = Number(
+                it?.quantity || it?.quantity_requested || 0
+              );
+              total += price * baseQty;
+            }
+          } else {
+            total = subtotalLocal || 0;
+          }
+
+          return (
+            <div className="cart-trigger-container">
+              <button
+                className="cart-trigger-btn"
+                onClick={() => {
+                  if (!isOrderSectionOpen) {
+                    setIsOrderSectionOpen(true);
+                  }
+                }}
+                onTouchStart={
+                  !isOrderSectionOpen ? handleTouchStart : undefined
+                }
+                onTouchMove={!isOrderSectionOpen ? handleTouchMove : undefined}
+                onTouchEnd={!isOrderSectionOpen ? handleTouchEnd : undefined}
+                type="button"
+                style={{
+                  transform:
+                    !isOrderSectionOpen && swipeProgress > 0
+                      ? `translateY(-${Math.min(swipeProgress * 0.5, 20)}px)`
+                      : "translateY(0)",
+                  transition:
+                    swipeProgress === 0 ? "transform 0.2s ease" : "none",
+                }}
+              >
+                <div className="cart-trigger-left">
+                  <ShoppingCart size={20} />
+                  <div className="cart-trigger-info">
+                    <span className="cart-trigger-label">Корзина</span>
+                    {total > 0 && (
+                      <span className="cart-trigger-total">
+                        К оплате: {total.toLocaleString()}.00 KGS
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="cart-trigger-right">
+                  {totalItemsCount > 0 && (
+                    <span className="cart-badge">{totalItemsCount}</span>
+                  )}
+                  {!isOrderSectionOpen && (
+                    <ChevronUp
+                      size={20}
+                      className="swipe-hint-icon"
+                      style={{
+                        opacity:
+                          swipeProgress > 0
+                            ? Math.min(swipeProgress / 50, 1)
+                            : 0.6,
+                        transform:
+                          swipeProgress > 0
+                            ? `translateY(-${swipeProgress * 0.2}px)`
+                            : "translateY(0)",
+                        transition:
+                          swipeProgress === 0
+                            ? "opacity 0.2s ease, transform 0.2s ease"
+                            : "none",
+                      }}
+                    />
+                  )}
+                </div>
+              </button>
+            </div>
+          );
+        })()}
     </>
   );
 };
