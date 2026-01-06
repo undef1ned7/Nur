@@ -60,7 +60,7 @@ const AddCashFlowsModal = ({ onClose }) => {
           <input
             type="text"
             name="name"
-            placeholder="Например, Закупка материалов"
+            placeholder=""
             className="vitrina__modal-input"
             value={newCashbox.name}
             onChange={(e) =>

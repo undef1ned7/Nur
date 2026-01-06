@@ -1402,6 +1402,30 @@ const Cart = ({
     setOrderTouchStart(touch.clientY);
     setOrderSwipeProgress(0);
 
+    // Сохраняем начальную X позицию для проверки горизонтального движения
+    const section = e.target.closest(".mobile-order-section");
+    if (section) {
+      section.dataset.startX = touch.clientX.toString();
+    }
+
+    // Сохраняем информацию о том, где началось касание
+    const contentElement = e.target.closest(".mobile-order-section-content");
+    const isInsideContent = !!contentElement;
+
+    // Если касание внутри контента, сохраняем начальную позицию скролла
+    if (isInsideContent && contentElement && section) {
+      const scrollTop = contentElement.scrollTop;
+      const scrollHeight = contentElement.scrollHeight;
+      const clientHeight = contentElement.clientHeight;
+      const isScrollable = scrollHeight > clientHeight;
+      const isAtTop = scrollTop <= 5; // Небольшой допуск
+
+      // Сохраняем информацию о начальном состоянии скролла
+      section.dataset.scrollStart = scrollTop.toString();
+      section.dataset.isScrollable = isScrollable.toString();
+      section.dataset.isAtTop = isAtTop.toString();
+    }
+
     // Если секция открыта и контент в начале - предотвращаем pull-to-refresh
     if (isOrderSectionOpen) {
       const contentElement = e.target.closest(".mobile-order-section-content");
@@ -1464,12 +1488,26 @@ const Cart = ({
     const isInsideContent = !!contentElement;
 
     // Если касание внутри контента - проверяем, можно ли скроллить
-    if (isInsideContent) {
+    if (isInsideContent && contentElement) {
       const scrollTop = contentElement.scrollTop;
       const scrollHeight = contentElement.scrollHeight;
       const clientHeight = contentElement.clientHeight;
-      const isAtTop = scrollTop <= 0;
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1; // Небольшой допуск для округления
+      const isScrollable = scrollHeight > clientHeight;
+      const isAtTop = scrollTop <= 5; // Небольшой допуск
+
+      // Получаем информацию о начальном состоянии скролла из элемента секции
+      const section = e.target.closest(".mobile-order-section");
+      const scrollStart = section
+        ? parseFloat(section.dataset.scrollStart || "0")
+        : 0;
+      const wasAtTop = section ? section.dataset.isAtTop === "true" : true;
+      const hasScrolled = Math.abs(scrollTop - scrollStart) > 3; // Если произошел скролл
+
+      // Если произошел скролл контента - это не свайп для закрытия
+      if (hasScrolled) {
+        setOrderSwipeProgress(0);
+        return; // Позволяем скролл контента
+      }
 
       // Если свайп вверх (отрицательное расстояние) - это скролл контента вверх
       if (distance < 0) {
@@ -1483,9 +1521,29 @@ const Cart = ({
         return; // Позволяем скролл контента
       }
 
+      // Если контент скроллируемый и не в начале - не закрываем
+      if (isScrollable && !isAtTop) {
+        setOrderSwipeProgress(0);
+        return;
+      }
+
       // Если свайп вниз и контент в начале - это может быть закрытие секции
-      // Но только если свайп достаточно большой и явно направлен вниз
-      if (distance > 0 && isAtTop) {
+      // Но только если свайп достаточно большой, вертикальный и явно направлен вниз
+      if (distance > 0 && isAtTop && wasAtTop) {
+        // Проверяем, что это действительно вертикальный свайп (не горизонтальный)
+        const touch = e.targetTouches[0];
+        const startX = section
+          ? parseFloat(section.dataset.startX || "0")
+          : touch.clientX;
+        const deltaX = Math.abs(touch.clientX - startX);
+        const deltaY = Math.abs(distance);
+
+        // Если горизонтальное движение больше вертикального - это не свайп для закрытия
+        if (deltaX > deltaY * 0.5) {
+          setOrderSwipeProgress(0);
+          return;
+        }
+
         // Проверяем, что это действительно свайп для закрытия, а не случайное движение
         // Блокируем только если свайп достаточно большой
         if (distance >= minSwipeDistance) {
@@ -1551,7 +1609,36 @@ const Cart = ({
         setIsOrderSectionOpen(true);
       }
     } else {
-      // Если секция открыта - закрываем при свайпе вниз
+      // Если секция открыта - проверяем, можно ли закрывать
+      const contentElement = e.target.closest(".mobile-order-section-content");
+      const isInsideContent = !!contentElement;
+
+      // Если касание было внутри контента, проверяем, был ли скролл
+      if (isInsideContent && contentElement) {
+        const section = e.target.closest(".mobile-order-section");
+        const scrollStart = section
+          ? parseFloat(section.dataset.scrollStart || "0")
+          : 0;
+        const scrollTop = contentElement.scrollTop;
+        const hasScrolled = Math.abs(scrollTop - scrollStart) > 3;
+
+        // Если был скролл контента - не закрываем секцию
+        if (hasScrolled) {
+          setOrderTouchStart(null);
+          setOrderSwipeProgress(0);
+          return;
+        }
+
+        // Проверяем, что контент в начале
+        const isAtTop = scrollTop <= 5;
+        if (!isAtTop) {
+          setOrderTouchStart(null);
+          setOrderSwipeProgress(0);
+          return;
+        }
+      }
+
+      // Закрываем только если свайп вниз достаточно большой
       if (distance > minSwipeDistance) {
         handleCloseOrderSection();
       }
@@ -1559,6 +1646,15 @@ const Cart = ({
 
     setOrderTouchStart(null);
     setOrderSwipeProgress(0);
+
+    // Очищаем временные данные
+    const section = e.target.closest(".mobile-order-section");
+    if (section) {
+      delete section.dataset.scrollStart;
+      delete section.dataset.isScrollable;
+      delete section.dataset.isAtTop;
+      delete section.dataset.startX;
+    }
   };
 
   const handleCloseOrderSection = () => {
