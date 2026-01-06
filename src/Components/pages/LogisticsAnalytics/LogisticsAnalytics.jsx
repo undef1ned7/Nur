@@ -79,41 +79,53 @@ const LogisticsAnalytics = () => {
     if (!analytics) {
       return {
         cards: {
-          all: { count: 0, sum: 0, service_cost: 0 },
-          placed: { count: 0, sum: 0, service_cost: 0 },
-          in_transit: { count: 0, sum: 0, service_cost: 0 },
-          completed: { count: 0, sum: 0, service_cost: 0 },
+          all: { orders: 0, revenue: 0, service: 0 },
+          placed: { orders: 0, revenue: 0, service: 0 },
+          in_transit: { orders: 0, revenue: 0, service: 0 },
+          completed: { orders: 0, revenue: 0, service: 0 },
         },
         charts: {
           orders_by_status: [],
           orders_by_arrival_date: [],
-          service_cost_by_status: [],
+          service_by_status: [],
+          revenue_by_status: [],
         },
       };
     }
 
-    // Если данные приходят в другом формате, адаптируем их
-    const cards = analytics.cards || analytics.summary || {};
+    const cards = analytics.cards || {};
     const charts = analytics.charts || {};
+    const byStatus = cards.by_status || [];
+
+    // Преобразуем by_status в объект с ключами по статусам
+    const statusMap = {};
+    byStatus.forEach((item) => {
+      const title = item.title || "";
+      if (title.includes("Оформлен") || title.includes("decorated")) {
+        statusMap.placed = item;
+      } else if (title.includes("В пути") || title.includes("transit")) {
+        statusMap.in_transit = item;
+      } else if (title.includes("Завершен") || title.includes("completed")) {
+        statusMap.completed = item;
+      }
+    });
 
     return {
       cards: {
-        all: cards.all ||
-          cards.all_orders || { count: 0, sum: 0, service_cost: 0 },
-        placed: cards.placed ||
-          cards.processed || { count: 0, sum: 0, service_cost: 0 },
-        in_transit: cards.in_transit ||
-          cards.in_transit || { count: 0, sum: 0, service_cost: 0 },
-        completed: cards.completed ||
-          cards.finished || { count: 0, sum: 0, service_cost: 0 },
+        all: cards.all || { orders: 0, revenue: 0, service: 0 },
+        placed: statusMap.placed || { orders: 0, revenue: 0, service: 0 },
+        in_transit: statusMap.in_transit || {
+          orders: 0,
+          revenue: 0,
+          service: 0,
+        },
+        completed: statusMap.completed || { orders: 0, revenue: 0, service: 0 },
       },
       charts: {
-        orders_by_status:
-          charts.orders_by_status || charts.distribution_by_status || [],
-        orders_by_arrival_date:
-          charts.orders_by_arrival_date || charts.by_arrival_date || [],
-        service_cost_by_status:
-          charts.service_cost_by_status || charts.cost_by_status || [],
+        orders_by_status: charts.orders_by_status || [],
+        orders_by_arrival_date: charts.orders_by_arrival_date || [],
+        service_by_status: charts.service_by_status || [],
+        revenue_by_status: charts.revenue_by_status || [],
       },
     };
   }, [analytics]);
@@ -125,33 +137,33 @@ const LogisticsAnalytics = () => {
     return [
       {
         title: "Все заказы",
-        count: all.count || 0,
-        sum: all.sum || 0,
-        serviceCost: all.service_cost || 0,
+        count: all.orders || 0,
+        sum: all.revenue || 0,
+        serviceCost: all.service || 0,
         icon: FileText,
         color: "#f7d617",
       },
       {
         title: "Оформлен",
-        count: placed.count || 0,
-        sum: placed.sum || 0,
-        serviceCost: placed.service_cost || 0,
+        count: placed.orders || 0,
+        sum: placed.revenue || 0,
+        serviceCost: placed.service || 0,
         icon: Package,
         color: "#3b82f6",
       },
       {
         title: "В пути",
-        count: in_transit.count || 0,
-        sum: in_transit.sum || 0,
-        serviceCost: in_transit.service_cost || 0,
+        count: in_transit.orders || 0,
+        sum: in_transit.revenue || 0,
+        serviceCost: in_transit.service || 0,
         icon: Truck,
         color: "#f59e0b",
       },
       {
         title: "Завершен",
-        count: completed.count || 0,
-        sum: completed.sum || 0,
-        serviceCost: completed.service_cost || 0,
+        count: completed.orders || 0,
+        sum: completed.revenue || 0,
+        serviceCost: completed.service || 0,
         icon: CheckCircle,
         color: "#10b981",
       },
@@ -165,19 +177,18 @@ const LogisticsAnalytics = () => {
     if (!data || data.length === 0) {
       // Используем данные из карточек как fallback
       return {
-        labels: ["Все заказы", "Оформлен", "В пути", "Завершен"],
+        labels: ["Оформлен", "В пути", "Завершен"],
         data: [
-          analyticsData.cards.all.count || 0,
-          analyticsData.cards.placed.count || 0,
-          analyticsData.cards.in_transit.count || 0,
-          analyticsData.cards.completed.count || 0,
+          analyticsData.cards.placed.orders || 0,
+          analyticsData.cards.in_transit.orders || 0,
+          analyticsData.cards.completed.orders || 0,
         ],
       };
     }
 
     return {
-      labels: data.map((item) => item.status || item.name || "Неизвестно"),
-      data: data.map((item) => item.count || item.orders || 0),
+      labels: data.map((item) => item.name || item.status || "Неизвестно"),
+      data: data.map((item) => item.value || 0),
     };
   }, [analyticsData]);
 
@@ -194,42 +205,47 @@ const LogisticsAnalytics = () => {
 
     return {
       labels: data.map((item) => {
-        const date = new Date(item.date || item.arrival_date);
+        const date = new Date(item.date || item.day);
         return `${String(date.getDate()).padStart(2, "0")}.${String(
           date.getMonth() + 1
         ).padStart(2, "0")}`;
       }),
-      data: data.map((item) => parseFloat(item.sum || item.total || 0)),
+      data: data.map((item) => parseFloat(item.value || item.orders || 0)),
     };
   }, [analyticsData]);
 
   // Данные для графика "Стоимость услуг по статусам"
   const serviceCostByStatusChart = useMemo(() => {
-    const data = analyticsData.charts.service_cost_by_status;
+    const serviceData = analyticsData.charts.service_by_status || [];
+    const revenueData = analyticsData.charts.revenue_by_status || [];
 
-    if (!data || data.length === 0) {
+    if (serviceData.length === 0 && revenueData.length === 0) {
       // Используем данные из карточек как fallback
       return {
-        labels: ["Все заказы", "Оформлен", "В пути", "Завершен"],
+        labels: ["Оформлен", "В пути", "Завершен"],
         serviceCost: [
-          analyticsData.cards.all.service_cost || 0,
-          analyticsData.cards.placed.service_cost || 0,
-          analyticsData.cards.in_transit.service_cost || 0,
-          analyticsData.cards.completed.service_cost || 0,
+          analyticsData.cards.placed.service || 0,
+          analyticsData.cards.in_transit.service || 0,
+          analyticsData.cards.completed.service || 0,
         ],
-        orderSum: [
-          analyticsData.cards.all.sum || 0,
-          analyticsData.cards.placed.sum || 0,
-          analyticsData.cards.in_transit.sum || 0,
-          analyticsData.cards.completed.sum || 0,
+        revenue: [
+          analyticsData.cards.placed.revenue || 0,
+          analyticsData.cards.in_transit.revenue || 0,
+          analyticsData.cards.completed.revenue || 0,
         ],
       };
     }
 
+    // Используем service_by_status для labels и serviceCost
+    const labels =
+      serviceData.length > 0
+        ? serviceData.map((item) => item.name || item.status || "Неизвестно")
+        : revenueData.map((item) => item.name || item.status || "Неизвестно");
+
     return {
-      labels: data.map((item) => item.status || item.name || "Неизвестно"),
-      serviceCost: data.map((item) => parseFloat(item.service_cost || 0)),
-      orderSum: data.map((item) => parseFloat(item.sum || item.total || 0)),
+      labels,
+      serviceCost: serviceData.map((item) => parseFloat(item.value || 0)),
+      revenue: revenueData.map((item) => parseFloat(item.value || 0)),
     };
   }, [analyticsData]);
 
@@ -239,7 +255,7 @@ const LogisticsAnalytics = () => {
 
     return {
       labels: ["Оформлен", "В пути", "Завершен"],
-      data: [placed.count || 0, in_transit.count || 0, completed.count || 0],
+      data: [placed.orders || 0, in_transit.orders || 0, completed.orders || 0],
       colors: ["#f7d617", "#f59e0b", "#10b981"],
     };
   }, [analyticsData]);
@@ -250,7 +266,11 @@ const LogisticsAnalytics = () => {
 
     return {
       labels: ["Оформлен", "В пути", "Завершен"],
-      data: [placed.sum || 0, in_transit.sum || 0, completed.sum || 0],
+      data: [
+        placed.revenue || 0,
+        in_transit.revenue || 0,
+        completed.revenue || 0,
+      ],
       colors: ["#f7d617", "#f59e0b", "#10b981"],
     };
   }, [analyticsData]);
@@ -354,7 +374,7 @@ const LogisticsAnalytics = () => {
                   labels: ordersByArrivalDateChart.labels,
                   datasets: [
                     {
-                      label: "Сумма (сом)",
+                      label: "Количество заказов",
                       data: ordersByArrivalDateChart.data,
                       borderColor: "#f7d617",
                       backgroundColor: "rgba(247, 214, 23, 0.1)",
@@ -376,9 +396,7 @@ const LogisticsAnalytics = () => {
                     y: {
                       beginAtZero: true,
                       ticks: {
-                        callback: function (value) {
-                          return formatCurrency(value);
-                        },
+                        stepSize: 1,
                       },
                     },
                   },
@@ -406,8 +424,8 @@ const LogisticsAnalytics = () => {
                     borderWidth: 1,
                   },
                   {
-                    label: "Сумма заказов (сом)",
-                    data: serviceCostByStatusChart.orderSum,
+                    label: "Выручка (сом)",
+                    data: serviceCostByStatusChart.revenue,
                     backgroundColor: "#f7d617",
                     borderColor: "#f7d617",
                     borderWidth: 1,

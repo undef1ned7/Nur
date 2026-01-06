@@ -180,7 +180,7 @@ const LogisticsPage = () => {
       description: order.description || "",
       carPrice: order.carPrice || "",
       servicePrice: order.servicePrice || "",
-      salePrice: order.salePrice || "",
+      salePrice: order.sale_price || "",
       status: order.status || "created",
       time: order.time || "",
       arrivalDate: order.arrivalDate || "",
@@ -289,42 +289,38 @@ const LogisticsPage = () => {
 
   // Данные для аналитики по статусам (из /logistics/logistics/analytics/)
   const statusSummary = statusOptions.map((s) => {
-    const item = analytics?.items?.find(
-      (it) => String(it.status) === String(s.value)
-    );
-    // Вычисляем сумму стоимости услуг для заказов с этим статусом
-    const ordersWithStatus = logistics.filter(
-      (o) => String(o.status) === String(s.value)
-    );
-    const totalServiceAmount = ordersWithStatus.reduce((sum, order) => {
-      const servicePrice =
-        parseFloat(order.price_service ?? order.servicePrice ?? 0) || 0;
-      return sum + servicePrice;
-    }, 0);
+    // Ищем данные в cards.by_status по статусу
+    const statusItem = analytics?.cards?.by_status?.find((item) => {
+      const title = item.title || "";
+      if (s.value === "decorated") {
+        return title.includes("Оформлен");
+      } else if (s.value === "transit") {
+        return title.includes("В пути");
+      } else if (s.value === "completed") {
+        return title.includes("Завершен");
+      }
+      return false;
+    });
 
     return {
       key: s.value,
-      label: item?.status_display || s.label,
+      label: statusItem?.title || s.label,
       color:
         s.value === "decorated"
           ? "blue"
           : s.value === "transit"
           ? "orange"
           : "green",
-      count: item?.orders ?? 0,
-      totalAmount: item?.amount ?? 0,
-      totalServiceAmount: totalServiceAmount,
+      count: statusItem?.orders ?? 0,
+      totalAmount: statusItem?.revenue ?? 0,
+      totalServiceAmount: statusItem?.service ?? 0,
     };
   });
 
-  // Общий итог по всем статусам
-  const totalOrders = statusSummary.reduce((acc, s) => acc + s.count, 0);
-  const totalAmount = statusSummary.reduce((acc, s) => acc + s.totalAmount, 0);
-  // Общая сумма стоимости услуг
-  const totalServiceAmount = statusSummary.reduce(
-    (acc, s) => acc + s.totalServiceAmount,
-    0
-  );
+  // Общий итог из cards.all
+  const totalOrders = analytics?.cards?.all?.orders ?? 0;
+  const totalAmount = analytics?.cards?.all?.revenue ?? 0;
+  const totalServiceAmount = analytics?.cards?.all?.service ?? 0;
 
   const filteredOrdersRaw = filterStatus
     ? logistics.filter((o) => o.status === filterStatus)
@@ -348,7 +344,7 @@ const LogisticsPage = () => {
       description: item.description || "",
       carPrice: carPrice,
       servicePrice: item.price_service ?? item.servicePrice ?? "",
-      salePrice: salePrice,
+      sale_price: salePrice,
       revenue: revenue,
       status: item.status || "decorated",
       time: item.created_at || item.time || "",
@@ -521,7 +517,7 @@ const LogisticsPage = () => {
                           <td>{order.carName || "—"}</td>
                           <td>{order.carPrice || "—"}</td>
                           <td>{order.servicePrice || "—"}</td>
-                          <td>{order.salePrice || "—"}</td>
+                          <td>{order.sale_price || "—"}</td>
                           <td>
                             {order.revenue !== null &&
                             order.revenue !== undefined
@@ -655,7 +651,7 @@ const LogisticsPage = () => {
                           <div className="rounded-xl bg-slate-50 p-2">
                             <div className="text-slate-500">Цена продажи</div>
                             <div className="mt-0.5 font-semibold text-slate-900">
-                              {order.salePrice || "—"}
+                              {order.sale_price || "—"}
                             </div>
                           </div>
 
