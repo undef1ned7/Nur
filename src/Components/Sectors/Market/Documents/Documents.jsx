@@ -10,10 +10,11 @@ import {
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { pdf } from "@react-pdf/renderer";
 import {
   fetchDocuments,
   getReceiptJson,
-  getProductInvoice,
+  getInvoiceJson,
 } from "../../../../store/creators/saleThunk";
 import {
   handleCheckoutResponseForPrinting,
@@ -23,6 +24,7 @@ import ReconciliationModal from "./components/ReconciliationModal";
 import ReceiptPreviewModal from "./components/ReceiptPreviewModal";
 import ReceiptEditModal from "./components/ReceiptEditModal";
 import InvoicePreviewModal from "./components/InvoicePreviewModal";
+import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
 
 const Documents = () => {
@@ -230,32 +232,35 @@ const Documents = () => {
 
     try {
       if (activeTab === "invoices") {
-        // Для накладной скачиваем PDF
-        const result = await dispatch(getProductInvoice(item.id));
-        if (getProductInvoice.fulfilled.match(result)) {
-          const pdfBlob = result.payload;
+        // Для накладной получаем JSON данные и генерируем PDF через InvoicePdfDocument
+        const result = await dispatch(getInvoiceJson(item.id));
+        if (getInvoiceJson.fulfilled.match(result)) {
+          const invoiceData = result.payload;
 
-          if (pdfBlob instanceof Blob) {
-            // Убеждаемся, что blob имеет правильный MIME type
-            const blob =
-              pdfBlob.type === "application/pdf"
-                ? pdfBlob
-                : new Blob([pdfBlob], { type: "application/pdf" });
-
-            // Скачиваем файл
-            const url = window.URL.createObjectURL(blob);
-            const a = window.document.createElement("a");
-            a.href = url;
-            a.download = `invoice_${item.id}.pdf`;
-            window.document.body.appendChild(a);
-            a.click();
-            window.document.body.removeChild(a);
-            setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-          } else {
-            throw new Error("Получен неверный формат PDF");
+          if (!invoiceData) {
+            throw new Error("Нет данных для генерации PDF");
           }
+
+          // Генерируем PDF из JSON используя InvoicePdfDocument
+          const blob = await pdf(
+            <InvoicePdfDocument data={invoiceData} />
+          ).toBlob();
+
+          const fileName = `invoice_${
+            invoiceData?.document?.number || item.id
+          }.pdf`;
+
+          // Скачиваем файл
+          const url = window.URL.createObjectURL(blob);
+          const a = window.document.createElement("a");
+          a.href = url;
+          a.download = fileName;
+          window.document.body.appendChild(a);
+          a.click();
+          window.document.body.removeChild(a);
+          setTimeout(() => window.URL.revokeObjectURL(url), 1000);
         } else {
-          throw new Error("Не удалось загрузить PDF накладной");
+          throw new Error("Не удалось загрузить данные накладной");
         }
       } else {
         // Для чека печатаем через USB принтер
