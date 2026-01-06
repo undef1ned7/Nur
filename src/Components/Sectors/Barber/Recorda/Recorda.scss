@@ -160,7 +160,7 @@ $col-header-h: 60px;
 
   &__colsWrap {
     overflow-x: auto;
-    overflow-y: hidden;
+
     border-radius: 12px;
     border: 1px solid var(--border);
     background: #fff;
@@ -1255,5 +1255,3 @@ $col-header-h: 60px;
     transition: none !important;
   }
 }
-
-

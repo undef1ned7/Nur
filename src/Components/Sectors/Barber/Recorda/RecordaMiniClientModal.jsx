@@ -1,5 +1,5 @@
 // // RecordaMiniClientModal.jsx
-// import React, { useState } from "react";
+// import React, { useEffect, useMemo, useState } from "react";
 // import { FaTimes } from "react-icons/fa";
 // import "./Recorda.scss";
 // import api from "../../../../api";
@@ -23,20 +23,63 @@
 //   const [miniAlerts, setMiniAlerts] = useState([]);
 //   const [miniErrs, setMiniErrs] = useState({});
 
-//   if (!isOpen) return null;
+//   // ✅ хуки всегда вызываются, даже если isOpen=false
+//   useEffect(() => {
+//     if (!isOpen) return;
+//     setMiniName("");
+//     setMiniPhone("");
+//     setMiniSaving(false);
+//     setMiniAlerts([]);
+//     setMiniErrs({});
+//   }, [isOpen]);
+
+//   const nameNorm = useMemo(() => {
+//     if (!isOpen) return "";
+//     return normalizeName(norm(miniName));
+//   }, [isOpen, miniName]);
+
+//   const phoneDigits = useMemo(() => {
+//     if (!isOpen) return "";
+//     return normalizePhone(norm(miniPhone));
+//   }, [isOpen, miniPhone]);
+
+//   const suggestions = useMemo(() => {
+//     if (!isOpen) return [];
+
+//     const hasQuery = !!nameNorm || !!phoneDigits;
+//     if (!hasQuery) return [];
+
+//     const arr = (clients || []).filter((c) => {
+//       const cName = normalizeName(norm(c?.name));
+//       const cPhone = normalizePhone(norm(c?.phone));
+//       const byName = nameNorm ? cName.includes(nameNorm) : false;
+//       const byPhone = phoneDigits ? cPhone.includes(phoneDigits) : false;
+//       return byName || byPhone;
+//     });
+
+//     return arr.slice(0, 8);
+//   }, [isOpen, clients, nameNorm, phoneDigits]);
 
 //   const closeMini = () => {
-//     if (!miniSaving) onClose();
+//     if (!miniSaving) onClose?.();
+//   };
+
+//   const pickExisting = (c) => {
+//     if (!c?.id) return;
+//     onSelectClient?.(String(c.id));
+//     onClose?.();
 //   };
 
 //   const saveMini = async (e) => {
 //     e?.preventDefault?.();
+
 //     setMiniSaving(true);
 //     setMiniAlerts([]);
 //     setMiniErrs({});
 
 //     const name = norm(miniName);
 //     const phone = norm(miniPhone);
+
 //     const alerts = [];
 //     const errs = {};
 
@@ -44,22 +87,29 @@
 //       errs.name = true;
 //       alerts.push("Укажите ФИО.");
 //     }
-//     if (!isValidPhone(phone)) {
-//       errs.phone = true;
-//       alerts.push("Телефон должен содержать минимум 10 цифр.");
+
+//     // ✅ телефон НЕ обязателен
+//     // проверяем только если пользователь реально что-то ввёл
+//     if (phone) {
+//       if (!isValidPhone(phone)) {
+//         errs.phone = true;
+//         alerts.push("Телефон должен содержать минимум 10 цифр.");
+//       }
 //     }
 
-//     const digits = normalizePhone(phone);
-//     const dupLocal = clients.find(
-//       (c) =>
-//         normalizePhone(c.phone) === digits ||
-//         normalizeName(c.name) === normalizeName(name)
-//     );
+//     // локальный дубль: по телефону (если ввели) или по имени
+//     const dupLocal = (clients || []).find((c) => {
+//       const samePhone = phone
+//         ? normalizePhone(c?.phone) === normalizePhone(phone)
+//         : false;
+//       const sameName = normalizeName(c?.name) === normalizeName(name);
+//       return samePhone || sameName;
+//     });
 
 //     if (!errs.name && !errs.phone && dupLocal) {
 //       errs.name = true;
 //       errs.phone = true;
-//       alerts.push("Клиент с такими данными уже существует.");
+//       alerts.push("Клиент уже существует — выберите его из списка.");
 //     }
 
 //     if (alerts.length) {
@@ -72,11 +122,13 @@
 //     try {
 //       const payload = {
 //         full_name: name,
-//         phone,
+//         // ✅ если не ввели — отправляем null
+//         phone: phone ? phone : null,
 //         status: "active",
 //         notes: null,
 //         company: localStorage.getItem("company"),
 //       };
+
 //       const { data } = await api.post("/barbershop/clients/", payload);
 //       const newId = data?.id;
 
@@ -86,6 +138,7 @@
 //         : Array.isArray(cl.data)
 //         ? cl.data
 //         : [];
+
 //       const cls = arr
 //         .map((c) => ({
 //           id: c.id,
@@ -95,11 +148,10 @@
 //         }))
 //         .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 
-//       onClientsChange(cls);
-//       if (newId) {
-//         onSelectClient(String(newId));
-//       }
-//       onClose();
+//       onClientsChange?.(cls);
+
+//       if (newId) onSelectClient?.(String(newId));
+//       onClose?.();
 //     } catch (e2) {
 //       const d = e2?.response?.data;
 //       const msgs = [];
@@ -110,14 +162,16 @@
 //           msgs.push(String(Array.isArray(v) ? v[0] : v))
 //         );
 //       }
-//       if (!msgs.length) {
-//         msgs.push("Не удалось создать клиента.");
-//       }
+//       if (!msgs.length) msgs.push("Не удалось создать клиента.");
 //       setMiniAlerts(msgs);
+//       console.error("Create client error:", e2);
 //     } finally {
 //       setMiniSaving(false);
 //     }
 //   };
+
+//   // ✅ return null ТОЛЬКО после хуков
+//   if (!isOpen) return null;
 
 //   return (
 //     <div
@@ -175,7 +229,31 @@
 //               autoFocus
 //               required
 //             />
+
+//             {suggestions.length > 0 && (
+//               <div className="barberrecorda__suggestList">
+//                 {suggestions.map((c) => (
+//                   <button
+//                     key={c.id}
+//                     type="button"
+//                     className="barberrecorda__suggestItem"
+//                     onClick={() => pickExisting(c)}
+//                     title="Выбрать существующего клиента"
+//                   >
+//                     <span className="barberrecorda__suggestName">
+//                       {c.name || "Без имени"}
+//                     </span>
+//                     {c.phone ? (
+//                       <span className="barberrecorda__suggestPhone">
+//                         {c.phone}
+//                       </span>
+//                     ) : null}
+//                   </button>
+//                 ))}
+//               </div>
+//             )}
 //           </label>
+
 //           <label
 //             className={`barberrecorda__field ${
 //               miniErrs.phone ? "is-invalid" : ""
@@ -188,7 +266,7 @@
 //               onChange={(e) => setMiniPhone(e.target.value)}
 //               placeholder="+996 ..."
 //               inputMode="tel"
-//               required
+//               // ✅ НЕ required
 //             />
 //           </label>
 
@@ -220,17 +298,13 @@
 
 
 
+
 // RecordaMiniClientModal.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import "./Recorda.scss";
 import api from "../../../../api";
-import {
-  norm,
-  normalizePhone,
-  normalizeName,
-  isValidPhone,
-} from "./RecordaUtils";
+import { norm, normalizePhone, normalizeName, isValidPhone } from "./RecordaUtils";
 
 const RecordaMiniClientModal = ({
   isOpen,
@@ -245,7 +319,9 @@ const RecordaMiniClientModal = ({
   const [miniAlerts, setMiniAlerts] = useState([]);
   const [miniErrs, setMiniErrs] = useState({});
 
-  // ✅ хуки всегда вызываются, даже если isOpen=false
+  // ✅ управление: где фокус (чтобы подсказки работали только на ФИО)
+  const [isNameActive, setIsNameActive] = useState(true);
+
   useEffect(() => {
     if (!isOpen) return;
     setMiniName("");
@@ -253,6 +329,7 @@ const RecordaMiniClientModal = ({
     setMiniSaving(false);
     setMiniAlerts([]);
     setMiniErrs({});
+    setIsNameActive(true);
   }, [isOpen]);
 
   const nameNorm = useMemo(() => {
@@ -260,27 +337,27 @@ const RecordaMiniClientModal = ({
     return normalizeName(norm(miniName));
   }, [isOpen, miniName]);
 
+  // phoneDigits нужен для валидации/дублей, но НЕ для подсказок
   const phoneDigits = useMemo(() => {
     if (!isOpen) return "";
     return normalizePhone(norm(miniPhone));
   }, [isOpen, miniPhone]);
 
+  // ✅ ПОДСКАЗКИ ТОЛЬКО ПО ФИО (телефон вообще не участвует)
   const suggestions = useMemo(() => {
     if (!isOpen) return [];
+    if (!isNameActive) return [];
 
-    const hasQuery = !!nameNorm || !!phoneDigits;
-    if (!hasQuery) return [];
+    const q = nameNorm;
+    if (!q) return [];
 
     const arr = (clients || []).filter((c) => {
       const cName = normalizeName(norm(c?.name));
-      const cPhone = normalizePhone(norm(c?.phone));
-      const byName = nameNorm ? cName.includes(nameNorm) : false;
-      const byPhone = phoneDigits ? cPhone.includes(phoneDigits) : false;
-      return byName || byPhone;
+      return cName.includes(q);
     });
 
     return arr.slice(0, 8);
-  }, [isOpen, clients, nameNorm, phoneDigits]);
+  }, [isOpen, clients, nameNorm, isNameActive]);
 
   const closeMini = () => {
     if (!miniSaving) onClose?.();
@@ -310,8 +387,7 @@ const RecordaMiniClientModal = ({
       alerts.push("Укажите ФИО.");
     }
 
-    // ✅ телефон НЕ обязателен
-    // проверяем только если пользователь реально что-то ввёл
+    // ✅ телефон НЕ обязателен — проверяем только если ввели
     if (phone) {
       if (!isValidPhone(phone)) {
         errs.phone = true;
@@ -319,7 +395,7 @@ const RecordaMiniClientModal = ({
       }
     }
 
-    // локальный дубль: по телефону (если ввели) или по имени
+    // ✅ дубль: по телефону (если ввели) или по имени
     const dupLocal = (clients || []).find((c) => {
       const samePhone = phone
         ? normalizePhone(c?.phone) === normalizePhone(phone)
@@ -331,7 +407,7 @@ const RecordaMiniClientModal = ({
     if (!errs.name && !errs.phone && dupLocal) {
       errs.name = true;
       errs.phone = true;
-      alerts.push("Клиент уже существует — выберите его из списка.");
+      alerts.push("Клиент уже существует — выберите его по ФИО.");
     }
 
     if (alerts.length) {
@@ -344,7 +420,6 @@ const RecordaMiniClientModal = ({
     try {
       const payload = {
         full_name: name,
-        // ✅ если не ввели — отправляем null
         phone: phone ? phone : null,
         status: "active",
         notes: null,
@@ -377,6 +452,7 @@ const RecordaMiniClientModal = ({
     } catch (e2) {
       const d = e2?.response?.data;
       const msgs = [];
+
       if (typeof d === "string") {
         msgs.push(d);
       } else if (d && typeof d === "object") {
@@ -384,6 +460,7 @@ const RecordaMiniClientModal = ({
           msgs.push(String(Array.isArray(v) ? v[0] : v))
         );
       }
+
       if (!msgs.length) msgs.push("Не удалось создать клиента.");
       setMiniAlerts(msgs);
       console.error("Create client error:", e2);
@@ -392,7 +469,6 @@ const RecordaMiniClientModal = ({
     }
   };
 
-  // ✅ return null ТОЛЬКО после хуков
   if (!isOpen) return null;
 
   return (
@@ -432,28 +508,29 @@ const RecordaMiniClientModal = ({
           </div>
         )}
 
-        <form
-          className="barberrecorda__miniForm"
-          onSubmit={saveMini}
-          noValidate
-        >
+        <form className="barberrecorda__miniForm" onSubmit={saveMini} noValidate>
           <label
-            className={`barberrecorda__field ${
-              miniErrs.name ? "is-invalid" : ""
-            }`}
+            className={`barberrecorda__field ${miniErrs.name ? "is-invalid" : ""}`}
           >
             <span className="barberrecorda__label">ФИО</span>
             <input
               className="barberrecorda__input"
               value={miniName}
               onChange={(e) => setMiniName(e.target.value)}
+              onFocus={() => setIsNameActive(true)}
               placeholder="Фамилия Имя Отчество"
               autoFocus
               required
+              autoComplete="off"
+              name="mini-client-name"
             />
 
             {suggestions.length > 0 && (
-              <div className="barberrecorda__suggestList">
+              <div
+                className="barberrecorda__suggestList"
+                // ✅ чтобы клик по варианту не ломался из-за blur/focus
+                onMouseDown={(e) => e.preventDefault()}
+              >
                 {suggestions.map((c) => (
                   <button
                     key={c.id}
@@ -466,9 +543,7 @@ const RecordaMiniClientModal = ({
                       {c.name || "Без имени"}
                     </span>
                     {c.phone ? (
-                      <span className="barberrecorda__suggestPhone">
-                        {c.phone}
-                      </span>
+                      <span className="barberrecorda__suggestPhone">{c.phone}</span>
                     ) : null}
                   </button>
                 ))}
@@ -477,18 +552,18 @@ const RecordaMiniClientModal = ({
           </label>
 
           <label
-            className={`barberrecorda__field ${
-              miniErrs.phone ? "is-invalid" : ""
-            }`}
+            className={`barberrecorda__field ${miniErrs.phone ? "is-invalid" : ""}`}
           >
             <span className="barberrecorda__label">Телефон</span>
             <input
               className="barberrecorda__input"
               value={miniPhone}
               onChange={(e) => setMiniPhone(e.target.value)}
+              onFocus={() => setIsNameActive(false)} // ✅ телефон закрывает подсказки
               placeholder="+996 ..."
               inputMode="tel"
-              // ✅ НЕ required
+              autoComplete="off"
+              name="mini-client-phone"
             />
           </label>
 
