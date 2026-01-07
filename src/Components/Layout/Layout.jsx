@@ -5,7 +5,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import arnament from "../Photo/Group 1216.png";
 import arnament2 from "../Photo/Group 1204.png";
 import arnament3 from "../Photo/Group 1215.png";
-import arnament4 from "../Photo/gory.jpg";
+import arnament4 from "../Photo/Gory.jpg"; // фон каторый не роботаеть 
 import "./Layout.scss";
 import { X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
@@ -43,62 +43,41 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 const Layout = () => {
   const dispatch = useDispatch();
   const { company } = useUser();
-  // На десктопе по умолчанию сайдбар открыт, на мобильных - закрыт
-  // Но учитываем настройку автоматического закрытия
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
       const isDesktop = window.innerWidth >= 769;
       const sidebarAutoClose =
         localStorage.getItem("sidebarAutoClose") === "true";
 
-      // На десктопе: открыт по умолчанию, если настройка не требует закрытия
-      if (isDesktop) {
-        return !sidebarAutoClose;
-      }
-      // На мобильных: закрыт по умолчанию
+      if (isDesktop) return !sidebarAutoClose;
       return false;
     }
-    return true; // По умолчанию открыт для SSR
+    return true;
   });
+
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
   const location = useLocation();
-
-  // Проверяем, является ли текущий путь страницей кассы (должно быть объявлено до использования)
   const isCashierPage = location.pathname.startsWith("/crm/market/cashier");
 
   useEffect(() => {
     dispatch(getCompany());
   }, [dispatch]);
 
-  // Проверяем настройку автоматического закрытия сайдбара при переходах
   useEffect(() => {
     const savedSetting = localStorage.getItem("sidebarAutoClose");
     const sidebarAutoClose = savedSetting === "true";
 
-    // Только если настройка явно включена (true) - закрываем сайдбар
-    if (sidebarAutoClose) {
-      setIsSidebarOpen(false);
-    }
-    // Если настройка выключена (false) или не установлена (null) - НЕ меняем состояние сайдбара
-    // Это предотвращает "прыгание" сайдбара при переходах
+    if (sidebarAutoClose) setIsSidebarOpen(false);
   }, [location.pathname]);
 
-  // Обновляем состояние при изменении размера окна
   useEffect(() => {
     const handleResize = () => {
       const savedSetting = localStorage.getItem("sidebarAutoClose");
       const sidebarAutoClose = savedSetting === "true";
 
-      if (window.innerWidth >= 769) {
-        // На десктопе открываем сайдбар, если настройка не требует автоматического закрытия
-        if (!sidebarAutoClose) {
-          setIsSidebarOpen(true);
-        }
-        // Если настройка включена - не меняем состояние (остается как было)
-      } else {
-        // На мобильных устройствах НЕ меняем состояние сайдбара при изменении размера
-        // Состояние должно управляться только через настройку автоматического закрытия при переходах
-        // или пользователем вручную
+      if (window.innerWidth >= 769 && !sidebarAutoClose) {
+        setIsSidebarOpen(true);
       }
     };
 
@@ -106,34 +85,25 @@ const Layout = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 🔹 каждый переход на новый роут — скроллим страницу наверх
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [location.pathname]);
 
-  // 🔒 Блокировка скролла body когда сайдбар открыт на мобильных
   useEffect(() => {
     const isMobile = window.innerWidth < 769;
-    
+
     if (isMobile && isSidebarOpen && !isCashierPage) {
-      // Сохраняем текущую позицию скролла
       const scrollY = window.scrollY;
-      
-      // Блокируем скролл
+
       document.body.style.position = "fixed";
       document.body.style.top = `-${scrollY}px`;
       document.body.style.width = "100%";
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
-      
-      // Также блокируем скролл на html элементе для дополнительной защиты
       document.documentElement.style.overflow = "hidden";
-      
-      // Обработчик изменения размера окна (например, поворот экрана)
+
       const handleResize = () => {
-        const stillMobile = window.innerWidth < 769;
-        if (!stillMobile) {
-          // Если перешли на десктоп, восстанавливаем скролл
+        if (window.innerWidth >= 769) {
           document.body.style.position = "";
           document.body.style.top = "";
           document.body.style.width = "";
@@ -143,10 +113,9 @@ const Layout = () => {
           window.scrollTo(0, scrollY);
         }
       };
-      
+
       window.addEventListener("resize", handleResize);
-      
-      // Восстанавливаем скролл при закрытии
+
       return () => {
         window.removeEventListener("resize", handleResize);
         document.body.style.position = "";
@@ -155,7 +124,6 @@ const Layout = () => {
         document.body.style.overflow = "";
         document.body.style.touchAction = "";
         document.documentElement.style.overflow = "";
-        // Восстанавливаем позицию скролла
         window.scrollTo(0, scrollY);
       };
     }
@@ -175,11 +143,12 @@ const Layout = () => {
 
   return (
     <div className="layout-wrapper">
+      {/* насилное поставка вона  */}
       <div
-        style={{
-          backgroundImage: lan === "ky" ? `url(${arnament4})` : "none",
-        }}
         className="content_background"
+        style={{
+          backgroundImage: `url(${arnament4})`,
+        }}
       ></div>
 
       <div className={`App ${!isSidebarOpen ? "sidebar-collapsed" : ""}`}>
@@ -187,7 +156,6 @@ const Layout = () => {
           <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
         )}
 
-        {/* Overlay для мобильных устройств */}
         {isSidebarOpen && !isCashierPage && (
           <div
             className="sidebar-overlay"

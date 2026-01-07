@@ -28,10 +28,11 @@ $container-max: 1200px;
   overflow-x: hidden;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu,
     "Helvetica Neue", Arial;
-
+  z-index: 0;
+  /* Проблема ФОН СТРАНИЦЫ */
   &::before {
     content: "";
-    position: fixed;
+    position: absolute; /* заменя FIX */
     inset: 0;
     background-image: linear-gradient(
         180deg,
@@ -42,16 +43,17 @@ $container-max: 1200px;
     background-position: center;
     background-size: cover;
     background-repeat: no-repeat;
-    z-index: -2;
+    z-index: -1; 
   }
 
   &__container {
+    position: relative;
+    z-index: 1;
     width: min(#{$container-max}, 100%);
     margin-inline: auto;
     padding-inline: 16px;
   }
 }
-
 /* ===== TOPBAR ===== */
 .landing {
   &__topbar {
@@ -398,10 +400,12 @@ $container-max: 1200px;
     overflow-x: auto;
     padding: 6px 2px;
     scroll-snap-type: x mandatory;
-    scrollbar-width: thin;
+    // scrollbar-width: thin;
+
   }
   &__scroller::-webkit-scrollbar {
     height: 8px;
+    display: none;
   }
   &__scroller::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.2);
@@ -428,6 +432,8 @@ $container-max: 1200px;
       border-color: rgba(255, 255, 255, 0.22);
     }
   }
+
+  
   &__card-ico {
     width: 44px;
     height: 44px;
