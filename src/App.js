@@ -7,6 +7,8 @@ import { ScrollToTop } from "./hooks/ScrollToTop";
 import { publicRoutes, crmRoutes } from "./config/routes";
 import { ThemeModeProvider } from "./theme/ThemeModeProvider";
 import { Box } from "@mui/system";
+import "../src/i18n.js"
+import "../src/i18n"
 
 function App() {
   const [profile, setProfile] = useState(null);

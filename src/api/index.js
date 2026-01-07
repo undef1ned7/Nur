@@ -1,5 +1,6 @@
 import axios from "axios";
-
+import "../i18n.js"
+import "../i18n"
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_BASE_URL || "https://app.nurcrm.kg/api",
   timeout: 20000,

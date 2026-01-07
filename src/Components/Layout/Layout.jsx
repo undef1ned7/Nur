@@ -5,13 +5,13 @@ import { Outlet, useLocation } from "react-router-dom";
 import arnament from "../Photo/Group 1216.png";
 import arnament2 from "../Photo/Group 1204.png";
 import arnament3 from "../Photo/Group 1215.png";
-import arnament4 from "../Photo/Gory.jpg"; // фон каторый не роботаеть 
+import arnament4 from "../Photo/Gory.jpg"; // фон каторый не роботаеть
 import "./Layout.scss";
 import { X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
 import { getCompany } from "../../store/creators/userCreators";
 import { useDispatch } from "react-redux";
-
+import { useTranslation } from "react-i18next";
 const useAnnouncement = (company, setHideAnnouncement) => {
   const [daysLeft, setDaysLeft] = useState(null);
 
@@ -137,6 +137,12 @@ const Layout = () => {
     if (lan === "ru") return "app-ru";
     if (lan === "ky") return "app-ky";
     if (lan === "en") return "app-en";
+  };
+  const { t, i18n } = useTranslation();
+  
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+    localStorage.setItem("i18nextLng", lng);
   };
 
   const daysLeft = useAnnouncement(company, setHideAnnouncement);
