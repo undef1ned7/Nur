@@ -1119,7 +1119,7 @@ const Masters = () => {
                     ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
                     : ""
                 }`
-              : `${filteredEmployees.length} записей${
+              : `${filteredEmployees.length} сотрудников${
                   filteredEmployees.length > PAGE_SIZE
                     ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
                     : ""
