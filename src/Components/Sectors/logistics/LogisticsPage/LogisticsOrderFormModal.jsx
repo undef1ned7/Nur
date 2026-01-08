@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import {
-  createClientAsync,
-} from "../../../../store/creators/clientCreators";
+import { createClientAsync } from "../../../../store/creators/clientCreators";
 
 const LogisticsOrderFormModal = ({
   visible,
@@ -61,18 +59,12 @@ const LogisticsOrderFormModal = ({
   };
 
   return (
-    <div
-      className="logistics-page__modal-overlay"
-      onClick={onClose}
-    >
+    <div className="logistics-page__modal-overlay" onClick={onClose}>
       <div
         className="logistics-page__modal"
         onClick={(e) => e.stopPropagation()}
       >
-        <form
-          className="logistics-page__form"
-          onSubmit={handleFormSubmit}
-        >
+        <form className="logistics-page__form" onSubmit={handleFormSubmit}>
           <h2 className="logistics-page__form-title">
             {editingId ? "Редактировать заявку" : "Новая заявка"}
           </h2>
@@ -90,9 +82,7 @@ const LogisticsOrderFormModal = ({
                 }
               >
                 <option value="">
-                  {clientsLoading
-                    ? "Загрузка клиентов..."
-                    : "Выберите клиента"}
+                  {clientsLoading ? "Загрузка клиентов..." : "Выберите клиента"}
                 </option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -145,9 +135,7 @@ const LogisticsOrderFormModal = ({
 
             {/* Название машины */}
             <div className="logistics-page__field">
-              <label className="logistics-page__label">
-                Название машины
-              </label>
+              <label className="logistics-page__label">Название машины</label>
               <input
                 className="logistics-page__input"
                 placeholder="Например: MAN TGX, гос. номер…"
@@ -158,12 +146,15 @@ const LogisticsOrderFormModal = ({
               />
             </div>
 
-            {/* Дата прибытия */}
+            {/* Примерная дата прибытия */}
             <div className="logistics-page__field">
-              <label className="logistics-page__label">Дата прибытия</label>
+              <label className="logistics-page__label">
+                Примерная дата прибытия (например: 10-20)
+              </label>
               <input
-                type="date"
+                type="text"
                 className="logistics-page__input"
+                placeholder="10-20"
                 value={form.arrivalDate}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, arrivalDate: e.target.value }))
@@ -186,9 +177,7 @@ const LogisticsOrderFormModal = ({
 
             {/* Стоимость услуги */}
             <div className="logistics-page__field">
-              <label className="logistics-page__label">
-                Стоимость услуги
-              </label>
+              <label className="logistics-page__label">Стоимость услуги</label>
               <input
                 className="logistics-page__input"
                 placeholder="Логистическая услуга"

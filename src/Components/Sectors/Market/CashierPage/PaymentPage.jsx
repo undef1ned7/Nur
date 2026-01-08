@@ -45,6 +45,7 @@ const PaymentPage = ({
   const [selectedCustomer, setSelectedCustomer] = useState(customer);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
+  const [selectedBank, setSelectedBank] = useState("");
   const [receiptData, setReceiptData] = useState(null);
   const [printing, setPrinting] = useState(false);
   const [alertModal, setAlertModal] = useState({
@@ -84,6 +85,82 @@ const PaymentPage = ({
       label: "Отсрочка",
       description: "Оплата в долг",
     },
+  ];
+
+  // Список банков Кыргызстана
+  // Для добавления логотипа укажите путь к изображению в поле logo
+  // id должен соответствовать значению, которое отправляется в checkout (mbank, optima, obank, bakai)
+  const banks = [
+    {
+      id: "mbank",
+      name: "МБанк",
+      logo: "https://mbank.kg/_next/static/media/logo.6cee92d7.svg",
+    },
+    {
+      id: "optima",
+      name: "Оптима Банк",
+      logo: "https://economist.kg/content/images/size/w2400/format/webp/wp-content/uploads/2020/06/banki-optima-bank-1.jpg",
+    },
+    {
+      id: "obank",
+      name: "О-Банк",
+      logo: (
+        <svg
+          width="240"
+          height="90"
+          viewBox="0 0 121 54"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          data-v-af68376c=""
+        >
+          <g clip-path="url(#clip0_18_165)">
+            <path
+              d="M62.6301 26.3393C63.5794 26.8346 64.3222 27.5156 64.8519 28.3754C65.3884 29.2421 65.6567 30.2395 65.6567 31.3745C65.6567 33.1492 65.0308 34.6212 63.772 35.7906C62.5132 36.9669 60.9792 37.5515 59.1701 37.5515H49.8977V15.925H58.4891C60.2638 15.925 61.7565 16.496 62.9878 17.6378C64.2122 18.7797 64.8244 20.2105 64.8244 21.9164C64.8244 23.7942 64.0953 25.2663 62.6301 26.3325V26.3393ZM58.4891 19.2612H53.454V24.9498H58.4891C59.2733 24.9498 59.9337 24.6747 60.4633 24.1313C60.9999 23.5879 61.2681 22.9138 61.2681 22.109C61.2681 21.3042 60.9999 20.63 60.4633 20.0866C59.9268 19.5432 59.2664 19.2681 58.4891 19.2681V19.2612ZM59.1701 34.2154C59.9956 34.2154 60.6903 33.9196 61.2544 33.3349C61.8184 32.7502 62.1073 32.0349 62.1073 31.1888C62.1073 30.3427 61.8253 29.6273 61.2544 29.0426C60.6903 28.458 59.9956 28.1622 59.1701 28.1622H53.454V34.2154H59.1701Z"
+              fill="white"
+            ></path>
+            <path
+              d="M81.2506 22.1021H84.5867V37.5516H81.2506V35.3297C79.9918 37.0838 78.1896 37.9574 75.8439 37.9574C73.7253 37.9574 71.9094 37.1663 70.4029 35.5911C68.8965 34.0159 68.1467 32.0968 68.1467 29.8268C68.1467 27.5569 68.8965 25.6171 70.4029 24.0487C71.9094 22.4804 73.7184 21.7031 75.8439 21.7031C78.1896 21.7031 79.9918 22.5698 81.2506 24.2964V22.1021ZM72.8792 33.3624C73.8079 34.2979 74.9704 34.7657 76.3736 34.7657C77.7768 34.7657 78.9393 34.2979 79.868 33.3624C80.7966 32.427 81.2574 31.2438 81.2574 29.8268C81.2574 28.4098 80.7966 27.2267 79.868 26.2912C78.9393 25.3557 77.7768 24.8879 76.3736 24.8879C74.9704 24.8879 73.8079 25.3557 72.8792 26.2912C71.9506 27.2267 71.4898 28.4098 71.4898 29.8268C71.4898 31.2438 71.9506 32.427 72.8792 33.3624Z"
+              fill="white"
+            ></path>
+            <path
+              d="M96.8171 21.7031C98.5917 21.7031 100.023 22.2672 101.109 23.4022C102.203 24.5371 102.746 26.0917 102.746 28.0659V37.5516H99.4103V28.4029C99.4103 27.2473 99.1008 26.3669 98.4817 25.7478C97.8626 25.1287 97.0165 24.8192 95.9503 24.8192C94.7741 24.8192 93.8317 25.1837 93.1095 25.9197C92.3872 26.6558 92.0295 27.7701 92.0295 29.2696V37.5516H88.6934V22.1021H92.0295V24.0831C93.0407 22.4942 94.6365 21.7031 96.8171 21.7031Z"
+              fill="white"
+            ></path>
+            <path
+              d="M120.328 37.5515H116.339L110.004 30.4115V37.5515H106.667V15.925H110.004V28.9326L116.002 22.1021H120.081L113.285 29.6755L120.328 37.5584V37.5515Z"
+              fill="white"
+            ></path>
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M40.928 45.689H15.7452L17.9464 41.8713L6.72045 53.0973V45.689H0V7.7876H40.928V45.689ZM34.6409 15.9182H30.6169L31.0365 31.5809H34.2144L34.6272 15.9182H34.6409ZM30.782 37.5515H34.524V33.8096H30.782V37.5515ZM17.121 15.6568C9.90527 15.6568 6.24582 21.201 6.24582 26.7452C6.24582 32.2894 9.90527 37.8336 17.121 37.8336C24.3367 37.8336 27.9136 32.2894 27.9136 26.7452C27.9136 21.201 24.3367 15.6568 17.121 15.6568ZM17.121 19.667C12.7255 19.667 10.4693 23.2095 10.4693 26.7452C10.4693 30.2808 12.7255 33.8233 17.121 33.8233C21.5164 33.8233 23.6832 30.2808 23.6832 26.7452C23.6832 23.2095 21.5164 19.667 17.121 19.667Z"
+              fill="#F0047F"
+            ></path>
+          </g>
+          <defs>
+            <clipPath id="clip0_18_165">
+              <rect
+                width="120.328"
+                height="45.3097"
+                fill="white"
+                transform="translate(0 7.7876)"
+              ></rect>
+            </clipPath>
+          </defs>
+        </svg>
+      ),
+    },
+    {
+      id: "bakai",
+      name: "Бакай Банк",
+      logo: null,
+    },
+    {
+      id: "demir",
+      name: "Демир Банк",
+      logo: "https://www.demirbank.kg/assets/logo-without-slogan-f5a092c7.svg",
+    },
+    { id: "other", name: "Другой банк", logo: null },
   ];
 
   const customerDebt =
@@ -133,6 +210,18 @@ const PaymentPage = ({
       }
     }
 
+    // Валидация для безналичных - требуется выбор банка
+    if (paymentMethod === "cashless") {
+      if (!selectedBank) {
+        showAlert(
+          "warning",
+          "Требуется банк",
+          "Для безналичной оплаты необходимо выбрать банк"
+        );
+        return;
+      }
+    }
+
     // Валидация для наличных
     if (paymentMethod === "cash") {
       const received = parseFloat(amountReceived) || 0;
@@ -148,9 +237,16 @@ const PaymentPage = ({
 
     try {
       // Маппинг способов оплаты
+      // payment_method может быть: cash, transfer, debt, mbank, optima, obank, bakai
       let paymentMethodApi = "cash";
       if (paymentMethod === "cashless") {
-        paymentMethodApi = "transfer";
+        // Если выбран один из поддерживаемых банков, используем его id как payment_method
+        const supportedBanks = ["mbank", "optima", "obank", "bakai"];
+        if (selectedBank && supportedBanks.includes(selectedBank)) {
+          paymentMethodApi = selectedBank;
+        } else {
+          paymentMethodApi = "transfer"; // По умолчанию для безналичных
+        }
       } else if (paymentMethod === "deferred") {
         paymentMethodApi = "debt"; // Отправляем как долг
       }
@@ -438,6 +534,10 @@ const PaymentPage = ({
       // При переключении на наличные или безналичные устанавливаем итоговую сумму
       setAmountReceived(total ? total.toFixed(2) : "0.00");
     }
+    // Сбрасываем выбор банка при смене способа оплаты
+    if (paymentMethod !== "cashless") {
+      setSelectedBank("");
+    }
   }, [paymentMethod, total]);
 
   // Обработка нажатия Enter для закрытия модалки успеха
@@ -546,6 +646,49 @@ const PaymentPage = ({
               ))}
             </div>
           </div>
+
+          {paymentMethod === "cashless" && (
+            <div className="payment-page__section">
+              <h3 className="payment-page__section-title">ВЫБОР БАНКА</h3>
+              <div className="payment-page__banks">
+                {banks.map((bank) => (
+                  <button
+                    key={bank.id}
+                    className={`payment-page__bank ${
+                      selectedBank === bank.id
+                        ? "payment-page__bank--active"
+                        : ""
+                    }`}
+                    onClick={() => setSelectedBank(bank.id)}
+                    title={bank.name}
+                  >
+                    <div className="payment-page__bank-content">
+                      {bank.logo ? (
+                        typeof bank.logo === "string" ? (
+                          <img
+                            src={bank.logo}
+                            alt={bank.name}
+                            className="payment-page__bank-logo"
+                          />
+                        ) : (
+                          <div className="payment-page__bank-svg">
+                            {bank.logo}
+                          </div>
+                        )
+                      ) : (
+                        <div className="payment-page__bank-name">
+                          {bank.name}
+                        </div>
+                      )}
+                    </div>
+                    {selectedBank === bank.id && (
+                      <div className="payment-page__bank-check">✓</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="payment-page__section">
             <h3 className="payment-page__section-title">ПОКУПАТЕЛЬ</h3>
