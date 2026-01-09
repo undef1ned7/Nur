@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDispatch } from "react-redux";
 import {
   X,
@@ -378,6 +378,9 @@ const RequestCart = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [formError, setFormError] = useState("");
   
+  // Ref для сохранения фокуса на активном инпуте
+  const focusedInputRef = useRef(null);
+  
   // Состояние для долга
   const [paymentType, setPaymentType] = useState(""); // "", "Долги", "Предоплата"
   const [debtMonths, setDebtMonths] = useState("");
@@ -734,6 +737,24 @@ const RequestCart = ({
     loadCartClient();
   }, [cartId]);
 
+  // Восстанавливаем фокус на активном инпуте после рендера
+  useEffect(() => {
+    if (focusedInputRef.current && isCreateMode && isClientSelectorOpen) {
+      const input = document.querySelector(
+        `input[name="${focusedInputRef.current}"]`
+      );
+      if (input) {
+        // Небольшая задержка для обеспечения рендера
+        setTimeout(() => {
+          input.focus();
+          // Устанавливаем курсор в конец текста
+          const length = input.value.length;
+          input.setSelectionRange(length, length);
+        }, 0);
+      }
+    }
+  }, [clientFormState, isCreateMode, isClientSelectorOpen]);
+
   const handleUpdateQuantityLocal = async (itemId, newQuantity) => {
     if (!newQuantity || newQuantity < 1) return;
     if (onUpdateQuantity) {
@@ -766,31 +787,35 @@ const RequestCart = ({
     ? clients.results
     : clients || [];
 
-  const filteredClients = (clientsList || []).filter((client) => {
-    const q = normalize(searchQuery);
-    const qPhone = normalizePhone(searchQuery);
-    const name = normalize(getClientName(client));
-    const phone = normalizePhone(client?.phone);
+  const filteredClients = useMemo(() => {
+    return (clientsList || []).filter((client) => {
+      const q = normalize(searchQuery);
+      const qPhone = normalizePhone(searchQuery);
+      const name = normalize(getClientName(client));
+      const phone = normalizePhone(client?.phone);
 
-    // Ищем либо по имени/фамилии, либо по телефону
-    return (
-      (q && name.includes(q)) ||
-      (qPhone && phone.includes(qPhone)) ||
-      (!q && !qPhone)
-    );
-  });
+      // Ищем либо по имени/фамилии, либо по телефону
+      return (
+        (q && name.includes(q)) ||
+        (qPhone && phone.includes(qPhone)) ||
+        (!q && !qPhone)
+      );
+    });
+  }, [clientsList, searchQuery]);
 
-  const handleClientFormChange = (e) => {
+  const handleClientFormChange = useCallback((e) => {
     const { name, value } = e.target;
+    // Сохраняем фокус на активном инпуте
+    focusedInputRef.current = e.target.name;
     setClientFormState((prev) => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
   // Выбор существующего клиента
-  const handleSelectClient = (client) => {
+  const handleSelectClient = useCallback((client) => {
     setSelectedClient(client);
     setIsClientSelectorOpen(false);
     setSearchQuery("");
-  };
+  }, []);
 
   // Создание нового клиента
   const handleCreateClient = async () => {
@@ -959,14 +984,29 @@ const RequestCart = ({
     }
   };
 
-  // Компонент ClientSelector
-  const ClientSelector = () => (
+  // Обработчики для ClientSelector
+  const toggleClientSelector = useCallback(() => {
+    setIsClientSelectorOpen((v) => !v);
+  }, []);
+
+  const handleCreateModeToggle = useCallback(() => {
+    setIsCreateMode(true);
+    setFormError("");
+  }, []);
+
+  const handleCancelCreate = useCallback(() => {
+    setIsCreateMode(false);
+    setFormError("");
+  }, []);
+
+  // Компонент ClientSelector - мемоизирован для предотвращения потери фокуса
+  const clientSelectorContent = useMemo(() => (
     <div className="client-selector">
       <label className="selector-label">Выберите клиента</label>
       <div className="selector-dropdown">
         <button
           className="selector-trigger"
-          onClick={() => setIsClientSelectorOpen((v) => !v)}
+          onClick={toggleClientSelector}
           disabled={!cartId}
         >
           <div className="selected-client">
@@ -1012,10 +1052,7 @@ const RequestCart = ({
                 >
                   <button
                     className="create-client-btn"
-                    onClick={() => {
-                      setIsCreateMode(true);
-                      setFormError("");
-                    }}
+                    onClick={handleCreateModeToggle}
                   >
                     + Новый клиент
                   </button>
@@ -1124,10 +1161,7 @@ const RequestCart = ({
                   </button>
                   <button
                     className="cancel-create-btn"
-                    onClick={() => {
-                      setIsCreateMode(false);
-                      setFormError("");
-                    }}
+                    onClick={handleCancelCreate}
                     disabled={creating}
                   >
                     Отмена
@@ -1182,12 +1216,30 @@ const RequestCart = ({
         )}
       </div>
     </div>
-  );
+  ), [
+    selectedClient,
+    isClientSelectorOpen,
+    isCreateMode,
+    searchQuery,
+    clientFormState,
+    formError,
+    clientError,
+    creating,
+    filteredClients,
+    clientsLoading,
+    cartId,
+    toggleClientSelector,
+    handleCreateModeToggle,
+    handleCancelCreate,
+    handleSelectClient,
+    handleClientFormChange,
+    handleCreateClient,
+  ]);
 
   // Секция заказа (выбор клиента + итог) - всегда рендерится для мобильных/планшетов
   const orderSectionContent = (
     <div className="cart-column cart-order-column">
-      <ClientSelector />
+      {clientSelectorContent}
 
       <RequestSummary
         items={items}

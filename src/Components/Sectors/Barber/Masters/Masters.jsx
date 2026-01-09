@@ -966,6 +966,11 @@ const Masters = () => {
             label: "Списание",
             backendKey: "can_view_products",
           },
+          {
+            value: "Документы",
+            label: "Документы",
+            backendKey: "can_view_document",
+          },
         ],
         Производство: [
           {

@@ -201,6 +201,14 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_logistics",
     },
   ],
+  Склад: [
+    {
+      value: "Аналитика",
+      label: "Аналитика",
+      backendKey: "can_view_analytics",
+    },
+    { value: "Документы", label: "Документы", backendKey: "can_view_document" },
+  ],
 };
 
 // Функция для получения всех доступных permissions на основе сектора

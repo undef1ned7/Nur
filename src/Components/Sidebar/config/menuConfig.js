@@ -136,7 +136,7 @@ export const MENU_CONFIG = {
 
     // Барбершоп
     barber: [
-            {
+      {
         label: "Аналитика",
         to: "/crm/barber/cash-reports",
         icon: menuIcons.chartBar,
@@ -171,7 +171,7 @@ export const MENU_CONFIG = {
         permission: "can_view_barber_records",
         implemented: true,
       },
-            {
+      {
         label: "Сотрудники",
         to: "/crm/barber/masters",
         icon: menuIcons.user,
@@ -474,13 +474,6 @@ export const MENU_CONFIG = {
 
     warehouse: [
       {
-        label: "Клиенты",
-        to: "/crm/warehouse/clients",
-        icon: menuIcons.users,
-        permission: "can_view_clients",
-        implemented: true,
-      },
-      {
         label: "Аналитика",
         to: "/crm/warehouse/analytics",
         icon: menuIcons.chartLine,
@@ -488,47 +481,54 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
-        label: "Товары",
-        to: "/crm/warehouse/products",
-        icon: menuIcons.boxOpen,
-        permission: "can_view_products",
+        label: "Документы",
+        to: "/crm/market/documents",
+        icon: menuIcons.documentScanner,
+        permission: "can_view_document",
         implemented: true,
       },
-      {
-        label: "Справочники",
-        to: "/crm/warehouse/directories",
-        icon: menuIcons.tags,
-        permission: "can_view_brand_category",
-        implemented: true,
-      },
-      {
-        label: "Остатки",
-        to: "/crm/warehouse/stocks",
-        icon: menuIcons.warehouse,
-        permission: "can_view_products",
-        implemented: true,
-      },
-      {
-        label: "Операции (Перемещения)",
-        to: "/crm/warehouse/movements",
-        icon: menuIcons.exchangeAlt,
-        permission: "can_view_products",
-        implemented: true,
-      },
-      {
-        label: "Поставки",
-        to: "/crm/warehouse/supply",
-        icon: menuIcons.truckLoading,
-        permission: "can_view_products",
-        implemented: true,
-      },
-      {
-        label: "Списание",
-        to: "/crm/warehouse/write_offs",
-        icon: menuIcons.trashAlt,
-        permission: "can_view_products",
-        implemented: true,
-      },
+      // {
+      //   label: "Товары",
+      //   to: "/crm/warehouse/products",
+      //   icon: menuIcons.boxOpen,
+      //   permission: "can_view_products",
+      //   implemented: true,
+      // },
+      // {
+      //   label: "Справочники",
+      //   to: "/crm/warehouse/directories",
+      //   icon: menuIcons.tags,
+      //   permission: "can_view_brand_category",
+      //   implemented: true,
+      // },
+      // {
+      //   label: "Остатки",
+      //   to: "/crm/warehouse/stocks",
+      //   icon: menuIcons.warehouse,
+      //   permission: "can_view_products",
+      //   implemented: true,
+      // },
+      // {
+      //   label: "Операции (Перемещения)",
+      //   to: "/crm/warehouse/movements",
+      //   icon: menuIcons.exchangeAlt,
+      //   permission: "can_view_products",
+      //   implemented: true,
+      // },
+      // {
+      //   label: "Поставки",
+      //   to: "/crm/warehouse/supply",
+      //   icon: menuIcons.truckLoading,
+      //   permission: "can_view_products",
+      //   implemented: true,
+      // },
+      // {
+      //   label: "Списание",
+      //   to: "/crm/warehouse/write_offs",
+      //   icon: menuIcons.trashAlt,
+      //   permission: "can_view_products",
+      //   implemented: true,
+      // },
     ],
 
     production: [
