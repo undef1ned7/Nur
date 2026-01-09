@@ -20,6 +20,7 @@ import { useLogistics } from "../../../../store/slices/logisticsSlice";
 
 import LogisticsOrderFormModal from "./LogisticsOrderFormModal";
 import LogisticsOrderViewModal from "./LogisticsOrderViewModal";
+import AddCashFlowsModal from "../../../Deposits/Kassa/AddCashFlowsModal/AddCashFlowsModal";
 
 const statusOptions = [
   { value: "decorated", label: "Оформлен" },
@@ -33,6 +34,7 @@ const emptyForm = {
   description: "",
   carPrice: "",
   servicePrice: "",
+  salePrice: "",
   status: "decorated",
   time: "",
   arrivalDate: "",
@@ -60,6 +62,7 @@ const LogisticsPage = () => {
   const [form, setForm] = useState(emptyForm);
   const [sentToCashAmount, setSentToCashAmount] = useState(0); // сумма, отправленная в кассу
   const [viewMode, setViewMode] = useState(getInitialViewMode); // "table" | "cards"
+  const [showAddCashboxModal, setShowAddCashboxModal] = useState(false);
 
   const { company } = useUser();
   const { list: logistics, loading, analytics } = useLogistics();
@@ -111,6 +114,19 @@ const LogisticsPage = () => {
   }, [sentToCashAmount, company?.id]);
 
   const handleSubmit = async () => {
+    // Вычисляем выручку: цена продажи - цена машины
+    const salePrice = parseFloat(form.salePrice || 0);
+    const carPrice = parseFloat(form.carPrice || 0);
+    let revenue = null;
+    if (
+      !isNaN(salePrice) &&
+      !isNaN(carPrice) &&
+      salePrice > 0 &&
+      carPrice > 0
+    ) {
+      revenue = salePrice - carPrice;
+    }
+
     const payload = {
       company: company?.id,
       branch: company?.branch || null,
@@ -119,6 +135,8 @@ const LogisticsPage = () => {
       description: form.description,
       price_car: form.carPrice || "0",
       price_service: form.servicePrice || "0",
+      price_sale: form.salePrice || "0",
+      revenue: revenue !== null ? revenue.toString() : "0",
       status: "decorated", // новая заявка всегда с оформленным статусом
       arrival_date: form.arrivalDate || null,
     };
@@ -162,6 +180,7 @@ const LogisticsPage = () => {
       description: order.description || "",
       carPrice: order.carPrice || "",
       servicePrice: order.servicePrice || "",
+      salePrice: order.sale_price || "",
       status: order.status || "created",
       time: order.time || "",
       arrivalDate: order.arrivalDate || "",
@@ -270,59 +289,69 @@ const LogisticsPage = () => {
 
   // Данные для аналитики по статусам (из /logistics/logistics/analytics/)
   const statusSummary = statusOptions.map((s) => {
-    const item = analytics?.items?.find(
-      (it) => String(it.status) === String(s.value)
-    );
-    // Вычисляем сумму стоимости услуг для заказов с этим статусом
-    const ordersWithStatus = logistics.filter(
-      (o) => String(o.status) === String(s.value)
-    );
-    const totalServiceAmount = ordersWithStatus.reduce((sum, order) => {
-      const servicePrice =
-        parseFloat(order.price_service ?? order.servicePrice ?? 0) || 0;
-      return sum + servicePrice;
-    }, 0);
+    // Ищем данные в cards.by_status по статусу
+    const statusItem = analytics?.cards?.by_status?.find((item) => {
+      const title = item.title || "";
+      if (s.value === "decorated") {
+        return title.includes("Оформлен");
+      } else if (s.value === "transit") {
+        return title.includes("В пути");
+      } else if (s.value === "completed") {
+        return title.includes("Завершен");
+      }
+      return false;
+    });
 
     return {
       key: s.value,
-      label: item?.status_display || s.label,
+      label: statusItem?.title || s.label,
       color:
         s.value === "decorated"
           ? "blue"
           : s.value === "transit"
           ? "orange"
           : "green",
-      count: item?.orders ?? 0,
-      totalAmount: item?.amount ?? 0,
-      totalServiceAmount: totalServiceAmount,
+      count: statusItem?.orders ?? 0,
+      totalAmount: statusItem?.revenue ?? 0,
+      totalServiceAmount: statusItem?.service ?? 0,
     };
   });
 
-  // Общий итог по всем статусам
-  const totalOrders = statusSummary.reduce((acc, s) => acc + s.count, 0);
-  const totalAmount = statusSummary.reduce((acc, s) => acc + s.totalAmount, 0);
-  // Общая сумма стоимости услуг
-  const totalServiceAmount = statusSummary.reduce(
-    (acc, s) => acc + s.totalServiceAmount,
-    0
-  );
+  // Общий итог из cards.all
+  const totalOrders = analytics?.cards?.all?.orders ?? 0;
+  const totalAmount = analytics?.cards?.all?.revenue ?? 0;
+  const totalServiceAmount = analytics?.cards?.all?.service ?? 0;
 
   const filteredOrdersRaw = filterStatus
     ? logistics.filter((o) => o.status === filterStatus)
     : logistics;
 
-  const filteredOrders = filteredOrdersRaw.map((item) => ({
-    id: item.id,
-    clientId: item.client || item.clientId || "",
-    carName: item.title || item.carName || "",
-    description: item.description || "",
-    carPrice: item.price_car ?? item.carPrice ?? "",
-    servicePrice: item.price_service ?? item.servicePrice ?? "",
-    status: item.status || "decorated",
-    time: item.created_at || item.time || "",
-    arrivalDate: item.arrival_date || item.arrivalDate || "",
-    updated_at: item.updated_at || item.updatedAt || item.created_at || "",
-  }));
+  const filteredOrders = filteredOrdersRaw.map((item) => {
+    const salePrice =
+      item.price_sale ?? item.sale_price ?? item.salePrice ?? "";
+    const carPrice = item.price_car ?? item.carPrice ?? "";
+
+    // Берем выручку из данных, если нет - null
+    const revenue =
+      item.revenue !== undefined && item.revenue !== null
+        ? parseFloat(item.revenue)
+        : null;
+
+    return {
+      id: item.id,
+      clientId: item.client || item.clientId || "",
+      carName: item.title || item.carName || "",
+      description: item.description || "",
+      carPrice: carPrice,
+      servicePrice: item.price_service ?? item.servicePrice ?? "",
+      sale_price: salePrice,
+      revenue: revenue,
+      status: item.status || "decorated",
+      time: item.created_at || item.time || "",
+      arrivalDate: item.arrival_date || item.arrivalDate || "",
+      updated_at: item.updated_at || item.updatedAt || item.created_at || "",
+    };
+  });
 
   return (
     <div className="logistics-page">
@@ -401,7 +430,7 @@ const LogisticsPage = () => {
         <button
           type="button"
           className="logistics-page__btn logistics-page__btn--ghost"
-          onClick={handleSendToCash}
+          onClick={() => setShowAddCashboxModal(true)}
           disabled={
             filteredOrders.length === 0 ||
             filteredOrders.reduce((sum, order) => {
@@ -412,7 +441,7 @@ const LogisticsPage = () => {
             }, 0) <= 0
           }
         >
-          Отправить в кассу{" "}
+          Расход{" "}
           {/* {totalServiceAmount.toLocaleString("ru-RU", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
@@ -470,6 +499,8 @@ const LogisticsPage = () => {
                         <th>Машина</th>
                         <th>Цена машины</th>
                         <th>Стоимость услуги</th>
+                        <th>Цена продажи</th>
+                        <th>Выручка с продажи</th>
                         <th>Статус</th>
                         {/* <th>Создан</th> */}
                         <th>Примерная дата прибытия</th>
@@ -486,6 +517,16 @@ const LogisticsPage = () => {
                           <td>{order.carName || "—"}</td>
                           <td>{order.carPrice || "—"}</td>
                           <td>{order.servicePrice || "—"}</td>
+                          <td>{order.sale_price || "—"}</td>
+                          <td>
+                            {order.revenue !== null &&
+                            order.revenue !== undefined
+                              ? order.revenue.toLocaleString("ru-RU", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })
+                              : "—"}
+                          </td>
                           <td>
                             {statusOptions.find((s) => s.value === order.status)
                               ?.label || order.status}
@@ -606,6 +647,28 @@ const LogisticsPage = () => {
                               {order.servicePrice || "—"}
                             </div>
                           </div>
+
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">Цена продажи</div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              {order.sale_price || "—"}
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">
+                              Выручка с продажи
+                            </div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              {order.revenue !== null &&
+                              order.revenue !== undefined
+                                ? order.revenue.toLocaleString("ru-RU", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })
+                                : "—"}
+                            </div>
+                          </div>
                         </div>
                         {/* 
                         <div className="mb-3 text-xs">
@@ -682,6 +745,9 @@ const LogisticsPage = () => {
             handleStatusChangeFromTimeline(viewOrder, newStatus)
           }
         />
+      )}
+      {showAddCashboxModal && (
+        <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />
       )}
     </div>
   );

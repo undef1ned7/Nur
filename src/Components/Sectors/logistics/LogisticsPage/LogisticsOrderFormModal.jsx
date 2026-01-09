@@ -188,6 +188,38 @@ const LogisticsOrderFormModal = ({
               />
             </div>
 
+            {/* Цена продажи */}
+            <div className="logistics-page__field">
+              <label className="logistics-page__label">Цена продажи</label>
+              <input
+                className="logistics-page__input"
+                placeholder="Цена продажи машины"
+                value={form.salePrice}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, salePrice: e.target.value }))
+                }
+              />
+            </div>
+
+            {/* Выручка с продажи (вычисляется автоматически) */}
+            <div className="logistics-page__field">
+              <label className="logistics-page__label">Выручка с продажи</label>
+              <p className="bg-[#f9fafb] py-2 px-2.5 border border-[#e5e7eb] rounded-[10px] text-[14px]">
+                {(() => {
+                  const salePrice = parseFloat(form.salePrice || 0);
+                  const carPrice = parseFloat(form.carPrice || 0);
+                  const revenue = !isNaN(salePrice) && !isNaN(carPrice) 
+                    ? salePrice - carPrice 
+                    : 0;
+                  return revenue.toLocaleString("ru-RU", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  });
+                })()}{" "}
+                сом
+              </p>
+            </div>
+
             {/* Статус */}
             <div className="logistics-page__field">
               <label className="logistics-page__label">Статус</label>

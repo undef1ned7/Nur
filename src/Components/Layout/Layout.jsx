@@ -63,6 +63,9 @@ const Layout = () => {
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
   const location = useLocation();
 
+  // Проверяем, является ли текущий путь страницей кассы (должно быть объявлено до использования)
+  const isCashierPage = location.pathname.startsWith("/crm/market/cashier");
+
   useEffect(() => {
     dispatch(getCompany());
   }, [dispatch]);
@@ -108,6 +111,56 @@ const Layout = () => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [location.pathname]);
 
+  // 🔒 Блокировка скролла body когда сайдбар открыт на мобильных
+  useEffect(() => {
+    const isMobile = window.innerWidth < 769;
+    
+    if (isMobile && isSidebarOpen && !isCashierPage) {
+      // Сохраняем текущую позицию скролла
+      const scrollY = window.scrollY;
+      
+      // Блокируем скролл
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      
+      // Также блокируем скролл на html элементе для дополнительной защиты
+      document.documentElement.style.overflow = "hidden";
+      
+      // Обработчик изменения размера окна (например, поворот экрана)
+      const handleResize = () => {
+        const stillMobile = window.innerWidth < 769;
+        if (!stillMobile) {
+          // Если перешли на десктоп, восстанавливаем скролл
+          document.body.style.position = "";
+          document.body.style.top = "";
+          document.body.style.width = "";
+          document.body.style.overflow = "";
+          document.body.style.touchAction = "";
+          document.documentElement.style.overflow = "";
+          window.scrollTo(0, scrollY);
+        }
+      };
+      
+      window.addEventListener("resize", handleResize);
+      
+      // Восстанавливаем скролл при закрытии
+      return () => {
+        window.removeEventListener("resize", handleResize);
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.width = "";
+        document.body.style.overflow = "";
+        document.body.style.touchAction = "";
+        document.documentElement.style.overflow = "";
+        // Восстанавливаем позицию скролла
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isSidebarOpen, isCashierPage]);
+
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
 
@@ -119,9 +172,6 @@ const Layout = () => {
   };
 
   const daysLeft = useAnnouncement(company, setHideAnnouncement);
-
-  // Проверяем, является ли текущий путь страницей кассы
-  const isCashierPage = location.pathname.startsWith("/crm/market/cashier");
 
   return (
     <div className="layout-wrapper">

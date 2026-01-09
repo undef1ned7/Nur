@@ -1,0 +1,310 @@
+.logistics-analytics {
+  padding: 24px;
+  min-height: 100vh;
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 12px;
+  }
+
+  &__header {
+    margin-bottom: 24px;
+
+    @media (max-width: 768px) {
+      margin-bottom: 16px;
+    }
+  }
+
+  &__title {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+
+    @media (max-width: 768px) {
+      font-size: 20px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 18px;
+    }
+  }
+
+  &__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: #6b7280;
+    font-size: 16px;
+  }
+
+  // Карточки KPI
+  &__kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+
+    @media (max-width: 1024px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 480px) {
+      gap: 10px;
+    }
+  }
+
+  &__kpi-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s;
+
+    @media (max-width: 768px) {
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 480px) {
+      padding: 12px;
+    }
+
+    &:hover {
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  &__kpi-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+
+    @media (max-width: 480px) {
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+  }
+
+  &__kpi-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+
+    @media (max-width: 768px) {
+      font-size: 14px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 13px;
+    }
+  }
+
+  &__kpi-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    @media (max-width: 480px) {
+      gap: 6px;
+    }
+  }
+
+  &__kpi-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+
+    @media (max-width: 768px) {
+      font-size: 18px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 16px;
+    }
+  }
+
+  &__kpi-sum {
+    font-size: 18px;
+    font-weight: 600;
+    color: #059669;
+
+    @media (max-width: 768px) {
+      font-size: 16px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 14px;
+    }
+  }
+
+  &__kpi-service {
+    font-size: 14px;
+    color: #6b7280;
+
+    @media (max-width: 768px) {
+      font-size: 12px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 11px;
+    }
+  }
+
+  // Графики
+  &__charts {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+
+    &-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-bottom: 24px;
+
+      @media (max-width: 1024px) {
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      @media (max-width: 768px) {
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 480px) {
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+    }
+  }
+
+  &__chart-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    height: 450px;
+    width: calc(50% - 12px);
+
+    @media (max-width: 1024px) {
+      height: 400px;
+      padding: 16px;
+    }
+
+    @media (max-width: 768px) {
+      width: 100%;
+      height: 350px;
+      padding: 14px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 480px) {
+      height: 300px;
+      padding: 12px;
+      border-radius: 6px;
+    }
+
+    &--full-width {
+      height: 500px;
+      width: 100%;
+      margin-bottom: 24px;
+
+      @media (max-width: 1024px) {
+        height: 450px;
+        margin-bottom: 20px;
+      }
+
+      @media (max-width: 768px) {
+        height: 380px;
+        margin-bottom: 16px;
+      }
+
+      @media (max-width: 480px) {
+        height: 320px;
+        margin-bottom: 12px;
+      }
+    }
+  }
+
+  &__chart-container {
+    flex: 1;
+    height: 350px;
+    position: relative;
+    width: 100%;
+
+    @media (max-width: 1024px) {
+      height: 300px;
+    }
+
+    @media (max-width: 768px) {
+      height: 250px;
+    }
+
+    @media (max-width: 480px) {
+      height: 200px;
+    }
+
+    canvas {
+      max-height: none !important;
+      height: 100% !important;
+      width: 100% !important;
+    }
+
+    .logistics-analytics__chart-card--full-width & {
+      height: 400px;
+
+      @media (max-width: 1024px) {
+        height: 350px;
+      }
+
+      @media (max-width: 768px) {
+        height: 280px;
+      }
+
+      @media (max-width: 480px) {
+        height: 240px;
+      }
+    }
+  }
+
+  &__chart-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 20px 0;
+
+    @media (max-width: 1024px) {
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 480px) {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+  }
+}

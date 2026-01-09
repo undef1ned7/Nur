@@ -45,6 +45,8 @@ html.dark {
   z-index: 99; // Под сайдбаром (сайдбар z-index: 100)
   display: none;
   animation: fadeIn 0.3s ease-out;
+  touch-action: none; // Предотвращаем скролл на overlay
+  -webkit-overflow-scrolling: none;
 
   @keyframes fadeIn {
     from {
@@ -82,6 +84,15 @@ body {
   position: relative;
   overflow-y: auto;
   overflow-x: hidden;
+  
+  // Блокировка скролла на мобильных когда сайдбар открыт
+  &.sidebar-open-mobile {
+    position: fixed;
+    width: 100%;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-overflow-scrolling: none;
+  }
 }
 
 html {

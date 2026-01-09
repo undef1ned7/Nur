@@ -33,6 +33,7 @@ const ProductionRequest = () => {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [viewMode, setViewMode] = useState("grid");
   const [showCart, setShowCart] = useState(false);
+  const [isCartSectionOpen, setIsCartSectionOpen] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertType, setAlertType] = useState("success");
   const [alertMessage, setAlertMessage] = useState("");
@@ -53,6 +54,40 @@ const ProductionRequest = () => {
     loadOrCreateCart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Блокировка прокрутки фона при открытии корзины (только на десктопе)
+  useEffect(() => {
+    // Проверяем, десктоп ли это
+    const isDesktop = window.innerWidth >= 1024;
+
+    if (isCartSectionOpen && isDesktop) {
+      // Сохраняем текущую позицию прокрутки
+      const scrollY = window.scrollY;
+      // Блокируем прокрутку только на десктопе
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
+    } else {
+      // Восстанавливаем прокрутку
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
+    }
+
+    // Очистка при размонтировании
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+    };
+  }, [isCartSectionOpen]);
 
   // Debounce для поиска
   useEffect(() => {
@@ -215,11 +250,11 @@ const ProductionRequest = () => {
   };
 
   const handleOpenCart = () => {
-    setShowCart(true);
+    setIsCartSectionOpen(true);
   };
 
   const handleCloseCart = () => {
-    setShowCart(false);
+    setIsCartSectionOpen(false);
   };
 
   // Вычисляем количество товаров (позиций) в корзине
@@ -228,7 +263,7 @@ const ProductionRequest = () => {
   }, [cartItems]);
 
   const handleNotify = async (type, message) => {
-    setShowCart(false);
+    setIsCartSectionOpen(false);
     setAlertType(type || "success");
     setAlertMessage(message || "");
 
@@ -350,30 +385,19 @@ const ProductionRequest = () => {
         onRequestWithoutCart={handleRequestWithoutCart}
       />
 
-      {showCart && (
-        <div className="cart-modal-overlay" onClick={handleCloseCart}>
-          <div className="" onClick={(e) => e.stopPropagation()}>
-            {/* <div className="cart-modal-header">
-              <h2>Запрос товаров</h2>
-              <button className="close-cart-btn" onClick={handleCloseCart}>
-                ×
-              </button>
-            </div> */}
-            {/* <div className="cart-modal-content"> */}
-            <RequestCart
-              cartId={cartId}
-              items={cartItems}
-              onUpdateQuantity={handleUpdateItemQuantity}
-              onRemoveItem={handleRemoveItem}
-              onNotify={handleNotify}
-              onRefresh={refreshCart}
-              onCreateNewCart={createNewCart}
-              onClose={handleCloseCart}
-            />
-          </div>
-          {/* </div> */}
-        </div>
-      )}
+      <RequestCart
+        cartId={cartId}
+        items={cartItems}
+        onUpdateQuantity={handleUpdateItemQuantity}
+        onRemoveItem={handleRemoveItem}
+        onNotify={handleNotify}
+        onRefresh={refreshCart}
+        onCreateNewCart={createNewCart}
+        onClose={handleCloseCart}
+        isOpen={isCartSectionOpen}
+        onOpenChange={setIsCartSectionOpen}
+        totalItemsCount={totalItemsCount}
+      />
 
       <AlertModal
         open={alertOpen}

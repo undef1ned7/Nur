@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Eye,
   Heart,
@@ -11,6 +17,7 @@ import {
   Plus,
   Minus,
   X,
+  Send,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -31,7 +38,15 @@ import {
   addProductToAgentCart,
   getAgentCart,
   getMyAgentProductsAsync,
+  checkoutAgentCart,
 } from "../../../../store/creators/agentCartCreators";
+import {
+  openShiftAsync,
+  fetchShiftsAsync,
+} from "../../../../store/creators/shiftThunk";
+import { useShifts } from "../../../../store/slices/shiftSlice";
+import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
+import { useUser } from "../../../../store/slices/userSlice";
 import Cart from "./Cart";
 import "./ProductionCatalog.scss";
 import { display, margin } from "@mui/system";
@@ -144,6 +159,7 @@ const ProductCard = ({
   onDragEnd,
   isDragging,
   onAddToCart,
+  onAddToCartWithoutCart,
 }) => {
   const [isLongPress, setIsLongPress] = useState(false);
   const longPressTimer = useRef(null);
@@ -156,8 +172,20 @@ const ProductCard = ({
   const available = isAvailableInAgent && maxQuantity > 0;
 
   const handleQuantityChange = (newQuantity) => {
-    const qty = Math.max(1, Math.min(maxQuantity || 999, newQuantity));
+    // Разрешаем пустое значение или 0 во время ввода
+    if (newQuantity === "" || isNaN(newQuantity) || newQuantity < 1) {
+      setQuantity("");
+      return;
+    }
+    const qty = Math.min(maxQuantity || 999, Math.max(1, newQuantity));
     setQuantity(qty);
+  };
+
+  // Валидация количества при потере фокуса
+  const handleQuantityBlur = () => {
+    if (quantity === "" || quantity < 1 || isNaN(quantity)) {
+      setQuantity(1);
+    }
   };
 
   const handleIncrement = (e) => {
@@ -176,8 +204,11 @@ const ProductCard = ({
 
   const handleAddToCartClick = (e) => {
     e.stopPropagation();
-    if (available && quantity > 0 && onAddToCart) {
-      onAddToCart(product, quantity);
+    // Валидируем количество перед добавлением
+    const validQuantity =
+      quantity === "" || quantity < 1 || isNaN(quantity) ? 1 : quantity;
+    if (available && validQuantity > 0 && onAddToCart) {
+      onAddToCart(product, validQuantity);
       setQuantity(1);
       setShowQuantityControls(false);
     }
@@ -187,6 +218,18 @@ const ProductCard = ({
     e.stopPropagation();
     if (available && onAddToCart) {
       onAddToCart(product, 1);
+    }
+  };
+
+  const handleAddToCartWithoutCartClick = (e) => {
+    e.stopPropagation();
+    // Валидируем количество перед добавлением
+    const validQuantity =
+      quantity === "" || quantity < 1 || isNaN(quantity) ? 1 : quantity;
+    if (available && validQuantity > 0 && onAddToCartWithoutCart) {
+      onAddToCartWithoutCart(product, validQuantity);
+      setQuantity(1);
+      setShowQuantityControls(false);
     }
   };
 
@@ -275,14 +318,42 @@ const ProductCard = ({
           <>
             {!showQuantityControls ? (
               <div className="product-cart-controls">
-                <button
-                  className="add-to-cart-btn"
-                  onClick={handleQuickAdd}
-                  disabled={!available}
-                >
-                  <ShoppingCart size={16} />
-                  Быстро добавить
-                </button>
+                {onAddToCartWithoutCart && (
+                  <div className="request-buttons-row">
+                    <button
+                      className="request-without-cart-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (available && onAddToCartWithoutCart) {
+                          onAddToCartWithoutCart(product, 1);
+                        }
+                      }}
+                      disabled={!available}
+                      title="Создать корзину и отправить"
+                    >
+                      <Send size={14} />
+                      Без корзины
+                    </button>
+                    <button
+                      className="request-with-cart-btn"
+                      onClick={handleQuickAdd}
+                      disabled={!available}
+                      title="Добавить в корзину"
+                    >
+                      <ShoppingCart size={14} />В корзину
+                    </button>
+                  </div>
+                )}
+                {!onAddToCartWithoutCart && (
+                  <button
+                    className="add-to-cart-btn"
+                    onClick={handleQuickAdd}
+                    disabled={!available}
+                  >
+                    <ShoppingCart size={16} />
+                    Быстро добавить
+                  </button>
+                )}
                 <button
                   className="select-quantity-btn"
                   onClick={handleToggleQuantityControls}
@@ -308,8 +379,11 @@ const ProductCard = ({
                     max={maxQuantity || 999}
                     value={quantity}
                     onChange={(e) =>
-                      handleQuantityChange(Number(e.target.value))
+                      handleQuantityChange(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
                     }
+                    onBlur={handleQuantityBlur}
                     className="quantity-input-small"
                   />
                   <button
@@ -321,14 +395,37 @@ const ProductCard = ({
                     <Plus size={14} />
                   </button>
                 </div>
-                <button
-                  className="add-to-cart-btn"
-                  onClick={handleAddToCartClick}
-                  disabled={!available || quantity <= 0}
-                >
-                  <ShoppingCart size={16} />
-                  Добавить ({quantity})
-                </button>
+                {onAddToCartWithoutCart && (
+                  <div className="request-buttons-row">
+                    <button
+                      className="request-without-cart-btn"
+                      onClick={handleAddToCartWithoutCartClick}
+                      disabled={!available || quantity <= 0}
+                      title="Создать корзину и отправить"
+                    >
+                      <Send size={14} />
+                      Без корзины ({quantity})
+                    </button>
+                    <button
+                      className="request-with-cart-btn"
+                      onClick={handleAddToCartClick}
+                      disabled={!available || quantity <= 0}
+                      title="Добавить в корзину"
+                    >
+                      <ShoppingCart size={14} />В корзину ({quantity})
+                    </button>
+                  </div>
+                )}
+                {!onAddToCartWithoutCart && (
+                  <button
+                    className="add-to-cart-btn"
+                    onClick={handleAddToCartClick}
+                    disabled={!available || quantity <= 0}
+                  >
+                    <ShoppingCart size={16} />
+                    Добавить ({quantity})
+                  </button>
+                )}
                 <button
                   className="cancel-quantity-btn"
                   onClick={(e) => {
@@ -348,7 +445,13 @@ const ProductCard = ({
   );
 };
 
-const ProductDetailModal = ({ product, isOpen, onClose, onAddToCart }) => {
+const ProductDetailModal = ({
+  product,
+  isOpen,
+  onClose,
+  onAddToCart,
+  onAddToCartWithoutCart,
+}) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -363,8 +466,20 @@ const ProductDetailModal = ({ product, isOpen, onClose, onAddToCart }) => {
   const available = isAvailableInAgent && maxQuantity > 0;
 
   const handleQuantityChange = (newQuantity) => {
-    const qty = Math.max(1, Math.min(maxQuantity || 999, newQuantity));
+    // Разрешаем пустое значение или 0 во время ввода
+    if (newQuantity === "" || isNaN(newQuantity) || newQuantity < 1) {
+      setQuantity("");
+      return;
+    }
+    const qty = Math.min(maxQuantity || 999, Math.max(1, newQuantity));
     setQuantity(qty);
+  };
+
+  // Валидация количества при потере фокуса
+  const handleQuantityBlur = () => {
+    if (quantity === "" || quantity < 1 || isNaN(quantity)) {
+      setQuantity(1);
+    }
   };
 
   const handleIncrement = () => {
@@ -380,8 +495,11 @@ const ProductDetailModal = ({ product, isOpen, onClose, onAddToCart }) => {
   };
 
   const handleAddToCartClick = () => {
-    if (available && quantity > 0 && onAddToCart) {
-      onAddToCart(product, quantity);
+    // Валидируем количество перед добавлением
+    const validQuantity =
+      quantity === "" || quantity < 1 || isNaN(quantity) ? 1 : quantity;
+    if (available && validQuantity > 0 && onAddToCart) {
+      onAddToCart(product, validQuantity);
       setQuantity(1);
     }
   };
@@ -389,6 +507,16 @@ const ProductDetailModal = ({ product, isOpen, onClose, onAddToCart }) => {
   const handleQuickAdd = () => {
     if (available && onAddToCart) {
       onAddToCart(product, 1);
+    }
+  };
+
+  const handleAddToCartWithoutCartClick = () => {
+    // Валидируем количество перед добавлением
+    const validQuantity =
+      quantity === "" || quantity < 1 || isNaN(quantity) ? 1 : quantity;
+    if (available && validQuantity > 0 && onAddToCartWithoutCart) {
+      onAddToCartWithoutCart(product, validQuantity);
+      setQuantity(1);
     }
   };
 
@@ -675,8 +803,11 @@ const ProductDetailModal = ({ product, isOpen, onClose, onAddToCart }) => {
                     max={maxQuantity || 999}
                     value={quantity}
                     onChange={(e) =>
-                      handleQuantityChange(Number(e.target.value))
+                      handleQuantityChange(
+                        e.target.value === "" ? "" : Number(e.target.value)
+                      )
                     }
+                    onBlur={handleQuantityBlur}
                     className="quantity-input-modal"
                   />
                   <button
@@ -697,21 +828,43 @@ const ProductDetailModal = ({ product, isOpen, onClose, onAddToCart }) => {
                   flexDirection: "column",
                 }}
               >
-                <button
-                  className="add-to-cart-btn"
-                  onClick={handleAddToCartClick}
-                  disabled={!available || quantity <= 0}
-                >
-                  <ShoppingCart size={20} />
-                  Добавить в корзину ({quantity} шт.)
-                </button>
-                <button
-                  className="quick-add-btn"
-                  onClick={handleQuickAdd}
-                  disabled={!available}
-                >
-                  Быстро добавить (1 шт.)
-                </button>
+                {onAddToCartWithoutCart ? (
+                  <>
+                    <button
+                      className="request-without-cart-btn-modal"
+                      onClick={handleAddToCartWithoutCartClick}
+                      disabled={!available || quantity <= 0}
+                    >
+                      <Send size={18} />
+                      Без корзины ({quantity} шт.)
+                    </button>
+                    <button
+                      className="request-with-cart-btn-modal"
+                      onClick={handleAddToCartClick}
+                      disabled={!available || quantity <= 0}
+                    >
+                      <ShoppingCart size={18} />В корзину ({quantity} шт.)
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="add-to-cart-btn"
+                      onClick={handleAddToCartClick}
+                      disabled={!available || quantity <= 0}
+                    >
+                      <ShoppingCart size={20} />
+                      Добавить в корзину ({quantity} шт.)
+                    </button>
+                    <button
+                      className="quick-add-btn"
+                      onClick={handleQuickAdd}
+                      disabled={!available}
+                    >
+                      Быстро добавить (1 шт.)
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -726,6 +879,9 @@ const ProductionCatalog = () => {
   const { products, loading, error, selectedProduct, filters } = useSelector(
     (state) => state.catalog
   );
+  const { shifts, currentShift } = useShifts();
+  const { list: cashBoxes } = useCash();
+  const { profile, currentUser, userId } = useUser();
 
   // console.log(1, products);
 
@@ -738,6 +894,7 @@ const ProductionCatalog = () => {
   const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
   const [showFilters, setShowFilters] = useState(false);
   const [showCart, setShowCart] = useState(false);
+  const [isCartSectionOpen, setIsCartSectionOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [agentCartId, setAgentCartId] = useState(null);
   const [agentCartItemsCount, setAgentCartItemsCount] = useState(0);
@@ -761,19 +918,19 @@ const ProductionCatalog = () => {
       // Проверяем наличие товара в агентских продуктах
       const aHasInAgent = agentProductsMap.has(a.id);
       const bHasInAgent = agentProductsMap.has(b.id);
-      
+
       // Получаем количество
-      const aQty = aHasInAgent ? (agentProductsMap.get(a.id) ?? 0) : 0;
-      const bQty = bHasInAgent ? (agentProductsMap.get(b.id) ?? 0) : 0;
-      
+      const aQty = aHasInAgent ? agentProductsMap.get(a.id) ?? 0 : 0;
+      const bQty = bHasInAgent ? agentProductsMap.get(b.id) ?? 0 : 0;
+
       // Товар в наличии, если есть в агентских продуктах и количество > 0
       const aInStock = aHasInAgent && aQty > 0;
       const bInStock = bHasInAgent && bQty > 0;
-      
+
       // Сначала товары в наличии (true идет первым)
       if (aInStock && !bInStock) return -1;
       if (!aInStock && bInStock) return 1;
-      
+
       // Если оба в наличии или оба не в наличии, сохраняем исходный порядок
       return 0;
     });
@@ -903,6 +1060,12 @@ const ProductionCatalog = () => {
     })();
   }, [dispatch]);
 
+  // Загружаем смены и кассы при монтировании
+  useEffect(() => {
+    dispatch(fetchShiftsAsync());
+    dispatch(getCashBoxes());
+  }, [dispatch]);
+
   // Ensure agent cart exists once per page load: if no id in localStorage, create
   useEffect(() => {
     (async () => {
@@ -944,6 +1107,40 @@ const ProductionCatalog = () => {
       }
     })();
   }, [dispatch, refreshCartItems]);
+
+  // Блокировка прокрутки фона при открытии корзины (только на десктопе)
+  useEffect(() => {
+    // Проверяем, десктоп ли это
+    const isDesktop = window.innerWidth >= 1024;
+
+    if (isCartSectionOpen && isDesktop) {
+      // Сохраняем текущую позицию прокрутки
+      const scrollY = window.scrollY;
+      // Блокируем прокрутку только на десктопе
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      document.body.style.overflow = "hidden";
+    } else {
+      // Восстанавливаем прокрутку
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
+    }
+
+    // Очистка при размонтировании
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+      document.body.style.overflow = "";
+    };
+  }, [isCartSectionOpen]);
 
   const handleViewProduct = (product) => {
     dispatch(setSelectedProduct(product));
@@ -1113,6 +1310,132 @@ const ProductionCatalog = () => {
     }
   };
 
+  // Функция для проверки и открытия смены
+  const ensureShiftIsOpen = async () => {
+    // Проверяем наличие открытой смены
+    const openShift = shifts.find((s) => s.status === "open") || currentShift;
+
+    if (openShift) {
+      return; // Смена уже открыта
+    }
+
+    // Если смены нет, открываем её
+    let availableCashBoxes = cashBoxes;
+    if (!availableCashBoxes || availableCashBoxes.length === 0) {
+      // Загружаем кассы, если их нет
+      availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
+      if (!availableCashBoxes || availableCashBoxes.length === 0) {
+        throw new Error(
+          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены."
+        );
+      }
+    }
+
+    const firstCashBox = availableCashBoxes[0];
+    const cashboxId = firstCashBox?.id;
+
+    if (!cashboxId) {
+      throw new Error("Не удалось определить кассу");
+    }
+
+    const cashierId = currentUser?.id || userId || profile?.id;
+
+    if (!cashierId) {
+      throw new Error("Не удалось определить кассира");
+    }
+
+    // Открываем смену с нулевой суммой
+    await dispatch(
+      openShiftAsync({
+        cashbox: cashboxId,
+        cashier: cashierId,
+        opening_cash: "0",
+      })
+    ).unwrap();
+
+    // Обновляем список смен
+    await dispatch(fetchShiftsAsync());
+  };
+
+  // Добавление в корзину без сохранения (создать корзину, добавить товар, отправить)
+  const handleAddToCartWithoutCart = async (product, quantity = 1) => {
+    if (!product || !product.id || quantity <= 0) return;
+
+    try {
+      // Проверяем и открываем смену перед оформлением заказа
+      await ensureShiftIsOpen();
+
+      // Создаем новую корзину
+      const created = await dispatch(
+        startAgentCart({
+          agent: null,
+          order_discount_total: "0.00",
+        })
+      ).unwrap();
+      const tempCartId = created?.id || null;
+
+      if (!tempCartId) {
+        setAlertType("error");
+        setAlertMessage("Не удалось создать корзину");
+        setAlertOpen(true);
+        return;
+      }
+
+      // Добавляем товар в корзину используя тот же метод, что и в обычном добавлении
+      const updated = await dispatch(
+        addProductToAgentCart({
+          cartId: tempCartId,
+          product_id: product.id,
+          quantity: quantity,
+        })
+      ).unwrap();
+
+      // Оформляем заказ без клиента (используя тот же метод, что и в Cart.jsx)
+      await dispatch(
+        checkoutAgentCart({
+          cartId: tempCartId,
+          print_receipt: false,
+          // client_id не передаем, так как это быстрый заказ без корзины
+        })
+      ).unwrap();
+
+      // Показываем уведомление об успешной отправке
+      setAlertType("success");
+      setAlertMessage(
+        `Заказ на товар "${product.name}" (${quantity} шт.) успешно отправлен!`
+      );
+      setAlertOpen(true);
+
+      // Обновляем текущую корзину (создаем новую пустую)
+      const newCart = await dispatch(
+        startAgentCart({
+          agent: null,
+          order_discount_total: "0.00",
+        })
+      ).unwrap();
+      if (newCart?.id) {
+        localStorage.setItem("agentCartId", newCart.id);
+        setAgentCartId(newCart.id);
+        setAgentCartItemsCount(0);
+      }
+
+      // Обновляем список товаров
+      dispatch(fetchProducts());
+      refreshAgentProducts();
+    } catch (error) {
+      console.error("Error adding to cart without saving:", error);
+      const errorMessage =
+        error?.response?.data?.shift_id?.[0] ||
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Не удалось отправить заказ";
+      setAlertType("error");
+      setAlertMessage(errorMessage);
+      setAlertOpen(true);
+    }
+  };
+
   const handleOpenCart = async () => {
     try {
       let cid = agentCartId || localStorage.getItem("agentCartId");
@@ -1139,16 +1462,16 @@ const ProductionCatalog = () => {
       console.error("Error opening cart:", e);
       // keep null; component will fallback to local items
     } finally {
-      setShowCart(true);
+      setIsCartSectionOpen(true);
     }
   };
 
   const handleCloseCart = () => {
-    setShowCart(false);
+    setIsCartSectionOpen(false);
   };
 
   const handleNotify = (type, message) => {
-    setShowCart(false);
+    setIsCartSectionOpen(false);
     setAlertType(type || "success");
     setAlertMessage(message || "");
     // ensure next open starts fresh if needed
@@ -1333,6 +1656,7 @@ const ProductionCatalog = () => {
                       onDragEnd={handleDragEnd}
                       isDragging={draggedItem === product.id}
                       onAddToCart={handleAddToCart}
+                      onAddToCartWithoutCart={handleAddToCartWithoutCart}
                     />
                   </div>
                 );
@@ -1405,21 +1729,20 @@ const ProductionCatalog = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onAddToCart={handleAddToCart}
+        onAddToCartWithoutCart={handleAddToCartWithoutCart}
       />
 
-      {/* Модальное окно корзины */}
-      {showCart && (
-        <div className="cart-modal-overlay" onClick={handleCloseCart}>
-          <div className="" onClick={(e) => e.stopPropagation()}>
-            <Cart
-              agentCartId={agentCartId}
-              onNotify={handleNotify}
-              onClose={handleCloseCart}
-            />
-            {/* </div> */}
-          </div>
-        </div>
-      )}
+      {/* Компонент корзины - всегда рендерится, но секция заказа открывается условно */}
+      <Cart
+        agentCartId={agentCartId}
+        onNotify={handleNotify}
+        onClose={handleCloseCart}
+        isOpen={isCartSectionOpen}
+        onOpenChange={setIsCartSectionOpen}
+        totalItemsCount={
+          agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount
+        }
+      />
 
       <AlertModal
         open={alertOpen}

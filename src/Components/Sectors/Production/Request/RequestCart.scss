@@ -1,5 +1,5 @@
 .cart-page {
-  height: 60vh;
+  // height: 60vh;
   background: #f8f9fa;
   padding: 0;
   border-radius: 12px;
@@ -25,38 +25,273 @@
       color: #333;
       margin: 0;
     }
+  }
 
-    .close-cart-btn {
-      background: none;
-      border: none;
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: #666;
-      padding: 8px;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: all 0.3s ease;
+  .cart-content {
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 
-      &:hover {
-        background: #f8f9fa;
-        color: #333;
+    // Десктопная версия - две колонки
+    @media (min-width: 1024px) {
+      flex-direction: row;
+      gap: 30px;
+      align-items: flex-start;
+    }
+  }
+
+  .cart-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    // Десктопная версия
+    @media (min-width: 1024px) {
+      &.cart-items-column {
+        flex: 1.5;
+        max-height: calc(90vh - 120px);
+        overflow-y: auto;
+      }
+
+      &.cart-order-column {
+        flex: 1;
+        position: sticky;
+        top: 0;
+        max-height: calc(90vh - 120px);
+        overflow-y: auto;
+
+        &.desktop-only {
+          // Скрываем на мобильных/планшетах
+          @media (max-width: 1023px) {
+            display: none;
+          }
+        }
       }
     }
   }
 
-  .cart-content {
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 30px;
-    padding: 30px;
+  .cart-items-section {
+    // На мобильных убираем ограничение высоты
+    @media (max-width: 1023px) {
+      max-height: 50vh;
+      overflow-y: auto;
+    }
+  }
+}
 
-    @media (max-width: 1024px) {
-      grid-template-columns: 1fr;
-      gap: 20px;
+// Модалка корзины
+.cart-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .cart-modal-content {
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    animation: slideUpModal 0.3s ease-out;
+    overflow: hidden;
+
+    // Десктопная версия - шире для двух колонок
+    @media (min-width: 1024px) {
+      max-width: 1200px;
+      width: 95%;
+    }
+
+    @keyframes slideUpModal {
+      from {
+        transform: scale(0.9) translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .cart-page {
+      height: auto;
+      max-height: 90vh;
+      border-radius: 16px;
+      overflow: hidden;
+
+      .cart-container {
+        height: auto;
+        max-height: 90vh;
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    }
+  }
+}
+
+.close-cart-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #666;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: #f8f9fa;
+    color: #333;
+  }
+}
+
+// Кнопка корзины внизу экрана - для мобильных/планшетов
+.cart-trigger-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: white;
+  border-top: 1px solid #e9ecef;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1002;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.3s ease;
+  pointer-events: auto; // Кнопка должна быть кликабельной
+
+  // Скрываем на десктопе
+  @media (min-width: 1024px) {
+    display: none !important;
+  }
+
+  .cart-trigger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #ffd600;
+    color: #000;
+    border: none;
+    border-radius: 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+    width: 100%;
+    max-width: 100%;
+
+    &:hover {
+      background: #ffd600;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(255, 214, 0, 0.4);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+
+    .cart-trigger-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0; // Позволяет тексту обрезаться
+
+      svg {
+        flex-shrink: 0;
+      }
+
+      .cart-trigger-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+        flex: 1;
+
+        .cart-trigger-label {
+          font-size: 1rem;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+
+        .cart-trigger-total {
+          font-size: 0.85rem;
+          font-weight: 500;
+          opacity: 0.95;
+          white-space: nowrap;
+        }
+      }
+    }
+
+    .cart-trigger-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+
+      .cart-badge {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+
+      .swipe-hint-icon {
+        flex-shrink: 0;
+        pointer-events: none;
+      }
+    }
+
+    .cart-badge {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .swipe-indicator {
+      position: absolute;
+      top: 50%;
+      right: 16px;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
     }
   }
 }
@@ -282,316 +517,437 @@
   }
 }
 
-// Секция заказа
-.order-section {
-  .client-selector {
-    margin-bottom: 30px;
+// Overlay для блокировки заднего фона
+.mobile-order-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
 
-    .selector-label {
-      display: block;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 10px;
-      font-size: 1.1rem;
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    display: none !important;
+  }
+}
+
+// Секция заказа внизу экрана - для мобильных/планшетов
+.mobile-order-section {
+  position: fixed;
+  bottom: 70px; // Отступ для кнопки корзины
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 2px solid #007bff;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+  max-height: calc(85vh - 70px);
+  overflow: hidden;
+  transform: translateY(100%); // Полностью скрыта по умолчанию
+  transition: transform 0.3s ease-out, max-height 0.3s ease-out;
+  pointer-events: none; // Не блокируем прокрутку когда закрыта
+
+  // Показываем только на мобильных и планшетах (до 1023px)
+  // Скрываем на десктопе (от 1024px)
+  @media (min-width: 1024px) {
+    display: none !important;
+  }
+
+  // Когда секция закрыта - полностью скрыта, но разрешаем touch-события для открытия свайпом
+  &:not(.open):not(.closing) {
+    transform: translateY(100%) !important; // Полностью скрыта
+    height: 0 !important;
+    max-height: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    // Разрешаем touch-события для обработки свайпов, но не блокируем прокрутку страницы
+    pointer-events: auto !important;
+
+    .mobile-order-section-content {
+      display: none !important;
+      height: 0 !important;
+      max-height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+  }
+
+  &.open {
+    transform: translateY(0); // Полностью видна
+    height: auto !important;
+    max-height: calc(85vh - 70px);
+    overflow-y: auto;
+    pointer-events: auto; // Разрешаем взаимодействие когда открыта
+  }
+
+  &.closing {
+    transform: translateY(100%) !important; // Полностью скрывается при закрытии
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+
+    .mobile-order-section-content {
+      display: none !important;
+      height: 0 !important;
+      max-height: 0 !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+    }
+  }
+
+  .mobile-order-section-content {
+    padding: 20px;
+    padding-bottom: 20px;
+    max-height: calc(85vh - 130px);
+    overflow-y: auto;
+    transition: opacity 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    // Стили для списка товаров в мобильной секции
+    .cart-items-column {
+      width: 100%;
+      margin-bottom: 0;
     }
 
-    .selector-dropdown {
-      position: relative;
+    .cart-items-section {
+      max-height: none;
+      overflow-y: visible;
+    }
 
-      .selector-trigger {
-        width: 100%;
-        padding: 15px;
-        border: 2px solid #e9ecef;
-        border-radius: 8px;
-        background: white;
-        cursor: pointer;
+    // Стили для секции заказа в мобильной версии
+    .cart-order-column {
+      width: 100%;
+      margin-top: 20px;
+    }
+  }
+}
+
+// Стили для клиент-селектора и итога (используются и в модалке, и в мобильной секции)
+.client-selector {
+  margin-bottom: 30px;
+
+  .selector-label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+  }
+
+  .selector-dropdown {
+    position: relative;
+
+    .selector-trigger {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      background: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: border-color 0.3s ease;
+
+      &:hover {
+        border-color: #ffd600;
+      }
+
+      .selected-client {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        transition: border-color 0.3s ease;
+        gap: 10px;
+        flex: 1;
 
-        &:hover {
-          border-color: #ffd600;
+        .client-phone {
+          color: #666;
+          font-size: 0.9rem;
         }
+      }
 
-        .selected-client {
-          display: flex;
-          align-items: center;
-          gap: 10px;
+      .chevron {
+        transition: transform 0.3s ease;
+
+        &.open {
+          transform: rotate(180deg);
+        }
+      }
+    }
+
+    .selector-dropdown-content {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 2px solid #e9ecef;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      max-height: 300px;
+      overflow-y: auto;
+
+      .search-box {
+        padding: 15px;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        input {
           flex: 1;
+          border: none;
+          outline: none;
+          font-size: 1rem;
 
-          .client-phone {
-            color: #666;
-            font-size: 0.9rem;
-          }
-        }
-
-        .chevron {
-          transition: transform 0.3s ease;
-
-          &.open {
-            transform: rotate(180deg);
+          &::placeholder {
+            color: #999;
           }
         }
       }
 
-      .selector-dropdown-content {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: white;
-        border: 2px solid #e9ecef;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        z-index: 1000;
-        max-height: 300px;
-        overflow-y: auto;
+      .actions-row {
+        padding: 0 15px 10px 15px;
 
-        .search-box {
+        .create-client-btn {
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px dashed #ffd600;
+          background: #fffbea;
+          color: #8a6d00;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 600;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: #fff3bf;
+          }
+        }
+
+        .clear-client-btn {
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #e9ecef;
+          background: white;
+          color: #666;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: #f8f9fa;
+          }
+        }
+      }
+
+      .create-client-form {
+        padding: 12px 15px 15px 15px;
+        border-bottom: 1px solid #f8f9fa;
+
+        input {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #e9ecef;
+          border-radius: 8px;
+          font-size: 0.95rem;
+          outline: none;
+          transition: border-color 0.2s ease;
+
+          &:focus {
+            border-color: #ffd600;
+          }
+
+          &::placeholder {
+            color: #999;
+          }
+        }
+
+        .error {
+          margin-top: 4px;
+        }
+
+        .save-client-btn {
+          padding: 10px 14px;
+          background: #28a745;
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease;
+
+          &:hover:not(:disabled) {
+            background: #218838;
+          }
+
+          &:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+        }
+
+        .cancel-create-btn {
+          padding: 10px 14px;
+          background: #f1f3f5;
+          color: #333;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease;
+
+          &:hover:not(:disabled) {
+            background: #e9ecef;
+          }
+
+          &:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+        }
+      }
+
+      .clients-list {
+        .client-option {
+          width: 100%;
           padding: 15px;
-          border-bottom: 1px solid #e9ecef;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-
-          input {
-            flex: 1;
-            border: none;
-            outline: none;
-            font-size: 1rem;
-
-            &::placeholder {
-              color: #999;
-            }
-          }
-        }
-
-        .actions-row {
-          padding: 0 15px 10px 15px;
-
-          .create-client-btn {
-            margin-top: 10px;
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px dashed #ffd600;
-            background: #fffbea;
-            color: #8a6d00;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s ease;
-
-            &:hover {
-              background: #fff3bf;
-            }
-          }
-
-          .clear-client-btn {
-            margin-top: 10px;
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e9ecef;
-            background: white;
-            color: #666;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s ease;
-
-            &:hover {
-              background: #f8f9fa;
-            }
-          }
-        }
-
-        .create-client-form {
-          padding: 12px 15px 15px 15px;
+          border: none;
+          background: none;
+          text-align: left;
+          cursor: pointer;
+          transition: background 0.3s ease;
           border-bottom: 1px solid #f8f9fa;
 
-          input {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            outline: none;
-            transition: border-color 0.2s ease;
-
-            &:focus {
-              border-color: #ffd600;
-            }
-
-            &::placeholder {
-              color: #999;
-            }
+          &:hover {
+            background: #f8f9fa;
           }
 
-          .error {
-            margin-top: 4px;
+          &.selected {
+            background: #ffd600;
+            color: white;
           }
 
-          .save-client-btn {
-            padding: 10px 14px;
-            background: #28a745;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
+          .client-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
 
-            &:hover:not(:disabled) {
-              background: #218838;
+            .client-name {
+              font-weight: 600;
+              font-size: 1rem;
             }
 
-            &:disabled {
-              opacity: 0.7;
-              cursor: not-allowed;
-            }
-          }
-
-          .cancel-create-btn {
-            padding: 10px 14px;
-            background: #f1f3f5;
-            color: #333;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s ease;
-
-            &:hover:not(:disabled) {
-              background: #e9ecef;
-            }
-
-            &:disabled {
-              opacity: 0.7;
-              cursor: not-allowed;
+            .client-phone {
+              font-size: 0.9rem;
+              opacity: 0.8;
             }
           }
         }
 
-        .clients-list {
-          .client-option {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            background: none;
-            text-align: left;
-            cursor: pointer;
-            transition: background 0.3s ease;
-            border-bottom: 1px solid #f8f9fa;
-
-            &:hover {
-              background: #f8f9fa;
-            }
-
-            &.selected {
-              background: #ffd600;
-              color: white;
-            }
-
-            .client-info {
-              display: flex;
-              flex-direction: column;
-              gap: 4px;
-
-              .client-name {
-                font-weight: 600;
-                font-size: 1rem;
-              }
-
-              .client-phone {
-                font-size: 0.9rem;
-                opacity: 0.8;
-              }
-            }
-          }
-
-          .loading,
-          .no-clients {
-            padding: 20px;
-            text-align: center;
-            color: #666;
-          }
+        .loading,
+        .no-clients {
+          padding: 20px;
+          text-align: center;
+          color: #666;
         }
       }
     }
   }
+}
 
-  .order-summary {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 25px;
-    border: 1px solid #e9ecef;
+// Стили для итога заказа (используются и в модалке, и в мобильной секции)
+.order-summary {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 25px;
+  border: 1px solid #e9ecef;
 
-    h2 {
-      font-size: 1.5rem;
-      font-weight: bold;
-      color: #333;
-      margin: 0 0 20px 0;
-    }
+  h2 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #333;
+    margin: 0 0 20px 0;
+  }
 
-    .summary-details {
-      margin-bottom: 15px;
+  .summary-details {
+    margin-bottom: 15px;
 
-      .summary-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-        font-size: 1rem;
-        color: #666;
-
-        &.discount {
-          color: #28a745;
-          font-weight: 600;
-        }
-      }
-    }
-
-    .summary-divider {
-      height: 1px;
-      background: #e9ecef;
-      margin: 15px 0;
-    }
-
-    .total-amount {
-      font-size: 1.3rem;
-      font-weight: bold;
-      color: #333;
-      margin-bottom: 20px;
-    }
-
-    .buy-btn {
-      width: 100%;
-      padding: 15px;
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      cursor: pointer;
+    .summary-row {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      transition: all 0.3s ease;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 1rem;
+      color: #666;
 
-      &:hover:not(:disabled) {
-        background: #c82333;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+      &.discount {
+        color: #28a745;
+        font-weight: 600;
       }
+    }
+  }
 
-      &:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-      }
+  .summary-divider {
+    height: 1px;
+    background: #e9ecef;
+    margin: 15px 0;
+  }
+
+  .total-amount {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+  }
+
+  .buy-btn {
+    width: 100%;
+    padding: 15px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+
+    &:hover:not(:disabled) {
+      background: #c82333;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+    }
+
+    &:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
     }
   }
 }
