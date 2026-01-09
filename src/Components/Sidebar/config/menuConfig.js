@@ -178,13 +178,13 @@ export const MENU_CONFIG = {
         permission: "can_view_employees",
         implemented: true,
       },
-            {
-        label: "Склад",
-        to: "/crm/barber/warehouse",
-        icon: menuIcons.warehouse,
-        permission: "can_view_products",
-        implemented: true,
-      },
+      //       {
+      //   label: "Склад",
+      //   to: "/crm/barber/warehouse",
+      //   icon: menuIcons.warehouse,
+      //   permission: "can_view_products",
+      //   implemented: true,
+      // },
     ],
 
     // Гостиница
