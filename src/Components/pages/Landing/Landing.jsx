@@ -1,20 +1,30 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Lang from "../../Lang/Lang";
 import logo from "../../Photo/logo2.png";
 import "./Landing.scss";
 
 const Landing = () => {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Блокируем скролл фона, когда открыт off-canvas
+  // Блокировка скролла при открытом меню
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    if (menuOpen) document.body.style.overflow = "hidden";
+    document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = "";
     };
   }, [menuOpen]);
+
+  // Хелпер для массивов из t()
+  const tArray = (key) => {
+    const value = t(key, { returnObjects: true });
+    return Array.isArray(value) ? value : [];
+  };
+
+  const industries = tArray("industries.list");
+  const pricingPlans = tArray("pricing.plans");
 
   return (
     <div className="landing">
@@ -22,55 +32,51 @@ const Landing = () => {
       <header className="landing__topbar" role="banner">
         <div className="landing__container">
           <div className="landing__topbar-row">
-            <Link to="/" className="landing__logo" aria-label="Главная">
+            <Link to="/" className="landing__logo" aria-label={t("hero.title")}>
               <img src={logo} alt="NUR CRM" className="landing__logo-img" />
             </Link>
 
-            {/* Desktop-набор действий (на md- скрывается) */}
             <nav className="landing__actions" aria-label="Авторизация">
               <Link
                 to="/login"
                 className="landing__btn landing__btn--secondary"
               >
-                Вход
+                {t("header.login")}
               </Link>
               <Link
                 to="/submit-application"
                 className="landing__btn landing__btn--primary"
               >
-                Оставить заявку
+                {t("header.submitApplication")}
               </Link>
               <div className="landing__lang">
                 <Lang />
               </div>
             </nav>
 
-            {/* Бургер — ВСЕГДА справа */}
             <button
               type="button"
               className={`landing__burger ${menuOpen ? "is-open" : ""}`}
               aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
               aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((s) => !s)}
+              onClick={() => setMenuOpen((prev) => !prev)}
             >
+              <span className="landing__burger-line" />
+              <span className="landing__burger-line" />
               <span className="landing__burger-line" />
             </button>
           </div>
         </div>
       </header>
 
-      {/* ===== Off-canvas меню (mobile) ===== */}
+      {/* ===== Off-canvas меню ===== */}
       <div
         className={`landing__offcanvas ${
           menuOpen ? "landing__offcanvas--open" : ""
         }`}
         aria-hidden={!menuOpen}
       >
-        <div
-          className="landing__backdrop"
-          onClick={() => setMenuOpen(false)}
-          aria-hidden
-        />
+        <div className="landing__backdrop" onClick={() => setMenuOpen(false)} />
         <aside
           className="landing__panel"
           role="dialog"
@@ -84,6 +90,7 @@ const Landing = () => {
             onClick={() => setMenuOpen(false)}
           >
             <span />
+            <span />
           </button>
 
           <nav className="landing__panel-body">
@@ -92,14 +99,14 @@ const Landing = () => {
               className="landing__btn landing__btn--secondary landing__btn--block"
               onClick={() => setMenuOpen(false)}
             >
-              Вход
+              {t("header.login")}
             </Link>
             <Link
               to="/submit-application"
               className="landing__btn landing__btn--primary landing__btn--block"
               onClick={() => setMenuOpen(false)}
             >
-              Оставить заявку
+              {t("header.submitApplication")}
             </Link>
             <div className="landing__lang landing__lang--block">
               <Lang />
@@ -108,36 +115,29 @@ const Landing = () => {
         </aside>
       </div>
 
-      {/* ===== Секции ===== */}
+      {/* ===== Основной контент ===== */}
       <main className="landing__main" id="main">
         {/* HERO */}
-        <section className="landing__hero" aria-label="Введение">
+        <section className="landing__hero">
           <div className="landing__container">
             <div className="landing__hero-inner">
-              <h1 className="landing__hero-title">
-                Сила управления в&nbsp;ваших руках
-              </h1>
-              <p className="landing__hero-text">
-                Премиум-платформа для бизнеса: единый стек для кафе,
-                строй-сферы, маркетов, барбершопов/салонов красоты, школ и
-                гостиниц — красиво, быстро, надёжно.
-              </p>
+              <h1 className="landing__hero-title">{t("hero.title")}</h1>
+              <p className="landing__hero-text">{t("hero.text")}</p>
               <div className="landing__hero-actions">
                 <Link
                   to="/submit-application"
                   className="landing__btn landing__btn--primary"
                 >
-                  Попробовать
+                  {t("hero.button")}
                 </Link>
               </div>
 
               <ul className="landing__trust">
-                <li className="landing__trust-item">Кафе</li>
-                <li className="landing__trust-item">Строй-сфера</li>
-                <li className="landing__trust-item">Маркет</li>
-                <li className="landing__trust-item">Барбершоп / Салон</li>
-                <li className="landing__trust-item">Школа</li>
-                <li className="landing__trust-item">Гостиница</li>
+                {industries.map((item, idx) => (
+                  <li key={idx} className="landing__trust-item">
+                    {item.name}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -146,45 +146,22 @@ const Landing = () => {
         {/* ОТРАСЛИ */}
         <section
           className="landing__section landing__section--industries"
-          aria-label="Отрасли"
+          aria-label={t("industries.title")}
         >
           <div className="landing__container">
-            <h2 className="landing__title">Отрасли</h2>
-
+            <h2 className="landing__title">{t("industries.title")}</h2>
             <div
               className="landing__scroller"
               tabIndex="0"
-              aria-label="Список отраслей"
+              aria-label={t("industries.title")}
             >
-              {[
-                { t: "Кафе", d: "Столы, заказы, кухня/KDS, быстрые оплаты." },
-                {
-                  t: "Строй-сфера",
-                  d: "Сметы, заявки, объекты, материалы, акты.",
-                },
-                {
-                  t: "Маркет",
-                  d: "Товары, остатки, штрих-коды, касса, скидки.",
-                },
-                {
-                  t: "Барбершоп/Салон",
-                  d: "Записи, мастера, услуги, клиентская база.",
-                },
-                {
-                  t: "Школа",
-                  d: "Лиды, группы, расписания, счета, рассрочки.",
-                },
-                {
-                  t: "Гостиница",
-                  d: "Номера, брони, заселение/выезд, отчёты.",
-                },
-              ].map((i, idx) => (
+              {industries.map((item, idx) => (
                 <article className="landing__card" key={idx}>
-                  <div className="landing__card-ico" aria-hidden>
+                  <div className="landing__card-ico" aria-hidden="true">
                     <span className="landing__dot" />
                   </div>
-                  <h3 className="landing__card-title">{i.t}</h3>
-                  <p className="landing__card-text">{i.d}</p>
+                  <h3 className="landing__card-title">{item.name}</h3>
+                  <p className="landing__card-text">{item.desc}</p>
                 </article>
               ))}
             </div>
@@ -194,55 +171,43 @@ const Landing = () => {
         {/* ТАРИФЫ */}
         <section
           className="landing__section landing__section--pricing"
-          aria-label="Тарифы"
+          aria-label={t("pricing.title")}
         >
           <div className="landing__container">
-            <h2 className="landing__title">Тарифы</h2>
-
+            <h2 className="landing__title">{t("pricing.title")}</h2>
             <div className="landing__plans">
-              <article className="landing__plan">
-                <h3 className="landing__plan-name">Старт</h3>
-                <p className="landing__plan-desc">
-                  Минимум функций, максимум пользы
-                </p>
-                <div className="landing__price">500 сом</div>
-              </article>
-
-              <article className="landing__plan landing__plan--highlight">
-                <div className="landing__badge">Хит</div>
-                <h3 className="landing__plan-name">Стандарт</h3>
-                <p className="landing__plan-desc">
-                  Аналитика, отчёты, поддержка 24/7
-                </p>
-                <div className="landing__price">3000 сом / мес</div>
-              </article>
-
-              <article className="landing__plan">
-                <h3 className="landing__plan-name">Стандарт+</h3>
-                <p className="landing__plan-desc">
-                  Полная кастомизация и контроль
-                </p>
-                <div className="landing__price">10000 сом / мес</div>
-              </article>
+              {pricingPlans.map((plan, idx) => (
+                <article
+                  key={idx}
+                  className={`landing__plan ${
+                    idx === 1 ? "landing__plan--highlight" : ""
+                  }`}
+                >
+                  {idx === 1 && (
+                    <div className="landing__badge">
+                      {t("pricing.highlightBadge")}
+                    </div>
+                  )}
+                  <h3 className="landing__plan-name">{plan.name}</h3>
+                  <p className="landing__plan-desc">{plan.desc}</p>
+                  <div className="landing__price">{plan.price}</div>
+                </article>
+              ))}
             </div>
           </div>
         </section>
 
         {/* CTA */}
-        <section className="landing__cta" aria-label="Призыв к действию">
+        <section className="landing__cta" aria-label={t("cta.title")}>
           <div className="landing__container">
             <div className="landing__cta-card">
-              <h3 className="landing__cta-title">
-                Готовы управлять эффективнее?
-              </h3>
-              <p className="landing__cta-text">
-                Подключим вашу отрасль за 1 день и аккуратно перенесём данные.
-              </p>
+              <h3 className="landing__cta-title">{t("cta.title")}</h3>
+              <p className="landing__cta-text">{t("cta.text")}</p>
               <Link
                 to="/submit-application"
                 className="landing__btn landing__btn--primary"
               >
-                Получить консультацию
+                {t("cta.button")}
               </Link>
             </div>
           </div>
@@ -251,24 +216,24 @@ const Landing = () => {
         {/* КОНТАКТЫ */}
         <section
           className="landing__section landing__section--contact"
-          aria-label="Контакты"
+          aria-label={t("contact.title")}
         >
           <div className="landing__container">
-            <h2 className="landing__title">Связь с нами</h2>
+            <h2 className="landing__title">{t("contact.title")}</h2>
             <p className="landing__text">
-              Email:{" "}
+              {t("contact.email")}:{" "}
               <a className="landing__link" href="mailto:support@nurcrm.com">
                 support@nurcrm.com
               </a>
             </p>
             <p className="landing__text">
-              Телефон:{" "}
+              {t("contact.phone")}:{" "}
               <a className="landing__link" href="tel:+996700123456">
                 +996 700 123 456
               </a>
             </p>
             <p className="landing__text">
-              Telegram:{" "}
+              {t("contact.telegram")}:{" "}
               <a
                 className="landing__link"
                 href="https://t.me/nurcrm"
@@ -285,9 +250,7 @@ const Landing = () => {
       {/* FOOTER */}
       <footer className="landing__footer">
         <div className="landing__container">
-          <p className="landing__footer-text">
-            © 2025 NUR CRM — Все права защищены.
-          </p>
+          <p className="landing__footer-text">{t("footer.text")}</p>
         </div>
       </footer>
     </div>
