@@ -1,18 +1,26 @@
 import React, { useState, useEffect } from "react";
-import { X, Printer } from "lucide-react";
+import { X, Printer, Download } from "lucide-react";
 import { useDispatch } from "react-redux";
+import { pdf } from "@react-pdf/renderer";
 import { getReceiptJson } from "../../../../../store/creators/saleThunk";
 import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
 } from "../../../../pages/Sell/services/printService";
+import ReceiptPdfDocument from "./ReceiptPdfDocument";
 import "./ReceiptPreviewModal.scss";
 
-const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClose, onEdit }) => {
+const ReceiptPreviewModal = ({
+  receiptId,
+  receiptData: initialReceiptData,
+  onClose,
+  onEdit,
+}) => {
   const dispatch = useDispatch();
   const [receiptData, setReceiptData] = useState(initialReceiptData);
   const [loading, setLoading] = useState(!initialReceiptData);
   const [printing, setPrinting] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -54,14 +62,16 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
     const isPrinterConnected = await checkPrinterConnection();
 
     if (!isPrinterConnected) {
-      alert("Принтер не подключен. Пожалуйста, подключите принтер перед печатью.");
+      alert(
+        "Принтер не подключен. Пожалуйста, подключите принтер перед печатью."
+      );
       return;
     }
 
     setPrinting(true);
     try {
       let dataToPrint = receiptData;
-      
+
       // Если данных нет, загружаем их заново
       if (!dataToPrint && receiptId) {
         const result = await dispatch(getReceiptJson(receiptId));
@@ -94,9 +104,62 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
       onClose();
     } catch (printError) {
       console.error("Ошибка при печати чека:", printError);
-      alert("Ошибка при печати чека: " + (printError.message || "Неизвестная ошибка"));
+      alert(
+        "Ошибка при печати чека: " +
+          (printError.message || "Неизвестная ошибка")
+      );
     } finally {
       setPrinting(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!receiptData && !receiptId) return;
+
+    setDownloadingPdf(true);
+    try {
+      let dataToDownload = receiptData;
+
+      // Если данных нет, загружаем их заново
+      if (!dataToDownload && receiptId) {
+        const result = await dispatch(getReceiptJson(receiptId));
+        if (result.type === "products/getReceiptJson/fulfilled") {
+          dataToDownload = result.payload;
+          setReceiptData(result.payload);
+        } else {
+          throw new Error("Не удалось загрузить данные чека");
+        }
+      }
+
+      if (!dataToDownload) {
+        throw new Error("Нет данных для генерации PDF");
+      }
+
+      // Генерируем PDF из JSON используя ReceiptPdfDocument
+      const blob = await pdf(
+        <ReceiptPdfDocument data={dataToDownload} />
+      ).toBlob();
+
+      const doc = dataToDownload?.document || dataToDownload?.sale || {};
+      const fileName = `receipt_${doc.number || doc.doc_no || receiptId}.pdf`;
+
+      // Скачиваем файл
+      const url = window.URL.createObjectURL(blob);
+      const a = window.document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (downloadError) {
+      console.error("Ошибка при скачивании PDF:", downloadError);
+      alert(
+        "Ошибка при скачивании PDF: " +
+          (downloadError.message || "Неизвестная ошибка")
+      );
+    } finally {
+      setDownloadingPdf(false);
     }
   };
 
@@ -140,7 +203,10 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
   if (loading) {
     return (
       <div className="receipt-preview-modal-overlay" onClick={onClose}>
-        <div className="receipt-preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="receipt-preview-modal"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="receipt-preview-modal__loading">Загрузка чека...</div>
         </div>
       </div>
@@ -150,12 +216,18 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
   if (error || !receiptData) {
     return (
       <div className="receipt-preview-modal-overlay" onClick={onClose}>
-        <div className="receipt-preview-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="receipt-preview-modal"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="receipt-preview-modal__error">
             {error || "Чек не найден"}
           </div>
           <div className="receipt-preview-modal__actions">
-            <button className="receipt-preview-modal__close-btn" onClick={onClose}>
+            <button
+              className="receipt-preview-modal__close-btn"
+              onClick={onClose}
+            >
               ЗАКРЫТЬ
             </button>
           </div>
@@ -185,17 +257,23 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
   const discount = parseFloat(receiptData?.totals?.discount_total || 0);
   const tax = parseFloat(receiptData?.totals?.tax_total || 0);
   const total = parseFloat(receiptData?.totals?.total || 0);
-  
+
   const payment = receiptData?.payment || {};
-  const paidCash = payment.method === "cash" ? parseFloat(payment.cash_received || 0) : 0;
+  const paidCash =
+    payment.method === "cash" ? parseFloat(payment.cash_received || 0) : 0;
   const paidCard = payment.method === "card" ? parseFloat(total) : 0;
   const change = parseFloat(payment.change || 0);
 
   return (
     <div className="receipt-preview-modal-overlay" onClick={onClose}>
-      <div className="receipt-preview-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="receipt-preview-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="receipt-preview-modal__header">
-          <h2 className="receipt-preview-modal__title">Предварительный просмотр чека</h2>
+          <h2 className="receipt-preview-modal__title">
+            Предварительный просмотр чека
+          </h2>
           <button className="receipt-preview-modal__close" onClick={onClose}>
             <X size={24} />
           </button>
@@ -211,7 +289,7 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
             {/* Заголовок чека */}
             <div className="receipt-preview-modal__receipt-header">
               <div className="receipt-preview-modal__doc-title">
-                ТОВАРНЫЙ ЧЕК №{doc.number || doc.doc_no || ""} от{" "}
+                ЧЕК №{doc.number || doc.doc_no || ""} от{" "}
                 {formatDate(doc.date || doc.created_at)}
               </div>
             </div>
@@ -228,79 +306,44 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
               )}
             </div>
 
-            {/* Таблица товаров */}
-            <div className="receipt-preview-modal__table">
-              {/* Заголовок таблицы */}
-              <div className="receipt-preview-modal__table-header">
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--no">
-                  №
-                </div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name">
-                  Наименование
-                </div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--unit">
-                  Ед. изм.
-                </div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--qty">
-                  Кол-во
-                </div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--price">
-                  Цена
-                </div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--sum">
-                  Сумма
-                </div>
-              </div>
-
-              {/* Строки товаров */}
+            {/* Список товаров */}
+            <div className="receipt-preview-modal__items">
               {items.length > 0 ? (
                 items.map((item, index) => (
                   <div
                     key={item.id || index}
-                    className="receipt-preview-modal__table-row"
+                    className="receipt-preview-modal__item"
                   >
-                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--no">
-                      {index + 1}
+                    <div className="receipt-preview-modal__item-row">
+                      <div className="receipt-preview-modal__item-name">
+                        {item.name}
+                      </div>
+                      <div className="receipt-preview-modal__item-price">
+                        {formatMoney(item.qty)} X {formatMoney(item.price)} ≡
+                      </div>
                     </div>
-                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name">
-                      {item.name}
-                    </div>
-                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--unit">
-                      {item.unit}
-                    </div>
-                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--qty">
-                      {formatMoney(item.qty)}
-                    </div>
-                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--price">
-                      {formatMoney(item.price)}
-                    </div>
-                    <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--sum">
+                    <div className="receipt-preview-modal__item-total">
                       {formatMoney(item.total)}
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="receipt-preview-modal__table-row">
-                  <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name" style={{ gridColumn: "1 / -1" }}>
+                <div className="receipt-preview-modal__item">
+                  <div className="receipt-preview-modal__item-name">
                     Нет товаров
                   </div>
                 </div>
               )}
+            </div>
 
-              {/* Строка "Итого:" */}
-              <div className="receipt-preview-modal__table-row receipt-preview-modal__table-row--total">
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--no"></div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--name">
-                  Итого:
-                </div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--unit"></div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--qty">
-                  {formatMoney(items.reduce((sum, it) => sum + it.qty, 0))}
-                </div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--price"></div>
-                <div className="receipt-preview-modal__table-col receipt-preview-modal__table-col--sum">
-                  {formatMoney(total)}
-                </div>
+            {/* Пунктирная линия перед итогом */}
+            <div className="receipt-preview-modal__divider receipt-preview-modal__divider--dashed"></div>
+
+            {/* Итого */}
+            <div className="receipt-preview-modal__total-section">
+              <div className="receipt-preview-modal__total-label">ИТОГ</div>
+              <div className="receipt-preview-modal__total-amount">
+                {formatMoney(total)}
               </div>
             </div>
 
@@ -321,31 +364,6 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
                 )}
               </div>
             )}
-
-            {/* Итоги */}
-            <div className="receipt-preview-modal__receipt-totals">
-              <div className="receipt-preview-modal__total-row">
-                <span>Промежуточный итог:</span>
-                <span>{formatMoney(subtotal)}</span>
-              </div>
-              {discount > 0 && (
-                <div className="receipt-preview-modal__total-row">
-                  <span>Скидка:</span>
-                  <span>-{formatMoney(discount)}</span>
-                </div>
-              )}
-              {tax > 0 && (
-                <div className="receipt-preview-modal__total-row">
-                  <span>Налог:</span>
-                  <span>{formatMoney(tax)}</span>
-                </div>
-              )}
-              <div className="receipt-preview-modal__divider"></div>
-              <div className="receipt-preview-modal__total-row receipt-preview-modal__total-row--bold">
-                <span>ИТОГО:</span>
-                <span>{formatMoney(total)}</span>
-              </div>
-            </div>
 
             {/* Оплата */}
             {(paidCash > 0 || paidCard > 0 || change > 0) && (
@@ -386,6 +404,14 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
 
         <div className="receipt-preview-modal__actions">
           <button
+            className="receipt-preview-modal__download-btn"
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+          >
+            <Download size={20} />
+            {downloadingPdf ? "Скачивание..." : "СКАЧАТЬ PDF"}
+          </button>
+          <button
             className="receipt-preview-modal__print-btn"
             onClick={handlePrint}
             disabled={printing}
@@ -393,7 +419,10 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
             <Printer size={20} />
             {printing ? "Печать..." : "ПЕЧАТАТЬ"}
           </button>
-          <button className="receipt-preview-modal__close-btn" onClick={onClose}>
+          <button
+            className="receipt-preview-modal__close-btn"
+            onClick={onClose}
+          >
             ЗАКРЫТЬ
           </button>
         </div>
@@ -403,4 +432,3 @@ const ReceiptPreviewModal = ({ receiptId, receiptData: initialReceiptData, onClo
 };
 
 export default ReceiptPreviewModal;
-

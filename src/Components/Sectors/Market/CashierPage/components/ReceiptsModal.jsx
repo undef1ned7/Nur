@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Search, Calendar, User, Store, ChevronDown, Eye } from "lucide-react";
+import {
+  X,
+  Search,
+  Calendar,
+  User,
+  Store,
+  ChevronDown,
+  Eye,
+} from "lucide-react";
 import { useDispatch } from "react-redux";
 import api from "../../../../../api";
-import { getProductCheckout } from "../../../../../store/creators/saleThunk";
+import { getReceiptJson } from "../../../../../store/creators/saleThunk";
 import { useClient } from "../../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../../store/slices/productSlice";
-import ReceiptPreviewModal from "./ReceiptPreviewModal";
+import ReceiptPreviewModal from "../../Documents/components/ReceiptPreviewModal";
 import "./ReceiptsModal.scss";
 
 const ReceiptsModal = ({ onClose }) => {
@@ -246,42 +254,29 @@ const ReceiptsModal = ({ onClose }) => {
 
   const handlePreviewReceipt = async (receiptId) => {
     setPreviewReceiptId(receiptId);
-    
-    // Загружаем детали чека, если их еще нет
-    let receiptData = receiptsDetails.get(receiptId);
-    if (!receiptData) {
-      receiptData = await loadReceiptDetails(receiptId);
-    }
-    
-    // Также загружаем данные для печати (Blob с JSON)
+
+    // Загружаем данные чека через getReceiptJson (как в Documents)
     try {
-      const result = await dispatch(getProductCheckout(receiptId));
-      if (result.type === "products/getProductCheckout/fulfilled") {
-        const blob = result.payload;
-        // Пытаемся извлечь JSON из Blob
-        try {
-          const text = await blob.text();
-          const json = JSON.parse(text);
-          if (json && Array.isArray(json.items)) {
-            // Объединяем данные из деталей продажи с данными из чека
-            setPreviewReceiptData({
-              ...receiptData,
-              ...json,
-              // Используем items из JSON, если они есть
-              items: json.items || receiptData?.items || [],
-            });
-            return;
-          }
-        } catch (e) {
-          // Если не JSON, используем данные из receiptData
+      const result = await dispatch(getReceiptJson(receiptId));
+      if (result.type === "products/getReceiptJson/fulfilled") {
+        setPreviewReceiptData(result.payload);
+      } else {
+        // Если не удалось загрузить через getReceiptJson, используем детали из кэша
+        let receiptData = receiptsDetails.get(receiptId);
+        if (!receiptData) {
+          receiptData = await loadReceiptDetails(receiptId);
         }
+        setPreviewReceiptData(receiptData);
       }
     } catch (error) {
       console.warn("Ошибка при загрузке данных чека:", error);
+      // Fallback: используем данные из кэша
+      let receiptData = receiptsDetails.get(receiptId);
+      if (!receiptData) {
+        receiptData = await loadReceiptDetails(receiptId);
+      }
+      setPreviewReceiptData(receiptData);
     }
-    
-    // Используем данные из деталей продажи
-    setPreviewReceiptData(receiptData);
   };
 
   const handleClosePreview = () => {

@@ -26,6 +26,12 @@ const s = StyleSheet.create({
     padding: 30,
     color: "#000",
   },
+  createdDate: {
+    fontSize: 8,
+    textAlign: "center",
+    marginBottom: 8,
+    color: "#666",
+  },
   header: {
     textAlign: "center",
     marginBottom: 10,
@@ -36,80 +42,106 @@ const s = StyleSheet.create({
     marginBottom: 4,
     textTransform: "uppercase",
   },
-  subtitle: {
-    fontSize: 10,
+  companyInfo: {
+    marginBottom: 12,
+  },
+  companyName: {
+    fontSize: 11,
+    textAlign: "left",
+    marginBottom: 2,
+  },
+  companyAddress: {
+    fontSize: 9,
+    textAlign: "left",
+    color: "#666",
+  },
+  items: {
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  item: {
     marginBottom: 10,
   },
-  table: {
-    marginTop: 15,
-    borderWidth: 1,
-    borderColor: "#000",
-    marginBottom: 15,
-  },
-  tableHeader: {
+  itemRow: {
     flexDirection: "row",
-    backgroundColor: "#f3f3f3",
-    fontWeight: "bold",
-    fontSize: 9,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 3,
   },
-  tableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#000",
-    minHeight: 20,
-  },
-  tableRowLast: {
-    borderBottomWidth: 0,
-  },
-  tableCell: {
-    padding: 6,
-    borderRightWidth: 1,
-    borderRightColor: "#000",
-    fontSize: 9,
-  },
-  tableCellLast: {
-    borderRightWidth: 0,
-  },
-  colNo: { width: "8%" },
-  colName: { width: "40%" },
-  colUnit: { width: "12%" },
-  colQty: { width: "12%", textAlign: "right" },
-  colPrice: { width: "14%", textAlign: "right" },
-  colSum: { width: "14%", textAlign: "right" },
-
-  total: {
-    marginTop: 12,
+  itemName: {
+    flex: 1,
     fontSize: 10,
+    textAlign: "left",
+  },
+  itemPrice: {
+    fontSize: 10,
+    textAlign: "right",
+    marginLeft: 12,
+  },
+  itemTotal: {
+    fontSize: 10,
+    textAlign: "right",
+    fontWeight: "bold",
+    marginTop: 2,
+  },
+  divider: {
+    borderTopWidth: 1,
+    borderTopColor: "#d1d5db",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  dividerDashed: {
+    borderTopWidth: 1,
+    borderTopColor: "#d1d5db",
+    borderStyle: "dashed",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  totalSection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+  },
+  totalAmount: {
+    fontSize: 16,
     fontWeight: "bold",
     textAlign: "right",
   },
-  totalText: {
+  receiptInfo: {
     marginTop: 8,
-    fontSize: 9,
-    textAlign: "left",
+    marginBottom: 8,
   },
-  footer: {
-    marginTop: 20,
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 3,
+    fontSize: 9,
+  },
+  receiptPayment: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  paymentRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 3,
     fontSize: 10,
+  },
+  receiptFooter: {
+    marginTop: 12,
     textAlign: "center",
   },
-  signature: {
-    marginTop: 15,
-    fontSize: 9,
-  },
-  signatureRow: {
-    flexDirection: "row",
-    marginTop: 15,
-    gap: 20,
-  },
-  signatureCol: {
-    flex: 1,
-  },
-  signatureLine: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#000",
-    marginTop: 20,
-    minHeight: 20,
+  thankYou: {
+    fontSize: 11,
+    fontWeight: "bold",
+    marginTop: 6,
   },
 });
 
@@ -168,111 +200,119 @@ export default function ReceiptPdfDocument({ data }) {
 
   const totals = data?.totals || {};
   const total = Number(totals.total || 0);
-  const itemsCount = items.length;
+  const subtotal = Number(totals.subtotal || 0);
+  const discount = Number(totals.discount_total || 0);
+  const tax = Number(totals.tax_total || 0);
+
+  const payment = data?.payment || {};
+  const paidCash =
+    payment.method === "cash" ? Number(payment.cash_received || 0) : 0;
+  const paidCard = payment.method === "card" ? Number(total) : 0;
+  const change = Number(payment.change || 0);
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
         {/* Дата и время создания */}
-        <Text style={s.subtitle}>{fmtDateTime(new Date().toISOString())}</Text>
+        <Text style={s.createdDate}>
+          {fmtDate(new Date().toISOString())}
+        </Text>
 
-        {/* Заголовок - только один раз */}
+        {/* Заголовок чека */}
         <View style={s.header}>
           <Text style={s.title}>
-            ТОВАРНЫЙ ЧЕК №{doc.number || doc.doc_no || ""} от{" "}
+            ЧЕК №{doc.number || doc.doc_no || ""} от{" "}
             {fmtDate(doc.date || doc.created_at)}
           </Text>
         </View>
 
         {/* Информация о продавце */}
-        <View style={{ marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, textAlign: "left" }}>
-            {company?.name || "market"}
-          </Text>
-          <Text style={{ fontSize: 10, textAlign: "left" }}>
-            {company?.address || "Балыкчы"}
-          </Text>
+        <View style={s.companyInfo}>
+          <Text style={s.companyName}>{company?.name || "market"}</Text>
+          {company?.address && (
+            <Text style={s.companyAddress}>{company.address}</Text>
+          )}
         </View>
 
-        {/* Таблица товаров */}
-        <View style={s.table}>
-          {/* Заголовок таблицы */}
-          <View style={[s.tableRow, s.tableHeader]}>
-            <View style={[s.tableCell, s.colNo]}>
-              <Text>№</Text>
-            </View>
-            <View style={[s.tableCell, s.colName]}>
-              <Text>Наименование</Text>
-            </View>
-            <View style={[s.tableCell, s.colUnit]}>
-              <Text>Ед. изм.</Text>
-            </View>
-            <View style={[s.tableCell, s.colQty]}>
-              <Text style={{ textAlign: "right" }}>Кол-во</Text>
-            </View>
-            <View style={[s.tableCell, s.colPrice]}>
-              <Text style={{ textAlign: "right" }}>Цена</Text>
-            </View>
-            <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
-              <Text style={{ textAlign: "right" }}>Сумма</Text>
-            </View>
-          </View>
-
-          {/* Строки товаров */}
-          {items.map((item, idx, arr) => (
-            <View
-              key={item.id || idx}
-              style={[
-                s.tableRow,
-                idx === arr.length - 1 ? s.tableRowLast : null,
-              ]}
-            >
-              <View style={[s.tableCell, s.colNo]}>
-                <Text>{idx + 1}</Text>
+        {/* Список товаров */}
+        <View style={s.items}>
+          {items.length > 0 ? (
+            items.map((item, index) => (
+              <View key={item.id || index} style={s.item}>
+                <View style={s.itemRow}>
+                  <Text style={s.itemName}>{item.name}</Text>
+                  <Text style={s.itemPrice}>
+                    {n2(item.qty)} X {n2(item.unit_price)} =
+                  </Text>
+                </View>
+                <Text style={s.itemTotal}>{n2(item.total)}</Text>
               </View>
-              <View style={[s.tableCell, s.colName]}>
-                <Text>{item.name}</Text>
-              </View>
-              <View style={[s.tableCell, s.colUnit]}>
-                <Text>{item.unit}</Text>
-              </View>
-              <View style={[s.tableCell, s.colQty]}>
-                <Text style={{ textAlign: "right" }}>{n2(item.qty)}</Text>
-              </View>
-              <View style={[s.tableCell, s.colPrice]}>
-                <Text style={{ textAlign: "right" }}>
-                  {n2(item.unit_price)}
-                </Text>
-              </View>
-              <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
-                <Text style={{ textAlign: "right" }}>{n2(item.total)}</Text>
-              </View>
+            ))
+          ) : (
+            <View style={s.item}>
+              <Text style={s.itemName}>Нет товаров</Text>
             </View>
-          ))}
+          )}
         </View>
+
+        {/* Пунктирная линия перед итогом */}
+        <View style={s.dividerDashed} />
 
         {/* Итого */}
-        <Text style={s.total}>ИТОГО: {n2(total)}</Text>
+        <View style={s.totalSection}>
+          <Text style={s.totalLabel}>ИТОГ</Text>
+          <Text style={s.totalAmount}>{n2(total)}</Text>
+        </View>
 
-        {/* Текстовая сумма */}
-        <Text style={s.totalText}>
-          Итого: {itemsCount} позиций на сумму {n2(total)} сом
-        </Text>
+        {/* Информация о кассире и клиенте */}
+        {(cashier?.name || client?.full_name) && (
+          <View style={s.receiptInfo}>
+            {cashier?.name && (
+              <View style={s.infoRow}>
+                <Text>Кассир:</Text>
+                <Text>{cashier.name}</Text>
+              </View>
+            )}
+            {client?.full_name && (
+              <View style={s.infoRow}>
+                <Text>Покупатель:</Text>
+                <Text>{client.full_name}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
-        {/* Подписи в две колонки */}
-        <View style={s.signatureRow}>
-          <View style={s.signatureCol}>
-            <Text>Продавец: {company?.name || "—"}</Text>
-            {/* <View style={s.signatureLine} /> */}
-            <Text style={{ marginTop: 4, fontSize: 8 }}>Подпись:</Text>
-            <View style={s.signatureLine} />
-          </View>
-          <View style={s.signatureCol}>
-            <Text>Покупатель: {client?.full_name || client?.name || "—"}</Text>
-            {/* <View style={s.signatureLine} /> */}
-            <Text style={{ marginTop: 4, fontSize: 8 }}>Подпись:</Text>
-            <View style={s.signatureLine} />
-          </View>
+        {/* Оплата */}
+        {(paidCash > 0 || paidCard > 0 || change > 0) && (
+          <>
+            <View style={s.divider} />
+            <View style={s.receiptPayment}>
+              {paidCash > 0 && (
+                <View style={s.paymentRow}>
+                  <Text>Наличными:</Text>
+                  <Text>{n2(paidCash)}</Text>
+                </View>
+              )}
+              {paidCard > 0 && (
+                <View style={s.paymentRow}>
+                  <Text>Картой:</Text>
+                  <Text>{n2(paidCard)}</Text>
+                </View>
+              )}
+              {change > 0 && (
+                <View style={s.paymentRow}>
+                  <Text>Сдача:</Text>
+                  <Text>{n2(change)}</Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* Футер чека */}
+        <View style={s.receiptFooter}>
+          <View style={s.divider} />
+          <Text style={s.thankYou}>Спасибо за покупку!</Text>
         </View>
       </Page>
     </Document>
