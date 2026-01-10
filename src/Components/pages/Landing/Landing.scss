@@ -32,7 +32,7 @@ $container-max: 1200px;
   /* Проблема ФОН СТРАНИЦЫ */
   &::before {
     content: "";
-    position: absolute; /* заменя FIX */
+    position: fixed; /* заменя FIX */
     inset: 0;
     background-image: linear-gradient(
         180deg,
@@ -305,7 +305,7 @@ $container-max: 1200px;
     padding-top: 6px;
   }
 }
-.landing__burger{
+.landing__burger {
   display: none;
 }
 /* ===== HERO ===== */
@@ -375,6 +375,7 @@ $container-max: 1200px;
 
 /* ===== Секции ===== */
 .landing {
+
   &__section {
     padding: clamp(28px, 6vw, 56px) 0;
   }
@@ -491,7 +492,6 @@ $container-max: 1200px;
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
       border-color: var(--gold);
       box-shadow: 0 12px 36px rgba(255, 217, 0, 0.238);
-
     }
   }
   &__plan--highlight {
@@ -589,6 +589,7 @@ $container-max: 1200px;
 }
 
 @media (max-width: $bp-sm) {
+
   .landing__logo-img {
     width: 140px;
   }
