@@ -135,6 +135,7 @@ import WarehouseProducts from "../Components/Sectors/Warehouse/Products/Products
 import WarehouseStocks from "../Components/Sectors/Warehouse/Stocks/Stocks";
 import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
+import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
 
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
@@ -301,6 +302,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("consulting/services", ConsultingServices),
 
   // Warehouse routes
+  createProtectedRoute("warehouse/warehouses", Warehouses),
   createProtectedRoute("warehouse/analytics", WarehouseAnalytics),
   createProtectedRoute("warehouse/clients", WarehouseClients),
   createProtectedRoute("warehouse/directories", WarehouseDirectories),

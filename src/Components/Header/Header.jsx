@@ -111,7 +111,6 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
   const showCashierButton = useMemo(() => {
     if (!userProfile) return false;
-    // Кнопка появляется только когда can_view_cashier === true
     return userProfile.can_view_cashier === true;
   }, [userProfile]);
 

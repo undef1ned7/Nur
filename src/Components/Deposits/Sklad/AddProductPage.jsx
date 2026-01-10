@@ -69,17 +69,6 @@ const AddProductPage = () => {
   const isEditMode = !!productId;
   const [loadingProduct, setLoadingProduct] = useState(isEditMode);
 
-  // Проверка на маркет
-  const isMarketSector = useMemo(() => {
-    if (!company?.sector?.name) return false;
-    const sectorName = company.sector.name.toLowerCase().trim();
-    return (
-      sectorName === "магазин" ||
-      sectorName === "цветочный магазин" ||
-      sectorName.includes("магазин")
-    );
-  }, [company?.sector?.name]);
-
   const [activeTab, setActiveTab] = useState(0); // 0 - Ввод вручную, 1 - Сканирование
   const [productType, setProductType] = useState("piece"); // "piece" или "weight"
   const [selectCashBox, setSelectCashBox] = useState("");
@@ -205,13 +194,11 @@ const AddProductPage = () => {
   useEffect(() => {
     dispatch(fetchClientsAsync());
     dispatch(getCashBoxes());
-    if (isMarketSector) {
-      dispatch(fetchBrandsAsync());
-      dispatch(fetchCategoriesAsync());
-      // Загружаем все товары для точного подсчета весовых товаров
-      dispatch(fetchProductsAsync({ page_size: 10000 }));
-    }
-  }, [dispatch, isMarketSector]);
+    dispatch(fetchBrandsAsync());
+    dispatch(fetchCategoriesAsync());
+    // Загружаем все товары для точного подсчета весовых товаров
+    dispatch(fetchProductsAsync({ page_size: 10000 }));
+  }, [dispatch]);
 
   // Загрузка данных товара для редактирования
   useEffect(() => {
@@ -246,52 +233,50 @@ const AddProductPage = () => {
           });
 
           // Заполняем данные для маркета
-          if (isMarketSector) {
-            setMarketData({
-              code: product.code || "",
-              article: product.article || "",
-              unit: product.unit || "шт",
-              isWeightProduct: product.is_weight || false,
-              isFractionalService: product.is_weight || false,
-              plu: product.plu ? String(product.plu) : "",
-              height: product.characteristics?.height_cm || "0",
-              width: product.characteristics?.width_cm || "0",
-              depth: product.characteristics?.depth_cm || "0",
-              weight: product.characteristics?.factual_weight_kg || "0",
-              description: product.characteristics?.description || "",
-              country: product.country || "",
-              purchasePrice: product.purchase_price || "",
-              markup: product.markup_percent || "0",
-              discount: product.discount_percent || "0",
-              supplier: product.client || "",
-              minStock: "0", // Нет в API
-              expiryDate: product.expiration_date || "",
-              kitProducts: [], // Будет загружено из packages
-              kitSearchTerm: "",
-              packagings: (product.packages || []).map((pkg, idx) => ({
-                id: Date.now() + idx,
-                name: pkg.name || "",
-                quantity: String(pkg.quantity_in_package || 1),
-              })),
-            });
+          setMarketData({
+            code: product.code || "",
+            article: product.article || "",
+            unit: product.unit || "шт",
+            isWeightProduct: product.is_weight || false,
+            isFractionalService: product.is_weight || false,
+            plu: product.plu ? String(product.plu) : "",
+            height: product.characteristics?.height_cm || "0",
+            width: product.characteristics?.width_cm || "0",
+            depth: product.characteristics?.depth_cm || "0",
+            weight: product.characteristics?.factual_weight_kg || "0",
+            description: product.characteristics?.description || "",
+            country: product.country || "",
+            purchasePrice: product.purchase_price || "",
+            markup: product.markup_percent || "0",
+            discount: product.discount_percent || "0",
+            supplier: product.client || "",
+            minStock: "0", // Нет в API
+            expiryDate: product.expiration_date || "",
+            kitProducts: [], // Будет загружено из packages
+            kitSearchTerm: "",
+            packagings: (product.packages || []).map((pkg, idx) => ({
+              id: Date.now() + idx,
+              name: pkg.name || "",
+              quantity: String(pkg.quantity_in_package || 1),
+            })),
+          });
 
-            // Загружаем изображения
-            if (product.images && product.images.length > 0) {
-              const loadedImages = product.images.map((img) => ({
-                file: null, // Файл не загружаем, только URL
-                alt: img.alt || "",
-                is_primary: img.is_primary || false,
-                preview: img.image_url || img.image || "",
-                id: img.id,
-              }));
-              setImages(loadedImages);
-            }
+          // Загружаем изображения
+          if (product.images && product.images.length > 0) {
+            const loadedImages = product.images.map((img) => ({
+              file: null, // Файл не загружаем, только URL
+              alt: img.alt || "",
+              is_primary: img.is_primary || false,
+              preview: img.image_url || img.image || "",
+              id: img.id,
+            }));
+            setImages(loadedImages);
+          }
 
-            // Для комплекта загружаем состав из packages
-            if (detectedItemType === "kit" && product.packages) {
-              // Нужно найти товары по названиям из packages
-              // Пока оставляем пустым, можно будет доработать
-            }
+          // Для комплекта загружаем состав из packages
+          if (detectedItemType === "kit" && product.packages) {
+            // Нужно найти товары по названиям из packages
+            // Пока оставляем пустым, можно будет доработать
           }
         } catch (error) {
           console.error("Ошибка при загрузке товара:", error);
@@ -307,7 +292,7 @@ const AddProductPage = () => {
       };
       loadProduct();
     }
-  }, [isEditMode, productId, isMarketSector]);
+  }, [isEditMode, productId]);
 
   // Обработка дублирования товара
   useEffect(() => {
@@ -341,46 +326,44 @@ const AddProductPage = () => {
       });
 
       // Заполняем данные для маркета
-      if (isMarketSector) {
-        setMarketData({
-          code: product.code || "",
-          article: product.article || "",
-          unit: product.unit || "шт",
-          isWeightProduct: product.is_weight || false,
-          isFractionalService: product.is_weight || false,
-          plu: product.plu ? String(product.plu) : "",
-          height: product.characteristics?.height_cm || "0",
-          width: product.characteristics?.width_cm || "0",
-          depth: product.characteristics?.depth_cm || "0",
-          weight: product.characteristics?.factual_weight_kg || "0",
-          description: product.characteristics?.description || "",
-          country: product.country || "",
-          purchasePrice: product.purchase_price || "",
-          markup: product.markup_percent || "0",
-          discount: product.discount_percent || "0",
-          supplier: product.client || "",
-          minStock: "0",
-          expiryDate: product.expiration_date || "",
-          kitProducts: [], // Для комплекта можно будет доработать
-          kitSearchTerm: "",
-          packagings: (product.packages || []).map((pkg, idx) => ({
-            id: Date.now() + idx,
-            name: pkg.name || "",
-            quantity: String(pkg.quantity_in_package || 1),
-          })),
-        });
+      setMarketData({
+        code: product.code || "",
+        article: product.article || "",
+        unit: product.unit || "шт",
+        isWeightProduct: product.is_weight || false,
+        isFractionalService: product.is_weight || false,
+        plu: product.plu ? String(product.plu) : "",
+        height: product.characteristics?.height_cm || "0",
+        width: product.characteristics?.width_cm || "0",
+        depth: product.characteristics?.depth_cm || "0",
+        weight: product.characteristics?.factual_weight_kg || "0",
+        description: product.characteristics?.description || "",
+        country: product.country || "",
+        purchasePrice: product.purchase_price || "",
+        markup: product.markup_percent || "0",
+        discount: product.discount_percent || "0",
+        supplier: product.client || "",
+        minStock: "0",
+        expiryDate: product.expiration_date || "",
+        kitProducts: [], // Для комплекта можно будет доработать
+        kitSearchTerm: "",
+        packagings: (product.packages || []).map((pkg, idx) => ({
+          id: Date.now() + idx,
+          name: pkg.name || "",
+          quantity: String(pkg.quantity_in_package || 1),
+        })),
+      });
 
-        // Загружаем изображения (копируем ссылки, но не файлы)
-        if (product.images && product.images.length > 0) {
-          const loadedImages = product.images.map((img) => ({
-            file: null, // Файл не копируем, только URL для предпросмотра
-            alt: img.alt || "",
-            is_primary: img.is_primary || false,
-            preview: img.image_url || img.image || "",
-            id: img.id,
-          }));
-          setImages(loadedImages);
-        }
+      // Загружаем изображения (копируем ссылки, но не файлы)
+      if (product.images && product.images.length > 0) {
+        const loadedImages = product.images.map((img) => ({
+          file: null, // Файл не копируем, только URL для предпросмотра
+          alt: img.alt || "",
+          is_primary: img.is_primary || false,
+          preview: img.image_url || img.image || "",
+          id: img.id,
+        }));
+        setImages(loadedImages);
       }
 
       // Очищаем state после использования, чтобы при возврате назад не дублировалось снова
@@ -388,7 +371,7 @@ const AddProductPage = () => {
         navigate(location.pathname, { replace: true, state: {} });
       }
     }
-  }, [location.state, isEditMode, isMarketSector, navigate, location.pathname]);
+  }, [location.state, isEditMode, navigate, location.pathname]);
 
   // Автоматически выбираем первую кассу
   useEffect(() => {
@@ -471,57 +454,38 @@ const AddProductPage = () => {
         ? String(marketData.markup)
         : "0";
 
-    // Для маркета проверяем обязательные поля
-    if (isMarketSector) {
-      if (!name || !name.trim()) {
-        errors.name = "Обязательное поле";
-      }
-      if (!barcode || !barcode.trim()) {
-        errors.barcode = "Обязательное поле";
-      }
+    // Проверяем обязательные поля
+    if (!name || !name.trim()) {
+      errors.name = "Обязательное поле";
+    }
+    if (!barcode || !barcode.trim()) {
+      errors.barcode = "Обязательное поле";
+    }
 
-      const purchasePriceValue = purchase_price ? String(purchase_price) : "";
-      const priceValue = price ? String(price) : "";
+    const purchasePriceValue = purchase_price ? String(purchase_price) : "";
+    const priceValue = price ? String(price) : "";
 
-      if (itemType === "product") {
-        if (purchasePriceValue.trim() === "") {
-          errors.purchase_price = "Обязательное поле";
-        }
-        if (priceValue.trim() === "") {
-          errors.price = "Обязательное поле";
-        }
+    if (itemType === "product") {
+      if (purchasePriceValue.trim() === "") {
+        errors.purchase_price = "Обязательное поле";
       }
-
-      if (itemType === "service") {
-        if (priceValue.trim() === "") {
-          errors.price = "Обязательное поле";
-        }
-      }
-
-      if (itemType === "kit") {
-        if (priceValue.trim() === "") {
-          errors.price = "Обязательное поле";
-        }
-        if (!marketData.kitProducts || marketData.kitProducts.length === 0) {
-          errors.kitProducts = "Добавьте хотя бы один товар в комплект";
-        }
-      }
-    } else {
-      // Для других секторов
-      if (!name || !name.trim()) {
-        errors.name = "Обязательное поле";
-      }
-      if (!barcode || !barcode.trim()) {
-        errors.barcode = "Обязательное поле";
-      }
-      if (price === "" || String(price).trim() === "") {
+      if (priceValue.trim() === "") {
         errors.price = "Обязательное поле";
       }
-      if (quantity === "" || String(quantity).trim() === "") {
-        errors.quantity = "Обязательное поле";
+    }
+
+    if (itemType === "service") {
+      if (priceValue.trim() === "") {
+        errors.price = "Обязательное поле";
       }
-      if (purchase_price === "" || String(purchase_price).trim() === "") {
-        errors.purchase_price = "Обязательное поле";
+    }
+
+    if (itemType === "kit") {
+      if (priceValue.trim() === "") {
+        errors.price = "Обязательное поле";
+      }
+      if (!marketData.kitProducts || marketData.kitProducts.length === 0) {
+        errors.kitProducts = "Добавьте хотя бы один товар в комплект";
       }
     }
 
@@ -570,7 +534,7 @@ const AddProductPage = () => {
       }
     }
 
-    // Формируем payload в зависимости от сектора
+    // Формируем payload
     let payload = {
       name,
       barcode: barcode || null,
@@ -581,156 +545,143 @@ const AddProductPage = () => {
       plu: newItemData.plu ? Number(newItemData.plu) : null,
     };
 
-    if (isMarketSector) {
-      // Для маркета формируем payload согласно API схеме
-      const characteristics = {
-        height_cm:
-          marketData.height && marketData.height !== "0"
-            ? marketData.height.toString()
-            : null,
-        width_cm:
-          marketData.width && marketData.width !== "0"
-            ? marketData.width.toString()
-            : null,
-        depth_cm:
-          marketData.depth && marketData.depth !== "0"
-            ? marketData.depth.toString()
-            : null,
-        factual_weight_kg:
-          marketData.weight && marketData.weight !== "0"
-            ? marketData.weight.toString()
-            : null,
-        description: marketData.description || "",
-      };
+    // Формируем payload согласно API схеме
+    const characteristics = {
+      height_cm:
+        marketData.height && marketData.height !== "0"
+          ? marketData.height.toString()
+          : null,
+      width_cm:
+        marketData.width && marketData.width !== "0"
+          ? marketData.width.toString()
+          : null,
+      depth_cm:
+        marketData.depth && marketData.depth !== "0"
+          ? marketData.depth.toString()
+          : null,
+      factual_weight_kg:
+        marketData.weight && marketData.weight !== "0"
+          ? marketData.weight.toString()
+          : null,
+      description: marketData.description || "",
+    };
 
-      // Проверяем, есть ли хотя бы одно заполненное поле в characteristics
-      const hasCharacteristics =
-        characteristics.height_cm !== null ||
-        characteristics.width_cm !== null ||
-        characteristics.depth_cm !== null ||
-        characteristics.factual_weight_kg !== null ||
-        (characteristics.description &&
-          characteristics.description.trim() !== "");
+    // Проверяем, есть ли хотя бы одно заполненное поле в characteristics
+    const hasCharacteristics =
+      characteristics.height_cm !== null ||
+      characteristics.width_cm !== null ||
+      characteristics.depth_cm !== null ||
+      characteristics.factual_weight_kg !== null ||
+      (characteristics.description &&
+        characteristics.description.trim() !== "");
 
-      // Определяем is_weight для товара или услуги
-      const isWeight =
-        itemType === "product"
-          ? marketData.isWeightProduct
-          : itemType === "service"
-          ? marketData.isFractionalService
-          : false;
+    // Определяем is_weight для товара или услуги
+    const isWeight =
+      itemType === "product"
+        ? marketData.isWeightProduct
+        : itemType === "service"
+        ? marketData.isFractionalService
+        : false;
 
-      // Автоматическая генерация PLU для весовых товаров или дробных услуг, если не указан
-      let pluValue = null;
-      if (isWeight) {
-        // Если PLU уже указан пользователем, используем его
-        if (marketData.plu && marketData.plu.trim() !== "") {
-          pluValue = Number(marketData.plu);
-        } else if (newItemData.plu && newItemData.plu.trim() !== "") {
-          pluValue = Number(newItemData.plu);
-        } else {
-          // Генерируем PLU автоматически на основе количества весовых товаров
-          // Используем weightProductsCount из store, который считается в fetchProductsAsync
-          pluValue = weightProductsCount + 1;
-        }
+    // Автоматическая генерация PLU для весовых товаров или дробных услуг, если не указан
+    let pluValue = null;
+    if (isWeight) {
+      // Если PLU уже указан пользователем, используем его
+      if (marketData.plu && marketData.plu.trim() !== "") {
+        pluValue = Number(marketData.plu);
+      } else if (newItemData.plu && newItemData.plu.trim() !== "") {
+        pluValue = Number(newItemData.plu);
+      } else {
+        // Генерируем PLU автоматически на основе количества весовых товаров
+        // Используем weightProductsCount из store, который считается в fetchProductsAsync
+        pluValue = weightProductsCount + 1;
       }
+    }
 
-      // Базовый payload для маркета
-      // Убеждаемся, что цена правильно извлекается
-      const finalPrice = price && price.trim() !== "" ? price.toString() : "0";
+    // Базовый payload для маркета
+    // Убеждаемся, что цена правильно извлекается
+    const finalPrice = price && price.trim() !== "" ? price.toString() : "0";
 
-      // Определяем kind на основе itemType
-      let kindValue = "product"; // default
-      if (itemType === "service") {
-        kindValue = "service";
-      } else if (itemType === "kit") {
-        kindValue = "bundle";
-      }
+    // Определяем kind на основе itemType
+    let kindValue = "product"; // default
+    if (itemType === "service") {
+      kindValue = "service";
+    } else if (itemType === "kit") {
+      kindValue = "bundle";
+    }
 
-      payload = {
-        name,
-        barcode: barcode || null,
-        brand_name: brand_name || "",
-        category_name: category_name || "",
-        article: marketData.article || "",
-        unit: marketData.unit || "шт",
-        is_weight: isWeight,
-        price: finalPrice,
-        discount_percent: (marketData.discount || "0").toString(),
-        country: marketData.country || "",
-        expiration_date: marketData.expiryDate || null,
-        client: client || null,
-        plu: pluValue,
-        description: marketData.description || "",
-        characteristics: hasCharacteristics ? characteristics : null,
-        kind: kindValue,
-      };
+    payload = {
+      name,
+      barcode: barcode || null,
+      brand_name: brand_name || "",
+      category_name: category_name || "",
+      article: marketData.article || "",
+      unit: marketData.unit || "шт",
+      is_weight: isWeight,
+      price: finalPrice,
+      discount_percent: (marketData.discount || "0").toString(),
+      country: marketData.country || "",
+      expiration_date: marketData.expiryDate || null,
+      client: client || null,
+      plu: pluValue,
+      description: marketData.description || "",
+      characteristics: hasCharacteristics ? characteristics : null,
+      kind: kindValue,
+    };
 
-      // Извлекаем количество из newItemData, убеждаемся что это число
-      const quantityValue =
-        quantity && quantity.toString().trim() !== "" ? Number(quantity) : 0;
+    // Извлекаем количество из newItemData, убеждаемся что это число
+    const quantityValue =
+      quantity && quantity.toString().trim() !== "" ? Number(quantity) : 0;
 
-      if (itemType === "product") {
-        // Для товара
-        payload = {
-          ...payload,
-          purchase_price: (purchase_price || "0").toString(),
-          markup_percent: normalizedMarkup,
-          quantity: quantityValue,
-          stock: true, // Товар есть на складе
-        };
-      } else if (itemType === "service") {
-        // Для услуги
-        payload = {
-          ...payload,
-          purchase_price: "0",
-          markup_percent: normalizedMarkup,
-          quantity: 0,
-          stock: false, // Услуги не имеют остатка
-          is_weight: marketData.isFractionalService, // Дробная услуга
-        };
-      } else if (itemType === "kit") {
-        // Для комплекта - преобразуем товары из состава комплекта в packages_input
-        // Каждый товар из kitProducts становится элементом packages_input
-        const kitPackages = (marketData.kitProducts || [])
-          .filter((product) => product.id) // Фильтруем только товары с ID
-          .map((product) => ({
-            name: product.name || "", // Название товара
-            quantity_in_package: Number(product.quantity || 1), // Количество товара в комплекте
-            unit: product.unit || marketData.unit || "шт", // Единица измерения
-          }));
-
-        // Также добавляем упаковки из packagings
-        const packagingItems = (marketData.packagings || [])
-          .filter((pkg) => pkg.name && pkg.name.trim()) // Фильтруем только заполненные упаковки
-          .map((pkg) => ({
-            name: pkg.name.trim(),
-            quantity_in_package: Number(pkg.quantity || 1),
-            unit: marketData.unit || "шт",
-          }));
-
-        // Объединяем товары из комплекта и упаковки
-        const allPackages = [...kitPackages, ...packagingItems];
-
-        payload = {
-          ...payload,
-          packages_input: allPackages.length > 0 ? allPackages : [], // Отправляем состав комплекта в packages_input
-          purchase_price: "0", // Комплект не имеет цены закупки
-          markup_percent: normalizedMarkup,
-          quantity: quantityValue, // Используем количество из формы
-          stock: false,
-        };
-      }
-    } else {
-      // Старый формат для других секторов
+    if (itemType === "product") {
+      // Для товара
       payload = {
         ...payload,
-        price: price.toString(),
-        quantity: Number(quantity),
-        purchase_price,
-        scale_type:
-          newItemData.scale_type ||
-          (productType === "piece" ? "piece" : "weight"),
+        purchase_price: (purchase_price || "0").toString(),
+        markup_percent: normalizedMarkup,
+        quantity: quantityValue,
+        stock: true, // Товар есть на складе
+      };
+    } else if (itemType === "service") {
+      // Для услуги
+      payload = {
+        ...payload,
+        purchase_price: "0",
+        markup_percent: normalizedMarkup,
+        quantity: 0,
+        stock: false, // Услуги не имеют остатка
+        is_weight: marketData.isFractionalService, // Дробная услуга
+      };
+    } else if (itemType === "kit") {
+      // Для комплекта - преобразуем товары из состава комплекта в packages_input
+      // Каждый товар из kitProducts становится элементом packages_input
+      const kitPackages = (marketData.kitProducts || [])
+        .filter((product) => product.id) // Фильтруем только товары с ID
+        .map((product) => ({
+          name: product.name || "", // Название товара
+          quantity_in_package: Number(product.quantity || 1), // Количество товара в комплекте
+          unit: product.unit || marketData.unit || "шт", // Единица измерения
+        }));
+
+      // Также добавляем упаковки из packagings
+      const packagingItems = (marketData.packagings || [])
+        .filter((pkg) => pkg.name && pkg.name.trim()) // Фильтруем только заполненные упаковки
+        .map((pkg) => ({
+          name: pkg.name.trim(),
+          quantity_in_package: Number(pkg.quantity || 1),
+          unit: marketData.unit || "шт",
+        }));
+
+      // Объединяем товары из комплекта и упаковки
+      const allPackages = [...kitPackages, ...packagingItems];
+
+      payload = {
+        ...payload,
+        packages_input: allPackages.length > 0 ? allPackages : [], // Отправляем состав комплекта в packages_input
+        purchase_price: "0", // Комплект не имеет цены закупки
+        markup_percent: normalizedMarkup,
+        quantity: quantityValue, // Используем количество из формы
+        stock: false,
       };
     }
 
@@ -748,16 +699,12 @@ const AddProductPage = () => {
         // Режим создания
         product = await dispatch(createProductAsync(payload)).unwrap();
       }
-      // Вычисляем totalAmount: для маркета используем purchase_price из payload, для других - из product
+      // Вычисляем totalAmount
       let totalAmount = 0;
-      if (isMarketSector) {
-        const purchasePrice =
-          itemType === "product" ? purchase_price || "0" : "0";
-        const qty = itemType === "product" ? Number(quantity || "0") : 0;
-        totalAmount = Number(purchasePrice) * qty;
-      } else {
-        totalAmount = Number(product?.purchase_price * product?.quantity);
-      }
+      const purchasePrice =
+        itemType === "product" ? purchase_price || "0" : "0";
+      const qty = itemType === "product" ? Number(quantity || "0") : 0;
+      totalAmount = Number(purchasePrice) * qty;
 
       // Загрузка изображений (после создания товара или при редактировании)
       try {
@@ -1040,37 +987,34 @@ const AddProductPage = () => {
     }
   }, []);
 
-  // Генерируем код товара для маркета на основе count из API (только для создания)
+  // Генерируем код товара на основе count из API (только для создания)
   useEffect(() => {
-    if (isMarketSector && !isEditMode && !marketData.code) {
+    if (!isEditMode && !marketData.code) {
       // Новый код = count + 1, форматируем как 4-значное число
       // Например, если count = 20, новый будет 0021
       const newCode = String((count || 0) + 1).padStart(4, "0");
       setMarketData((prev) => ({ ...prev, code: newCode }));
     }
-  }, [isMarketSector, isEditMode, count, marketData.code]);
+  }, [isEditMode, count, marketData.code]);
 
   // Автоматическая генерация PLU для весового товара или дробной услуги
   useEffect(() => {
-    if (isMarketSector) {
-      const isWeight =
-        (itemType === "product" && marketData.isWeightProduct) ||
-        (itemType === "service" && marketData.isFractionalService);
+    const isWeight =
+      (itemType === "product" && marketData.isWeightProduct) ||
+      (itemType === "service" && marketData.isFractionalService);
 
-      // Генерируем PLU только если:
-      // 1. Товар/услуга весовой/дробный
-      // 2. PLU еще не заполнен вручную
-      // 3. weightProductsCount доступен
-      if (isWeight && (!marketData.plu || marketData.plu.trim() === "")) {
-        const generatedPlu = weightProductsCount + 1;
-        setMarketData((prev) => ({ ...prev, plu: String(generatedPlu) }));
-      } else if (!isWeight && marketData.plu) {
-        // Если весовой режим выключен, очищаем PLU
-        setMarketData((prev) => ({ ...prev, plu: "" }));
-      }
+    // Генерируем PLU только если:
+    // 1. Товар/услуга весовой/дробный
+    // 2. PLU еще не заполнен вручную
+    // 3. weightProductsCount доступен
+    if (isWeight && (!marketData.plu || marketData.plu.trim() === "")) {
+      const generatedPlu = weightProductsCount + 1;
+      setMarketData((prev) => ({ ...prev, plu: String(generatedPlu) }));
+    } else if (!isWeight && marketData.plu) {
+      // Если весовой режим выключен, очищаем PLU
+      setMarketData((prev) => ({ ...prev, plu: "" }));
     }
   }, [
-    isMarketSector,
     itemType,
     marketData.isWeightProduct,
     marketData.isFractionalService,
@@ -1270,7 +1214,7 @@ const AddProductPage = () => {
                 selectCashBox={selectCashBox}
               />
             </div>
-          ) : isMarketSector && !loadingProduct ? (
+          ) : !loadingProduct ? (
             // Форма для маркета с выбором типа товара/услуги/комплекта
             <MarketProductForm
               itemType={itemType}

@@ -5,7 +5,6 @@ import { Outlet, useLocation } from "react-router-dom";
 import arnament from "../Photo/Group 1216.png";
 import arnament2 from "../Photo/Group 1204.png";
 import arnament3 from "../Photo/Group 1215.png";
-
 import "./Layout.scss";
 import { X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";

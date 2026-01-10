@@ -1,16 +1,18 @@
 import { X } from "lucide-react";
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
+import { pdf } from "@react-pdf/renderer";
 // import "./Sklad.scss";
 
 import {
   getProductCheckout,
-  getProductInvoice,
+  getInvoiceJson,
   historySellObjectDetail,
   historySellProductDetail,
 } from "../../../store/creators/saleThunk";
 import { useSale } from "../../../store/slices/saleSlice";
 import { useUser } from "../../../store/slices/userSlice";
+import InvoicePdfDocument from "../../Sectors/Market/Documents/components/InvoicePdfDocument";
 import { de } from "date-fns/locale";
 
 /* ============================================================
@@ -606,32 +608,49 @@ const SellDetail = ({ onClose, id }) => {
   };
 
   const handleDownloadInvoice = async () => {
+    if (!item?.id) {
+      alert("ID продажи не найден");
+      return;
+    }
+
     try {
-      const pdfInvoiceBlob = await dispatch(
-        getProductInvoice(item?.id)
-      ).unwrap();
-      if (pdfInvoiceBlob instanceof Blob) {
-        const url = window.URL.createObjectURL(pdfInvoiceBlob);
+      // Получаем JSON данные накладной
+      const result = await dispatch(getInvoiceJson(item.id));
+      if (getInvoiceJson.fulfilled.match(result)) {
+        const invoiceData = result.payload;
+
+        if (!invoiceData) {
+          throw new Error("Нет данных для генерации PDF");
+        }
+
+        // Генерируем PDF из JSON используя InvoicePdfDocument
+        const blob = await pdf(
+          <InvoicePdfDocument data={invoiceData} />
+        ).toBlob();
+
+        const fileName = `invoice_${
+          invoiceData?.document?.number || item.id
+        }.pdf`;
+
+        // Скачиваем файл
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = "invoice.pdf";
+        link.download = fileName;
+        window.document.body.appendChild(link);
         link.click();
-        window.URL.revokeObjectURL(url);
+        window.document.body.removeChild(link);
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
       } else {
-        // если бэк вдруг вернул не Blob — попробуем преобразовать
-        const data = new Blob([JSON.stringify(pdfInvoiceBlob, null, 2)], {
-          type: "application/octet-stream",
-        });
-        const url = window.URL.createObjectURL(data);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "invoice.bin";
-        link.click();
-        window.URL.revokeObjectURL(url);
+        throw new Error("Не удалось загрузить данные накладной");
       }
     } catch (err) {
       console.error("Скачивание накладной не удалось:", err);
-      alert(err?.detail || "Не удалось получить накладную");
+      alert(
+        err?.message ||
+          err?.detail ||
+          "Не удалось скачать накладную. Попробуйте позже."
+      );
     }
   };
 

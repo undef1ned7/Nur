@@ -43,65 +43,65 @@ try {
 const s = StyleSheet.create({
   page: {
     fontFamily: robotoRegistered ? "Roboto" : "Helvetica", // Используем Roboto если зарегистрирован, иначе Helvetica
-    fontSize: 10,
-    padding: 30,
+    fontSize: 8,
+    padding: 15,
     color: "#000",
   },
 
   // Заголовок
   header: {
-    marginBottom: 12,
+    marginBottom: 6,
     textAlign: "center",
   },
   title: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   subtitle: {
-    fontSize: 10,
+    fontSize: 8,
     textAlign: "center",
-    marginTop: 2,
+    marginTop: 1,
   },
 
   // Две колонки (поставщик и покупатель)
   partiesRow: {
     flexDirection: "row",
-    marginTop: 12,
-    marginBottom: 12,
-    gap: 12,
+    marginTop: 6,
+    marginBottom: 6,
+    gap: 6,
   },
   partyBox: {
     flex: 1,
-    padding: 10,
+    padding: 5,
   },
   partyTitle: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: "bold",
-    marginBottom: 8,
+    marginBottom: 4,
     textAlign: "center",
   },
   partyField: {
-    marginBottom: 4,
-    fontSize: 9,
+    marginBottom: 2,
+    fontSize: 7,
   },
   partyLabel: {
     width: 70,
-    fontSize: 9,
+    fontSize: 7,
   },
   partyValue: {
-    fontSize: 9,
+    fontSize: 7,
   },
   warehouse: {
-    marginTop: 8,
-    marginBottom: 12,
-    fontSize: 9,
+    marginTop: 4,
+    marginBottom: 6,
+    fontSize: 7,
   },
 
   // Таблица товаров
   goodsTable: {
-    marginTop: 16,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: "#000",
   },
@@ -109,7 +109,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#000",
-    minHeight: 20,
+    minHeight: 12,
   },
   tableRowLast: {
     borderBottomWidth: 0,
@@ -117,13 +117,13 @@ const s = StyleSheet.create({
   tableHeader: {
     backgroundColor: "#f5f5f5",
     fontWeight: "bold",
-    fontSize: 9,
+    fontSize: 7,
   },
   tableCell: {
-    padding: 6,
+    padding: 3,
     borderRightWidth: 1,
     borderRightColor: "#000",
-    fontSize: 9,
+    fontSize: 7,
     justifyContent: "center",
   },
   tableCellLast: {
@@ -140,54 +140,54 @@ const s = StyleSheet.create({
 
   // Итоги
   totalsSection: {
-    marginTop: 12,
+    marginTop: 6,
     marginLeft: "auto",
     width: 280,
   },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 3,
-    fontSize: 9,
+    marginBottom: 2,
+    fontSize: 7,
   },
   totalLabel: {
-    fontSize: 9,
+    fontSize: 7,
   },
   totalValue: {
-    fontSize: 9,
+    fontSize: 7,
     fontWeight: "normal",
   },
   totalBold: {
     fontWeight: "bold",
-    fontSize: 10,
+    fontSize: 8,
   },
 
   // Подписи
   signatures: {
-    marginTop: 30,
+    marginTop: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 40,
   },
   signatureCol: {
     flex: 1,
-    fontSize: 9,
+    fontSize: 7,
     // display: "flex",
     // alignItems: "flex-end",
   },
   signatureLabel: {
-    marginBottom: 10,
-    fontSize: 9,
+    marginBottom: 5,
+    fontSize: 7,
   },
   signatureLine: {
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     marginBottom: 2,
-    minHeight: 20,
+    minHeight: 15,
   },
   signatureSeal: {
-    fontSize: 8,
-    marginTop: 4,
+    fontSize: 6,
+    marginTop: 2,
     fontStyle: "italic",
   },
 });
@@ -470,7 +470,7 @@ export default function InvoicePdfDocument({ data }) {
     <Document>
       <Page size="A4" style={s.page}>
         {/* Дата и время создания */}
-        <Text style={{ fontSize: 9, marginBottom: 8 }}>
+        <Text style={{ fontSize: 7, marginBottom: 4 }}>
           {fmtDateTime(new Date().toISOString())}
         </Text>
 
@@ -493,31 +493,31 @@ export default function InvoicePdfDocument({ data }) {
         <View
           style={{
             flexDirection: "column",
-            gap: 8,
-            marginTop: 12,
-            marginBottom: 12,
+            gap: 4,
+            marginTop: 6,
+            marginBottom: 6,
           }}
         >
-          <View style={{ flexDirection: "row", fontSize: 10 }}>
-            <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+          <View style={{ flexDirection: "row", fontSize: 8 }}>
+            <Text style={{ fontSize: 8, fontWeight: "bold" }}>
               Поставщик:{" "}
             </Text>
-            <Text style={{ fontSize: 10 }}>{safe(seller.name)}</Text>
+            <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
             {seller.address && (
-              <Text style={{ fontSize: 10 }}> {safe(seller.address)}</Text>
+              <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
             )}
           </View>
 
-          <View style={{ flexDirection: "row", fontSize: 10 }}>
-            <Text style={{ fontSize: 10, fontWeight: "bold" }}>
+          <View style={{ flexDirection: "row", fontSize: 8 }}>
+            <Text style={{ fontSize: 8, fontWeight: "bold" }}>
               Покупатель:{" "}
             </Text>
             {buyer ? (
-              <Text style={{ fontSize: 10 }}>
+              <Text style={{ fontSize: 8 }}>
                 {safe(buyer.name || buyer.full_name)}
               </Text>
             ) : (
-              <Text style={{ fontSize: 10 }}>—</Text>
+              <Text style={{ fontSize: 8 }}>—</Text>
             )}
           </View>
         </View>
@@ -644,15 +644,15 @@ export default function InvoicePdfDocument({ data }) {
         </View>
 
         {/* Текст с количеством наименований и суммой */}
-        <View style={{ marginTop: 8, fontSize: 9 }}>
-          <Text style={{ fontSize: 9 }}>
+        <View style={{ marginTop: 4, fontSize: 7 }}>
+          <Text style={{ fontSize: 7 }}>
             Всего наименований {items.length}, на сумму {n2(total)} KGS
           </Text>
         </View>
 
         {/* Сумма прописью */}
-        <View style={{ marginTop: 4, fontSize: 9 }}>
-          <Text style={{ fontSize: 9, textTransform: "capitalize" }}>
+        <View style={{ marginTop: 2, fontSize: 7 }}>
+          <Text style={{ fontSize: 7, textTransform: "capitalize" }}>
             {numToWords(total)}
           </Text>
         </View>
