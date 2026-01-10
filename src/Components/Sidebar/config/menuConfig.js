@@ -487,13 +487,13 @@ export const MENU_CONFIG = {
         permission: "can_view_document",
         implemented: true,
       },
-      // {
-      //   label: "Товары",
-      //   to: "/crm/warehouse/products",
-      //   icon: menuIcons.boxOpen,
-      //   permission: "can_view_products",
-      //   implemented: true,
-      // },
+      {
+        label: "Склады",
+        to: "/crm/warehouse/warehouses",
+        icon: menuIcons.boxOpen,
+        permission: "can_view_products",
+        implemented: true,
+      },
       // {
       //   label: "Справочники",
       //   to: "/crm/warehouse/directories",
