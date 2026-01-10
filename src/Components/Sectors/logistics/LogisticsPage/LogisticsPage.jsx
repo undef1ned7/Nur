@@ -135,7 +135,7 @@ const LogisticsPage = () => {
       description: form.description,
       price_car: form.carPrice || "0",
       price_service: form.servicePrice || "0",
-      price_sale: form.salePrice || "0",
+      sale_price: form.salePrice || "0",
       revenue: revenue !== null ? revenue.toString() : "0",
       status: "decorated", // новая заявка всегда с оформленным статусом
       arrival_date: form.arrivalDate || null,

@@ -5,7 +5,6 @@ import { Outlet, useLocation } from "react-router-dom";
 import arnament from "../Photo/Group 1216.png";
 import arnament2 from "../Photo/Group 1204.png";
 import arnament3 from "../Photo/Group 1215.png";
-import arnament4 from "../Photo/gory.jpg"; // фон каторый не роботаеть
 import "./Layout.scss";
 import { X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
@@ -152,9 +151,7 @@ const Layout = () => {
       {/* насилное поставка вона  */}
       <div
         className="content_background"
-        style={{
-          backgroundImage: `url(${arnament4})`,
-        }}
+
       ></div>
 
       <div className={`App ${!isSidebarOpen ? "sidebar-collapsed" : ""}`}>
