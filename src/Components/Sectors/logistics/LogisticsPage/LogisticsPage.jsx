@@ -21,6 +21,7 @@ import { useLogistics } from "../../../../store/slices/logisticsSlice";
 import LogisticsOrderFormModal from "./LogisticsOrderFormModal";
 import LogisticsOrderViewModal from "./LogisticsOrderViewModal";
 import AddCashFlowsModal from "../../../Deposits/Kassa/AddCashFlowsModal/AddCashFlowsModal";
+import AlertModal from "../../../common/AlertModal/AlertModal";
 
 const statusOptions = [
   { value: "decorated", label: "Оформлен" },
@@ -63,6 +64,12 @@ const LogisticsPage = () => {
   const [sentToCashAmount, setSentToCashAmount] = useState(0); // сумма, отправленная в кассу
   const [viewMode, setViewMode] = useState(getInitialViewMode); // "table" | "cards"
   const [showAddCashboxModal, setShowAddCashboxModal] = useState(false);
+  const [alert, setAlert] = useState({
+    open: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
 
   const { company } = useUser();
   const { list: logistics, loading, analytics } = useLogistics();
@@ -161,8 +168,25 @@ const LogisticsPage = () => {
       setForm(emptyForm);
       setEditingId(null);
       setShowForm(false);
+
+      // Показываем уведомление об успехе
+      setAlert({
+        open: true,
+        type: "success",
+        title: editingId ? "Заказ обновлен" : "Заказ создан",
+        message: editingId ? "Заказ успешно обновлен" : "Заказ успешно создан",
+      });
     } catch (error) {
       console.error("Ошибка при сохранении заказа:", error);
+      setAlert({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message:
+          error?.response?.data?.detail ||
+          error?.message ||
+          "Не удалось сохранить заказ",
+      });
     }
   };
 
@@ -209,7 +233,12 @@ const LogisticsPage = () => {
       cashBoxes && cashBoxes.length ? cashBoxes[0].id : null;
 
     if (!firstCashboxId) {
-      console.error("Нет доступных касс");
+      setAlert({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message: "Нет доступных касс",
+      });
       return;
     }
 
@@ -222,7 +251,12 @@ const LogisticsPage = () => {
     }, 0);
 
     if (totalServiceAmount <= 0) {
-      console.error("Общая сумма стоимости услуг должна быть больше 0");
+      setAlert({
+        open: true,
+        type: "warning",
+        title: "Предупреждение",
+        message: "Общая сумма стоимости услуг должна быть больше 0",
+      });
       return;
     }
 
@@ -245,8 +279,28 @@ const LogisticsPage = () => {
         dispatch(fetchLogisticsAsync(params));
         dispatch(fetchLogisticsAnalyticsAsync(params));
       }
+
+      // Показываем уведомление об успехе
+      setAlert({
+        open: true,
+        type: "success",
+        title: "Успешно",
+        message: `Сумма ${totalServiceAmount.toLocaleString("ru-RU", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} сом успешно отправлена в кассу`,
+      });
     } catch (err) {
       console.error("Не удалось отправить сумму в кассу:", err);
+      setAlert({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message:
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Не удалось отправить сумму в кассу",
+      });
     }
   };
 
@@ -282,8 +336,27 @@ const LogisticsPage = () => {
       const params = { company: company.id, branch: company.branch };
       dispatch(fetchLogisticsAsync(params));
       dispatch(fetchLogisticsAnalyticsAsync(params));
+
+      // Показываем уведомление об успехе
+      const statusLabel =
+        statusOptions.find((s) => s.value === newStatus)?.label || newStatus;
+      setAlert({
+        open: true,
+        type: "success",
+        title: "Статус обновлен",
+        message: `Статус заказа изменен на "${statusLabel}"`,
+      });
     } catch (e) {
       console.error("Не удалось обновить статус логистики из таймлайна:", e);
+      setAlert({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message:
+          e?.response?.data?.detail ||
+          e?.message ||
+          "Не удалось обновить статус заказа",
+      });
     }
   };
 
@@ -749,6 +822,14 @@ const LogisticsPage = () => {
       {showAddCashboxModal && (
         <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />
       )}
+
+      <AlertModal
+        open={alert.open}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onClose={() => setAlert({ ...alert, open: false })}
+      />
     </div>
   );
 };
