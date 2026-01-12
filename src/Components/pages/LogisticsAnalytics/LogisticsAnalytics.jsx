@@ -308,10 +308,10 @@ const LogisticsAnalytics = () => {
                   {formatNumber(card.count)} заказов
                 </div>
                 <div className="logistics-analytics__kpi-sum">
-                  {formatCurrency(card.sum)} сом
+                  {formatCurrency(card.sum)} $
                 </div>
                 <div className="logistics-analytics__kpi-service">
-                  Стоимость услуг: {formatCurrency(card.serviceCost)} сом
+                  Стоимость услуг: {formatCurrency(card.serviceCost)} $
                 </div>
               </div>
             </div>
@@ -417,14 +417,14 @@ const LogisticsAnalytics = () => {
                 labels: serviceCostByStatusChart.labels,
                 datasets: [
                   {
-                    label: "Стоимость услуг (сом)",
+                    label: "Стоимость услуг ($)",
                     data: serviceCostByStatusChart.serviceCost,
                     backgroundColor: "#06b6d4",
                     borderColor: "#06b6d4",
                     borderWidth: 1,
                   },
                   {
-                    label: "Выручка (сом)",
+                    label: "Выручка ($)",
                     data: serviceCostByStatusChart.revenue,
                     backgroundColor: "#f7d617",
                     borderColor: "#f7d617",
