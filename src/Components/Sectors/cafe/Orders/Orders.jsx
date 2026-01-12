@@ -1,12 +1,10 @@
-// import React, { useEffect, useMemo, useState, useRef } from "react";
-// import WaiterModal from "./WaiterModal";
+// // src/.../Orders.jsx
+// import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 // import {
 //   FaSearch,
 //   FaPlus,
 //   FaTimes,
 //   FaClipboardList,
-//   FaChair,
-//   FaUser,
 //   FaTrash,
 //   FaEdit,
 //   FaCheckCircle,
@@ -14,21 +12,40 @@
 // import api from "../../../../api";
 // import { getAll as getAllClients, createClient } from "../Clients/clientStore";
 // import "./Orders.scss";
+// import WaiterModal from "./WaiterModal";
 // import CookModal from "./CookModal";
+// import PrinterSelect from "./PrinterSelect";
+
+// // ВАЖНО: поправь путь под свой проект
+// import {
+//   printOrderReceiptJSONViaUSB,
+//   attachUsbListenersOnce,
+//   checkPrinterConnection,
+// } from "./OrdersPrintService";
+// import { printOrderReceiptJSONViaUSBWithDialog } from "./OrdersPrintService";
+
+
+
 
 // /* ==== helpers ==== */
 // const listFrom = (res) => res?.data?.results || res?.data || [];
+
 // const toNum = (x) => {
 //   if (x === null || x === undefined) return 0;
 //   const n = Number(String(x).replace(",", "."));
 //   return Number.isFinite(n) ? n : 0;
 // };
+
 // const fmtMoney = (n) =>
 //   new Intl.NumberFormat("ru-RU", {
 //     minimumFractionDigits: 2,
 //     maximumFractionDigits: 2,
 //   }).format(toNum(n));
+
+// const fmtShort = (n) => String(Math.round(toNum(n)));
+
 // const numStr = (n) => String(Number(n) || 0).replace(",", ".");
+
 // /* ВАЖНО: «оплачено» учтено */
 // const isUnpaidStatus = (s) => {
 //   const v = (s || "").toString().toLowerCase();
@@ -45,15 +62,18 @@
 //     "completed",
 //   ].includes(v);
 // };
+
 // const fullName = (u) =>
 //   [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() ||
 //   u?.email ||
 //   "Без имени";
+
 // const toId = (v) => {
 //   if (v === "" || v === undefined || v === null) return null;
 //   const s = String(v);
 //   return /^\d+$/.test(s) ? Number(s) : s;
 // };
+
 // const formatApiErrors = (e) => {
 //   if (!e) return "Неизвестная ошибка";
 //   if (typeof e === "string") return e;
@@ -66,12 +86,12 @@
 //     return JSON.stringify(e, null, 2);
 //   }
 // };
+
 // const stripEmpty = (obj) =>
 //   Object.fromEntries(
-//     Object.entries(obj).filter(
-//       ([, v]) => v !== undefined && v !== null && v !== ""
-//     )
+//     Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "")
 //   );
+
 // const normalizeOrderPayload = (f) =>
 //   stripEmpty({
 //     table: toId(f.table),
@@ -97,13 +117,21 @@
 //   role_display: e.role_display ?? "",
 // });
 
+// const safeUserData = () => {
+//   try {
+//     const raw = localStorage.getItem("userData");
+//     return raw ? JSON.parse(raw) : null;
+//   } catch {
+//     return null;
+//   }
+// };
+
 // const Orders = () => {
 //   // каталоги
 //   const [tables, setTables] = useState([]);
 //   const [employees, setEmployees] = useState([]);
 //   const [menuItems, setMenuItems] = useState([]);
 //   const menuCacheRef = useRef(new Map()); // id -> полный объект menu_item (с image_url)
-
 //   const [loading, setLoading] = useState(true);
 
 //   // заказы
@@ -116,11 +144,17 @@
 //   const originalItemsRef = useRef([]); // [{menu_item, quantity}]
 //   const originalTableRef = useRef(null); // id стола
 
-//   /* ===== API loaders ===== */
-//   const fetchTables = async () =>
-//     setTables(listFrom(await api.get("/cafe/tables/")));
+//   // пользователь
+//   const userData = useMemo(() => safeUserData(), []);
+//   const userRole = userData?.role || "";
+//   const userId = localStorage.getItem("userId");
 
-//   // персонал из /users/employees/
+//   // печать
+//   const [printingId, setPrintingId] = useState(null);
+
+//   /* ===== API loaders ===== */
+//   const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/")));
+
 //   const fetchEmployees = async () => {
 //     const arr = listFrom(await api.get("/users/employees/")) || [];
 //     setEmployees(arr.map(normalizeEmployee));
@@ -129,10 +163,7 @@
 //   const fetchMenu = async () => {
 //     const arr = listFrom(await api.get("/cafe/menu-items/")) || [];
 //     setMenuItems(arr);
-//     for (const m of arr) {
-//       // кладём в кэш — пригодится для image_url и рецептуры
-//       menuCacheRef.current.set(String(m.id), m);
-//     }
+//     for (const m of arr) menuCacheRef.current.set(String(m.id), m);
 //   };
 
 //   // если items не пришли в списке — дотянем деталями
@@ -141,6 +172,7 @@
 //       .filter((o) => !Array.isArray(o.items) || o.items.length === 0)
 //       .map((o) => o.id);
 //     if (!ids.length) return list;
+
 //     const details = await Promise.all(
 //       ids.map((id) =>
 //         api
@@ -149,6 +181,7 @@
 //           .catch(() => null)
 //       )
 //     );
+
 //     return list.map((o) => {
 //       const d = details.find((x) => x && x.id === o.id)?.data;
 //       return d ? { ...o, ...d } : o;
@@ -162,6 +195,14 @@
 //   };
 
 //   useEffect(() => {
+//     // WebUSB авто-коннект слушатели (безопасно вызвать 1 раз)
+//     try {
+//       attachUsbListenersOnce();
+//     } catch (e) {
+//       // тут только диагностика — не спамим
+//       console.error("Print init error:", e);
+//     }
+
 //     (async () => {
 //       try {
 //         await Promise.all([fetchTables(), fetchEmployees(), fetchMenu()]);
@@ -184,12 +225,8 @@
 //   }, []);
 
 //   /* справочники */
-//   const tablesMap = useMemo(
-//     () => new Map(tables.map((t) => [t.id, t])),
-//     [tables]
-//   );
+//   const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
 
-//   // только официанты
 //   const waiters = useMemo(
 //     () =>
 //       employees
@@ -197,10 +234,8 @@
 //         .map((u) => ({ id: u.id, name: fullName(u) })),
 //     [employees]
 //   );
-//   const waitersMap = useMemo(
-//     () => new Map(waiters.map((w) => [w.id, w])),
-//     [waiters]
-//   );
+
+//   const waitersMap = useMemo(() => new Map(waiters.map((w) => [w.id, w])), [waiters]);
 
 //   const menuMap = useMemo(() => {
 //     const m = new Map();
@@ -216,10 +251,7 @@
 
 //   const menuImageUrl = (id) => {
 //     const key = String(id ?? "");
-//     return (
-//       menuMap.get(key)?.image_url ||
-//       (menuCacheRef.current.get(key)?.image_url ?? "")
-//     );
+//     return menuMap.get(key)?.image_url || (menuCacheRef.current.get(key)?.image_url ?? "");
 //   };
 
 //   // занятость столов только по НЕоплаченным
@@ -239,12 +271,7 @@
 //       const wName = String(waitersMap.get(o.waiter)?.name ?? "").toLowerCase();
 //       const guests = String(o.guests ?? "").toLowerCase();
 //       const status = String(o.status ?? "").toLowerCase();
-//       return (
-//         tNum.includes(q) ||
-//         wName.includes(q) ||
-//         guests.includes(q) ||
-//         status.includes(q)
-//       );
+//       return tNum.includes(q) || wName.includes(q) || guests.includes(q) || status.includes(q);
 //     });
 //   }, [orders, query, tablesMap, waitersMap]);
 
@@ -259,14 +286,81 @@
 //   const calcTotals = (o) => {
 //     const items = Array.isArray(o.items) ? o.items : [];
 //     const count = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
-//     const total = items.reduce(
-//       (s, it) => s + linePrice(it) * (Number(it.quantity) || 0),
-//       0
-//     );
+//     const total = items.reduce((s, it) => s + linePrice(it) * (Number(it.quantity) || 0), 0);
 //     return { count, total };
 //   };
 
-//   /* ===== модалка ===== */
+//   // Форматирование даты для чека
+//   const formatReceiptDate = (dateStr) => {
+//     if (!dateStr) return "";
+//     try {
+//       const d = new Date(dateStr);
+//       const day = String(d.getDate()).padStart(2, "0");
+//       const month = String(d.getMonth() + 1).padStart(2, "0");
+//       const year = String(d.getFullYear()).slice(-2);
+//       const hours = String(d.getHours()).padStart(2, "0");
+//       const minutes = String(d.getMinutes()).padStart(2, "0");
+//       return `${day}.${month}.${year} ${hours}:${minutes}`;
+//     } catch {
+//       return dateStr;
+//     }
+//   };
+
+//   /* ===== печать чека (JSON → ESC/POS) ===== */
+// const buildPrintPayload = useCallback(
+//   (order) => {
+//     const t = tablesMap.get(order?.table);
+//     const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+//     const cashier = fullName(userData || {});
+//     const items = Array.isArray(order?.items) ? order.items : [];
+
+//     return {
+//       company: localStorage.getItem("company_name") || "КАССА",
+//       // ВАЖНО: убрали UUID полностью
+//       doc_no: `СТОЛ ${t?.number ?? "—"}`,
+//       created_at: dt,
+//       cashier_name: cashier,
+//       discount: 0,
+//       tax: 0,
+//       paid_cash: 0,
+//       paid_card: 0,
+//       change: 0,
+// items: items.map((it) => ({
+//   name: String(it.menu_item_title || it.title || "Позиция"),
+//   qty: Math.max(1, Number(it.quantity) || 1),
+//   price: linePrice(it),
+// })),
+
+
+//     };
+//   },
+//   [tablesMap, userData]
+// );
+
+
+// const printOrder = useCallback(
+//   async (order) => {
+//     if (!order?.id) return;
+//     if (printingId) return;
+
+//     setPrintingId(order.id);
+//     try {
+//       await checkPrinterConnection().catch(() => false);
+
+//       const payload = buildPrintPayload(order);
+// await printOrderReceiptJSONViaUSBWithDialog(payload);
+//     } catch (e) {
+//       console.error("Print error:", e);
+//       alert(e?.message || "Не удалось распечатать чек.");
+//     } finally {
+//       setPrintingId(null);
+//     }
+//   },
+//   [buildPrintPayload, printingId, checkPrinterConnection, printOrderReceiptJSONViaUSB]
+// );
+
+
+//   /* ===== модалка создания/редактирования ===== */
 //   const [modalOpen, setModalOpen] = useState(false);
 //   const [saving, setSaving] = useState(false);
 //   const [editingId, setEditingId] = useState(null);
@@ -296,6 +390,7 @@
 //   useEffect(() => {
 //     if (!modalOpen) return;
 //     let mounted = true;
+
 //     (async () => {
 //       try {
 //         setClientsLoading(true);
@@ -303,12 +398,13 @@
 //         const data = await getAllClients();
 //         if (mounted) setClients(Array.isArray(data) ? data : []);
 //       } catch (e) {
-//         console.error(e);
+//         console.error("Ошибка загрузки клиентов:", e);
 //         if (mounted) setClientsErr("Не удалось загрузить клиентов");
 //       } finally {
 //         if (mounted) setClientsLoading(false);
 //       }
 //     })();
+
 //     return () => {
 //       mounted = false;
 //     };
@@ -317,9 +413,7 @@
 //   const filteredClients = useMemo(() => {
 //     const s = clientQ.trim().toLowerCase();
 //     if (!s) return clients;
-//     return clients.filter((c) =>
-//       `${c.full_name} ${c.phone}`.toLowerCase().includes(s)
-//     );
+//     return clients.filter((c) => `${c.full_name} ${c.phone}`.toLowerCase().includes(s));
 //   }, [clients, clientQ]);
 
 //   async function handleCreateClient(e) {
@@ -339,14 +433,10 @@
 //       setClientQ(c.full_name || c.phone || "");
 //       setShowAddClient(false);
 //       try {
-//         window.dispatchEvent(
-//           new CustomEvent("clients:refresh", { detail: { client: c } })
-//         );
+//         window.dispatchEvent(new CustomEvent("clients:refresh", { detail: { client: c } }));
 //       } catch {}
 //     } catch (e2) {
-//       const msg = e2?.response?.data
-//         ? formatApiErrors(e2.response.data)
-//         : "Не удалось создать клиента";
+//       const msg = e2?.response?.data ? formatApiErrors(e2.response.data) : "Не удалось создать клиента";
 //       alert(msg);
 //     } finally {
 //       setAddClientSaving(false);
@@ -387,9 +477,7 @@
 //       client: order.client ? String(order.client) : "",
 //       items: itemsNormalized,
 //     });
-//     originalItemsRef.current = itemsNormalized.map(
-//       ({ menu_item, quantity }) => ({ menu_item, quantity })
-//     );
+//     originalItemsRef.current = itemsNormalized.map(({ menu_item, quantity }) => ({ menu_item, quantity }));
 //     originalTableRef.current = String(order.table ?? "");
 //     setAddingId("");
 //     setAddingQty(1);
@@ -431,9 +519,7 @@
 
 //   const updateWarehouseItem = async (item, nextRem) => {
 //     try {
-//       await api.patch(`/cafe/warehouse/${item.id}/`, {
-//         remainder: numStr(nextRem),
-//       });
+//       await api.patch(`/cafe/warehouse/${item.id}/`, { remainder: numStr(nextRem) });
 //     } catch {
 //       try {
 //         await api.put(`/cafe/warehouse/${item.id}/`, {
@@ -443,13 +529,14 @@
 //           minimum: numStr(item.minimum),
 //         });
 //       } catch (e) {
-//         console.warn("Не удалось обновить остаток:", item?.title || item?.id);
+//         console.error("Не удалось обновить остаток:", item?.title || item?.id);
 //       }
 //     }
 //   };
 
 //   const applyWarehouseDelta = async (deltaMap) => {
 //     if (!deltaMap || !deltaMap.size) return true;
+
 //     const wr = await api.get("/cafe/warehouse/");
 //     const stock = listFrom(wr) || [];
 //     const stockMap = new Map(stock.map((s) => [String(s.id), s]));
@@ -459,8 +546,7 @@
 //       if (delta > 0) {
 //         const s = stockMap.get(String(pid));
 //         const have = toNum(s?.remainder);
-//         if (have < delta)
-//           lacks.push(`${s?.title || pid}: надо ${delta}, есть ${have}`);
+//         if (have < delta) lacks.push(`${s?.title || pid}: надо ${delta}, есть ${have}`);
 //       }
 //     }
 //     if (lacks.length) {
@@ -475,16 +561,16 @@
 //         await updateWarehouseItem(s, nextRem);
 //       })
 //     );
+
 //     return true;
 //   };
 
 //   const addItem = () => {
 //     if (!addingId) return;
 //     const idStr = String(addingId);
-//     const menu =
-//       menuItems.find((m) => String(m.id) === idStr) ||
-//       menuCacheRef.current.get(idStr);
+//     const menu = menuItems.find((m) => String(m.id) === idStr) || menuCacheRef.current.get(idStr);
 //     if (!menu) return;
+
 //     const qty = Math.max(1, Number(addingQty) || 1);
 
 //     setForm((prev) => {
@@ -493,25 +579,16 @@
 //         return {
 //           ...prev,
 //           items: prev.items.map((i) =>
-//             String(i.menu_item) === idStr
-//               ? { ...i, quantity: i.quantity + qty }
-//               : i
+//             String(i.menu_item) === idStr ? { ...i, quantity: i.quantity + qty } : i
 //           ),
 //         };
 //       }
 //       return {
 //         ...prev,
-//         items: [
-//           ...prev.items,
-//           {
-//             menu_item: idStr,
-//             title: menu.title,
-//             price: toNum(menu.price),
-//             quantity: qty,
-//           },
-//         ],
+//         items: [...prev.items, { menu_item: idStr, title: menu.title, price: toNum(menu.price), quantity: qty }],
 //       };
 //     });
+
 //     setAddingQty(1);
 //   };
 
@@ -519,29 +596,20 @@
 //     const q = Math.max(1, Number(qty) || 1);
 //     setForm((prev) => ({
 //       ...prev,
-//       items: prev.items.map((i) =>
-//         String(i.menu_item) === String(id) ? { ...i, quantity: q } : i
-//       ),
+//       items: prev.items.map((i) => (String(i.menu_item) === String(id) ? { ...i, quantity: q } : i)),
 //     }));
 //   };
 
 //   const removeItem = (id) => {
-//     setForm((prev) => ({
-//       ...prev,
-//       items: prev.items.filter((i) => String(i.menu_item) !== String(id)),
-//     }));
+//     setForm((prev) => ({ ...prev, items: prev.items.filter((i) => String(i.menu_item) !== String(id)) }));
 //   };
 
 //   // POST/PUT/PATCH с фолбэком по waiter
 //   const postWithWaiterFallback = async (url, payload, method = "post") => {
 //     try {
-//       if (method === "post") {
-//         return await api.post(url, payload);
-//       } else if (method === "patch") {
-//         return await api.patch(url, payload);
-//       } else if (method === "put") {
-//         return await api.put(url, payload);
-//       }
+//       if (method === "post") return await api.post(url, payload);
+//       if (method === "patch") return await api.patch(url, payload);
+//       if (method === "put") return await api.put(url, payload);
 //       throw new Error("Unsupported method");
 //     } catch (err) {
 //       const r = err?.response;
@@ -557,188 +625,116 @@
 //     }
 //   };
 
-//   const saveForm = async (e) => {
-//     e.preventDefault();
-//     if (!form.table || !form.items.length) return;
+// const saveForm = async (e) => {
+//   e.preventDefault();
+//   if (!form.table || !form.items.length) return;
 
-//     setSaving(true);
-//     try {
-//       if (!isEditing) {
-//         const needMap = await buildConsumption(form.items);
+//   setSaving(true);
+//   try {
+//     if (!isEditing) {
+//       const basePayload = normalizeOrderPayload(form);
 
-//         const wr = await api.get("/cafe/warehouse/");
-//         const stockMap = new Map(
-//           (listFrom(wr) || []).map((s) => [String(s.id), s])
-//         );
-//         const lacks = [];
-//         for (const [pid, needQty] of needMap.entries()) {
-//           const have = toNum(stockMap.get(String(pid))?.remainder);
-//           if (have < needQty)
-//             lacks.push(
-//               `${
-//                 stockMap.get(String(pid))?.title || pid
-//               } — надо ${needQty}, есть ${have}`
-//             );
-//         }
-//         if (lacks.length) {
-//           alert("Недостаточно на складе:\n" + lacks.join("\n"));
-//           setSaving(false);
-//           return;
-//         }
+//       // СОЗДАНИЕ: без status: "payment" и без склада
+//       const res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
 
-//         const basePayload = normalizeOrderPayload(form);
-//         const payload = { ...basePayload, status: "payment" }; // статус при создании
-
-//         const res = await postWithWaiterFallback(
-//           "/cafe/orders/",
-//           payload,
-//           "post"
-//         );
-
-//         await applyWarehouseDelta(needMap);
-
-//         // стол → busy
+//       // стол → busy
+//       try {
+//         await api.patch(`/cafe/tables/${toId(form.table)}/`, { status: "busy" });
+//       } catch {
 //         try {
-//           await api.patch(`/cafe/tables/${toId(form.table)}/`, {
+//           const cur = tablesMap.get(form.table) || {};
+//           await api.put(`/cafe/tables/${toId(form.table)}/`, {
+//             number: cur.number,
+//             zone: toId(cur.zone?.id || cur.zone),
+//             places: cur.places,
 //             status: "busy",
 //           });
+//         } catch {}
+//       }
+
+//       setOrders((prev) => [...prev, res.data]);
+
+//       try {
+//         window.dispatchEvent(
+//           new CustomEvent("clients:order-created", { detail: { order: res.data } })
+//         );
+//       } catch {}
+//     } else {
+//       // РЕДАКТИРОВАНИЕ: тоже без склада
+//       const payload = normalizeOrderPayload(form);
+//       await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
+
+//       // пересадка на другой стол — статусы
+//       const wasTable = originalTableRef.current;
+//       if (wasTable && String(wasTable) !== String(form.table)) {
+//         try {
+//           await api.patch(`/cafe/tables/${toId(form.table)}/`, { status: "busy" });
 //         } catch {
 //           try {
-//             const cur = tablesMap.get(form.table) || {};
+//             const curNew = tablesMap.get(form.table) || {};
 //             await api.put(`/cafe/tables/${toId(form.table)}/`, {
-//               number: cur.number,
-//               zone: toId(cur.zone?.id || cur.zone),
-//               places: cur.places,
+//               number: curNew.number,
+//               zone: toId(curNew.zone?.id || curNew.zone),
+//               places: curNew.places,
 //               status: "busy",
 //             });
 //           } catch {}
 //         }
 
-//         setOrders((prev) => [...prev, res.data]);
-
-//         // событие для клиентской карточки
-//         try {
-//           window.dispatchEvent(
-//             new CustomEvent("clients:order-created", {
-//               detail: { order: res.data },
-//             })
-//           );
-//         } catch {}
-//       } else {
-//         // редактирование
-//         const oldItems = originalItemsRef.current || [];
-//         const oldNeed = await buildConsumption(oldItems);
-//         const newNeed = await buildConsumption(form.items);
-//         const delta = new Map(newNeed);
-//         for (const [pid, oldQty] of oldNeed.entries()) {
-//           delta.set(pid, (delta.get(pid) || 0) - oldQty);
-//         }
-//         const ok = await applyWarehouseDelta(delta);
-//         if (!ok) {
-//           setSaving(false);
-//           return;
-//         }
-
-//         const payload = normalizeOrderPayload(form);
-//         await postWithWaiterFallback(
-//           `/cafe/orders/${editingId}/`,
-//           payload,
-//           "patch"
+//         const hasOther = orders.some(
+//           (o) =>
+//             o.id !== editingId &&
+//             isUnpaidStatus(o.status) &&
+//             String(o.table) === String(wasTable)
 //         );
 
-//         // пересадка на другой стол — статусы
-//         const wasTable = originalTableRef.current;
-//         if (wasTable && String(wasTable) !== String(form.table)) {
+//         if (!hasOther) {
 //           try {
-//             await api.patch(`/cafe/tables/${toId(form.table)}/`, {
-//               status: "busy",
-//             });
+//             await api.patch(`/cafe/tables/${toId(wasTable)}/`, { status: "free" });
 //           } catch {
 //             try {
-//               const curNew = tablesMap.get(form.table) || {};
-//               await api.put(`/cafe/tables/${toId(form.table)}/`, {
-//                 number: curNew.number,
-//                 zone: toId(curNew.zone?.id || curNew.zone),
-//                 places: curNew.places,
-//                 status: "busy",
+//               const curOld = tablesMap.get(wasTable) || {};
+//               await api.put(`/cafe/tables/${toId(wasTable)}/`, {
+//                 number: curOld.number,
+//                 zone: toId(curOld.zone?.id || curOld.zone),
+//                 places: curOld.places,
+//                 status: "free",
 //               });
 //             } catch {}
 //           }
-
-//           const hasOther = orders.some(
-//             (o) =>
-//               o.id !== editingId &&
-//               isUnpaidStatus(o.status) &&
-//               String(o.table) === String(wasTable)
-//           );
-//           if (!hasOther) {
-//             try {
-//               await api.patch(`/cafe/tables/${toId(wasTable)}/`, {
-//                 status: "free",
-//               });
-//             } catch {
-//               try {
-//                 const curOld = tablesMap.get(wasTable) || {};
-//                 await api.put(`/cafe/tables/${toId(wasTable)}/`, {
-//                   number: curOld.number,
-//                   zone: toId(curOld.zone?.id || curOld.zone),
-//                   places: curOld.places,
-//                   status: "free",
-//                 });
-//               } catch {}
-//             }
-//           }
 //         }
 //       }
-
-//       setModalOpen(false);
-//       await fetchOrders();
-//     } catch (err) {
-//       const r = err?.response;
-//       console.group(
-//         "%cОшибка сохранения заказа",
-//         "color:crimson;font-weight:bold;"
-//       );
-//       console.log("HTTP status:", r?.status);
-//       try {
-//         const payloadDbg = !isEditing
-//           ? { ...normalizeOrderPayload(form), status: "payment" }
-//           : normalizeOrderPayload(form);
-//         console.log("Payload:", payloadDbg);
-//       } catch {}
-//       console.log("Server errors:", r?.data);
-//       console.groupEnd();
-
-//       const msg = r?.data
-//         ? formatApiErrors(r.data)
-//         : err.message || "Ошибка при сохранении.";
-//       alert(msg);
-//     } finally {
-//       setSaving(false);
 //     }
+
+//     setModalOpen(false);
+//     await fetchOrders();
+//   } catch (err) {
+//     console.error("Ошибка сохранения заказа:", err);
+//     const r = err?.response;
+//     const msg = r?.data ? formatApiErrors(r.data) : err?.message || "Ошибка при сохранении.";
+//     alert(msg);
+//   } finally {
+//     setSaving(false);
+//   }
+// };
+
+
+//   /* ===== ОПЛАТА (без window.confirm) ===== */
+//   const [payOpen, setPayOpen] = useState(false);
+//   const [paying, setPaying] = useState(false);
+//   const [payOrder, setPayOrder] = useState(null);
+
+//   const openPay = (order) => {
+//     setPayOrder(order);
+//     setPayOpen(true);
 //   };
 
-//   const tableLabel = (t) =>
-//     `Стол ${t.number}${t.places ? ` • ${t.places} мест` : ""}`;
-//   const waiterName = (id) => waitersMap.get(id)?.name || "—";
-
-//   // Форматирование даты для чека
-//   const formatReceiptDate = (dateStr) => {
-//     if (!dateStr) return "";
-//     try {
-//       const d = new Date(dateStr);
-//       const day = String(d.getDate()).padStart(2, "0");
-//       const month = String(d.getMonth() + 1).padStart(2, "0");
-//       const year = String(d.getFullYear()).slice(-2);
-//       const hours = String(d.getHours()).padStart(2, "0");
-//       const minutes = String(d.getMinutes()).padStart(2, "0");
-//       return `${day}.${month}.${year} ${hours}:${minutes}`;
-//     } catch {
-//       return dateStr;
-//     }
+//   const closePay = () => {
+//     if (paying) return;
+//     setPayOpen(false);
+//     setPayOrder(null);
 //   };
 
-//   // Оплата заказа
 //   const markOrderPaid = async (id) => {
 //     try {
 //       await api.post(`/cafe/orders/${id}/pay/`);
@@ -759,49 +755,54 @@
 //     return false;
 //   };
 
-//   const handlePayOrder = async (order) => {
-//     const totals = calcTotals(order);
-//     if (
-//       !window.confirm(`Оплатить заказ на сумму ${fmtMoney(totals.total)} сом?`)
-//     )
-//       return;
+//   const confirmPay = async () => {
+//     if (!payOrder?.id) return;
 
-//     const ok = await markOrderPaid(order.id);
-//     if (!ok) {
-//       alert("Не удалось пометить заказ как оплаченный.");
-//       return;
-//     }
-
-//     // Освободить стол, если нет других неоплаченных заказов
-//     const hasOther = orders.some(
-//       (o) =>
-//         o.id !== order.id &&
-//         isUnpaidStatus(o.status) &&
-//         String(o.table) === String(order.table)
-//     );
-//     if (!hasOther && order.table) {
-//       try {
-//         await api.patch(`/cafe/tables/${toId(order.table)}/`, {
-//           status: "free",
-//         });
-//       } catch {
-//         try {
-//           const cur = tablesMap.get(order.table) || {};
-//           await api.put(`/cafe/tables/${toId(order.table)}/`, {
-//             number: cur.number,
-//             zone: toId(cur.zone?.id || cur.zone),
-//             places: cur.places,
-//             status: "free",
-//           });
-//         } catch {}
-//       }
-//     }
-
-//     await fetchOrders();
+//     setPaying(true);
 //     try {
-//       window.dispatchEvent(new CustomEvent("orders:refresh"));
-//     } catch {}
+//       const ok = await markOrderPaid(payOrder.id);
+//       if (!ok) {
+//         alert("Не удалось пометить заказ как оплаченный.");
+//         setPaying(false);
+//         return;
+//       }
+
+//       // Освободить стол, если нет других неоплаченных заказов
+//       const hasOther = orders.some(
+//         (o) => o.id !== payOrder.id && isUnpaidStatus(o.status) && String(o.table) === String(payOrder.table)
+//       );
+
+//       if (!hasOther && payOrder.table) {
+//         try {
+//           await api.patch(`/cafe/tables/${toId(payOrder.table)}/`, { status: "free" });
+//         } catch {
+//           try {
+//             const cur = tablesMap.get(payOrder.table) || {};
+//             await api.put(`/cafe/tables/${toId(payOrder.table)}/`, {
+//               number: cur.number,
+//               zone: toId(cur.zone?.id || cur.zone),
+//               places: cur.places,
+//               status: "free",
+//             });
+//           } catch {}
+//         }
+//       }
+
+//       await fetchOrders();
+//       try {
+//         window.dispatchEvent(new CustomEvent("orders:refresh"));
+//       } catch {}
+
+//       setPayOpen(false);
+//       setPayOrder(null);
+//     } catch (e) {
+//       console.error("Ошибка оплаты:", e);
+//       alert("Ошибка при оплате.");
+//     } finally {
+//       setPaying(false);
+//     }
 //   };
+
 //   return (
 //     <section className="orders">
 //       {/* Header */}
@@ -809,10 +810,10 @@
 //         <div>
 //           <h2 className="orders__title">Заказы</h2>
 //           <div className="orders__subtitle">
-//             Новые заказы попадают в «Оплата». После оплаты заказ остаётся здесь
-//             как архив.
+//             Новые заказы попадают в «Оплата». После оплаты заказ остаётся здесь как архив.
 //           </div>
 //         </div>
+
 
 //         <div className="orders__actions">
 //           <div className="orders__search">
@@ -824,14 +825,9 @@
 //               onChange={(e) => setQuery(e.target.value)}
 //             />
 //           </div>
-//           {localStorage.getItem("userData") &&
-//           JSON.parse(localStorage.getItem("userData")).role === "повара" ? (
-//             ""
-//           ) : (
-//             <button
-//               className="orders__btn orders__btn--primary"
-//               onClick={openCreate}
-//             >
+
+//           {userRole === "повара" ? null : (
+//             <button className="orders__btn orders__btn--primary" onClick={openCreate} type="button">
 //               <FaPlus /> Новый заказ
 //             </button>
 //           )}
@@ -843,138 +839,119 @@
 //         {loading && <div className="orders__alert">Загрузка…</div>}
 
 //         {!loading &&
-//           (localStorage.getItem("userData") &&
-//           JSON.parse(localStorage.getItem("userData")).role === "официант"
-//             ? filtered.filter((item) => {
-//                 return item.waiter === localStorage.getItem("userId");
-//               })
-//             : filtered
-//           ).map((o) => {
-//             const t = tablesMap.get(o.table);
-//             const totals = calcTotals(o);
-//             const isPaid = !isUnpaidStatus(o.status);
-//             const orderDate = formatReceiptDate(
-//               o.created_at || o.date || o.created
-//             );
+//           (userRole === "официант" ? filtered.filter((item) => String(item.waiter) === String(userId)) : filtered).map(
+//             (o) => {
+//               const t = tablesMap.get(o.table);
+//               const totals = calcTotals(o);
+//               const isPaid = !isUnpaidStatus(o.status);
+//               const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
 
-//             return (
-//               <article
-//                 key={o.id}
-//                 className={`orders__receipt ${
-//                   isPaid ? "orders__receipt--paid" : ""
-//                 }`}
-//               >
-//                 {/* Header */}
-//                 <div className="orders__receiptHeader">
-//                   <div className="orders__receiptTable">
-//                     СТОЛ {t?.number || "—"}
+//               return (
+//                 <article key={o.id} className={`orders__receipt ${isPaid ? "orders__receipt--paid" : ""}`}>
+//                   <div className="orders__receiptHeader">
+//                     <div className="orders__receiptTable">СТОЛ {t?.number || "—"}</div>
+//                     {orderDate && <div className="orders__receiptDate">{orderDate}</div>}
 //                   </div>
-//                   {orderDate && (
-//                     <div className="orders__receiptDate">{orderDate}</div>
-//                   )}
-//                 </div>
 
-//                 {/* Divider */}
-//                 <div className="orders__receiptDivider"></div>
+//                   <div className="orders__receiptDivider"></div>
 
-//                 {/* Items List */}
-//                 {Array.isArray(o.items) && o.items.length > 0 ? (
-//                   <div className="orders__receiptItems">
-//                     {o.items.map((it, i) => {
-//                       const itemPrice = linePrice(it);
-//                       const itemTitle =
-//                         it.menu_item_title || it.title || "Позиция";
-//                       const itemQty = Number(it.quantity) || 0;
-//                       return (
-//                         <div
-//                           key={it.id || it.menu_item || i}
-//                           className="orders__receiptItem"
-//                         >
-//                           <span className="orders__receiptItemName">
-//                             {itemTitle}
-//                           </span>
-//                           <span className="orders__receiptItemQty">
-//                             x{itemQty}
-//                           </span>
-//                           <span className="orders__receiptItemPrice">
-//                             {itemPrice}
-//                           </span>
-//                         </div>
-//                       );
-//                     })}
-//                   </div>
-//                 ) : (
-//                   <div className="orders__receiptItems">
-//                     <div className="orders__receiptItem">
-//                       <span className="orders__receiptItemName">
-//                         Нет позиций
-//                       </span>
+//                   {Array.isArray(o.items) && o.items.length > 0 ? (
+//                     <div className="orders__receiptItems">
+//                       {o.items.map((it, i) => {
+//                         const itemPrice = linePrice(it);
+//                         const itemTitle = it.menu_item_title || it.title || "Позиция";
+//                         const itemQty = Number(it.quantity) || 0;
+//                         const sum = itemPrice * itemQty;
+
+//                         return (
+//                           <div key={it.id || it.menu_item || i} className="orders__receiptItem">
+//                             <span className="orders__receiptItemName">{itemTitle}</span>
+//                             <span className="orders__receiptItemQty">x{itemQty}</span>
+//                             {/* в карточке — как на скрине (без ,00) */}
+//                             <span className="orders__receiptItemPrice">{fmtShort(sum)}</span>
+//                           </div>
+//                         );
+//                       })}
 //                     </div>
+//                   ) : (
+//                     <div className="orders__receiptItems">
+//                       <div className="orders__receiptItem">
+//                         <span className="orders__receiptItemName">Нет позиций</span>
+//                       </div>
+//                     </div>
+//                   )}
+
+//                   <div className="orders__receiptDivider orders__receiptDivider--dashed"></div>
+
+//                   <div className="orders__receiptTotal">
+//                     <span className="orders__receiptTotalLabel">ИТОГО</span>
+//                     <span className="orders__receiptTotalAmount">{fmtShort(totals.total)}</span>
 //                   </div>
-//                 )}
 
-//                 {/* Dashed Divider */}
-//                 <div className="orders__receiptDivider orders__receiptDivider--dashed"></div>
+//                   {isUnpaidStatus(o.status) && (
+//                     <div className="orders__receiptActions">
+//                       {userRole !== "повара" ? (
+//                         <>
+//                           <button
+//                             className="orders__btn orders__btn--secondary"
+//                             onClick={() => openEdit(o)}
+//                             type="button"
+//                             title="Изменить стол, официанта, гостей и позиции"
+//                             disabled={saving || paying || printingId === o.id}
+//                           >
+//                             <FaEdit /> Редактировать
+//                           </button>
 
-//                 {/* Total */}
-//                 <div className="orders__receiptTotal">
-//                   <span className="orders__receiptTotalLabel">ИТОГО</span>
-//                   <span className="orders__receiptTotalAmount">
-//                     {Math.round(totals.total)}
-//                   </span>
-//                 </div>
+//                           <button
+//                             className="orders__btn orders__btn--secondary"
+//                             onClick={() => printOrder(o)}
+//                             type="button"
+//                             title="Распечатать чек на ESC/POS"
+//                             disabled={saving || paying || printingId === o.id}
+//                           >
+//                             <FaClipboardList /> {printingId === o.id ? "Печать…" : "Чек"}
+//                           </button>
 
-//                 {/* Actions */}
-//                 {isUnpaidStatus(o.status) && (
-//                   <div className="orders__receiptActions">
-//                     {localStorage.getItem("userData") &&
-//                     JSON.parse(localStorage.getItem("userData")).role !==
-//                       "повара" ? (
-//                       <>
+//                           <button
+//                             className="orders__btn orders__btn--primary"
+//                             onClick={() => openPay(o)}
+//                             type="button"
+//                             title="Показать чек и оплатить"
+//                             disabled={saving || paying || printingId === o.id}
+//                           >
+//                             <FaCheckCircle /> Оплатить
+//                           </button>
+//                         </>
+//                       ) : (
 //                         <button
 //                           className="orders__btn orders__btn--secondary"
 //                           onClick={() => openEdit(o)}
-//                           title="Изменить стол, официанта, гостей и позиции"
+//                           type="button"
+//                           title="Посмотреть заказ"
+//                           disabled={saving || paying || printingId === o.id}
 //                         >
-//                           <FaEdit /> Редактировать
+//                           Посмотреть
 //                         </button>
-//                         <button
-//                           className="orders__btn orders__btn--primary"
-//                           onClick={() => handlePayOrder(o)}
-//                           title="Оплатить заказ"
-//                         >
-//                           <FaCheckCircle /> Оплатить
-//                         </button>
-//                       </>
-//                     ) : (
-//                       <button
-//                         className="orders__btn orders__btn--secondary"
-//                         onClick={() => openEdit(o)}
-//                         title="Посмотреть заказ"
-//                       >
-//                         Посмотреть
-//                       </button>
-//                     )}
-//                   </div>
-//                 )}
-//                 {isPaid && (
-//                   <div className="orders__receiptPaid">
-//                     <span className="orders__receiptPaidBadge">Оплачен</span>
-//                   </div>
-//                 )}
-//               </article>
-//             );
-//           })}
+//                       )}
+//                     </div>
+//                   )}
 
-//         {!loading && !filtered.length && (
-//           <div className="orders__alert">Ничего не найдено по «{query}».</div>
-//         )}
+//                   {isPaid && (
+//                     <div className="orders__receiptPaid">
+//                       <span className="orders__receiptPaidBadge">Оплачен</span>
+//                     </div>
+//                   )}
+//                 </article>
+//               );
+//             }
+//           )}
+
+//         {!loading && !filtered.length && <div className="orders__alert">Ничего не найдено по «{query}».</div>}
 //       </div>
 
-//       {/* Modal */}
+//       {/* Modal create/edit/view */}
 //       {modalOpen &&
-//         (localStorage.getItem("userData") &&
-//         JSON.parse(localStorage.getItem("userData")).role === "повара" ? (
+//         (userRole === "повара" ? (
 //           <CookModal
 //             saving={saving}
 //             setModalOpen={setModalOpen}
@@ -1011,8 +988,7 @@
 //             toNum={toNum}
 //             removeItem={removeItem}
 //           />
-//         ) : localStorage.getItem("userData") &&
-//           JSON.parse(localStorage.getItem("userData")).role === "официант" ? (
+//         ) : userRole === "официант" ? (
 //           <WaiterModal
 //             saving={saving}
 //             setModalOpen={setModalOpen}
@@ -1050,68 +1026,46 @@
 //             removeItem={removeItem}
 //           />
 //         ) : (
-//           <div
-//             className="orders-modal__overlay"
-//             onClick={() => !saving && setModalOpen(false)}
-//           >
-//             <div
-//               className="orders-modal__card"
-//               onClick={(e) => e.stopPropagation()}
-//             >
+//           <div className="orders-modal__overlay" onClick={() => !saving && setModalOpen(false)}>
+//             <div className="orders-modal__card" onClick={(e) => e.stopPropagation()}>
 //               <div className="orders-modal__header">
-//                 <h3 className="orders-modal__title">
-//                   {isEditing ? "Редактировать заказ" : "Новый заказ"}
-//                 </h3>
+//                 <h3 className="orders-modal__title">{isEditing ? "Редактировать заказ" : "Новый заказ"}</h3>
 //                 <button
 //                   className="orders-modal__close"
 //                   onClick={() => !saving && setModalOpen(false)}
 //                   disabled={saving}
 //                   title={saving ? "Сохранение…" : "Закрыть"}
 //                   aria-label="Закрыть"
+//                   type="button"
 //                 >
 //                   <FaTimes />
 //                 </button>
 //               </div>
 
+//               {/* ... твой текущий админ-форму блок без изменений ... */}
 //               <form className="orders__form" onSubmit={saveForm}>
 //                 <div className="orders__formGrid">
-//                   {/* Стол */}
 //                   <div className="orders__field">
 //                     <label className="orders__label">Стол</label>
 //                     <select
 //                       className="orders__input"
 //                       value={form.table ?? ""}
-//                       onChange={(e) =>
-//                         setForm((f) => ({ ...f, table: e.target.value }))
-//                       }
+//                       onChange={(e) => setForm((f) => ({ ...f, table: e.target.value }))}
 //                       required
 //                       disabled={saving}
 //                     >
-//                       {!isEditing && (
-//                         <option value="">— Выберите стол —</option>
-//                       )}
+//                       {!isEditing && <option value="">— Выберите стол —</option>}
 //                       {tables
-//                         .filter(
-//                           (t) =>
-//                             !busyTableIds.has(t.id) ||
-//                             String(t.id) === String(form.table)
-//                         )
+//                         .filter((t) => !busyTableIds.has(t.id) || String(t.id) === String(form.table))
 //                         .map((t) => (
 //                           <option key={t.id} value={t.id}>
-//                             {`Стол ${t.number}${
-//                               t.places ? ` • ${t.places} мест` : ""
-//                             }`}
+//                             {`Стол ${t.number}${t.places ? ` • ${t.places} мест` : ""}`}
 //                           </option>
 //                         ))}
 //                     </select>
-//                     {busyTableIds.size > 0 && (
-//                       <div className="orders__hint">
-//                         Занятые столы скрыты до оплаты.
-//                       </div>
-//                     )}
+//                     {busyTableIds.size > 0 && <div className="orders__hint">Занятые столы скрыты до оплаты.</div>}
 //                   </div>
 
-//                   {/* Гостей */}
 //                   <div className="orders__field">
 //                     <label className="orders__label">Гостей</label>
 //                     <input
@@ -1120,24 +1074,18 @@
 //                       className="orders__input"
 //                       value={form.guests}
 //                       onChange={(e) =>
-//                         setForm((f) => ({
-//                           ...f,
-//                           guests: Math.max(0, Number(e.target.value) || 0),
-//                         }))
+//                         setForm((f) => ({ ...f, guests: Math.max(0, Number(e.target.value) || 0) }))
 //                       }
 //                       disabled={saving}
 //                     />
 //                   </div>
 
-//                   {/* Официант */}
 //                   <div className="orders__field">
 //                     <label className="orders__label">Официант</label>
 //                     <select
 //                       className="orders__input"
 //                       value={form.waiter ?? ""}
-//                       onChange={(e) =>
-//                         setForm((f) => ({ ...f, waiter: e.target.value }))
-//                       }
+//                       onChange={(e) => setForm((f) => ({ ...f, waiter: e.target.value }))}
 //                       disabled={saving}
 //                       title="Если сервер ругается на waiter, оставьте «Без официанта» — заказ сохранится."
 //                     >
@@ -1151,16 +1099,10 @@
 //                   </div>
 
 //                   <div className="orders__field orders__field--full">
-//                     <div className="orders__subtitle">
-//                       {isEditing ? (
-//                         "Можно менять стол, состав заказа и кол-во гостей."
-//                       ) : (
-//                         <>
-//                           Статус при создании = <b>Оплата</b>.
-//                         </>
-//                       )}
-//                     </div>
-//                   </div>
+//   <div className="orders__subtitle">
+//     {isEditing ? "Можно менять стол, состав заказа и кол-во гостей." : null}
+//   </div>
+// </div>
 //                 </div>
 
 //                 {/* Клиент */}
@@ -1219,9 +1161,7 @@
 //                         className="orders__btn orders__btn--primary"
 //                         onClick={handleCreateClient}
 //                         disabled={addClientSaving || saving}
-//                         title={
-//                           addClientSaving ? "Сохранение…" : "Сохранить клиента"
-//                         }
+//                         title={addClientSaving ? "Сохранение…" : "Сохранить клиента"}
 //                       >
 //                         {addClientSaving ? "Сохранение…" : "Сохранить"}
 //                       </button>
@@ -1229,9 +1169,7 @@
 //                   )}
 
 //                   <div className="orders__clientList">
-//                     {clientsErr && (
-//                       <div className="orders__clientErr">{clientsErr}</div>
-//                     )}
+//                     {clientsErr && <div className="orders__clientErr">{clientsErr}</div>}
 //                     {clientsLoading ? (
 //                       <div className="orders__clientLoading">Загрузка…</div>
 //                     ) : filteredClients.length ? (
@@ -1239,29 +1177,19 @@
 //                         <button
 //                           key={c.id}
 //                           type="button"
-//                           onClick={() =>
-//                             setForm((f) => ({ ...f, client: c.id }))
-//                           }
+//                           onClick={() => setForm((f) => ({ ...f, client: c.id }))}
 //                           className={`orders__clientItem ${
-//                             String(form.client) === String(c.id)
-//                               ? "orders__clientItem--active"
-//                               : ""
+//                             String(form.client) === String(c.id) ? "orders__clientItem--active" : ""
 //                           }`}
 //                           title={c.full_name}
 //                           disabled={saving}
 //                         >
-//                           <span className="orders__clientName">
-//                             {c.full_name || "—"}
-//                           </span>
-//                           <span className="orders__clientPhone">
-//                             {c.phone || ""}
-//                           </span>
+//                           <span className="orders__clientName">{c.full_name || "—"}</span>
+//                           <span className="orders__clientPhone">{c.phone || ""}</span>
 //                         </button>
 //                       ))
 //                     ) : (
-//                       <div className="orders__clientLoading">
-//                         Ничего не найдено
-//                       </div>
+//                       <div className="orders__clientLoading">Ничего не найдено</div>
 //                     )}
 //                   </div>
 //                 </div>
@@ -1287,22 +1215,13 @@
 //                         ))}
 //                       </select>
 
-//                       {/* превью выбранной позиции */}
 //                       {addingId && (
 //                         <div className="orders__selectPreview">
-//                           <span
-//                             className="orders__thumb orders__thumb--sm"
-//                             aria-hidden
-//                           >
-//                             {menuImageUrl(addingId) ? (
-//                               <img src={menuImageUrl(addingId)} alt="" />
-//                             ) : (
-//                               <FaClipboardList />
-//                             )}
+//                           <span className="orders__thumb orders__thumb--sm" aria-hidden>
+//                             {menuImageUrl(addingId) ? <img src={menuImageUrl(addingId)} alt="" /> : <FaClipboardList />}
 //                           </span>
 //                           <span className="orders__selectPreviewText">
-//                             {menuMap.get(String(addingId))?.title ||
-//                               "Позиция меню"}
+//                             {menuMap.get(String(addingId))?.title || "Позиция меню"}
 //                           </span>
 //                         </div>
 //                       )}
@@ -1315,9 +1234,7 @@
 //                         min={1}
 //                         className="orders__input"
 //                         value={addingQty}
-//                         onChange={(e) =>
-//                           setAddingQty(Math.max(1, Number(e.target.value) || 1))
-//                         }
+//                         onChange={(e) => setAddingQty(Math.max(1, Number(e.target.value) || 1))}
 //                         disabled={saving}
 //                       />
 //                     </div>
@@ -1354,15 +1271,8 @@
 //                               <tr key={it.menu_item}>
 //                                 <td>
 //                                   <div className="orders__dishCell">
-//                                     <span
-//                                       className="orders__thumb orders__thumb--sm"
-//                                       aria-hidden
-//                                     >
-//                                       {img ? (
-//                                         <img src={img} alt="" />
-//                                       ) : (
-//                                         <FaClipboardList />
-//                                       )}
+//                                     <span className="orders__thumb orders__thumb--sm" aria-hidden>
+//                                       {img ? <img src={img} alt="" /> : <FaClipboardList />}
 //                                     </span>
 //                                     <span>{it.title}</span>
 //                                   </div>
@@ -1374,20 +1284,12 @@
 //                                     min={1}
 //                                     className="orders__input"
 //                                     value={it.quantity}
-//                                     onChange={(e) =>
-//                                       changeItemQty(
-//                                         it.menu_item,
-//                                         e.target.value
-//                                       )
-//                                     }
+//                                     onChange={(e) => changeItemQty(it.menu_item, e.target.value)}
 //                                     disabled={saving}
 //                                   />
 //                                 </td>
 //                                 <td>
-//                                   {fmtMoney(
-//                                     toNum(it.price) * (Number(it.quantity) || 0)
-//                                   )}{" "}
-//                                   сом
+//                                   {fmtMoney(toNum(it.price) * (Number(it.quantity) || 0))} сом
 //                                 </td>
 //                                 <td>
 //                                   <button
@@ -1410,25 +1312,11 @@
 //                               <b>Итого</b>
 //                             </td>
 //                             <td>
-//                               <b>
-//                                 {form.items.reduce(
-//                                   (s, i) => s + (Number(i.quantity) || 0),
-//                                   0
-//                                 )}
-//                               </b>
+//                               <b>{form.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)}</b>
 //                             </td>
 //                             <td>
 //                               <b>
-//                                 {fmtMoney(
-//                                   form.items.reduce(
-//                                     (s, i) =>
-//                                       s +
-//                                       toNum(i.price) *
-//                                         (Number(i.quantity) || 0),
-//                                     0
-//                                   )
-//                                 )}{" "}
-//                                 сом
+//                                 {fmtMoney(form.items.reduce((s, i) => s + toNum(i.price) * (Number(i.quantity) || 0), 0))} сом
 //                               </b>
 //                             </td>
 //                             <td></td>
@@ -1447,17 +1335,113 @@
 //                     className="orders__btn orders__btn--primary"
 //                     disabled={saving || !form.table || !form.items.length}
 //                   >
-//                     {saving
-//                       ? "Сохраняем…"
-//                       : isEditing
-//                       ? "Сохранить"
-//                       : "Добавить"}
+//                     {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
 //                   </button>
 //                 </div>
 //               </form>
 //             </div>
 //           </div>
 //         ))}
+
+//       {/* Pay modal (чек) */}
+//       {payOpen && payOrder && (
+//         <div className="orders-modal__overlay" onClick={closePay}>
+//           <div className="orders-modal__card" onClick={(e) => e.stopPropagation()}>
+//             <div className="orders-modal__header">
+//               <h3 className="orders-modal__title">Чек перед оплатой</h3>
+//               <button
+//                 className="orders-modal__close"
+//                 onClick={closePay}
+//                 disabled={paying || printingId === payOrder.id}
+//                 title={paying ? "Оплата…" : "Закрыть"}
+//                 aria-label="Закрыть"
+//                 type="button"
+//               >
+//                 <FaTimes />
+//               </button>
+//             </div>
+
+//             {(() => {
+//               const t = tablesMap.get(payOrder.table);
+//               const totals = calcTotals(payOrder);
+//               const orderDate = formatReceiptDate(payOrder.created_at || payOrder.date || payOrder.created);
+
+//               return (
+//                 <div className="orders__receipt orders__receipt--preview">
+//                   <div className="orders__receiptHeader">
+//                     <div className="orders__receiptTable">СТОЛ {t?.number || "—"}</div>
+//                     {orderDate && <div className="orders__receiptDate">{orderDate}</div>}
+//                   </div>
+
+//                   <div className="orders__receiptDivider"></div>
+
+//                   {Array.isArray(payOrder.items) && payOrder.items.length ? (
+//                     <div className="orders__receiptItems">
+//                       {payOrder.items.map((it, i) => {
+//                         const title = it.menu_item_title || it.title || "Позиция";
+//                         const qty = Number(it.quantity) || 0;
+//                         const price = linePrice(it);
+//                         const sum = price * qty;
+//                         return (
+//                           <div key={it.id || it.menu_item || i} className="orders__receiptItem">
+//                             <span className="orders__receiptItemName">{title}</span>
+//                             <span className="orders__receiptItemQty">x{qty}</span>
+//                             <span className="orders__receiptItemPrice">{fmtMoney(sum)}</span>
+//                           </div>
+//                         );
+//                       })}
+//                     </div>
+//                   ) : (
+//                     <div className="orders__receiptItems">
+//                       <div className="orders__receiptItem">
+//                         <span className="orders__receiptItemName">Нет позиций</span>
+//                       </div>
+//                     </div>
+//                   )}
+
+//                   <div className="orders__receiptDivider orders__receiptDivider--dashed"></div>
+
+//                   <div className="orders__receiptTotal">
+//                     <span className="orders__receiptTotalLabel">ИТОГО</span>
+//                     <span className="orders__receiptTotalAmount">{fmtMoney(totals.total)}</span>
+//                   </div>
+
+//                   <div className="orders__formActions" style={{ marginTop: 14 }}>
+//                     <button
+//                       type="button"
+//                       className="orders__btn orders__btn--secondary"
+//                       onClick={closePay}
+//                       disabled={paying || printingId === payOrder.id}
+//                     >
+//                       Отмена
+//                     </button>
+
+//                     <button
+//                       type="button"
+//                       className="orders__btn orders__btn--secondary"
+//                       onClick={() => printOrder(payOrder)}
+//                       disabled={paying || printingId === payOrder.id}
+//                       title="Печать чека на принтер"
+//                     >
+//                       <FaClipboardList /> {printingId === payOrder.id ? "Печать…" : "Чек"}
+//                     </button>
+
+//                     <button
+//                       type="button"
+//                       className="orders__btn orders__btn--primary"
+//                       onClick={confirmPay}
+//                       disabled={paying || printingId === payOrder.id}
+//                       title={paying ? "Оплата…" : "Оплатить"}
+//                     >
+//                       {paying ? "Оплата…" : "Оплатить"}
+//                     </button>
+//                   </div>
+//                 </div>
+//               );
+//             })()}
+//           </div>
+//         </div>
+//       )}
 //     </section>
 //   );
 // };
@@ -1466,15 +1450,28 @@
 
 
 
-
 // src/.../Orders.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import { FaSearch, FaPlus, FaTimes, FaClipboardList, FaTrash, FaEdit, FaCheckCircle } from "react-icons/fa";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import {
+  FaSearch,
+  FaPlus,
+  FaTimes,
+  FaClipboardList,
+  FaTrash,
+  FaEdit,
+  FaCheckCircle,
+} from "react-icons/fa";
 import api from "../../../../api";
 import { getAll as getAllClients, createClient } from "../Clients/clientStore";
 import "./Orders.scss";
 import WaiterModal from "./WaiterModal";
 import CookModal from "./CookModal";
+
+import {
+  attachUsbListenersOnce,
+  checkPrinterConnection,
+  printOrderReceiptJSONViaUSBWithDialog,
+} from "./OrdersPrintService";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -1486,13 +1483,17 @@ const toNum = (x) => {
 };
 
 const fmtMoney = (n) =>
-  new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(toNum(n));
+  new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(toNum(n));
 
+const fmtShort = (n) => String(Math.round(toNum(n)));
 const numStr = (n) => String(Number(n) || 0).replace(",", ".");
 
-/* ВАЖНО: «оплачено» учтено */
+/* НЕОПЛАЧЕН = любой, КРОМЕ paid / отменён / закрыт */
 const isUnpaidStatus = (s) => {
-  const v = (s || "").toString().toLowerCase();
+  const v = (s || "").toString().trim().toLowerCase();
   return ![
     "paid",
     "оплачен",
@@ -1508,7 +1509,9 @@ const isUnpaidStatus = (s) => {
 };
 
 const fullName = (u) =>
-  [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() || u?.email || "Без имени";
+  [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() ||
+  u?.email ||
+  "Без имени";
 
 const toId = (v) => {
   if (v === "" || v === undefined || v === null) return null;
@@ -1548,7 +1551,6 @@ const normalizeOrderPayload = (f) =>
       ),
   });
 
-/* normalize staff from /users/employees/ */
 const normalizeEmployee = (e = {}) => ({
   id: e.id,
   email: e.email ?? "",
@@ -1571,8 +1573,12 @@ const Orders = () => {
   const [tables, setTables] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
-  const menuCacheRef = useRef(new Map()); // id -> полный объект menu_item (с image_url)
+  const menuCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
+
+  // кассы (всегда первая)
+  const [cashboxes, setCashboxes] = useState([]);
+  const [cashboxId, setCashboxId] = useState("");
 
   // заказы
   const [orders, setOrders] = useState([]);
@@ -1581,13 +1587,15 @@ const Orders = () => {
   const [query, setQuery] = useState("");
 
   // для редактирования
-  const originalItemsRef = useRef([]); // [{menu_item, quantity}]
-  const originalTableRef = useRef(null); // id стола
+  const originalTableRef = useRef(null);
 
   // пользователь
   const userData = useMemo(() => safeUserData(), []);
   const userRole = userData?.role || "";
   const userId = localStorage.getItem("userId");
+
+  // печать
+  const [printingId, setPrintingId] = useState(null);
 
   /* ===== API loaders ===== */
   const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/")));
@@ -1603,9 +1611,25 @@ const Orders = () => {
     for (const m of arr) menuCacheRef.current.set(String(m.id), m);
   };
 
-  // если items не пришли в списке — дотянем деталями
+  const fetchCashboxes = async () => {
+    try {
+      const r = await api.get("/construction/cashboxes/");
+      const arr = listFrom(r) || [];
+      const list = Array.isArray(arr) ? arr : [];
+      setCashboxes(list);
+
+      const firstKey = String(list?.[0]?.id || list?.[0]?.uuid || "");
+      setCashboxId(firstKey);
+    } catch {
+      setCashboxes([]);
+      setCashboxId("");
+    }
+  };
+
   const hydrateOrdersDetails = async (list) => {
-    const ids = list.filter((o) => !Array.isArray(o.items) || o.items.length === 0).map((o) => o.id);
+    const ids = list
+      .filter((o) => !Array.isArray(o.items) || o.items.length === 0)
+      .map((o) => o.id);
     if (!ids.length) return list;
 
     const details = await Promise.all(
@@ -1630,9 +1654,15 @@ const Orders = () => {
   };
 
   useEffect(() => {
+    try {
+      attachUsbListenersOnce();
+    } catch (e) {
+      console.error("Print init error:", e);
+    }
+
     (async () => {
       try {
-        await Promise.all([fetchTables(), fetchEmployees(), fetchMenu()]);
+        await Promise.all([fetchTables(), fetchEmployees(), fetchMenu(), fetchCashboxes()]);
         await fetchOrders();
       } catch (e) {
         console.error("Ошибка загрузки:", e);
@@ -1642,7 +1672,6 @@ const Orders = () => {
     })();
   }, []);
 
-  // Рефреш по событию от кассы
   useEffect(() => {
     const handler = () => {
       fetchOrders();
@@ -1667,7 +1696,11 @@ const Orders = () => {
   const menuMap = useMemo(() => {
     const m = new Map();
     menuItems.forEach((mi) =>
-      m.set(String(mi.id), { title: mi.title, price: toNum(mi.price), image_url: mi.image_url || "" })
+      m.set(String(mi.id), {
+        title: mi.title,
+        price: toNum(mi.price),
+        image_url: mi.image_url || "",
+      })
     );
     return m;
   }, [menuItems]);
@@ -1684,11 +1717,12 @@ const Orders = () => {
     return set;
   }, [orders]);
 
-  // показываем все заказы (и оплаченные тоже)
+  // ПОКАЗЫВАЕМ ТОЛЬКО НЕОПЛАЧЕННЫЕ (после оплаты исчезают отсюда)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const base = orders;
+    const base = (orders || []).filter((o) => isUnpaidStatus(o.status));
     if (!q) return base;
+
     return base.filter((o) => {
       const tNum = String(tablesMap.get(o.table)?.number ?? "").toLowerCase();
       const wName = String(waitersMap.get(o.waiter)?.name ?? "").toLowerCase();
@@ -1713,7 +1747,6 @@ const Orders = () => {
     return { count, total };
   };
 
-  // Форматирование даты для чека
   const formatReceiptDate = (dateStr) => {
     if (!dateStr) return "";
     try {
@@ -1728,6 +1761,54 @@ const Orders = () => {
       return dateStr;
     }
   };
+
+  /* ===== печать чека ===== */
+  const buildPrintPayload = useCallback(
+    (order) => {
+      const t = tablesMap.get(order?.table);
+      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+      const cashier = fullName(userData || {});
+      const items = Array.isArray(order?.items) ? order.items : [];
+
+      return {
+        company: localStorage.getItem("company_name") || "КАССА",
+        doc_no: `СТОЛ ${t?.number ?? "—"}`,
+        created_at: dt,
+        cashier_name: cashier,
+        discount: 0,
+        tax: 0,
+        paid_cash: 0,
+        paid_card: 0,
+        change: 0,
+        items: items.map((it) => ({
+          name: String(it.menu_item_title || it.title || "Позиция"),
+          qty: Math.max(1, Number(it.quantity) || 1),
+          price: linePrice(it),
+        })),
+      };
+    },
+    [tablesMap, userData]
+  );
+
+  const printOrder = useCallback(
+    async (order) => {
+      if (!order?.id) return;
+      if (printingId) return;
+
+      setPrintingId(order.id);
+      try {
+        await checkPrinterConnection().catch(() => false);
+        const payload = buildPrintPayload(order);
+        await printOrderReceiptJSONViaUSBWithDialog(payload);
+      } catch (e) {
+        console.error("Print error:", e);
+        alert(e?.message || "Не удалось распечатать чек.");
+      } finally {
+        setPrintingId(null);
+      }
+    },
+    [buildPrintPayload, printingId]
+  );
 
   /* ===== модалка создания/редактирования ===== */
   const [modalOpen, setModalOpen] = useState(false);
@@ -1823,7 +1904,6 @@ const Orders = () => {
     });
     setAddingId("");
     setAddingQty(1);
-    originalItemsRef.current = [];
     originalTableRef.current = null;
     setEditingId(null);
     setModalOpen(true);
@@ -1839,6 +1919,7 @@ const Orders = () => {
           quantity: Number(it.quantity) || 1,
         }))
       : [];
+
     setForm({
       table: String(order.table ?? ""),
       guests: Number(order.guests) || 0,
@@ -1846,92 +1927,11 @@ const Orders = () => {
       client: order.client ? String(order.client) : "",
       items: itemsNormalized,
     });
-    originalItemsRef.current = itemsNormalized.map(({ menu_item, quantity }) => ({ menu_item, quantity }));
+
     originalTableRef.current = String(order.table ?? "");
     setAddingId("");
     setAddingQty(1);
     setModalOpen(true);
-  };
-
-  // меню c ингредиентами (кэш)
-  const getMenuWithIngredients = async (id) => {
-    if (!id) return null;
-    const idStr = String(id);
-    if (menuCacheRef.current.has(idStr)) return menuCacheRef.current.get(idStr);
-    const local = menuItems.find((m) => String(m.id) === idStr);
-    if (local) {
-      menuCacheRef.current.set(idStr, local);
-      return local;
-    }
-    const r = await api.get(`/cafe/menu-items/${idStr}/`);
-    const full = r?.data || null;
-    if (full) menuCacheRef.current.set(idStr, full);
-    return full;
-  };
-
-  // потребность склада по блюдам заказа
-  const buildConsumption = async (orderItems) => {
-    const need = new Map();
-    for (const it of orderItems) {
-      const full = await getMenuWithIngredients(it.menu_item);
-      const recipe = Array.isArray(full?.ingredients) ? full.ingredients : [];
-      for (const r of recipe) {
-        if (!r?.product) continue;
-        const perPortion = toNum(r.amount);
-        const add = perPortion * (Number(it.quantity) || 0);
-        const key = String(r.product);
-        need.set(key, (need.get(key) || 0) + add);
-      }
-    }
-    return need;
-  };
-
-  const updateWarehouseItem = async (item, nextRem) => {
-    try {
-      await api.patch(`/cafe/warehouse/${item.id}/`, { remainder: numStr(nextRem) });
-    } catch {
-      try {
-        await api.put(`/cafe/warehouse/${item.id}/`, {
-          title: item.title,
-          unit: item.unit,
-          remainder: numStr(nextRem),
-          minimum: numStr(item.minimum),
-        });
-      } catch (e) {
-        console.error("Не удалось обновить остаток:", item?.title || item?.id);
-      }
-    }
-  };
-
-  const applyWarehouseDelta = async (deltaMap) => {
-    if (!deltaMap || !deltaMap.size) return true;
-
-    const wr = await api.get("/cafe/warehouse/");
-    const stock = listFrom(wr) || [];
-    const stockMap = new Map(stock.map((s) => [String(s.id), s]));
-
-    const lacks = [];
-    for (const [pid, delta] of deltaMap.entries()) {
-      if (delta > 0) {
-        const s = stockMap.get(String(pid));
-        const have = toNum(s?.remainder);
-        if (have < delta) lacks.push(`${s?.title || pid}: надо ${delta}, есть ${have}`);
-      }
-    }
-    if (lacks.length) {
-      alert("Недостаточно на складе:\n" + lacks.join("\n"));
-      return false;
-    }
-
-    await Promise.all(
-      Array.from(deltaMap.entries()).map(async ([pid, delta]) => {
-        const s = stockMap.get(String(pid));
-        const nextRem = Math.max(0, toNum(s?.remainder) - delta);
-        await updateWarehouseItem(s, nextRem);
-      })
-    );
-
-    return true;
   };
 
   const addItem = () => {
@@ -1954,10 +1954,7 @@ const Orders = () => {
       }
       return {
         ...prev,
-        items: [
-          ...prev.items,
-          { menu_item: idStr, title: menu.title, price: toNum(menu.price), quantity: qty },
-        ],
+        items: [...prev.items, { menu_item: idStr, title: menu.title, price: toNum(menu.price), quantity: qty }],
       };
     });
 
@@ -1976,7 +1973,6 @@ const Orders = () => {
     setForm((prev) => ({ ...prev, items: prev.items.filter((i) => String(i.menu_item) !== String(id)) }));
   };
 
-  // POST/PUT/PATCH с фолбэком по waiter
   const postWithWaiterFallback = async (url, payload, method = "post") => {
     try {
       if (method === "post") return await api.post(url, payload);
@@ -2004,30 +2000,9 @@ const Orders = () => {
     setSaving(true);
     try {
       if (!isEditing) {
-        const needMap = await buildConsumption(form.items);
-
-        const wr = await api.get("/cafe/warehouse/");
-        const stockMap = new Map((listFrom(wr) || []).map((s) => [String(s.id), s]));
-
-        const lacks = [];
-        for (const [pid, needQty] of needMap.entries()) {
-          const have = toNum(stockMap.get(String(pid))?.remainder);
-          if (have < needQty) lacks.push(`${stockMap.get(String(pid))?.title || pid} — надо ${needQty}, есть ${have}`);
-        }
-        if (lacks.length) {
-          alert("Недостаточно на складе:\n" + lacks.join("\n"));
-          setSaving(false);
-          return;
-        }
-
         const basePayload = normalizeOrderPayload(form);
-        const payload = { ...basePayload, status: "payment" };
+        const res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
 
-        const res = await postWithWaiterFallback("/cafe/orders/", payload, "post");
-
-        await applyWarehouseDelta(needMap);
-
-        // стол → busy
         try {
           await api.patch(`/cafe/tables/${toId(form.table)}/`, { status: "busy" });
         } catch {
@@ -2048,23 +2023,9 @@ const Orders = () => {
           window.dispatchEvent(new CustomEvent("clients:order-created", { detail: { order: res.data } }));
         } catch {}
       } else {
-        const oldItems = originalItemsRef.current || [];
-        const oldNeed = await buildConsumption(oldItems);
-        const newNeed = await buildConsumption(form.items);
-
-        const delta = new Map(newNeed);
-        for (const [pid, oldQty] of oldNeed.entries()) delta.set(pid, (delta.get(pid) || 0) - oldQty);
-
-        const ok = await applyWarehouseDelta(delta);
-        if (!ok) {
-          setSaving(false);
-          return;
-        }
-
         const payload = normalizeOrderPayload(form);
         await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
 
-        // пересадка на другой стол — статусы
         const wasTable = originalTableRef.current;
         if (wasTable && String(wasTable) !== String(form.table)) {
           try {
@@ -2084,6 +2045,7 @@ const Orders = () => {
           const hasOther = orders.some(
             (o) => o.id !== editingId && isUnpaidStatus(o.status) && String(o.table) === String(wasTable)
           );
+
           if (!hasOther) {
             try {
               await api.patch(`/cafe/tables/${toId(wasTable)}/`, { status: "free" });
@@ -2107,7 +2069,7 @@ const Orders = () => {
     } catch (err) {
       console.error("Ошибка сохранения заказа:", err);
       const r = err?.response;
-      const msg = r?.data ? formatApiErrors(r.data) : err.message || "Ошибка при сохранении.";
+      const msg = r?.data ? formatApiErrors(r.data) : err?.message || "Ошибка при сохранении.";
       alert(msg);
     } finally {
       setSaving(false);
@@ -2150,24 +2112,55 @@ const Orders = () => {
     return false;
   };
 
+  const createCashflowIncome = async (order, amount) => {
+    const firstKey = cashboxId || String(cashboxes?.[0]?.id || cashboxes?.[0]?.uuid || "");
+    if (!firstKey) throw new Error("Нет кассы. Создайте кассу в разделе «Кассы».");
+    if (!cashboxId) setCashboxId(firstKey);
+
+    const t = tablesMap.get(order?.table);
+    const name = `Оплата стол ${t?.number ?? "—"}`;
+
+    const res = await api.post("/construction/cashflows/", {
+      cashbox: firstKey,
+      type: "income",
+      name,
+      amount: numStr(amount),
+    });
+
+    return res?.data || null;
+  };
+
+  const tryRollbackCashflow = async (cashflowData) => {
+    const id = cashflowData?.id || cashflowData?.uuid;
+    if (!id) return;
+    try {
+      await api.delete(`/construction/cashflows/${id}/`);
+    } catch {}
+  };
+
   const confirmPay = async () => {
     if (!payOrder?.id) return;
 
     setPaying(true);
+    let cashflowData = null;
+
     try {
+      const totals = calcTotals(payOrder);
+
+      // 1) приход в кассу (всегда в первую кассу)
+      cashflowData = await createCashflowIncome(payOrder, totals.total);
+
+      // 2) пометить заказ оплаченным
       const ok = await markOrderPaid(payOrder.id);
       if (!ok) {
+        await tryRollbackCashflow(cashflowData);
         alert("Не удалось пометить заказ как оплаченный.");
-        setPaying(false);
         return;
       }
 
-      // Освободить стол, если нет других неоплаченных заказов
+      // 3) освободить стол, если нет других неоплаченных
       const hasOther = orders.some(
-        (o) =>
-          o.id !== payOrder.id &&
-          isUnpaidStatus(o.status) &&
-          String(o.table) === String(payOrder.table)
+        (o) => o.id !== payOrder.id && isUnpaidStatus(o.status) && String(o.table) === String(payOrder.table)
       );
 
       if (!hasOther && payOrder.table) {
@@ -2186,7 +2179,14 @@ const Orders = () => {
         }
       }
 
-      await fetchOrders();
+      // 4) убрать заказ из списка СРАЗУ
+      setOrders((prev) => (prev || []).filter((x) => String(x.id) !== String(payOrder.id)));
+
+      // 5) если бэк поддерживает удаление — удалим (молча)
+      try {
+        await api.delete(`/cafe/orders/${payOrder.id}/`);
+      } catch {}
+
       try {
         window.dispatchEvent(new CustomEvent("orders:refresh"));
       } catch {}
@@ -2195,7 +2195,7 @@ const Orders = () => {
       setPayOrder(null);
     } catch (e) {
       console.error("Ошибка оплаты:", e);
-      alert("Ошибка при оплате.");
+      alert(e?.message || "Ошибка при оплате.");
     } finally {
       setPaying(false);
     }
@@ -2208,7 +2208,7 @@ const Orders = () => {
         <div>
           <h2 className="orders__title">Заказы</h2>
           <div className="orders__subtitle">
-            Новые заказы попадают в «Оплата». После оплаты заказ остаётся здесь как архив.
+            После оплаты заказ исчезает отсюда и появляется в кассе (приход).
           </div>
         </div>
 
@@ -2236,58 +2236,53 @@ const Orders = () => {
         {loading && <div className="orders__alert">Загрузка…</div>}
 
         {!loading &&
-          (userRole === "официант"
-            ? filtered.filter((item) => String(item.waiter) === String(userId))
-            : filtered
-          ).map((o) => {
-            const t = tablesMap.get(o.table);
-            const totals = calcTotals(o);
-            const isPaid = !isUnpaidStatus(o.status);
-            const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
+          (userRole === "официант" ? filtered.filter((item) => String(item.waiter) === String(userId)) : filtered).map(
+            (o) => {
+              const t = tablesMap.get(o.table);
+              const totals = calcTotals(o);
+              const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
 
-            return (
-              <article
-                key={o.id}
-                className={`orders__receipt ${isPaid ? "orders__receipt--paid" : ""}`}
-              >
-                <div className="orders__receiptHeader">
-                  <div className="orders__receiptTable">СТОЛ {t?.number || "—"}</div>
-                  {orderDate && <div className="orders__receiptDate">{orderDate}</div>}
-                </div>
-
-                <div className="orders__receiptDivider"></div>
-
-                {Array.isArray(o.items) && o.items.length > 0 ? (
-                  <div className="orders__receiptItems">
-                    {o.items.map((it, i) => {
-                      const itemPrice = linePrice(it);
-                      const itemTitle = it.menu_item_title || it.title || "Позиция";
-                      const itemQty = Number(it.quantity) || 0;
-                      return (
-                        <div key={it.id || it.menu_item || i} className="orders__receiptItem">
-                          <span className="orders__receiptItemName">{itemTitle}</span>
-                          <span className="orders__receiptItemQty">x{itemQty}</span>
-                          <span className="orders__receiptItemPrice">{itemPrice}</span>
-                        </div>
-                      );
-                    })}
+              return (
+                <article key={o.id} className="orders__receipt">
+                  <div className="orders__receiptHeader">
+                    <div className="orders__receiptTable">СТОЛ {t?.number || "—"}</div>
+                    {orderDate && <div className="orders__receiptDate">{orderDate}</div>}
                   </div>
-                ) : (
-                  <div className="orders__receiptItems">
-                    <div className="orders__receiptItem">
-                      <span className="orders__receiptItemName">Нет позиций</span>
+
+                  <div className="orders__receiptDivider"></div>
+
+                  {Array.isArray(o.items) && o.items.length > 0 ? (
+                    <div className="orders__receiptItems">
+                      {o.items.map((it, i) => {
+                        const itemPrice = linePrice(it);
+                        const itemTitle = it.menu_item_title || it.title || "Позиция";
+                        const itemQty = Number(it.quantity) || 0;
+                        const sum = itemPrice * itemQty;
+
+                        return (
+                          <div key={it.id || it.menu_item || i} className="orders__receiptItem">
+                            <span className="orders__receiptItemName">{itemTitle}</span>
+                            <span className="orders__receiptItemQty">x{itemQty}</span>
+                            <span className="orders__receiptItemPrice">{fmtShort(sum)}</span>
+                          </div>
+                        );
+                      })}
                     </div>
+                  ) : (
+                    <div className="orders__receiptItems">
+                      <div className="orders__receiptItem">
+                        <span className="orders__receiptItemName">Нет позиций</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="orders__receiptDivider orders__receiptDivider--dashed"></div>
+
+                  <div className="orders__receiptTotal">
+                    <span className="orders__receiptTotalLabel">ИТОГО</span>
+                    <span className="orders__receiptTotalAmount">{fmtShort(totals.total)}</span>
                   </div>
-                )}
 
-                <div className="orders__receiptDivider orders__receiptDivider--dashed"></div>
-
-                <div className="orders__receiptTotal">
-                  <span className="orders__receiptTotalLabel">ИТОГО</span>
-                  <span className="orders__receiptTotalAmount">{Math.round(totals.total)}</span>
-                </div>
-
-                {isUnpaidStatus(o.status) && (
                   <div className="orders__receiptActions">
                     {userRole !== "повара" ? (
                       <>
@@ -2296,14 +2291,27 @@ const Orders = () => {
                           onClick={() => openEdit(o)}
                           type="button"
                           title="Изменить стол, официанта, гостей и позиции"
+                          disabled={saving || paying || printingId === o.id}
                         >
                           <FaEdit /> Редактировать
                         </button>
+
+                        <button
+                          className="orders__btn orders__btn--secondary"
+                          onClick={() => printOrder(o)}
+                          type="button"
+                          title="Распечатать чек на ESC/POS"
+                          disabled={saving || paying || printingId === o.id}
+                        >
+                          <FaClipboardList /> {printingId === o.id ? "Печать…" : "Чек"}
+                        </button>
+
                         <button
                           className="orders__btn orders__btn--primary"
                           onClick={() => openPay(o)}
                           type="button"
                           title="Показать чек и оплатить"
+                          disabled={saving || paying || printingId === o.id}
                         >
                           <FaCheckCircle /> Оплатить
                         </button>
@@ -2314,25 +2322,18 @@ const Orders = () => {
                         onClick={() => openEdit(o)}
                         type="button"
                         title="Посмотреть заказ"
+                        disabled={saving || paying || printingId === o.id}
                       >
                         Посмотреть
                       </button>
                     )}
                   </div>
-                )}
+                </article>
+              );
+            }
+          )}
 
-                {isPaid && (
-                  <div className="orders__receiptPaid">
-                    <span className="orders__receiptPaidBadge">Оплачен</span>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-
-        {!loading && !filtered.length && (
-          <div className="orders__alert">Ничего не найдено по «{query}».</div>
-        )}
+        {!loading && !filtered.length && <div className="orders__alert">Ничего не найдено по «{query}».</div>}
       </div>
 
       {/* Modal create/edit/view */}
@@ -2458,9 +2459,7 @@ const Orders = () => {
                       min={0}
                       className="orders__input"
                       value={form.guests}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, guests: Math.max(0, Number(e.target.value) || 0) }))
-                      }
+                      onChange={(e) => setForm((f) => ({ ...f, guests: Math.max(0, Number(e.target.value) || 0) }))}
                       disabled={saving}
                     />
                   </div>
@@ -2484,9 +2483,7 @@ const Orders = () => {
                   </div>
 
                   <div className="orders__field orders__field--full">
-                    <div className="orders__subtitle">
-                      {isEditing ? "Можно менять стол, состав заказа и кол-во гостей." : <>Статус при создании = <b>Оплата</b>.</>}
-                    </div>
+                    <div className="orders__subtitle">{isEditing ? "Можно менять стол, состав заказа и кол-во гостей." : null}</div>
                   </div>
                 </div>
 
@@ -2626,12 +2623,7 @@ const Orders = () => {
 
                     <div className="orders__field">
                       <label className="orders__label">&nbsp;</label>
-                      <button
-                        type="button"
-                        className="orders__btn orders__btn--primary"
-                        onClick={addItem}
-                        disabled={!addingId || saving}
-                      >
+                      <button type="button" className="orders__btn orders__btn--primary" onClick={addItem} disabled={!addingId || saving}>
                         <FaPlus /> Добавить позицию
                       </button>
                     </div>
@@ -2673,9 +2665,7 @@ const Orders = () => {
                                     disabled={saving}
                                   />
                                 </td>
-                                <td>
-                                  {fmtMoney(toNum(it.price) * (Number(it.quantity) || 0))} сом
-                                </td>
+                                <td>{fmtMoney(toNum(it.price) * (Number(it.quantity) || 0))} сом</td>
                                 <td>
                                   <button
                                     type="button"
@@ -2700,9 +2690,7 @@ const Orders = () => {
                               <b>{form.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0)}</b>
                             </td>
                             <td>
-                              <b>
-                                {fmtMoney(form.items.reduce((s, i) => s + toNum(i.price) * (Number(i.quantity) || 0), 0))} сом
-                              </b>
+                              <b>{fmtMoney(form.items.reduce((s, i) => s + toNum(i.price) * (Number(i.quantity) || 0), 0))} сом</b>
                             </td>
                             <td></td>
                           </tr>
@@ -2715,11 +2703,7 @@ const Orders = () => {
                 </div>
 
                 <div className="orders__formActions">
-                  <button
-                    type="submit"
-                    className="orders__btn orders__btn--primary"
-                    disabled={saving || !form.table || !form.items.length}
-                  >
+                  <button type="submit" className="orders__btn orders__btn--primary" disabled={saving || !form.table || !form.items.length}>
                     {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
                   </button>
                 </div>
@@ -2737,7 +2721,7 @@ const Orders = () => {
               <button
                 className="orders-modal__close"
                 onClick={closePay}
-                disabled={paying}
+                disabled={paying || printingId === payOrder.id}
                 title={paying ? "Оплата…" : "Закрыть"}
                 aria-label="Закрыть"
                 type="button"
@@ -2745,6 +2729,12 @@ const Orders = () => {
                 <FaTimes />
               </button>
             </div>
+
+            {(!cashboxId && !cashboxes.length) && (
+              <div className="orders__alert" style={{ margin: "12px 0" }}>
+                Нет кассы. Создайте кассу в разделе «Кассы».
+              </div>
+            )}
 
             {(() => {
               const t = tablesMap.get(payOrder.table);
@@ -2792,20 +2782,26 @@ const Orders = () => {
                   </div>
 
                   <div className="orders__formActions" style={{ marginTop: 14 }}>
+                    <button type="button" className="orders__btn orders__btn--secondary" onClick={closePay} disabled={paying || printingId === payOrder.id}>
+                      Отмена
+                    </button>
+
                     <button
                       type="button"
                       className="orders__btn orders__btn--secondary"
-                      onClick={closePay}
-                      disabled={paying}
+                      onClick={() => printOrder(payOrder)}
+                      disabled={paying || printingId === payOrder.id}
+                      title="Печать чека на принтер"
                     >
-                      Отмена
+                      <FaClipboardList /> {printingId === payOrder.id ? "Печать…" : "Чек"}
                     </button>
+
                     <button
                       type="button"
                       className="orders__btn orders__btn--primary"
                       onClick={confirmPay}
-                      disabled={paying}
-                      title={paying ? "Оплата…" : "Оплатить"}
+                      disabled={paying || printingId === payOrder.id || (!cashboxId && !cashboxes.length)}
+                      title={paying ? "Оплата…" : "Оплатить (создать приход в кассу)"}
                     >
                       {paying ? "Оплата…" : "Оплатить"}
                     </button>

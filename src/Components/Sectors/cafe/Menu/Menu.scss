@@ -10,10 +10,9 @@
 
 /* ===== Блок MENU (изоляция) ===== */
 .menu {
-  /* локальные токены */
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
-  --avatar: 56px; /* ← ЕДИНЫЙ размер фото/иконки в карточке */
+  --avatar: 56px;
 
   background: var(--surface);
   border-radius: var(--radius);
@@ -24,13 +23,62 @@
   gap: 20px;
   color: var(--text);
 
+  /* верхняя строка: header + переключатель справа */
+  &__topRow {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  &__topGrow {
+    flex: 1 1 auto;
+    min-width: 240px;
+  }
+
+  /* переключатель вида */
+  &__viewToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: var(--shadow);
+  }
+  &__viewBtn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: #fff;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.18s;
+
+    &:hover {
+      background: #f9fafb;
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    &--active {
+      background: rgba(247, 215, 79, 0.35);
+      color: #111;
+      border-color: var(--primary-dark);
+    }
+  }
+
   &__header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
   &__title { font-size: 20px; font-weight: 700; color: var(--text); margin: 0; }
   &__subtitle { font-size: 13px; color: var(--muted); }
 
   &__actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
-  /* поиск */
   &__search { position: relative; }
   &__searchInput {
     width: 280px; padding: 10px 12px 10px 32px; border-radius: 10px;
@@ -43,7 +91,6 @@
     font-size: 14px; color: var(--muted); pointer-events: none;
   }
 
-  /* кнопки */
   &__btn {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
@@ -60,8 +107,9 @@
     }
   }
 
-  /* список карточек */
+  /* ====== Список (как было) ====== */
   &__list { display: grid; gap: 10px; }
+
   &__card {
     display: flex; justify-content: space-between; align-items: stretch;
     padding: 14px; border: 1px solid var(--border); border-radius: var(--radius);
@@ -70,21 +118,18 @@
   }
   &__cardLeft { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
 
-  /* ► круглая аватарка фикс-размера + кадрирование */
   &__avatar {
     width: var(--avatar);
     height: var(--avatar);
     min-width: var(--avatar);
     flex: 0 0 var(--avatar);
     border-radius: 50%;
-    overflow: hidden; /* важное: круговое кадрирование */
+    overflow: hidden;
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: #fff; display: grid; place-items: center;
     font-size: 18px; box-shadow: var(--shadow);
   }
-  &__avatar img {
-    width: 100%; height: 100%; object-fit: cover; display: block;
-  }
+  &__avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   &__name { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
   &__meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -98,12 +143,95 @@
     &--off { background: #f3f4f6; border-color: #e5e7eb; color: #374151; }
   }
 
+  /* ====== Карточки (как онлайн-меню) ====== */
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  &__tile {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: #fff;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    transition: 0.18s;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+    }
+  }
+
+  &__tileMedia {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #f3f4f6;
+    position: relative;
+    overflow: hidden;
+  }
+
+  &__tileMedia img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &__tileBody {
+    padding: 12px;
+    display: grid;
+    gap: 8px;
+  }
+
+  &__tileTitle {
+    font-size: 15px;
+    font-weight: 800;
+    margin: 0;
+    color: var(--text);
+    line-height: 1.2;
+  }
+
+  &__tileRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  &__tilePrice {
+    font-weight: 800;
+    color: #111;
+  }
+
+  &__tileCat {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  &__tileActions {
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    display: grid;
+    gap: 8px;
+  }
+
+  &__tileActionsRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
   &__alert {
     padding: 10px 12px; border-radius: 10px; font-size: 14px;
     background: rgba(231,76,60,.12); color: #e74c3c; border: 1px solid rgba(231,76,60,.35);
   }
 
-  /* форма/модалка (контент) */
   &__form { margin-top: 16px; display: flex; flex-direction: column; gap: 16px; }
   &__formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   &__field { display: flex; flex-direction: column; gap: 6px; }
@@ -115,15 +243,18 @@
   }
   &__formActions { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
 
-  /* рецептура мини-список */
   &__recipeMini { margin: 6px 0 0; padding-left: 0; display: grid; gap: 2px; list-style: none; }
   &__recipeBlock { display: grid; gap: 10px; }
 
-  /* адаптация */
+  @media (max-width: 1100px) {
+    &__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+
   @media (max-width: 860px) {
     &__searchInput { width: 100%; }
     &__card { flex-direction: column; gap: 10px; }
     &__rowActions .menu__btn { width: 100%; justify-content: center; }
+    &__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   @media (max-width: 640px) {
@@ -131,21 +262,21 @@
     &__formGrid { grid-template-columns: 1fr; }
   }
 
-  /* удобные кнопки и layout на узких */
   @media (max-width: 560px) {
     &__actions { width: 100%; flex-direction: column; align-items: stretch; }
     &__btn { width: 100%; justify-content: center; }
+    &__viewToggle { width: 100%; justify-content: center; }
+    &__grid { grid-template-columns: 1fr; }
   }
 
   @media (max-width: 360px) {
-    --avatar: 48px; /* компактный размер */
+    --avatar: 48px;
     padding: 16px;
     &__title { font-size: 18px; }
     &__btn { padding: 9px 12px; }
     &__input { padding: 9px 10px; }
   }
 
-  /* чёткая работа до 320px */
   @media (max-width: 320px) {
     --avatar: 44px;
     &__header { gap: 8px; }
@@ -154,7 +285,7 @@
   }
 }
 
-/* ===== Блок MENU-MODAL (отдельный неймспейс) ===== */
+/* ===== Блок MENU-MODAL ===== */
 .menu-modal {
   &__overlay {
     position: fixed; inset: 0; background: rgba(15,23,42,.45);
@@ -180,7 +311,6 @@
     &:hover { background: #f3f4f6; border-color: #cbd5e1; color: #0f172a; }
   }
 
-  /* 🔸 внутренние отступы контента модалки */
   &__card .menu__form{
     margin-top: 0;
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
