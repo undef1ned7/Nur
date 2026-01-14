@@ -1,43 +1,46 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import "../Warehouses/Warehouses.scss";
+import { Plus } from "lucide-react";
+import "./Brands.scss";
 import AlertModal from "../../../common/AlertModal/AlertModal";
-import WarehouseHeader from "../Warehouses/components/WarehouseHeader";
 import SearchSection from "../../Market/Warehouse/components/SearchSection";
-import FilterModal from "../../Market/Warehouse/components/FilterModal";
 import BulkActionsBar from "../../Market/Warehouse/components/BulkActionsBar";
-import ProductTable from "../../Market/Warehouse/components/ProductTable";
-import ProductCards from "../../Market/Warehouse/components/ProductCards";
-import Pagination from "../Warehouses/components/Pagination";
+import Pagination from "../../Market/Warehouse/components/Pagination";
+import BrandTable from "./components/BrandTable";
+import BrandCards from "./components/BrandCards";
+import CreateBrandModal from "./components/CreateBrandModal";
 import {
-  bulkDeleteProductsAsync,
-  fetchProductsAsync,
-} from "../../../../store/creators/productCreators";
-import { useSearch } from "../Warehouses/hooks/useSearch";
-import { usePagination } from "../Warehouses/hooks/usePagination";
+  fetchWarehouseBrandsAsync,
+  bulkDeleteWarehouseBrandsAsync,
+} from "../../../../store/creators/warehouseCreators";
+import { useSearch } from "../../Market/Warehouse/hooks/useSearch";
+import { usePagination } from "../../Market/Warehouse/hooks/usePagination";
 import { useProductSelection } from "../../Market/Warehouse/hooks/useProductSelection";
-import {
-  useWarehouseData,
-  useWarehouseReferences,
-} from "../../Market/Warehouse/hooks/useWarehouseData";
 import { STORAGE_KEY, VIEW_MODES } from "../../Market/Warehouse/constants";
-import { formatDeleteMessage } from "../../Market/Warehouse/utils";
 
-const Stocks = () => {
+const Brands = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const warehouseId = searchParams.get("warehouse_id");
+
+  // Redux state
+  const {
+    brands,
+    brandsCount,
+    brandsNext,
+    brandsPrevious,
+    brandsLoading,
+    deletingBrand,
+  } = useSelector((state) => state.warehouse);
 
   // Состояние фильтров и модальных окон
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filters, setFilters] = useState({});
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingBrand, setEditingBrand] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(`${STORAGE_KEY}_brands`);
     if (saved === VIEW_MODES.TABLE || saved === VIEW_MODES.CARDS) return saved;
     const isSmall = window.matchMedia("(max-width: 1199px)").matches;
     return isSmall ? VIEW_MODES.CARDS : VIEW_MODES.TABLE;
@@ -45,9 +48,7 @@ const Stocks = () => {
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
-
-  // Загрузка справочников
-  const { brands, categories } = useWarehouseReferences();
+  const [searchParams] = useSearchParams();
 
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(
@@ -59,22 +60,19 @@ const Stocks = () => {
   const requestParams = useMemo(() => {
     const params = {
       page: currentPageFromUrl,
-      ...filters,
     };
-    if (warehouseId) {
-      params.warehouse = warehouseId;
-    }
     if (debouncedSearchTerm?.trim()) {
       params.search = debouncedSearchTerm.trim();
     }
     return params;
-  }, [currentPageFromUrl, filters, debouncedSearchTerm, warehouseId]);
+  }, [currentPageFromUrl, debouncedSearchTerm]);
 
-  // Загрузка товаров
-  const { products, loading, count, next, previous } =
-    useWarehouseData(requestParams);
+  // Загрузка брендов
+  useEffect(() => {
+    dispatch(fetchWarehouseBrandsAsync(requestParams));
+  }, [dispatch, requestParams]);
 
-  // Хук для пагинации с реальными данными
+  // Хук для пагинации
   const {
     currentPage,
     totalPages,
@@ -83,7 +81,7 @@ const Stocks = () => {
     getRowNumber,
     handlePageChange: handlePageChangeBase,
     resetToFirstPage,
-  } = usePagination(count, next, previous);
+  } = usePagination(brandsCount, brandsNext, brandsPrevious);
 
   // Сброс на первую страницу при изменении поиска
   useEffect(() => {
@@ -92,7 +90,7 @@ const Stocks = () => {
     }
   }, [debouncedSearchTerm, resetToFirstPage]);
 
-  // Хук для выбора товаров
+  // Хук для выбора брендов
   const {
     selectedRows,
     isAllSelected,
@@ -101,21 +99,22 @@ const Stocks = () => {
     handleSelectAll,
     clearSelection,
     setSelectedRows,
-  } = useProductSelection(products);
+  } = useProductSelection(brands);
 
   // Сохранение режима просмотра
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, viewMode);
+      localStorage.setItem(`${STORAGE_KEY}_brands`, viewMode);
     }
   }, [viewMode]);
 
   // Обработчики событий
-  const handleProductClick = useCallback(
-    (product) => {
-      navigate(`/crm/sklad/${product.id}`);
+  const handleBrandClick = useCallback(
+    (brand) => {
+      setEditingBrand(brand);
+      setShowCreateModal(true);
     },
-    [navigate]
+    []
   );
 
   const handlePageChange = useCallback(
@@ -135,7 +134,7 @@ const Stocks = () => {
     setBulkDeleting(true);
     try {
       await dispatch(
-        bulkDeleteProductsAsync({
+        bulkDeleteWarehouseBrandsAsync({
           ids: Array.from(selectedRows),
           soft: true,
           require_all: false,
@@ -143,11 +142,11 @@ const Stocks = () => {
       ).unwrap();
 
       setSelectedRows(new Set());
-      dispatch(fetchProductsAsync(requestParams));
+      dispatch(fetchWarehouseBrandsAsync(requestParams));
     } catch (e) {
-      console.error("Ошибка при удалении товаров:", e);
+      console.error("Ошибка при удалении брендов:", e);
       alert(
-        "Не удалось удалить товары: " +
+        "Не удалось удалить бренды: " +
           (e?.message || e?.detail || "Неизвестная ошибка")
       );
     } finally {
@@ -155,78 +154,104 @@ const Stocks = () => {
     }
   }, [dispatch, selectedRows, requestParams]);
 
-  const handleApplyFilters = useCallback((newFilters) => {
-    setFilters(newFilters);
-  }, []);
-
-  const handleResetFilters = useCallback(() => {
-    setFilters({});
+  const handleCreateBrand = useCallback(() => {
+    setEditingBrand(null);
+    setShowCreateModal(true);
   }, []);
 
   const handleViewModeChange = useCallback((mode) => {
     setViewMode(mode);
   }, []);
 
-  const handleCreateProduct = useCallback(() => {
-    if (warehouseId) {
-      navigate(`/crm/warehouse/stocks/add-product?warehouse_id=${warehouseId}`);
-    } else {
-      navigate("/crm/warehouse/stocks/add-product");
-    }
-  }, [navigate, warehouseId]);
+  const handleModalClose = useCallback(() => {
+    setShowCreateModal(false);
+    setEditingBrand(null);
+  }, []);
+
+  const handleBrandSaved = useCallback(() => {
+    dispatch(fetchWarehouseBrandsAsync(requestParams));
+  }, [dispatch, requestParams]);
+
+  // Фильтрация брендов по поисковому запросу
+  const filteredBrands = useMemo(() => {
+    if (!debouncedSearchTerm?.trim()) return brands;
+    const searchLower = debouncedSearchTerm.toLowerCase();
+    return brands.filter((brand) =>
+      brand.name?.toLowerCase().includes(searchLower)
+    );
+  }, [brands, debouncedSearchTerm]);
 
   // Мемоизация сообщения для модального окна удаления
   const deleteModalMessage = useMemo(
-    () => formatDeleteMessage(selectedCount),
+    () => {
+      const count = selectedCount;
+      if (count === 1) return "Вы уверены, что хотите удалить выбранный бренд?";
+      return `Вы уверены, что хотите удалить ${count} брендов?`;
+    },
     [selectedCount]
   );
 
   return (
     <div className="warehouse-page">
-      <WarehouseHeader 
-        onCreateProduct={handleCreateProduct}
-        title="Товары склада"
-        subtitle="Управление товарами на складе"
-      />
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon">
+            <div className="warehouse-header__icon-box">🏷️</div>
+          </div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">Бренды</h1>
+            <p className="warehouse-header__subtitle">
+              Управление брендами склада
+            </p>
+          </div>
+        </div>
+        <button
+          className="warehouse-header__create-btn"
+          onClick={handleCreateBrand}
+        >
+          <Plus size={16} />
+          Создать бренд
+        </button>
+      </div>
 
       <SearchSection
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
-        onOpenFilters={() => setShowFilterModal(true)}
-        count={count}
-        foundCount={products.length}
+        onOpenFilters={null}
+        count={brandsCount}
+        foundCount={filteredBrands.length}
       />
 
       <BulkActionsBar
         selectedCount={selectedCount}
         onClearSelection={clearSelection}
         onBulkDelete={handleBulkDelete}
-        isDeleting={bulkDeleting}
+        isDeleting={bulkDeleting || deletingBrand}
       />
 
       <div className="warehouse-table-container w-full">
         {viewMode === VIEW_MODES.TABLE ? (
-          <ProductTable
-            products={products}
-            loading={loading}
+          <BrandTable
+            brands={filteredBrands}
+            loading={brandsLoading}
             selectedRows={selectedRows}
             isAllSelected={isAllSelected}
             onRowSelect={handleRowSelect}
             onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
+            onBrandClick={handleBrandClick}
             getRowNumber={getRowNumber}
           />
         ) : (
-          <ProductCards
-            products={products}
-            loading={loading}
+          <BrandCards
+            brands={filteredBrands}
+            loading={brandsLoading}
             selectedRows={selectedRows}
             isAllSelected={isAllSelected}
             onRowSelect={handleRowSelect}
             onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
+            onBrandClick={handleBrandClick}
             getRowNumber={getRowNumber}
           />
         )}
@@ -234,22 +259,19 @@ const Stocks = () => {
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          count={count}
-          loading={loading}
+          count={brandsCount}
+          loading={brandsLoading}
           hasNextPage={hasNextPage}
           hasPrevPage={hasPrevPage}
           onPageChange={handlePageChange}
         />
       </div>
 
-      {showFilterModal && (
-        <FilterModal
-          onClose={() => setShowFilterModal(false)}
-          currentFilters={filters}
-          onApplyFilters={handleApplyFilters}
-          onResetFilters={handleResetFilters}
-          brands={brands}
-          categories={categories}
+      {showCreateModal && (
+        <CreateBrandModal
+          onClose={handleModalClose}
+          brand={editingBrand}
+          onSaved={handleBrandSaved}
         />
       )}
 
@@ -266,4 +288,5 @@ const Stocks = () => {
   );
 };
 
-export default Stocks;
+export default Brands;
+

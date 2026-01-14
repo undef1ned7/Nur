@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
@@ -11,20 +11,21 @@ import {
   HelpCircle,
   ChevronDown,
 } from "lucide-react";
-import { useClient } from "../../../store/slices/ClientSlice";
-import { useProducts } from "../../../store/slices/productSlice";
-import { useUser } from "../../../store/slices/userSlice";
+import { useClient } from "../../../../store/slices/ClientSlice";
+import { useProducts } from "../../../../store/slices/productSlice";
+import { useUser } from "../../../../store/slices/userSlice";
+import { useSelector } from "react-redux";
 import {
   createClientAsync,
   fetchClientsAsync,
-} from "../../../store/creators/clientCreators";
+} from "../../../../store/creators/clientCreators";
 import {
   addCashFlows,
   getCashBoxes,
   useCash,
-} from "../../../store/slices/cashSlice";
-import { createDeal } from "../../../store/creators/saleThunk";
-import AddProductBarcode from "./AddProductBarcode";
+} from "../../../../store/slices/cashSlice";
+import { createDeal } from "../../../../store/creators/saleThunk";
+import AddProductBarcode from "../../../Deposits/Sklad/AddProductBarcode";
 import {
   createProductAsync,
   updateProductAsync,
@@ -33,23 +34,20 @@ import {
   fetchCategoriesAsync,
   createBrandAsync,
   createCategoryAsync,
-} from "../../../store/creators/productCreators";
-import { countries } from "../../../data/countries";
-import api from "../../../api";
-import AlertModal from "../../common/AlertModal/AlertModal";
-import "./AddProductPage.scss";
+} from "../../../../store/creators/productCreators";
+import { fetchWarehousesAsync } from "../../../../store/creators/warehouseCreators";
+import { countries } from "../../../../data/countries";
+import api from "../../../../api";
+import AlertModal from "../../../common/AlertModal/AlertModal";
+import "../../../Deposits/Sklad/AddProductPage.scss";
 
-// Импорт модулей
-import * as constants from "./AddProductPage/constants";
-import * as utils from "./AddProductPage/utils";
-import { useProductImages, useKitProducts } from "./AddProductPage/hooks";
-import {
-  ProductTypeSelector,
-  ProductBasicInfo,
-  ProductImagesSection,
-} from "./AddProductPage/components";
+// Функция для создания долга
+async function createDebt(payload) {
+  const res = await api.post("/main/debts/", payload);
+  return res.data;
+}
 
-const AddProductPage = () => {
+const AddWarehouseProductPage = () => {
   const { id: productId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -68,6 +66,15 @@ const AddProductPage = () => {
   } = useProducts();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
+
+  // Получаем список складов из Redux
+  const warehouses = useSelector((state) => state.warehouse.list || []);
+  const warehousesLoading = useSelector(
+    (state) => state.warehouse.loading || false
+  );
+
+  // Состояние для выбора склада
+  const [selectedWarehouse, setSelectedWarehouse] = useState("");
 
   // Режим редактирования
   const isEditMode = !!productId;
@@ -105,47 +112,15 @@ const AddProductPage = () => {
     packagings: [], // Список упаковок
   });
 
-  // Для поиска товаров в комплекте - используем хук
-  const {
-    kitProducts: kitProductsFromHook,
-    setKitProducts: setKitProductsFromHook,
-    kitSearchTerm: kitSearchTermFromHook,
-    showKitSearch: showKitSearchFromHook,
-    setShowKitSearch: setShowKitSearchFromHook,
-    kitSearchResults: kitSearchResultsFromHook,
-    handleKitSearch: handleKitSearchFromHook,
-    addProductToKit: addProductToKitFromHook,
-    removeProductFromKit: removeProductFromKitFromHook,
-    updateKitProductQuantity: updateKitProductQuantityFromHook,
-    recalculateKitPrice: recalculateKitPriceFromHook,
-  } = useKitProducts(products);
-
-  // Синхронизируем с marketData
-  useEffect(() => {
-    if (marketData.kitProducts !== kitProductsFromHook) {
-      handleMarketDataChange("kitProducts", kitProductsFromHook);
-    }
-  }, [kitProductsFromHook, marketData.kitProducts, handleMarketDataChange]);
-
-  // Синхронизируем kitSearchTerm
-  useEffect(() => {
-    if (marketData.kitSearchTerm !== kitSearchTermFromHook) {
-      handleMarketDataChange("kitSearchTerm", kitSearchTermFromHook);
-    }
-  }, [kitSearchTermFromHook, marketData.kitSearchTerm, handleMarketDataChange]);
-
+  // Для поиска товаров в комплекте
+  const [kitSearchResults, setKitSearchResults] = useState([]);
+  const [showKitSearch, setShowKitSearch] = useState(false);
   const [showKitRecalculateTooltip, setShowKitRecalculateTooltip] =
     useState(false);
 
-  // Изображения товара - используем хук
-  const {
-    images,
-    setImages,
-    fileInputRef,
-    addImages,
-    removeImage,
-    setPrimaryImage,
-  } = useProductImages();
+  // Изображения товара
+  const [images, setImages] = useState([]);
+  const fileInputRef = useRef(null);
 
   // Состояние для AlertModal
   const [alertModal, setAlertModal] = useState({
@@ -232,10 +207,19 @@ const AddProductPage = () => {
     dispatch(getCashBoxes());
     dispatch(fetchBrandsAsync());
     dispatch(fetchCategoriesAsync());
+    dispatch(fetchWarehousesAsync({ page_size: 1000 })); // Загружаем склады
     // Загружаем все товары для точного подсчета весовых товаров
-    // Оптимизация: загружаем только необходимое количество товаров
-    dispatch(fetchProductsAsync({ page_size: 100 }));
+    dispatch(fetchProductsAsync({ page_size: 10000 }));
   }, [dispatch]);
+
+  // Автоматически выбираем склад из URL параметра
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const warehouseId = searchParams.get("warehouse_id");
+    if (warehouseId && warehouses.length > 0) {
+      setSelectedWarehouse(warehouseId);
+    }
+  }, [location.search, warehouses]);
 
   // Загрузка данных товара для редактирования
   useEffect(() => {
@@ -243,7 +227,23 @@ const AddProductPage = () => {
       const loadProduct = async () => {
         try {
           setLoadingProduct(true);
-          const response = await api.get(`/main/products/${productId}/`);
+          // Для редактирования используем warehouse API если есть warehouse_id
+          const warehouseId =
+            selectedWarehouse ||
+            new URLSearchParams(location.search).get("warehouse_id");
+          let response;
+          if (warehouseId) {
+            try {
+              response = await api.get(
+                `/warehouse/${warehouseId}/products/${productId}/`
+              );
+            } catch (e) {
+              // Fallback на обычный endpoint
+              response = await api.get(`/main/products/${productId}/`);
+            }
+          } else {
+            response = await api.get(`/main/products/${productId}/`);
+          }
           const product = response.data;
 
           // Определяем тип товара на основе kind
@@ -298,10 +298,10 @@ const AddProductPage = () => {
             })),
           });
 
-          // Загружаем изображения используя хук
+          // Загружаем изображения
           if (product.images && product.images.length > 0) {
             const loadedImages = product.images.map((img) => ({
-              file: null,
+              file: null, // Файл не загружаем, только URL
               alt: img.alt || "",
               is_primary: img.is_primary || false,
               preview: img.image_url || img.image || "",
@@ -480,17 +480,57 @@ const AddProductPage = () => {
     } = newItemData;
 
     // Сбрасываем предыдущие ошибки
+    const errors = {};
     setFieldErrors({});
 
-    // Валидация товара
-    const productErrors = utils.validateProductData({
-      newItemData,
-      marketData,
-      itemType,
-    });
+    // Нормализуем наценку: если не заполнена, считаем её 0
+    const normalizedMarkup =
+      marketData.markup !== undefined &&
+      marketData.markup !== null &&
+      String(marketData.markup).trim() !== ""
+        ? String(marketData.markup)
+        : "0";
 
-    if (Object.keys(productErrors).length > 0) {
-      setFieldErrors(productErrors);
+    // Проверяем обязательные поля
+    if (!selectedWarehouse) {
+      errors.warehouse = "Выберите склад";
+    }
+    if (!name || !name.trim()) {
+      errors.name = "Обязательное поле";
+    }
+    if (!barcode || !barcode.trim()) {
+      errors.barcode = "Обязательное поле";
+    }
+
+    const purchasePriceValue = purchase_price ? String(purchase_price) : "";
+    const priceValue = price ? String(price) : "";
+
+    if (itemType === "product") {
+      if (purchasePriceValue.trim() === "") {
+        errors.purchase_price = "Обязательное поле";
+      }
+      if (priceValue.trim() === "") {
+        errors.price = "Обязательное поле";
+      }
+    }
+
+    if (itemType === "service") {
+      if (priceValue.trim() === "") {
+        errors.price = "Обязательное поле";
+      }
+    }
+
+    if (itemType === "kit") {
+      if (priceValue.trim() === "") {
+        errors.price = "Обязательное поле";
+      }
+      if (!marketData.kitProducts || marketData.kitProducts.length === 0) {
+        errors.kitProducts = "Добавьте хотя бы один товар в комплект";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       showAlert("Пожалуйста, заполните обязательные поля.");
       return;
     }
@@ -501,45 +541,237 @@ const AddProductPage = () => {
       return;
     }
 
-    const debtErrors = utils.validateDebtData(
-      {
-        debt,
-        debtMonths,
-        amount,
-        purchasePrice: purchase_price,
-        quantity,
-        debtState,
-      },
-      company
-    );
-
-    if (Object.keys(debtErrors).length > 0) {
-      const firstError = Object.values(debtErrors)[0];
-      showAlert(firstError);
-      return;
+    if (debt === "Долги") {
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        showAlert("Введите корректный срок долга");
+        return;
+      }
+      if (company?.subscription_plan?.name === "Старт") {
+        if (!debtState.dueDate) {
+          showAlert("Выберите дату оплаты");
+          return;
+        }
+        if (!debtState.phone) {
+          showAlert("Введите номер телефона поставщика");
+          return;
+        }
+      }
     }
 
-    // Формируем payload используя утилиту (убрано ~150 строк дублирующего кода)
-    const payload = utils.buildProductPayload({
-      newItemData,
-      marketData,
-      itemType,
-      weightProductsCount,
-    });
+    if (debt === "Предоплата") {
+      if (!amount || Number(amount) <= 0) {
+        showAlert("Введите корректную сумму предоплаты");
+        return;
+      }
+      const totalAmount = Number(purchase_price) * Number(quantity);
+      if (Number(amount) > totalAmount) {
+        showAlert("Сумма предоплаты не может превышать общую сумму");
+        return;
+      }
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        showAlert("Введите корректный срок долга");
+        return;
+      }
+    }
+
+    // Формируем payload
+    let payload = {
+      name,
+      barcode: barcode || null,
+      brand_name: brand_name || "",
+      category_name: category_name || "",
+      price: price ? price.toString() : "0",
+      client: client || null,
+      plu: newItemData.plu ? Number(newItemData.plu) : null,
+    };
+
+    // Формируем payload согласно API схеме
+    const characteristics = {
+      height_cm:
+        marketData.height && marketData.height !== "0"
+          ? marketData.height.toString()
+          : null,
+      width_cm:
+        marketData.width && marketData.width !== "0"
+          ? marketData.width.toString()
+          : null,
+      depth_cm:
+        marketData.depth && marketData.depth !== "0"
+          ? marketData.depth.toString()
+          : null,
+      factual_weight_kg:
+        marketData.weight && marketData.weight !== "0"
+          ? marketData.weight.toString()
+          : null,
+      description: marketData.description || "",
+    };
+
+    // Проверяем, есть ли хотя бы одно заполненное поле в characteristics
+    const hasCharacteristics =
+      characteristics.height_cm !== null ||
+      characteristics.width_cm !== null ||
+      characteristics.depth_cm !== null ||
+      characteristics.factual_weight_kg !== null ||
+      (characteristics.description &&
+        characteristics.description.trim() !== "");
+
+    // Определяем is_weight для товара или услуги
+    const isWeight =
+      itemType === "product"
+        ? marketData.isWeightProduct
+        : itemType === "service"
+        ? marketData.isFractionalService
+        : false;
+
+    // Автоматическая генерация PLU для весовых товаров или дробных услуг, если не указан
+    let pluValue = null;
+    if (isWeight) {
+      // Если PLU уже указан пользователем, используем его
+      if (marketData.plu && marketData.plu.trim() !== "") {
+        pluValue = Number(marketData.plu);
+      } else if (newItemData.plu && newItemData.plu.trim() !== "") {
+        pluValue = Number(newItemData.plu);
+      } else {
+        // Генерируем PLU автоматически на основе количества весовых товаров
+        // Используем weightProductsCount из store, который считается в fetchProductsAsync
+        pluValue = weightProductsCount + 1;
+      }
+    }
+
+    // Базовый payload для маркета
+    // Убеждаемся, что цена правильно извлекается
+    const finalPrice = price && price.trim() !== "" ? price.toString() : "0";
+
+    // Определяем kind на основе itemType
+    let kindValue = "product"; // default
+    if (itemType === "service") {
+      kindValue = "service";
+    } else if (itemType === "kit") {
+      kindValue = "bundle";
+    }
+
+    payload = {
+      name,
+      barcode: barcode || null,
+      brand_name: brand_name || "",
+      category_name: category_name || "",
+      article: marketData.article || "",
+      unit: marketData.unit || "шт",
+      is_weight: isWeight,
+      price: finalPrice,
+      discount_percent: (marketData.discount || "0").toString(),
+      country: marketData.country || "",
+      expiration_date: marketData.expiryDate || null,
+      client: client || null,
+      plu: pluValue,
+      description: marketData.description || "",
+      characteristics: hasCharacteristics ? characteristics : null,
+      kind: kindValue,
+    };
+
+    // Извлекаем количество из newItemData, убеждаемся что это число
+    const quantityValue =
+      quantity && quantity.toString().trim() !== "" ? Number(quantity) : 0;
+
+    if (itemType === "product") {
+      // Для товара
+      payload = {
+        ...payload,
+        purchase_price: (purchase_price || "0").toString(),
+        markup_percent: normalizedMarkup,
+        quantity: quantityValue,
+        stock: true, // Товар есть на складе
+      };
+    } else if (itemType === "service") {
+      // Для услуги
+      payload = {
+        ...payload,
+        purchase_price: "0",
+        markup_percent: normalizedMarkup,
+        quantity: 0,
+        stock: false, // Услуги не имеют остатка
+        is_weight: marketData.isFractionalService, // Дробная услуга
+      };
+    } else if (itemType === "kit") {
+      // Для комплекта - преобразуем товары из состава комплекта в packages_input
+      // Каждый товар из kitProducts становится элементом packages_input
+      const kitPackages = (marketData.kitProducts || [])
+        .filter((product) => product.id) // Фильтруем только товары с ID
+        .map((product) => ({
+          name: product.name || "", // Название товара
+          quantity_in_package: Number(product.quantity || 1), // Количество товара в комплекте
+          unit: product.unit || marketData.unit || "шт", // Единица измерения
+        }));
+
+      // Также добавляем упаковки из packagings
+      const packagingItems = (marketData.packagings || [])
+        .filter((pkg) => pkg.name && pkg.name.trim()) // Фильтруем только заполненные упаковки
+        .map((pkg) => ({
+          name: pkg.name.trim(),
+          quantity_in_package: Number(pkg.quantity || 1),
+          unit: marketData.unit || "шт",
+        }));
+
+      // Объединяем товары из комплекта и упаковки
+      const allPackages = [...kitPackages, ...packagingItems];
+
+      payload = {
+        ...payload,
+        packages_input: allPackages.length > 0 ? allPackages : [], // Отправляем состав комплекта в packages_input
+        purchase_price: "0", // Комплект не имеет цены закупки
+        markup_percent: normalizedMarkup,
+        quantity: quantityValue, // Используем количество из формы
+        stock: false,
+      };
+    }
 
     try {
       let product;
       if (isEditMode && productId) {
-        // Режим редактирования
-        product = await dispatch(
-          updateProductAsync({
-            productId,
-            updatedData: payload,
-          })
-        ).unwrap();
+        // Режим редактирования - используем warehouse API если есть warehouse_id
+        const warehouseId =
+          selectedWarehouse ||
+          new URLSearchParams(location.search).get("warehouse_id");
+        if (warehouseId) {
+          try {
+            const response = await api.patch(
+              `/warehouse/${warehouseId}/products/${productId}/`,
+              payload
+            );
+            product = response.data;
+          } catch (e) {
+            // Fallback на обычный endpoint
+            product = await dispatch(
+              updateProductAsync({
+                productId,
+                updatedData: payload,
+              })
+            ).unwrap();
+          }
+        } else {
+          product = await dispatch(
+            updateProductAsync({
+              productId,
+              updatedData: payload,
+            })
+          ).unwrap();
+        }
       } else {
-        // Режим создания
-        product = await dispatch(createProductAsync(payload)).unwrap();
+        // Режим создания - используем warehouse API
+        if (!selectedWarehouse) {
+          showAlert("Выберите склад", "error", "Ошибка");
+          return;
+        }
+        try {
+          const response = await api.post(
+            `/warehouse/${selectedWarehouse}/products/`,
+            payload
+          );
+          product = response.data;
+        } catch (e) {
+          // Fallback на обычный endpoint
+          product = await dispatch(createProductAsync(payload)).unwrap();
+        }
       }
       // Вычисляем totalAmount
       let totalAmount = 0;
@@ -562,7 +794,14 @@ const AddProductPage = () => {
               fd.append("image", im.file);
               if (im.alt) fd.append("alt", im.alt || name);
               fd.append("is_primary", String(Boolean(im.is_primary)));
-              return api.post(`/main/products/${targetProductId}/images/`, fd, {
+              // Используем warehouse API если есть warehouse_id
+              const warehouseId =
+                selectedWarehouse ||
+                new URLSearchParams(location.search).get("warehouse_id");
+              const imagesEndpoint = warehouseId
+                ? `/warehouse/${warehouseId}/products/${targetProductId}/images/`
+                : `/main/products/${targetProductId}/images/`;
+              return api.post(imagesEndpoint, fd, {
                 headers: { "Content-Type": "multipart/form-data" },
               });
             });
@@ -577,7 +816,7 @@ const AddProductPage = () => {
       // Создание долга, если выбран
       if (debt === "Долги" && client) {
         if (company?.subscription_plan?.name === "Старт") {
-          await utils.createDebt({
+          await createDebt({
             name: pickSupplier?.full_name,
             phone: debtState.phone,
             due_date: debtState.dueDate,
@@ -677,7 +916,11 @@ const AddProductPage = () => {
         "Успех"
       );
       setTimeout(() => {
-        navigate("/crm/sklad");
+        if (selectedWarehouse) {
+          navigate(`/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`);
+        } else {
+          navigate("/crm/warehouse/stocks");
+        }
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
@@ -785,13 +1028,33 @@ const AddProductPage = () => {
   };
   const filterClient = list.filter((item) => item.type === "suppliers");
 
-  // Используем утилиту для вычисления контрольной суммы
-  const calculateEAN13Checksum = utils.calculateEAN13Checksum;
+  // Функция для вычисления контрольной суммы EAN-13
+  const calculateEAN13Checksum = (digits) => {
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      const digit = parseInt(digits[i]);
+      // Нечетные позиции (1, 3, 5, 7, 9, 11) умножаем на 1
+      // Четные позиции (2, 4, 6, 8, 10, 12) умножаем на 3
+      sum += i % 2 === 0 ? digit : digit * 3;
+    }
+    const checksum = (10 - (sum % 10)) % 10;
+    return checksum;
+  };
 
   // Генерируем EAN-13 штрих-код автоматически при загрузке (только для создания)
   useEffect(() => {
     if (!isEditMode && !newItemData.barcode) {
-      const barcode = utils.generateEAN13Barcode();
+      // Генерируем 12 случайных цифр
+      const randomDigits = Array.from({ length: 12 }, () =>
+        Math.floor(Math.random() * 10)
+      ).join("");
+
+      // Вычисляем контрольную сумму
+      const checksum = calculateEAN13Checksum(randomDigits);
+
+      // Формируем полный EAN-13 код (12 цифр + контрольная сумма)
+      const barcode = randomDigits + checksum;
+
       setNewItemData((prev) => ({
         ...prev,
         barcode: barcode,
@@ -844,26 +1107,99 @@ const AddProductPage = () => {
     marketData.plu,
   ]);
 
-  // Обработчик изменения данных для маркета (мемоизирован для оптимизации)
-  const handleMarketDataChange = useCallback((field, value) => {
+  // Обработчик изменения данных для маркета
+  const handleMarketDataChange = (field, value) => {
     setMarketData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  };
 
   // Генерация EAN-13 штрих-кода для маркета
   const generateBarcode = () => {
-    const barcode = utils.generateEAN13Barcode();
+    // Генерируем 12 случайных цифр
+    const randomDigits = Array.from({ length: 12 }, () =>
+      Math.floor(Math.random() * 10)
+    ).join("");
+
+    // Вычисляем контрольную сумму
+    const checksum = calculateEAN13Checksum(randomDigits);
+
+    // Формируем полный EAN-13 код (12 цифр + контрольная сумма)
+    const barcode = randomDigits + checksum;
+
     setNewItemData((prev) => ({ ...prev, barcode }));
   };
 
-  // Используем функции и переменные из хука useKitProducts
-  const handleKitSearch = handleKitSearchFromHook;
-  const addProductToKit = addProductToKitFromHook;
-  const removeProductFromKit = removeProductFromKitFromHook;
-  const handleUpdateKitProductQuantity = updateKitProductQuantityFromHook;
-  const recalculateKitPrice = recalculateKitPriceFromHook;
-  const kitSearchResults = kitSearchResultsFromHook;
-  const showKitSearch = showKitSearchFromHook;
-  const setShowKitSearch = setShowKitSearchFromHook;
+  // Поиск товаров для комплекта
+  const handleKitSearch = (searchTerm) => {
+    handleMarketDataChange("kitSearchTerm", searchTerm);
+    if (searchTerm.trim()) {
+      const filtered = products.filter((p) =>
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setKitSearchResults(filtered.slice(0, 10));
+      setShowKitSearch(true);
+    } else {
+      setKitSearchResults([]);
+      setShowKitSearch(false);
+    }
+  };
+
+  // Добавление товара в комплект
+  const addProductToKit = (product) => {
+    if (!marketData.kitProducts.find((p) => p.id === product.id)) {
+      const updatedKitProducts = [
+        ...marketData.kitProducts,
+        { ...product, quantity: 1 },
+      ];
+      setMarketData((prev) => ({
+        ...prev,
+        kitProducts: updatedKitProducts,
+      }));
+      // Цена будет автоматически пересчитана через useEffect
+    }
+    handleMarketDataChange("kitSearchTerm", "");
+    setShowKitSearch(false);
+  };
+
+  // Удаление товара из комплекта
+  const removeProductFromKit = (productId) => {
+    const updatedKitProducts = marketData.kitProducts.filter(
+      (p) => p.id !== productId
+    );
+    setMarketData((prev) => ({
+      ...prev,
+      kitProducts: updatedKitProducts,
+    }));
+    // Цена будет автоматически пересчитана через useEffect
+  };
+
+  // Обновление количества товара в комплекте
+  const handleUpdateKitProductQuantity = (productId, quantity) => {
+    const updatedKitProducts = marketData.kitProducts.map((p) =>
+      p.id === productId ? { ...p, quantity: parseFloat(quantity) || 1 } : p
+    );
+    setMarketData((prev) => ({
+      ...prev,
+      kitProducts: updatedKitProducts,
+    }));
+    // Цена будет автоматически пересчитана через useEffect
+  };
+
+  // Пересчет стоимости комплекта
+  const recalculateKitPrice = () => {
+    const totalCost = marketData.kitProducts.reduce((sum, item) => {
+      // Используем цену продажи товара, если есть, иначе цену закупки
+      const itemPrice = parseFloat(item.price || item.purchase_price || 0);
+      const itemQuantity = parseFloat(item.quantity || 1);
+      return sum + itemPrice * itemQuantity;
+    }, 0);
+    const calculatedPrice = Math.round(totalCost * 100) / 100;
+    handleMarketDataChange("purchasePrice", calculatedPrice.toString());
+    // Устанавливаем цену продажи равной сумме стоимостей товаров
+    setNewItemData((prev) => ({
+      ...prev,
+      price: calculatedPrice.toString(),
+    }));
+  };
 
   return (
     <>
@@ -878,7 +1214,15 @@ const AddProductPage = () => {
         <div className="add-product-page__header">
           <button
             className="add-product-page__back"
-            onClick={() => navigate("/crm/sklad")}
+            onClick={() => {
+              if (selectedWarehouse) {
+                navigate(
+                  `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
+                );
+              } else {
+                navigate("/crm/warehouse/stocks");
+              }
+            }}
           >
             <ArrowLeft size={20} />
             Вернуться к складу
@@ -946,7 +1290,15 @@ const AddProductPage = () => {
                 </div>
               )}
               <AddProductBarcode
-                onClose={() => navigate("/crm/sklad")}
+                onClose={() => {
+                  if (selectedWarehouse) {
+                    navigate(
+                      `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
+                    );
+                  } else {
+                    navigate("/crm/warehouse/stocks");
+                  }
+                }}
                 onShowSuccessAlert={(productName) => {
                   showAlert(
                     `Товар "${productName}" успешно добавлен!`,
@@ -954,7 +1306,13 @@ const AddProductPage = () => {
                     "Успех"
                   );
                   setTimeout(() => {
-                    navigate("/crm/sklad");
+                    if (selectedWarehouse) {
+                      navigate(
+                        `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
+                      );
+                    } else {
+                      navigate("/crm/warehouse/stocks");
+                    }
                   }, 1500);
                 }}
                 onShowErrorAlert={(errorMsg) => {
@@ -994,11 +1352,12 @@ const AddProductPage = () => {
               images={images}
               setImages={setImages}
               fileInputRef={fileInputRef}
-              addImages={addImages}
-              removeImage={removeImage}
-              setPrimaryImage={setPrimaryImage}
               isEditMode={isEditMode}
               fieldErrors={fieldErrors}
+              selectedWarehouse={selectedWarehouse}
+              setSelectedWarehouse={setSelectedWarehouse}
+              warehouses={warehouses}
+              warehousesLoading={warehousesLoading}
               showBrandInputs={showBrandInputs}
               setShowBrandInputs={setShowBrandInputs}
               newBrand={newBrand}
@@ -1593,7 +1952,15 @@ const AddProductPage = () => {
                 <div className="add-product-page__actions">
                   <button
                     className="add-product-page__cancel-btn"
-                    onClick={() => navigate("/crm/sklad")}
+                    onClick={() => {
+                      if (selectedWarehouse) {
+                        navigate(
+                          `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
+                        );
+                      } else {
+                        navigate("/crm/warehouse/stocks");
+                      }
+                    }}
                     disabled={creating}
                   >
                     Отмена
@@ -1645,9 +2012,6 @@ const MarketProductForm = ({
   images,
   setImages,
   fileInputRef,
-  addImages,
-  removeImage,
-  setPrimaryImage,
   isEditMode = false,
   fieldErrors = {},
   showBrandInputs,
@@ -1678,6 +2042,10 @@ const MarketProductForm = ({
   onChangeDebt,
   pickSupplier,
   company,
+  selectedWarehouse,
+  setSelectedWarehouse,
+  warehouses = [],
+  warehousesLoading = false,
 }) => {
   const [showPluTooltip, setShowPluTooltip] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
@@ -1840,32 +2208,261 @@ const MarketProductForm = ({
 
   return (
     <div className="market-product-form">
-      {/* Выбор типа: Товар, Услуга, Комплект */}
-      <ProductTypeSelector
-        itemType={itemType}
-        setItemType={setItemType}
-        isEditMode={isEditMode}
-      />
+      {/* Выбор типа: Товар, Услуга, Комплект - скрыт в режиме редактирования */}
+      {!isEditMode && (
+        <div className="market-product-form__type-selector">
+          <button
+            className={`market-product-form__type-card ${
+              itemType === "product"
+                ? "market-product-form__type-card--active"
+                : ""
+            }`}
+            onClick={() => setItemType("product")}
+          >
+            <h3 className="text-center">Товар</h3>
+            <p className="text-center">
+              Продукт, имеющий остаток, который необходимо восполнять
+            </p>
+          </button>
+          <button
+            className={`market-product-form__type-card ${
+              itemType === "service"
+                ? "market-product-form__type-card--active"
+                : ""
+            }`}
+            onClick={() => setItemType("service")}
+          >
+            <h3 className="text-center">Услуга</h3>
+            <p className="text-center">Продукт, не имеющий остатка на складе</p>
+          </button>
+          <button
+            className={`market-product-form__type-card ${
+              itemType === "kit" ? "market-product-form__type-card--active" : ""
+            }`}
+            onClick={() => setItemType("kit")}
+          >
+            <h3 className="text-center">Комплект</h3>
+            <p className="text-center">
+              Продукт, состоящий из нескольких других
+            </p>
+          </button>
+        </div>
+      )}
+
+      {/* Выбор склада */}
+      <div className="market-product-form__section">
+        <h3 className="market-product-form__section-title">Выбор склада</h3>
+        <div className="market-product-form__form-group">
+          <label className="market-product-form__label">Склад *</label>
+          <select
+            className="market-product-form__input"
+            value={selectedWarehouse}
+            onChange={(e) => setSelectedWarehouse(e.target.value)}
+            required
+            disabled={isEditMode || warehousesLoading}
+          >
+            <option value="">Выберите склад</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.name || warehouse.title || `Склад #${warehouse.id}`}
+              </option>
+            ))}
+          </select>
+          {fieldErrors.warehouse && (
+            <p className="add-product-page__error">{fieldErrors.warehouse}</p>
+          )}
+        </div>
+      </div>
 
       {/* Основная информация */}
-      <ProductBasicInfo
-        newItemData={newItemData}
-        handleChange={handleChange}
-        marketData={marketData}
-        handleMarketDataChange={handleMarketDataChange}
-        generateBarcode={generateBarcode}
-        fieldErrors={fieldErrors}
-        itemType={itemType}
-      />
+      <div className="market-product-form__section">
+        <h3 className="market-product-form__section-title">
+          Основная информация
+        </h3>
+
+        <div className="market-product-form__form-group">
+          <label className="market-product-form__label">Наименование *</label>
+          <input
+            type="text"
+            name="name"
+            placeholder="Введите наименование"
+            className="market-product-form__input"
+            value={newItemData.name}
+            onChange={handleChange}
+            required
+          />
+          {fieldErrors.name && (
+            <p className="add-product-page__error">{fieldErrors.name}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">
+              {itemType === "service" ? "Код услуги" : "Код товара"}
+            </label>
+            <input
+              type="text"
+              className="market-product-form__input"
+              value={marketData.code}
+              readOnly
+              placeholder="Генерируется автоматически"
+            />
+          </div>
+
+          <div className="market-product-form__form-group">
+            <label className="market-product-form__label">
+              Штрих-код{" "}
+              <button
+                type="button"
+                className="market-product-form__generate-link"
+                onClick={generateBarcode}
+              >
+                (Сгенерировать)
+              </button>
+            </label>
+            <input
+              type="text"
+              name="barcode"
+              placeholder="Введите штрих-код"
+              className="market-product-form__input"
+              value={newItemData.barcode}
+              onChange={handleChange}
+            />
+            {fieldErrors.barcode && (
+              <p className="add-product-page__error">{fieldErrors.barcode}</p>
+            )}
+          </div>
+
+          <div className="market-product-form__form-group col-span-full xl:col-span-1">
+            <label className="market-product-form__label">Артикул</label>
+            <input
+              type="text"
+              placeholder="Введите артикул"
+              className="market-product-form__input"
+              value={marketData.article}
+              onChange={(e) =>
+                handleMarketDataChange("article", e.target.value)
+              }
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Изображение */}
-      <ProductImagesSection
-        images={images}
-        fileInputRef={fileInputRef}
-        onImageAdd={addImages}
-        onImageRemove={removeImage}
-        onSetPrimary={setPrimaryImage}
-      />
+      <div className="market-product-form__section">
+        <h3 className="market-product-form__section-title">Изображение</h3>
+        <div className="market-product-form__image-upload">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              const newImages = files.map((file, idx) => ({
+                file,
+                alt: "",
+                is_primary: images.length === 0 && idx === 0,
+                preview: URL.createObjectURL(file),
+              }));
+              setImages((prev) => [...prev, ...newImages]);
+              // Сброс input для возможности повторного выбора того же файла
+              if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+              }
+            }}
+          />
+          <div
+            className="market-product-form__image-placeholder"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const files = Array.from(e.dataTransfer.files || []).filter((f) =>
+                f.type.startsWith("image/")
+              );
+              const newImages = files.map((file, idx) => ({
+                file,
+                alt: "",
+                is_primary: images.length === 0 && idx === 0,
+                preview: URL.createObjectURL(file),
+              }));
+              setImages((prev) => [...prev, ...newImages]);
+            }}
+            style={{ cursor: "pointer" }}
+          >
+            <p>Выберите фото для загрузки</p>
+            <p>или перетащите его мышью</p>
+            <button
+              type="button"
+              className="market-product-form__image-add-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+            >
+              +
+            </button>
+          </div>
+          {images.length > 0 && (
+            <div className="market-product-form__image-list">
+              {images.map((img, idx) => (
+                <div key={idx} className="market-product-form__image-item">
+                  <img
+                    src={img.preview}
+                    alt={img.alt || "Preview"}
+                    className="market-product-form__image-preview"
+                  />
+                  <button
+                    type="button"
+                    className="market-product-form__image-remove"
+                    onClick={() => {
+                      if (img.preview) URL.revokeObjectURL(img.preview);
+                      const newImages = images.filter((_, i) => i !== idx);
+                      // Если удалили главное, назначаем первое как главное
+                      if (
+                        img.is_primary &&
+                        newImages.length > 0 &&
+                        !newImages.some((p) => p.is_primary)
+                      ) {
+                        newImages[0] = { ...newImages[0], is_primary: true };
+                      }
+                      setImages(newImages);
+                    }}
+                  >
+                    ×
+                  </button>
+                  {img.is_primary && (
+                    <span className="market-product-form__image-primary">
+                      Главное
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="market-product-form__image-set-primary"
+                    onClick={() => {
+                      setImages((prev) =>
+                        prev.map((it, i) => ({
+                          ...it,
+                          is_primary: i === idx,
+                        }))
+                      );
+                    }}
+                  >
+                    {img.is_primary ? "Главное" : "Сделать главным"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Категория и Бренд */}
       <div className="market-product-form__section">
@@ -2890,4 +3487,4 @@ const MarketProductForm = ({
   );
 };
 
-export default AddProductPage;
+export default AddWarehouseProductPage;

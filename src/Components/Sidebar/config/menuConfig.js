@@ -494,6 +494,13 @@ export const MENU_CONFIG = {
         permission: "can_view_products",
         implemented: true,
       },
+      {
+        label: "Бренды и категории",
+        to: "/crm/warehouse/brands",
+        icon: menuIcons.tags,
+        permission: "can_view_brand_category",
+        implemented: true,
+      },
       // {
       //   label: "Справочники",
       //   to: "/crm/warehouse/directories",

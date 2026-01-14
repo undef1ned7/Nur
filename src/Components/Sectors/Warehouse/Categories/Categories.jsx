@@ -1,43 +1,46 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import "../Warehouses/Warehouses.scss";
+import { Plus } from "lucide-react";
+import "./Categories.scss";
 import AlertModal from "../../../common/AlertModal/AlertModal";
-import WarehouseHeader from "../Warehouses/components/WarehouseHeader";
 import SearchSection from "../../Market/Warehouse/components/SearchSection";
-import FilterModal from "../../Market/Warehouse/components/FilterModal";
 import BulkActionsBar from "../../Market/Warehouse/components/BulkActionsBar";
-import ProductTable from "../../Market/Warehouse/components/ProductTable";
-import ProductCards from "../../Market/Warehouse/components/ProductCards";
-import Pagination from "../Warehouses/components/Pagination";
+import Pagination from "../../Market/Warehouse/components/Pagination";
+import CategoryTable from "./components/CategoryTable";
+import CategoryCards from "./components/CategoryCards";
+import CreateCategoryModal from "./components/CreateCategoryModal";
 import {
-  bulkDeleteProductsAsync,
-  fetchProductsAsync,
-} from "../../../../store/creators/productCreators";
-import { useSearch } from "../Warehouses/hooks/useSearch";
-import { usePagination } from "../Warehouses/hooks/usePagination";
+  fetchWarehouseCategoriesAsync,
+  bulkDeleteWarehouseCategoriesAsync,
+} from "../../../../store/creators/warehouseCreators";
+import { useSearch } from "../../Market/Warehouse/hooks/useSearch";
+import { usePagination } from "../../Market/Warehouse/hooks/usePagination";
 import { useProductSelection } from "../../Market/Warehouse/hooks/useProductSelection";
-import {
-  useWarehouseData,
-  useWarehouseReferences,
-} from "../../Market/Warehouse/hooks/useWarehouseData";
 import { STORAGE_KEY, VIEW_MODES } from "../../Market/Warehouse/constants";
-import { formatDeleteMessage } from "../../Market/Warehouse/utils";
 
-const Stocks = () => {
+const Categories = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const warehouseId = searchParams.get("warehouse_id");
+
+  // Redux state
+  const {
+    categories,
+    categoriesCount,
+    categoriesNext,
+    categoriesPrevious,
+    categoriesLoading,
+    deletingCategory,
+  } = useSelector((state) => state.warehouse);
 
   // Состояние фильтров и модальных окон
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filters, setFilters] = useState({});
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(`${STORAGE_KEY}_categories`);
     if (saved === VIEW_MODES.TABLE || saved === VIEW_MODES.CARDS) return saved;
     const isSmall = window.matchMedia("(max-width: 1199px)").matches;
     return isSmall ? VIEW_MODES.CARDS : VIEW_MODES.TABLE;
@@ -45,9 +48,7 @@ const Stocks = () => {
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
-
-  // Загрузка справочников
-  const { brands, categories } = useWarehouseReferences();
+  const [searchParams] = useSearchParams();
 
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(
@@ -59,22 +60,19 @@ const Stocks = () => {
   const requestParams = useMemo(() => {
     const params = {
       page: currentPageFromUrl,
-      ...filters,
     };
-    if (warehouseId) {
-      params.warehouse = warehouseId;
-    }
     if (debouncedSearchTerm?.trim()) {
       params.search = debouncedSearchTerm.trim();
     }
     return params;
-  }, [currentPageFromUrl, filters, debouncedSearchTerm, warehouseId]);
+  }, [currentPageFromUrl, debouncedSearchTerm]);
 
-  // Загрузка товаров
-  const { products, loading, count, next, previous } =
-    useWarehouseData(requestParams);
+  // Загрузка категорий
+  useEffect(() => {
+    dispatch(fetchWarehouseCategoriesAsync(requestParams));
+  }, [dispatch, requestParams]);
 
-  // Хук для пагинации с реальными данными
+  // Хук для пагинации
   const {
     currentPage,
     totalPages,
@@ -83,7 +81,7 @@ const Stocks = () => {
     getRowNumber,
     handlePageChange: handlePageChangeBase,
     resetToFirstPage,
-  } = usePagination(count, next, previous);
+  } = usePagination(categoriesCount, categoriesNext, categoriesPrevious);
 
   // Сброс на первую страницу при изменении поиска
   useEffect(() => {
@@ -92,7 +90,7 @@ const Stocks = () => {
     }
   }, [debouncedSearchTerm, resetToFirstPage]);
 
-  // Хук для выбора товаров
+  // Хук для выбора категорий
   const {
     selectedRows,
     isAllSelected,
@@ -101,21 +99,22 @@ const Stocks = () => {
     handleSelectAll,
     clearSelection,
     setSelectedRows,
-  } = useProductSelection(products);
+  } = useProductSelection(categories);
 
   // Сохранение режима просмотра
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, viewMode);
+      localStorage.setItem(`${STORAGE_KEY}_categories`, viewMode);
     }
   }, [viewMode]);
 
   // Обработчики событий
-  const handleProductClick = useCallback(
-    (product) => {
-      navigate(`/crm/sklad/${product.id}`);
+  const handleCategoryClick = useCallback(
+    (category) => {
+      setEditingCategory(category);
+      setShowCreateModal(true);
     },
-    [navigate]
+    []
   );
 
   const handlePageChange = useCallback(
@@ -135,7 +134,7 @@ const Stocks = () => {
     setBulkDeleting(true);
     try {
       await dispatch(
-        bulkDeleteProductsAsync({
+        bulkDeleteWarehouseCategoriesAsync({
           ids: Array.from(selectedRows),
           soft: true,
           require_all: false,
@@ -143,11 +142,11 @@ const Stocks = () => {
       ).unwrap();
 
       setSelectedRows(new Set());
-      dispatch(fetchProductsAsync(requestParams));
+      dispatch(fetchWarehouseCategoriesAsync(requestParams));
     } catch (e) {
-      console.error("Ошибка при удалении товаров:", e);
+      console.error("Ошибка при удалении категорий:", e);
       alert(
-        "Не удалось удалить товары: " +
+        "Не удалось удалить категории: " +
           (e?.message || e?.detail || "Неизвестная ошибка")
       );
     } finally {
@@ -155,78 +154,104 @@ const Stocks = () => {
     }
   }, [dispatch, selectedRows, requestParams]);
 
-  const handleApplyFilters = useCallback((newFilters) => {
-    setFilters(newFilters);
-  }, []);
-
-  const handleResetFilters = useCallback(() => {
-    setFilters({});
+  const handleCreateCategory = useCallback(() => {
+    setEditingCategory(null);
+    setShowCreateModal(true);
   }, []);
 
   const handleViewModeChange = useCallback((mode) => {
     setViewMode(mode);
   }, []);
 
-  const handleCreateProduct = useCallback(() => {
-    if (warehouseId) {
-      navigate(`/crm/warehouse/stocks/add-product?warehouse_id=${warehouseId}`);
-    } else {
-      navigate("/crm/warehouse/stocks/add-product");
-    }
-  }, [navigate, warehouseId]);
+  const handleModalClose = useCallback(() => {
+    setShowCreateModal(false);
+    setEditingCategory(null);
+  }, []);
+
+  const handleCategorySaved = useCallback(() => {
+    dispatch(fetchWarehouseCategoriesAsync(requestParams));
+  }, [dispatch, requestParams]);
+
+  // Фильтрация категорий по поисковому запросу
+  const filteredCategories = useMemo(() => {
+    if (!debouncedSearchTerm?.trim()) return categories;
+    const searchLower = debouncedSearchTerm.toLowerCase();
+    return categories.filter((category) =>
+      category.name?.toLowerCase().includes(searchLower)
+    );
+  }, [categories, debouncedSearchTerm]);
 
   // Мемоизация сообщения для модального окна удаления
   const deleteModalMessage = useMemo(
-    () => formatDeleteMessage(selectedCount),
+    () => {
+      const count = selectedCount;
+      if (count === 1) return "Вы уверены, что хотите удалить выбранную категорию?";
+      return `Вы уверены, что хотите удалить ${count} категорий?`;
+    },
     [selectedCount]
   );
 
   return (
     <div className="warehouse-page">
-      <WarehouseHeader 
-        onCreateProduct={handleCreateProduct}
-        title="Товары склада"
-        subtitle="Управление товарами на складе"
-      />
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon">
+            <div className="warehouse-header__icon-box">📁</div>
+          </div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">Категории</h1>
+            <p className="warehouse-header__subtitle">
+              Управление категориями склада
+            </p>
+          </div>
+        </div>
+        <button
+          className="warehouse-header__create-btn"
+          onClick={handleCreateCategory}
+        >
+          <Plus size={16} />
+          Создать категорию
+        </button>
+      </div>
 
       <SearchSection
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
-        onOpenFilters={() => setShowFilterModal(true)}
-        count={count}
-        foundCount={products.length}
+        onOpenFilters={null}
+        count={categoriesCount}
+        foundCount={filteredCategories.length}
       />
 
       <BulkActionsBar
         selectedCount={selectedCount}
         onClearSelection={clearSelection}
         onBulkDelete={handleBulkDelete}
-        isDeleting={bulkDeleting}
+        isDeleting={bulkDeleting || deletingCategory}
       />
 
       <div className="warehouse-table-container w-full">
         {viewMode === VIEW_MODES.TABLE ? (
-          <ProductTable
-            products={products}
-            loading={loading}
+          <CategoryTable
+            categories={filteredCategories}
+            loading={categoriesLoading}
             selectedRows={selectedRows}
             isAllSelected={isAllSelected}
             onRowSelect={handleRowSelect}
             onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
+            onCategoryClick={handleCategoryClick}
             getRowNumber={getRowNumber}
           />
         ) : (
-          <ProductCards
-            products={products}
-            loading={loading}
+          <CategoryCards
+            categories={filteredCategories}
+            loading={categoriesLoading}
             selectedRows={selectedRows}
             isAllSelected={isAllSelected}
             onRowSelect={handleRowSelect}
             onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
+            onCategoryClick={handleCategoryClick}
             getRowNumber={getRowNumber}
           />
         )}
@@ -234,22 +259,19 @@ const Stocks = () => {
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          count={count}
-          loading={loading}
+          count={categoriesCount}
+          loading={categoriesLoading}
           hasNextPage={hasNextPage}
           hasPrevPage={hasPrevPage}
           onPageChange={handlePageChange}
         />
       </div>
 
-      {showFilterModal && (
-        <FilterModal
-          onClose={() => setShowFilterModal(false)}
-          currentFilters={filters}
-          onApplyFilters={handleApplyFilters}
-          onResetFilters={handleResetFilters}
-          brands={brands}
-          categories={categories}
+      {showCreateModal && (
+        <CreateCategoryModal
+          onClose={handleModalClose}
+          category={editingCategory}
+          onSaved={handleCategorySaved}
         />
       )}
 
@@ -266,4 +288,5 @@ const Stocks = () => {
   );
 };
 
-export default Stocks;
+export default Categories;
+
