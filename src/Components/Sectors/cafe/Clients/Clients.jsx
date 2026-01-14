@@ -25,7 +25,7 @@ const toNum = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/* DRF fetch-all (для столов) */
+/* DRF fetch-all */
 async function fetchAll(url0) {
   let url = url0;
   const acc = [];
@@ -227,7 +227,7 @@ const Clients = () => {
             new Date(a.updated_at_derived || a.updated_at || 0)
         );
       });
-      // подгрузим stats для нового клиента
+
       getOrdersStatsByClient(c.id)
         .then((stats) =>
           setRows((prev) =>
@@ -244,6 +244,7 @@ const Clients = () => {
         )
         .catch(() => {});
     };
+
     window.addEventListener("clients:refresh", onClientsRefresh);
     return () =>
       window.removeEventListener("clients:refresh", onClientsRefresh);
@@ -281,6 +282,8 @@ const Clients = () => {
     setIsFormOpen(true);
   };
   const onDelete = async (id) => {
+    // оставил как есть, потому что ты не просил менять UX удаления
+    // но да: window.confirm — плохая практика для нормального UI
     if (!window.confirm("Удалить клиента?")) return;
     try {
       await removeClient(id);
@@ -557,7 +560,31 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [openOrder, setOpenOrder] = useState(null); // ← МОДАЛКА ДЕТАЛЕЙ
+  const [openOrder, setOpenOrder] = useState(null);
+
+  // ВАЖНО: карта меню, чтобы доставать названия по menu_item(id)
+  const [menuMap, setMenuMap] = useState(new Map()); // id -> {title, price}
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const allMenu = await fetchAll("/cafe/menu-items/");
+        const m = new Map(
+          (Array.isArray(allMenu) ? allMenu : []).map((x) => [
+            String(x.id),
+            { title: x.title, price: toNum(x.price) },
+          ])
+        );
+        if (mounted) setMenuMap(m);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // закрытие по ESC (включая модалку заказа)
   useEffect(() => {
@@ -576,12 +603,13 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
     (async () => {
       try {
         setLoading(true);
-        const all = await getAll(); // клиенты
+        const all = await getAll();
         const c = all.find((x) => String(x.id) === String(id)) || null;
-        const ords = await getOrdersByClient(id); // активные + история
+
+        const ords = await getOrdersByClient(id);
         if (mounted) {
           setClient(c);
-          setOrders(ords);
+          setOrders(Array.isArray(ords) ? ords : []);
         }
       } finally {
         if (mounted) setLoading(false);
@@ -647,13 +675,47 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
     return "Стол —";
   };
 
-  // ——— helpers для модалки заказа ———
-  const itemName = (it) =>
-    it?.menu_item_name || it?.name || it?.title || "Без названия";
-  const itemPrice = (it) =>
-    toNum(it.menu_item_price ?? it.price ?? it.price_each ?? 0);
+  // ===== fixes: нормальное имя позиции =====
+  const itemName = (it) => {
+    const direct =
+      it?.menu_item_title ??
+      it?.menu_title ??
+      it?.menu_item_name ??
+      it?.menu_item?.title ??
+      it?.menu_item?.name ??
+      it?.name ??
+      it?.title ??
+      "";
+
+    const viaId =
+      (it?.menu_item != null && menuMap.get(String(it.menu_item))?.title) ||
+      (it?.menu_item_id != null && menuMap.get(String(it.menu_item_id))?.title) ||
+      "";
+
+    return String(direct || viaId || "").trim() || "Без названия";
+  };
+
+  const itemPrice = (it) => {
+    const direct = toNum(it.menu_item_price ?? it.price ?? it.price_each ?? 0);
+    if (direct > 0) return direct;
+
+    const byId =
+      (it?.menu_item != null && menuMap.get(String(it.menu_item))?.price) ||
+      (it?.menu_item_id != null && menuMap.get(String(it.menu_item_id))?.price) ||
+      0;
+
+    return toNum(byId);
+  };
+
   const itemQty = (it) => Number(it.quantity) || 0;
   const lineTotal = (it) => itemPrice(it) * itemQty(it);
+
+  const orderTotal = (o) => {
+    const t = toNum(o.total ?? o.total_amount ?? o.sum ?? o.amount);
+    if (t > 0) return t;
+    const items = Array.isArray(o.items) ? o.items : [];
+    return items.reduce((s, it) => s + lineTotal(it), 0);
+  };
 
   return (
     <div
@@ -758,7 +820,7 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
                         <td>{tableLabel(o)}</td>
                         <td>{o.guests ?? "—"}</td>
                         <td>{o.status || "—"}</td>
-                        <td>{fmtMoney(o.total)}</td>
+                        <td>{fmtMoney(orderTotal(o))}</td>
                         <td>
                           {o.created_at
                             ? new Date(o.created_at).toLocaleString()
@@ -811,7 +873,6 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
               </button>
             </div>
 
-            {/* Краткая сводка */}
             <div className="clients__form" style={{ paddingTop: 0 }}>
               <div className="clients__formGrid">
                 <div className="clients__field">
@@ -836,7 +897,6 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
                 </div>
               </div>
 
-              {/* Таблица позиций */}
               <div className="clients__tableWrap" style={{ marginTop: 10 }}>
                 <table className="clients__table">
                   <thead>
@@ -850,11 +910,8 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
                   <tbody>
                     {(openOrder.items || []).length ? (
                       openOrder.items.map((it, i) => (
-                        <tr key={i}>
-                          <td
-                            className="clients__ellipsis"
-                            title={itemName(it)}
-                          >
+                        <tr key={it?.id || it?.menu_item || i}>
+                          <td className="clients__ellipsis" title={itemName(it)}>
                             {itemName(it)}
                           </td>
                           <td>{itemQty(it)}</td>
@@ -876,7 +933,7 @@ const ClientCard = ({ id, onClose, tablesMap }) => {
                         <th colSpan={3} style={{ textAlign: "right" }}>
                           Итого:
                         </th>
-                        <th>{fmtMoney(openOrder.total)}</th>
+                        <th>{fmtMoney(orderTotal(openOrder))}</th>
                       </tr>
                     </tfoot>
                   ) : null}

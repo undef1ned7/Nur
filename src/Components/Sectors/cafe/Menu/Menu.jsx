@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { FaListUl, FaThLarge } from "react-icons/fa";
 import api from "../../../../api";
 import "./Menu.scss";
 
@@ -9,22 +10,27 @@ import MenuItemModal from "./components/MenuItemModal";
 import MenuCategoryModal from "./components/MenuCategoryModal";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
+
 const toNum = (x) => {
   if (x === null || x === undefined) return 0;
   const n = Number(String(x).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
+
 const fmtMoney = (n) =>
   new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(toNum(n));
 
+const numStr = (n) => String(Number(n) || 0).replace(",", ".");
+
 const Menu = () => {
   const [activeTab, setActiveTab] = useState("items");
+  const [viewMode, setViewMode] = useState("list"); // "list" | "cards"
 
-  const [categories, setCategories] = useState([]); 
-  const [warehouse, setWarehouse] = useState([]); 
+  const [categories, setCategories] = useState([]);
+  const [warehouse, setWarehouse] = useState([]);
 
   const [items, setItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(true);
@@ -40,11 +46,12 @@ const Menu = () => {
     category: "",
     price: 0,
     is_active: true,
-    ingredients: [], 
+    ingredients: [],
   });
 
-  const [imageFile, setImageFile] = useState(null); 
-  const [imagePreview, setImagePreview] = useState(""); 
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [catEditId, setCatEditId] = useState(null);
   const [catTitle, setCatTitle] = useState("");
@@ -65,12 +72,37 @@ const Menu = () => {
   const productTitle = (id) => warehouseMap.get(id)?.title || id || "";
   const productUnit = (id) => warehouseMap.get(id)?.unit || "";
 
+  const fetchCats = async () => {
+    const cats = await api.get("/cafe/categories/");
+    setCategories(listFrom(cats));
+  };
+
+  const fetchWarehouse = async () => {
+    const wh = await api.get("/cafe/warehouse/");
+    setWarehouse(listFrom(wh));
+  };
+
+  const fetchMenuList = async () => {
+    const res = await api.get("/cafe/menu-items/");
+    setItems(listFrom(res));
+  };
+
+  const fetchMenuDetail = async (id) => {
+    if (!id) return null;
+    try {
+      const r = await api.get(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
+      return r?.data || null;
+    } catch (e) {
+      console.error("Ошибка detail блюда:", e);
+      return null;
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
         setLoadingCats(true);
-        const cats = await api.get("/cafe/categories/");
-        setCategories(listFrom(cats));
+        await fetchCats();
       } catch (e) {
         console.error("Ошибка категорий:", e);
       } finally {
@@ -82,8 +114,7 @@ const Menu = () => {
   useEffect(() => {
     (async () => {
       try {
-        const wh = await api.get("/cafe/warehouse/");
-        setWarehouse(listFrom(wh));
+        await fetchWarehouse();
       } catch (e) {
         console.error("Ошибка склада:", e);
       }
@@ -94,8 +125,7 @@ const Menu = () => {
     (async () => {
       try {
         setLoadingItems(true);
-        const res = await api.get("/cafe/menu-items/");
-        setItems(listFrom(res));
+        await fetchMenuList();
       } catch (e) {
         console.error("Ошибка меню:", e);
       } finally {
@@ -142,79 +172,146 @@ const Menu = () => {
     setModalOpen(true);
   };
 
-  const openEdit = (item) => {
-    setEditingId(item.id);
+  const openEdit = async (item) => {
+    const baseId = item?.id;
+    let full = item;
+
+    if (!Array.isArray(item?.ingredients)) {
+      const d = await fetchMenuDetail(baseId);
+      if (d) full = d;
+    }
+
+    setEditingId(full.id);
     setForm({
-      title: item.title || "",
-      category: item.category || categories[0]?.id || "",
-      price: toNum(item.price),
-      is_active: !!item.is_active,
-      ingredients: Array.isArray(item.ingredients)
-        ? item.ingredients.map((ing) => ({
+      title: full.title || "",
+      category: full.category || categories[0]?.id || "",
+      price: toNum(full.price),
+      is_active: !!full.is_active,
+      ingredients: Array.isArray(full.ingredients)
+        ? full.ingredients.map((ing) => ({
             product: ing.product,
             amount: toNum(ing.amount),
           }))
         : [],
     });
+
     setImageFile(null);
-    setImagePreview(item.image_url || "");
+    setImagePreview(full.image_url || "");
     setModalOpen(true);
   };
 
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     if (imagePreview && imagePreview.startsWith("blob:")) {
       URL.revokeObjectURL(imagePreview);
     }
+
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
 
-  const saveItem = async (e) => {
-    e.preventDefault();
+  const buildPayload = () => {
     const payload = {
       title: (form.title || "").trim(),
       category: form.category,
-      price: String(Math.max(0, Number(form.price) || 0)),
+      price: numStr(Math.max(0, Number(form.price) || 0)),
       is_active: !!form.is_active,
       ingredients: (form.ingredients || [])
         .filter((r) => r && r.product && (Number(r.amount) || 0) > 0)
         .map((r) => ({
           product: r.product,
-          amount: String(Math.max(0, Number(r.amount) || 0)),
+          amount: numStr(Math.max(0, Number(r.amount) || 0)),
         })),
     };
-    if (!payload.title || !payload.category) return;
+
+    if (!payload.title || !payload.category) return null;
+    return payload;
+  };
+
+  const uploadImageIfNeeded = async (id) => {
+    if (!id || !imageFile) return true;
 
     const fd = new FormData();
-    fd.append("title", payload.title);
-    fd.append("category", payload.category);
-    fd.append("price", payload.price);
-    fd.append("is_active", payload.is_active ? "true" : "false");
-    fd.append("ingredients", JSON.stringify(payload.ingredients));
-    if (imageFile) {
-      fd.append("image", imageFile);
-    }
+    fd.append("image", imageFile);
 
     try {
-      if (editingId == null) {
-        const res = await api.post("/cafe/menu-items/", fd, {
+      await api.patch(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return true;
+    } catch (e) {
+      try {
+        const p = buildPayload();
+        if (!p) return false;
+
+        const fd2 = new FormData();
+        fd2.append("title", p.title);
+        fd2.append("category", p.category);
+        fd2.append("price", p.price);
+        fd2.append("is_active", p.is_active ? "true" : "false");
+        fd2.append("ingredients", JSON.stringify(p.ingredients));
+        fd2.append("image", imageFile);
+
+        await api.put(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, fd2, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        setItems((prev) => [...prev, res.data]);
-      } else {
-        const res = await api.put(`/cafe/menu-items/${editingId}/`, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        setItems((prev) =>
-          prev.map((m) => (m.id === editingId ? res.data : m))
-        );
+
+        return true;
+      } catch (e2) {
+        console.error("Ошибка загрузки картинки:", e2);
+        return false;
       }
+    }
+  };
+
+  const saveItem = async (e) => {
+    e.preventDefault();
+
+    const payload = buildPayload();
+    if (!payload) return;
+
+    try {
+      let saved = null;
+
+      if (editingId == null) {
+        const res = await api.post("/cafe/menu-items/", payload);
+        saved = res?.data || null;
+      } else {
+        const res = await api.put(
+          `/cafe/menu-items/${encodeURIComponent(String(editingId))}/`,
+          payload
+        );
+        saved = res?.data || null;
+      }
+
+      const savedId = saved?.id || editingId;
+
+      if (imageFile && savedId) {
+        const ok = await uploadImageIfNeeded(savedId);
+        if (!ok) console.error("Картинка не загрузилась, но блюдо сохранено.");
+      }
+
+      const full = savedId ? await fetchMenuDetail(savedId) : null;
+      const finalItem = full || saved;
+
+      if (finalItem?.id) {
+        setItems((prev) => {
+          const exists = prev.some((m) => String(m.id) === String(finalItem.id));
+          if (!exists) return [...prev, finalItem];
+          return prev.map((m) => (String(m.id) === String(finalItem.id) ? finalItem : m));
+        });
+      } else {
+        await fetchMenuList();
+      }
+
       setModalOpen(false);
+
       if (imagePreview && imagePreview.startsWith("blob:")) {
         URL.revokeObjectURL(imagePreview);
       }
+
       setImageFile(null);
       setImagePreview("");
     } catch (err) {
@@ -225,8 +322,8 @@ const Menu = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Удалить позицию меню?")) return;
     try {
-      await api.delete(`/cafe/menu-items/${id}/`);
-      setItems((prev) => prev.filter((m) => m.id !== id));
+      await api.delete(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
+      setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
     } catch (err) {
       console.error("Ошибка удаления позиции меню:", err);
     }
@@ -271,12 +368,11 @@ const Menu = () => {
     e.preventDefault();
     const payload = { title: (catTitle || "").trim() };
     if (!payload.title) return;
+
     try {
       if (catEditId) {
-        const res = await api.put(`/cafe/categories/${catEditId}/`, payload);
-        setCategories((prev) =>
-          prev.map((c) => (c.id === catEditId ? res.data : c))
-        );
+        const res = await api.put(`/cafe/categories/${encodeURIComponent(String(catEditId))}/`, payload);
+        setCategories((prev) => prev.map((c) => (c.id === catEditId ? res.data : c)));
       } else {
         const res = await api.post("/cafe/categories/", payload);
         setCategories((prev) => [...prev, res.data]);
@@ -290,8 +386,8 @@ const Menu = () => {
   const removeCat = async (id) => {
     if (!window.confirm("Удалить категорию?")) return;
     try {
-      await api.delete(`/cafe/categories/${id}/`);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+      await api.delete(`/cafe/categories/${encodeURIComponent(String(id))}/`);
+      setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
     } catch (e) {
       console.error("Ошибка удаления категории:", e);
     }
@@ -299,7 +395,32 @@ const Menu = () => {
 
   return (
     <section className="menu">
-      <MenuHeader activeTab={activeTab} onTabChange={setActiveTab} />
+      <div className="menu__topRow">
+        <div className="menu__topGrow">
+          <MenuHeader activeTab={activeTab} onTabChange={setActiveTab} />
+        </div>
+
+        {activeTab === "items" && (
+          <div className="menu__viewToggle" aria-label="Переключение вида">
+            <button
+              type="button"
+              className={`menu__viewBtn ${viewMode === "list" ? "menu__viewBtn--active" : ""}`}
+              onClick={() => setViewMode("list")}
+              title="Список"
+            >
+              <FaListUl />
+            </button>
+            <button
+              type="button"
+              className={`menu__viewBtn ${viewMode === "cards" ? "menu__viewBtn--active" : ""}`}
+              onClick={() => setViewMode("cards")}
+              title="Карточки"
+            >
+              <FaThLarge />
+            </button>
+          </div>
+        )}
+      </div>
 
       {activeTab === "items" && (
         <MenuItemsTab
@@ -316,6 +437,7 @@ const Menu = () => {
           toNum={toNum}
           productTitle={productTitle}
           productUnit={productUnit}
+          viewMode={viewMode}
         />
       )}
 
