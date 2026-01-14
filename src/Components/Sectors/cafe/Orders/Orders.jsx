@@ -9,7 +9,6 @@ import {
   FaEdit,
   FaCheckCircle,
   FaMinus,
-  FaChevronDown,
 } from "react-icons/fa";
 import api from "../../../../api";
 import { getAll as getAllClients, createClient } from "../Clients/clientStore";
@@ -21,7 +20,11 @@ import {
   attachUsbListenersOnce,
   checkPrinterConnection,
   printOrderReceiptJSONViaUSBWithDialog,
+  printOrderReceiptJSONViaUSB,
+  setActivePrinterByKey,
 } from "./OrdersPrintService";
+
+import { RightMenuPanel, SearchSelect } from "./OrdersParts";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -119,309 +122,13 @@ const safeUserData = () => {
   }
 };
 
-/* =========================================================
-   Searchable Combobox (SearchSelect) — один открытый и закрывается после выбора
-   ========================================================= */
-const SearchSelect = ({
-  id,
-  openId,
-  setOpenId,
-  label,
-  placeholder = "Выберите…",
-  value,
-  onChange,
-  options = [],
-  disabled = false,
-  hint,
-  allowClear = true,
-}) => {
-  const rootRef = useRef(null);
-  const inputRef = useRef(null);
-
-  const open = openId === id;
-
-  const [q, setQ] = useState("");
-  const [dir, setDir] = useState("down"); // down | up
-
-  const selected = useMemo(
-    () => options.find((o) => String(o.value) === String(value)) || null,
-    [options, value]
-  );
-
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return options;
-
-    return options.filter((o) => {
-      const hay = String(o.search ?? o.label ?? "").toLowerCase();
-      return hay.includes(s);
-    });
-  }, [options, q]);
-
-  const closeDropdown = useCallback(() => {
-    setOpenId(null);
-    setQ("");
-  }, [setOpenId]);
-
-  const computeDir = useCallback(() => {
-    const el = rootRef.current;
-    if (!el) return;
-
-    const r = el.getBoundingClientRect();
-    const viewportH = window.innerHeight || 0;
-
-    const estimated = Math.min(320, 56 + (options?.length || 0) * 44);
-    const spaceBelow = viewportH - r.bottom;
-    const spaceAbove = r.top;
-
-    if (spaceBelow < estimated && spaceAbove > spaceBelow) setDir("up");
-    else setDir("down");
-  }, [options]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onDoc = (e) => {
-      if (!rootRef.current) return;
-      if (!rootRef.current.contains(e.target)) closeDropdown();
-    };
-
-    const onKey = (e) => {
-      if (e.key === "Escape") closeDropdown();
-    };
-
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", computeDir, { passive: true });
-    window.addEventListener("scroll", computeDir, { passive: true });
-
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", computeDir);
-      window.removeEventListener("scroll", computeDir);
-    };
-  }, [open, computeDir, closeDropdown]);
-
-  useEffect(() => {
-    if (!open) {
-      setQ("");
-      return;
-    }
-    computeDir();
-    const t = window.setTimeout(() => inputRef.current?.focus?.(), 0);
-    return () => window.clearTimeout(t);
-  }, [open, computeDir]);
-
-  const openDropdown = () => {
-    if (disabled) return;
-    setOpenId(id);
-    setQ("");
-  };
-
-  const toggleDropdown = () => {
-    if (disabled) return;
-    setOpenId((prev) => {
-      const next = prev === id ? null : id;
-      return next;
-    });
-    setQ("");
-  };
-
-  const pick = (opt) => {
-    onChange?.(opt.value);
-    closeDropdown();
-  };
-
-  const clear = () => {
-    onChange?.("");
-    closeDropdown();
-  };
-
-  const shownValue = open ? q : selected?.label || "";
-
-  return (
-    <div ref={rootRef} className={`sselect ${open ? "sselect--open" : ""}`}>
-      {label ? <div className="sselect__label">{label}</div> : null}
-
-      <div
-        className={`sselect__control ${open ? "sselect__control--open" : ""} ${
-          disabled ? "sselect__control--disabled" : ""
-        }`}
-        onMouseDown={(e) => {
-          if (disabled) return;
-          e.preventDefault();
-
-          // если уже открыто и клик по input — не сворачиваем, чтобы можно было выделять текст
-          if (open && e.target === inputRef.current) return;
-
-          toggleDropdown();
-        }}
-        role="combobox"
-        aria-expanded={open}
-        aria-disabled={disabled}
-      >
-        <input
-          ref={inputRef}
-          className="sselect__input"
-          value={shownValue}
-          onChange={(e) => {
-            if (!open) setOpenId(id);
-            setQ(e.target.value);
-          }}
-          onFocus={() => openDropdown()}
-          placeholder={placeholder}
-          readOnly={!open}
-          disabled={disabled}
-        />
-
-        {allowClear && !disabled && value ? (
-          <button
-            type="button"
-            className="sselect__clear"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              clear();
-            }}
-            aria-label="Очистить"
-            title="Очистить"
-          >
-            <FaTimes />
-          </button>
-        ) : null}
-
-        <span className="sselect__icon" aria-hidden>
-          <FaChevronDown />
-        </span>
-
-        {open && (
-          <div
-            className={`sselect__dropdown ${dir === "up" ? "sselect__dropdown--up" : ""}`}
-            role="listbox"
-            onMouseDown={(e) => {
-              // важно: иначе событие долетит до control и снова откроет/закроет
-              e.stopPropagation();
-            }}
-          >
-            <div className="sselect__list">
-              {filtered.length ? (
-                filtered.map((opt) => {
-                  const active = String(opt.value) === String(value);
-                  return (
-                    <button
-                      key={String(opt.value)}
-                      type="button"
-                      className={`sselect__item ${active ? "sselect__item--active" : ""}`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        pick(opt);
-                      }}
-                      title={opt.label}
-                    >
-                      <span className="sselect__itemLabel">{opt.label}</span>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="sselect__empty">Ничего не найдено</div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {hint ? <div className="sselect__hint">{hint}</div> : null}
-    </div>
-  );
-};
-
-/* =========================================================
-   Правая панель меню
-   ========================================================= */
-const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick }) => {
-  const [q, setQ] = useState("");
-
-  useEffect(() => {
-    if (!open) setQ("");
-  }, [open]);
-
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return menuItems || [];
-    return (menuItems || []).filter((m) => String(m?.title || "").toLowerCase().includes(s));
-  }, [menuItems, q]);
-
-  if (!open) return null;
-
-  return (
-    <aside className="orders-rpanel" aria-label="Меню">
-      <div className="orders-rpanel__head">
-        <div className="orders-rpanel__title">Меню</div>
-        <button
-          type="button"
-          className="orders-rpanel__close"
-          onClick={onClose}
-          aria-label="Закрыть"
-        >
-          <FaTimes />
-        </button>
-      </div>
-
-      <div className="orders-rpanel__search">
-        <FaSearch className="orders-rpanel__searchIcon" />
-        <input
-          className="orders-rpanel__searchInput"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Поиск блюд…"
-        />
-      </div>
-
-      <div className="orders-rpanel__list">
-        {filtered.length ? (
-          filtered.map((m) => {
-            const img = menuImageUrl?.(m.id);
-            return (
-              <button
-                key={m.id}
-                type="button"
-                className="orders-rpanel__item"
-                onClick={() => onPick(m)}
-                title={m.title}
-              >
-                <span className="orders-rpanel__thumb" aria-hidden>
-                  {img ? <img src={img} alt="" /> : <FaClipboardList />}
-                </span>
-
-                <span className="orders-rpanel__meta">
-                  <span className="orders-rpanel__name">{m.title}</span>
-                  <span className="orders-rpanel__price">{fmtMoney(m.price)} сом</span>
-                </span>
-
-                <span className="orders-rpanel__add" aria-hidden>
-                  <FaPlus />
-                </span>
-              </button>
-            );
-          })
-        ) : (
-          <div className="orders-rpanel__empty">Ничего не найдено</div>
-        )}
-      </div>
-
-      <div className="orders-rpanel__footer">
-        <button
-          type="button"
-          className="orders__btn orders__btn--primary orders__btn--wide"
-          onClick={onClose}
-        >
-          Готов
-        </button>
-      </div>
-    </aside>
-  );
+const readKitchenPrinterMap = () => {
+  try {
+    const raw = localStorage.getItem("kitchen_printer_map");
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
 };
 
 /* =========================================================
@@ -434,13 +141,13 @@ const Orders = () => {
   const menuCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
 
+  const [kitchens, setKitchens] = useState([]);
+
   const [cashboxes, setCashboxes] = useState([]);
   const [cashboxId, setCashboxId] = useState("");
 
   const [orders, setOrders] = useState([]);
   const [query, setQuery] = useState("");
-
-  const originalTableRef = useRef(null);
 
   const userData = useMemo(() => safeUserData(), []);
   const userRole = userData?.role || "";
@@ -464,10 +171,27 @@ const Orders = () => {
     setEmployees(arr.map(normalizeEmployee));
   };
 
+  const fetchKitchens = async () => {
+    try {
+      const r = await api.get("/cafe/kitchens/");
+      setKitchens(listFrom(r) || []);
+    } catch (e) {
+      console.error("Ошибка загрузки кухонь:", e);
+      setKitchens([]);
+    }
+  };
+
   const fetchMenu = async () => {
     const arr = listFrom(await api.get("/cafe/menu-items/")) || [];
     setMenuItems(arr);
-    for (const m of arr) menuCacheRef.current.set(String(m.id), m);
+
+    for (const m of arr) {
+      // важно: сохраняем kitchen, чтобы печатать по кухне
+      menuCacheRef.current.set(String(m.id), {
+        ...m,
+        kitchen: m.kitchen ?? null,
+      });
+    }
   };
 
   const fetchCashboxes = async () => {
@@ -489,6 +213,7 @@ const Orders = () => {
     const ids = list
       .filter((o) => !Array.isArray(o.items) || o.items.length === 0)
       .map((o) => o.id);
+
     if (!ids.length) return list;
 
     const details = await Promise.all(
@@ -521,7 +246,13 @@ const Orders = () => {
 
     (async () => {
       try {
-        await Promise.all([fetchTables(), fetchEmployees(), fetchMenu(), fetchCashboxes()]);
+        await Promise.all([
+          fetchTables(),
+          fetchEmployees(),
+          fetchMenu(),
+          fetchKitchens(),
+          fetchCashboxes(),
+        ]);
         await fetchOrders();
       } catch (e) {
         console.error("Ошибка загрузки:", e);
@@ -548,6 +279,19 @@ const Orders = () => {
   );
   const waitersMap = useMemo(() => new Map(waiters.map((w) => [w.id, w])), [waiters]);
 
+  const kitchensMap = useMemo(() => {
+    const m = new Map();
+    (kitchens || []).forEach((k) => {
+      const title = String(k?.title || k?.name || k?.kitchen_title || "Кухня").trim();
+      const number = k?.number ?? k?.kitchen_number;
+      const label = `${title}${
+        number !== undefined && number !== null && number !== "" ? ` №${number}` : ""
+      }`;
+      m.set(String(k?.id), { ...k, label });
+    });
+    return m;
+  }, [kitchens]);
+
   const menuMap = useMemo(() => {
     const m = new Map();
     menuItems.forEach((mi) =>
@@ -555,6 +299,7 @@ const Orders = () => {
         title: mi.title,
         price: toNum(mi.price),
         image_url: mi.image_url || "",
+        kitchen: mi.kitchen ?? null,
       })
     );
     return m;
@@ -563,6 +308,15 @@ const Orders = () => {
   const menuImageUrl = (id) => {
     const key = String(id ?? "");
     return menuMap.get(key)?.image_url || (menuCacheRef.current.get(key)?.image_url ?? "");
+  };
+
+  const getMenuKitchenId = (menuId) => {
+    const key = String(menuId ?? "");
+    return (
+      menuMap.get(key)?.kitchen ??
+      menuCacheRef.current.get(key)?.kitchen ??
+      null
+    );
   };
 
   const busyTableIds = useMemo(() => {
@@ -594,7 +348,8 @@ const Orders = () => {
 
   const visibleOrders = useMemo(() => {
     if (showAll) return roleFiltered;
-    if (roleFiltered.length > ORDERS_COLLAPSE_LIMIT) return roleFiltered.slice(0, ORDERS_COLLAPSE_LIMIT);
+    if (roleFiltered.length > ORDERS_COLLAPSE_LIMIT)
+      return roleFiltered.slice(0, ORDERS_COLLAPSE_LIMIT);
     return roleFiltered;
   }, [roleFiltered, showAll]);
 
@@ -642,7 +397,7 @@ const Orders = () => {
     });
   };
 
-  /* ===== печать ===== */
+  /* ===== печать (оплата/чек) ===== */
   const buildPrintPayload = useCallback(
     (order) => {
       const t = tablesMap.get(order?.table);
@@ -688,6 +443,117 @@ const Orders = () => {
       }
     },
     [buildPrintPayload, printingId]
+  );
+
+  /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА =====
+     Логика:
+     1) Берём полный заказ с items (detail).
+     2) Группируем позиции по kitchen (у блюда menu-item есть kitchen).
+     3) Для каждой кухни находим printer_key (в /cafe/kitchens/ или в localStorage kitchen_printer_map).
+     4) Ставим активный принтер и печатаем БЕЗ диалога.
+  */
+  const buildKitchenTicketPayload = useCallback(
+    ({ order, kitchenId, kitchenLabel, items }) => {
+      const t = tablesMap.get(order?.table);
+      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+      const cashier = fullName(userData || {});
+
+      return {
+        company: localStorage.getItem("company_name") || "КАССА",
+        doc_no: `${kitchenLabel || "КУХНЯ"} • СТОЛ ${t?.number ?? "—"}`,
+        created_at: dt,
+        cashier_name: cashier,
+        discount: 0,
+        tax: 0,
+        paid_cash: 0,
+        paid_card: 0,
+        change: 0,
+        kitchen_id: kitchenId,
+        items: (items || []).map((it) => ({
+          name: String(it.menu_item_title || it.title || "Позиция"),
+          qty: Math.max(1, Number(it.quantity) || 1),
+          price: linePrice(it),
+        })),
+      };
+    },
+    [tablesMap, userData]
+  );
+
+  const getKitchenPrinterKey = useCallback(
+    (kitchenId) => {
+      const kid = String(kitchenId || "");
+      if (!kid) return "";
+
+      const k = kitchensMap.get(kid);
+      const direct = String(
+        k?.printer_key || k?.printerKey || k?.printer || k?.printer_id || ""
+      ).trim();
+      if (direct) return direct;
+
+      const ls = readKitchenPrinterMap();
+      return String(ls?.[kid] || "").trim();
+    },
+    [kitchensMap]
+  );
+
+  const autoPrintKitchenTickets = useCallback(
+    async (createdOrderId) => {
+      if (!createdOrderId) return;
+
+      // Важно: автопечать возможна только если WebUSB уже разрешён ранее.
+      // Если разрешения нет — браузер НЕ даст печатать без диалога. Это ограничение WebUSB.
+      try {
+        const detail = await api.get(`/cafe/orders/${createdOrderId}/`).then((r) => r?.data || null);
+        if (!detail) return;
+
+        const items = Array.isArray(detail?.items) ? detail.items : [];
+        if (!items.length) return;
+
+        // group by kitchen
+        const groups = new Map(); // kitchenId -> items[]
+        for (const it of items) {
+          const menuId = it?.menu_item || it?.menu_item_id || it?.menuItem || it?.id;
+          const kitchenId = getMenuKitchenId(menuId);
+          if (!kitchenId) continue;
+
+          const key = String(kitchenId);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(it);
+        }
+
+        if (!groups.size) return;
+
+        // печатаем по кухням
+        for (const [kitchenId, kitItems] of groups.entries()) {
+          const k = kitchensMap.get(String(kitchenId));
+          const kitchenLabel = k?.label || k?.title || k?.name || "Кухня";
+          const printerKey = getKitchenPrinterKey(kitchenId);
+
+          if (!printerKey) {
+            console.error("Kitchen print skipped: no printer_key for kitchen", kitchenId);
+            continue;
+          }
+
+          const payload = buildKitchenTicketPayload({
+            order: detail,
+            kitchenId,
+            kitchenLabel,
+            items: kitItems,
+          });
+
+          // переключаем активный принтер под кухню и печатаем без диалога
+          await setActivePrinterByKey(printerKey);
+          await printOrderReceiptJSONViaUSB(payload);
+        }
+      } catch (e) {
+        console.error("Auto kitchen print error:", e);
+        // без лишнего спама: только 1 понятный alert
+        alert(
+          "Не удалось отправить чек на кухню. Проверьте, что принтер подключён и разрешён в браузере (WebUSB)."
+        );
+      }
+    },
+    [buildKitchenTicketPayload, getKitchenPrinterKey, getMenuKitchenId, kitchensMap]
   );
 
   /* ===== модалка ===== */
@@ -775,7 +641,6 @@ const Orders = () => {
       client: "",
       items: [],
     });
-    originalTableRef.current = null;
     setEditingId(null);
     setMenuOpen(false);
     setShowAddClient(false);
@@ -803,7 +668,6 @@ const Orders = () => {
       items: itemsNormalized,
     });
 
-    originalTableRef.current = String(order.table ?? "");
     setMenuOpen(false);
     setShowAddClient(false);
     setOpenSelectId(null);
@@ -905,9 +769,16 @@ const Orders = () => {
 
         try {
           await api.patch(`/cafe/tables/${toId(form.table)}/`, { status: "busy" });
-        } catch {}
+        } catch {
+          // молча
+        }
 
         setOrders((prev) => [...prev, res.data]);
+
+        // ✅ АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ
+        // если блюдо привязано к кухне, а кухня привязана к принтеру — печатаем без выбора.
+        await autoPrintKitchenTickets(res?.data?.id);
+
       } else {
         const payload = normalizeOrderPayload(form);
         await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
@@ -1144,7 +1015,6 @@ const Orders = () => {
                     <span className="orders__receiptTotalAmount">{fmtShort(totals.total)}</span>
                   </div>
 
-                  {/* ✅ УБРАЛИ "Чек" из карточек. Остаётся только в оплате */}
                   <div className="orders__receiptActions">
                     <button
                       className="orders__btn orders__btn--secondary"
@@ -1170,9 +1040,7 @@ const Orders = () => {
           })}
 
         {!loading && !roleFiltered.length && (
-          <div className="orders__alert orders__alert--muted">
-            Ничего не найдено по «{query}».
-          </div>
+          <div className="orders__alert orders__alert--muted">Ничего не найдено по «{query}».</div>
         )}
       </div>
 
@@ -1341,7 +1209,6 @@ const Orders = () => {
                       </button>
                     </div>
 
-                    {/* ✅ Никакого красного текста сразу. Если позиций нет — просто пусто */}
                     {form.items.length ? (
                       <div className="orders__itemsList">
                         {form.items.map((it) => {
@@ -1450,6 +1317,7 @@ const Orders = () => {
                 menuItems={menuItems}
                 menuImageUrl={menuImageUrl}
                 onPick={(m) => addOrIncMenuItem(m)}
+                fmtMoney={fmtMoney}
               />
             </div>
           </div>
@@ -1476,7 +1344,9 @@ const Orders = () => {
               <div className="orders-pay">
                 {(() => {
                   const t = tablesMap.get(payOrder?.table);
-                  const dt = formatReceiptDate(payOrder?.created_at || payOrder?.date || payOrder?.created);
+                  const dt = formatReceiptDate(
+                    payOrder?.created_at || payOrder?.date || payOrder?.created
+                  );
                   const items = Array.isArray(payOrder?.items) ? payOrder.items : [];
                   const totals = calcTotals(payOrder);
 
