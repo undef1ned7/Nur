@@ -27,7 +27,9 @@ const numStr = (n) => String(Number(n) || 0).replace(",", ".");
 
 const Menu = () => {
   const [activeTab, setActiveTab] = useState("items");
-  const [viewMode, setViewMode] = useState("list"); // "list" | "cards"
+  // const [viewMode, setViewMode] = useState("list"); // "list" | "cards"
+  const [viewMode, setViewMode] = useState("cards"); // по умолчанию карточки
+
 
   const [categories, setCategories] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
