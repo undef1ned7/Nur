@@ -8,9 +8,7 @@
   --surface: #ffffff;
 }
 
-/* ===== Блок COOK (изоляция) ===== */
 .cook {
-  /* локальные токены блока */
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 
@@ -20,7 +18,7 @@
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   color: var(--text);
 
   &__header {
@@ -31,163 +29,37 @@
     gap: 12px;
   }
 
+  &__headText {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 240px;
+  }
+
   &__title {
     font-size: 20px;
     font-weight: 700;
-    color: var(--text);
     margin: 0;
   }
 
   &__subtitle {
     font-size: 13px;
     color: var(--muted);
-    margin-top: 4px;
   }
 
-  /* поиск */
+  &__tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
   &__search {
     position: relative;
-    width: auto;
     display: flex;
     align-items: center;
+    width: 320px;
   }
-
-  &__searchInput {
-    width: 280px;
-    padding: 10px 32px 10px 32px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    font-size: 14px;
-    background: #fff;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-
-    &:focus {
-      border-color: var(--primary-dark);
-      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
-    }
-
-    &:not(:placeholder-shown) {
-      padding-right: 40px;
-    }
-  }
-
-
-    &__alert {
-    &--neutral {
-      background: rgba(15, 23, 42, 0.04);
-      color: var(--muted);
-      border: 1px solid rgba(15, 23, 42, 0.08);
-    }
-  }
-
-  &__receiptMeta {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
-  }
-
-  &__summary {
-    display: flex;
-    justify-content: flex-start;
-    margin-top: 2px;
-  }
-
-  &__toggle {
-    border: 1px solid var(--border);
-    background: rgba(15, 23, 42, 0.02);
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 12px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: 0.15s;
-
-    &:hover {
-      background: rgba(15, 23, 42, 0.05);
-    }
-  }
-
-  &__rows {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  &__row {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid rgba(15, 23, 42, 0.06);
-    background: rgba(15, 23, 42, 0.02);
-    border-radius: 12px;
-  }
-
-  &__rowLeft {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  &__rowTitle {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 260px;
-  }
-
-  &__rowSub {
-    font-size: 12px;
-    color: var(--muted);
-  }
-
-  &__rowRight {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-
-  &__rowTitle {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text);
-
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-    max-width: none;
-    word-break: break-word;
-  }
-
-
-  &__btn {
-    &--compact {
-      width: auto;
-      padding: 8px 12px;
-      font-size: 12px;
-      text-transform: none;
-      border-radius: 10px;
-    }
-  }
-
-  @media (max-width: 560px) {
-    &__rowTitle {
-      max-width: 160px;
-    }
-
-    &__rowRight {
-      gap: 8px;
-    }
-  }
-
 
   &__searchIcon {
     position: absolute;
@@ -200,13 +72,29 @@
     z-index: 1;
   }
 
+  &__searchInput {
+    width: 100%;
+    padding: 10px 40px 10px 32px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+
+    &:focus {
+      border-color: var(--primary-dark);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
+  }
+
   &__searchClear {
     position: absolute;
     right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border: none;
     background: transparent;
     color: var(--muted);
@@ -216,33 +104,68 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: 999px;
     transition: background 0.15s, color 0.15s;
-    z-index: 1;
 
     &:hover {
       background: rgba(0, 0, 0, 0.05);
       color: var(--text);
     }
-
-    &:active {
-      background: rgba(0, 0, 0, 0.1);
-    }
   }
 
-  /* табы */
+  &__combo {
+    position: relative;
+    width: 190px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0 12px 0 34px;
+    overflow: hidden;
+  }
+
+  &__comboIcon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  &__comboSelect {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  &__comboValue {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   &__tabs {
     display: flex;
     gap: 8px;
     border-bottom: 2px solid var(--border);
-    padding-bottom: 0;
+    margin-top: 2px;
   }
 
   &__tab {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 20px;
+    padding: 12px 18px;
     border: none;
     background: transparent;
     color: var(--muted);
@@ -263,147 +186,122 @@
     }
   }
 
-  /* список */
+  &__notice {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(15, 23, 42, 0.04);
+    color: var(--text);
+
+    &--error {
+      background: rgba(231, 76, 60, 0.12);
+      border-color: rgba(231, 76, 60, 0.35);
+      color: #e74c3c;
+    }
+
+    &--ok {
+      background: rgba(22, 163, 74, 0.12);
+      border-color: rgba(22, 163, 74, 0.35);
+      color: #15803d;
+    }
+
+    &--info {
+      background: rgba(37, 99, 235, 0.10);
+      border-color: rgba(37, 99, 235, 0.25);
+      color: #1e40af;
+    }
+  }
+
+  &__noticeText {
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 600;
+    white-space: pre-line;
+  }
+
+  &__noticeClose {
+    border: none;
+    background: transparent;
+    color: currentColor;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+    border-radius: 8px;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.06);
+    }
+  }
+
   &__list {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
   }
 
-  /* Receipt-style card */
   &__receipt {
     background: #ffffff;
     border-radius: 12px;
-    padding: 20px;
+    padding: 18px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 1px solid #e5e7eb;
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-width: 0;
   }
 
   &__receiptHeader {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 4px;
+    gap: 10px;
+  }
+
+  &__receiptLeft {
+    min-width: 0;
   }
 
   &__receiptTable {
     font-size: 24px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.2;
+    font-weight: 800;
+    line-height: 1.1;
   }
 
   &__receiptClient {
     font-size: 13px;
-    color: #6b7280;
+    color: var(--muted);
     margin-top: 4px;
+  }
+
+  &__receiptWaiter {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  &__receiptMeta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   &__receiptDate {
     font-size: 13px;
-    color: #6b7280;
+    color: var(--muted);
     line-height: 1.2;
   }
 
   &__receiptDivider {
     height: 1px;
     background: #e5e7eb;
-    margin: 8px 0;
-
-    &--dashed {
-      background: transparent;
-      border-top: 1px dashed #d1d5db;
-      height: 0;
-      margin: 12px 0;
-    }
-  }
-
-  &__receiptItems {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  &__receiptItem {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 12px;
-    align-items: center;
-    font-size: 14px;
-  }
-
-  &__receiptItemName {
-    text-align: left;
-    color: var(--text);
-  }
-
-  &__receiptItemQty {
-    text-align: center;
-    color: var(--text);
-    font-weight: 500;
-  }
-
-  &__receiptItemPrice {
-    text-align: right;
-    color: var(--text);
-    font-weight: 500;
-  }
-
-  &__receiptTotal {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 4px;
-  }
-
-  &__receiptTotalLabel {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  &__receiptTotalAmount {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-  }
-
-  &__receiptActions {
-    display: flex;
-    gap: 10px;
-    margin-top: 8px;
-  }
-
-  &__receiptPaid {
-    display: flex;
-    justify-content: center;
-    margin-top: 8px;
-  }
-
-  &__receiptPaidBadge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    background: #16a34a;
-    color: #ffffff;
-  }
-
-  &__receiptWaiter {
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 2px;
-  }
-
-  &__receiptStatusInfo {
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 4px;
-    font-style: italic;
   }
 
   &__receiptStatusBadge {
@@ -411,7 +309,7 @@
     padding: 4px 10px;
     border-radius: 6px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
 
     &--pending {
       background: #fef3c7;
@@ -428,40 +326,129 @@
       color: #065f46;
     }
 
-    &--cancelled {
+    &--cancelled,
+    &--canceled {
       background: #fee2e2;
       color: #991b1b;
     }
   }
 
-  /* кнопки */
+  &__summary {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  &__toggle {
+    border: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.02);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.15s;
+
+    &:hover {
+      background: rgba(15, 23, 42, 0.05);
+    }
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 320px;
+    overflow: auto;
+
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    background: rgba(15, 23, 42, 0.02);
+    border-radius: 12px;
+    min-width: 0;
+  }
+
+  &__rowLeft {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__rowTitle {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;
+  }
+
+  &__rowSub {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  &__rowRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  &__rowPrice {
+    font-size: 14px;
+    font-weight: 700;
+    min-width: 44px;
+    text-align: right;
+  }
+
   &__btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    padding: 12px 20px;
     border-radius: 10px;
     font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
+    font-weight: 800;
     cursor: pointer;
     transition: 0.18s;
     border: none;
-    width: 100%;
 
     &:disabled {
       opacity: 0.6;
       cursor: not-allowed;
     }
 
+    &--compact {
+      padding: 8px 12px;
+      font-size: 12px;
+      text-transform: none;
+      width: auto;
+    }
+
     &--inProgress {
-      background: #f7d74f;
-      color: #0f172a;
-      border: 1px solid #d4b800;
+      background: var(--primary);
+      color: var(--text);
+      border: 1px solid var(--primary-dark);
 
       &:hover:not(:disabled) {
-        background: #d4b800;
+        background: var(--primary-dark);
       }
     }
 
@@ -476,7 +463,22 @@
     }
   }
 
-  /* уведомления */
+  &__receiptPaid {
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  &__receiptPaidBadge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    background: #16a34a;
+    color: #ffffff;
+  }
+
   &__alert {
     padding: 10px 12px;
     border-radius: 10px;
@@ -486,11 +488,14 @@
     border: 1px solid rgba(231, 76, 60, 0.35);
     grid-column: 1 / -1;
     text-align: center;
+
+    &--neutral {
+      background: rgba(15, 23, 42, 0.04);
+      color: var(--muted);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
   }
 
-  /* ====== адаптив ====== */
-
-  /* до 860px */
   @media (max-width: 860px) {
     &__list {
       grid-template-columns: repeat(2, 1fr);
@@ -498,14 +503,7 @@
 
     &__search {
       width: 100%;
-    }
-
-    &__searchInput {
-      width: 100%;
-    }
-
-    &__receipt {
-      padding: 16px;
+      max-width: 520px;
     }
 
     &__receiptTable {
@@ -513,35 +511,53 @@
     }
   }
 
-  /* до 560px */
   @media (max-width: 560px) {
     padding: 18px;
-
-    &__list {
-      grid-template-columns: 1fr;
-    }
 
     &__header {
       flex-direction: column;
       align-items: stretch;
     }
 
+    &__tools {
+      width: 100%;
+    }
+
     &__search {
       width: 100%;
+      max-width: none;
+    }
+
+    &__combo {
+      width: 100%;
+    }
+
+    &__list {
+      grid-template-columns: 1fr;
     }
 
     &__tabs {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
+
+      scrollbar-width: none;
+
+      &::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+      }
     }
 
     &__tab {
       white-space: nowrap;
       flex-shrink: 0;
     }
+
+    &__rowTitle {
+      max-width: 170px;
+    }
   }
 
-  /* до 400px */
   @media (max-width: 400px) {
     padding: 14px;
 
@@ -555,21 +571,6 @@
 
     &__receiptTable {
       font-size: 18px;
-    }
-
-    &__receiptItem {
-      font-size: 13px;
-      gap: 8px;
-    }
-
-    &__receiptTotalLabel,
-    &__receiptTotalAmount {
-      font-size: 15px;
-    }
-
-    &__btn {
-      padding: 10px 16px;
-      font-size: 13px;
     }
   }
 }

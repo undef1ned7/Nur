@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { FaListUl, FaThLarge } from "react-icons/fa";
+// src/Components/Sectors/cafe/Menu/Menu.jsx
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { FaListUl, FaThLarge, FaTimes, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import "./Menu.scss";
 
@@ -25,11 +26,16 @@ const fmtMoney = (n) =>
 
 const numStr = (n) => String(Number(n) || 0).replace(",", ".");
 
+const normalizeDecimalInput = (value) => {
+  const raw = String(value ?? "").replace(",", ".");
+  // Разрешаем: "", "0", "0.", "0.2", "12.345"
+  if (/^\d*\.?\d*$/.test(raw)) return raw;
+  return null;
+};
+
 const Menu = () => {
   const [activeTab, setActiveTab] = useState("items");
-  // const [viewMode, setViewMode] = useState("list"); // "list" | "cards"
-  const [viewMode, setViewMode] = useState("cards"); // по умолчанию карточки
-
+  const [viewMode, setViewMode] = useState("cards");
 
   const [categories, setCategories] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
@@ -46,7 +52,7 @@ const Menu = () => {
   const [form, setForm] = useState({
     title: "",
     category: "",
-    price: 0,
+    price: "0",
     is_active: true,
     ingredients: [],
   });
@@ -57,6 +63,12 @@ const Menu = () => {
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [catEditId, setCatEditId] = useState(null);
   const [catTitle, setCatTitle] = useState("");
+
+  // confirm modal (вместо window.confirm)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmKind, setConfirmKind] = useState(""); // "item" | "cat"
+  const [confirmId, setConfirmId] = useState(null);
+  const [confirmTitle, setConfirmTitle] = useState("");
 
   const categoriesMap = useMemo(() => {
     const m = new Map();
@@ -165,7 +177,7 @@ const Menu = () => {
     setForm({
       title: "",
       category: categories[0]?.id || "",
-      price: 0,
+      price: "0",
       is_active: true,
       ingredients: [],
     });
@@ -187,12 +199,13 @@ const Menu = () => {
     setForm({
       title: full.title || "",
       category: full.category || categories[0]?.id || "",
-      price: toNum(full.price),
+      price: String(full.price ?? "0").replace(",", "."),
       is_active: !!full.is_active,
       ingredients: Array.isArray(full.ingredients)
         ? full.ingredients.map((ing) => ({
             product: ing.product,
-            amount: toNum(ing.amount),
+            // ВАЖНО: строка, чтобы "0.2" работало без прыжков
+            amount: String(ing.amount ?? "").replace(",", "."),
           }))
         : [],
     });
@@ -218,13 +231,13 @@ const Menu = () => {
     const payload = {
       title: (form.title || "").trim(),
       category: form.category,
-      price: numStr(Math.max(0, Number(form.price) || 0)),
+      price: numStr(Math.max(0, Number(String(form.price ?? "0").replace(",", ".")) || 0)),
       is_active: !!form.is_active,
       ingredients: (form.ingredients || [])
-        .filter((r) => r && r.product && (Number(r.amount) || 0) > 0)
+        .filter((r) => r && r.product && String(r.amount || "").trim() !== "")
         .map((r) => ({
           product: r.product,
-          amount: numStr(Math.max(0, Number(r.amount) || 0)),
+          amount: numStr(Math.max(0, Number(String(r.amount).replace(",", ".")) || 0)),
         })),
     };
 
@@ -321,28 +334,70 @@ const Menu = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Удалить позицию меню?")) return;
+  const openConfirmDeleteItem = (id) => {
+    setConfirmKind("item");
+    setConfirmId(id);
+    setConfirmTitle("Удалить позицию меню?");
+    setConfirmOpen(true);
+  };
+
+  const openConfirmDeleteCat = (id) => {
+    setConfirmKind("cat");
+    setConfirmId(id);
+    setConfirmTitle("Удалить категорию?");
+    setConfirmOpen(true);
+  };
+
+  const closeConfirm = () => {
+    setConfirmOpen(false);
+    setConfirmKind("");
+    setConfirmId(null);
+    setConfirmTitle("");
+  };
+
+  const confirmDelete = async () => {
+    const id = confirmId;
+    const kind = confirmKind;
+
+    closeConfirm();
+
+    if (!id || !kind) return;
+
     try {
-      await api.delete(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
-      setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
+      if (kind === "item") {
+        await api.delete(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
+        setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
+        return;
+      }
+
+      if (kind === "cat") {
+        await api.delete(`/cafe/categories/${encodeURIComponent(String(id))}/`);
+        setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
+      }
     } catch (err) {
-      console.error("Ошибка удаления позиции меню:", err);
+      console.error("Ошибка удаления:", err);
     }
   };
 
   const addIngredientRow = () =>
     setForm((f) => ({
       ...f,
-      ingredients: [...(f.ingredients || []), { product: "", amount: 1 }],
+      ingredients: [...(f.ingredients || []), { product: "", amount: "1" }],
     }));
 
+  // ✅ КЛЮЧЕВОЙ FIX: amount хранится строкой, точка не ломается
   const changeIngredientRow = (idx, field, value) => {
     setForm((f) => {
       const rows = [...(f.ingredients || [])];
       const row = { ...(rows[idx] || {}) };
+
       if (field === "product") row.product = value;
-      if (field === "amount") row.amount = Math.max(0, Number(value) || 0);
+
+      if (field === "amount") {
+        const normalized = normalizeDecimalInput(value);
+        if (normalized !== null) row.amount = normalized;
+      }
+
       rows[idx] = row;
       return { ...f, ingredients: rows };
     });
@@ -373,7 +428,10 @@ const Menu = () => {
 
     try {
       if (catEditId) {
-        const res = await api.put(`/cafe/categories/${encodeURIComponent(String(catEditId))}/`, payload);
+        const res = await api.put(
+          `/cafe/categories/${encodeURIComponent(String(catEditId))}/`,
+          payload
+        );
         setCategories((prev) => prev.map((c) => (c.id === catEditId ? res.data : c)));
       } else {
         const res = await api.post("/cafe/categories/", payload);
@@ -382,16 +440,6 @@ const Menu = () => {
       setCatModalOpen(false);
     } catch (e2) {
       console.error("Ошибка сохранения категории:", e2);
-    }
-  };
-
-  const removeCat = async (id) => {
-    if (!window.confirm("Удалить категорию?")) return;
-    try {
-      await api.delete(`/cafe/categories/${encodeURIComponent(String(id))}/`);
-      setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
-    } catch (e) {
-      console.error("Ошибка удаления категории:", e);
     }
   };
 
@@ -412,6 +460,7 @@ const Menu = () => {
             >
               <FaListUl />
             </button>
+
             <button
               type="button"
               className={`menu__viewBtn ${viewMode === "cards" ? "menu__viewBtn--active" : ""}`}
@@ -432,7 +481,7 @@ const Menu = () => {
           setQueryItems={setQueryItems}
           onCreate={openCreate}
           onEdit={openEdit}
-          onDelete={handleDelete}
+          onDelete={openConfirmDeleteItem} // ✅ вместо window.confirm
           hasCategories={!!categories.length}
           categoryTitle={categoryTitle}
           fmtMoney={fmtMoney}
@@ -451,7 +500,7 @@ const Menu = () => {
           setQueryCats={setQueryCats}
           onCreateCat={openCreateCat}
           onEditCat={openEditCat}
-          onDeleteCat={removeCat}
+          onDeleteCat={openConfirmDeleteCat} // ✅ вместо window.confirm
         />
       )}
 
@@ -480,6 +529,35 @@ const Menu = () => {
         setCatTitle={setCatTitle}
         onSubmit={saveCat}
       />
+
+      {confirmOpen && (
+        <div className="menu-modal__overlay" onMouseDown={closeConfirm}>
+          <div className="menu-modal__card" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="menu-modal__header">
+              <div className="menu-modal__headLeft">
+                <h3 className="menu-modal__title">{confirmTitle || "Подтверждение"}</h3>
+                <div className="menu-modal__sub">Действие нельзя отменить.</div>
+              </div>
+
+              <button type="button" className="menu-modal__close" onClick={closeConfirm} aria-label="Закрыть">
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="menu__form">
+              <div className="menu__formActions">
+                <button type="button" className="menu__btn menu__btn--secondary" onClick={closeConfirm}>
+                  Отмена
+                </button>
+
+                <button type="button" className="menu__btn menu__btn--danger" onClick={confirmDelete}>
+                  <FaTrash /> Удалить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

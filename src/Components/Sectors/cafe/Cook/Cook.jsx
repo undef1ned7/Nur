@@ -1,13 +1,14 @@
 // src/.../Cook.jsx
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { FaSearch, FaCheckCircle, FaClock } from "react-icons/fa";
 import api from "../../../../api";
 import {
   fetchKitchenTasksAsync,
   claimKitchenTaskAsync,
   readyKitchenTaskAsync,
 } from "../../../../store/creators/cafeOrdersCreators";
+import CookHeader from "./CookHeader";
+import CookReceiptCard from "./CookReceiptCard";
 import "./Cook.scss";
 
 /* ==== helpers ==== */
@@ -65,8 +66,8 @@ const getStatusLabel = (status) => {
     pending: "Ожидает",
     in_progress: "В работе",
     ready: "Готов",
-    cancelled: "Отменен",
-    canceled: "Отменен",
+    cancelled: "Отменён",
+    canceled: "Отменён",
   };
   return labels[status] || status;
 };
@@ -112,7 +113,7 @@ const tryFetchTaskDetail = async (taskId) => {
       const r = await api.get(url);
       if (r?.data) return r.data;
     } catch {
-      // try next
+      // next
     }
   }
   return null;
@@ -170,17 +171,59 @@ const extractRecipeProductId = (row) =>
 const extractRecipeAmount = (row) =>
   firstDefined(row?.amount, row?.qty, row?.quantity, row?.count, 0);
 
+/* ==== user-friendly messages ==== */
+const toUserMessage = (err) => {
+  const raw = String(err?.message || err?.detail || err?.error || err || "").trim();
+  const lower = raw.toLowerCase();
+
+  // Рецепт/ингредиенты не настроены
+  if (
+    lower.includes("ингредиенты пустые") ||
+    lower.includes("ingredients") ||
+    lower.includes("menu-items") ||
+    lower.includes("menu items")
+  ) {
+    return "Нельзя отметить «Готово»: у блюда не настроены ингредиенты. Обратитесь к администратору.";
+  }
+
+  // Склад/остатки
+  if (lower.includes("недостаточно на складе") || lower.includes("нет на складе")) {
+    return "Нельзя отметить «Готово»: на складе не хватает ингредиентов. Проверьте остатки.";
+  }
+
+  // Не найдено
+  if (lower.includes("не найдено") || lower.includes("404")) {
+    return "Нельзя отметить «Готово»: блюдо не найдено. Обратитесь к администратору.";
+  }
+
+  // Сеть/сервер
+  if (lower.includes("network") || lower.includes("failed to fetch")) {
+    return "Нет связи с сервером. Попробуйте ещё раз.";
+  }
+
+  return "Не удалось выполнить действие. Попробуйте ещё раз.";
+};
+
 const Cook = () => {
   const dispatch = useDispatch();
   const { tasks, loading, error, updatingStatus } = useSelector(
     (state) => state.cafeOrders
   );
 
-  const [activeTab, setActiveTab] = useState("current"); // "current" | "history"
+  const [activeTab, setActiveTab] = useState("current"); // current | history
   const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState({}); // { [groupKey]: boolean }
+  const [statusFilter, setStatusFilter] = useState("all"); // all|pending|in_progress|ready|cancelled
+  const [collapsed, setCollapsed] = useState({}); // true => collapsed
+  const [notice, setNotice] = useState(null); // { type: "error"|"ok"|"info", text }
 
-  const menuCacheRef = useRef(new Map()); // menuId -> full menu object
+  const menuCacheRef = useRef(new Map());
+  const noticeTimerRef = useRef(null);
+
+  const showNotice = useCallback((type, text) => {
+    setNotice({ type, text });
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => setNotice(null), 3500);
+  }, []);
 
   const refetch = useCallback(() => {
     if (activeTab === "current") dispatch(fetchKitchenTasksAsync({}));
@@ -197,9 +240,12 @@ const Cook = () => {
     return () => window.removeEventListener("orders:refresh", handler);
   }, [refetch]);
 
-  const isUpdating = (taskId) => updatingStatus?.[taskId] === true;
+  const isUpdating = useCallback(
+    (taskId) => updatingStatus?.[taskId] === true,
+    [updatingStatus]
+  );
 
-  const getMenuWithIngredients = async (menuId) => {
+  const getMenuWithIngredients = useCallback(async (menuId) => {
     const key = String(menuId || "");
     if (!key) return null;
 
@@ -209,78 +255,67 @@ const Cook = () => {
     const full = r?.data || null;
     if (full) menuCacheRef.current.set(key, full);
     return full;
-  };
+  }, []);
 
-  const buildNeedForTask = async (task) => {
-    let menuId = extractMenuIdFromTask(task);
+  const buildNeedForTask = useCallback(
+    async (task) => {
+      let menuId = extractMenuIdFromTask(task);
 
-    if (!menuId && task?.id) {
-      const detail = await tryFetchTaskDetail(task.id);
-      if (detail) menuId = extractMenuIdFromTask(detail);
-    }
-
-    if (!menuId) {
-      throw new Error(
-        "В задаче кухни нет menu_item id. Нужен ID блюда (uuid), а не только title."
-      );
-    }
-
-    let full = null;
-    try {
-      full = await getMenuWithIngredients(menuId);
-    } catch (e) {
-      const status = e?.response?.status;
-      if (status === 404) {
-        throw new Error(
-          `Блюдо меню не найдено: GET /cafe/menu-items/${menuId}/ вернул 404. Проверь, что kitchen task отдаёт правильный menu_item id.`
-        );
+      if (!menuId && task?.id) {
+        const detail = await tryFetchTaskDetail(task.id);
+        if (detail) menuId = extractMenuIdFromTask(detail);
       }
-      throw new Error(
-        `Не удалось получить блюдо меню (id=${menuId}). Ошибка API: ${
-          status || "network"
-        }`
-      );
-    }
 
-    if (!full) throw new Error(`Не удалось получить блюдо меню (id=${menuId}).`);
+      if (!menuId) {
+        throw new Error("У блюда не найден ID для списания со склада.");
+      }
 
-    const recipeRows = extractRecipeRows(full);
-    if (!recipeRows.length) {
-      throw new Error(
-        `У блюда (id=${menuId}) ингредиенты пустые. Проверь, что ingredients сохраняются и GET /cafe/menu-items/${menuId}/ отдаёт ingredients.`
-      );
-    }
+      let full = null;
+      try {
+        full = await getMenuWithIngredients(menuId);
+      } catch (e) {
+        const status = e?.response?.status;
+        if (status === 404) {
+          throw new Error("Блюдо не найдено в меню. Обратитесь к администратору.");
+        }
+        throw new Error("Не удалось получить данные блюда. Попробуйте ещё раз.");
+      }
 
-    const portions = extractPortionsFromTask(task);
+      if (!full) throw new Error("Не удалось получить данные блюда. Попробуйте ещё раз.");
 
-    const need = new Map();
-    for (const row of recipeRows) {
-      const pid = extractRecipeProductId(row);
-      if (!pid) continue;
+      const recipeRows = extractRecipeRows(full);
+      if (!recipeRows.length) {
+        throw new Error("У блюда не настроены ингредиенты. Обратитесь к администратору.");
+      }
 
-      const perPortion = toNum(extractRecipeAmount(row));
-      const add = perPortion * portions;
+      const portions = extractPortionsFromTask(task);
+      const need = new Map();
 
-      const k = String(pid);
-      need.set(k, (need.get(k) || 0) + add);
-    }
+      for (const row of recipeRows) {
+        const pid = extractRecipeProductId(row);
+        if (!pid) continue;
 
-    if (!need.size) {
-      throw new Error(
-        `ingredients у блюда (id=${menuId}) есть, но в строках нет поля product. По swagger должно быть row.product.`
-      );
-    }
+        const perPortion = toNum(extractRecipeAmount(row));
+        const add = perPortion * portions;
 
-    return need;
-  };
+        const k = String(pid);
+        need.set(k, (need.get(k) || 0) + add);
+      }
 
-  const updateWarehouseItem = async (item, nextRem) => {
-    if (!item?.id) throw new Error("Позиция склада без id.");
+      if (!need.size) {
+        throw new Error("У блюда не настроены ингредиенты. Обратитесь к администратору.");
+      }
+
+      return need;
+    },
+    [getMenuWithIngredients]
+  );
+
+  const updateWarehouseItem = useCallback(async (item, nextRem) => {
+    if (!item?.id) throw new Error("Позиция склада без ID.");
 
     try {
-      await api.patch(`/cafe/warehouse/${item.id}/`, {
-        remainder: numStr(nextRem),
-      });
+      await api.patch(`/cafe/warehouse/${item.id}/`, { remainder: numStr(nextRem) });
       return;
     } catch {
       // fallback to PUT
@@ -292,75 +327,81 @@ const Cook = () => {
       remainder: numStr(nextRem),
       minimum: numStr(item.minimum),
     });
-  };
+  }, []);
 
-  const applyWarehouseDecreaseSafe = async (needMap) => {
-    if (!needMap || !needMap.size) return { ok: true };
+  const applyWarehouseDecreaseSafe = useCallback(
+    async (needMap) => {
+      if (!needMap || !needMap.size) return { ok: true };
 
-    const wr = await api.get("/cafe/warehouse/");
-    const stock = listFrom(wr) || [];
-    const stockMap = new Map(stock.map((s) => [String(s.id), s]));
+      const wr = await api.get("/cafe/warehouse/");
+      const stock = listFrom(wr) || [];
+      const stockMap = new Map(stock.map((s) => [String(s.id), s]));
 
-    const lacks = [];
-    for (const [pid, needQty] of needMap.entries()) {
-      const s = stockMap.get(String(pid));
-      if (!s) {
-        lacks.push(`${pid}: нет на складе`);
-        continue;
-      }
-      const have = toNum(s?.remainder);
-      if (have < needQty) {
-        lacks.push(`${s?.title || pid}: надо ${needQty}, есть ${have}`);
-      }
-    }
-
-    if (lacks.length) {
-      return { ok: false, message: "Недостаточно на складе:\n" + lacks.join("\n") };
-    }
-
-    const applied = [];
-    try {
+      const lacks = [];
       for (const [pid, needQty] of needMap.entries()) {
         const s = stockMap.get(String(pid));
-        const prev = toNum(s?.remainder);
-        const next = Math.max(0, prev - needQty);
-
-        await updateWarehouseItem(s, next);
-        applied.push({ item: s, prev });
-      }
-      return { ok: true };
-    } catch (e) {
-      try {
-        for (let i = applied.length - 1; i >= 0; i -= 1) {
-          const { item, prev } = applied[i];
-          await updateWarehouseItem(item, prev);
+        if (!s) {
+          lacks.push(String(pid));
+          continue;
         }
-      } catch {
-        // ignore rollback failure
+        const have = toNum(s?.remainder);
+        if (have < needQty) {
+          lacks.push(String(pid));
+        }
       }
-      throw e;
-    }
-  };
 
-  const applyWarehouseIncreaseSafe = async (needMap) => {
-    if (!needMap || !needMap.size) return;
+      if (lacks.length) {
+        return { ok: false, message: "Нельзя отметить «Готово»: на складе не хватает ингредиентов." };
+      }
 
-    const wr = await api.get("/cafe/warehouse/");
-    const stock = listFrom(wr) || [];
-    const stockMap = new Map(stock.map((s) => [String(s.id), s]));
-
-    for (const [pid, qty] of needMap.entries()) {
-      const s = stockMap.get(String(pid));
-      if (!s) continue;
-      const cur = toNum(s?.remainder);
-      const next = cur + qty;
+      const applied = [];
       try {
-        await updateWarehouseItem(s, next);
-      } catch {
-        // ignore
+        for (const [pid, needQty] of needMap.entries()) {
+          const s = stockMap.get(String(pid));
+          const prev = toNum(s?.remainder);
+          const next = Math.max(0, prev - needQty);
+
+          await updateWarehouseItem(s, next);
+          applied.push({ item: s, prev });
+        }
+        return { ok: true };
+      } catch (e) {
+        try {
+          for (let i = applied.length - 1; i >= 0; i -= 1) {
+            const { item, prev } = applied[i];
+            await updateWarehouseItem(item, prev);
+          }
+        } catch {
+          // ignore rollback failure
+        }
+        throw e;
       }
-    }
-  };
+    },
+    [updateWarehouseItem]
+  );
+
+  const applyWarehouseIncreaseSafe = useCallback(
+    async (needMap) => {
+      if (!needMap || !needMap.size) return;
+
+      const wr = await api.get("/cafe/warehouse/");
+      const stock = listFrom(wr) || [];
+      const stockMap = new Map(stock.map((s) => [String(s.id), s]));
+
+      for (const [pid, qty] of needMap.entries()) {
+        const s = stockMap.get(String(pid));
+        if (!s) continue;
+        const cur = toNum(s?.remainder);
+        const next = cur + qty;
+        try {
+          await updateWarehouseItem(s, next);
+        } catch {
+          // ignore
+        }
+      }
+    },
+    [updateWarehouseItem]
+  );
 
   const groups = useMemo(() => {
     const base = Array.isArray(tasks) ? tasks : [];
@@ -372,6 +413,7 @@ const Cook = () => {
       const fallbackKey = `tbl:${String(t?.table_number ?? "")}|w:${String(
         t?.waiter_label ?? ""
       )}|g:${String(t?.guest ?? "")}|c:${minute}`;
+
       const key = orderId ? `order:${orderId}` : fallbackKey;
 
       if (!map.has(key)) {
@@ -415,16 +457,21 @@ const Cook = () => {
       };
     });
 
+    const stLabels = {
+      pending: "ожидает",
+      in_progress: "в работе",
+      ready: "готов",
+      cancelled: "отменён",
+      canceled: "отменён",
+    };
+
+    if (statusFilter !== "all") {
+      const sf = statusFilter === "cancelled" ? "cancelled" : statusFilter;
+      arr = arr.filter((g) => String(g.status || "") === sf);
+    }
+
     const q = query.trim().toLowerCase();
     if (q) {
-      const stLabels = {
-        pending: "ожидает",
-        in_progress: "в работе",
-        ready: "готов",
-        cancelled: "отменен",
-        canceled: "отменен",
-      };
-
       arr = arr.filter((g) => {
         const tNum = String(g.table_number ?? "").toLowerCase();
         const guest = String(g.guest ?? "").toLowerCase();
@@ -457,130 +504,126 @@ const Cook = () => {
       const db = new Date(b.created_at || 0).getTime();
       return db - da;
     });
-  }, [tasks, query]);
+  }, [tasks, query, statusFilter]);
 
-  const toggleGroup = (key) => {
-    setCollapsed((p) => ({ ...p, [key]: !p[key] }));
-  };
-
-  const handleClaimOne = async (taskId) => {
-    try {
-      await dispatch(claimKitchenTaskAsync(taskId)).unwrap();
-      refetch();
-    } catch (e) {
-      console.error("Не удалось взять порцию в работу:", e);
-      alert(
-        `Не удалось взять в работу: ${
-          e?.message || e?.detail || e?.error || "Ошибка"
-        }`
-      );
-    }
-  };
-
-  const handleReadyOne = async (task) => {
-    const taskId = task?.id;
-    if (!taskId) return;
-
-    let needMap = null;
-
-    try {
-      needMap = await buildNeedForTask(task);
-
-      const dec = await applyWarehouseDecreaseSafe(needMap);
-      if (!dec.ok) {
-        alert(dec.message || "Недостаточно на складе.");
-        refetch();
-        return;
+  // default collapsed for new groups
+  useEffect(() => {
+    if (!groups.length) return;
+    setCollapsed((prev) => {
+      const next = { ...prev };
+      for (const g of groups) {
+        if (next[g.key] === undefined) next[g.key] = true;
       }
+      return next;
+    });
+  }, [groups]);
+
+  const toggleGroup = useCallback((key) => {
+    setCollapsed((p) => ({ ...p, [key]: !p[key] }));
+  }, []);
+
+  const handleClaimOne = useCallback(
+    async (taskId, e) => {
+      if (e?.preventDefault) e.preventDefault();
 
       try {
-        await dispatch(readyKitchenTaskAsync(taskId)).unwrap();
-      } catch (eReady) {
-        try {
-          await applyWarehouseIncreaseSafe(needMap);
-        } catch {
-          // ignore
+        await dispatch(claimKitchenTaskAsync(taskId)).unwrap();
+        refetch();
+      } catch (err) {
+        console.error("Не удалось взять порцию в работу:", err);
+        showNotice("error", toUserMessage(err));
+      }
+    },
+    [dispatch, refetch, showNotice]
+  );
+
+  const handleReadyOne = useCallback(
+    async (task, e) => {
+      if (e?.preventDefault) e.preventDefault();
+
+      const taskId = task?.id;
+      if (!taskId) return;
+
+      try {
+        const needMap = await buildNeedForTask(task);
+
+        const dec = await applyWarehouseDecreaseSafe(needMap);
+        if (!dec.ok) {
+          showNotice("error", dec.message || "Нельзя отметить «Готово»: не хватает ингредиентов.");
+          return;
         }
 
-        alert(
-          `Не удалось отметить как готово: ${
-            eReady?.message || eReady?.detail || eReady?.error || "Ошибка"
-          }`
-        );
-        refetch();
-        return;
-      }
+        try {
+          await dispatch(readyKitchenTaskAsync(taskId)).unwrap();
+          showNotice("ok", "Отмечено как готово.");
+        } catch (eReady) {
+          try {
+            await applyWarehouseIncreaseSafe(needMap);
+          } catch {
+            // ignore
+          }
+          console.error("Не удалось отметить как готово:", eReady);
+          showNotice("error", toUserMessage(eReady));
+          return;
+        }
 
-      refetch();
-      try {
-        window.dispatchEvent(new CustomEvent("orders:refresh"));
-      } catch {
-        // ignore
+        // никаких browser dialogs и никаких принудительных обновлений
+        refetch();
+      } catch (err) {
+        console.error("Списание/готово ошибка:", err);
+        showNotice("error", toUserMessage(err));
+        refetch();
       }
-    } catch (e) {
-      console.error("Списание/готово ошибка:", e);
-      alert(
-        `Списание не выполнено: ${e?.message || e?.detail || e?.error || "Ошибка"}`
-      );
-      refetch();
-    }
-  };
+    },
+    [
+      dispatch,
+      refetch,
+      showNotice,
+      buildNeedForTask,
+      applyWarehouseDecreaseSafe,
+      applyWarehouseIncreaseSafe,
+    ]
+  );
+
+  const statusOptions = useMemo(
+    () => [
+      { value: "all", label: "Все статусы" },
+      { value: "pending", label: "Ожидает" },
+      { value: "in_progress", label: "В работе" },
+      { value: "ready", label: "Готов" },
+      { value: "cancelled", label: "Отменён" },
+    ],
+    []
+  );
 
   return (
     <section className="cook">
-      <div className="cook__header">
-        <div>
-          <h2 className="cook__title">Заказы повара</h2>
-          <div className="cook__subtitle">
-            Управление текущими задачами и просмотр истории
-          </div>
+      <CookHeader
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        query={query}
+        setQuery={setQuery}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        statusOptions={statusOptions}
+      />
+
+      {notice?.text ? (
+        <div className={`cook__notice cook__notice--${notice.type}`}>
+          <div className="cook__noticeText">{notice.text}</div>
+          <button
+            className="cook__noticeClose"
+            type="button"
+            onClick={() => setNotice(null)}
+            aria-label="Закрыть"
+            title="Закрыть"
+          >
+            ×
+          </button>
         </div>
+      ) : null}
 
-        <div className="cook__search">
-          <FaSearch className="cook__searchIcon" />
-          <input
-            className="cook__searchInput"
-            placeholder="Поиск: стол, клиент, блюдо, статус…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            type="text"
-            autoComplete="off"
-          />
-          {query && (
-            <button
-              className="cook__searchClear"
-              onClick={() => setQuery("")}
-              title="Очистить поиск"
-              type="button"
-            >
-              ×
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="cook__tabs">
-        <button
-          className={`cook__tab ${
-            activeTab === "current" ? "cook__tab--active" : ""
-          }`}
-          onClick={() => setActiveTab("current")}
-          type="button"
-        >
-          <FaClock /> Текущие задачи
-        </button>
-        <button
-          className={`cook__tab ${
-            activeTab === "history" ? "cook__tab--active" : ""
-          }`}
-          onClick={() => setActiveTab("history")}
-          type="button"
-        >
-          <FaCheckCircle /> История
-        </button>
-      </div>
-
-      <div className="cook__list">
+      <div className="cook__list" aria-busy={loading ? "true" : "false"}>
         {loading && (
           <div className="cook__alert cook__alert--neutral">Загрузка…</div>
         )}
@@ -603,149 +646,22 @@ const Cook = () => {
 
         {!loading &&
           !error &&
-          groups.map((g) => {
-            const headerDate = formatReceiptDate(g.created_at);
-            const isCollapsed = collapsed[g.key] === true;
-
-            return (
-              <article key={g.key} className="cook__receipt">
-                <div className="cook__receiptHeader">
-                  <div>
-                    <div className="cook__receiptTable">
-                      СТОЛ {g.table_number || "—"}
-                    </div>
-                    {g.guest ? (
-                      <div className="cook__receiptClient">{g.guest}</div>
-                    ) : null}
-                    {g.waiter_label ? (
-                      <div className="cook__receiptWaiter">
-                        Официант: {g.waiter_label}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="cook__receiptMeta">
-                    {headerDate ? (
-                      <div className="cook__receiptDate">{headerDate}</div>
-                    ) : null}
-                    <span
-                      className={`cook__receiptStatusBadge cook__receiptStatusBadge--${g.status}`}
-                      title="Общий статус заказа"
-                    >
-                      {getStatusLabel(g.status)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="cook__receiptDivider"></div>
-
-                <div className="cook__summary">
-                  <button
-                    type="button"
-                    className="cook__toggle"
-                    onClick={() => toggleGroup(g.key)}
-                    title={isCollapsed ? "Показать позиции" : "Свернуть позиции"}
-                  >
-                    {isCollapsed
-                      ? `Показать позиции (${g.items.length})`
-                      : `Свернуть позиции (${g.items.length})`}
-                  </button>
-                </div>
-
-                {!isCollapsed && (
-                  <div className="cook__rows">
-                    {(g.items || []).map((t, idx) => {
-                      const status = String(t?.status || "");
-                      const isPending = status === "pending";
-                      const isInProgress = status === "in_progress";
-                      const isReady = status === "ready";
-                      const updating = isUpdating(t.id);
-
-                      const portions = extractPortionsFromTask(t);
-
-                      return (
-                        <div
-                          key={t.id || idx}
-                          className="cook__row"
-                          title={
-                            status === "in_progress" && t?.started_at
-                              ? `Начато: ${formatReceiptDate(t.started_at)}`
-                              : status === "ready" && t?.finished_at
-                              ? `Готово: ${formatReceiptDate(t.finished_at)}`
-                              : ""
-                          }
-                        >
-                          <div className="cook__rowLeft">
-                            <div className="cook__rowTitle">
-                              {t?.menu_item_title || "Блюдо"}
-                            </div>
-                            <div className="cook__rowSub">
-                              Кол-во: {portions}
-                            </div>
-                          </div>
-
-                          <div className="cook__rowRight">
-                            <div className="cook__rowPrice">
-                              {toNum(t?.price)}
-                            </div>
-
-                            <span
-                              className={`cook__receiptStatusBadge cook__receiptStatusBadge--${status}`}
-                            >
-                              {getStatusLabel(status)}
-                            </span>
-
-                            {activeTab === "current" ? (
-                              <>
-                                {isPending && (
-                                  <button
-                                    className="cook__btn cook__btn--inProgress cook__btn--compact"
-                                    onClick={() => handleClaimOne(t.id)}
-                                    disabled={updating}
-                                    type="button"
-                                  >
-                                    {updating ? "…" : "В работу"}
-                                  </button>
-                                )}
-
-                                {isInProgress && (
-                                  <button
-                                    className="cook__btn cook__btn--ready cook__btn--compact"
-                                    onClick={() => handleReadyOne(t)}
-                                    disabled={updating}
-                                    type="button"
-                                    title="ГОТОВ (списывает склад)"
-                                  >
-                                    {updating ? "…" : "Готов"}
-                                  </button>
-                                )}
-
-                                {isReady && (
-                                  <button
-                                    className="cook__btn cook__btn--ready cook__btn--compact"
-                                    disabled
-                                    type="button"
-                                  >
-                                    Готов
-                                  </button>
-                                )}
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {activeTab === "history" && g.status === "ready" ? (
-                  <div className="cook__receiptPaid">
-                    <span className="cook__receiptPaidBadge">ГОТОВ</span>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
+          groups.map((g) => (
+            <CookReceiptCard
+              key={g.key}
+              group={g}
+              activeTab={activeTab}
+              collapsed={collapsed[g.key] !== false}
+              onToggle={() => toggleGroup(g.key)}
+              formatReceiptDate={formatReceiptDate}
+              getStatusLabel={getStatusLabel}
+              extractPortionsFromTask={extractPortionsFromTask}
+              toNum={toNum}
+              isUpdating={(id) => isUpdating(id)}
+              onClaimOne={handleClaimOne}
+              onReadyOne={handleReadyOne}
+            />
+          ))}
       </div>
     </section>
   );

@@ -28,27 +28,8 @@ const MenuItemsTab = ({
     return "Список блюд пуст.";
   }, [loadingItems, hasCategories, queryItems]);
 
-  const renderRecipeMini = (row) => {
-    const ings = Array.isArray(row?.ingredients) ? row.ingredients : [];
-    if (!ings.length) return null;
+const renderRecipeMini = () => null;
 
-    return (
-      <ul className="menu__recipeMini">
-        {ings.slice(0, 3).map((ing) => {
-          const pid = ing?.product;
-          const title = productTitle(pid);
-          const unit = productUnit(pid);
-          const amount = toNum(ing?.amount);
-          return (
-            <li key={ing?.id || `${pid}-${amount}`}>
-              {title}: {amount} {unit}
-            </li>
-          );
-        })}
-        {ings.length > 3 && <li>… ещё {ings.length - 3}</li>}
-      </ul>
-    );
-  };
 
   const renderList = () => {
     return (

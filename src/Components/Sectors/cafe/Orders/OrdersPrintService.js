@@ -432,4 +432,3 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
     }
   }
 }
-
