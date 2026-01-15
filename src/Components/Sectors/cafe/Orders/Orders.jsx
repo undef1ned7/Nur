@@ -15,7 +15,6 @@ import { getAll as getAllClients, createClient } from "../Clients/clientStore";
 import "./Orders.scss";
 import WaiterModal from "./WaiterModal";
 import CookModal from "./CookModal";
-
 import {
   attachUsbListenersOnce,
   checkPrinterConnection,
