@@ -30,12 +30,14 @@ import {
   createProductAsync,
   updateProductAsync,
   fetchProductsAsync,
-  fetchBrandsAsync,
-  fetchCategoriesAsync,
-  createBrandAsync,
-  createCategoryAsync,
 } from "../../../../store/creators/productCreators";
-import { fetchWarehousesAsync } from "../../../../store/creators/warehouseCreators";
+import {
+  fetchWarehousesAsync,
+  fetchWarehouseBrandsAsync,
+  createWarehouseBrandAsync,
+  fetchWarehouseCategoriesAsync,
+  createWarehouseCategoryAsync,
+} from "../../../../store/creators/warehouseCreators";
 import { countries } from "../../../../data/countries";
 import api from "../../../../api";
 import AlertModal from "../../../common/AlertModal/AlertModal";
@@ -57,8 +59,6 @@ const AddWarehouseProductPage = () => {
     creating,
     updating,
     createError,
-    brands,
-    categories,
     scannedProduct,
     list: products,
     count,
@@ -67,8 +67,11 @@ const AddWarehouseProductPage = () => {
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
 
-  // Получаем список складов из Redux
+  // Получаем список складов, брендов и категорий из Redux
   const warehouses = useSelector((state) => state.warehouse.list || []);
+  const brands = useSelector((state) => state.warehouse.brands || []);
+  const categories = useSelector((state) => state.warehouse.categories || []);
+
   const warehousesLoading = useSelector(
     (state) => state.warehouse.loading || false
   );
@@ -143,8 +146,8 @@ const AddWarehouseProductPage = () => {
   const [newItemData, setNewItemData] = useState({
     name: "",
     barcode: "",
-    brand_name: "",
-    category_name: "",
+    brand: "",
+    category: "",
     price: "",
     quantity: "",
     client: "",
@@ -205,12 +208,20 @@ const AddWarehouseProductPage = () => {
   useEffect(() => {
     dispatch(fetchClientsAsync());
     dispatch(getCashBoxes());
-    dispatch(fetchBrandsAsync());
-    dispatch(fetchCategoriesAsync());
+    dispatch(fetchWarehouseBrandsAsync());
+    dispatch(fetchWarehouseCategoriesAsync());
     dispatch(fetchWarehousesAsync({ page_size: 1000 })); // Загружаем склады
-    // Загружаем все товары для точного подсчета весовых товаров
-    dispatch(fetchProductsAsync({ page_size: 10000 }));
-  }, [dispatch]);
+
+    // Загружаем товары для подсчета весовых товаров
+    const searchParams = new URLSearchParams(location.search);
+    const warehouseIdFromUrl = searchParams.get("warehouse_id");
+
+    const fetchParams = { page_size: 10000 };
+    if (warehouseIdFromUrl) {
+      fetchParams.warehouse = warehouseIdFromUrl;
+    }
+    dispatch(fetchProductsAsync(fetchParams));
+  }, [dispatch, location.search]);
 
   // Автоматически выбираем склад из URL параметра
   useEffect(() => {
@@ -227,24 +238,15 @@ const AddWarehouseProductPage = () => {
       const loadProduct = async () => {
         try {
           setLoadingProduct(true);
-          // Для редактирования используем warehouse API если есть warehouse_id
-          const warehouseId =
-            selectedWarehouse ||
-            new URLSearchParams(location.search).get("warehouse_id");
-          let response;
-          if (warehouseId) {
-            try {
-              response = await api.get(
-                `/warehouse/${warehouseId}/products/${productId}/`
-              );
-            } catch (e) {
-              // Fallback на обычный endpoint
-              response = await api.get(`/main/products/${productId}/`);
-            }
-          } else {
-            response = await api.get(`/main/products/${productId}/`);
-          }
+          // Для просмотра/редактирования товара склада используем единый эндпоинт:
+          // /warehouse/products/{productId}/
+          const response = await api.get(`/warehouse/products/${productId}/`);
           const product = response.data;
+
+          // Если API возвращает склад товара — фиксируем выбранный склад
+          if (product?.warehouse && !selectedWarehouse) {
+            setSelectedWarehouse(String(product.warehouse));
+          }
 
           // Определяем тип товара на основе kind
           let detectedItemType = "product";
@@ -259,8 +261,8 @@ const AddWarehouseProductPage = () => {
           setNewItemData({
             name: product.name || "",
             barcode: product.barcode || "",
-            brand_name: product.brand_name || "",
-            category_name: product.category_name || "",
+            brand: product.brand || product.brand_name || "",
+            category: product.category || product.category_name || "",
             price: product.price || "",
             quantity: product.quantity || "",
             client: product.client || "",
@@ -329,7 +331,7 @@ const AddWarehouseProductPage = () => {
       };
       loadProduct();
     }
-  }, [isEditMode, productId]);
+  }, [isEditMode, productId, selectedWarehouse]);
 
   // Обработка дублирования товара
   useEffect(() => {
@@ -352,8 +354,8 @@ const AddWarehouseProductPage = () => {
       setNewItemData({
         name: product.name || "",
         barcode: "", // Очищаем штрих-код для нового товара
-        brand_name: product.brand_name || "",
-        category_name: product.category_name || "",
+        brand: product.brand || product.brand_name || "",
+        category: product.category || product.category_name || "",
         price: product.price || "",
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",
@@ -471,8 +473,8 @@ const AddWarehouseProductPage = () => {
     const {
       name,
       barcode,
-      brand_name,
-      category_name,
+      brand,
+      category,
       price,
       quantity,
       client,
@@ -493,7 +495,10 @@ const AddWarehouseProductPage = () => {
 
     // Проверяем обязательные поля
     if (!selectedWarehouse) {
-      errors.warehouse = "Выберите склад";
+      errors.warehouse = "Обязательное поле.";
+    }
+    if (!category || (typeof category === "string" && !category.trim())) {
+      errors.category = "Обязательное поле.";
     }
     if (!name || !name.trim()) {
       errors.name = "Обязательное поле";
@@ -578,8 +583,8 @@ const AddWarehouseProductPage = () => {
     let payload = {
       name,
       barcode: barcode || null,
-      brand_name: brand_name || "",
-      category_name: category_name || "",
+      brand: brand || null,
+      category: category || null,
       price: price ? price.toString() : "0",
       client: client || null,
       plu: newItemData.plu ? Number(newItemData.plu) : null,
@@ -653,8 +658,9 @@ const AddWarehouseProductPage = () => {
     payload = {
       name,
       barcode: barcode || null,
-      brand_name: brand_name || "",
-      category_name: category_name || "",
+      brand: brand || null,
+      category: category || null,
+      warehouse: selectedWarehouse, // Добавляем ID склада
       article: marketData.article || "",
       unit: marketData.unit || "шт",
       is_weight: isWeight,
@@ -728,51 +734,78 @@ const AddWarehouseProductPage = () => {
     try {
       let product;
       if (isEditMode && productId) {
-        // Режим редактирования - используем warehouse API если есть warehouse_id
-        const warehouseId =
-          selectedWarehouse ||
-          new URLSearchParams(location.search).get("warehouse_id");
-        if (warehouseId) {
-          try {
-            const response = await api.patch(
-              `/warehouse/${warehouseId}/products/${productId}/`,
-              payload
-            );
-            product = response.data;
-          } catch (e) {
-            // Fallback на обычный endpoint
-            product = await dispatch(
-              updateProductAsync({
-                productId,
-                updatedData: payload,
-              })
-            ).unwrap();
-          }
-        } else {
-          product = await dispatch(
-            updateProductAsync({
-              productId,
-              updatedData: payload,
-            })
-          ).unwrap();
-        }
+        // Режим редактирования - используем единый эндпоинт товара склада:
+        // /warehouse/products/{productId}/
+        const response = await api.patch(
+          `/warehouse/products/${productId}/`,
+          payload
+        );
+        product = response.data;
       } else {
         // Режим создания - используем warehouse API
-        if (!selectedWarehouse) {
-          showAlert("Выберите склад", "error", "Ошибка");
-          return;
-        }
-        try {
-          const response = await api.post(
-            `/warehouse/${selectedWarehouse}/products/`,
-            payload
-          );
-          product = response.data;
-        } catch (e) {
-          // Fallback на обычный endpoint
-          product = await dispatch(createProductAsync(payload)).unwrap();
-        }
+        const response = await api.post(
+          `/warehouse/${selectedWarehouse}/products/`,
+          payload
+        );
+        product = response.data;
       }
+
+      // Packages (упаковки/состав) — используем эндпоинт склада:
+      // /warehouse/products/{productId}/packages/
+      try {
+        const targetProductId = isEditMode
+          ? productId
+          : product?.id || product?.data?.id;
+
+        // Для комплекта используем packages_input (состав + упаковки),
+        // для остальных типов — только упаковки (packagings).
+        const packagingItems = (marketData.packagings || [])
+          .filter((pkg) => pkg.name && String(pkg.name).trim())
+          .map((pkg) => ({
+            name: String(pkg.name).trim(),
+            quantity_in_package: Number(pkg.quantity || 1),
+            unit: marketData.unit || "шт",
+          }));
+
+        const kitPackages =
+          itemType === "kit"
+            ? (marketData.kitProducts || [])
+                .filter((p) => p.id)
+                .map((p) => ({
+                  name: p.name || "",
+                  quantity_in_package: Number(p.quantity || 1),
+                  unit: p.unit || marketData.unit || "шт",
+                }))
+            : [];
+
+        const packagesPayload =
+          itemType === "kit"
+            ? [...kitPackages, ...packagingItems]
+            : packagingItems;
+
+        if (targetProductId && packagesPayload.length > 0) {
+          // Сначала пробуем bulk (если API поддерживает), иначе — постим по одному
+          try {
+            await api.post(
+              `/warehouse/products/${targetProductId}/packages/`,
+              packagesPayload
+            );
+          } catch (_) {
+            await Promise.allSettled(
+              packagesPayload.map((pkg) =>
+                api.post(
+                  `/warehouse/products/${targetProductId}/packages/`,
+                  pkg
+                )
+              )
+            );
+          }
+        }
+      } catch (e) {
+        console.warn("Загрузка packages не удалась:", e);
+        // не блокируем основной флоу
+      }
+
       // Вычисляем totalAmount
       let totalAmount = 0;
       const purchasePrice =
@@ -794,13 +827,9 @@ const AddWarehouseProductPage = () => {
               fd.append("image", im.file);
               if (im.alt) fd.append("alt", im.alt || name);
               fd.append("is_primary", String(Boolean(im.is_primary)));
-              // Используем warehouse API если есть warehouse_id
-              const warehouseId =
-                selectedWarehouse ||
-                new URLSearchParams(location.search).get("warehouse_id");
-              const imagesEndpoint = warehouseId
-                ? `/warehouse/${warehouseId}/products/${targetProductId}/images/`
-                : `/main/products/${targetProductId}/images/`;
+              // Для склада используем единый эндпоинт загрузки изображений:
+              // /warehouse/products/{productId}/images/
+              const imagesEndpoint = `/warehouse/products/${targetProductId}/images/`;
               return api.post(imagesEndpoint, fd, {
                 headers: { "Content-Type": "multipart/form-data" },
               });
@@ -917,7 +946,7 @@ const AddWarehouseProductPage = () => {
       );
       setTimeout(() => {
         if (selectedWarehouse) {
-          navigate(`/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`);
+          navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
         } else {
           navigate("/crm/warehouse/stocks");
         }
@@ -977,14 +1006,14 @@ const AddWarehouseProductPage = () => {
     }
     try {
       const brand = await dispatch(
-        createBrandAsync({ name: newBrand.name.trim() })
+        createWarehouseBrandAsync({ name: newBrand.name.trim() })
       ).unwrap();
-      dispatch(fetchBrandsAsync());
+      dispatch(fetchWarehouseBrandsAsync());
       setShowBrandInputs(false);
       // Автоматически выбираем созданный бренд
       setNewItemData((prev) => ({
         ...prev,
-        brand_name: brand.name || newBrand.name.trim(),
+        brand: brand.id || brand.name || newBrand.name.trim(),
       }));
       setNewBrand({ name: "" });
       showAlert("Бренд успешно создан!", "success", "Успех");
@@ -1006,14 +1035,14 @@ const AddWarehouseProductPage = () => {
     }
     try {
       const category = await dispatch(
-        createCategoryAsync({ name: newCategory.name.trim() })
+        createWarehouseCategoryAsync({ name: newCategory.name.trim() })
       ).unwrap();
-      dispatch(fetchCategoriesAsync());
+      dispatch(fetchWarehouseCategoriesAsync());
       setShowCategoryInputs(false);
       // Автоматически выбираем созданную категорию
       setNewItemData((prev) => ({
         ...prev,
-        category_name: category.name || newCategory.name.trim(),
+        category: category.id || category.name || newCategory.name.trim(),
       }));
       setNewCategory({ name: "" });
       showAlert("Категория успешно создана!", "success", "Успех");
@@ -1216,9 +1245,7 @@ const AddWarehouseProductPage = () => {
             className="add-product-page__back"
             onClick={() => {
               if (selectedWarehouse) {
-                navigate(
-                  `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
-                );
+                navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
               } else {
                 navigate("/crm/warehouse/stocks");
               }
@@ -1292,9 +1319,7 @@ const AddWarehouseProductPage = () => {
               <AddProductBarcode
                 onClose={() => {
                   if (selectedWarehouse) {
-                    navigate(
-                      `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
-                    );
+                    navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
                   } else {
                     navigate("/crm/warehouse/stocks");
                   }
@@ -1307,9 +1332,7 @@ const AddWarehouseProductPage = () => {
                   );
                   setTimeout(() => {
                     if (selectedWarehouse) {
-                      navigate(
-                        `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
-                      );
+                      navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
                     } else {
                       navigate("/crm/warehouse/stocks");
                     }
@@ -1507,15 +1530,15 @@ const AddWarehouseProductPage = () => {
                         </label>
                         <div className="add-product-page__supplier-row">
                           <select
-                            name="brand_name"
+                            name="brand"
                             className="add-product-page__input"
-                            value={newItemData.brand_name}
+                            value={newItemData.brand}
                             onChange={handleChange}
                             required
                           >
                             <option value="">Выберите бренд</option>
                             {brands.map((brand, idx) => (
-                              <option key={brand.id ?? idx} value={brand.name}>
+                              <option key={brand.id ?? idx} value={brand.id}>
                                 {brand.name}
                               </option>
                             ))}
@@ -1575,9 +1598,9 @@ const AddWarehouseProductPage = () => {
                         </label>
                         <div className="add-product-page__supplier-row">
                           <select
-                            name="category_name"
+                            name="category"
                             className="add-product-page__input"
-                            value={newItemData.category_name}
+                            value={newItemData.category}
                             onChange={handleChange}
                             required
                           >
@@ -1585,7 +1608,7 @@ const AddWarehouseProductPage = () => {
                             {categories.map((category, idx) => (
                               <option
                                 key={category.id ?? idx}
-                                value={category.name}
+                                value={category.id}
                               >
                                 {category.name}
                               </option>
@@ -1954,9 +1977,7 @@ const AddWarehouseProductPage = () => {
                     className="add-product-page__cancel-btn"
                     onClick={() => {
                       if (selectedWarehouse) {
-                        navigate(
-                          `/crm/warehouse/stocks?warehouse_id=${selectedWarehouse}`
-                        );
+                        navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
                       } else {
                         navigate("/crm/warehouse/stocks");
                       }
@@ -2471,15 +2492,15 @@ const MarketProductForm = ({
             <label className="market-product-form__label">Категория</label>
             <div className="add-product-page__supplier-row">
               <select
-                name="category_name"
+                name="category"
                 className="market-product-form__input"
-                value={newItemData.category_name}
+                value={newItemData.category}
                 onChange={handleChange}
                 required
               >
                 <option value="">Выберите категорию</option>
                 {categories.map((category, idx) => (
-                  <option key={category.id ?? idx} value={category.name}>
+                  <option key={category.id ?? idx} value={category.id}>
                     {category.name}
                   </option>
                 ))}
@@ -2492,6 +2513,9 @@ const MarketProductForm = ({
                 + Создать категорию
               </button>
             </div>
+            {fieldErrors.category && (
+              <p className="add-product-page__error">{fieldErrors.category}</p>
+            )}
             {showCategoryInputs && (
               <form
                 className="add-product-page__supplier-form"
@@ -2531,15 +2555,15 @@ const MarketProductForm = ({
             <label className="market-product-form__label">Бренд</label>
             <div className="add-product-page__supplier-row">
               <select
-                name="brand_name"
+                name="brand"
                 className="market-product-form__input"
-                value={newItemData.brand_name}
+                value={newItemData.brand}
                 onChange={handleChange}
                 required
               >
                 <option value="">Выберите бренд</option>
                 {brands.map((brand, idx) => (
-                  <option key={brand.id ?? idx} value={brand.name}>
+                  <option key={brand.id ?? idx} value={brand.id}>
                     {brand.name}
                   </option>
                 ))}

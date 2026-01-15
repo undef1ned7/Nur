@@ -120,6 +120,12 @@ const AddProductPage = () => {
     recalculateKitPrice: recalculateKitPriceFromHook,
   } = useKitProducts(products);
 
+  // Обработчик изменения данных для маркета (мемоизирован для оптимизации)
+  // Объявляем ДО использования в useEffect
+  const handleMarketDataChange = useCallback((field, value) => {
+    setMarketData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
   // Синхронизируем с marketData
   useEffect(() => {
     if (marketData.kitProducts !== kitProductsFromHook) {
@@ -843,11 +849,6 @@ const AddProductPage = () => {
     weightProductsCount,
     marketData.plu,
   ]);
-
-  // Обработчик изменения данных для маркета (мемоизирован для оптимизации)
-  const handleMarketDataChange = useCallback((field, value) => {
-    setMarketData((prev) => ({ ...prev, [field]: value }));
-  }, []);
 
   // Генерация EAN-13 штрих-кода для маркета
   const generateBarcode = () => {

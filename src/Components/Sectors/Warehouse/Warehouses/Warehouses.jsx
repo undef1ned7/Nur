@@ -75,7 +75,7 @@ const Warehouses = () => {
 
   const handleOpenWarehouse = useCallback(
     (warehouse) => {
-      navigate(`/crm/warehouse/stocks?warehouse_id=${warehouse.id}`);
+      navigate(`/crm/warehouse/stocks/${warehouse.id}`);
     },
     [navigate]
   );

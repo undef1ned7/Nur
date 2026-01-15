@@ -158,20 +158,18 @@ const warehouseSlice = createSlice({
       })
       .addCase(fetchWarehouseBrandsAsync.fulfilled, (state, action) => {
         state.brandsLoading = false;
-        applyPagination(
-          {
-            list: state.brands,
-            count: state.brandsCount,
-            next: state.brandsNext,
-            previous: state.brandsPrevious,
-          },
-          action.payload,
-          "list"
-        );
-        state.brands = state.list;
-        state.brandsCount = state.count;
-        state.brandsNext = state.next;
-        state.brandsPrevious = state.previous;
+        const results = Array.isArray(action.payload.results)
+          ? action.payload.results
+          : Array.isArray(action.payload)
+          ? action.payload
+          : [];
+        state.brands = results;
+        state.brandsCount =
+          typeof action.payload.count === "number"
+            ? action.payload.count
+            : results.length;
+        state.brandsNext = action.payload.next ?? null;
+        state.brandsPrevious = action.payload.previous ?? null;
       })
       .addCase(fetchWarehouseBrandsAsync.rejected, (state, action) => {
         state.brandsLoading = false;
@@ -226,7 +224,10 @@ const warehouseSlice = createSlice({
         state.deletingBrand = false;
         const deletedIds = new Set(action.payload?.deleted_ids || []);
         state.brands = state.brands.filter((b) => !deletedIds.has(b.id));
-        state.brandsCount = Math.max(0, (state.brandsCount || 0) - deletedIds.size);
+        state.brandsCount = Math.max(
+          0,
+          (state.brandsCount || 0) - deletedIds.size
+        );
       })
       .addCase(bulkDeleteWarehouseBrandsAsync.rejected, (state, action) => {
         state.deletingBrand = false;
@@ -240,20 +241,18 @@ const warehouseSlice = createSlice({
       })
       .addCase(fetchWarehouseCategoriesAsync.fulfilled, (state, action) => {
         state.categoriesLoading = false;
-        applyPagination(
-          {
-            list: state.categories,
-            count: state.categoriesCount,
-            next: state.categoriesNext,
-            previous: state.categoriesPrevious,
-          },
-          action.payload,
-          "list"
-        );
-        state.categories = state.list;
-        state.categoriesCount = state.count;
-        state.categoriesNext = state.next;
-        state.categoriesPrevious = state.previous;
+        const results = Array.isArray(action.payload.results)
+          ? action.payload.results
+          : Array.isArray(action.payload)
+          ? action.payload
+          : [];
+        state.categories = results;
+        state.categoriesCount =
+          typeof action.payload.count === "number"
+            ? action.payload.count
+            : results.length;
+        state.categoriesNext = action.payload.next ?? null;
+        state.categoriesPrevious = action.payload.previous ?? null;
       })
       .addCase(fetchWarehouseCategoriesAsync.rejected, (state, action) => {
         state.categoriesLoading = false;
@@ -278,7 +277,9 @@ const warehouseSlice = createSlice({
       })
       .addCase(updateWarehouseCategoryAsync.fulfilled, (state, action) => {
         state.updatingCategory = false;
-        const index = state.categories.findIndex((c) => c.id === action.payload.id);
+        const index = state.categories.findIndex(
+          (c) => c.id === action.payload.id
+        );
         if (index !== -1) {
           state.categories[index] = action.payload;
         }
@@ -293,7 +294,9 @@ const warehouseSlice = createSlice({
       })
       .addCase(deleteWarehouseCategoryAsync.fulfilled, (state, action) => {
         state.deletingCategory = false;
-        state.categories = state.categories.filter((c) => c.id !== action.payload);
+        state.categories = state.categories.filter(
+          (c) => c.id !== action.payload
+        );
         state.categoriesCount = Math.max(0, (state.categoriesCount || 0) - 1);
       })
       .addCase(deleteWarehouseCategoryAsync.rejected, (state, action) => {
@@ -304,12 +307,20 @@ const warehouseSlice = createSlice({
         state.deletingCategory = true;
         state.deleteCategoryError = null;
       })
-      .addCase(bulkDeleteWarehouseCategoriesAsync.fulfilled, (state, action) => {
-        state.deletingCategory = false;
-        const deletedIds = new Set(action.payload?.deleted_ids || []);
-        state.categories = state.categories.filter((c) => !deletedIds.has(c.id));
-        state.categoriesCount = Math.max(0, (state.categoriesCount || 0) - deletedIds.size);
-      })
+      .addCase(
+        bulkDeleteWarehouseCategoriesAsync.fulfilled,
+        (state, action) => {
+          state.deletingCategory = false;
+          const deletedIds = new Set(action.payload?.deleted_ids || []);
+          state.categories = state.categories.filter(
+            (c) => !deletedIds.has(c.id)
+          );
+          state.categoriesCount = Math.max(
+            0,
+            (state.categoriesCount || 0) - deletedIds.size
+          );
+        }
+      )
       .addCase(bulkDeleteWarehouseCategoriesAsync.rejected, (state, action) => {
         state.deletingCategory = false;
         state.deleteCategoryError = action.payload;

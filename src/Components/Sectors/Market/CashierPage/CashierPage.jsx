@@ -1569,7 +1569,8 @@ const CashierPage = () => {
                       <Trash2 size={18} />
                     </button>
                     <div className="cashier-page__cart-item-price">
-                      {formatPrice((item.price || 0) * item.quantity)} сом
+                      {Number(((item.price || 0) * item.quantity).toFixed(3))}{" "}
+                      сом
                     </div>
                   </div>
                 </div>

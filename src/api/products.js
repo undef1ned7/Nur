@@ -3,7 +3,14 @@ import api from "./index";
 
 export const fetchProductsApi = async (params = {}) => {
   try {
-    const response = await api.get("main/products/list/", { params });
+    const { warehouse, ...restParams } = params;
+    let url = "main/products/list/";
+
+    if (warehouse) {
+      url = `warehouse/${warehouse}/products/`;
+    }
+
+    const response = await api.get(url, { params: restParams });
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -11,6 +18,7 @@ export const fetchProductsApi = async (params = {}) => {
       console.error("Fetch Products Error Status:", error.response.status);
       return Promise.reject(error.response.data);
     }
+    return Promise.reject(error);
   }
 };
 
