@@ -120,6 +120,78 @@
 //   return acc;
 // }
 
+// /* ===== kitchen analytics normalizers ===== */
+// const pickName = (x) =>
+//   x?.name ||
+//   x?.full_name ||
+//   x?.fullName ||
+//   x?.username ||
+//   x?.user?.full_name ||
+//   x?.user?.username ||
+//   x?.user?.email ||
+//   x?.waiter?.full_name ||
+//   x?.cook?.full_name ||
+//   x?.title ||
+//   "—";
+
+// const pickId = (x, idx) =>
+//   x?.id || x?.user_id || x?.user?.id || x?.waiter_id || x?.cook_id || `${pickName(x)}_${idx}`;
+
+// const normalizeStaffRow = (x, idx) => {
+//   const revenue =
+//     toNum(x?.revenue) ||
+//     toNum(x?.sum) ||
+//     toNum(x?.total) ||
+//     toNum(x?.total_revenue) ||
+//     toNum(x?.total_amount);
+
+//   const orders =
+//     toNum(x?.orders_count) ||
+//     toNum(x?.orders) ||
+//     toNum(x?.count) ||
+//     toNum(x?.checks_count) ||
+//     toNum(x?.transactions);
+
+//   const items =
+//     toNum(x?.items_qty) ||
+//     toNum(x?.items) ||
+//     toNum(x?.qty) ||
+//     toNum(x?.positions) ||
+//     toNum(x?.positions_qty);
+
+//   const avgCheck =
+//     toNum(x?.avg_check) ||
+//     toNum(x?.avg) ||
+//     toNum(x?.average_check) ||
+//     (orders > 0 ? revenue / orders : 0);
+
+//   const prepared =
+//     toNum(x?.prepared_count) ||
+//     toNum(x?.done_count) ||
+//     toNum(x?.ready_count) ||
+//     toNum(x?.completed);
+
+//   const avgTime =
+//     toNum(x?.avg_time) ||
+//     toNum(x?.avg_cook_time) ||
+//     toNum(x?.avg_prepare_time) ||
+//     toNum(x?.avg_minutes);
+
+//   return {
+//     _id: pickId(x, idx),
+//     name: pickName(x),
+//     orders_count: orders,
+//     items_qty: items,
+//     revenue,
+//     avg_check: avgCheck,
+//     prepared_count: prepared,
+//     avg_time: avgTime,
+//     raw: x,
+//   };
+// };
+
+// const sumBy = (arr, key) => arr.reduce((acc, x) => acc + toNum(x?.[key]), 0);
+
 // /* ===== Modal ===== */
 // const Modal = ({ open, title, subtitle, onClose, children }) => {
 //   useEffect(() => {
@@ -189,11 +261,18 @@
 //   // гости (кол-во клиентов)
 //   const [guestsCount, setGuestsCount] = useState(0);
 
+//   // кухня аналитика
+//   const [cooksRows, setCooksRows] = useState([]);
+//   const [waitersRows, setWaitersRows] = useState([]);
+//   const [kitchenLoading, setKitchenLoading] = useState(false);
+
 //   // series для графика
 //   const [revenueSeries, setRevenueSeries] = useState([]);
 
 //   // modal
-//   const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock
+//   const [modalKey, setModalKey] = useState(null); // revenue | avg | clients | stock | cooks | waiters
+//   const [staffQ, setStaffQ] = useState("");
+//   const [staffSort, setStaffSort] = useState("revenue_desc"); // revenue_desc | orders_desc | avg_desc | name_asc
 
 //   const params = useMemo(() => {
 //     const p = {};
@@ -204,30 +283,54 @@
 
 //   const fetchGuestsCount = useCallback(async () => {
 //     try {
-//       // IMPORTANT: путь может отличаться. Если у тебя в clientStore другой — поменяй тут.
 //       const clients = await fetchAllPages("/cafe/clients/");
 //       setGuestsCount(Array.isArray(clients) ? clients.length : 0);
 //     } catch (e) {
-//       // без лишних логов
 //       setGuestsCount(0);
 //     }
 //   }, []);
 
+//   const fetchKitchenAnalytics = useCallback(async () => {
+//     setKitchenLoading(true);
+//     try {
+//       const [rCooks, rWaiters] = await Promise.all([
+//         api.get("/cafe/kitchen/analytics/cooks/", { params }).catch(() => ({ data: [] })),
+//         api.get("/cafe/kitchen/analytics/waiters/", { params }).catch(() => ({ data: [] })),
+//       ]);
+
+//       const cooks = asArray(rCooks?.data).map(normalizeStaffRow);
+//       const waiters = asArray(rWaiters?.data).map(normalizeStaffRow);
+
+//       setCooksRows(Array.isArray(cooks) ? cooks : []);
+//       setWaitersRows(Array.isArray(waiters) ? waiters : []);
+//     } catch (e) {
+//       console.error("Reports kitchen analytics error:", e);
+//       setCooksRows([]);
+//       setWaitersRows([]);
+//     } finally {
+//       setKitchenLoading(false);
+//     }
+//   }, [params]);
+
 //   const fetchAll = useCallback(async () => {
 //     setLoading(true);
 //     try {
+//       // ВАЖНО: здесь раньше была ошибка — промисов 4, а переменных 3.
 //       const [rSalesSummary, rSalesItems, rLowStock] = await Promise.all([
 //         api.get("/cafe/analytics/sales/summary/", { params }).catch(() => ({ data: null })),
 //         api
 //           .get("/cafe/analytics/sales/items/", { params: { ...params, limit: 10 } })
 //           .catch(() => ({ data: [] })),
 //         api.get("/cafe/analytics/warehouse/low-stock/").catch(() => ({ data: [] })),
-//         fetchGuestsCount().catch(() => {}),
 //       ]);
 
 //       setSalesSummary(rSalesSummary?.data || { orders_count: 0, items_qty: 0, revenue: "0.00" });
 //       setSalesItems(Array.isArray(listFrom(rSalesItems)) ? listFrom(rSalesItems) : []);
 //       setLowStock(Array.isArray(listFrom(rLowStock)) ? listFrom(rLowStock) : []);
+
+//       // грузим отдельно, чтобы не ломать общие отчёты, даже если клиенты/кухня падают
+//       fetchGuestsCount().catch(() => {});
+//       fetchKitchenAnalytics().catch(() => {});
 //     } catch (e) {
 //       console.error("Reports fetchAll error:", e);
 //       setSalesSummary({ orders_count: 0, items_qty: 0, revenue: "0.00" });
@@ -236,7 +339,7 @@
 //     } finally {
 //       setLoading(false);
 //     }
-//   }, [params, fetchGuestsCount]);
+//   }, [params, fetchGuestsCount, fetchKitchenAnalytics]);
 
 //   const fetchRevenueSeries = useCallback(async () => {
 //     if (!dateFrom || !dateTo) {
@@ -359,7 +462,15 @@
 //     [revenueTotal, trxCount]
 //   );
 
-//   const openModal = (key) => setModalKey(key);
+//   // кухонные KPI
+//   const cooksCount = useMemo(() => cooksRows.length, [cooksRows]);
+//   const waitersCount = useMemo(() => waitersRows.length, [waitersRows]);
+
+//   const openModal = (key) => {
+//     setModalKey(key);
+//     setStaffQ("");
+//     setStaffSort("revenue_desc");
+//   };
 //   const closeModal = () => setModalKey(null);
 
 //   const modalTitle = useMemo(() => {
@@ -367,6 +478,8 @@
 //     if (modalKey === "avg") return "Средний чек";
 //     if (modalKey === "clients") return "Гости";
 //     if (modalKey === "stock") return "Склад";
+//     if (modalKey === "cooks") return "Аналитика по поварам";
+//     if (modalKey === "waiters") return "Аналитика по официантам";
 //     return "";
 //   }, [modalKey]);
 
@@ -376,6 +489,33 @@
 //     if (dateTo) p.push(`до ${dateTo}`);
 //     return p.join(" ");
 //   }, [dateFrom, dateTo]);
+
+//   const activeStaffRows = useMemo(() => {
+//     const base = modalKey === "cooks" ? cooksRows : modalKey === "waiters" ? waitersRows : [];
+//     const q = (staffQ || "").trim().toLowerCase();
+
+//     const filtered = q
+//       ? base.filter((x) => String(x?.name || "").toLowerCase().includes(q))
+//       : base.slice();
+
+//     const sorted = filtered.sort((a, b) => {
+//       if (staffSort === "name_asc") return String(a.name).localeCompare(String(b.name), "ru");
+//       if (staffSort === "orders_desc") return toNum(b.orders_count) - toNum(a.orders_count);
+//       if (staffSort === "avg_desc") return toNum(b.avg_check) - toNum(a.avg_check);
+//       return toNum(b.revenue) - toNum(a.revenue);
+//     });
+
+//     return sorted;
+//   }, [modalKey, cooksRows, waitersRows, staffQ, staffSort]);
+
+//   const staffTotals = useMemo(() => {
+//     const rows = activeStaffRows;
+//     return {
+//       revenue: sumBy(rows, "revenue"),
+//       orders: sumBy(rows, "orders_count"),
+//       items: sumBy(rows, "items_qty"),
+//     };
+//   }, [activeStaffRows]);
 
 //   return (
 //     <section className="cafeAnalytics">
@@ -420,7 +560,7 @@
 //                   fetchAll();
 //                   fetchRevenueSeries();
 //                 }}
-//                 disabled={loading}
+//                 disabled={loading || kitchenLoading}
 //                 type="button"
 //               >
 //                 <FaSync /> Обновить
@@ -431,12 +571,8 @@
 
 //         {/* KPI */}
 //         <div className="cafeAnalytics__kpis cafeAnalytics__kpis--3">
-//           {/* ВЫРУЧКА (кликабельная) */}
-//           <button
-//             className="cafeAnalytics__kpi"
-//             type="button"
-//             onClick={() => openModal("revenue")}
-//           >
+//           {/* ВЫРУЧКА */}
+//           <button className="cafeAnalytics__kpi" type="button" onClick={() => openModal("revenue")}>
 //             <div className="cafeAnalytics__kpiTop">
 //               <div className="cafeAnalytics__kpiLabel">ВЫРУЧКА</div>
 //               <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
@@ -448,7 +584,7 @@
 //             </div>
 //           </button>
 
-//           {/* ТРАНЗАКЦИИ (НЕ кликабельная) */}
+//           {/* ТРАНЗАКЦИИ */}
 //           <div className="cafeAnalytics__kpi cafeAnalytics__kpi--static" aria-disabled="true">
 //             <div className="cafeAnalytics__kpiTop">
 //               <div className="cafeAnalytics__kpiLabel">ТРАНЗАКЦИИ</div>
@@ -459,7 +595,7 @@
 //             <div className="cafeAnalytics__kpiValue">{fmtInt(trxCount)}</div>
 //           </div>
 
-//           {/* ГОСТИ (кликабельная) */}
+//           {/* ГОСТИ */}
 //           <button className="cafeAnalytics__kpi" type="button" onClick={() => openModal("clients")}>
 //             <div className="cafeAnalytics__kpiTop">
 //               <div className="cafeAnalytics__kpiLabel">ГОСТИ</div>
@@ -468,6 +604,45 @@
 //               </div>
 //             </div>
 //             <div className="cafeAnalytics__kpiValue">{fmtInt(guestsCount)}</div>
+//           </button>
+//         </div>
+
+//         {/* KPI kitchen */}
+//         <div className="cafeAnalytics__kpis cafeAnalytics__kpis--2">
+//           <button
+//             className="cafeAnalytics__kpi cafeAnalytics__kpi--kitchen"
+//             type="button"
+//             onClick={() => openModal("cooks")}
+//             disabled={kitchenLoading}
+//           >
+//             <div className="cafeAnalytics__kpiTop">
+//               <div className="cafeAnalytics__kpiLabel">ПОВАРА</div>
+//               <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
+//                 <FaUsers />
+//               </div>
+//             </div>
+//             <div className="cafeAnalytics__kpiValue">{fmtInt(cooksCount)}</div>
+//             <div className="cafeAnalytics__kpiHint">
+//               {kitchenLoading ? "Загрузка…" : "Сводка и рейтинг"}
+//             </div>
+//           </button>
+
+//           <button
+//             className="cafeAnalytics__kpi cafeAnalytics__kpi--kitchen"
+//             type="button"
+//             onClick={() => openModal("waiters")}
+//             disabled={kitchenLoading}
+//           >
+//             <div className="cafeAnalytics__kpiTop">
+//               <div className="cafeAnalytics__kpiLabel">ОФИЦИАНТЫ</div>
+//               <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
+//                 <FaUsers />
+//               </div>
+//             </div>
+//             <div className="cafeAnalytics__kpiValue">{fmtInt(waitersCount)}</div>
+//             <div className="cafeAnalytics__kpiHint">
+//               {kitchenLoading ? "Загрузка…" : "Выручка, чеки, позиции"}
+//             </div>
 //           </button>
 //         </div>
 //       </div>
@@ -492,7 +667,7 @@
 
 //       {/* Bottom */}
 //       <div className="cafeAnalytics__bottom">
-//         {/* TOP ITEMS во всю ширину */}
+//         {/* TOP ITEMS */}
 //         <div className="cafeAnalytics__card cafeAnalytics__card--full">
 //           <div className="cafeAnalytics__cardHead cafeAnalytics__cardHead--tight">
 //             <div className="cafeAnalytics__cardTitle">Топ блюд по выручке</div>
@@ -671,13 +846,120 @@
 //             </div>
 //           </div>
 //         )}
+
+//         {(modalKey === "cooks" || modalKey === "waiters") && (
+//           <div className="cafeAnalyticsModalContent">
+//             <div className="cafeAnalyticsStaffBar">
+//               <label className="cafeAnalyticsStaffBar__field">
+//                 <span>Поиск</span>
+//                 <input
+//                   className="cafeAnalytics__input"
+//                   value={staffQ}
+//                   onChange={(e) => setStaffQ(e.target.value)}
+//                   placeholder="Имя сотрудника…"
+//                 />
+//               </label>
+
+//               <label className="cafeAnalyticsStaffBar__field">
+//                 <span>Сортировка</span>
+//                 <select
+//                   className="cafeAnalyticsStaffBar__select"
+//                   value={staffSort}
+//                   onChange={(e) => setStaffSort(e.target.value)}
+//                 >
+//                   <option value="revenue_desc">Выручка ↓</option>
+//                   <option value="orders_desc">Чеки ↓</option>
+//                   <option value="avg_desc">Средний чек ↓</option>
+//                   <option value="name_asc">Имя A–Я</option>
+//                 </select>
+//               </label>
+
+//               <button
+//                 className="cafeAnalytics__btn cafeAnalyticsStaffBar__btn"
+//                 type="button"
+//                 onClick={() => fetchKitchenAnalytics()}
+//                 disabled={kitchenLoading}
+//               >
+//                 <FaSync /> Обновить
+//               </button>
+//             </div>
+
+//             <div className="cafeAnalyticsModalContent__kpiRow cafeAnalyticsModalContent__kpiRow--3">
+//               <div className="cafeAnalyticsModalContent__kpi">
+//                 <div className="cafeAnalyticsModalContent__kLabel">Выручка</div>
+//                 <div className="cafeAnalyticsModalContent__kVal">{fmtMoney(staffTotals.revenue)}</div>
+//               </div>
+//               <div className="cafeAnalyticsModalContent__kpi">
+//                 <div className="cafeAnalyticsModalContent__kLabel">Чеки</div>
+//                 <div className="cafeAnalyticsModalContent__kVal">{fmtInt(staffTotals.orders)}</div>
+//               </div>
+//               <div className="cafeAnalyticsModalContent__kpi">
+//                 <div className="cafeAnalyticsModalContent__kLabel">Позиции</div>
+//                 <div className="cafeAnalyticsModalContent__kVal">{fmtInt(staffTotals.items)}</div>
+//               </div>
+//             </div>
+
+//             <div className="cafeAnalyticsModalContent__block">
+//               <div className="cafeAnalyticsModalContent__blockTitle">
+//                 {modalKey === "cooks" ? "Рейтинг поваров" : "Рейтинг официантов"}
+//               </div>
+
+//               <div className="cafeAnalyticsModalContent__tableWrap">
+//                 <table className="cafeAnalyticsModalContent__table cafeAnalyticsModalContent__table--staff">
+//                   <thead>
+//                     <tr>
+//                       <th>Сотрудник</th>
+//                       <th>Чеки</th>
+//                       <th>Позиции</th>
+//                       <th>Выручка</th>
+//                       <th>Средний чек</th>
+//                     </tr>
+//                   </thead>
+//                   <tbody>
+//                     {kitchenLoading && (
+//                       <tr>
+//                         <td colSpan={5} className="cafeAnalyticsModalContent__empty">
+//                           Загрузка…
+//                         </td>
+//                       </tr>
+//                     )}
+
+//                     {!kitchenLoading &&
+//                       activeStaffRows.map((x) => (
+//                         <tr key={x._id}>
+//                           <td className="cafeAnalyticsModalContent__tdTitle" title={x.name}>
+//                             {x.name}
+//                           </td>
+//                           <td>{fmtInt(x.orders_count)}</td>
+//                           <td>{fmtInt(x.items_qty)}</td>
+//                           <td>{fmtMoney(x.revenue)}</td>
+//                           <td>{fmtMoney(x.avg_check)}</td>
+//                         </tr>
+//                       ))}
+
+//                     {!kitchenLoading && !activeStaffRows.length && (
+//                       <tr>
+//                         <td colSpan={5} className="cafeAnalyticsModalContent__empty">
+//                           Нет данных за выбранный период.
+//                         </td>
+//                       </tr>
+//                     )}
+//                   </tbody>
+//                 </table>
+//               </div>
+
+//               {!kitchenLoading && (modalKey === "cooks" || modalKey === "waiters") && (
+//                 <div></div>
+//               )}
+//             </div>
+//           </div>
+//         )}
 //       </Modal>
 //     </section>
 //   );
 // };
 
 // export default Reports;
-
 
 
 // src/.../Reports.jsx
@@ -689,7 +971,6 @@ import {
   FaBoxOpen,
   FaShoppingCart,
   FaUsers,
-  FaTimes,
 } from "react-icons/fa";
 import {
   Chart,
@@ -704,6 +985,7 @@ import {
 } from "chart.js";
 import api from "../../../../api";
 import "./reports.scss";
+import { Modal, ReportsModalContent } from "./ReportsModals";
 
 Chart.register(
   LineController,
@@ -817,7 +1099,12 @@ const pickName = (x) =>
   "—";
 
 const pickId = (x, idx) =>
-  x?.id || x?.user_id || x?.user?.id || x?.waiter_id || x?.cook_id || `${pickName(x)}_${idx}`;
+  x?.id ||
+  x?.user_id ||
+  x?.user?.id ||
+  x?.waiter_id ||
+  x?.cook_id ||
+  `${pickName(x)}_${idx}`;
 
 const normalizeStaffRow = (x, idx) => {
   const revenue =
@@ -874,52 +1161,6 @@ const normalizeStaffRow = (x, idx) => {
 
 const sumBy = (arr, key) => arr.reduce((acc, x) => acc + toNum(x?.[key]), 0);
 
-/* ===== Modal ===== */
-const Modal = ({ open, title, subtitle, onClose, children }) => {
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-
-    document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return (
-    <div className="cafeAnalyticsModal" role="dialog" aria-modal="true">
-      <button
-        className="cafeAnalyticsModal__overlay"
-        aria-label="Закрыть"
-        onClick={onClose}
-        type="button"
-      />
-      <div className="cafeAnalyticsModal__panel">
-        <div className="cafeAnalyticsModal__head">
-          <div className="cafeAnalyticsModal__headText">
-            <div className="cafeAnalyticsModal__title">{title}</div>
-            {subtitle ? <div className="cafeAnalyticsModal__sub">{subtitle}</div> : null}
-          </div>
-          <button className="cafeAnalyticsModal__close" onClick={onClose} type="button">
-            <FaTimes />
-          </button>
-        </div>
-
-        <div className="cafeAnalyticsModal__body">{children}</div>
-      </div>
-    </div>
-  );
-};
-
 /* ===== component ===== */
 const Reports = () => {
   const chartRef = useRef(null);
@@ -927,8 +1168,8 @@ const Reports = () => {
 
   const [loading, setLoading] = useState(false);
 
-  // дефолт: последние 14 дней
-  const [dateFrom, setDateFrom] = useState(() => isoDate(addDays(new Date(), -11)));
+  // дефолт: последние 14 дней (включительно)
+  const [dateFrom, setDateFrom] = useState(() => isoDate(addDays(new Date(), -13)));
   const [dateTo, setDateTo] = useState(() => isoDate(new Date()));
 
   // данные
@@ -940,7 +1181,7 @@ const Reports = () => {
   const [salesItems, setSalesItems] = useState([]);
   const [lowStock, setLowStock] = useState([]);
 
-  // гости (кол-во клиентов)
+  // гости
   const [guestsCount, setGuestsCount] = useState(0);
 
   // кухня аналитика
@@ -997,7 +1238,6 @@ const Reports = () => {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      // ВАЖНО: здесь раньше была ошибка — промисов 4, а переменных 3.
       const [rSalesSummary, rSalesItems, rLowStock] = await Promise.all([
         api.get("/cafe/analytics/sales/summary/", { params }).catch(() => ({ data: null })),
         api
@@ -1010,7 +1250,6 @@ const Reports = () => {
       setSalesItems(Array.isArray(listFrom(rSalesItems)) ? listFrom(rSalesItems) : []);
       setLowStock(Array.isArray(listFrom(rLowStock)) ? listFrom(rLowStock) : []);
 
-      // грузим отдельно, чтобы не ломать общие отчёты, даже если клиенты/кухня падают
       fetchGuestsCount().catch(() => {});
       fetchKitchenAnalytics().catch(() => {});
     } catch (e) {
@@ -1139,10 +1378,7 @@ const Reports = () => {
 
   const revenueTotal = useMemo(() => toNum(salesSummary?.revenue), [salesSummary]);
   const trxCount = useMemo(() => Number(salesSummary?.orders_count || 0), [salesSummary]);
-  const avgCheck = useMemo(
-    () => (trxCount > 0 ? revenueTotal / trxCount : 0),
-    [revenueTotal, trxCount]
-  );
+  const avgCheck = useMemo(() => (trxCount > 0 ? revenueTotal / trxCount : 0), [revenueTotal, trxCount]);
 
   // кухонные KPI
   const cooksCount = useMemo(() => cooksRows.length, [cooksRows]);
@@ -1176,9 +1412,7 @@ const Reports = () => {
     const base = modalKey === "cooks" ? cooksRows : modalKey === "waiters" ? waitersRows : [];
     const q = (staffQ || "").trim().toLowerCase();
 
-    const filtered = q
-      ? base.filter((x) => String(x?.name || "").toLowerCase().includes(q))
-      : base.slice();
+    const filtered = q ? base.filter((x) => String(x?.name || "").toLowerCase().includes(q)) : base.slice();
 
     const sorted = filtered.sort((a, b) => {
       if (staffSort === "name_asc") return String(a.name).localeCompare(String(b.name), "ru");
@@ -1253,7 +1487,6 @@ const Reports = () => {
 
         {/* KPI */}
         <div className="cafeAnalytics__kpis cafeAnalytics__kpis--3">
-          {/* ВЫРУЧКА */}
           <button className="cafeAnalytics__kpi" type="button" onClick={() => openModal("revenue")}>
             <div className="cafeAnalytics__kpiTop">
               <div className="cafeAnalytics__kpiLabel">ВЫРУЧКА</div>
@@ -1266,7 +1499,6 @@ const Reports = () => {
             </div>
           </button>
 
-          {/* ТРАНЗАКЦИИ */}
           <div className="cafeAnalytics__kpi cafeAnalytics__kpi--static" aria-disabled="true">
             <div className="cafeAnalytics__kpiTop">
               <div className="cafeAnalytics__kpiLabel">ТРАНЗАКЦИИ</div>
@@ -1277,7 +1509,6 @@ const Reports = () => {
             <div className="cafeAnalytics__kpiValue">{fmtInt(trxCount)}</div>
           </div>
 
-          {/* ГОСТИ */}
           <button className="cafeAnalytics__kpi" type="button" onClick={() => openModal("clients")}>
             <div className="cafeAnalytics__kpiTop">
               <div className="cafeAnalytics__kpiLabel">ГОСТИ</div>
@@ -1304,9 +1535,7 @@ const Reports = () => {
               </div>
             </div>
             <div className="cafeAnalytics__kpiValue">{fmtInt(cooksCount)}</div>
-            <div className="cafeAnalytics__kpiHint">
-              {kitchenLoading ? "Загрузка…" : "Сводка и рейтинг"}
-            </div>
+            <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Сводка и рейтинг"}</div>
           </button>
 
           <button
@@ -1322,9 +1551,7 @@ const Reports = () => {
               </div>
             </div>
             <div className="cafeAnalytics__kpiValue">{fmtInt(waitersCount)}</div>
-            <div className="cafeAnalytics__kpiHint">
-              {kitchenLoading ? "Загрузка…" : "Выручка, чеки, позиции"}
-            </div>
+            <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Выручка, чеки, позиции"}</div>
           </button>
         </div>
       </div>
@@ -1349,7 +1576,6 @@ const Reports = () => {
 
       {/* Bottom */}
       <div className="cafeAnalytics__bottom">
-        {/* TOP ITEMS */}
         <div className="cafeAnalytics__card cafeAnalytics__card--full">
           <div className="cafeAnalytics__cardHead cafeAnalytics__cardHead--tight">
             <div className="cafeAnalytics__cardTitle">Топ блюд по выручке</div>
@@ -1388,7 +1614,6 @@ const Reports = () => {
           </div>
         </div>
 
-        {/* Склад */}
         <button className="cafeAnalyticsMini" type="button" onClick={() => openModal("stock")}>
           <div className="cafeAnalyticsMini__top">
             <div className="cafeAnalyticsMini__icon cafeAnalyticsMini__icon--red">
@@ -1400,7 +1625,6 @@ const Reports = () => {
           <div className="cafeAnalyticsMini__meta">Позиции ниже минимума</div>
         </button>
 
-        {/* Средний чек */}
         <button className="cafeAnalyticsMini" type="button" onClick={() => openModal("avg")}>
           <div className="cafeAnalyticsMini__top">
             <div className="cafeAnalyticsMini__icon cafeAnalyticsMini__icon--dark">
@@ -1415,227 +1639,28 @@ const Reports = () => {
 
       {/* Modal */}
       <Modal open={!!modalKey} title={modalTitle} subtitle={modalSubtitle} onClose={closeModal}>
-        {modalKey === "revenue" && (
-          <div className="cafeAnalyticsModalContent">
-            <div className="cafeAnalyticsModalContent__kpiRow cafeAnalyticsModalContent__kpiRow--2">
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Выручка</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtMoney(revenueTotal)}</div>
-              </div>
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Транзакции</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtInt(trxCount)}</div>
-              </div>
-            </div>
-
-            <div className="cafeAnalyticsModalContent__block">
-              <div className="cafeAnalyticsModalContent__blockTitle">Топ блюд по выручке</div>
-              <div className="cafeAnalyticsModalContent__tableWrap">
-                <table className="cafeAnalyticsModalContent__table">
-                  <thead>
-                    <tr>
-                      <th>Блюдо</th>
-                      <th>Кол-во</th>
-                      <th>Выручка</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {salesItems.map((x) => (
-                      <tr key={x.menu_item_id || x.title}>
-                        <td className="cafeAnalyticsModalContent__tdTitle" title={x.title}>
-                          {x.title}
-                        </td>
-                        <td>{fmtInt(x.qty)}</td>
-                        <td>{fmtMoney(toNum(x.revenue))}</td>
-                      </tr>
-                    ))}
-                    {!salesItems.length && (
-                      <tr>
-                        <td colSpan={3} className="cafeAnalyticsModalContent__empty">
-                          Нет данных.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {modalKey === "clients" && (
-          <div className="cafeAnalyticsModalContent">
-            <div className="cafeAnalyticsModalContent__kpiRow cafeAnalyticsModalContent__kpiRow--1">
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Гости</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtInt(guestsCount)}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {modalKey === "avg" && (
-          <div className="cafeAnalyticsModalContent">
-            <div className="cafeAnalyticsModalContent__kpiRow cafeAnalyticsModalContent__kpiRow--2">
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Средний чек</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtMoney(avgCheck)}</div>
-              </div>
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Транзакции</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtInt(trxCount)}</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {modalKey === "stock" && (
-          <div className="cafeAnalyticsModalContent">
-            <div className="cafeAnalyticsModalContent__block">
-              <div className="cafeAnalyticsModalContent__blockTitle">Позиции ниже минимума</div>
-              <div className="cafeAnalyticsModalContent__tableWrap">
-                <table className="cafeAnalyticsModalContent__table">
-                  <thead>
-                    <tr>
-                      <th>Название</th>
-                      <th>Остаток</th>
-                      <th>Минимум</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lowStock.map((x) => (
-                      <tr key={x.id}>
-                        <td className="cafeAnalyticsModalContent__tdTitle" title={x.title}>
-                          {x.title}{" "}
-                          <span className="cafeAnalyticsModalContent__unit">
-                            {x.unit ? `· ${x.unit}` : ""}
-                          </span>
-                        </td>
-                        <td>{String(x.remainder || "0")}</td>
-                        <td>{String(x.minimum || "0")}</td>
-                      </tr>
-                    ))}
-                    {!lowStock.length && (
-                      <tr>
-                        <td colSpan={3} className="cafeAnalyticsModalContent__empty">
-                          Склад в норме: ниже минимума ничего нет.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {(modalKey === "cooks" || modalKey === "waiters") && (
-          <div className="cafeAnalyticsModalContent">
-            <div className="cafeAnalyticsStaffBar">
-              <label className="cafeAnalyticsStaffBar__field">
-                <span>Поиск</span>
-                <input
-                  className="cafeAnalytics__input"
-                  value={staffQ}
-                  onChange={(e) => setStaffQ(e.target.value)}
-                  placeholder="Имя сотрудника…"
-                />
-              </label>
-
-              <label className="cafeAnalyticsStaffBar__field">
-                <span>Сортировка</span>
-                <select
-                  className="cafeAnalyticsStaffBar__select"
-                  value={staffSort}
-                  onChange={(e) => setStaffSort(e.target.value)}
-                >
-                  <option value="revenue_desc">Выручка ↓</option>
-                  <option value="orders_desc">Чеки ↓</option>
-                  <option value="avg_desc">Средний чек ↓</option>
-                  <option value="name_asc">Имя A–Я</option>
-                </select>
-              </label>
-
-              <button
-                className="cafeAnalytics__btn cafeAnalyticsStaffBar__btn"
-                type="button"
-                onClick={() => fetchKitchenAnalytics()}
-                disabled={kitchenLoading}
-              >
-                <FaSync /> Обновить
-              </button>
-            </div>
-
-            <div className="cafeAnalyticsModalContent__kpiRow cafeAnalyticsModalContent__kpiRow--3">
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Выручка</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtMoney(staffTotals.revenue)}</div>
-              </div>
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Чеки</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtInt(staffTotals.orders)}</div>
-              </div>
-              <div className="cafeAnalyticsModalContent__kpi">
-                <div className="cafeAnalyticsModalContent__kLabel">Позиции</div>
-                <div className="cafeAnalyticsModalContent__kVal">{fmtInt(staffTotals.items)}</div>
-              </div>
-            </div>
-
-            <div className="cafeAnalyticsModalContent__block">
-              <div className="cafeAnalyticsModalContent__blockTitle">
-                {modalKey === "cooks" ? "Рейтинг поваров" : "Рейтинг официантов"}
-              </div>
-
-              <div className="cafeAnalyticsModalContent__tableWrap">
-                <table className="cafeAnalyticsModalContent__table cafeAnalyticsModalContent__table--staff">
-                  <thead>
-                    <tr>
-                      <th>Сотрудник</th>
-                      <th>Чеки</th>
-                      <th>Позиции</th>
-                      <th>Выручка</th>
-                      <th>Средний чек</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {kitchenLoading && (
-                      <tr>
-                        <td colSpan={5} className="cafeAnalyticsModalContent__empty">
-                          Загрузка…
-                        </td>
-                      </tr>
-                    )}
-
-                    {!kitchenLoading &&
-                      activeStaffRows.map((x) => (
-                        <tr key={x._id}>
-                          <td className="cafeAnalyticsModalContent__tdTitle" title={x.name}>
-                            {x.name}
-                          </td>
-                          <td>{fmtInt(x.orders_count)}</td>
-                          <td>{fmtInt(x.items_qty)}</td>
-                          <td>{fmtMoney(x.revenue)}</td>
-                          <td>{fmtMoney(x.avg_check)}</td>
-                        </tr>
-                      ))}
-
-                    {!kitchenLoading && !activeStaffRows.length && (
-                      <tr>
-                        <td colSpan={5} className="cafeAnalyticsModalContent__empty">
-                          Нет данных за выбранный период.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {!kitchenLoading && (modalKey === "cooks" || modalKey === "waiters") && (
-                <div></div>
-              )}
-            </div>
-          </div>
-        )}
+        <ReportsModalContent
+          modalKey={modalKey}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          revenueTotal={revenueTotal}
+          trxCount={trxCount}
+          avgCheck={avgCheck}
+          guestsCount={guestsCount}
+          salesItems={salesItems}
+          lowStock={lowStock}
+          kitchenLoading={kitchenLoading}
+          staffQ={staffQ}
+          setStaffQ={setStaffQ}
+          staffSort={staffSort}
+          setStaffSort={setStaffSort}
+          onRefreshKitchen={fetchKitchenAnalytics}
+          activeStaffRows={activeStaffRows}
+          staffTotals={staffTotals}
+          fmtInt={fmtInt}
+          fmtMoney={fmtMoney}
+          toNum={toNum}
+        />
       </Modal>
     </section>
   );
