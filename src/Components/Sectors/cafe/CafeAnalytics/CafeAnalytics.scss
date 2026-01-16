@@ -1,4 +1,4 @@
-/* src/.../reports.scss */
+/* src/.../cafeAnalytics.scss */
 
 /* только цвета в :root */
 :root {
@@ -13,7 +13,7 @@
   --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
 }
 
-/* ===== Блок CAFE ANALYTICS ===== */
+/* ===== BEM block: cafeAnalytics ===== */
 .cafeAnalytics {
   --radius: 16px;
   --radius-sm: 12px;
@@ -376,37 +376,37 @@
     color: var(--muted);
     padding: 18px 12px;
   }
-}
 
-/* ===== mini card ===== */
-.cafeAnalyticsMini {
-  text-align: left;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: #fff;
-  padding: 16px;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
-  cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  /* ===== mini card (was cafeAnalyticsMini) ===== */
+  &__mini {
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: #fff;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
 
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
-    border-color: rgba(226, 232, 240, 0.9);
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+      border-color: rgba(226, 232, 240, 0.9);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
   }
 
-  &:active {
-    transform: translateY(0);
-  }
-
-  &__top {
+  &__miniTop {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 10px;
   }
 
-  &__icon {
+  &__miniIcon {
     width: 40px;
     height: 40px;
     border-radius: 12px;
@@ -438,7 +438,7 @@
     }
   }
 
-  &__label {
+  &__miniLabel {
     font-size: 13px;
     font-weight: 900;
     letter-spacing: 0.6px;
@@ -446,14 +446,14 @@
     text-transform: uppercase;
   }
 
-  &__value {
+  &__miniValue {
     font-size: 28px;
     font-weight: 900;
     color: #0b1220;
     margin-bottom: 6px;
   }
 
-  &__meta {
+  &__miniMeta {
     font-size: 13px;
     color: var(--muted);
 
@@ -462,18 +462,18 @@
       font-weight: 900;
     }
   }
-}
 
-/* ===== Modal ===== */
-.cafeAnalyticsModal {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: grid;
-  place-items: center;
-  padding: 18px;
+  /* ===== modal (was cafeAnalyticsModal) ===== */
+  &__modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+  }
 
-  &__overlay {
+  &__modalOverlay {
     position: absolute;
     inset: 0;
     background: rgba(2, 6, 23, 0.45);
@@ -481,7 +481,7 @@
     cursor: pointer;
   }
 
-  &__panel {
+  &__modalPanel {
     position: relative;
     width: min(980px, calc(100vw - 24px));
     max-height: calc(100vh - 24px);
@@ -494,7 +494,7 @@
     flex-direction: column;
   }
 
-  &__head {
+  &__modalHead {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -504,24 +504,24 @@
     background: #fff;
   }
 
-  &__headText {
+  &__modalHeadText {
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
 
-  &__title {
+  &__modalTitle {
     font-size: 18px;
     font-weight: 900;
     color: #0b1220;
   }
 
-  &__sub {
+  &__modalSub {
     font-size: 13px;
     color: var(--muted);
   }
 
-  &__close {
+  &__modalClose {
     width: 40px;
     height: 40px;
     border-radius: 12px;
@@ -545,19 +545,19 @@
     }
   }
 
-  &__body {
+  &__modalBody {
     padding: 16px;
     overflow: auto; /* обязательный скролл */
   }
-}
 
-/* ===== Modal content ===== */
-.cafeAnalyticsModalContent {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  /* ===== modal content (was cafeAnalyticsModalContent) ===== */
+  &__modalContent {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
 
-  &__kpiRow {
+  &__modalKpiRow {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
@@ -575,14 +575,14 @@
     }
   }
 
-  &__kpi {
+  &__modalKpi {
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 14px;
     background: #fff;
   }
 
-  &__kLabel {
+  &__modalKLabel {
     font-size: 12px;
     font-weight: 900;
     letter-spacing: 0.4px;
@@ -591,31 +591,31 @@
     margin-bottom: 6px;
   }
 
-  &__kVal {
+  &__modalKVal {
     font-size: 20px;
     font-weight: 900;
     color: #0b1220;
   }
 
-  &__block {
+  &__modalBlock {
     border: 1px solid var(--border);
     border-radius: 14px;
     background: #fff;
     overflow: hidden;
   }
 
-  &__blockTitle {
+  &__modalBlockTitle {
     padding: 12px 14px;
     border-bottom: 1px solid var(--border);
     font-weight: 900;
     color: #0b1220;
   }
 
-  &__tableWrap {
+  &__modalTableWrap {
     overflow: auto; /* обязательный скролл */
   }
 
-  &__table {
+  &__modalTable {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
@@ -651,7 +651,7 @@
     }
   }
 
-  &__tdTitle {
+  &__modalTdTitle {
     max-width: 520px;
     white-space: nowrap;
     overflow: hidden;
@@ -659,42 +659,32 @@
     font-weight: 800;
   }
 
-  &__unit {
+  &__modalUnit {
     margin-left: 6px;
     color: var(--muted);
     font-size: 12px;
     font-weight: 700;
   }
 
-  &__empty {
+  &__modalEmpty {
     text-align: center;
     color: var(--muted);
     padding: 18px 12px;
   }
 
-  &__note {
-    font-size: 14px;
-    color: var(--text);
-    background: rgba(247, 215, 79, 0.18);
-    border: 1px solid rgba(247, 215, 79, 0.35);
-    border-radius: 12px;
+  /* staff bar (was cafeAnalyticsStaffBar) */
+  &__staffBar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
     padding: 12px;
-    margin: 12px 14px 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fafafa;
   }
-}
 
-/* staff bar */
-.cafeAnalyticsStaffBar {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: #fafafa;
-
-  &__field {
+  &__staffField {
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -707,7 +697,7 @@
     }
   }
 
-  &__select {
+  &__staffSelect {
     padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -722,7 +712,7 @@
     }
   }
 
-  &__btn {
+  &__staffBtn {
     margin-left: auto;
   }
 }
@@ -742,10 +732,7 @@
     &__card--full {
       grid-column: auto;
     }
-  }
-
-  .cafeAnalyticsStaffBar {
-    &__btn {
+    &__staffBtn {
       margin-left: 0;
     }
   }

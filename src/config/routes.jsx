@@ -94,7 +94,7 @@ import CreateSaleDocument from "../Components/Sectors/Market/Documents/CreateSal
 import MarketAnalytics from "../Components/Sectors/Market/Analytics/Analytics";
 
 // Cafe
-import CafeAnalytics from "../Components/Sectors/cafe/Analytics/Analytics";
+import CafeAnalytics from "../Components/Sectors/cafe/CafeAnalytics/CafeAnalytics";
 import CafeDocuments from "../Components/Sectors/cafe/Documents/Documents";
 import Cook from "../Components/Sectors/cafe/Cook/Cook";
 import CafeInventory from "../Components/Sectors/cafe/Inventory/CafeInventory";
@@ -104,7 +104,6 @@ import CafePayroll from "../Components/Sectors/cafe/Payroll/Payroll";
 import CafePurchasing from "../Components/Sectors/cafe/Purchasing/Purchasing";
 import CafeReports from "../Components/Sectors/cafe/Reports/Reports";
 import CafeReservations from "../Components/Sectors/cafe/Reservations/Reservations";
-import CafeStaff from "../Components/Sectors/cafe/Staff/Staff";
 import CafeStock from "../Components/Sectors/cafe/Stock/Stock";
 import CafeKassa from "../Components/Sectors/cafe/kassaCafe/kassa";
 import CafeClients from "../Components/Sectors/cafe/Clients/Clients";
@@ -151,6 +150,13 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
 
+
+
+// Public pages
+import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
+// import OnlineCatalog from "../Components/Online/Market/Catalog";
+
+
 /**
  * Создает защищенный роут
  */
@@ -166,6 +172,10 @@ const createProtectedRoute = (path, Component) => (
   />
 );
 
+
+
+
+
 /**
  * Конфигурация публичных роутов
  */
@@ -173,6 +183,22 @@ export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
   <Route key="/" path="/" element={<Landing />} />,
   <Route key="/register" path="/register" element={<Register />} />,
+
+
+
+    // ✅ Публичное онлайн-меню кафе по slug
+  //     <Route
+  //   key="/catalog/:slug"
+  //   path="/catalog/:slug"
+  //   element={<OnlineCatalog />}
+  // />,
+  <Route
+    key="/cafe/:company_slug/menu"
+    path="/cafe/:company_slug/menu"
+    element={<CafeMenuOnline />}
+  />,
+
+
   <Route
     key="/submit-application"
     path="/submit-application"
@@ -283,7 +309,6 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("cafe/purchasing", CafePurchasing),
   createProtectedRoute("cafe/reports", CafeReports),
   createProtectedRoute("cafe/reservations", CafeReservations),
-  createProtectedRoute("cafe/staff", CafeStaff),
   createProtectedRoute("cafe/stock", CafeStock),
   createProtectedRoute("cafe/kassa/*", CafeKassa),
   createProtectedRoute("cafe/clients", CafeClients),

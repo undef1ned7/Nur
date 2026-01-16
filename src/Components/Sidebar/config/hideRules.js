@@ -43,7 +43,6 @@ export const HIDE_RULES = [
     hide: {
       toIncludes: [
         "/crm/zakaz",
-        "/crm/cafe/analytics",
         "/crm/kassa",
         "/crm/cafe/reports",
         "/crm/sell",

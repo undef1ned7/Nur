@@ -1,3 +1,4 @@
+// src/Components/Sectors/cafe/Clients/clientStore.js
 import api from "../../../../api";
 
 // ===== helpers
@@ -111,6 +112,7 @@ async function enrichOrdersDetails(list) {
   const byId = new Map(
     details.filter(Boolean).map((x) => [String(x.id), x.data])
   );
+
   return list.map((o) => {
     const d = byId.get(String(o.id));
     if (!d) return { ...o, total: o.total || calcOrderTotal(o) };
@@ -154,6 +156,7 @@ export async function getOrdersByClient(clientId) {
 
   let raw = await fetchAll(`/cafe/orders/?client=${clientId}`);
   if (!raw.length) raw = await fetchAll(`/cafe/clients/${clientId}/orders/`);
+
   const base = raw.map(normalizeOrderLite);
   const fullActive = await enrichOrdersDetails(base);
   const withTotals = fullActive.map((o) => ({

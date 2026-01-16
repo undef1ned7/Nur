@@ -1,8 +1,9 @@
 // src/page/homePage/components/Stock.jsx (или твой путь)
 import React, { useEffect, useMemo, useState } from "react";
-import { FaSearch, FaPlus, FaTimes, FaBoxes, FaEdit, FaTrash } from "react-icons/fa";
+import { FaSearch, FaPlus, FaBoxes, FaEdit, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import "./stock.scss";
+import { StockItemModal, StockMoveModal, StockDeleteModal } from "./StockModals";
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -41,18 +42,18 @@ const Stock = () => {
   const [form, setForm] = useState({
     title: "",
     unit: "",
-    remainder: "", // <-- было 0
-    minimum: "", // <-- было 0 (чтобы тоже не прилипал ноль)
-    expense: "", // <-- было 0
+    remainder: "",
+    minimum: "",
+    expense: "",
   });
 
   // модалка движения (приход)
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveItem, setMoveItem] = useState(null);
-  const [moveQty, setMoveQty] = useState(""); // <-- было 1
-  const [moveSum, setMoveSum] = useState(""); // <-- было 0
+  const [moveQty, setMoveQty] = useState("");
+  const [moveSum, setMoveSum] = useState("");
 
-  // модалка подтверждения удаления (вместо window.confirm)
+  // модалка подтверждения удаления
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState(null);
 
@@ -266,7 +267,6 @@ const Stock = () => {
             />
           </div>
 
-          {/* выбор кассы для записи расхода */}
           <select
             className="stock__select"
             value={cashboxId}
@@ -283,7 +283,12 @@ const Stock = () => {
           <button className="stock__btn stock__btn--secondary" type="button">
             Экспорт
           </button>
-          <button className="stock__btn stock__btn--primary" onClick={openCreate} type="button">
+
+          <button
+            className="stock__btn stock__btn--primary"
+            onClick={openCreate}
+            type="button"
+          >
             <FaPlus /> Новый товар
           </button>
         </div>
@@ -306,7 +311,9 @@ const Stock = () => {
                       Остаток: {toNum(s.remainder)} {s.unit}
                     </span>
                     <span
-                      className={`stock__status ${isLow(s) ? "stock__status--low" : "stock__status--ok"}`}
+                      className={`stock__status ${
+                        isLow(s) ? "stock__status--low" : "stock__status--ok"
+                      }`}
                     >
                       {isLow(s) ? "Мало" : "Ок"}
                     </span>
@@ -315,13 +322,25 @@ const Stock = () => {
               </div>
 
               <div className="stock__rowActions">
-                <button className="stock__btn stock__btn--success" onClick={() => openMove(s)} type="button">
+                <button
+                  className="stock__btn stock__btn--success"
+                  onClick={() => openMove(s)}
+                  type="button"
+                >
                   Приход
                 </button>
-                <button className="stock__btn stock__btn--secondary" onClick={() => openEdit(s)} type="button">
+                <button
+                  className="stock__btn stock__btn--secondary"
+                  onClick={() => openEdit(s)}
+                  type="button"
+                >
                   <FaEdit /> Изменить
                 </button>
-                <button className="stock__btn stock__btn--danger" onClick={() => openDelete(s)} type="button">
+                <button
+                  className="stock__btn stock__btn--danger"
+                  onClick={() => openDelete(s)}
+                  type="button"
+                >
                   <FaTrash /> Удалить
                 </button>
               </div>
@@ -333,203 +352,39 @@ const Stock = () => {
         )}
       </div>
 
-      {/* модалка товара */}
+      {/* Модалка товара */}
       {modalOpen && (
-        <div className="stock__modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="stock__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="stock__modal-header">
-              <h3 className="stock__modal-title">{editingId == null ? "Новый товар" : "Изменить товар"}</h3>
-              <button className="stock__icon-btn" onClick={() => setModalOpen(false)} type="button">
-                <FaTimes />
-              </button>
-            </div>
-
-            <form className="stock__form" onSubmit={saveItem}>
-              <div className="stock__form-grid">
-                <div className="stock__field">
-                  <label className="stock__label">Название</label>
-                  <input
-                    className="stock__input"
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    required
-                    maxLength={255}
-                    placeholder="Введите название"
-                  />
-                </div>
-
-                <div className="stock__field">
-                  <label className="stock__label">Ед. изм.</label>
-                  <input
-                    className="stock__input"
-                    value={form.unit}
-                    onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-                    required
-                    maxLength={255}
-                    placeholder="Например: кг, шт, л"
-                  />
-                </div>
-
-                <div className="stock__field">
-                  <label className="stock__label">Кол-во</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="stock__input"
-                    value={form.remainder}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        remainder: sanitizeDecimalInput(e.target.value),
-                      }))
-                    }
-                    required
-                    placeholder="Введите количество"
-                  />
-                </div>
-
-                {/* Создание: обязательно указать сумму расхода */}
-                {editingId == null ? (
-                  <div className="stock__field">
-                    <label className="stock__label">Сумма (сом) для расхода</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      className="stock__input"
-                      value={form.expense}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          expense: sanitizeDecimalInput(e.target.value),
-                        }))
-                      }
-                      required
-                      placeholder="Введите сумму"
-                    />
-                  </div>
-                ) : (
-                  <div className="stock__field">
-                    <label className="stock__label">Минимум</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      className="stock__input"
-                      value={form.minimum}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          minimum: sanitizeDecimalInput(e.target.value),
-                        }))
-                      }
-                      required
-                      placeholder="Введите минимум"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="stock__form-actions">
-                <button
-                  type="button"
-                  className="stock__btn stock__btn--secondary"
-                  onClick={() => setModalOpen(false)}
-                >
-                  Отмена
-                </button>
-                <button type="submit" className="stock__btn stock__btn--primary">
-                  Сохранить
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <StockItemModal
+          editingId={editingId}
+          form={form}
+          setForm={setForm}
+          onClose={() => setModalOpen(false)}
+          onSubmit={saveItem}
+          sanitizeDecimalInput={sanitizeDecimalInput}
+        />
       )}
 
-      {/* модалка приход */}
+      {/* Модалка приход */}
       {moveOpen && moveItem && (
-        <div className="stock__modal-overlay" onClick={() => setMoveOpen(false)}>
-          <div className="stock__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="stock__modal-header">
-              <h3 className="stock__modal-title">Приход: {moveItem.title}</h3>
-              <button className="stock__icon-btn" onClick={() => setMoveOpen(false)} type="button">
-                <FaTimes />
-              </button>
-            </div>
-
-            <form className="stock__form" onSubmit={applyMove}>
-              <div className="stock__form-grid">
-                <div className="stock__field">
-                  <label className="stock__label">Количество ({moveItem.unit})</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="stock__input"
-                    value={moveQty}
-                    onChange={(e) => setMoveQty(sanitizeDecimalInput(e.target.value))}
-                    required
-                    placeholder="Введите количество"
-                  />
-                </div>
-
-                <div className="stock__field">
-                  <label className="stock__label">Сумма (сом) для расхода</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="stock__input"
-                    value={moveSum}
-                    onChange={(e) => setMoveSum(sanitizeDecimalInput(e.target.value))}
-                    required
-                    placeholder="Введите сумму"
-                  />
-                  <div className="stock__hint">
-                    Эта сумма будет записана как <b>расход</b> в выбранную кассу.
-                  </div>
-                </div>
-              </div>
-
-              <div className="stock__form-actions">
-                <button type="button" className="stock__btn stock__btn--secondary" onClick={() => setMoveOpen(false)}>
-                  Отмена
-                </button>
-                <button type="submit" className="stock__btn stock__btn--primary">
-                  Применить
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <StockMoveModal
+          moveItem={moveItem}
+          moveQty={moveQty}
+          setMoveQty={setMoveQty}
+          moveSum={moveSum}
+          setMoveSum={setMoveSum}
+          onClose={() => setMoveOpen(false)}
+          onSubmit={applyMove}
+          sanitizeDecimalInput={sanitizeDecimalInput}
+        />
       )}
 
-      {/* модалка подтверждения удаления */}
+      {/* Модалка подтверждения удаления */}
       {deleteOpen && deleteItem && (
-        <div className="stock__modal-overlay" onClick={() => setDeleteOpen(false)}>
-          <div className="stock__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="stock__modal-header">
-              <h3 className="stock__modal-title">Удалить товар</h3>
-              <button className="stock__icon-btn" onClick={() => setDeleteOpen(false)} type="button">
-                <FaTimes />
-              </button>
-            </div>
-
-            <div className="stock__hint" style={{ marginTop: 4 }}>
-              Точно удалить позицию склада: <b>{deleteItem.title}</b>?
-            </div>
-
-            <div className="stock__form-actions" style={{ marginTop: 14 }}>
-              <button
-                type="button"
-                className="stock__btn stock__btn--secondary"
-                onClick={() => setDeleteOpen(false)}
-              >
-                Отмена
-              </button>
-              <button type="button" className="stock__btn stock__btn--danger" onClick={confirmDelete}>
-                Удалить
-              </button>
-            </div>
-          </div>
-        </div>
+        <StockDeleteModal
+          deleteItem={deleteItem}
+          onClose={() => setDeleteOpen(false)}
+          onConfirm={confirmDelete}
+        />
       )}
     </section>
   );

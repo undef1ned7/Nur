@@ -314,7 +314,7 @@ export const MENU_CONFIG = {
     // Кафе
     cafe: [
       {
-        label: "Аналитика выплат",
+        label: "Аналитика",
         to: "/crm/cafe/analytics",
         icon: menuIcons.barChart3,
         permission: "can_view_analytics",

@@ -2,14 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import "./Analytics.scss";
 import api from "../../../../api";
 
-/**
- * Источники:
- *  - GET /cafe/staff/
- *  - GET /cafe/payroll-payouts/?month=YYYY-MM (с пагинацией; выгружаем все нужные месяцы)
- * + оффлайн-выплаты из localStorage (fallback).
- * Фильтрация по датам делается по полю paid_at (включительно).
- */
-
 // ===== оффлайн-хранилище выплат (как в Payroll.jsx)
 const LS_KEY_PAYOUTS = "local_payouts_v1";
 const readLocalPayouts = () => {
