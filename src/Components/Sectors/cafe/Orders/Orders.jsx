@@ -13,8 +13,7 @@ import {
 import api from "../../../../api";
 import { getAll as getAllClients, createClient } from "../Clients/clientStore";
 import "./Orders.scss";
-import WaiterModal from "./WaiterModal";
-import CookModal from "./CookModal";
+
 import {
   attachUsbListenersOnce,
   checkPrinterConnection,
@@ -49,6 +48,7 @@ const isUnpaidStatus = (s) => {
     "paid",
     "оплачен",
     "оплачено",
+    "оплачён",
     "canceled",
     "cancelled",
     "отменён",
@@ -185,7 +185,6 @@ const Orders = () => {
     setMenuItems(arr);
 
     for (const m of arr) {
-      // важно: сохраняем kitchen, чтобы печатать по кухне
       menuCacheRef.current.set(String(m.id), {
         ...m,
         kitchen: m.kitchen ?? null,
@@ -230,11 +229,11 @@ const Orders = () => {
     });
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     const base = listFrom(await api.get("/cafe/orders/")) || [];
     const full = await hydrateOrdersDetails(base);
     setOrders(full);
-  };
+  }, []);
 
   useEffect(() => {
     try {
@@ -245,13 +244,7 @@ const Orders = () => {
 
     (async () => {
       try {
-        await Promise.all([
-          fetchTables(),
-          fetchEmployees(),
-          fetchMenu(),
-          fetchKitchens(),
-          fetchCashboxes(),
-        ]);
+        await Promise.all([fetchTables(), fetchEmployees(), fetchMenu(), fetchKitchens(), fetchCashboxes()]);
         await fetchOrders();
       } catch (e) {
         console.error("Ошибка загрузки:", e);
@@ -259,13 +252,13 @@ const Orders = () => {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [fetchOrders]);
 
   useEffect(() => {
     const handler = () => fetchOrders();
     window.addEventListener("orders:refresh", handler);
     return () => window.removeEventListener("orders:refresh", handler);
-  }, []);
+  }, [fetchOrders]);
 
   const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
 
@@ -283,9 +276,7 @@ const Orders = () => {
     (kitchens || []).forEach((k) => {
       const title = String(k?.title || k?.name || k?.kitchen_title || "Кухня").trim();
       const number = k?.number ?? k?.kitchen_number;
-      const label = `${title}${
-        number !== undefined && number !== null && number !== "" ? ` №${number}` : ""
-      }`;
+      const label = `${title}${number !== undefined && number !== null && number !== "" ? ` №${number}` : ""}`;
       m.set(String(k?.id), { ...k, label });
     });
     return m;
@@ -311,11 +302,7 @@ const Orders = () => {
 
   const getMenuKitchenId = (menuId) => {
     const key = String(menuId ?? "");
-    return (
-      menuMap.get(key)?.kitchen ??
-      menuCacheRef.current.get(key)?.kitchen ??
-      null
-    );
+    return menuMap.get(key)?.kitchen ?? menuCacheRef.current.get(key)?.kitchen ?? null;
   };
 
   const busyTableIds = useMemo(() => {
@@ -347,8 +334,7 @@ const Orders = () => {
 
   const visibleOrders = useMemo(() => {
     if (showAll) return roleFiltered;
-    if (roleFiltered.length > ORDERS_COLLAPSE_LIMIT)
-      return roleFiltered.slice(0, ORDERS_COLLAPSE_LIMIT);
+    if (roleFiltered.length > ORDERS_COLLAPSE_LIMIT) return roleFiltered.slice(0, ORDERS_COLLAPSE_LIMIT);
     return roleFiltered;
   }, [roleFiltered, showAll]);
 
@@ -444,13 +430,7 @@ const Orders = () => {
     [buildPrintPayload, printingId]
   );
 
-  /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА =====
-     Логика:
-     1) Берём полный заказ с items (detail).
-     2) Группируем позиции по kitchen (у блюда menu-item есть kitchen).
-     3) Для каждой кухни находим printer_key (в /cafe/kitchens/ или в localStorage kitchen_printer_map).
-     4) Ставим активный принтер и печатаем БЕЗ диалога.
-  */
+  /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА ===== */
   const buildKitchenTicketPayload = useCallback(
     ({ order, kitchenId, kitchenLabel, items }) => {
       const t = tablesMap.get(order?.table);
@@ -484,9 +464,7 @@ const Orders = () => {
       if (!kid) return "";
 
       const k = kitchensMap.get(kid);
-      const direct = String(
-        k?.printer_key || k?.printerKey || k?.printer || k?.printer_id || ""
-      ).trim();
+      const direct = String(k?.printer_key || k?.printerKey || k?.printer || k?.printer_id || "").trim();
       if (direct) return direct;
 
       const ls = readKitchenPrinterMap();
@@ -499,8 +477,6 @@ const Orders = () => {
     async (createdOrderId) => {
       if (!createdOrderId) return;
 
-      // Важно: автопечать возможна только если WebUSB уже разрешён ранее.
-      // Если разрешения нет — браузер НЕ даст печатать без диалога. Это ограничение WebUSB.
       try {
         const detail = await api.get(`/cafe/orders/${createdOrderId}/`).then((r) => r?.data || null);
         if (!detail) return;
@@ -508,8 +484,7 @@ const Orders = () => {
         const items = Array.isArray(detail?.items) ? detail.items : [];
         if (!items.length) return;
 
-        // group by kitchen
-        const groups = new Map(); // kitchenId -> items[]
+        const groups = new Map();
         for (const it of items) {
           const menuId = it?.menu_item || it?.menu_item_id || it?.menuItem || it?.id;
           const kitchenId = getMenuKitchenId(menuId);
@@ -522,7 +497,6 @@ const Orders = () => {
 
         if (!groups.size) return;
 
-        // печатаем по кухням
         for (const [kitchenId, kitItems] of groups.entries()) {
           const k = kitchensMap.get(String(kitchenId));
           const kitchenLabel = k?.label || k?.title || k?.name || "Кухня";
@@ -540,22 +514,18 @@ const Orders = () => {
             items: kitItems,
           });
 
-          // переключаем активный принтер под кухню и печатаем без диалога
           await setActivePrinterByKey(printerKey);
           await printOrderReceiptJSONViaUSB(payload);
         }
       } catch (e) {
         console.error("Auto kitchen print error:", e);
-        // без лишнего спама: только 1 понятный alert
-        alert(
-          "Не удалось отправить чек на кухню. Проверьте, что принтер подключён и разрешён в браузере (WebUSB)."
-        );
+        alert("Не удалось отправить чек на кухню. Проверьте принтер и разрешение WebUSB.");
       }
     },
     [buildKitchenTicketPayload, getKitchenPrinterKey, getMenuKitchenId, kitchensMap]
   );
 
-  /* ===== модалка ===== */
+  /* ===== модалка create/edit ===== */
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -622,9 +592,7 @@ const Orders = () => {
       setNewClientPhone("");
       setShowAddClient(false);
     } catch (e2) {
-      const msg = e2?.response?.data
-        ? formatApiErrors(e2.response.data)
-        : "Не удалось создать клиента";
+      const msg = e2?.response?.data ? formatApiErrors(e2.response.data) : "Не удалось создать клиента";
       alert(msg);
     } finally {
       setAddClientSaving(false);
@@ -682,17 +650,12 @@ const Orders = () => {
       if (ex) {
         return {
           ...prev,
-          items: prev.items.map((i) =>
-            String(i.menu_item) === idStr ? { ...i, quantity: i.quantity + 1 } : i
-          ),
+          items: prev.items.map((i) => (String(i.menu_item) === idStr ? { ...i, quantity: i.quantity + 1 } : i)),
         };
       }
       return {
         ...prev,
-        items: [
-          ...prev.items,
-          { menu_item: idStr, title: menu.title, price: toNum(menu.price), quantity: 1 },
-        ],
+        items: [...prev.items, { menu_item: idStr, title: menu.title, price: toNum(menu.price), quantity: 1 }],
       };
     });
   };
@@ -701,9 +664,7 @@ const Orders = () => {
     const q = Math.max(1, Number(nextQty) || 1);
     setForm((prev) => ({
       ...prev,
-      items: prev.items.map((i) =>
-        String(i.menu_item) === String(id) ? { ...i, quantity: q } : i
-      ),
+      items: prev.items.map((i) => (String(i.menu_item) === String(id) ? { ...i, quantity: q } : i)),
     }));
   };
 
@@ -774,10 +735,7 @@ const Orders = () => {
 
         setOrders((prev) => [...prev, res.data]);
 
-        // ✅ АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ
-        // если блюдо привязано к кухне, а кухня привязана к принтеру — печатаем без выбора.
         await autoPrintKitchenTickets(res?.data?.id);
-
       } else {
         const payload = normalizeOrderPayload(form);
         await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
@@ -787,6 +745,7 @@ const Orders = () => {
       setMenuOpen(false);
       setShowAddClient(false);
       setOpenSelectId(null);
+
       await fetchOrders();
     } catch (err) {
       console.error("Ошибка сохранения заказа:", err);
@@ -798,37 +757,7 @@ const Orders = () => {
     }
   };
 
-  /* ===== ОПЛАТА ===== */
-  const [payOpen, setPayOpen] = useState(false);
-  const [paying, setPaying] = useState(false);
-  const [payOrder, setPayOrder] = useState(null);
 
-  const openPay = (order) => {
-    setPayOrder(order);
-    setPayOpen(true);
-  };
-
-  const closePay = () => {
-    if (paying) return;
-    setPayOpen(false);
-    setPayOrder(null);
-  };
-
-  const markOrderPaid = async (id) => {
-    try {
-      await api.post(`/cafe/orders/${id}/pay/`);
-      return true;
-    } catch {}
-    try {
-      await api.patch(`/cafe/orders/${id}/`, { status: "paid" });
-      return true;
-    } catch {}
-    try {
-      await api.patch(`/cafe/orders/${id}/`, { status: "оплачен" });
-      return true;
-    } catch {}
-    return false;
-  };
 
   const createCashflowIncome = async (order, amount) => {
     const firstKey = cashboxId || String(cashboxes?.[0]?.id || cashboxes?.[0]?.uuid || "");
@@ -848,36 +777,87 @@ const Orders = () => {
     return res?.data || null;
   };
 
-  const confirmPay = async () => {
-    if (!payOrder?.id) return;
-
-    setPaying(true);
+  const freeTable = async (tableId) => {
+    if (!tableId) return;
     try {
-      const totals = calcTotals(payOrder);
-
-      await createCashflowIncome(payOrder, totals.total);
-
-      const ok = await markOrderPaid(payOrder.id);
-      if (!ok) {
-        alert("Не удалось пометить заказ как оплаченный.");
-        return;
-      }
-
-      setOrders((prev) => (prev || []).filter((x) => String(x.id) !== String(payOrder.id)));
-
-      try {
-        window.dispatchEvent(new CustomEvent("orders:refresh"));
-      } catch {}
-
-      setPayOpen(false);
-      setPayOrder(null);
+      await api.patch(`/cafe/tables/${tableId}/`, { status: "free" });
     } catch (e) {
-      console.error("Ошибка оплаты:", e);
-      alert(e?.message || "Ошибка при оплате.");
-    } finally {
-      setPaying(false);
+      console.error("Не удалось освободить стол:", e);
     }
   };
+
+
+  /* ===== ОПЛАТА (DELETE order после прихода) ===== */
+const [payOpen, setPayOpen] = useState(false);
+const [paying, setPaying] = useState(false);
+const [payOrder, setPayOrder] = useState(null);
+
+const openPay = (order) => {
+  setPayOrder(order);
+  setPayOpen(true);
+};
+
+const closePay = () => {
+  if (paying) return;
+  setPayOpen(false);
+  setPayOrder(null);
+};
+
+const paidGuardKey = (orderId) => `orders_paid_income_created_${orderId}`;
+
+const confirmPay = async () => {
+  if (!payOrder?.id) return;
+
+  setPaying(true);
+  try {
+    const totals = calcTotals(payOrder);
+
+    // 1) Создаём приход (если ещё не создавали)
+    const guardKey = paidGuardKey(payOrder.id);
+    const alreadyCreated = localStorage.getItem(guardKey);
+
+    if (!alreadyCreated) {
+      const income = await createCashflowIncome(payOrder, totals.total);
+      localStorage.setItem(guardKey, String(income?.id || income?.uuid || "1"));
+    }
+
+    // 2) Удаляем заказ (это и есть "оплата")
+    await api.delete(`/cafe/orders/${payOrder.id}/`);
+
+    // 3) Освобождаем стол
+    await freeTable(payOrder.table);
+
+    // 4) Сразу убираем из UI
+    setOrders((prev) => (prev || []).filter((o) => String(o.id) !== String(payOrder.id)));
+
+    // 5) Закрываем модалку
+    setPayOpen(false);
+    setPayOrder(null);
+
+    // 6) Синхронизация с сервером
+    await fetchOrders();
+
+    // успех — снимаем guard
+    localStorage.removeItem(guardKey);
+  } catch (e) {
+    console.error("Ошибка оплаты (delete order):", e);
+
+    const guardKey = payOrder?.id ? paidGuardKey(payOrder.id) : null;
+    const alreadyCreated = guardKey ? localStorage.getItem(guardKey) : null;
+
+    if (alreadyCreated) {
+      alert(
+        "Приход уже создан, но заказ не удалился. Исправь ошибку DELETE и нажми «Оплатить» ещё раз — второй приход не создастся."
+      );
+      return;
+    }
+
+    alert(e?.response?.data ? formatApiErrors(e.response.data) : e?.message || "Ошибка при оплате.");
+  } finally {
+    setPaying(false);
+  }
+};
+
 
   /* options */
   const tableOptions = useMemo(() => {
@@ -891,10 +871,11 @@ const Orders = () => {
   }, [tables, busyTableIds, form.table]);
 
   const waiterOptions = useMemo(() => {
-    return [
-      { value: "", label: "— Без официанта —", search: "без официанта" },
-      ...waiters.map((w) => ({ value: String(w.id), label: w.name, search: w.name })),
-    ];
+    return [{ value: "", label: "— Без официанта —", search: "без официанта" }, ...waiters.map((w) => ({
+      value: String(w.id),
+      label: w.name,
+      search: w.name,
+    }))];
   }, [waiters]);
 
   const clientOptions = useMemo(() => {
@@ -910,9 +891,7 @@ const Orders = () => {
       <div className="orders__header">
         <div>
           <h2 className="orders__title">Заказы</h2>
-          <div className="orders__subtitle">
-            После оплаты заказ исчезает здесь и появляется в кассе как приход.
-          </div>
+          <div className="orders__subtitle">После оплаты заказ исчезает здесь и появляется в кассе как приход.</div>
         </div>
 
         <div className="orders__actions">
@@ -986,21 +965,13 @@ const Orders = () => {
                   })}
 
                   {!expanded && rest > 0 && (
-                    <button
-                      type="button"
-                      className="orders__moreItemsBtn"
-                      onClick={() => toggleExpandedOrder(o.id)}
-                    >
+                    <button type="button" className="orders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
                       Ещё {rest} поз.
                     </button>
                   )}
 
                   {expanded && items.length > CARD_ITEMS_LIMIT && (
-                    <button
-                      type="button"
-                      className="orders__moreItemsBtn"
-                      onClick={() => toggleExpandedOrder(o.id)}
-                    >
+                    <button type="button" className="orders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
                       Свернуть позиции ({items.length})
                     </button>
                   )}
@@ -1043,286 +1014,273 @@ const Orders = () => {
         )}
       </div>
 
-      {/* Modal create/edit/view */}
-      {modalOpen &&
-        (userRole === "повара" ? (
-          <CookModal />
-        ) : userRole === "официант" ? (
-          <WaiterModal />
-        ) : (
-          <div
-            className="orders-modal__overlay"
-            onClick={() => {
-              if (!saving) {
-                setModalOpen(false);
-                setMenuOpen(false);
-                setShowAddClient(false);
-                setOpenSelectId(null);
-              }
-            }}
-          >
-            <div className="orders-modal__shell" onClick={(e) => e.stopPropagation()}>
-              <div className="orders-modal__card">
-                <div className="orders-modal__header">
-                  <h3 className="orders-modal__title">
-                    {isEditing ? "Редактировать заказ" : "Новый заказ"}
-                  </h3>
-                  <button
-                    className="orders-modal__close"
-                    onClick={() => {
-                      if (!saving) {
-                        setModalOpen(false);
-                        setMenuOpen(false);
-                        setShowAddClient(false);
-                        setOpenSelectId(null);
-                      }
-                    }}
-                    disabled={saving}
-                    aria-label="Закрыть"
-                    type="button"
-                  >
-                    <FaTimes />
-                  </button>
-                </div>
+      {/* Modal create/edit */}
+      {modalOpen && (
+        <div
+          className="orders-modal__overlay"
+          onClick={() => {
+            if (!saving) {
+              setModalOpen(false);
+              setMenuOpen(false);
+              setShowAddClient(false);
+              setOpenSelectId(null);
+            }
+          }}
+        >
+          <div className="orders-modal__shell" onClick={(e) => e.stopPropagation()}>
+            <div className="orders-modal__card">
+              <div className="orders-modal__header">
+                <h3 className="orders-modal__title">{isEditing ? "Редактировать заказ" : "Новый заказ"}</h3>
+                <button
+                  className="orders-modal__close"
+                  onClick={() => {
+                    if (!saving) {
+                      setModalOpen(false);
+                      setMenuOpen(false);
+                      setShowAddClient(false);
+                      setOpenSelectId(null);
+                    }
+                  }}
+                  disabled={saving}
+                  aria-label="Закрыть"
+                  type="button"
+                >
+                  <FaTimes />
+                </button>
+              </div>
 
-                <form className="orders__form" onSubmit={saveForm}>
-                  <div className="orders__formGrid">
+              <form className="orders__form" onSubmit={saveForm}>
+                <div className="orders__formGrid">
+                  <SearchSelect
+                    id="table"
+                    openId={openSelectId}
+                    setOpenId={setOpenSelectId}
+                    label="Стол"
+                    placeholder="— Выберите стол —"
+                    value={String(form.table ?? "")}
+                    onChange={(val) => setForm((f) => ({ ...f, table: val }))}
+                    options={tableOptions}
+                    disabled={saving}
+                    hint={busyTableIds.size > 0 ? "Занятые столы скрыты до оплаты." : ""}
+                  />
+
+                  <div className="orders__field">
+                    <label className="orders__label">Гостей</label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="orders__input"
+                      value={form.guests}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, guests: Math.max(0, Number(e.target.value) || 0) }))
+                      }
+                      disabled={saving}
+                    />
+                  </div>
+
+                  <div className="orders__field" style={{ gridColumn: "1 / -1" }}>
                     <SearchSelect
-                      id="table"
+                      id="waiter"
                       openId={openSelectId}
                       setOpenId={setOpenSelectId}
-                      label="Стол"
-                      placeholder="— Выберите стол —"
-                      value={String(form.table ?? "")}
-                      onChange={(val) => setForm((f) => ({ ...f, table: val }))}
-                      options={tableOptions}
+                      label="Официант"
+                      placeholder="— Выберите официанта —"
+                      value={String(form.waiter ?? "")}
+                      onChange={(val) => setForm((f) => ({ ...f, waiter: val }))}
+                      options={waiterOptions}
                       disabled={saving}
-                      hint={busyTableIds.size > 0 ? "Занятые столы скрыты до оплаты." : ""}
                     />
+                  </div>
+                </div>
 
-                    <div className="orders__field">
-                      <label className="orders__label">Гостей</label>
-                      <input
-                        type="number"
-                        min={0}
-                        className="orders__input"
-                        value={form.guests}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            guests: Math.max(0, Number(e.target.value) || 0),
-                          }))
-                        }
-                        disabled={saving}
-                      />
-                    </div>
-
-                    <div className="orders__field" style={{ gridColumn: "1 / -1" }}>
+                {/* Клиент */}
+                <div className="orders__itemsBlock">
+                  <div className="orders__clientTopRow">
+                    <div className="orders__clientTopLeft">
                       <SearchSelect
-                        id="waiter"
+                        id="client"
                         openId={openSelectId}
                         setOpenId={setOpenSelectId}
-                        label="Официант"
-                        placeholder="— Выберите официанта —"
-                        value={String(form.waiter ?? "")}
-                        onChange={(val) => setForm((f) => ({ ...f, waiter: val }))}
-                        options={waiterOptions}
-                        disabled={saving}
+                        label={clientsLoading ? "Клиент (загрузка…)" : "Клиент"}
+                        placeholder={clientsLoading ? "Загрузка…" : "— Выберите клиента —"}
+                        value={String(form.client ?? "")}
+                        onChange={(val) => setForm((f) => ({ ...f, client: val }))}
+                        options={clientOptions}
+                        disabled={saving || clientsLoading}
+                        hint={clientsErr ? clientsErr : "Поиск работает по имени и телефону."}
                       />
                     </div>
-                  </div>
 
-                  {/* Клиент */}
-                  <div className="orders__itemsBlock">
-                    <div className="orders__clientTopRow">
-                      <div className="orders__clientTopLeft">
-                        <SearchSelect
-                          id="client"
-                          openId={openSelectId}
-                          setOpenId={setOpenSelectId}
-                          label={clientsLoading ? "Клиент (загрузка…)" : "Клиент"}
-                          placeholder={clientsLoading ? "Загрузка…" : "— Выберите клиента —"}
-                          value={String(form.client ?? "")}
-                          onChange={(val) => setForm((f) => ({ ...f, client: val }))}
-                          options={clientOptions}
-                          disabled={saving || clientsLoading}
-                          hint={clientsErr ? clientsErr : "Поиск работает по имени и телефону."}
-                        />
-                      </div>
-
-                      <div className="orders__clientTopRight">
-                        <button
-                          type="button"
-                          className="orders__btn orders__btn--secondary"
-                          onClick={() => setShowAddClient((v) => !v)}
-                          disabled={saving}
-                        >
-                          <FaPlus /> Добавить
-                        </button>
-                      </div>
+                    <div className="orders__clientTopRight">
+                      <button
+                        type="button"
+                        className="orders__btn orders__btn--secondary"
+                        onClick={() => setShowAddClient((v) => !v)}
+                        disabled={saving}
+                      >
+                        <FaPlus /> Добавить
+                      </button>
                     </div>
-
-                    {showAddClient && (
-                      <div className="orders__clientAdd">
-                        <input
-                          className="orders__input"
-                          placeholder="Имя *"
-                          value={newClientName}
-                          onChange={(e) => setNewClientName(e.target.value)}
-                          disabled={addClientSaving || saving}
-                        />
-                        <input
-                          className="orders__input"
-                          placeholder="Телефон"
-                          value={newClientPhone}
-                          onChange={(e) => setNewClientPhone(e.target.value)}
-                          disabled={addClientSaving || saving}
-                        />
-                        <button
-                          type="button"
-                          className="orders__btn orders__btn--primary"
-                          onClick={handleCreateClient}
-                          disabled={addClientSaving || saving}
-                        >
-                          {addClientSaving ? "Сохранение…" : "Сохранить"}
-                        </button>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Позиции */}
-                  <div className="orders__itemsBlock">
-                    <div className="orders__itemsHead">
-                      <h4 className="orders__itemsHeadTitle">Позиции заказа</h4>
-
+                  {showAddClient && (
+                    <div className="orders__clientAdd">
+                      <input
+                        className="orders__input"
+                        placeholder="Имя *"
+                        value={newClientName}
+                        onChange={(e) => setNewClientName(e.target.value)}
+                        disabled={addClientSaving || saving}
+                      />
+                      <input
+                        className="orders__input"
+                        placeholder="Телефон"
+                        value={newClientPhone}
+                        onChange={(e) => setNewClientPhone(e.target.value)}
+                        disabled={addClientSaving || saving}
+                      />
                       <button
                         type="button"
                         className="orders__btn orders__btn--primary"
-                        onClick={() => {
-                          setOpenSelectId(null);
-                          setMenuOpen(true);
-                        }}
-                        disabled={saving}
+                        onClick={handleCreateClient}
+                        disabled={addClientSaving || saving}
                       >
-                        <FaPlus /> Добавить блюда
+                        {addClientSaving ? "Сохранение…" : "Сохранить"}
                       </button>
                     </div>
+                  )}
+                </div>
 
-                    {form.items.length ? (
-                      <div className="orders__itemsList">
-                        {form.items.map((it) => {
-                          const img = menuImageUrl(it.menu_item);
-                          const qty = Math.max(1, Number(it.quantity) || 1);
-                          const price = toNum(it.price);
-                          const sum = price * qty;
+                {/* Позиции */}
+                <div className="orders__itemsBlock">
+                  <div className="orders__itemsHead">
+                    <h4 className="orders__itemsHeadTitle">Позиции заказа</h4>
 
-                          return (
-                            <div key={it.menu_item} className="orders__itemRow">
-                              <div className="orders__itemLeft">
-                                <span className="orders__thumb orders__thumb--sm" aria-hidden>
-                                  {img ? <img src={img} alt="" /> : <FaClipboardList />}
-                                </span>
+                    <button
+                      type="button"
+                      className="orders__btn orders__btn--primary"
+                      onClick={() => {
+                        setOpenSelectId(null);
+                        setMenuOpen(true);
+                      }}
+                      disabled={saving}
+                    >
+                      <FaPlus /> Добавить блюда
+                    </button>
+                  </div>
 
-                                <div className="orders__itemInfo">
-                                  <div className="orders__itemTitle" title={it.title}>
-                                    {it.title}
-                                  </div>
-                                  <div className="orders__itemMeta">
-                                    <span>{fmtMoney(price)} сом</span>
-                                    <span className="orders__dot">•</span>
-                                    <span>{fmtMoney(sum)} сом</span>
-                                  </div>
+                  {form.items.length ? (
+                    <div className="orders__itemsList">
+                      {form.items.map((it) => {
+                        const img = menuImageUrl(it.menu_item);
+                        const qty = Math.max(1, Number(it.quantity) || 1);
+                        const price = toNum(it.price);
+                        const sum = price * qty;
+
+                        return (
+                          <div key={it.menu_item} className="orders__itemRow">
+                            <div className="orders__itemLeft">
+                              <span className="orders__thumb orders__thumb--sm" aria-hidden>
+                                {img ? <img src={img} alt="" /> : <FaClipboardList />}
+                              </span>
+
+                              <div className="orders__itemInfo">
+                                <div className="orders__itemTitle" title={it.title}>
+                                  {it.title}
+                                </div>
+                                <div className="orders__itemMeta">
+                                  <span>{fmtMoney(price)} сом</span>
+                                  <span className="orders__dot">•</span>
+                                  <span>{fmtMoney(sum)} сом</span>
                                 </div>
                               </div>
+                            </div>
 
-                              <div className="orders__itemRight">
-                                <div className="orders__qty">
-                                  <button
-                                    type="button"
-                                    className="orders__qtyBtn"
-                                    onClick={() => decItem(it.menu_item)}
-                                    disabled={saving || qty <= 1}
-                                    aria-label="Уменьшить"
-                                  >
-                                    <FaMinus />
-                                  </button>
+                            <div className="orders__itemRight">
+                              <div className="orders__qty">
+                                <button
+                                  type="button"
+                                  className="orders__qtyBtn"
+                                  onClick={() => decItem(it.menu_item)}
+                                  disabled={saving || qty <= 1}
+                                  aria-label="Уменьшить"
+                                >
+                                  <FaMinus />
+                                </button>
 
-                                  <input
-                                    className="orders__qtyInput"
-                                    value={qty}
-                                    onChange={(e) => changeItemQty(it.menu_item, e.target.value)}
-                                    disabled={saving}
-                                    inputMode="numeric"
-                                  />
-
-                                  <button
-                                    type="button"
-                                    className="orders__qtyBtn"
-                                    onClick={() => incItem(it.menu_item)}
-                                    disabled={saving}
-                                    aria-label="Увеличить"
-                                  >
-                                    <FaPlus />
-                                  </button>
-                                </div>
+                                <input
+                                  className="orders__qtyInput"
+                                  value={qty}
+                                  onChange={(e) => changeItemQty(it.menu_item, e.target.value)}
+                                  disabled={saving}
+                                  inputMode="numeric"
+                                />
 
                                 <button
                                   type="button"
-                                  className="orders__btn orders__btn--danger orders__itemRemove"
-                                  onClick={() => removeItem(it.menu_item)}
+                                  className="orders__qtyBtn"
+                                  onClick={() => incItem(it.menu_item)}
                                   disabled={saving}
-                                  title="Удалить"
+                                  aria-label="Увеличить"
                                 >
-                                  <FaTrash />
+                                  <FaPlus />
                                 </button>
                               </div>
-                            </div>
-                          );
-                        })}
 
-                        <div className="orders__itemsFooter">
-                          <div className="orders__itemsTotalLine">
-                            <span>Итого</span>
-                            <span>
-                              {fmtMoney(
-                                form.items.reduce(
-                                  (s, i) => s + toNum(i.price) * (Number(i.quantity) || 0),
-                                  0
-                                )
-                              )}{" "}
-                              сом
-                            </span>
+                              <button
+                                type="button"
+                                className="orders__btn orders__btn--danger orders__itemRemove"
+                                onClick={() => removeItem(it.menu_item)}
+                                disabled={saving}
+                                title="Удалить"
+                              >
+                                <FaTrash />
+                              </button>
+                            </div>
                           </div>
+                        );
+                      })}
+
+                      <div className="orders__itemsFooter">
+                        <div className="orders__itemsTotalLine">
+                          <span>Итого</span>
+                          <span>
+                            {fmtMoney(
+                              form.items.reduce((s, i) => s + toNum(i.price) * (Number(i.quantity) || 0), 0)
+                            )}{" "}
+                            сом
+                          </span>
                         </div>
                       </div>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
+                </div>
 
-                  <div className="orders__formActions">
-                    <button
-                      type="submit"
-                      className="orders__btn orders__btn--primary"
-                      disabled={saving || !form.table || !form.items.length}
-                    >
-                      {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              <RightMenuPanel
-                open={menuOpen}
-                onClose={() => setMenuOpen(false)}
-                menuItems={menuItems}
-                menuImageUrl={menuImageUrl}
-                onPick={(m) => addOrIncMenuItem(m)}
-                fmtMoney={fmtMoney}
-              />
+                <div className="orders__formActions">
+                  <button
+                    type="submit"
+                    className="orders__btn orders__btn--primary"
+                    disabled={saving || !form.table || !form.items.length}
+                  >
+                    {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
+                  </button>
+                </div>
+              </form>
             </div>
-          </div>
-        ))}
 
-      {/* Pay modal (чек перед оплатой) */}
+            <RightMenuPanel
+              open={menuOpen}
+              onClose={() => setMenuOpen(false)}
+              menuItems={menuItems}
+              menuImageUrl={menuImageUrl}
+              onPick={(m) => addOrIncMenuItem(m)}
+              fmtMoney={fmtMoney}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Pay modal */}
       {payOpen && payOrder && (
         <div className="orders-modal__overlay" onClick={closePay}>
           <div className="orders-modal__shell" onClick={(e) => e.stopPropagation()}>
@@ -1343,9 +1301,7 @@ const Orders = () => {
               <div className="orders-pay">
                 {(() => {
                   const t = tablesMap.get(payOrder?.table);
-                  const dt = formatReceiptDate(
-                    payOrder?.created_at || payOrder?.date || payOrder?.created
-                  );
+                  const dt = formatReceiptDate(payOrder?.created_at || payOrder?.date || payOrder?.created);
                   const items = Array.isArray(payOrder?.items) ? payOrder.items : [];
                   const totals = calcTotals(payOrder);
 

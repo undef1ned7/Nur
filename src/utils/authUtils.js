@@ -8,11 +8,34 @@ import {
  * @param {string} path - Путь для проверки
  * @returns {boolean}
  */
+
+// export const isAllowedPathWithoutToken = (path) => {
+//   return ALLOWED_PATHS_WITHOUT_TOKEN.some(
+//     (allowedPath) =>
+//       path === allowedPath || path.startsWith("/submit-application")
+//   );
+// };
+
 export const isAllowedPathWithoutToken = (path) => {
-  return ALLOWED_PATHS_WITHOUT_TOKEN.some(
-    (allowedPath) =>
-      path === allowedPath || path.startsWith("/submit-application")
-  );
+  return ALLOWED_PATHS_WITHOUT_TOKEN.some((allowedPath) => {
+    // Точное совпадение
+    if (path === allowedPath) return true;
+
+    // Поддержка динамических параметров (например /cafe/:company_slug/menu)
+    const pathSegments = path.split("/").filter(Boolean);
+    const allowedSegments = allowedPath.split("/").filter(Boolean);
+
+    // Если длина не совпадает, это не наш маршрут
+    if (pathSegments.length !== allowedSegments.length) return false;
+
+    // Проверяем каждый сегмент
+    return pathSegments.every((segment, index) => {
+      const allowedSegment = allowedSegments[index];
+      // Если в allowedPath динамический параметр (начинается с :), принимаем любое значение
+      // Иначе требуем точное совпадение
+      return allowedSegment.startsWith(":") || segment === allowedSegment;
+    });
+  });
 };
 
 /**

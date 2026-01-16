@@ -8,13 +8,6 @@ import {
 } from "react-icons/fa";
 import api from "../../../../api";
 
-/**
- * БЕКЕНД (ожидается):
- * GET  /cafe/payroll-payouts/?month=YYYY-MM
- * POST /cafe/payroll-payouts/  { staff, month, orders_count, sales, salary }
- * Ответ POST: { id, staff, month, orders_count, sales, salary, paid_at }
- */
-
 // ===== настройки расчёта
 const COMMISSION_RATE = 0.1; // 10%
 

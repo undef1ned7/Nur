@@ -94,7 +94,7 @@ import CreateSaleDocument from "../Components/Sectors/Market/Documents/CreateSal
 import MarketAnalytics from "../Components/Sectors/Market/Analytics/Analytics";
 
 // Cafe
-import CafeAnalytics from "../Components/Sectors/cafe/Analytics/Analytics";
+import CafeAnalytics from "../Components/Sectors/cafe/CafeAnalytics/CafeAnalytics";
 import CafeDocuments from "../Components/Sectors/cafe/Documents/Documents";
 import Cook from "../Components/Sectors/cafe/Cook/Cook";
 import CafeInventory from "../Components/Sectors/cafe/Inventory/CafeInventory";
@@ -147,6 +147,13 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
 
+
+
+// Public pages
+import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
+// import OnlineCatalog from "../Components/Online/Market/Catalog";
+
+
 /**
  * Создает защищенный роут
  */
@@ -162,6 +169,10 @@ const createProtectedRoute = (path, Component) => (
   />
 );
 
+
+
+
+
 /**
  * Конфигурация публичных роутов
  */
@@ -169,6 +180,22 @@ export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
   <Route key="/" path="/" element={<Landing />} />,
   <Route key="/register" path="/register" element={<Register />} />,
+
+
+
+    // ✅ Публичное онлайн-меню кафе по slug
+  //     <Route
+  //   key="/catalog/:slug"
+  //   path="/catalog/:slug"
+  //   element={<OnlineCatalog />}
+  // />,
+  <Route
+    key="/cafe/:company_slug/menu"
+    path="/cafe/:company_slug/menu"
+    element={<CafeMenuOnline />}
+  />,
+
+
   <Route
     key="/submit-application"
     path="/submit-application"

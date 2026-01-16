@@ -1,0 +1,754 @@
+/* src/.../cafeAnalytics.scss */
+
+/* только цвета в :root */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+
+  --danger: #ef4444;
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+/* ===== BEM block: cafeAnalytics ===== */
+.cafeAnalytics {
+  --radius: 16px;
+  --radius-sm: 12px;
+
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  &__top {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  &__headLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__hTitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 900;
+    margin: 0;
+  }
+
+  &__hSub {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  &__headRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: #fafafa;
+  }
+
+  &__rangeLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 900;
+    white-space: nowrap;
+
+    svg {
+      color: var(--muted);
+    }
+  }
+
+  &__rangeField {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    span {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+  }
+
+  &__input {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    min-width: 210px;
+
+    &:focus {
+      border-color: var(--primary-dark);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
+  }
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(247, 215, 79, 0.6);
+    background: rgba(247, 215, 79, 0.25);
+    color: var(--text);
+    font-weight: 900;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 0.12s, background 0.12s, border-color 0.12s;
+
+    &:hover {
+      background: rgba(247, 215, 79, 0.34);
+      border-color: rgba(247, 215, 79, 0.85);
+    }
+
+    &:active {
+      transform: translateY(1px);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  /* KPI */
+  &__kpis {
+    display: grid;
+    gap: 14px;
+
+    &--3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    &--2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  &__kpi {
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fff;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    width: 100%;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+      border-color: rgba(226, 232, 240, 0.9);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+
+    &--static {
+      cursor: default;
+
+      &:hover {
+        transform: none;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+        border-color: var(--border);
+      }
+
+      &:active {
+        transform: none;
+      }
+    }
+
+    &--kitchen {
+      position: relative;
+
+      &:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  &__kpiTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  &__kpiLabel {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.6px;
+    color: rgba(15, 23, 42, 0.65);
+    text-transform: uppercase;
+  }
+
+  &__kpiIcon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    background: #f8fafc;
+
+    svg {
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    &--yellow {
+      background: rgba(247, 215, 79, 0.18);
+      border-color: rgba(247, 215, 79, 0.55);
+
+      svg {
+        color: #c29a00;
+      }
+    }
+  }
+
+  &__kpiValue {
+    font-size: 34px;
+    font-weight: 900;
+    line-height: 1.1;
+    color: #0b1220;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  &__kpiCur {
+    font-size: 14px;
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.65);
+    text-transform: lowercase;
+  }
+
+  &__kpiHint {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+
+  /* card */
+  &__card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+
+    &--full {
+      grid-column: 1 / -1;
+    }
+  }
+
+  &__cardHead {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+
+    &--tight {
+      padding: 14px 16px;
+    }
+  }
+
+  &__cardTitle {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0b1220;
+  }
+
+  &__cardBody {
+    padding: 14px 18px 18px;
+
+    &--tight {
+      padding: 12px 16px 14px;
+    }
+  }
+
+  &__chartWrap {
+    height: 360px;
+    width: 100%;
+  }
+
+  &__note {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  /* bottom */
+  &__bottom {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  &__tableWrap {
+    overflow: auto; /* обязательный скролл */
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 640px;
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f9fafb;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 900;
+      color: #0b1220;
+      text-align: left;
+      padding: 10px 12px;
+      z-index: 1;
+    }
+
+    tbody td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text);
+      vertical-align: top;
+    }
+
+    tbody tr:hover td {
+      background: rgba(15, 23, 42, 0.02);
+    }
+  }
+
+  &__tdTitle {
+    max-width: 520px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 800;
+  }
+
+  &__tdEmpty {
+    text-align: center;
+    color: var(--muted);
+    padding: 18px 12px;
+  }
+
+  /* ===== mini card (was cafeAnalyticsMini) ===== */
+  &__mini {
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: #fff;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+      border-color: rgba(226, 232, 240, 0.9);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+
+  &__miniTop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  &__miniIcon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    background: #f8fafc;
+
+    svg {
+      font-size: 18px;
+    }
+
+    &--dark {
+      background: rgba(15, 23, 42, 0.06);
+      border-color: rgba(15, 23, 42, 0.18);
+
+      svg {
+        color: #0f172a;
+      }
+    }
+
+    &--red {
+      background: rgba(239, 68, 68, 0.10);
+      border-color: rgba(239, 68, 68, 0.25);
+
+      svg {
+        color: #b91c1c;
+      }
+    }
+  }
+
+  &__miniLabel {
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.6px;
+    color: rgba(15, 23, 42, 0.65);
+    text-transform: uppercase;
+  }
+
+  &__miniValue {
+    font-size: 28px;
+    font-weight: 900;
+    color: #0b1220;
+    margin-bottom: 6px;
+  }
+
+  &__miniMeta {
+    font-size: 13px;
+    color: var(--muted);
+
+    b {
+      color: var(--text);
+      font-weight: 900;
+    }
+  }
+
+  /* ===== modal (was cafeAnalyticsModal) ===== */
+  &__modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+  }
+
+  &__modalOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.45);
+    border: 0;
+    cursor: pointer;
+  }
+
+  &__modalPanel {
+    position: relative;
+    width: min(980px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__modalHead {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    background: #fff;
+  }
+
+  &__modalHeadText {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__modalTitle {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0b1220;
+  }
+
+  &__modalSub {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  &__modalClose {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #fff;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 0.12s, transform 0.12s;
+
+    &:hover {
+      background: #f9fafb;
+    }
+    &:active {
+      transform: translateY(1px);
+    }
+
+    svg {
+      font-size: 16px;
+      color: var(--text);
+    }
+  }
+
+  &__modalBody {
+    padding: 16px;
+    overflow: auto; /* обязательный скролл */
+  }
+
+  /* ===== modal content (was cafeAnalyticsModalContent) ===== */
+  &__modalContent {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  &__modalKpiRow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+
+    &--2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    &--1 {
+      grid-template-columns: 1fr;
+    }
+
+    &--3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  &__modalKpi {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    background: #fff;
+  }
+
+  &__modalKLabel {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.4px;
+    color: rgba(15, 23, 42, 0.65);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  &__modalKVal {
+    font-size: 20px;
+    font-weight: 900;
+    color: #0b1220;
+  }
+
+  &__modalBlock {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  &__modalBlockTitle {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 900;
+    color: #0b1220;
+  }
+
+  &__modalTableWrap {
+    overflow: auto; /* обязательный скролл */
+  }
+
+  &__modalTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 620px;
+
+    &--staff {
+      min-width: 760px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f9fafb;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 900;
+      color: #0b1220;
+      text-align: left;
+      padding: 10px 12px;
+      z-index: 1;
+    }
+
+    tbody td {
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text);
+      vertical-align: top;
+    }
+
+    tbody tr:hover td {
+      background: rgba(15, 23, 42, 0.02);
+    }
+  }
+
+  &__modalTdTitle {
+    max-width: 520px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 800;
+  }
+
+  &__modalUnit {
+    margin-left: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  &__modalEmpty {
+    text-align: center;
+    color: var(--muted);
+    padding: 18px 12px;
+  }
+
+  /* staff bar (was cafeAnalyticsStaffBar) */
+  &__staffBar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #fafafa;
+  }
+
+  &__staffField {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    span {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+  }
+
+  &__staffSelect {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 14px;
+    background: #fff;
+    outline: none;
+    min-width: 210px;
+
+    &:focus {
+      border-color: var(--primary-dark);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
+  }
+
+  &__staffBtn {
+    margin-left: auto;
+  }
+}
+
+/* ===== Adaptive ===== */
+@media (max-width: 1100px) {
+  .cafeAnalytics {
+    &__kpis--3 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    &__kpis--2 {
+      grid-template-columns: 1fr;
+    }
+    &__bottom {
+      grid-template-columns: 1fr;
+    }
+    &__card--full {
+      grid-column: auto;
+    }
+    &__staffBtn {
+      margin-left: 0;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .cafeAnalytics {
+    &__range {
+      width: 100%;
+      justify-content: space-between;
+    }
+    &__chartWrap {
+      height: 300px;
+    }
+    &__kpis--3 {
+      grid-template-columns: 1fr;
+    }
+  }
+}

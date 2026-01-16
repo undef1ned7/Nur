@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FaChevronDown, FaClipboardList, FaPlus, FaSearch, FaTimes } from "react-icons/fa";
 
 /* =========================================================
-   Searchable Combobox (SearchSelect) — один открытый и закрывается после выбора
+   SearchSelect — один открытый и закрывается после выбора
    ========================================================= */
 export const SearchSelect = ({
   id,
@@ -131,10 +131,7 @@ export const SearchSelect = ({
         onMouseDown={(e) => {
           if (disabled) return;
           e.preventDefault();
-
-          // если уже открыто и клик по input — не сворачиваем
           if (open && e.target === inputRef.current) return;
-
           toggleDropdown();
         }}
         role="combobox"
@@ -179,9 +176,7 @@ export const SearchSelect = ({
           <div
             className={`sselect__dropdown ${dir === "up" ? "sselect__dropdown--up" : ""}`}
             role="listbox"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-            }}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="sselect__list">
               {filtered.length ? (
@@ -219,14 +214,7 @@ export const SearchSelect = ({
 /* =========================================================
    Правая панель меню
    ========================================================= */
-export const RightMenuPanel = ({
-  open,
-  onClose,
-  menuItems,
-  menuImageUrl,
-  onPick,
-  fmtMoney,
-}) => {
+export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick, fmtMoney }) => {
   const [q, setQ] = useState("");
 
   useEffect(() => {
@@ -245,12 +233,7 @@ export const RightMenuPanel = ({
     <aside className="orders-rpanel" aria-label="Меню">
       <div className="orders-rpanel__head">
         <div className="orders-rpanel__title">Меню</div>
-        <button
-          type="button"
-          className="orders-rpanel__close"
-          onClick={onClose}
-          aria-label="Закрыть"
-        >
+        <button type="button" className="orders-rpanel__close" onClick={onClose} aria-label="Закрыть">
           <FaTimes />
         </button>
       </div>
@@ -270,13 +253,7 @@ export const RightMenuPanel = ({
           filtered.map((m) => {
             const img = menuImageUrl?.(m.id);
             return (
-              <button
-                key={m.id}
-                type="button"
-                className="orders-rpanel__item"
-                onClick={() => onPick(m)}
-                title={m.title}
-              >
+              <button key={m.id} type="button" className="orders-rpanel__item" onClick={() => onPick(m)} title={m.title}>
                 <span className="orders-rpanel__thumb" aria-hidden>
                   {img ? <img src={img} alt="" /> : <FaClipboardList />}
                 </span>
@@ -298,11 +275,7 @@ export const RightMenuPanel = ({
       </div>
 
       <div className="orders-rpanel__footer">
-        <button
-          type="button"
-          className="orders__btn orders__btn--primary orders__btn--wide"
-          onClick={onClose}
-        >
+        <button type="button" className="orders__btn orders__btn--primary orders__btn--wide" onClick={onClose}>
           Готов
         </button>
       </div>

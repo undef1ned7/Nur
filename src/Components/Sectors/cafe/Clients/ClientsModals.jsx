@@ -1,39 +1,41 @@
+// src/Components/Sectors/cafe/Clients/ClientsModals.jsx
 import React, { useEffect, useRef, useState } from "react";
+import { FaTimes } from "react-icons/fa";
 
 /* ===== confirm delete ===== */
 const ConfirmDeleteModal = ({ busy, onClose, onConfirm }) => {
   return (
     <div
-      className="clients__modalOverlay"
+      className="cafeclients__modalOverlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-delete-title"
       onClick={onClose}
     >
-      <div className="clients__modal" onClick={(e) => e.stopPropagation()}>
-        <div className="clients__modalHeader">
-          <div id="confirm-delete-title" className="clients__modalTitle">
+      <div className="cafeclients__modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cafeclients__modalHeader">
+          <div id="confirm-delete-title" className="cafeclients__modalTitle">
             Удалить гостя
           </div>
           <button
-            className="clients__iconBtn"
+            className="cafeclients__iconBtn"
             onClick={onClose}
             aria-label="Закрыть"
             type="button"
           >
-            ×
+            <FaTimes />
           </button>
         </div>
 
-        <div className="clients__form" style={{ paddingTop: 0 }}>
-          <div className="clients__confirmText">
+        <div className="cafeclients__modalBody">
+          <div className="cafeclients__confirmText">
             Вы уверены? Это действие нельзя отменить.
           </div>
         </div>
 
-        <div className="clients__modalFooter">
+        <div className="cafeclients__modalFooter">
           <button
-            className="clients__btn"
+            className="cafeclients__btn"
             onClick={onClose}
             disabled={busy}
             type="button"
@@ -41,7 +43,7 @@ const ConfirmDeleteModal = ({ busy, onClose, onConfirm }) => {
             Отмена
           </button>
           <button
-            className="clients__btn clients__btn--primary"
+            className="cafeclients__btn cafeclients__btn--primary"
             onClick={onConfirm}
             disabled={busy}
             type="button"
@@ -74,7 +76,7 @@ const ClientForm = ({
 
   const nameRef = useRef(null);
 
-  // важное: синхронизируем поля при смене id/rows (исправляет баг "форма открылась, но данные не те")
+  // синхронизируем поля при смене id/rows
   useEffect(() => {
     const current = editing
       ? (rows || []).find((c) => String(c.id) === String(id)) || null
@@ -149,88 +151,86 @@ const ClientForm = ({
 
   return (
     <div
-      className="clients__modalOverlay"
+      className="cafeclients__modalOverlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="client-form-title"
       onClick={onClose}
     >
-      <div className="clients__modal" onClick={(e) => e.stopPropagation()}>
-        <div className="clients__modalHeader">
-          <div id="client-form-title" className="clients__modalTitle">
+      <div className="cafeclients__modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cafeclients__modalHeader">
+          <div id="client-form-title" className="cafeclients__modalTitle">
             {editing ? "Редактировать гостя" : "Новый гость"}
           </div>
           <button
-            className="clients__iconBtn"
+            className="cafeclients__iconBtn"
             onClick={onClose}
             aria-label="Закрыть"
             type="button"
           >
-            ×
+            <FaTimes />
           </button>
         </div>
 
-        {err && (
-          <div className="clients__error" style={{ marginTop: 8 }}>
-            {err}
-          </div>
-        )}
+        <div className="cafeclients__modalBody">
+          {err && <div className="cafeclients__error">{err}</div>}
 
-        <form className="clients__form" onSubmit={submit}>
-          <div className="clients__formGrid">
-            <div className="clients__field">
-              <label className="clients__label">Имя *</label>
-              <input
-                ref={nameRef}
-                className="clients__input"
-                value={full_name}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                autoComplete="name"
-              />
+          <form className="cafeclients__form" onSubmit={submit}>
+            <div className="cafeclients__formGrid">
+              <div className="cafeclients__field">
+                <label className="cafeclients__label">Имя *</label>
+                <input
+                  ref={nameRef}
+                  className="cafeclients__input"
+                  value={full_name}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  autoComplete="name"
+                />
+              </div>
+
+              <div className="cafeclients__field">
+                <label className="cafeclients__label">Телефон</label>
+                <input
+                  className="cafeclients__input"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+996700000000"
+                  inputMode="tel"
+                  autoComplete="tel"
+                />
+              </div>
+
+              <div className="cafeclients__field cafeclients__field--full">
+                <label className="cafeclients__label">Заметки</label>
+                <textarea
+                  className="cafeclients__input"
+                  rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="clients__field">
-              <label className="clients__label">Телефон</label>
-              <input
-                className="clients__input"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+996700000000"
-                inputMode="tel"
-                autoComplete="tel"
-              />
+            <div className="cafeclients__formActions">
+              <button
+                type="button"
+                className="cafeclients__btn"
+                onClick={onClose}
+                disabled={saving}
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                className="cafeclients__btn cafeclients__btn--primary"
+                disabled={saving}
+              >
+                {saving ? "Сохранение…" : "Сохранить"}
+              </button>
             </div>
-
-            <div className="clients__field" style={{ gridColumn: "1/-1" }}>
-              <label className="clients__label">Заметки</label>
-              <textarea
-                className="clients__input"
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="clients__formActions">
-            <button
-              type="button"
-              className="clients__btn"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="clients__btn clients__btn--primary"
-              disabled={saving}
-            >
-              {saving ? "Сохранение…" : "Сохранить"}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -416,176 +416,187 @@ const ClientCard = ({
 
   return (
     <div
-      className="clients__modalOverlay"
+      className="cafeclients__modalOverlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="client-card-title"
       onClick={onClose}
     >
-      <div className="clients__modalWide" onClick={(e) => e.stopPropagation()}>
-        <div className="clients__modalHeader">
-          <div id="client-card-title" className="clients__modalTitle">
+      <div
+        className="cafeclients__modalWide"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cafeclients__modalHeader">
+          <div id="client-card-title" className="cafeclients__modalTitle">
             Гость — {client.full_name || "—"}
           </div>
           <button
-            className="clients__iconBtn"
+            className="cafeclients__iconBtn"
             onClick={onClose}
             aria-label="Закрыть"
             type="button"
           >
-            ×
+            <FaTimes />
           </button>
         </div>
 
-        <div className="clients__cardHeader">
-          <div className="clients__profile">
-            <div>
-              <strong>Телефон:</strong> {client.phone || "—"}
-            </div>
-          </div>
-
-          <div className="clients__stats">
-            <div className="clients__statBox">
-              <div className="clients__statVal">{orders.length}</div>
-              <div className="clients__statLabel">Заказы</div>
-            </div>
-            <div className="clients__statBox">
-              <div className="clients__statVal">
-                {lastUpdated ? new Date(lastUpdated).toLocaleString() : "—"}
+        <div
+          className={`cafeclients__modalBody ${
+            openOrder ? "cafeclients__modalBody--locked" : ""
+          }`}
+        >
+          <div className="cafeclients__cardHeader">
+            <div className="cafeclients__profile">
+              <div>
+                <strong>Телефон:</strong> {client.phone || "—"}
               </div>
-              <div className="clients__statLabel">Обновлён</div>
+            </div>
+
+            <div className="cafeclients__stats">
+              <div className="cafeclients__statBox">
+                <div className="cafeclients__statVal">{orders.length}</div>
+                <div className="cafeclients__statLabel">Заказы</div>
+              </div>
+              <div className="cafeclients__statBox">
+                <div className="cafeclients__statVal">
+                  {lastUpdated ? new Date(lastUpdated).toLocaleString() : "—"}
+                </div>
+                <div className="cafeclients__statLabel">Обновлён</div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="clients__tabs">
-          <button
-            className={`clients__tab ${
-              tab === "profile" ? "clients__tab--active" : ""
-            }`}
-            onClick={() => setTab("profile")}
-            type="button"
-          >
-            Профиль
-          </button>
-          <button
-            className={`clients__tab ${
-              tab === "orders" ? "clients__tab--active" : ""
-            }`}
-            onClick={() => setTab("orders")}
-            type="button"
-          >
-            Заказы
-          </button>
-        </div>
-
-        {tab === "profile" && (
-          <div className="clients__profileBody">
-            <div className="clients__notes">
-              <strong>Заметки:</strong>
-              <div className="clients__noteArea">{client.notes || "—"}</div>
-            </div>
+          <div className="cafeclients__tabs">
+            <button
+              className={`cafeclients__tab ${
+                tab === "profile" ? "cafeclients__tab--active" : ""
+              }`}
+              onClick={() => setTab("profile")}
+              type="button"
+            >
+              Профиль
+            </button>
+            <button
+              className={`cafeclients__tab ${
+                tab === "orders" ? "cafeclients__tab--active" : ""
+              }`}
+              onClick={() => setTab("orders")}
+              type="button"
+            >
+              Заказы
+            </button>
           </div>
-        )}
 
-        {tab === "orders" && (
-          <>
-            {!isNarrow ? (
-              <div className="clients__tableWrap">
-                <table className="clients__table">
-                  <thead>
-                    <tr>
-                      <th>Стол</th>
-                      <th>Гостей</th>
-                      <th>Статус</th>
-                      <th>Сумма</th>
-                      <th>Создан</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
+          {tab === "profile" && (
+            <div className="cafeclients__profileBody">
+              <div className="cafeclients__notes">
+                <strong>Заметки:</strong>
+                <div className="cafeclients__noteArea">{client.notes || "—"}</div>
+              </div>
+            </div>
+          )}
+
+          {tab === "orders" && (
+            <>
+              {!isNarrow ? (
+                <div className="cafeclients__tableWrap">
+                  <table className="cafeclients__table">
+                    <thead>
                       <tr>
-                        <td className="clients__empty" colSpan={5}>
-                          Загрузка…
-                        </td>
+                        <th>Стол</th>
+                        <th>Гостей</th>
+                        <th>Статус</th>
+                        <th>Сумма</th>
+                        <th>Создан</th>
                       </tr>
-                    ) : ordersSorted.length ? (
-                      ordersSorted.map((o) => (
-                        <tr
-                          key={o.id}
-                          className="clients__rowClickable"
-                          style={{ cursor: "pointer" }}
-                          onClick={() => setOpenOrder(o)}
-                          title="Открыть детали заказа"
-                        >
-                          <td>{tableLabel(o)}</td>
-                          <td>{o.guests ?? "—"}</td>
-                          <td>{o.status || "—"}</td>
-                          <td>{fmtMoney(orderTotal(o))}</td>
-                          <td>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr>
+                          <td className="cafeclients__empty" colSpan={5}>
+                            Загрузка…
+                          </td>
+                        </tr>
+                      ) : ordersSorted.length ? (
+                        ordersSorted.map((o) => (
+                          <tr
+                            key={o.id}
+                            className="cafeclients__rowClickable"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => setOpenOrder(o)}
+                            title="Открыть детали заказа"
+                          >
+                            <td>{tableLabel(o)}</td>
+                            <td>{o.guests ?? "—"}</td>
+                            <td>{o.status || "—"}</td>
+                            <td>{fmtMoney(orderTotal(o))}</td>
+                            <td>
+                              {o.created_at
+                                ? new Date(o.created_at).toLocaleString()
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="cafeclients__empty" colSpan={5}>
+                            Заказов нет
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="cafeclients__ordersList">
+                  {loading ? (
+                    <div className="cafeclients__empty">Загрузка…</div>
+                  ) : ordersSorted.length ? (
+                    ordersSorted.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className="cafeclients__orderCard"
+                        onClick={() => setOpenOrder(o)}
+                        title="Открыть детали заказа"
+                      >
+                        <div className="cafeclients__orderTop">
+                          <div className="cafeclients__orderTitle">
+                            {tableLabel(o)}
+                          </div>
+                          <div className="cafeclients__orderSum">
+                            {fmtMoney(orderTotal(o))}
+                          </div>
+                        </div>
+                        <div className="cafeclients__orderMeta">
+                          <div>
+                            <span className="cafeclients__muted">Гостей:</span>{" "}
+                            {o.guests ?? "—"}
+                          </div>
+                          <div>
+                            <span className="cafeclients__muted">Статус:</span>{" "}
+                            {o.status || "—"}
+                          </div>
+                          <div>
+                            <span className="cafeclients__muted">Создан:</span>{" "}
                             {o.created_at
                               ? new Date(o.created_at).toLocaleString()
                               : "—"}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td className="clients__empty" colSpan={5}>
-                          Заказов нет
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="clients__ordersList">
-                {loading ? (
-                  <div className="clients__empty">Загрузка…</div>
-                ) : ordersSorted.length ? (
-                  ordersSorted.map((o) => (
-                    <button
-                      key={o.id}
-                      type="button"
-                      className="clients__orderCard"
-                      onClick={() => setOpenOrder(o)}
-                      title="Открыть детали заказа"
-                    >
-                      <div className="clients__orderTop">
-                        <div className="clients__orderTitle">{tableLabel(o)}</div>
-                        <div className="clients__orderSum">
-                          {fmtMoney(orderTotal(o))}
+                          </div>
                         </div>
-                      </div>
-                      <div className="clients__orderMeta">
-                        <div>
-                          <span className="clients__muted">Гостей:</span>{" "}
-                          {o.guests ?? "—"}
-                        </div>
-                        <div>
-                          <span className="clients__muted">Статус:</span>{" "}
-                          {o.status || "—"}
-                        </div>
-                        <div>
-                          <span className="clients__muted">Создан:</span>{" "}
-                          {o.created_at
-                            ? new Date(o.created_at).toLocaleString()
-                            : "—"}
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="clients__empty">Заказов нет</div>
-                )}
-              </div>
-            )}
-          </>
-        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="cafeclients__empty">Заказов нет</div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
-        <div className="clients__modalFooter">
-          <button className="clients__btn" onClick={onClose} type="button">
+        <div className="cafeclients__modalFooter">
+          <button className="cafeclients__btn" onClick={onClose} type="button">
             Закрыть
           </button>
         </div>
@@ -594,47 +605,46 @@ const ClientCard = ({
       {/* ───────────── модалка «Детали заказа» ───────────── */}
       {openOrder && (
         <div
-          className="clients__modalOverlay"
+          className="cafeclients__modalOverlay"
           role="dialog"
           aria-modal="true"
           aria-labelledby="order-detail-title"
           onClick={(e) => {
-            // FIX: чтобы не закрывалась карточка клиента при клике по затемнению деталей
             e.stopPropagation();
             setOpenOrder(null);
           }}
         >
-          <div className="clients__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="clients__modalHeader">
-              <div id="order-detail-title" className="clients__modalTitle">
+          <div className="cafeclients__modal" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeclients__modalHeader">
+              <div id="order-detail-title" className="cafeclients__modalTitle">
                 Детали заказа
               </div>
               <button
-                className="clients__iconBtn"
+                className="cafeclients__iconBtn"
                 onClick={() => setOpenOrder(null)}
                 aria-label="Закрыть"
                 type="button"
               >
-                ×
+                <FaTimes />
               </button>
             </div>
 
-            <div className="clients__form" style={{ paddingTop: 0 }}>
-              <div className="clients__formGrid">
-                <div className="clients__field">
-                  <label className="clients__label">Стол</label>
+            <div className="cafeclients__modalBody">
+              <div className="cafeclients__formGrid">
+                <div className="cafeclients__field">
+                  <label className="cafeclients__label">Стол</label>
                   <div>{tableLabel(openOrder)}</div>
                 </div>
-                <div className="clients__field">
-                  <label className="clients__label">Гостей</label>
+                <div className="cafeclients__field">
+                  <label className="cafeclients__label">Гостей</label>
                   <div>{openOrder.guests ?? "—"}</div>
                 </div>
-                <div className="clients__field">
-                  <label className="clients__label">Статус</label>
+                <div className="cafeclients__field">
+                  <label className="cafeclients__label">Статус</label>
                   <div>{openOrder.status || "—"}</div>
                 </div>
-                <div className="clients__field">
-                  <label className="clients__label">Создан</label>
+                <div className="cafeclients__field">
+                  <label className="cafeclients__label">Создан</label>
                   <div>
                     {openOrder.created_at
                       ? new Date(openOrder.created_at).toLocaleString()
@@ -643,8 +653,8 @@ const ClientCard = ({
                 </div>
               </div>
 
-              <div className="clients__tableWrap" style={{ marginTop: 10 }}>
-                <table className="clients__table">
+              <div className="cafeclients__tableWrap" style={{ marginTop: 10 }}>
+                <table className="cafeclients__table">
                   <thead>
                     <tr>
                       <th>Позиция</th>
@@ -657,7 +667,7 @@ const ClientCard = ({
                     {(openOrder.items || []).length ? (
                       openOrder.items.map((it, i) => (
                         <tr key={it?.id || it?.menu_item || i}>
-                          <td className="clients__ellipsis" title={itemName(it)}>
+                          <td className="cafeclients__ellipsis" title={itemName(it)}>
                             {itemName(it)}
                           </td>
                           <td>{itemQty(it)}</td>
@@ -667,7 +677,7 @@ const ClientCard = ({
                       ))
                     ) : (
                       <tr>
-                        <td className="clients__empty" colSpan={4}>
+                        <td className="cafeclients__empty" colSpan={4}>
                           Нет позиций
                         </td>
                       </tr>
@@ -688,9 +698,9 @@ const ClientCard = ({
               </div>
             </div>
 
-            <div className="clients__modalFooter">
+            <div className="cafeclients__modalFooter">
               <button
-                className="clients__btn"
+                className="cafeclients__btn"
                 onClick={() => setOpenOrder(null)}
                 type="button"
               >

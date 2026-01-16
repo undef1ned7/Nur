@@ -1,0 +1,349 @@
+// ===== CSS переменные (локальные, не в :root) =====
+.cafemenueonline {
+  // Цветовая палитра
+  --cmo-primary: #16a34a;
+  --cmo-primary-dark: #15803d;
+  --cmo-text: #0f172a;
+  --cmo-text-muted: #6b7280;
+  --cmo-bg: #ffffff;
+  --cmo-soft: #f3f4f6;
+  --cmo-border: #e5e7eb;
+  --cmo-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  --cmo-shadow-hover: 0 14px 30px rgba(15, 23, 42, 0.12);
+
+  // Layout
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--cmo-bg);
+  color: var(--cmo-text);
+
+  * {
+    box-sizing: border-box;
+  }
+
+  // ===== WRAP =====
+  &__wrap {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 18px 18px 40px;
+  }
+
+  // ===== HEADER =====
+  &__header {
+    padding: 6px 0 14px;
+  }
+
+  &__titleRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  &__titleLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  &__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    color: var(--cmo-primary);
+    background: rgba(22, 163, 74, 0.1);
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  &__subtitle {
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--cmo-text-muted);
+    font-weight: 600;
+  }
+
+  // ===== SEARCH =====
+  &__search {
+    position: relative;
+    width: 100%;
+  }
+
+  &__searchIcon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+  }
+
+  &__searchInput {
+    width: 100%;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--cmo-border);
+    background: #f7f7f8;
+    padding: 0 14px 0 40px;
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    transition: all 0.12s ease;
+
+    &:focus {
+      background: #fff;
+      border-color: rgba(22, 163, 74, 0.55);
+      box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.12);
+    }
+  }
+
+  &__divider {
+    height: 1px;
+    background: var(--cmo-border);
+    margin: 12px 0 14px;
+  }
+
+  // ===== TABS =====
+  &__tabs {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 4px 2px 10px;
+    scrollbar-width: thin;
+  }
+
+  &__tab {
+    border: 1px solid var(--cmo-border);
+    background: #fff;
+    color: var(--cmo-text);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+    }
+
+    &--active {
+      background: #0b1220;
+      border-color: #0b1220;
+      color: #fff;
+    }
+  }
+
+  // ===== CONTENT & HINT =====
+  &__content {
+    margin-top: 6px;
+  }
+
+  &__hint {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 10px 2px 14px;
+  }
+
+  &__hintTitle {
+    font-weight: 900;
+    font-size: 14px;
+  }
+
+  &__hintCount {
+    font-weight: 800;
+    font-size: 12px;
+    color: var(--cmo-text-muted);
+  }
+
+  // ===== GRID =====
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 18px;
+  }
+
+  // ===== CARD =====
+  &__card {
+    border: 1px solid var(--cmo-border);
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    padding: 0;
+    text-align: left;
+    transition: all 0.15s ease;
+    box-shadow: var(--cmo-shadow);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--cmo-shadow-hover);
+      border-color: rgba(15, 23, 42, 0.14);
+    }
+
+    &--skeleton {
+      &:hover {
+        transform: none;
+        box-shadow: var(--cmo-shadow);
+      }
+    }
+  }
+
+  &__imgWrap {
+    width: 100%;
+    height: 190px;
+    background: #eef2f7;
+    overflow: hidden;
+  }
+
+  &__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+
+    &--skeleton {
+      background: linear-gradient(90deg, #eef2f7 0%, #e5e7eb 50%, #eef2f7 100%);
+      background-size: 200% 100%;
+      animation: cafemenueonline-pulse 1.2s ease-in-out infinite;
+    }
+  }
+
+  &__cardBody {
+    padding: 14px 14px 16px;
+  }
+
+  &__rowTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  &__name {
+    font-weight: 900;
+    font-size: 16px;
+    line-height: 1.25;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__badge {
+    flex: 0 0 auto;
+    border-radius: 10px;
+    padding: 7px 10px;
+    background: #eef2f7;
+    color: #111827;
+    font-weight: 800;
+    font-size: 12px;
+  }
+
+  &__priceRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  &__price {
+    font-weight: 900;
+    font-size: 28px;
+    color: var(--cmo-primary);
+    letter-spacing: -0.02em;
+  }
+
+  // ===== ERROR STATE =====
+  &__error {
+    margin-top: 10px;
+    border: 1px solid rgba(239, 68, 68, 0.28);
+    background: rgba(239, 68, 68, 0.06);
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+
+  &__errorTitle {
+    font-weight: 900;
+    margin-bottom: 4px;
+  }
+
+  &__errorText {
+    color: #991b1b;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  // ===== EMPTY STATE =====
+  &__empty {
+    grid-column: 1 / -1;
+    border: 1px dashed var(--cmo-border);
+    border-radius: 16px;
+    padding: 18px;
+    background: #fafafa;
+  }
+
+  &__emptyTitle {
+    font-weight: 900;
+    margin-bottom: 6px;
+  }
+
+  &__emptyText {
+    color: var(--cmo-text-muted);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  // ===== SKELETON LINES =====
+  &__skLine {
+    height: 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #eef2f7 0%, #e5e7eb 50%, #eef2f7 100%);
+    background-size: 200% 100%;
+    animation: cafemenueonline-pulse 1.2s ease-in-out infinite;
+    margin-top: 10px;
+
+    &--w60 {
+      width: 60%;
+    }
+
+    &--w40 {
+      width: 40%;
+    }
+
+    &--w30 {
+      width: 30%;
+    }
+  }
+
+  // ===== KEYFRAMES =====
+  @keyframes cafemenueonline-pulse {
+    0% {
+      background-position: 0% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}

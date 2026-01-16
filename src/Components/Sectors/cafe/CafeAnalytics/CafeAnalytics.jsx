@@ -1,4 +1,4 @@
-// src/.../Reports.jsx
+// src/.../CafeAnalytics.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaChartLine,
@@ -20,8 +20,8 @@ import {
   Legend,
 } from "chart.js";
 import api from "../../../../api";
-import "./reports.scss";
-import { Modal, ReportsModalContent } from "./ReportsModals";
+import "./CafeAnalytics.scss";
+import { CafeAnalyticsModal, CafeAnalyticsModalContent } from "./CafeAnalyticsModals";
 
 Chart.register(
   LineController,
@@ -135,12 +135,7 @@ const pickName = (x) =>
   "—";
 
 const pickId = (x, idx) =>
-  x?.id ||
-  x?.user_id ||
-  x?.user?.id ||
-  x?.waiter_id ||
-  x?.cook_id ||
-  `${pickName(x)}_${idx}`;
+  x?.id || x?.user_id || x?.user?.id || x?.waiter_id || x?.cook_id || `${pickName(x)}_${idx}`;
 
 const normalizeStaffRow = (x, idx) => {
   const revenue =
@@ -198,7 +193,7 @@ const normalizeStaffRow = (x, idx) => {
 const sumBy = (arr, key) => arr.reduce((acc, x) => acc + toNum(x?.[key]), 0);
 
 /* ===== component ===== */
-const Reports = () => {
+const CafeAnalytics = () => {
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
@@ -263,7 +258,7 @@ const Reports = () => {
       setCooksRows(Array.isArray(cooks) ? cooks : []);
       setWaitersRows(Array.isArray(waiters) ? waiters : []);
     } catch (e) {
-      console.error("Reports kitchen analytics error:", e);
+      console.error("CafeAnalytics kitchen analytics error:", e);
       setCooksRows([]);
       setWaitersRows([]);
     } finally {
@@ -289,7 +284,7 @@ const Reports = () => {
       fetchGuestsCount().catch(() => {});
       fetchKitchenAnalytics().catch(() => {});
     } catch (e) {
-      console.error("Reports fetchAll error:", e);
+      console.error("CafeAnalytics fetchAll error:", e);
       setSalesSummary({ orders_count: 0, items_qty: 0, revenue: "0.00" });
       setSalesItems([]);
       setLowStock([]);
@@ -336,7 +331,7 @@ const Reports = () => {
 
       setRevenueSeries(out);
     } catch (e) {
-      console.error("Reports fetchRevenueSeries error:", e);
+      console.error("CafeAnalytics fetchRevenueSeries error:", e);
       setRevenueSeries([]);
     }
   }, [dateFrom, dateTo]);
@@ -474,10 +469,6 @@ const Reports = () => {
       <div className="cafeAnalytics__top">
         <div className="cafeAnalytics__head">
           <div className="cafeAnalytics__headLeft">
-            <div className="cafeAnalytics__hTitle">
-              <FaChartLine /> Отчёты и аналитика
-            </div>
-            <div className="cafeAnalytics__hSub">Данные по кафе за период</div>
           </div>
 
           <div className="cafeAnalytics__headRight">
@@ -650,35 +641,33 @@ const Reports = () => {
           </div>
         </div>
 
-        <button className="cafeAnalyticsMini" type="button" onClick={() => openModal("stock")}>
-          <div className="cafeAnalyticsMini__top">
-            <div className="cafeAnalyticsMini__icon cafeAnalyticsMini__icon--red">
+        <button className="cafeAnalytics__mini" type="button" onClick={() => openModal("stock")}>
+          <div className="cafeAnalytics__miniTop">
+            <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--red">
               <FaBoxOpen />
             </div>
-            <div className="cafeAnalyticsMini__label">СКЛАД</div>
+            <div className="cafeAnalytics__miniLabel">СКЛАД</div>
           </div>
-          <div className="cafeAnalyticsMini__value">{fmtInt(lowStock.length)}</div>
-          <div className="cafeAnalyticsMini__meta">Позиции ниже минимума</div>
+          <div className="cafeAnalytics__miniValue">{fmtInt(lowStock.length)}</div>
+          <div className="cafeAnalytics__miniMeta">Позиции ниже минимума</div>
         </button>
 
-        <button className="cafeAnalyticsMini" type="button" onClick={() => openModal("avg")}>
-          <div className="cafeAnalyticsMini__top">
-            <div className="cafeAnalyticsMini__icon cafeAnalyticsMini__icon--dark">
+        <button className="cafeAnalytics__mini" type="button" onClick={() => openModal("avg")}>
+          <div className="cafeAnalytics__miniTop">
+            <div className="cafeAnalytics__miniIcon cafeAnalytics__miniIcon--dark">
               <FaChartLine />
             </div>
-            <div className="cafeAnalyticsMini__label">СРЕДНИЙ ЧЕК</div>
+            <div className="cafeAnalytics__miniLabel">СРЕДНИЙ ЧЕК</div>
           </div>
-          <div className="cafeAnalyticsMini__value">{fmtMoney(avgCheck)}</div>
-          <div className="cafeAnalyticsMini__meta">Выручка / транзакции</div>
+          <div className="cafeAnalytics__miniValue">{fmtMoney(avgCheck)}</div>
+          <div className="cafeAnalytics__miniMeta">Выручка / транзакции</div>
         </button>
       </div>
 
       {/* Modal */}
-      <Modal open={!!modalKey} title={modalTitle} subtitle={modalSubtitle} onClose={closeModal}>
-        <ReportsModalContent
+      <CafeAnalyticsModal open={!!modalKey} title={modalTitle} subtitle={modalSubtitle} onClose={closeModal}>
+        <CafeAnalyticsModalContent
           modalKey={modalKey}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
           revenueTotal={revenueTotal}
           trxCount={trxCount}
           avgCheck={avgCheck}
@@ -697,9 +686,9 @@ const Reports = () => {
           fmtMoney={fmtMoney}
           toNum={toNum}
         />
-      </Modal>
+      </CafeAnalyticsModal>
     </section>
   );
 };
 
-export default Reports;
+export default CafeAnalytics;

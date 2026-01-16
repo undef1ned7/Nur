@@ -5,6 +5,10 @@ export const ALLOWED_PATHS_WITHOUT_TOKEN = [
   "/",
   "/submit-application",
   "/get-application-list",
+
+
+  "/cafe/:company_slug/menu",
+  // "/catalog/:slug"
 ];
 
 // Публичные пути, на которые нужно редиректить если токен валиден
