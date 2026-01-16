@@ -241,6 +241,26 @@ const Analytics = () => {
             color: "#f7d617",
           },
           {
+            title: "Себестоимость",
+            value: "0",
+            currency: "сом",
+            icon: Package,
+            color: "#f7d617",
+          },
+          {
+            title: "Валовая прибыль",
+            value: "0",
+            currency: "сом",
+            icon: TrendingUp,
+            color: "#f7d617",
+          },
+          {
+            title: "Маржа",
+            value: "0%",
+            icon: HelpCircle,
+            color: "#f7d617",
+          },
+          {
             title: "Транзакции",
             value: "0",
             icon: ShoppingCart,
@@ -280,6 +300,30 @@ const Analytics = () => {
           value: formatNumber(cards.revenue || "0"),
           currency: "сом",
           icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Себестоимость",
+          value: formatNumber(cards.cogs || "0"),
+          currency: "сом",
+          subtitle: cards.cogs_warning ? String(cards.cogs_warning) : "",
+          icon: Package,
+          color: "#f7d617",
+        },
+        {
+          title: "Валовая прибыль",
+          value: formatNumber(cards.gross_profit || "0"),
+          currency: "сом",
+          icon: TrendingUp,
+          color: "#f7d617",
+        },
+        {
+          title: "Маржа",
+          value: `${Number(cards.margin_percent || 0).toLocaleString("ru-RU", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          })}%`,
+          icon: HelpCircle,
           color: "#f7d617",
         },
         {
