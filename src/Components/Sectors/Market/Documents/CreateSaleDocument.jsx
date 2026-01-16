@@ -168,15 +168,19 @@ const CreateSaleDocument = () => {
       return sum + (itemPrice * itemQty * itemDiscountPercent) / 100;
     }, 0);
 
-    // Скидка по документу (в процентах)
+    // Сумма после скидок по позициям
+    const subtotalAfterItemsDiscount = subtotal - itemsDiscount;
+
+    // Скидка по документу (в процентах) применяется к сумме ПОСЛЕ скидок по позициям
     const discountPercent = Number(documentDiscount) || 0;
-    const documentDiscountAmount = (subtotal * discountPercent) / 100;
+    const documentDiscountAmount =
+      (subtotalAfterItemsDiscount * discountPercent) / 100;
 
     // Общая скидка (скидка по позициям + скидка по документу)
     const totalDiscount = itemsDiscount + documentDiscountAmount;
 
     // Итоговая сумма с учетом всех скидок
-    const total = subtotal - totalDiscount;
+    const total = subtotalAfterItemsDiscount - documentDiscountAmount;
     const paid = isDocumentPosted ? total : 0;
 
     return {
@@ -303,6 +307,9 @@ const CreateSaleDocument = () => {
         ? cashBoxes?.find((b) => b.id === warehouse)?.name || warehouse
         : null;
 
+      // Получаем скидку по документу
+      const discountPercent = Number(documentDiscount) || 0;
+
       // Формируем данные для PDF из текущей корзины
       const items = cartItems.map((item, idx) => {
         const itemName = item.productName || item.name || "Товар";
@@ -312,8 +319,17 @@ const CreateSaleDocument = () => {
           item.discount_percent || item.discount || 0
         );
         const itemSubtotal = itemPrice * itemQty;
+
+        // Скидка по позиции
         const itemDiscountAmount = (itemSubtotal * itemDiscount) / 100;
-        const itemTotal = itemSubtotal - itemDiscountAmount;
+        const itemSubtotalAfterItemDiscount = itemSubtotal - itemDiscountAmount;
+
+        // Применяем скидку по документу к товару после скидки по позиции
+        // Скидка по документу применяется пропорционально к каждому товару
+        const documentDiscountAmount =
+          (itemSubtotalAfterItemDiscount * discountPercent) / 100;
+        const itemTotal =
+          itemSubtotalAfterItemDiscount - documentDiscountAmount;
 
         return {
           id: item.id || idx,
@@ -324,6 +340,7 @@ const CreateSaleDocument = () => {
           unit: item.unit || "ШТ",
           article: item.article || "",
           discount_percent: itemDiscount,
+          price_before_discount: String(itemPrice.toFixed(2)), // Цена без скидки (исходная цена товара)
         };
       });
 
@@ -344,6 +361,7 @@ const CreateSaleDocument = () => {
             date: currentDate.toISOString().split("T")[0],
             datetime: currentDate.toISOString(),
             created_at: currentDate.toISOString(),
+            discount_percent: discountPercent, // Передаем скидку по документу
           },
           seller: {
             id: company?.id || "",

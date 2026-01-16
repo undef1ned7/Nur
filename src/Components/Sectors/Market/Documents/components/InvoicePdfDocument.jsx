@@ -204,6 +204,14 @@ function n2(v) {
   });
 }
 
+function fmtQty(v) {
+  const num = Number(v || 0);
+  return num.toLocaleString("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  });
+}
+
 function fmtDate(dt) {
   if (!dt) return "";
   const d = new Date(dt);
@@ -578,7 +586,7 @@ export default function InvoicePdfDocument({ data }) {
                 <Text style={{ textAlign: "right" }}>{it.unit || "ШТ"}</Text>
               </View>
               <View style={[s.tableCell, s.colQty]}>
-                <Text style={{ textAlign: "right" }}>{n2(it.qty)}</Text>
+                <Text style={{ textAlign: "right" }}>{fmtQty(it.qty)}</Text>
               </View>
               <View style={[s.tableCell, s.colPriceNoDiscount]}>
                 <Text style={{ textAlign: "right" }}>
@@ -615,7 +623,7 @@ export default function InvoicePdfDocument({ data }) {
             </View>
             <View style={[s.tableCell, s.colQty]}>
               <Text style={{ textAlign: "right", fontWeight: "bold" }}>
-                {n2(items.reduce((sum, it) => sum + Number(it.qty || 0), 0))}
+                {fmtQty(items.reduce((sum, it) => sum + Number(it.qty || 0), 0))}
               </Text>
             </View>
             <View style={[s.tableCell, s.colPriceNoDiscount]}>

@@ -300,6 +300,7 @@ const AccessList = ({
         консалтинг: "consulting",
         склад: "warehouse",
         пилорама: "pilorama",
+        логистика: "logistics",
       };
 
       const configKey = sectorMapping[sectorKey] || sectorKey;

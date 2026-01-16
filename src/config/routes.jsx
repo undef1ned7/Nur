@@ -131,10 +131,13 @@ import WarehouseClients from "../Components/Sectors/Warehouse/Clients/Clients";
 import WarehouseDirectories from "../Components/Sectors/Warehouse/Directories/Directories";
 import WarehouseMovements from "../Components/Sectors/Warehouse/Movements/Movements";
 import WarehouseProducts from "../Components/Sectors/Warehouse/Products/Products";
+import WarehouseProductDetail from "../Components/Sectors/Warehouse/Products/WarehouseProductDetail";
 import WarehouseStocks from "../Components/Sectors/Warehouse/Stocks/Stocks";
+import AddWarehouseProductPage from "../Components/Sectors/Warehouse/Stocks/AddWarehouseProductPage";
 import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
+import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategory/BrandCategoryPage";
 
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
@@ -333,9 +336,18 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/directories", WarehouseDirectories),
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
+  createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),
   createProtectedRoute("warehouse/stocks", WarehouseStocks),
+  createProtectedRoute("warehouse/stocks/:warehouse_id", WarehouseStocks),
+  createProtectedRoute("warehouse/stocks/add-product", AddWarehouseProductPage),
+  createProtectedRoute(
+    "warehouse/stocks/add-product/:id",
+    AddWarehouseProductPage
+  ),
   createProtectedRoute("warehouse/supply", WarehouseSupply),
   createProtectedRoute("warehouse/write_offs", WarehouseWriteOffs),
+  createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
+  createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),

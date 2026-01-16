@@ -9,7 +9,7 @@ import "../Warehouses.scss";
 const CreateWarehouseModal = ({ onClose, onCreate }) => {
   const [formData, setFormData] = useState({
     name: "",
-    address: "",
+    location: "",
   });
   const [error, setError] = useState("");
 
@@ -22,8 +22,10 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
     if (createError) {
       setError(
         createError?.detail ||
-        createError?.message ||
-        typeof createError === "string" ? createError : "Не удалось создать склад"
+          createError?.message ||
+          typeof createError === "string"
+          ? createError
+          : "Не удалось создать склад"
       );
     } else {
       setError("");
@@ -41,7 +43,7 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim()) {
       setError("Название склада обязательно");
       return;
@@ -53,7 +55,7 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
       await onCreate(formData);
       // При успешном создании (unwrap() не выбросил ошибку) закрываем модальное окно
       onClose();
-      setFormData({ name: "", address: "" });
+      setFormData({ name: "", location: "" });
       setError("");
     } catch (err) {
       // Ошибка уже обработана через Redux и отображена через useEffect
@@ -114,10 +116,10 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
               <label className="warehouse-filter-modal__label">Адрес</label>
               <input
                 type="text"
-                name="address"
+                name="location"
                 className="warehouse-filter-modal__select"
                 placeholder="Введите адрес склада"
-                value={formData.address}
+                value={formData.location}
                 onChange={handleChange}
                 disabled={creating}
               />
@@ -148,4 +150,3 @@ const CreateWarehouseModal = ({ onClose, onCreate }) => {
 };
 
 export default CreateWarehouseModal;
-

@@ -6,11 +6,7 @@ import "./WarehouseTable.scss";
  * Мемоизированный компонент строки таблицы
  */
 const WarehouseRow = React.memo(
-  ({
-    warehouse,
-    rowNumber,
-    onOpenWarehouse,
-  }) => {
+  ({ warehouse, rowNumber, onOpenWarehouse }) => {
     const handleOpenClick = (e) => {
       e.stopPropagation();
       onOpenWarehouse(warehouse);
@@ -133,4 +129,3 @@ const areEqual = (prevProps, nextProps) => {
 };
 
 export default React.memo(WarehouseTable, areEqual);
-

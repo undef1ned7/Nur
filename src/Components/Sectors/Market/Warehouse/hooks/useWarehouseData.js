@@ -49,7 +49,20 @@ export const useWarehouseReferences = () => {
  */
 export const useWarehouseData = (params) => {
   const dispatch = useDispatch();
-  const { list: products, loading, count, next, previous } = useProducts();
+
+  const {
+    list: productsFromStore,
+    loading: productsLoading,
+    count: productsCount,
+    next: productsNext,
+    previous: productsPrevious,
+  } = useProducts();
+
+  const products = productsFromStore;
+  const loading = productsLoading;
+  const count = productsCount;
+  const next = productsNext;
+  const previous = productsPrevious;
 
   // Сериализация params для стабильного сравнения (предотвращает лишние запросы)
   const paramsString = useMemo(() => {
@@ -67,6 +80,8 @@ export const useWarehouseData = (params) => {
   // Загрузка товаров при изменении параметров
   useEffect(() => {
     if (params && Object.keys(params).length > 0) {
+      // fetchProductsAsync теперь сам умеет ходить в /warehouse/{id}/products/
+      // если передать params.warehouse (см. src/api/products.js)
       dispatch(fetchProductsAsync(params));
     }
   }, [dispatch, paramsString]); // Используем строку вместо объекта

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useDispatch } from "react-redux";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import "../Warehouses/Warehouses.scss";
+import api from "../../../../api";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import WarehouseHeader from "../Warehouses/components/WarehouseHeader";
 import SearchSection from "../../Market/Warehouse/components/SearchSection";
@@ -28,7 +29,52 @@ const Stocks = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const warehouseId = searchParams.get("warehouse_id");
+  const { warehouse_id: warehouseIdFromParams } = useParams();
+  const warehouseId = warehouseIdFromParams || searchParams.get("warehouse_id");
+
+  // Получаем название склада из Redux store
+  const warehouseName = useSelector((state) => {
+    const warehouse = state.warehouse.list.find(
+      (w) => String(w.id) === String(warehouseId)
+    );
+    return warehouse ? warehouse.name : "";
+  });
+
+  // "Закрепляем" название, чтобы оно не исчезало при обновлениях стора
+  const [resolvedWarehouseName, setResolvedWarehouseName] = useState("");
+
+  useEffect(() => {
+    if (warehouseName) {
+      setResolvedWarehouseName(warehouseName);
+    }
+  }, [warehouseName]);
+
+  // Если в store нет названия (например, после обновления/перезагрузки),
+  // подгружаем детали склада по id и сохраняем локально.
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadWarehouseName = async () => {
+      if (!warehouseId) return;
+      if (resolvedWarehouseName) return;
+
+      try {
+        const { data } = await api.get(`/warehouse/${warehouseId}/`);
+        const name = data?.name || data?.title || "";
+        if (!cancelled && name) {
+          setResolvedWarehouseName(name);
+        }
+      } catch (_) {
+        // не блокируем UI
+      }
+    };
+
+    loadWarehouseName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [warehouseId, resolvedWarehouseName]);
 
   // Состояние фильтров и модальных окон
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -113,7 +159,7 @@ const Stocks = () => {
   // Обработчики событий
   const handleProductClick = useCallback(
     (product) => {
-      navigate(`/crm/sklad/${product.id}`);
+      navigate(`/crm/warehouse/products/${product.id}`);
     },
     [navigate]
   );
@@ -143,6 +189,8 @@ const Stocks = () => {
       ).unwrap();
 
       setSelectedRows(new Set());
+      // fetchProductsAsync сам выберет нужный эндпоинт (warehouse/{id}/products/),
+      // если в requestParams есть warehouse
       dispatch(fetchProductsAsync(requestParams));
     } catch (e) {
       console.error("Ошибка при удалении товаров:", e);
@@ -167,6 +215,14 @@ const Stocks = () => {
     setViewMode(mode);
   }, []);
 
+  const handleCreateProduct = useCallback(() => {
+    if (warehouseId) {
+      navigate(`/crm/warehouse/stocks/add-product?warehouse_id=${warehouseId}`);
+    } else {
+      navigate("/crm/warehouse/stocks/add-product");
+    }
+  }, [navigate, warehouseId]);
+
   // Мемоизация сообщения для модального окна удаления
   const deleteModalMessage = useMemo(
     () => formatDeleteMessage(selectedCount),
@@ -175,7 +231,15 @@ const Stocks = () => {
 
   return (
     <div className="warehouse-page">
-      <WarehouseHeader />
+      <WarehouseHeader
+        onCreateProduct={handleCreateProduct}
+        title={
+          resolvedWarehouseName
+            ? `Товары склада: ${resolvedWarehouseName}`
+            : "Товары склада"
+        }
+        subtitle="Управление товарами на складе"
+      />
 
       <SearchSection
         searchTerm={searchTerm}

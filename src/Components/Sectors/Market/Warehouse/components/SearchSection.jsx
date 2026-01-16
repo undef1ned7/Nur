@@ -62,13 +62,15 @@ const SearchSection = ({
             Карточки
           </button>
 
-          <button
-            className="warehouse-search__filter-btn"
-            onClick={onOpenFilters}
-          >
-            <Filter size={16} />
-            Фильтры
-          </button>
+          {onOpenFilters && (
+            <button
+              className="warehouse-search__filter-btn"
+              onClick={onOpenFilters}
+            >
+              <Filter size={16} />
+              Фильтры
+            </button>
+          )}
         </div>
       </div>
     </div>
