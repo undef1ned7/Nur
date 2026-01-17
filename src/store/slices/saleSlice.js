@@ -25,6 +25,17 @@ import {
   deleteSale, // <-- обработаем статусы создания сделок
   fetchDocuments,
 } from "../creators/saleThunk";
+import {
+  fetchWarehouseDocuments,
+  createWarehouseDocument,
+  updateWarehouseDocument,
+  patchWarehouseDocument,
+  deleteWarehouseDocument,
+  postWarehouseDocument,
+  unpostWarehouseDocument,
+  fetchWarehouseProducts,
+  fetchWarehouseCounterparties,
+} from "../creators/warehouseThunk";
 
 const initialState = {
   start: null, // POS-продажа (товары)
@@ -277,6 +288,7 @@ const saleSlice = createSlice({
         state.loading = false;
       })
 
+      // Старый API (для обратной совместимости)
       .addCase(fetchDocuments.pending, (state) => {
         state.documentsLoading = true;
       })
@@ -290,6 +302,61 @@ const saleSlice = createSlice({
       .addCase(fetchDocuments.rejected, (state, action) => {
         state.error = ensureError(action);
         state.documentsLoading = false;
+      })
+
+      // Новый Warehouse API
+      .addCase(fetchWarehouseDocuments.pending, (state) => {
+        state.documentsLoading = true;
+      })
+      .addCase(fetchWarehouseDocuments.fulfilled, (state, { payload }) => {
+        // Обрабатываем стандартный формат DRF пагинации
+        state.documents = payload?.results || (Array.isArray(payload) ? payload : []);
+        state.documentsCount = payload?.count || payload?.length || 0;
+        state.documentsNext = payload?.next || null;
+        state.documentsPrevious = payload?.previous || null;
+        state.documentsLoading = false;
+      })
+      .addCase(fetchWarehouseDocuments.rejected, (state, action) => {
+        state.error = ensureError(action);
+        state.documentsLoading = false;
+      })
+      .addCase(createWarehouseDocument.fulfilled, (state, { payload }) => {
+        // Добавляем новый документ в начало списка
+        state.documents = [payload, ...state.documents];
+        state.documentsCount = (state.documentsCount || 0) + 1;
+      })
+      .addCase(updateWarehouseDocument.fulfilled, (state, { payload }) => {
+        // Обновляем документ в списке
+        const index = state.documents.findIndex((doc) => doc.id === payload.id);
+        if (index !== -1) {
+          state.documents[index] = payload;
+        }
+      })
+      .addCase(patchWarehouseDocument.fulfilled, (state, { payload }) => {
+        // Обновляем документ в списке
+        const index = state.documents.findIndex((doc) => doc.id === payload.id);
+        if (index !== -1) {
+          state.documents[index] = payload;
+        }
+      })
+      .addCase(deleteWarehouseDocument.fulfilled, (state, { payload }) => {
+        // Удаляем документ из списка
+        state.documents = state.documents.filter((doc) => doc.id !== payload);
+        state.documentsCount = Math.max(0, (state.documentsCount || 0) - 1);
+      })
+      .addCase(postWarehouseDocument.fulfilled, (state, { payload }) => {
+        // Обновляем документ после проведения
+        const index = state.documents.findIndex((doc) => doc.id === payload.id);
+        if (index !== -1) {
+          state.documents[index] = payload;
+        }
+      })
+      .addCase(unpostWarehouseDocument.fulfilled, (state, { payload }) => {
+        // Обновляем документ после отмены проведения
+        const index = state.documents.findIndex((doc) => doc.id === payload.id);
+        if (index !== -1) {
+          state.documents[index] = payload;
+        }
       })
 
       .addCase(productCheckout.pending, (state) => {

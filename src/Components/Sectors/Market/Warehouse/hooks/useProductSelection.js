@@ -8,14 +8,16 @@ import { useState, useMemo, useCallback } from "react";
 export const useProductSelection = (products) => {
   const [selectedRows, setSelectedRows] = useState(() => new Set());
 
-  // Проверка, выбраны ли все товары
-  const isAllSelected = useMemo(
-    () =>
-      products.length > 0 &&
-      selectedRows.size === products.length &&
-      products.every((p) => selectedRows.has(p.id)),
-    [products, selectedRows]
-  );
+  // Проверка, выбраны ли все товары (оптимизировано)
+  const isAllSelected = useMemo(() => {
+    // Быстрая проверка: если размеры не совпадают, сразу false
+    if (products.length === 0 || selectedRows.size !== products.length) {
+      return false;
+    }
+    // Если размеры совпадают, проверяем что все ID есть в selectedRows
+    // Оптимизация: проверяем только если размеры совпадают
+    return products.every((p) => selectedRows.has(p.id));
+  }, [products, selectedRows.size]); // Используем только size вместо всего Set
 
   // Выбор/снятие выбора товара
   const handleRowSelect = useCallback((productId, e) => {

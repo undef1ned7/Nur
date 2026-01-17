@@ -362,16 +362,49 @@ function numToWords(num) {
   return result.trim();
 }
 
+// Функция для получения названия документа по типу
+function getDocumentTitle(docType) {
+  const titles = {
+    SALE: "Расходная накладная",
+    PURCHASE: "Приходная накладная",
+    SALE_RETURN: "Расходная накладная на возврат",
+    PURCHASE_RETURN: "Приходная накладная на возврат",
+    INVENTORY: "Бланк инвентаризации",
+    RECEIPT: "Оприходование",
+    WRITE_OFF: "Списание",
+    TRANSFER: "Накладная на перемещение",
+  };
+  return titles[docType] || "Накладная";
+}
+
+// Функция для определения, нужны ли колонки с ценой и суммой
+function needsPriceColumns(docType) {
+  return !["INVENTORY", "TRANSFER"].includes(docType);
+}
+
+// Функция для определения, нужны ли колонки со скидкой
+function needsDiscountColumns(docType) {
+  return ["SALE", "PURCHASE", "SALE_RETURN", "PURCHASE_RETURN"].includes(docType);
+}
+
 export default function InvoicePdfDocument({ data }) {
   const doc = data?.document || {};
   const seller = data?.seller || {};
   const buyer = data?.buyer || null;
+  const docType = data?.doc_type || doc.doc_type || doc.type || "SALE";
 
   const totals = data?.totals || {};
   const subtotal = Number(totals.subtotal || 0);
   const discountTotal = Number(totals.discount_total || 0);
   const tax = Number(totals.tax_total || 0);
   const total = Number(totals.total || 0);
+
+  // Определяем структуру документа
+  const documentTitle = getDocumentTitle(docType);
+  const showPriceColumns = needsPriceColumns(docType);
+  const showDiscountColumns = needsDiscountColumns(docType);
+  const isInventory = docType === "INVENTORY";
+  const isTransfer = docType === "TRANSFER";
 
   // Скидка на уровне документа (может быть в процентах или абсолютном значении)
   const documentDiscount = Number(
@@ -485,55 +518,125 @@ export default function InvoicePdfDocument({ data }) {
         {/* Заголовок */}
         <View style={s.header}>
           <Text style={s.title}>
-            Расходная накладная № {invoiceNumber || "—"} от{" "}
+            {documentTitle} № {invoiceNumber || "—"} от{" "}
             {fmtDate(invoiceDate)}
           </Text>
         </View>
 
         {/* Автор */}
-        {/* {seller?.name && (
-          <Text style={{ fontSize: 9, textAlign: "right", marginBottom: 12 }}>
+        {seller?.name && (
+          <Text style={{ fontSize: 7, textAlign: "right", marginBottom: 4 }}>
             Автор: {safe(seller.name)}
           </Text>
-        )} */}
+        )}
 
-        {/* Поставщик и Покупатель */}
-        <View
-          style={{
-            flexDirection: "column",
-            gap: 4,
-            marginTop: 6,
-            marginBottom: 6,
-          }}
-        >
-          <View style={{ flexDirection: "row", fontSize: 8 }}>
-            <Text style={{ fontSize: 8, fontWeight: "bold" }}>
-              Поставщик:{" "}
+        {/* Организация (для INVENTORY) */}
+        {isInventory && seller?.name && (
+          <View style={{ marginTop: 4, marginBottom: 4 }}>
+            <Text style={{ fontSize: 8 }}>
+              Организация: {safe(seller.name)}
+              {seller.address && ` ${safe(seller.address)}`}
             </Text>
-            <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
-            {seller.address && (
-              <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
+          </View>
+        )}
+
+        {/* Поставщик и Покупатель (для документов с контрагентами) */}
+        {!isInventory && (
+          <View
+            style={{
+              flexDirection: "column",
+              gap: 4,
+              marginTop: 6,
+              marginBottom: 6,
+            }}
+          >
+            {/* Для PURCHASE и PURCHASE_RETURN: Поставщик и Покупатель */}
+            {["PURCHASE", "PURCHASE_RETURN"].includes(docType) && (
+              <>
+                <View style={{ flexDirection: "row", fontSize: 8 }}>
+                  <Text style={{ fontSize: 8, fontWeight: "bold" }}>
+                    Поставщик:{" "}
+                  </Text>
+                  {buyer ? (
+                    <Text style={{ fontSize: 8 }}>
+                      {safe(buyer.name || buyer.full_name)}
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 8 }}>—</Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: "row", fontSize: 8 }}>
+                  <Text style={{ fontSize: 8, fontWeight: "bold" }}>
+                    Покупатель:{" "}
+                  </Text>
+                  <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
+                  {seller.address && (
+                    <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
+                  )}
+                </View>
+              </>
+            )}
+            {/* Для SALE и SALE_RETURN: Поставщик и Покупатель */}
+            {["SALE", "SALE_RETURN"].includes(docType) && (
+              <>
+                <View style={{ flexDirection: "row", fontSize: 8 }}>
+                  <Text style={{ fontSize: 8, fontWeight: "bold" }}>
+                    Поставщик:{" "}
+                  </Text>
+                  <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
+                  {seller.address && (
+                    <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: "row", fontSize: 8 }}>
+                  <Text style={{ fontSize: 8, fontWeight: "bold" }}>
+                    Покупатель:{" "}
+                  </Text>
+                  {buyer ? (
+                    <Text style={{ fontSize: 8 }}>
+                      {safe(buyer.name || buyer.full_name)}
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 8 }}>—</Text>
+                  )}
+                </View>
+              </>
+            )}
+            {/* Для RECEIPT и WRITE_OFF: только Организация и Склад */}
+            {["RECEIPT", "WRITE_OFF"].includes(docType) && seller?.name && (
+              <View style={{ flexDirection: "row", fontSize: 8 }}>
+                <Text style={{ fontSize: 8, fontWeight: "bold" }}>
+                  Организация:{" "}
+                </Text>
+                <Text style={{ fontSize: 8 }}>{safe(seller.name)}</Text>
+                {seller.address && (
+                  <Text style={{ fontSize: 8 }}> {safe(seller.address)}</Text>
+                )}
+              </View>
             )}
           </View>
+        )}
 
-          <View style={{ flexDirection: "row", fontSize: 8 }}>
-            <Text style={{ fontSize: 8, fontWeight: "bold" }}>
-              Покупатель:{" "}
-            </Text>
-            {buyer ? (
-              <Text style={{ fontSize: 8 }}>
-                {safe(buyer.name || buyer.full_name)}
-              </Text>
-            ) : (
-              <Text style={{ fontSize: 8 }}>—</Text>
-            )}
-          </View>
-        </View>
-
-        {/* Склад */}
-        {data?.warehouse && (
+        {/* Склад (для всех кроме TRANSFER) */}
+        {!isTransfer && data?.warehouse && (
           <View style={s.warehouse}>
             <Text>Склад: «{safe(data.warehouse)}»</Text>
+          </View>
+        )}
+
+        {/* Склады для TRANSFER */}
+        {isTransfer && (
+          <View style={{ marginTop: 4, marginBottom: 6, gap: 4 }}>
+            {data?.warehouse && (
+              <Text style={{ fontSize: 8 }}>
+                Со склада: «{safe(data.warehouse)}»
+              </Text>
+            )}
+            {data?.warehouse_to && (
+              <Text style={{ fontSize: 8 }}>
+                На склад: «{safe(data.warehouse_to)}»
+              </Text>
+            )}
           </View>
         )}
 
@@ -553,21 +656,47 @@ export default function InvoicePdfDocument({ data }) {
             <View style={[s.tableCell, s.colUnit]}>
               <Text>Ед. изм.</Text>
             </View>
-            <View style={[s.tableCell, s.colQty]}>
-              <Text style={{ textAlign: "right" }}>Кол-во</Text>
-            </View>
-            <View style={[s.tableCell, s.colPriceNoDiscount]}>
-              <Text style={{ textAlign: "right" }}>Цена без скидки</Text>
-            </View>
-            <View style={[s.tableCell, s.colDiscount]}>
-              <Text style={{ textAlign: "right" }}>Скидка</Text>
-            </View>
-            <View style={[s.tableCell, s.colPrice]}>
-              <Text style={{ textAlign: "right" }}>Цена</Text>
-            </View>
-            <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
-              <Text style={{ textAlign: "right" }}>Сумма</Text>
-            </View>
+            {isInventory ? (
+              <View style={[s.tableCell, { width: "55%", textAlign: "right" }, s.tableCellLast]}>
+                <Text style={{ textAlign: "right" }}>Остаток факт.</Text>
+              </View>
+            ) : (
+              <>
+                <View style={[s.tableCell, s.colQty]}>
+                  <Text style={{ textAlign: "right" }}>Кол-во</Text>
+                </View>
+                {showPriceColumns && (
+                  <>
+                    {showDiscountColumns && (
+                      <>
+                        <View style={[s.tableCell, s.colPriceNoDiscount]}>
+                          <Text style={{ textAlign: "right" }}>Цена без скидки</Text>
+                        </View>
+                        <View style={[s.tableCell, s.colDiscount]}>
+                          <Text style={{ textAlign: "right" }}>Скидка</Text>
+                        </View>
+                        <View style={[s.tableCell, s.colPrice]}>
+                          <Text style={{ textAlign: "right" }}>Цена</Text>
+                        </View>
+                      </>
+                    )}
+                    {!showDiscountColumns && (
+                      <View style={[s.tableCell, s.colPrice]}>
+                        <Text style={{ textAlign: "right" }}>Цена</Text>
+                      </View>
+                    )}
+                    <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
+                      <Text style={{ textAlign: "right" }}>Сумма</Text>
+                    </View>
+                  </>
+                )}
+                {!showPriceColumns && (
+                  <View style={[s.tableCell, { width: "47%", textAlign: "right" }, s.tableCellLast]}>
+                    <Text></Text>
+                  </View>
+                )}
+              </>
+            )}
           </View>
 
           {/* Строки товаров */}
@@ -585,85 +714,141 @@ export default function InvoicePdfDocument({ data }) {
               <View style={[s.tableCell, s.colUnit]}>
                 <Text style={{ textAlign: "right" }}>{it.unit || "ШТ"}</Text>
               </View>
-              <View style={[s.tableCell, s.colQty]}>
-                <Text style={{ textAlign: "right" }}>{fmtQty(it.qty)}</Text>
-              </View>
-              <View style={[s.tableCell, s.colPriceNoDiscount]}>
-                <Text style={{ textAlign: "right" }}>
-                  {n2(it.price_no_discount)}
-                </Text>
-              </View>
-              <View style={[s.tableCell, s.colDiscount]}>
-                <Text style={{ textAlign: "right" }}>
-                  {it.discount > 0 ? `${n2(it.discount)}%` : "—"}
-                </Text>
-              </View>
-              <View style={[s.tableCell, s.colPrice]}>
-                <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
-              </View>
-              <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
-                <Text style={{ textAlign: "right" }}>{n2(it.total)}</Text>
-              </View>
+              {isInventory ? (
+                <View style={[s.tableCell, { width: "55%", textAlign: "right" }, s.tableCellLast]}>
+                  <Text style={{ textAlign: "right" }}>—</Text>
+                </View>
+              ) : (
+                <>
+                  <View style={[s.tableCell, s.colQty]}>
+                    <Text style={{ textAlign: "right" }}>{fmtQty(it.qty)}</Text>
+                  </View>
+                  {showPriceColumns && (
+                    <>
+                      {showDiscountColumns && (
+                        <>
+                          <View style={[s.tableCell, s.colPriceNoDiscount]}>
+                            <Text style={{ textAlign: "right" }}>
+                              {n2(it.price_no_discount)}
+                            </Text>
+                          </View>
+                          <View style={[s.tableCell, s.colDiscount]}>
+                            <Text style={{ textAlign: "right" }}>
+                              {it.discount > 0 ? `${n2(it.discount)}%` : "—"}
+                            </Text>
+                          </View>
+                          <View style={[s.tableCell, s.colPrice]}>
+                            <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
+                          </View>
+                        </>
+                      )}
+                      {!showDiscountColumns && (
+                        <View style={[s.tableCell, s.colPrice]}>
+                          <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
+                        </View>
+                      )}
+                      <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
+                        <Text style={{ textAlign: "right" }}>{n2(it.total)}</Text>
+                      </View>
+                    </>
+                  )}
+                  {!showPriceColumns && (
+                    <View style={[s.tableCell, { width: "47%", textAlign: "right" }, s.tableCellLast]}>
+                      <Text></Text>
+                    </View>
+                  )}
+                </>
+              )}
             </View>
           ))}
 
-          {/* Строка "Итого:" */}
-          <View style={[s.tableRow, s.tableRowLast, s.tableHeader]}>
-            <View style={[s.tableCell, s.colNo]}>
-              <Text></Text>
+          {/* Строка "Итого:" (только для документов с ценой и суммой) */}
+          {showPriceColumns && (
+            <View style={[s.tableRow, s.tableRowLast, s.tableHeader]}>
+              <View style={[s.tableCell, s.colNo]}>
+                <Text></Text>
+              </View>
+              <View style={[s.tableCell, s.colName]}>
+                <Text style={{ fontWeight: "bold" }}>Итого:</Text>
+              </View>
+              <View style={[s.tableCell, { width: "8%" }]}>
+                <Text></Text>
+              </View>
+              <View style={[s.tableCell, s.colUnit]}>
+                <Text></Text>
+              </View>
+              <View style={[s.tableCell, s.colQty]}>
+                <Text style={{ textAlign: "right", fontWeight: "bold" }}>
+                  {fmtQty(items.reduce((sum, it) => sum + Number(it.qty || 0), 0))}
+                </Text>
+              </View>
+              {showDiscountColumns && (
+                <>
+                  <View style={[s.tableCell, s.colPriceNoDiscount]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[s.tableCell, s.colDiscount]}>
+                    <Text></Text>
+                  </View>
+                  <View style={[s.tableCell, s.colPrice]}>
+                    <Text></Text>
+                  </View>
+                </>
+              )}
+              {!showDiscountColumns && (
+                <View style={[s.tableCell, s.colPrice]}>
+                  <Text></Text>
+                </View>
+              )}
+              <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
+                <Text style={{ textAlign: "right", fontWeight: "bold" }}>
+                  {n2(total)}
+                </Text>
+              </View>
             </View>
-            <View style={[s.tableCell, s.colName]}>
-              <Text style={{ fontWeight: "bold" }}>Итого:</Text>
+          )}
+        </View>
+
+        {/* Итоги (только для документов с ценой и суммой) */}
+        {showPriceColumns && (
+          <>
+            <View style={s.totalsSection}>
+              <View style={[s.totalRow, s.totalBold]}>
+                <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
+                <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>
+              </View>
             </View>
-            <View style={[s.tableCell, { width: "8%" }]}>
-              <Text></Text>
-            </View>
-            <View style={[s.tableCell, s.colUnit]}>
-              <Text></Text>
-            </View>
-            <View style={[s.tableCell, s.colQty]}>
-              <Text style={{ textAlign: "right", fontWeight: "bold" }}>
-                {fmtQty(items.reduce((sum, it) => sum + Number(it.qty || 0), 0))}
+
+            {/* Текст с количеством наименований и суммой */}
+            <View style={{ marginTop: 4, fontSize: 7 }}>
+              <Text style={{ fontSize: 7 }}>
+                Всего наименований {items.length}, на сумму {n2(total)} KGS
               </Text>
             </View>
-            <View style={[s.tableCell, s.colPriceNoDiscount]}>
-              <Text></Text>
-            </View>
-            <View style={[s.tableCell, s.colDiscount]}>
-              <Text></Text>
-            </View>
-            <View style={[s.tableCell, s.colPrice]}>
-              <Text></Text>
-            </View>
-            <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
-              <Text style={{ textAlign: "right", fontWeight: "bold" }}>
-                {n2(total)}
+
+            {/* Сумма прописью */}
+            <View style={{ marginTop: 2, fontSize: 7 }}>
+              <Text style={{ fontSize: 7, textTransform: "capitalize" }}>
+                {numToWords(total)}
               </Text>
             </View>
+          </>
+        )}
+
+        {/* Для INVENTORY: Всего позиций и дата печати */}
+        {isInventory && (
+          <View style={{ marginTop: 4, fontSize: 7, gap: 2 }}>
+            <Text style={{ fontSize: 7 }}>
+              Всего позиций: {items.length}
+            </Text>
+            <Text style={{ fontSize: 7 }}>
+              Дата печати: {fmtDateTime(new Date().toISOString())}
+            </Text>
+            <Text style={{ fontSize: 7, marginTop: 4 }}>
+              Заполнил: _________
+            </Text>
           </View>
-        </View>
-
-        {/* Итоги */}
-        <View style={s.totalsSection}>
-          <View style={[s.totalRow, s.totalBold]}>
-            <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
-            <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>
-          </View>
-        </View>
-
-        {/* Текст с количеством наименований и суммой */}
-        <View style={{ marginTop: 4, fontSize: 7 }}>
-          <Text style={{ fontSize: 7 }}>
-            Всего наименований {items.length}, на сумму {n2(total)} KGS
-          </Text>
-        </View>
-
-        {/* Сумма прописью */}
-        <View style={{ marginTop: 2, fontSize: 7 }}>
-          <Text style={{ fontSize: 7, textTransform: "capitalize" }}>
-            {numToWords(total)}
-          </Text>
-        </View>
+        )}
 
         {/* Подписи */}
         <View style={s.signatures}>

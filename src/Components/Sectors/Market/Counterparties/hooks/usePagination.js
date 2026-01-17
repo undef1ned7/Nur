@@ -37,15 +37,14 @@ export const usePagination = (count, next, previous) => {
 
   // Синхронизация URL с состоянием страницы (оптимизировано)
   useEffect(() => {
-    // Обновляем URL только если страница действительно изменилась
     if (prevPageRef.current !== currentPage) {
       prevPageRef.current = currentPage;
       const params = new URLSearchParams(searchParams);
-    if (currentPage > 1) {
-      params.set("page", currentPage.toString());
+      if (currentPage > 1) {
+        params.set("page", currentPage.toString());
       } else {
         params.delete("page");
-    }
+      }
       setSearchParams(params, { replace: true });
     }
   }, [currentPage, searchParams, setSearchParams]);

@@ -930,47 +930,14 @@ const Masters = () => {
           { value: "Услуги", label: "Услуги", backendKey: "can_view_services" },
         ],
         Склад: [
-          {
-            value: "Клиенты",
-            label: "Клиенты",
-            backendKey: "can_view_clients",
-          },
+          { value: "Контрагенты", label: "Контрагенты", backendKey: "can_view_clients" },
           {
             value: "Аналитика",
             label: "Аналитика",
             backendKey: "can_view_analytics",
           },
           { value: "Товары", label: "Товары", backendKey: "can_view_products" },
-          {
-            value: "Справочники",
-            label: "Справочники",
-            backendKey: "can_view_brand_category",
-          },
-          {
-            value: "Остатки",
-            label: "Остатки",
-            backendKey: "can_view_products",
-          },
-          {
-            value: "Операции (Перемещения)",
-            label: "Операции (Перемещения)",
-            backendKey: "can_view_products",
-          },
-          {
-            value: "Поставки",
-            label: "Поставки",
-            backendKey: "can_view_products",
-          },
-          {
-            value: "Списание",
-            label: "Списание",
-            backendKey: "can_view_products",
-          },
-          {
-            value: "Документы",
-            label: "Документы",
-            backendKey: "can_view_document",
-          },
+          { value: "Документы", label: "Документы", backendKey: "can_view_document" },
         ],
         Производство: [
           {
