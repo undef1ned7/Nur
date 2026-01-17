@@ -90,6 +90,7 @@ import MarketClientDetails from "../Components/Sectors/Market/ClientDetails/Clie
 import MarketHistory from "../Components/Sectors/Market/History/History";
 import MarketDocuments from "../Components/Sectors/Market/Documents/Documents";
 import CreateSaleDocument from "../Components/Sectors/Market/Documents/CreateSaleDocument";
+import Counterparties from "../Components/Sectors/Market/Counterparties/Counterparties";
 import MarketAnalytics from "../Components/Sectors/Market/Analytics/Analytics";
 
 // Cafe
@@ -347,6 +348,8 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/write_offs", WarehouseWriteOffs),
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
   createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
+  createProtectedRoute("warehouse/counterparties", Counterparties),
+
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),

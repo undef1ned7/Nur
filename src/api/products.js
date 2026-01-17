@@ -3,7 +3,8 @@ import api from "./index";
 
 export const fetchProductsApi = async (params = {}) => {
   try {
-    const { warehouse, ...restParams } = params;
+    // Убираем служебные параметры из запроса
+    const { warehouse, _cacheKey, ...restParams } = params;
     let url = "main/products/list/";
 
     if (warehouse) {
