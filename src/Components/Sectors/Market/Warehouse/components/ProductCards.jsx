@@ -66,7 +66,6 @@ const ProductCard = React.memo(
             </div>
           </div>
         </div>
-
         <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-xl bg-slate-50 p-2">
             <div className="text-slate-500">Цена продажи</div>
