@@ -23,6 +23,7 @@ import {
 } from "./hooks/useWarehouseData";
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
+import ReactPortal from "../../../common/Portal/ReactPortal";
 
 const Warehouse = () => {
   const dispatch = useDispatch();
@@ -265,14 +266,16 @@ const Warehouse = () => {
       </div>
 
       {showFilterModal && (
-        <FilterModal
-          onClose={() => setShowFilterModal(false)}
-          currentFilters={filters}
-          onApplyFilters={handleApplyFilters}
-          onResetFilters={handleResetFilters}
-          brands={brands}
-          categories={categories}
-        />
+        <ReactPortal modalId="warehouse-filter-modal">
+          <FilterModal
+            onClose={() => setShowFilterModal(false)}
+            currentFilters={filters}
+            onApplyFilters={handleApplyFilters}
+            onResetFilters={handleResetFilters}
+            brands={brands}
+            categories={categories}
+          />
+        </ReactPortal>
       )}
 
       <AlertModal

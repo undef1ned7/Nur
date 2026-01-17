@@ -283,15 +283,17 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid var(--border);
-  background: white;
-  color: var(--text);
+  transition: all 0.2s linear;
+  border-style: solid;
+  border-width: 1px;
+  @apply border bg-white border-color-var(--border);
 
   &:hover {
     background: #f9fafb;
     color: #000;
     border-color: var(--primary);
+    transition: all 0.2s linear;
+    @apply border-color-var(--primary);
   }
 }
 

@@ -13,18 +13,12 @@ import Logo from "../Photo/logo2.png";
 import { useLocation } from "react-router-dom";
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
-  const dispatch = useDispatch();
   const { company, profile, tariff, sector } = useUser();
   const [openDropdown, setOpenDropdown] = useState(null);
 
   const location = useLocation();
   const menuRef = useRef(null); // 👈 ref теперь на меню
 
-  // useEffect(() => {
-  //   if (!profile) {
-  //     dispatch(getProfile());
-  //   }
-  // }, [dispatch, profile]);
 
   const currentTariff = tariff || company?.subscription_plan?.name || "Старт";
   const currentSector = sector || company?.sector?.name;

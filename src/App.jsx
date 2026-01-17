@@ -1,14 +1,13 @@
 import { useState, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./App.scss";
-import AuthGuard from "./Components/Auth/AuthGuard/AuthGuard";
-import Layout from "./Components/Layout/Layout";
-import { ScrollToTop } from "./hooks/ScrollToTop";
-import { publicRoutes, crmRoutes } from "./config/routes";
-import { ThemeModeProvider } from "./theme/ThemeModeProvider";
+import AuthGuard from "./Components/Auth/AuthGuard/AuthGuard.jsx";
+import Layout from "./Components/Layout/Layout.jsx";
+import { ScrollToTop } from "./hooks/ScrollToTop.jsx";
+import { publicRoutes, crmRoutes } from "./config/routes.jsx";
+import { ThemeModeProvider } from "./theme/ThemeModeProvider.jsx";
 import { Box } from "@mui/system";
-import "../src/i18n.js"
-import "../src/i18n"
+import "./i18n.js"
 
 function App() {
   const [profile, setProfile] = useState(null);
