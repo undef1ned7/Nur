@@ -39,6 +39,7 @@ export const useWarehouseReferences = () => {
     }
   }, [dispatch, brands.length, categories.length]);
 
+
   return { brands, categories };
 };
 

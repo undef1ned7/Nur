@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./Warehouse.scss";
@@ -28,6 +28,10 @@ const Warehouse = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  // Реф для отслеживания предыдущих продуктов
+  const prevProductsRef = useRef([]);
+  // Реф для первого рендера
+  const isInitialMountRef = useRef(true);
   // Состояние фильтров и модальных окон
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({});
@@ -40,6 +44,7 @@ const Warehouse = () => {
     const isSmall = window.matchMedia("(max-width: 1199px)").matches;
     return isSmall ? VIEW_MODES.CARDS : VIEW_MODES.TABLE;
   });
+
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
@@ -69,6 +74,35 @@ const Warehouse = () => {
   // Загрузка товаров
   const { products, loading, count, next, previous } =
     useWarehouseData(requestParams);
+
+
+
+  useEffect(() => {
+    if (loading) return;
+    // Пропускаем первый рендер
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
+    // Проверяем, что продукты изменились (новый запрос)
+    const prevProducts = prevProductsRef.current;
+    const currentProducts = products || [];
+
+    // Сравниваем первые товары - если они разные, значит новый запрос
+    const isNewData =
+      prevProducts.length > 0 &&
+      currentProducts.length > 0 &&
+      prevProducts[0]?.id !== currentProducts[0]?.id;
+
+    if (isNewData) {
+      document.getElementById('root').scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      })
+    }
+    prevProductsRef.current = currentProducts;
+  }, [products]);
 
   // Хук для пагинации с реальными данными
   const {
@@ -144,7 +178,7 @@ const Warehouse = () => {
       console.error("Ошибка при удалении товаров:", e);
       alert(
         "Не удалось удалить товары: " +
-          (e?.message || e?.detail || "Неизвестная ошибка")
+        (e?.message || e?.detail || "Неизвестная ошибка")
       );
     } finally {
       setBulkDeleting(false);

@@ -20,11 +20,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
   const menuRef = useRef(null); // 👈 ref теперь на меню
 
-  useEffect(() => {
-    if (!profile) {
-      dispatch(getProfile());
-    }
-  }, [dispatch, profile]);
+  // useEffect(() => {
+  //   if (!profile) {
+  //     dispatch(getProfile());
+  //   }
+  // }, [dispatch, profile]);
 
   const currentTariff = tariff || company?.subscription_plan?.name || "Старт";
   const currentSector = sector || company?.sector?.name;

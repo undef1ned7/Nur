@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import api from "../../../api";
 import { getCompany } from "../../../store/creators/userCreators";
-import { useUser } from "../../../store/slices/userSlice";
+import { getProfile, useUser } from "../../../store/slices/userSlice";
 import {
   isAllowedPathWithoutToken,
   shouldRedirectToCrm,
@@ -24,6 +24,17 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
   const [isCheckingToken, setIsCheckingToken] = useState(true);
   const dispatch = useDispatch();
   const { accessToken } = useUser();
+  const { profile, loading } = useUser();
+
+  const getProfileFunc = useCallback(async () => {
+    dispatch(getProfile())
+  }, [])
+  useEffect(() => {
+    if (loading) return;
+    if (onProfileLoaded) {
+      onProfileLoaded(profile);
+    }
+  }, [dispatch, loading])
 
   useEffect(() => {
     const checkTokenValidity = async () => {
@@ -42,13 +53,8 @@ const AuthGuard = ({ children, onProfileLoaded }) => {
 
       // Проверяем валидность токена через API
       try {
-        const response = await api.get("/users/profile/");
-        const data = response.data;
-
-        // Вызываем callback если передан (используем ref для стабильной ссылки)
-        if (onProfileLoaded) {
-          onProfileLoaded(data);
-        }
+        // const response = await api.get("/users/profile/");
+        await getProfileFunc();
 
         // Если токен валиден и мы на публичной странице - редирект на /crm
         if (shouldRedirectToCrm(currentPath)) {

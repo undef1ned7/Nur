@@ -9,7 +9,6 @@ import SubmitApplication from "../Components/pages/SubmitApplication/SubmitAppli
 import ApplicationList from "../Components/pages/SubmitApplication/ApplicationList";
 
 // Layout
-import Layout from "../Components/Layout/Layout";
 
 // Common pages
 import Set from "../Components/pages/Info/Settings/Settings";
