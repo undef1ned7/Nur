@@ -26,6 +26,7 @@ import cafeOrdersReducer from "./slices/cafeOrdersSlice";
 import branchReducer from "./slices/branchSlice";
 import shiftReducer from "./slices/shiftSlice";
 import warehouseReducer from "./slices/warehouseSlice";
+import counterpartyReducer from "./slices/counterpartySlice";
 import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
@@ -57,6 +58,7 @@ const store = configureStore({
     branches: branchReducer,
     shifts: shiftReducer,
     warehouse: warehouseReducer,
+    counterparty: counterpartyReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

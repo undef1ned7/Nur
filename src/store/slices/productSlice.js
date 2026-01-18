@@ -71,6 +71,9 @@ const initialState = {
 
   // Weight products count
   weightProductsCount: 0,
+
+  // Кэш для товаров (ключ - сериализованные параметры запроса)
+  productsCache: {},
 };
 
 const productSlice = createSlice({
@@ -89,14 +92,37 @@ const productSlice = createSlice({
       state.scannedProduct = null;
       state.scanProductError = null;
     },
+    loadProductsFromCache: (state, action) => {
+      const { cacheKey, cachedData } = action.payload;
+      if (cachedData) {
+        // Загружаем данные из кэша синхронно
+        state.list = cachedData.list || [];
+        state.count = cachedData.count || 0;
+        state.next = cachedData.next || null;
+        state.previous = cachedData.previous || null;
+        state.weightProductsCount = cachedData.weightProductsCount || 0;
+        // Не сбрасываем loading, чтобы не мешать фоновому обновлению
+        // loading будет сброшен когда придут новые данные
+      }
+    },
+    clearProductsCache: (state) => {
+      state.productsCache = {};
+    },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchProductsAsync.pending, (state) => {
+      .addCase(fetchProductsAsync.pending, (state, action) => {
+        // Не устанавливаем loading, если есть валидный кэш (stale-while-revalidate)
+        // Это позволяет показывать кэшированные данные без белого экрана при быстрой смене страниц
+        const skipLoading = action.meta?.arg?._skipLoadingIfCached;
+        if (!skipLoading || state.list.length === 0) {
         state.loading = true;
+        }
         state.error = null;
-        // Сбрасываем счетчик при начале новой загрузки
+        // Сбрасываем счетчик при начале новой загрузки только если нет данных
+        if (state.list.length === 0) {
         state.weightProductsCount = 0;
+        }
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
         state.loading = false;
@@ -116,6 +142,19 @@ const productSlice = createSlice({
           }
         }
         state.weightProductsCount = weightCount;
+
+        // Сохраняем в кэш (если передан _cacheKey в params)
+        const cacheKey = action.meta?.arg?._cacheKey;
+        if (cacheKey) {
+          state.productsCache[cacheKey] = {
+            list: [...state.list], // Копируем массив
+            count: state.count,
+            next: state.next,
+            previous: state.previous,
+            weightProductsCount: state.weightProductsCount,
+            timestamp: Date.now(),
+          };
+        }
       })
       .addCase(fetchProductsAsync.rejected, (state, action) => {
         state.loading = false;
@@ -395,5 +434,10 @@ const productSlice = createSlice({
 });
 
 export const useProducts = () => useSelector((state) => state.product);
-export const { clearProducts, clearScannedProduct } = productSlice.actions;
+export const {
+  clearProducts,
+  clearScannedProduct,
+  loadProductsFromCache,
+  clearProductsCache,
+} = productSlice.actions;
 export default productSlice.reducer;

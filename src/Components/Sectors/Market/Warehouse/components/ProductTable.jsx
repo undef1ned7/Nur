@@ -81,7 +81,9 @@ const ProductTable = ({
   onProductClick,
   getRowNumber,
 }) => {
-  // Мемоизация вычислений для всех товаров (критическая оптимизация)
+  // Мемоизация вычислений для всех товаров
+  // Используем selectedRows.size вместо selectedRows для более стабильного сравнения
+  const selectedRowsSize = selectedRows.size;
   const productsData = useMemo(() => {
     return products.map((product, index) => ({
       product,
@@ -89,9 +91,11 @@ const ProductTable = ({
       isSelected: selectedRows.has(product.id),
       rowNumber: getRowNumber(index, products.length),
     }));
-  }, [products, selectedRows, getRowNumber]);
+  }, [products, selectedRows, selectedRowsSize, getRowNumber]);
 
-  if (loading) {
+  // Показываем старые данные во время загрузки (оптимистичное обновление)
+  // Только если данных нет вообще - показываем загрузку
+  if (loading && products.length === 0) {
     return (
       <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="warehouse-table w-full min-w-[1100px]">
@@ -107,7 +111,7 @@ const ProductTable = ({
     );
   }
 
-  if (products.length === 0) {
+  if (products.length === 0 && !loading) {
     return (
       <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="warehouse-table w-full min-w-[1100px]">
@@ -124,7 +128,12 @@ const ProductTable = ({
   }
 
   return (
-    <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm relative">
+      {loading && products.length > 0 && (
+        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
+          <div className="text-sm text-slate-600">Загрузка...</div>
+        </div>
+      )}
       <table className="warehouse-table w-full min-w-[1100px]">
         <thead>
           <tr>
@@ -133,6 +142,7 @@ const ProductTable = ({
                 type="checkbox"
                 checked={isAllSelected}
                 onChange={onSelectAll}
+                disabled={loading}
               />
             </th>
             <th>№</th>
@@ -165,17 +175,37 @@ const ProductTable = ({
 
 // Оптимизированное сравнение для React.memo
 const areEqual = (prevProps, nextProps) => {
-  return (
-    prevProps.loading === nextProps.loading &&
-    prevProps.isAllSelected === nextProps.isAllSelected &&
-    prevProps.products.length === nextProps.products.length &&
-    prevProps.selectedRows.size === nextProps.selectedRows.size &&
-    prevProps.products.every(
-      (p, i) => p.id === nextProps.products[i]?.id
-    ) &&
-    // Проверяем, что функции не изменились (они должны быть мемоизированы через useCallback)
-    prevProps.getRowNumber === nextProps.getRowNumber
-  );
+  // Быстрые проверки сначала
+  if (
+    prevProps.loading !== nextProps.loading ||
+    prevProps.isAllSelected !== nextProps.isAllSelected ||
+    prevProps.selectedRows.size !== nextProps.selectedRows.size ||
+    prevProps.getRowNumber !== nextProps.getRowNumber
+  ) {
+    return false;
+  }
+
+  // Проверка длины массива (O(1))
+  if (prevProps.products.length !== nextProps.products.length) {
+    return false;
+  }
+
+  // Если массивы одинаковые по ссылке - пропускаем проверку
+  if (prevProps.products === nextProps.products) {
+    return true;
+  }
+
+  // При смене страницы данные всегда должны обновляться
+  // Проверяем только первые элементы - если они разные, значит это новая страница
+  if (prevProps.products.length > 0 && nextProps.products.length > 0) {
+    if (prevProps.products[0]?.id !== nextProps.products[0]?.id) {
+      return false; // Разные данные - нужно обновить
+    }
+  }
+
+  // Если первые элементы совпадают и длина совпадает, считаем что данные не изменились
+  // Это оптимизация для случая, когда меняется только selectedRows или другие пропсы
+  return true;
 };
 
 export default React.memo(ProductTable, areEqual);

@@ -501,6 +501,13 @@ export const MENU_CONFIG = {
         permission: "can_view_brand_category",
         implemented: true,
       },
+      {
+        label: "Контрагенты",
+        to: "/crm/warehouse/counterparties",
+        icon: menuIcons.filePerson,
+        permission: "can_view_clients",
+        implemented: true,
+      },
       // {
       //   label: "Справочники",
       //   to: "/crm/warehouse/directories",
