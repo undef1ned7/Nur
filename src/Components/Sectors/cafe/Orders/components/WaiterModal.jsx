@@ -47,19 +47,19 @@ const WaiterModal = ({
     }, []);
     return (
         <div
-            className="orders-modal__overlay"
+            className="cafeOrdersModal__overlay"
             onClick={() => !saving && setModalOpen(false)}
         >
             <div
-                className="orders-modal__card"
+                className="cafeOrdersModal__card"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="orders-modal__header">
-                    <h3 className="orders-modal__title">
+                <div className="cafeOrdersModal__header">
+                    <h3 className="cafeOrdersModal__title">
                         {isEditing ? "Редактировать заказ" : "Новый заказ"}
                     </h3>
                     <button
-                        className="orders-modal__close"
+                        className="cafeOrdersModal__close"
                         onClick={() => !saving && setModalOpen(false)}
                         disabled={saving}
                         title={saving ? "Сохранение…" : "Закрыть"}
@@ -69,13 +69,13 @@ const WaiterModal = ({
                     </button>
                 </div>
 
-                <form className="orders__form" onSubmit={saveForm}>
-                    <div className="orders__formGrid">
+                <form className="cafeOrders__form" onSubmit={saveForm}>
+                    <div className="cafeOrders__formGrid">
                         {/* Стол */}
-                        <div className="orders__field">
-                            <label className="orders__label">Стол</label>
+                        <div className="cafeOrders__field">
+                            <label className="cafeOrders__label">Стол</label>
                             <select
-                                className="orders__input"
+                                className="cafeOrders__input"
                                 value={form.table ?? ""}
                                 onChange={(e) =>
                                     setForm((f) => ({ ...f, table: e.target.value }))
@@ -98,19 +98,19 @@ const WaiterModal = ({
                                     ))}
                             </select>
                             {busyTableIds.size > 0 && (
-                                <div className="orders__hint">
+                                <div className="cafeOrders__hint">
                                     Занятые столы скрыты до оплаты.
                                 </div>
                             )}
                         </div>
 
                         {/* Гостей */}
-                        <div className="orders__field">
-                            <label className="orders__label">Гостей</label>
+                        <div className="cafeOrders__field">
+                            <label className="cafeOrders__label">Гостей</label>
                             <input
                                 type="number"
                                 min={0}
-                                className="orders__input"
+                                className="cafeOrders__input"
                                 value={form.guests}
                                 onChange={(e) =>
                                     setForm((f) => ({
@@ -123,13 +123,13 @@ const WaiterModal = ({
                         </div>
 
                         {/* Официант */}
-                        <div className="orders__field">
-                            <label className="orders__label">Официант</label>
+                        <div className="cafeOrders__field">
+                            <label className="cafeOrders__label">Официант</label>
                             {JSON.parse(localStorage.getItem('userData')).first_name}
                         </div>
 
-                        <div className="orders__field orders__field--full">
-                            <div className="orders__subtitle">
+                        <div className="cafeOrders__field cafeOrders__field--full">
+                            <div className="cafeOrders__subtitle">
                                 {isEditing ? (
                                     "Можно менять стол, состав заказа и кол-во гостей."
                                 ) : (
@@ -142,12 +142,12 @@ const WaiterModal = ({
                     </div>
 
                     {/* Клиент */}
-                    <div className="orders__itemsBlock">
-                        <h4 className="orders__subtitle">Клиент</h4>
+                    <div className="cafeOrders__itemsBlock">
+                        <h4 className="cafeOrders__subtitle">Клиент</h4>
 
-                        <div className="orders__clientRow">
+                        <div className="cafeOrders__clientRow">
                             <input
-                                className="orders__input orders__input--grow"
+                                className="cafeOrders__input cafeOrders__input--grow"
                                 placeholder="Найти клиента по имени или телефону…"
                                 value={clientQ}
                                 onChange={(e) => setClientQ(e.target.value)}
@@ -155,7 +155,7 @@ const WaiterModal = ({
                             />
                             <button
                                 type="button"
-                                className="orders__btn orders__btn--secondary"
+                                className="cafeOrders__btn cafeOrders__btn--secondary"
                                 onClick={() => setShowAddClient((v) => !v)}
                                 disabled={saving}
                             >
@@ -164,9 +164,9 @@ const WaiterModal = ({
                         </div>
 
                         {showAddClient && (
-                            <div className="orders__clientAdd">
+                            <div className="cafeOrders__clientAdd">
                                 <input
-                                    className="orders__input"
+                                    className="cafeOrders__input"
                                     placeholder="Имя *"
                                     value={newClientName}
                                     onChange={(e) => setNewClientName(e.target.value)}
@@ -180,7 +180,7 @@ const WaiterModal = ({
                                     disabled={addClientSaving || saving}
                                 />
                                 <input
-                                    className="orders__input"
+                                    className="cafeOrders__input"
                                     placeholder="Телефон"
                                     value={newClientPhone}
                                     onChange={(e) => setNewClientPhone(e.target.value)}
@@ -194,7 +194,7 @@ const WaiterModal = ({
                                 />
                                 <button
                                     type="button"
-                                    className="orders__btn orders__btn--primary"
+                                    className="cafeOrders__btn cafeOrders__btn--primary"
                                     onClick={handleCreateClient}
                                     disabled={addClientSaving || saving}
                                     title={
@@ -206,35 +206,35 @@ const WaiterModal = ({
                             </div>
                         )}
 
-                        <div className="orders__clientList">
+                        <div className="cafeOrders__clientList">
                             {clientsErr && (
-                                <div className="orders__clientErr">{clientsErr}</div>
+                                <div className="cafeOrders__clientErr">{clientsErr}</div>
                             )}
                             {clientsLoading ? (
-                                <div className="orders__clientLoading">Загрузка…</div>
+                                <div className="cafeOrders__clientLoading">Загрузка…</div>
                             ) : filteredClients.length ? (
                                 filteredClients.map((c) => (
                                     <button
                                         key={c.id}
                                         type="button"
                                         onClick={() => setForm((f) => ({ ...f, client: c.id }))}
-                                        className={`orders__clientItem ${String(form.client) === String(c.id)
-                                            ? "orders__clientItem--active"
+                                        className={`cafeOrders__clientItem ${String(form.client) === String(c.id)
+                                            ? "cafeOrders__clientItem--active"
                                             : ""
                                             }`}
                                         title={c.full_name}
                                         disabled={saving}
                                     >
-                                        <span className="orders__clientName">
+                                        <span className="cafeOrders__clientName">
                                             {c.full_name || "—"}
                                         </span>
-                                        <span className="orders__clientPhone">
+                                        <span className="cafeOrders__clientPhone">
                                             {c.phone || ""}
                                         </span>
                                     </button>
                                 ))
                             ) : (
-                                <div className="orders__clientLoading">
+                                <div className="cafeOrders__clientLoading">
                                     Ничего не найдено
                                 </div>
                             )}
@@ -242,14 +242,14 @@ const WaiterModal = ({
                     </div>
 
                     {/* Позиции */}
-                    <div className="orders__itemsBlock">
-                        <h4 className="orders__subtitle">Позиции заказа</h4>
+                    <div className="cafeOrders__itemsBlock">
+                        <h4 className="cafeOrders__subtitle">Позиции заказа</h4>
 
-                        <div className="orders__formGrid">
-                            <div className="orders__field">
-                                <label className="orders__label">Позиция меню</label>
+                        <div className="cafeOrders__formGrid">
+                            <div className="cafeOrders__field">
+                                <label className="cafeOrders__label">Позиция меню</label>
                                 <select
-                                    className="orders__input"
+                                    className="cafeOrders__input"
                                     value={addingId}
                                     onChange={(e) => setAddingId(e.target.value)}
                                     disabled={saving}
@@ -264,9 +264,9 @@ const WaiterModal = ({
 
                                 {/* превью выбранной позиции */}
                                 {addingId && (
-                                    <div className="orders__selectPreview">
+                                    <div className="cafeOrders__selectPreview">
                                         <span
-                                            className="orders__thumb orders__thumb--sm"
+                                            className="cafeOrders__thumb cafeOrders__thumb--sm"
                                             aria-hidden
                                         >
                                             {menuImageUrl(addingId) ? (
@@ -275,7 +275,7 @@ const WaiterModal = ({
                                                 <FaClipboardList />
                                             )}
                                         </span>
-                                        <span className="orders__selectPreviewText">
+                                        <span className="cafeOrders__selectPreviewText">
                                             {menuMap.get(String(addingId))?.title ||
                                                 "Позиция меню"}
                                         </span>
@@ -283,12 +283,12 @@ const WaiterModal = ({
                                 )}
                             </div>
 
-                            <div className="orders__field">
-                                <label className="orders__label">Кол-во</label>
+                            <div className="cafeOrders__field">
+                                <label className="cafeOrders__label">Кол-во</label>
                                 <input
                                     type="number"
                                     min={1}
-                                    className="orders__input"
+                                    className="cafeOrders__input"
                                     value={addingQty}
                                     onChange={(e) =>
                                         setAddingQty(Math.max(1, Number(e.target.value) || 1))
@@ -297,11 +297,11 @@ const WaiterModal = ({
                                 />
                             </div>
 
-                            <div className="orders__field">
-                                <label className="orders__label">&nbsp;</label>
+                            <div className="cafeOrders__field">
+                                <label className="cafeOrders__label">&nbsp;</label>
                                 <button
                                     type="button"
-                                    className="orders__btn orders__btn--primary"
+                                    className="cafeOrders__btn cafeOrders__btn--primary"
                                     onClick={addItem}
                                     disabled={!addingId || saving}
                                 >
@@ -311,8 +311,8 @@ const WaiterModal = ({
                         </div>
 
                         {form.items.length ? (
-                            <div className="orders__tableWrap">
-                                <table className="orders__table">
+                            <div className="cafeOrders__tableWrap">
+                                <table className="cafeOrders__table">
                                     <thead>
                                         <tr>
                                             <th>Блюдо</th>
@@ -328,9 +328,9 @@ const WaiterModal = ({
                                             return (
                                                 <tr key={it.menu_item}>
                                                     <td>
-                                                        <div className="orders__dishCell">
+                                                        <div className="cafeOrders__dishCell">
                                                             <span
-                                                                className="orders__thumb orders__thumb--sm"
+                                                                className="cafeOrders__thumb cafeOrders__thumb--sm"
                                                                 aria-hidden
                                                             >
                                                                 {img ? (
@@ -343,11 +343,11 @@ const WaiterModal = ({
                                                         </div>
                                                     </td>
                                                     <td>{fmtMoney(it.price)} сом</td>
-                                                    <td className="orders__qtyCell">
+                                                    <td className="cafeOrders__qtyCell">
                                                         <input
                                                             type="number"
                                                             min={1}
-                                                            className="orders__input"
+                                                            className="cafeOrders__input"
                                                             value={it.quantity}
                                                             onChange={(e) =>
                                                                 changeItemQty(it.menu_item, e.target.value)
@@ -364,7 +364,7 @@ const WaiterModal = ({
                                                     <td>
                                                         <button
                                                             type="button"
-                                                            className="orders__btn orders__btn--danger"
+                                                            className="cafeOrders__btn cafeOrders__btn--danger"
                                                             onClick={() => removeItem(it.menu_item)}
                                                             title="Удалить позицию"
                                                             disabled={saving}
@@ -377,9 +377,9 @@ const WaiterModal = ({
                                         })}
                                         <tr>
                                             <td rowSpan={4}>
-                                                <div className="orders__field">
-                                                    <label className="orders__label">скидка</label>
-                                                    <input className="orders__input" type="number" />
+                                                <div className="cafeOrders__field">
+                                                    <label className="cafeOrders__label">скидка</label>
+                                                    <input className="cafeOrders__input" type="number" />
                                                 </div>
                                             </td>
                                         </tr>
@@ -416,32 +416,32 @@ const WaiterModal = ({
                                 </table>
                             </div>
                         ) : (
-                            <div className="orders__alert">Добавьте блюдо из меню.</div>
+                            <div className="cafeOrders__alert">Добавьте блюдо из меню.</div>
                         )}
                     </div>
 
 
                     {
                         isEditing
-                            ? <div className="orders__field orders__field--checkbox">
-                                <label className="orders__label">Подано</label>
-                                <input className="orders__input" type="checkbox" />
+                            ? <div className="cafeOrders__field cafeOrders__field--checkbox">
+                                <label className="cafeOrders__label">Подано</label>
+                                <input className="cafeOrders__input" type="checkbox" />
                             </div>
                             : ''
                     }
 
-                    <div className="orders__formActions">
+                    <div className="cafeOrders__formActions">
                         {
                             isEditing
-                                ? <div className="orders__formActions">
-                                    <button className="orders__btn orders__btn--primary" type="button">Пометить как оплачено</button>
+                                ? <div className="cafeOrders__formActions">
+                                    <button className="cafeOrders__btn cafeOrders__btn--primary" type="button">Пометить как оплачено</button>
                                 </div>
                                 : ''
                         }
 
                         <button
                             type="submit"
-                            className="orders__btn orders__btn--primary"
+                            className="cafeOrders__btn cafeOrders__btn--primary"
                             disabled={saving || !form.table || !form.items.length}
                         >
                             {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}

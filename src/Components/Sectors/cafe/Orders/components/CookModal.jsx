@@ -60,19 +60,19 @@ const CookModal = ({
     }, [waiters, form])
     return (
         <div
-            className="orders-modal__overlay"
+            className="cafeOrdersModal__overlay"
             onClick={() => !saving && setModalOpen(false)}
         >
             <div
-                className="orders-modal__card"
+                className="cafeOrdersModal__card"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="orders-modal__header">
-                    <h3 className="orders-modal__title">
+                <div className="cafeOrdersModal__header">
+                    <h3 className="cafeOrdersModal__title">
                         Просмотр заказа
                     </h3>
                     <button
-                        className="orders-modal__close"
+                        className="cafeOrdersModal__close"
                         onClick={() => !saving && setModalOpen(false)}
                         disabled={saving}
                         title={saving ? "Сохранение…" : "Закрыть"}
@@ -82,25 +82,25 @@ const CookModal = ({
                     </button>
                 </div>
 
-                <form className="orders__form" onSubmit={saveForm}>
-                    <div className="orders__formGrid">
+                <form className="cafeOrders__form" onSubmit={saveForm}>
+                    <div className="cafeOrders__formGrid">
                         {/* Стол */}
-                        <div className="orders__field">
-                            <label className="orders__label">Стол</label>
+                        <div className="cafeOrders__field">
+                            <label className="cafeOrders__label">Стол</label>
                             <span> {`Стол ${table.number}${table.places ? ` • ${table.places} мест` : ""
                                 }`}</span>
 
                         </div>
 
                         {/* Гостей */}
-                        <div className="orders__field">
-                            <label className="orders__label">Гостей</label>
+                        <div className="cafeOrders__field">
+                            <label className="cafeOrders__label">Гостей</label>
                             <span>{form.guests}</span>
                         </div>
 
                         {/* Официант */}
-                        <div className="orders__field">
-                            <label className="orders__label">Официант</label>
+                        <div className="cafeOrders__field">
+                            <label className="cafeOrders__label">Официант</label>
                             {waiterName}
                         </div>
                     </div>
@@ -108,13 +108,13 @@ const CookModal = ({
 
 
                     {/* Позиции */}
-                    <div className="orders__itemsBlock">
-                        <h4 className="orders__subtitle">Позиции заказа</h4>
+                    <div className="cafeOrders__itemsBlock">
+                        <h4 className="cafeOrders__subtitle">Позиции заказа</h4>
 
 
                         {form.items.length ? (
-                            <div className="orders__tableWrap">
-                                <table className="orders__table">
+                            <div className="cafeOrders__tableWrap">
+                                <table className="cafeOrders__table">
                                     <thead>
                                         <tr>
                                             <th>Блюдо</th>
@@ -128,9 +128,9 @@ const CookModal = ({
                                             return (
                                                 <tr key={it.menu_item}>
                                                     <td>
-                                                        <div className="orders__dishCell">
+                                                        <div className="cafeOrders__dishCell">
                                                             <span
-                                                                className="orders__thumb orders__thumb--sm"
+                                                                className="cafeOrders__thumb cafeOrders__thumb--sm"
                                                                 aria-hidden
                                                             >
                                                                 {img ? (
@@ -142,7 +142,7 @@ const CookModal = ({
                                                             <span>{it.title}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="orders__qtyCell">
+                                                    <td className="cafeOrders__qtyCell">
                                                         {it.quantity}
 
                                                     </td>
@@ -157,21 +157,21 @@ const CookModal = ({
                                 </table>
                             </div>
                         ) : (
-                            <div className="orders__alert">Добавьте блюдо из меню.</div>
+                            <div className="cafeOrders__alert">Добавьте блюдо из меню.</div>
                         )}
                     </div>
 
 
 
 
-                    <div className="orders__formActions">
+                    <div className="cafeOrders__formActions">
                         <button
-                            className="orders__btn orders__btn--primary"
+                            className="cafeOrders__btn cafeOrders__btn--primary"
                             type="button">Взять заказ</button>
 
                         <button
                             type="submit"
-                            className="orders__btn orders__btn--primary"
+                            className="cafeOrders__btn cafeOrders__btn--primary"
                             disabled={saving || !form.table || !form.items.length}
                         >
                             Закрыть

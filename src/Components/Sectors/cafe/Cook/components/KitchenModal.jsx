@@ -1,7 +1,7 @@
 // src/.../KitchenModal.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaTimes, FaPlus } from "react-icons/fa";
-import api from "../../../../api";
+import api from "../../../../../api";
 import PrinterPicker from "./PrinterPicker";
 
 const toNum = (x) => {
@@ -131,25 +131,25 @@ const KitchenModal = ({ open, onClose, onCreated }) => {
 
   return (
     <div
-      className="cookModal"
+      className="cafeCookModal"
       role="dialog"
       aria-modal="true"
       aria-label="Создать кухню"
       ref={overlayRef}
       onMouseDown={onOverlayMouseDown}
     >
-      <div className="cookModal__panel" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="cookModal__head">
-          <div className="cookModal__titleBlock">
-            <div className="cookModal__title">Создать кухню</div>
-            <div className="cookModal__subtitle">
+      <div className="cafeCookModal__panel" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="cafeCookModal__head">
+          <div className="cafeCookModal__titleBlock">
+            <div className="cafeCookModal__title">Создать кухню</div>
+            <div className="cafeCookModal__subtitle">
               Выберите чековый аппарат — он будет закреплён за этой кухней.
             </div>
           </div>
 
           <button
             type="button"
-            className="cookModal__close"
+            className="cafeCookModal__close"
             onClick={closeSafe}
             aria-label="Закрыть"
             title="Закрыть"
@@ -158,12 +158,12 @@ const KitchenModal = ({ open, onClose, onCreated }) => {
           </button>
         </div>
 
-        <form className="cookModal__body" onSubmit={onSubmit}>
-          <div className="cookModal__grid cookModal__grid--kitchen">
-            <label className="cookModal__field">
-              <span className="cookModal__label">Кухня</span>
+        <form className="cafeCookModal__body" onSubmit={onSubmit}>
+          <div className="cafeCookModal__grid cafeCookModal__grid--kitchen">
+            <label className="cafeCookModal__field">
+              <span className="cafeCookModal__label">Кухня</span>
               <input
-                className="cookModal__input"
+                className="cafeCookModal__input"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Например: Основная кухня"
@@ -173,7 +173,7 @@ const KitchenModal = ({ open, onClose, onCreated }) => {
               />
             </label>
 
-            <div className="cookModal__field cookModal__field--wide">
+            <div className="cafeCookModal__field cafeCookModal__field--wide">
               <PrinterPicker
                 value={printerKey}
                 onChange={setPrinterKey}
@@ -184,19 +184,19 @@ const KitchenModal = ({ open, onClose, onCreated }) => {
           </div>
 
           {err ? (
-            <div className="cookModal__alert cookModal__alert--error">{err}</div>
+            <div className="cafeCookModal__alert cafeCookModal__alert--error">{err}</div>
           ) : null}
 
           {success ? (
-            <div className="cookModal__alert cookModal__alert--ok">
+            <div className="cafeCookModal__alert cafeCookModal__alert--ok">
               Кухня успешно создана и принтер привязан.
             </div>
           ) : null}
 
-          <div className="cookModal__actions">
+          <div className="cafeCookModal__actions">
             <button
               type="button"
-              className="cookModal__btn cookModal__btn--ghost"
+              className="cafeCookModal__btn cafeCookModal__btn--ghost"
               onClick={closeSafe}
               disabled={saving}
             >
@@ -205,7 +205,7 @@ const KitchenModal = ({ open, onClose, onCreated }) => {
 
             <button
               type="submit"
-              className="cookModal__btn cookModal__btn--primary"
+              className="cafeCookModal__btn cafeCookModal__btn--primary"
               disabled={!canSave}
               title="Создать кухню"
             >

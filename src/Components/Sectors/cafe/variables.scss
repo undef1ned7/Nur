@@ -1,0 +1,20 @@
+/* ===== Единые CSS переменные для всех модулей cafe ===== */
+/* В :root — только цвета и общие токены */
+
+:root {
+  /* Основные цвета */
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+
+  /* Дополнительные цвета */
+  --danger: #ef4444;
+  --danger-weak: rgba(239, 68, 68, 0.06);
+  --success: #22c55e;
+  --success-weak: rgba(34, 197, 94, 0.12);
+  --warning: #f59e0b;
+  --warning-weak: rgba(245, 158, 11, 0.1);
+}

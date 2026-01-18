@@ -121,12 +121,12 @@ export const SearchSelect = ({
   const shownValue = open ? q : selected?.label || "";
 
   return (
-    <div ref={rootRef} className={`sselect ${open ? "sselect--open" : ""}`}>
-      {label ? <div className="sselect__label">{label}</div> : null}
+    <div ref={rootRef} className={`cafeOrdersSselect ${open ? "cafeOrdersSselect--open" : ""}`}>
+      {label ? <div className="cafeOrdersSselect__label">{label}</div> : null}
 
       <div
-        className={`sselect__control ${open ? "sselect__control--open" : ""} ${
-          disabled ? "sselect__control--disabled" : ""
+        className={`cafeOrdersSselect__control ${open ? "cafeOrdersSselect__control--open" : ""} ${
+          disabled ? "cafeOrdersSselect__control--disabled" : ""
         }`}
         onMouseDown={(e) => {
           if (disabled) return;
@@ -140,7 +140,7 @@ export const SearchSelect = ({
       >
         <input
           ref={inputRef}
-          className="sselect__input"
+          className="cafeOrdersSselect__input"
           value={shownValue}
           onChange={(e) => {
             if (!open) setOpenId(id);
@@ -155,7 +155,7 @@ export const SearchSelect = ({
         {allowClear && !disabled && value ? (
           <button
             type="button"
-            className="sselect__clear"
+            className="cafeOrdersSselect__clear"
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -168,17 +168,17 @@ export const SearchSelect = ({
           </button>
         ) : null}
 
-        <span className="sselect__icon" aria-hidden>
+        <span className="cafeOrdersSselect__icon" aria-hidden>
           <FaChevronDown />
         </span>
 
         {open && (
           <div
-            className={`sselect__dropdown ${dir === "up" ? "sselect__dropdown--up" : ""}`}
+            className={`cafeOrdersSselect__dropdown ${dir === "up" ? "cafeOrdersSselect__dropdown--up" : ""}`}
             role="listbox"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="sselect__list">
+            <div className="cafeOrdersSselect__list">
               {filtered.length ? (
                 filtered.map((opt) => {
                   const active = String(opt.value) === String(value);
@@ -186,7 +186,7 @@ export const SearchSelect = ({
                     <button
                       key={String(opt.value)}
                       type="button"
-                      className={`sselect__item ${active ? "sselect__item--active" : ""}`}
+                      className={`cafeOrdersSselect__item ${active ? "cafeOrdersSselect__item--active" : ""}`}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -194,19 +194,19 @@ export const SearchSelect = ({
                       }}
                       title={opt.label}
                     >
-                      <span className="sselect__itemLabel">{opt.label}</span>
+                      <span className="cafeOrdersSselect__itemLabel">{opt.label}</span>
                     </button>
                   );
                 })
               ) : (
-                <div className="sselect__empty">Ничего не найдено</div>
+                <div className="cafeOrdersSselect__empty">Ничего не найдено</div>
               )}
             </div>
           </div>
         )}
       </div>
 
-      {hint ? <div className="sselect__hint">{hint}</div> : null}
+      {hint ? <div className="cafeOrdersSselect__hint">{hint}</div> : null}
     </div>
   );
 };
@@ -230,52 +230,52 @@ export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick,
   if (!open) return null;
 
   return (
-    <aside className="orders-rpanel" aria-label="Меню">
-      <div className="orders-rpanel__head">
-        <div className="orders-rpanel__title">Меню</div>
-        <button type="button" className="orders-rpanel__close" onClick={onClose} aria-label="Закрыть">
+    <aside className="cafeOrdersRpanel" aria-label="Меню">
+      <div className="cafeOrdersRpanel__head">
+        <div className="cafeOrdersRpanel__title">Меню</div>
+        <button type="button" className="cafeOrdersRpanel__close" onClick={onClose} aria-label="Закрыть">
           <FaTimes />
         </button>
       </div>
 
-      <div className="orders-rpanel__search">
-        <FaSearch className="orders-rpanel__searchIcon" />
+      <div className="cafeOrdersRpanel__search">
+        <FaSearch className="cafeOrdersRpanel__searchIcon" />
         <input
-          className="orders-rpanel__searchInput"
+          className="cafeOrdersRpanel__searchInput"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Поиск блюд…"
         />
       </div>
 
-      <div className="orders-rpanel__list">
+      <div className="cafeOrdersRpanel__list">
         {filtered.length ? (
           filtered.map((m) => {
             const img = menuImageUrl?.(m.id);
             return (
-              <button key={m.id} type="button" className="orders-rpanel__item" onClick={() => onPick(m)} title={m.title}>
-                <span className="orders-rpanel__thumb" aria-hidden>
+              <button key={m.id} type="button" className="cafeOrdersRpanel__item" onClick={() => onPick(m)} title={m.title}>
+                <span className="cafeOrdersRpanel__thumb" aria-hidden>
                   {img ? <img src={img} alt="" /> : <FaClipboardList />}
                 </span>
 
-                <span className="orders-rpanel__meta">
-                  <span className="orders-rpanel__name">{m.title}</span>
-                  <span className="orders-rpanel__price">{fmtMoney?.(m.price)} сом</span>
+                <span className="cafeOrdersRpanel__meta">
+                  <span className="cafeOrdersRpanel__name">{m.title}</span>
+                  <span className="cafeOrdersRpanel__price">{fmtMoney?.(m.price)} сом</span>
                 </span>
 
-                <span className="orders-rpanel__add" aria-hidden>
+                <span className="cafeOrdersRpanel__add" aria-hidden>
                   <FaPlus />
                 </span>
               </button>
             );
           })
         ) : (
-          <div className="orders-rpanel__empty">Ничего не найдено</div>
+          <div className="cafeOrdersRpanel__empty">Ничего не найдено</div>
         )}
       </div>
 
-      <div className="orders-rpanel__footer">
-        <button type="button" className="orders__btn orders__btn--primary orders__btn--wide" onClick={onClose}>
+      <div className="cafeOrdersRpanel__footer">
+        <button type="button" className="cafeOrders__btn cafeOrders__btn--primary cafeOrders__btn--wide" onClick={onClose}>
           Готов
         </button>
       </div>

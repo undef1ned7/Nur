@@ -1,22 +1,23 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+// src/.../PrinterPicker.jsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaPrint, FaSyncAlt } from "react-icons/fa";
 import {
   listAuthorizedPrinters,
   choosePrinterByDialog,
   getSavedPrinters,
   getActivePrinterKey,
-  setActivePrinterByKey,
-} from "./OrdersPrintService";
-import "./PrinterSelect.scss";
+} from "../../Orders/OrdersPrintService";
 
 const safeName = (p) => p?.name || "USB Printer";
 
-const PrinterSelect = () => {
+/**
+ * Controlled printer picker (NO auto-set active).
+ * Purpose: choose a printer key to bind with an entity (Kitchen).
+ */
+const PrinterPicker = ({ value, onChange, disabled, label = "Чековый аппарат" }) => {
   const [loading, setLoading] = useState(false);
   const [authorized, setAuthorized] = useState([]);
   const [saved, setSaved] = useState([]);
-  const [activeKey, setActiveKey] = useState(getActivePrinterKey());
-  const [selectedKey, setSelectedKey] = useState(getActivePrinterKey());
 
   const merged = useMemo(() => {
     const map = new Map();
@@ -33,11 +34,8 @@ const PrinterSelect = () => {
       setSaved(getSavedPrinters());
       const list = await listAuthorizedPrinters();
       setAuthorized(Array.isArray(list) ? list : []);
-      const a = getActivePrinterKey();
-      setActiveKey(a);
-      setSelectedKey((prev) => prev || a);
     } catch (e) {
-      console.error("Printer refresh error:", e);
+      console.error("PrinterPicker refresh error:", e);
     } finally {
       setLoading(false);
     }
@@ -47,40 +45,39 @@ const PrinterSelect = () => {
     refresh();
   }, [refresh]);
 
-  const onPick = async () => {
-    setLoading(true);
-    try {
-      await choosePrinterByDialog();
-      await refresh();
-    } catch (e) {
-      console.error("Choose printer error:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // если value пустой — аккуратно проставим активный (если он есть)
+  useEffect(() => {
+    if (value) return;
+    const active = getActivePrinterKey();
+    if (active) onChange?.(active);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const onSetActive = async () => {
-    if (!selectedKey) return;
+  const onPickByDialog = useCallback(async () => {
     setLoading(true);
     try {
-      await setActivePrinterByKey(selectedKey);
-      const a = getActivePrinterKey();
-      setActiveKey(a);
+      const picked = await choosePrinterByDialog();
+      await refresh();
+      if (picked?.key) onChange?.(picked.key);
     } catch (e) {
-      console.error("Set active printer error:", e);
+      console.error("PrinterPicker choose error:", e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [onChange, refresh]);
+
+  const activeKey = getActivePrinterKey();
 
   return (
-    <div className="printer-select">
-      <div className="printer-select__row">
+    <div className="cafeCookPpick">
+      {label ? <div className="cafeCookPpick__label">{label}</div> : null}
+
+      <div className="cafeCookPpick__row">
         <select
-          className="printer-select__select"
-          value={selectedKey || ""}
-          onChange={(e) => setSelectedKey(e.target.value)}
-          disabled={loading}
+          className="cafeCookPpick__select"
+          value={value || ""}
+          onChange={(e) => onChange?.(e.target.value)}
+          disabled={disabled || loading}
           title="Выберите принтер для печати чеков"
         >
           <option value="">— Выберите принтер —</option>
@@ -93,36 +90,31 @@ const PrinterSelect = () => {
 
         <button
           type="button"
-          className="printer-select__btn printer-select__btn--ghost"
+          className="cafeCookPpick__btn cafeCookPpick__btn--ghost"
           onClick={refresh}
-          disabled={loading}
+          disabled={disabled || loading}
           title="Обновить список"
+          aria-label="Обновить список"
         >
           <FaSyncAlt />
         </button>
 
         <button
           type="button"
-          className="printer-select__btn printer-select__btn--secondary"
-          onClick={onPick}
-          disabled={loading}
+          className="cafeCookPpick__btn cafeCookPpick__btn--secondary"
+          onClick={onPickByDialog}
+          disabled={disabled || loading}
           title="Открыть диалог WebUSB и выбрать принтер"
         >
           <FaPrint /> Выбрать
         </button>
+      </div>
 
-        <button
-          type="button"
-          className="printer-select__btn printer-select__btn--primary"
-          onClick={onSetActive}
-          disabled={loading || !selectedKey}
-          title="Сделать выбранный принтер активным"
-        >
-          Активный
-        </button>
+      <div className="cafeCookPpick__hint">
+        Выбранный чековый аппарат будет привязан к этой кухне.
       </div>
     </div>
   );
 };
 
-export default PrinterSelect;
+export default PrinterPicker;

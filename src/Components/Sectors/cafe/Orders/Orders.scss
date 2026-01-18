@@ -1,15 +1,7 @@
 /* src/.../Orders.scss */
-/* только цвета в :root */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-}
+@import "../variables.scss";
 
-.orders {
+.cafeOrders {
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
   --thumb: 44px;
@@ -83,6 +75,12 @@
       border-color: var(--primary-dark);
       box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
     }
+  }
+
+  &__filter {
+    width: 240px;
+    min-width: 220px;
+    max-width: 300px;
   }
 
   &__btn {
@@ -297,6 +295,16 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+
+    &--full {
+      grid-column: 1 / -1;
+    }
+
+    &--checkbox {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+    }
   }
 
   &__label {
@@ -317,6 +325,11 @@
     &:focus {
       border-color: var(--primary-dark);
       box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.2);
+    }
+
+    &--grow {
+      flex: 1;
+      min-width: 0;
     }
   }
 
@@ -561,7 +574,7 @@
 }
 
 /* ===== Модалка (всегда по центру) ===== */
-.orders-modal {
+.cafeOrdersModal {
   &__overlay {
     position: fixed;
     inset: 0;
@@ -629,7 +642,7 @@
 }
 
 /* ===== SearchSelect (Searchable Combobox) — без теней ===== */
-.sselect {
+.cafeOrdersSselect {
   position: relative;
 
   &__label {
@@ -787,7 +800,7 @@
 }
 
 /* ===== Правая панель меню ===== */
-.orders-rpanel {
+.cafeOrdersRpanel {
   position: absolute;
   top: 0;
   right: -380px;
@@ -807,7 +820,7 @@
   z-index: 5;
 }
 
-.orders-rpanel__head {
+.cafeOrdersRpanel__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -816,11 +829,11 @@
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 
-.orders-rpanel__title {
+.cafeOrdersRpanel__title {
   font-weight: 700;
 }
 
-.orders-rpanel__close {
+.cafeOrdersRpanel__close {
   background: #fff;
   border: 1px solid #e5e7eb;
   width: 34px;
@@ -836,13 +849,13 @@
   }
 }
 
-.orders-rpanel__search {
+.cafeOrdersRpanel__search {
   position: relative;
   padding: 10px 12px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.orders-rpanel__searchIcon {
+.cafeOrdersRpanel__searchIcon {
   position: absolute;
   left: 22px;
   top: 50%;
@@ -851,7 +864,7 @@
   pointer-events: none;
 }
 
-.orders-rpanel__searchInput {
+.cafeOrdersRpanel__searchInput {
   width: 100%;
   padding: 12px 12px 12px 34px;
   border-radius: 12px;
@@ -865,13 +878,13 @@
   }
 }
 
-.orders-rpanel__list {
+.cafeOrdersRpanel__list {
   padding: 10px;
   overflow: auto; /* скролл видимый */
   flex: 1;
 }
 
-.orders-rpanel__item {
+.cafeOrdersRpanel__item {
   width: 100%;
   display: grid;
   grid-template-columns: 44px 1fr 40px;
@@ -891,7 +904,7 @@
   }
 }
 
-.orders-rpanel__thumb {
+.cafeOrdersRpanel__thumb {
   width: 44px;
   height: 44px;
   border-radius: 12px;
@@ -908,26 +921,26 @@
   }
 }
 
-.orders-rpanel__meta {
+.cafeOrdersRpanel__meta {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.orders-rpanel__name {
+.cafeOrdersRpanel__name {
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.orders-rpanel__price {
+.cafeOrdersRpanel__price {
   font-size: 13px;
   color: var(--muted);
   font-weight: 600;
 }
 
-.orders-rpanel__add {
+.cafeOrdersRpanel__add {
   width: 36px;
   height: 36px;
   border-radius: 12px;
@@ -938,14 +951,14 @@
   color: #111;
 }
 
-.orders-rpanel__empty {
+.cafeOrdersRpanel__empty {
   padding: 14px;
   color: var(--muted);
   text-align: center;
   font-weight: 600;
 }
 
-.orders-rpanel__footer {
+.cafeOrdersRpanel__footer {
   padding: 12px;
   border-top: 1px solid rgba(15, 23, 42, 0.06);
   background: #fff;
@@ -953,7 +966,7 @@
 
 /* Маленькие экраны */
 @media (max-width: 980px) {
-  .orders-rpanel {
+  .cafeOrdersRpanel {
     position: fixed;
     right: auto;
     top: 18px;
@@ -987,7 +1000,7 @@
 }
 
 /* ===== Pay modal content (чек перед оплатой) ===== */
-.orders-pay {
+.cafeOrdersPay {
   padding: 16px;
 
   &__top {
@@ -1076,9 +1089,41 @@
     flex-wrap: wrap;
   }
 
+  @media (max-width: 980px) {
+    &__search {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    &__filter {
+      width: 220px;
+      min-width: 200px;
+      max-width: 260px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    &__filter {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+
   @media (max-width: 560px) {
     &__actions {
       flex-direction: column;
+    }
+
+    &__search {
+      width: 100%;
+      max-width: none;
+    }
+
+    &__filter {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
     }
   }
 }

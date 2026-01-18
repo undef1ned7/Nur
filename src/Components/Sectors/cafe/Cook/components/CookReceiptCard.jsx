@@ -18,22 +18,22 @@ const CookReceiptCard = ({
   const items = useMemo(() => group.items || [], [group.items]);
 
   return (
-    <article className="cook__receipt">
-      <div className="cook__receiptHeader">
-        <div className="cook__receiptLeft">
-          <div className="cook__receiptTable">СТОЛ {group.table_number || "—"}</div>
+    <article className="cafeCook__receipt">
+      <div className="cafeCook__receiptHeader">
+        <div className="cafeCook__receiptLeft">
+          <div className="cafeCook__receiptTable">СТОЛ {group.table_number || "—"}</div>
 
-          {group.guest ? <div className="cook__receiptClient">{group.guest}</div> : null}
+          {group.guest ? <div className="cafeCook__receiptClient">{group.guest}</div> : null}
 
           {group.waiter_label ? (
-            <div className="cook__receiptWaiter">Официант: {group.waiter_label}</div>
+            <div className="cafeCook__receiptWaiter">Официант: {group.waiter_label}</div>
           ) : null}
         </div>
 
-        <div className="cook__receiptMeta">
-          {headerDate ? <div className="cook__receiptDate">{headerDate}</div> : null}
+        <div className="cafeCook__receiptMeta">
+          {headerDate ? <div className="cafeCook__receiptDate">{headerDate}</div> : null}
           <span
-            className={`cook__receiptStatusBadge cook__receiptStatusBadge--${group.status}`}
+            className={`cafeCook__receiptStatusBadge cafeCook__receiptStatusBadge--${group.status}`}
             title="Общий статус заказа"
           >
             {getStatusLabel(group.status)}
@@ -41,12 +41,12 @@ const CookReceiptCard = ({
         </div>
       </div>
 
-      <div className="cook__receiptDivider" />
+      <div className="cafeCook__receiptDivider" />
 
-      <div className="cook__summary">
+      <div className="cafeCook__summary">
         <button
           type="button"
-          className="cook__toggle"
+          className="cafeCook__toggle"
           onClick={onToggle}
           title={collapsed ? "Показать позиции" : "Свернуть позиции"}
         >
@@ -56,7 +56,7 @@ const CookReceiptCard = ({
 
       {/* Закрыто = ничего не показываем (как на твоём 2-м фото) */}
       {!collapsed && (
-        <div className="cook__rows">
+        <div className="cafeCook__rows">
           {items.map((t, idx) => {
             const status = String(t?.status || "");
             const isPending = status === "pending";
@@ -67,18 +67,18 @@ const CookReceiptCard = ({
             const portions = extractPortionsFromTask(t);
 
             return (
-              <div key={t?.id || idx} className="cook__row">
-                <div className="cook__rowLeft">
-                  <div className="cook__rowTitle" title={t?.menu_item_title || ""}>
+              <div key={t?.id || idx} className="cafeCook__row">
+                <div className="cafeCook__rowLeft">
+                  <div className="cafeCook__rowTitle" title={t?.menu_item_title || ""}>
                     {t?.menu_item_title || "Блюдо"}
                   </div>
-                  <div className="cook__rowSub">Кол-во: {portions}</div>
+                  <div className="cafeCook__rowSub">Кол-во: {portions}</div>
                 </div>
 
-                <div className="cook__rowRight">
-                  <div className="cook__rowPrice">{toNum(t?.price)}</div>
+                <div className="cafeCook__rowRight">
+                  <div className="cafeCook__rowPrice">{toNum(t?.price)}</div>
 
-                  <span className={`cook__receiptStatusBadge cook__receiptStatusBadge--${status}`}>
+                  <span className={`cafeCook__receiptStatusBadge cafeCook__receiptStatusBadge--${status}`}>
                     {getStatusLabel(status)}
                   </span>
 
@@ -86,7 +86,7 @@ const CookReceiptCard = ({
                     <>
                       {isPending && (
                         <button
-                          className="cook__btn cook__btn--inProgress cook__btn--compact"
+                          className="cafeCook__btn cafeCook__btn--inProgress cafeCook__btn--compact"
                           onClick={(e) => onClaimOne(t.id, e)}
                           disabled={updating}
                           type="button"
@@ -97,7 +97,7 @@ const CookReceiptCard = ({
 
                       {isInProgress && (
                         <button
-                          className="cook__btn cook__btn--ready cook__btn--compact"
+                          className="cafeCook__btn cafeCook__btn--ready cafeCook__btn--compact"
                           onClick={(e) => onReadyOne(t, e)}
                           disabled={updating}
                           type="button"
@@ -109,7 +109,7 @@ const CookReceiptCard = ({
 
                       {isReady && (
                         <button
-                          className="cook__btn cook__btn--ready cook__btn--compact"
+                          className="cafeCook__btn cafeCook__btn--ready cafeCook__btn--compact"
                           disabled
                           type="button"
                         >
@@ -126,8 +126,8 @@ const CookReceiptCard = ({
       )}
 
       {activeTab === "history" && group.status === "ready" ? (
-        <div className="cook__receiptPaid">
-          <span className="cook__receiptPaidBadge">ГОТОВ</span>
+        <div className="cafeCook__receiptPaid">
+          <span className="cafeCook__receiptPaidBadge">ГОТОВ</span>
         </div>
       ) : null}
     </article>

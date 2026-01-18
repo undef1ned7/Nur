@@ -1,4 +1,4 @@
-:root{--primary:#f7d74f;--primary-dark:#d4b800;--text:#0f172a;--muted:#6b7280;--border:#e5e7eb;--surface:#fff;--radius:12px;--shadow:0 4px 16px rgba(0,0,0,.05);}
+@import "../variables.scss";
 
 .payroll{background:var(--surface);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:20px;}
 .payroll__header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}

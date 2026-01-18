@@ -1,6 +1,7 @@
 // src/.../TablesHall.jsx
 import React, { useMemo, useState, useCallback } from "react";
 import { FaSearch, FaPlus, FaTimes, FaEdit, FaTrash, FaChair, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
 
@@ -54,6 +55,7 @@ const TablesHall = ({
   openConfirm,
 }) => {
   const [query, setQuery] = useState("");
+  const [zoneFilter, setZoneFilter] = useState("");
 
   // ✅ раскрытие блюд по столам: key = tableId (string)
   const [expandedByTable, setExpandedByTable] = useState(() => ({}));
@@ -75,24 +77,36 @@ const TablesHall = ({
   });
 
   const filteredTables = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    let filtered = [...(tables || [])];
 
-    const sorted = [...(tables || [])].sort((a, b) => {
+    // Фильтр по зоне
+    if (zoneFilter) {
+      const zoneKey = asKey(zoneFilter);
+      filtered = filtered.filter((t) => {
+        const tZoneKey = asKey(t.zone?.id || t.zone);
+        return tZoneKey === zoneKey;
+      });
+    }
+
+    // Фильтр по поисковому запросу
+    const q = query.trim().toLowerCase();
+    if (q) {
+      filtered = filtered.filter((t) => {
+        const num = String(t.number || "").toLowerCase();
+        const zoneTxt = String(zoneTitleByAny(t.zone) || "").toLowerCase();
+        const st = String(t.status || "").toLowerCase();
+        return num.includes(q) || zoneTxt.includes(q) || st.includes(q);
+      });
+    }
+
+    // Сортировка
+    return filtered.sort((a, b) => {
       const an = Number(a?.number) || 0;
       const bn = Number(b?.number) || 0;
       if (an !== bn) return an - bn;
       return asKey(a?.id).localeCompare(asKey(b?.id));
     });
-
-    if (!q) return sorted;
-
-    return sorted.filter((t) => {
-      const num = String(t.number || "").toLowerCase();
-      const zoneTxt = String(zoneTitleByAny(t.zone) || "").toLowerCase();
-      const st = String(t.status || "").toLowerCase();
-      return num.includes(q) || zoneTxt.includes(q) || st.includes(q);
-    });
-  }, [tables, query, zoneTitleByAny]);
+  }, [tables, query, zoneFilter, zoneTitleByAny]);
 
   const openCreate = () => {
     setEditId(null);
@@ -145,35 +159,35 @@ const TablesHall = ({
   };
 
   const renderManageList = () => (
-    <div className="tables__list tables__scroll">
+    <div className="cafeTables__list cafeTables__scroll">
       {filteredTables.map((t) => {
         const tKey = asKey(t?.id);
         const hasActive = tKey ? activeByTable.has(tKey) : false;
 
         return (
-          <article key={t.id} className={`tables__card ${hasActive ? "tables__card--busy" : ""}`}>
-            <div className="tables__cardLeft">
-              <div className="tables__avatar" aria-hidden>
+          <article key={t.id} className={`cafeTables__card ${hasActive ? "cafeTables__card--busy" : ""}`}>
+            <div className="cafeTables__cardLeft">
+              <div className="cafeTables__avatar" aria-hidden>
                 <FaChair />
               </div>
 
-              <div className="tables__cardBody">
-                <h3 className="tables__name">Стол {t.number}</h3>
-                <div className="tables__meta">
-                  <span className="tables__muted">Зона: {zoneTitleByAny(t.zone) || "—"}</span>
-                  <span className="tables__muted">Мест: {t.places}</span>
-                  <span className={`tables__pill ${hasActive ? "tables__pill--busy" : "tables__pill--free"}`}>
+              <div className="cafeTables__cardBody">
+                <h3 className="cafeTables__name">Стол {t.number}</h3>
+                <div className="cafeTables__meta">
+                  <span className="cafeTables__muted">Зона: {zoneTitleByAny(t.zone) || "—"}</span>
+                  <span className="cafeTables__muted">Мест: {t.places}</span>
+                  <span className={`cafeTables__pill ${hasActive ? "cafeTables__pill--busy" : "cafeTables__pill--free"}`}>
                     {hasActive ? "ЗАНЯТ" : "СВОБОДЕН"}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="tables__rowActions">
-              <button className="tables__btn tables__btn--secondary" onClick={() => openEdit(t)} type="button">
+            <div className="cafeTables__rowActions">
+              <button className="cafeTables__btn cafeTables__btn--secondary" onClick={() => openEdit(t)} type="button">
                 <FaEdit /> Изменить
               </button>
-              <button className="tables__btn tables__btn--danger" onClick={() => openConfirm("table", t.id)} type="button">
+              <button className="cafeTables__btn cafeTables__btn--danger" onClick={() => openConfirm("table", t.id)} type="button">
                 <FaTrash /> Удалить
               </button>
             </div>
@@ -181,12 +195,12 @@ const TablesHall = ({
         );
       })}
 
-      {!filteredTables.length && <div className="tables__alert">Ничего не найдено по запросу «{query}».</div>}
+      {!filteredTables.length && <div className="cafeTables__alert">Ничего не найдено по запросу «{query}».</div>}
     </div>
   );
 
   const renderHall = () => (
-    <div className="tables__hallGrid tables__scroll">
+    <div className="cafeTables__hallGrid cafeTables__scroll">
       {filteredTables.map((t) => {
         const tKey = asKey(t?.id);
         const group = tKey ? activeByTable.get(tKey) : null;
@@ -215,27 +229,27 @@ const TablesHall = ({
         const moreCount = Math.max(0, dishes.length - COLLAPSED_LIMIT);
 
         return (
-          <article key={t.id} className="tables__hallCard">
-            <div className="tables__hallHead">
-              <div className="tables__hallTitle">СТОЛ {t.number}</div>
-              {date ? <div className="tables__hallDate">{date}</div> : null}
+          <article key={t.id} className="cafeTables__hallCard">
+            <div className="cafeTables__hallHead">
+              <div className="cafeTables__hallTitle">СТОЛ {t.number}</div>
+              {date ? <div className="cafeTables__hallDate">{date}</div> : null}
             </div>
 
-            <div className="tables__hallBody">
+            <div className="cafeTables__hallBody">
               {isBusy ? (
                 dishes.length ? (
-                  <div className="tables__dishes">
+                  <div className="cafeTables__dishes">
                     {visibleDishes.map((name, idx) => (
-                      <div key={`${t.id}-${idx}`} className="tables__dish" title={name}>
+                      <div key={`${t.id}-${idx}`} className="cafeTables__dish" title={name}>
                         {name}
                       </div>
                     ))}
 
-                    {/* ✅ вместо “+ ещё 4” — рабочая кнопка */}
+                    {/* ✅ вместо "+ ещё 4" — рабочая кнопка */}
                     {hasMore && (
                       <button
                         type="button"
-                        className="tables__moreBtn"
+                        className="cafeTables__moreBtn"
                         onClick={() => toggleExpanded(t.id)}
                         aria-expanded={isExpanded}
                       >
@@ -252,14 +266,14 @@ const TablesHall = ({
                     )}
                   </div>
                 ) : (
-                  <div className="tables__hallEmpty">Заказ в работе</div>
+                  <div className="cafeTables__hallEmpty">Заказ в работе</div>
                 )
               ) : (
-                <div className="tables__hallEmpty">Нет активного заказа</div>
+                <div className="cafeTables__hallEmpty">Нет активного заказа</div>
               )}
             </div>
 
-            <div className={`tables__hallStatus ${isBusy ? "tables__hallStatus--busy" : "tables__hallStatus--free"}`}>
+            <div className={`cafeTables__hallStatus ${isBusy ? "cafeTables__hallStatus--busy" : "cafeTables__hallStatus--free"}`}>
               {isBusy ? "ЗАНЯТ" : "СВОБОДЕН"}
             </div>
           </article>
@@ -270,20 +284,35 @@ const TablesHall = ({
 
   return (
     <>
-      <div className="tables__actions tables__actions--sub">
-        <div className="tables__search">
-          <FaSearch className="tables__searchIcon" />
-          <input
-            className="tables__searchInput"
-            placeholder="Поиск по столам: номер, зона, статус…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+      <div className="cafeTables__actions cafeTables__actions--sub">
+        <div className="cafeTables__filters">
+          <div className="cafeTables__search">
+            <FaSearch className="cafeTables__searchIcon" />
+            <input
+              className="cafeTables__searchInput"
+              placeholder="Поиск по столам: номер, зона, статус…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="cafeTables__filterZone">
+            <SearchableCombobox
+              value={zoneFilter}
+              onChange={setZoneFilter}
+              options={[
+                { value: "", label: "Все зоны" },
+                ...(zones || []).map((z) => ({ value: z.id, label: z.title })),
+              ]}
+              placeholder="Фильтр по зоне"
+              classNamePrefix="cafeTablesCombo"
+            />
+          </div>
         </div>
 
         <button
           type="button"
-          className="tables__btn tables__btn--primary"
+          className="cafeTables__btn cafeTables__btn--primary"
           onClick={openCreate}
           disabled={!zones?.length}
           title={!zones?.length ? "Сначала добавьте зону" : ""}
@@ -295,77 +324,70 @@ const TablesHall = ({
       {tablesView === "manage" ? renderManageList() : renderHall()}
 
       {tableModalOpen && (
-        <div className="tables__modalOverlay" onClick={closeModal}>
-          <div className="tables__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="tables__modalHeader">
-              <h3 className="tables__modalTitle">{editId ? "Редактировать стол" : "Новый стол"}</h3>
-              <button className="tables__iconBtn" type="button" onClick={closeModal} aria-label="Закрыть" disabled={saving}>
+        <div className="cafeTables__modalOverlay" onClick={closeModal}>
+          <div className="cafeTables__modal" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeTables__modalHeader">
+              <h3 className="cafeTables__modalTitle">{editId ? "Редактировать стол" : "Новый стол"}</h3>
+              <button className="cafeTables__iconBtn" type="button" onClick={closeModal} aria-label="Закрыть" disabled={saving}>
                 <FaTimes />
               </button>
             </div>
 
-            <form className="tables__form" onSubmit={save}>
-              <div className="tables__formGrid">
-                <div className="tables__field">
-                  <label className="tables__label">Номер</label>
+            <form className="cafeTables__form" onSubmit={save}>
+              <div className="cafeTables__formGrid">
+                <div className="cafeTables__field">
+                  <label className="cafeTables__label">Номер</label>
                   <input
                     type="number"
-                    className="tables__input"
+                    className="cafeTables__input"
                     value={form.number}
                     onChange={(e) => setForm((f) => ({ ...f, number: e.target.value }))}
                     required
                   />
                 </div>
 
-                <div className="tables__field">
-                  <label className="tables__label">Зона</label>
-                  <select
-                    className="tables__input"
+                <div className="cafeTables__field">
+                  <label className="cafeTables__label">Зона</label>
+                  <SearchableCombobox
                     value={form.zone}
-                    onChange={(e) => setForm((f) => ({ ...f, zone: e.target.value }))}
-                    required
-                  >
-                    {(zones || []).map((z) => (
-                      <option key={z.id} value={z.id}>
-                        {z.title}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setForm((f) => ({ ...f, zone: v }))}
+                    options={(zones || []).map((z) => ({ value: z.id, label: z.title }))}
+                    placeholder="Выберите зону…"
+                    disabled={saving}
+                    classNamePrefix="cafeTablesCombo"
+                  />
                 </div>
 
-                <div className="tables__field">
-                  <label className="tables__label">Мест</label>
+                <div className="cafeTables__field">
+                  <label className="cafeTables__label">Мест</label>
                   <input
                     type="number"
                     min="1"
-                    className="tables__input"
+                    className="cafeTables__input"
                     value={form.places}
                     onChange={(e) => setForm((f) => ({ ...f, places: e.target.value }))}
                     required
                   />
                 </div>
 
-                <div className="tables__field">
-                  <label className="tables__label">Статус</label>
-                  <select
-                    className="tables__input"
+                <div className="cafeTables__field">
+                  <label className="cafeTables__label">Статус</label>
+                  <SearchableCombobox
                     value={form.status}
-                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setForm((f) => ({ ...f, status: v }))}
+                    options={STATUSES}
+                    placeholder="Выберите статус…"
+                    disabled={saving}
+                    classNamePrefix="cafeTablesCombo"
+                  />
                 </div>
               </div>
 
-              <div className="tables__formActions">
-                <button type="button" className="tables__btn tables__btn--secondary" onClick={closeModal} disabled={saving}>
+              <div className="cafeTables__formActions">
+                <button type="button" className="cafeTables__btn cafeTables__btn--secondary" onClick={closeModal} disabled={saving}>
                   Отмена
                 </button>
-                <button type="submit" className="tables__btn tables__btn--primary" disabled={saving}>
+                <button type="submit" className="cafeTables__btn cafeTables__btn--primary" disabled={saving}>
                   {saving ? "Сохранение…" : "Сохранить"}
                 </button>
               </div>

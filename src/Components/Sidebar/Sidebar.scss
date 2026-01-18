@@ -128,6 +128,8 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(247, 215, 79, 0.3) transparent;
     padding-top: 10px;
+    display: flex;
+    flex-direction: column;
   }
 
   &__arnament2 {
@@ -287,32 +289,8 @@
     list-style: none;
     padding: 10px 0;
     margin: 0;
-    overflow-y: auto;
-    max-height: none;
-    height: auto;
-    flex-grow: 1;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable both-edges;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: linear-gradient(180deg, #f7d74f 0%, #f5c842 100%);
-      border-radius: 10px;
-      transition: background 0.2s ease;
-
-      &:hover {
-        background: linear-gradient(180deg, #f9e066 0%, #f7d74f 100%);
-      }
-    }
+    flex: 1;
+    min-height: 0; // Важно для flex-скролла
   }
 
   &__menu-item {

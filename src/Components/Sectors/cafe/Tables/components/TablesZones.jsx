@@ -74,11 +74,11 @@ const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, creat
   return (
     <>
       {/* ✅ Фильтр как у столов */}
-      <div className="tables__actions tables__actions--sub">
-        <div className="tables__search">
-          <FaSearch className="tables__searchIcon" />
+      <div className="cafeTables__actions cafeTables__actions--sub">
+        <div className="cafeTables__search">
+          <FaSearch className="cafeTables__searchIcon" />
           <input
-            className="tables__searchInput"
+            className="cafeTables__searchInput"
             placeholder="Поиск по зонам: название, количество, пустая…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -86,37 +86,37 @@ const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, creat
         </div>
       </div>
 
-      <div className="tables__zoneGrid tables__scroll">
+      <div className="cafeTables__zoneGrid cafeTables__scroll">
         {zonesWithCounts.map((z) => {
           const isEmpty = z.count === 0; // ✅ красная/зелёная как у столов
           return (
-            <article key={z.id} className={`tables__zoneCard ${isEmpty ? "tables__zoneCard--danger" : "tables__zoneCard--success"}`}>
-              <div className="tables__zoneHead">
-                <div className="tables__zoneTitle">{z.title || "—"}</div>
-                <div className="tables__zoneCount">Столов: {z.count}</div>
+            <article key={z.id} className={`cafeTables__zoneCard ${isEmpty ? "cafeTables__zoneCard--danger" : "cafeTables__zoneCard--success"}`}>
+              <div className="cafeTables__zoneHead">
+                <div className="cafeTables__zoneTitle">{z.title || "—"}</div>
+                <div className="cafeTables__zoneCount">Столов: {z.count}</div>
               </div>
 
-              <div className="tables__zoneBody">
-                <div className="tables__zoneLine">
-                  <span className="tables__zoneLabel">Название:</span>
-                  <span className="tables__zoneValue">{z.title || "—"}</span>
+              <div className="cafeTables__zoneBody">
+                <div className="cafeTables__zoneLine">
+                  <span className="cafeTables__zoneLabel">Название:</span>
+                  <span className="cafeTables__zoneValue">{z.title || "—"}</span>
                 </div>
-                <div className="tables__zoneLine">
-                  <span className="tables__zoneLabel">Количество столов:</span>
-                  <span className="tables__zoneValue">{z.count}</span>
+                <div className="cafeTables__zoneLine">
+                  <span className="cafeTables__zoneLabel">Количество столов:</span>
+                  <span className="cafeTables__zoneValue">{z.count}</span>
                 </div>
               </div>
 
               {/* ✅ цветная полоса снизу, как у столов */}
-              <div className={`tables__zoneStatus ${isEmpty ? "tables__zoneStatus--danger" : "tables__zoneStatus--success"}`}>
+              <div className={`cafeTables__zoneStatus ${isEmpty ? "cafeTables__zoneStatus--danger" : "cafeTables__zoneStatus--success"}`}>
                 {isEmpty ? "ПУСТАЯ ЗОНА" : "ЕСТЬ СТОЛЫ"}
               </div>
 
-              <div className="tables__zoneFooter">
-                <button type="button" className="tables__btn tables__btn--secondary" onClick={() => openEdit(z)}>
+              <div className="cafeTables__zoneFooter">
+                <button type="button" className="cafeTables__btn cafeTables__btn--secondary" onClick={() => openEdit(z)}>
                   <FaEdit /> Изменить
                 </button>
-                <button type="button" className="tables__btn tables__btn--danger" onClick={() => openConfirm("zone", z.id)}>
+                <button type="button" className="cafeTables__btn cafeTables__btn--danger" onClick={() => openConfirm("zone", z.id)}>
                   <FaTrash /> Удалить
                 </button>
               </div>
@@ -124,25 +124,25 @@ const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, creat
           );
         })}
 
-        {!zonesWithCounts.length && <div className="tables__alert">Ничего не найдено по запросу «{query}».</div>}
+        {!zonesWithCounts.length && <div className="cafeTables__alert">Ничего не найдено по запросу «{query}».</div>}
       </div>
 
       {/* Zone modal */}
       {zoneModalOpen && (
-        <div className="tables__modalOverlay" onClick={closeModal}>
-          <div className="tables__modal" onClick={(e) => e.stopPropagation()}>
-            <div className="tables__modalHeader">
-              <h3 className="tables__modalTitle">{zoneEditId ? "Редактировать зону" : "Новая зона"}</h3>
-              <button className="tables__iconBtn" type="button" onClick={closeModal} aria-label="Закрыть" disabled={zoneSaving}>
+        <div className="cafeTables__modalOverlay" onClick={closeModal}>
+          <div className="cafeTables__modal" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeTables__modalHeader">
+              <h3 className="cafeTables__modalTitle">{zoneEditId ? "Редактировать зону" : "Новая зона"}</h3>
+              <button className="cafeTables__iconBtn" type="button" onClick={closeModal} aria-label="Закрыть" disabled={zoneSaving}>
                 <FaTimes />
               </button>
             </div>
 
-            <form className="tables__form" onSubmit={saveZone}>
-              <div className="tables__field tables__field--full">
-                <label className="tables__label">Название зоны</label>
+            <form className="cafeTables__form" onSubmit={saveZone}>
+              <div className="cafeTables__field cafeTables__field--full">
+                <label className="cafeTables__label">Название зоны</label>
                 <input
-                  className="tables__input"
+                  className="cafeTables__input"
                   value={zoneTitle}
                   onChange={(e) => setZoneTitle(e.target.value)}
                   placeholder="Например: 1-этаж, VIP, Терраса"
@@ -151,11 +151,11 @@ const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, creat
                 />
               </div>
 
-              <div className="tables__formActions">
-                <button type="button" className="tables__btn tables__btn--secondary" onClick={closeModal} disabled={zoneSaving}>
+              <div className="cafeTables__formActions">
+                <button type="button" className="cafeTables__btn cafeTables__btn--secondary" onClick={closeModal} disabled={zoneSaving}>
                   Отмена
                 </button>
-                <button type="submit" className="tables__btn tables__btn--primary" disabled={zoneSaving}>
+                <button type="submit" className="cafeTables__btn cafeTables__btn--primary" disabled={zoneSaving}>
                   {zoneSaving ? "Сохранение…" : "Сохранить"}
                 </button>
               </div>

@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaPlus, FaPrint, FaSyncAlt, FaTimes } from "react-icons/fa";
-import api from "../../../../api";
+import api from "../../../../../api";
 import {
   listAuthorizedPrinters,
   choosePrinterByDialog,
   getSavedPrinters,
   getActivePrinterKey,
   setActivePrinterByKey,
-} from "../Orders/OrdersPrintService";
+} from "../../Orders/OrdersPrintService";
 import "./KitchenCreateModal.scss";
 
 const safeName = (p) => p?.name || "USB Printer";
@@ -154,23 +154,23 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
   return (
     <div
-      className="kitchen-modal"
+      className="cafeCookKitchenModal"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !saving) onClose?.();
       }}
     >
-      <div className="kitchen-modal__card" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="kitchen-modal__head">
-          <div className="kitchen-modal__headText">
-            <div className="kitchen-modal__title">Создать кухню</div>
-            <div className="kitchen-modal__subtitle">
+      <div className="cafeCookKitchenModal__card" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="cafeCookKitchenModal__head">
+          <div className="cafeCookKitchenModal__headText">
+            <div className="cafeCookKitchenModal__title">Создать кухню</div>
+            <div className="cafeCookKitchenModal__subtitle">
               Выберите чековый аппарат — он будет закреплён за этой кухней.
             </div>
           </div>
 
           <button
             type="button"
-            className="kitchen-modal__close"
+            className="cafeCookKitchenModal__close"
             onClick={() => (!saving ? onClose?.() : null)}
             aria-label="Закрыть"
             title="Закрыть"
@@ -180,11 +180,11 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
           </button>
         </div>
 
-        <div className="kitchen-modal__body">
-          <div className="kitchen-modal__field">
-            <div className="kitchen-modal__label">Кухня</div>
+        <div className="cafeCookKitchenModal__body">
+          <div className="cafeCookKitchenModal__field">
+            <div className="cafeCookKitchenModal__label">Кухня</div>
             <input
-              className="kitchen-modal__input"
+              className="cafeCookKitchenModal__input"
               placeholder="Например: Основная кухня"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -193,12 +193,12 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
             />
           </div>
 
-          <div className="kitchen-modal__field">
-            <div className="kitchen-modal__label">Чековый аппарат</div>
+          <div className="cafeCookKitchenModal__field">
+            <div className="cafeCookKitchenModal__label">Чековый аппарат</div>
 
-            <div className="kitchen-modal__printerRow">
+            <div className="cafeCookKitchenModal__printerRow">
               <select
-                className="kitchen-modal__select"
+                className="cafeCookKitchenModal__select"
                 value={selectedKey || ""}
                 onChange={(e) => setSelectedKey(e.target.value)}
                 disabled={loading || saving}
@@ -214,7 +214,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
               <button
                 type="button"
-                className="kitchen-modal__iconBtn"
+                className="cafeCookKitchenModal__iconBtn"
                 onClick={refresh}
                 disabled={loading || saving}
                 title="Обновить список"
@@ -224,7 +224,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
               <button
                 type="button"
-                className="kitchen-modal__btn kitchen-modal__btn--primary"
+                className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
                 onClick={onPickByDialog}
                 disabled={loading || saving}
                 title="Открыть диалог WebUSB и выбрать принтер"
@@ -234,7 +234,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
               <button
                 type="button"
-                className="kitchen-modal__btn kitchen-modal__btn--ghost"
+                className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost"
                 onClick={onSetActive}
                 disabled={loading || saving || !selectedKey}
                 title="Сделать выбранный принтер активным"
@@ -245,10 +245,10 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
           </div>
         </div>
 
-        <div className="kitchen-modal__footer">
+        <div className="cafeCookKitchenModal__footer">
           <button
             type="button"
-            className="kitchen-modal__btn kitchen-modal__btn--ghost"
+            className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost"
             onClick={() => (!saving ? onClose?.() : null)}
             disabled={saving}
           >
@@ -257,7 +257,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
           <button
             type="button"
-            className="kitchen-modal__btn kitchen-modal__btn--primary"
+            className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
             onClick={createKitchen}
             disabled={saving || !title.trim() || !selectedKey}
           >

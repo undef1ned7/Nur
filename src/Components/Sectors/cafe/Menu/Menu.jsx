@@ -1,6 +1,6 @@
 // src/Components/Sectors/cafe/Menu/Menu.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { FaListUl, FaThLarge, FaTimes, FaTrash } from "react-icons/fa";
+import { FaListUl, FaThLarge } from "react-icons/fa";
 import api from "../../../../api";
 import "./Menu.scss";
 
@@ -10,43 +10,49 @@ import MenuCategoriesTab from "./components/MenuCategoriesTab";
 import MenuItemModal from "./components/MenuItemModal";
 import MenuCategoryModal from "./components/MenuCategoryModal";
 
-const listFrom = (res) => res?.data?.results || res?.data || [];
+// Утилиты
+const getListFromResponse = (res) => res?.data?.results || res?.data || [];
 
-const toNum = (x) => {
-  if (x === null || x === undefined) return 0;
-  const n = Number(String(x).replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
+const toNumber = (value) => {
+  if (value === null || value === undefined) return 0;
+  const num = Number(String(value).replace(",", "."));
+  return Number.isFinite(num) ? num : 0;
 };
 
-const fmtMoney = (n) =>
+const formatMoney = (value) =>
   new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(toNum(n));
+  }).format(toNumber(value));
 
-const numStr = (n) => String(Number(n) || 0).replace(",", ".");
+const numberToString = (value) => String(Number(value) || 0).replace(",", ".");
 
-const normalizeDecimalInput = (value) => {
-  const raw = String(value ?? "").replace(",", ".");
-  if (/^\d*\.?\d*$/.test(raw)) return raw;
-  return null;
+const normalizeDecimalValue = (value) => {
+  const cleaned = String(value ?? "").replace(",", ".");
+  return /^\d*\.?\d*$/.test(cleaned) ? cleaned : null;
 };
 
 const Menu = () => {
+  // Основное состояние
   const [activeTab, setActiveTab] = useState("items");
   const [viewMode, setViewMode] = useState("cards");
 
+  // Данные из API
   const [categories, setCategories] = useState([]);
   const [kitchens, setKitchens] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
-
   const [items, setItems] = useState([]);
+
+  // Состояние загрузки
   const [loadingItems, setLoadingItems] = useState(true);
   const [loadingCats, setLoadingCats] = useState(true);
 
+  // Фильтры и поиск
   const [queryItems, setQueryItems] = useState("");
   const [queryCats, setQueryCats] = useState("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("");
 
+  // Модал для блюд
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -57,149 +63,170 @@ const Menu = () => {
     is_active: true,
     ingredients: [],
   });
-
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
 
+  // Модал для категорий
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [catEditId, setCatEditId] = useState(null);
   const [catTitle, setCatTitle] = useState("");
 
+  // Модал подтверждения удаления
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmKind, setConfirmKind] = useState(""); // "item" | "cat"
   const [confirmId, setConfirmId] = useState(null);
-  const [confirmTitle, setConfirmTitle] = useState("");
 
+  // Memoized maps для быстрого поиска
   const categoriesMap = useMemo(() => {
-    const m = new Map();
-    categories.forEach((c) => m.set(c.id, c.title));
-    return m;
+    const map = new Map();
+    categories.forEach((cat) => map.set(cat.id, cat.title));
+    return map;
   }, [categories]);
 
   const kitchensMap = useMemo(() => {
-    const m = new Map();
-    kitchens.forEach((k) => {
-      const title = k.title || k.name || k.kitchen_title || "Кухня";
-      const number = k.number ?? k.kitchen_number;
-      const label = `${title}${number !== undefined && number !== null && number !== "" ? ` №${number}` : ""}`;
-      m.set(k.id, label);
+    const map = new Map();
+    kitchens.forEach((kitchen) => {
+      const title = kitchen.title || kitchen.name || kitchen.kitchen_title || "Кухня";
+      const number = kitchen.number ?? kitchen.kitchen_number;
+      const label = `${title}${
+        number !== undefined && number !== null && number !== "" ? ` №${number}` : ""
+      }`;
+      map.set(kitchen.id, label);
     });
-    return m;
+    return map;
   }, [kitchens]);
 
   const warehouseMap = useMemo(() => {
-    const m = new Map();
-    warehouse.forEach((w) => m.set(w.id, w));
-    return m;
+    const map = new Map();
+    warehouse.forEach((item) => map.set(item.id, item));
+    return map;
   }, [warehouse]);
 
-  const categoryTitle = (id) => categoriesMap.get(id) || "Без категории";
-  const kitchenTitle = (id) => kitchensMap.get(id) || "";
-  const productTitle = (id) => warehouseMap.get(id)?.title || id || "";
-  const productUnit = (id) => warehouseMap.get(id)?.unit || "";
+  // Вспомогательные функции для получения данных по ID
+  const getCategoryTitle = (id) => categoriesMap.get(id) || "Без категории";
+  const getKitchenTitle = (id) => kitchensMap.get(id) || "";
+  const getProductTitle = (id) => warehouseMap.get(id)?.title || id || "";
+  const getProductUnit = (id) => warehouseMap.get(id)?.unit || "";
 
-  const fetchCats = async () => {
-    const cats = await api.get("/cafe/categories/");
-    setCategories(listFrom(cats));
+  // API методы для загрузки данных
+  const fetchCategories = async () => {
+    const res = await api.get("/cafe/categories/");
+    setCategories(getListFromResponse(res));
   };
 
   const fetchKitchens = async () => {
     const res = await api.get("/cafe/kitchens/");
-    setKitchens(listFrom(res));
+    setKitchens(getListFromResponse(res));
   };
 
   const fetchWarehouse = async () => {
-    const wh = await api.get("/cafe/warehouse/");
-    setWarehouse(listFrom(wh));
+    const res = await api.get("/cafe/warehouse/");
+    setWarehouse(getListFromResponse(res));
   };
 
-  const fetchMenuList = async () => {
+  const fetchMenuItems = async () => {
     const res = await api.get("/cafe/menu-items/");
-    setItems(listFrom(res));
+    setItems(getListFromResponse(res));
   };
 
-  const fetchMenuDetail = async (id) => {
+  const fetchMenuItemDetail = async (id) => {
     if (!id) return null;
     try {
-      const r = await api.get(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
-      return r?.data || null;
-    } catch (e) {
-      console.error("Ошибка detail блюда:", e);
+      const res = await api.get(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
+      return res?.data || null;
+    } catch (err) {
       return null;
     }
   };
 
+  // Загрузка категорий при монтировании
   useEffect(() => {
     (async () => {
       try {
         setLoadingCats(true);
-        await fetchCats();
-      } catch (e) {
-        console.error("Ошибка категорий:", e);
+        await fetchCategories();
       } finally {
         setLoadingCats(false);
       }
     })();
   }, []);
 
+  // Загрузка кухонь при монтировании
   useEffect(() => {
     (async () => {
       try {
         await fetchKitchens();
-      } catch (e) {
-        console.error("Ошибка кухонь:", e);
+      } catch (err) {
+        // Ошибка загрузки кухонь - продолжаем работу
       }
     })();
   }, []);
 
+  // Загрузка склада при монтировании
   useEffect(() => {
     (async () => {
       try {
         await fetchWarehouse();
-      } catch (e) {
-        console.error("Ошибка склада:", e);
+      } catch (err) {
+        // Ошибка загрузки склада - продолжаем работу
       }
     })();
   }, []);
 
+  // Загрузка блюд при монтировании
   useEffect(() => {
     (async () => {
       try {
         setLoadingItems(true);
-        await fetchMenuList();
-      } catch (e) {
-        console.error("Ошибка меню:", e);
+        await fetchMenuItems();
       } finally {
         setLoadingItems(false);
       }
     })();
   }, []);
 
+  // Очистка URL при размонтировании
   useEffect(() => {
     return () => {
-      if (imagePreview && imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
     };
   }, [imagePreview]);
 
+  // Фильтрованные списки
   const filteredItems = useMemo(() => {
-    const q = queryItems.trim().toLowerCase();
-    if (!q) return items;
+    let filtered = items;
 
-    return items.filter((m) => {
-      const title = (m.title || "").toLowerCase();
-      const cat = categoryTitle(m.category).toLowerCase();
-      const kit = kitchenTitle(m.kitchen).toLowerCase();
-      return title.includes(q) || cat.includes(q) || kit.includes(q);
-    });
-  }, [items, queryItems, categoriesMap, kitchensMap]);
+    // Фильтр по категории
+    if (selectedCategoryFilter) {
+      filtered = filtered.filter(
+        (item) => String(item?.category || "") === String(selectedCategoryFilter)
+      );
+    }
 
-  const filteredCats = useMemo(() => {
-    const q = queryCats.trim().toLowerCase();
-    if (!q) return categories;
-    return categories.filter((c) => (c.title || "").toLowerCase().includes(q));
+    // Фильтр по поисковому запросу
+    const query = queryItems.trim().toLowerCase();
+    if (query) {
+      filtered = filtered.filter((item) => {
+        const title = (item.title || "").toLowerCase();
+        const category = getCategoryTitle(item.category).toLowerCase();
+        const kitchen = getKitchenTitle(item.kitchen).toLowerCase();
+        return title.includes(query) || category.includes(query) || kitchen.includes(query);
+      });
+    }
+
+    return filtered;
+  }, [items, queryItems, selectedCategoryFilter, categoriesMap, kitchensMap]);
+
+  const filteredCategories = useMemo(() => {
+    const query = queryCats.trim().toLowerCase();
+    if (!query) return categories;
+    return categories.filter((cat) => (cat.title || "").toLowerCase().includes(query));
   }, [categories, queryCats]);
 
-  const openCreate = () => {
+  // Открытие модала создания блюда
+  const openCreateItemModal = () => {
     setEditingId(null);
     setForm({
       title: "",
@@ -214,24 +241,25 @@ const Menu = () => {
     setModalOpen(true);
   };
 
-  const openEdit = async (item) => {
+  // Открытие модала редактирования блюда
+  const openEditItemModal = async (item) => {
     const baseId = item?.id;
-    let full = item;
+    let fullItem = item;
 
     if (!Array.isArray(item?.ingredients)) {
-      const d = await fetchMenuDetail(baseId);
-      if (d) full = d;
+      const detail = await fetchMenuItemDetail(baseId);
+      if (detail) fullItem = detail;
     }
 
-    setEditingId(full.id);
+    setEditingId(fullItem.id);
     setForm({
-      title: full.title || "",
-      category: full.category || categories[0]?.id || "",
-      kitchen: full.kitchen ? String(full.kitchen) : "",
-      price: String(full.price ?? "0").replace(",", "."),
-      is_active: !!full.is_active,
-      ingredients: Array.isArray(full.ingredients)
-        ? full.ingredients.map((ing) => ({
+      title: fullItem.title || "",
+      category: fullItem.category || categories[0]?.id || "",
+      kitchen: fullItem.kitchen ? String(fullItem.kitchen) : "",
+      price: String(fullItem.price ?? "0").replace(",", "."),
+      is_active: !!fullItem.is_active,
+      ingredients: Array.isArray(fullItem.ingredients)
+        ? fullItem.ingredients.map((ing) => ({
             product: ing.product,
             amount: String(ing.amount ?? "").replace(",", "."),
           }))
@@ -239,32 +267,40 @@ const Menu = () => {
     });
 
     setImageFile(null);
-    setImagePreview(full.image_url || "");
+    setImagePreview(fullItem.image_url || "");
     setModalOpen(true);
   };
 
-  const onPickImage = (e) => {
+  // Выбор изображения
+  const handlePickImage = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (imagePreview && imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    if (imagePreview && imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
 
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
 
-  const buildPayload = () => {
+  // Построение payload для сохранения
+  const buildFormPayload = () => {
     const payload = {
       title: (form.title || "").trim(),
       category: form.category,
       kitchen: form.kitchen ? form.kitchen : null,
-      price: numStr(Math.max(0, Number(String(form.price ?? "0").replace(",", ".")) || 0)),
+      price: numberToString(
+        Math.max(0, Number(String(form.price ?? "0").replace(",", ".")) || 0)
+      ),
       is_active: !!form.is_active,
       ingredients: (form.ingredients || [])
-        .filter((r) => r && r.product && String(r.amount || "").trim() !== "")
-        .map((r) => ({
-          product: r.product,
-          amount: numStr(Math.max(0, Number(String(r.amount).replace(",", ".")) || 0)),
+        .filter((row) => row && row.product && String(row.amount || "").trim() !== "")
+        .map((row) => ({
+          product: row.product,
+          amount: numberToString(
+            Math.max(0, Number(String(row.amount).replace(",", ".")) || 0)
+          ),
         })),
     };
 
@@ -272,47 +308,48 @@ const Menu = () => {
     return payload;
   };
 
-  const uploadImageIfNeeded = async (id) => {
+  // Загрузка изображения отдельно
+  const uploadImage = async (id) => {
     if (!id || !imageFile) return true;
 
-    const fd = new FormData();
-    fd.append("image", imageFile);
+    const formData = new FormData();
+    formData.append("image", imageFile);
 
     try {
-      await api.patch(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, fd, {
+      await api.patch(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return true;
-    } catch (e) {
+    } catch (err) {
       try {
-        const p = buildPayload();
-        if (!p) return false;
+        const payload = buildFormPayload();
+        if (!payload) return false;
 
-        const fd2 = new FormData();
-        fd2.append("title", p.title);
-        fd2.append("category", p.category);
-        if (p.kitchen) fd2.append("kitchen", p.kitchen);
-        fd2.append("price", p.price);
-        fd2.append("is_active", p.is_active ? "true" : "false");
-        fd2.append("ingredients", JSON.stringify(p.ingredients));
-        fd2.append("image", imageFile);
+        const formData2 = new FormData();
+        formData2.append("title", payload.title);
+        formData2.append("category", payload.category);
+        if (payload.kitchen) formData2.append("kitchen", payload.kitchen);
+        formData2.append("price", payload.price);
+        formData2.append("is_active", payload.is_active ? "true" : "false");
+        formData2.append("ingredients", JSON.stringify(payload.ingredients));
+        formData2.append("image", imageFile);
 
-        await api.put(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, fd2, {
+        await api.put(`/cafe/menu-items/${encodeURIComponent(String(id))}/`, formData2, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
         return true;
-      } catch (e2) {
-        console.error("Ошибка загрузки картинки:", e2);
+      } catch (err2) {
         return false;
       }
     }
   };
 
-  const saveItem = async (e) => {
+  // Сохранение блюда
+  const saveMenuItem = async (e) => {
     e.preventDefault();
 
-    const payload = buildPayload();
+    const payload = buildFormPayload();
     if (!payload) return;
 
     try {
@@ -322,19 +359,21 @@ const Menu = () => {
         const res = await api.post("/cafe/menu-items/", payload);
         saved = res?.data || null;
       } else {
-        const res = await api.put(`/cafe/menu-items/${encodeURIComponent(String(editingId))}/`, payload);
+        const res = await api.put(
+          `/cafe/menu-items/${encodeURIComponent(String(editingId))}/`,
+          payload
+        );
         saved = res?.data || null;
       }
 
       const savedId = saved?.id || editingId;
 
       if (imageFile && savedId) {
-        const ok = await uploadImageIfNeeded(savedId);
-        if (!ok) console.error("Картинка не загрузилась, но блюдо сохранено.");
+        await uploadImage(savedId);
       }
 
-      const full = savedId ? await fetchMenuDetail(savedId) : null;
-      const finalItem = full || saved;
+      const fullItem = savedId ? await fetchMenuItemDetail(savedId) : null;
+      const finalItem = fullItem || saved;
 
       if (finalItem?.id) {
         setItems((prev) => {
@@ -343,45 +382,48 @@ const Menu = () => {
           return prev.map((m) => (String(m.id) === String(finalItem.id) ? finalItem : m));
         });
       } else {
-        await fetchMenuList();
+        await fetchMenuItems();
       }
 
       setModalOpen(false);
 
-      if (imagePreview && imagePreview.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
       setImageFile(null);
       setImagePreview("");
     } catch (err) {
-      console.error("Ошибка сохранения блюда:", err);
+      // Ошибка сохранения
     }
   };
 
+  // Открыть модал подтверждения удаления блюда
   const openConfirmDeleteItem = (id) => {
     setConfirmKind("item");
     setConfirmId(id);
-    setConfirmTitle("Удалить позицию меню?");
     setConfirmOpen(true);
   };
 
-  const openConfirmDeleteCat = (id) => {
+  // Открыть модал подтверждения удаления категории
+  const openConfirmDeleteCategory = (id) => {
     setConfirmKind("cat");
     setConfirmId(id);
-    setConfirmTitle("Удалить категорию?");
     setConfirmOpen(true);
   };
 
-  const closeConfirm = () => {
+  // Закрыть модал подтверждения
+  const closeConfirmModal = () => {
     setConfirmOpen(false);
     setConfirmKind("");
     setConfirmId(null);
-    setConfirmTitle("");
   };
 
+  // Выполнить удаление
   const confirmDelete = async () => {
     const id = confirmId;
     const kind = confirmKind;
 
-    closeConfirm();
+    closeConfirmModal();
     if (!id || !kind) return;
 
     try {
@@ -396,17 +438,18 @@ const Menu = () => {
         setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
       }
     } catch (err) {
-      console.error("Ошибка удаления:", err);
+      // Ошибка удаления
     }
   };
 
+  // Управление ингредиентами
   const addIngredientRow = () =>
     setForm((f) => ({
       ...f,
       ingredients: [...(f.ingredients || []), { product: "", amount: "1" }],
     }));
 
-  const changeIngredientRow = (idx, field, value) => {
+  const updateIngredientRow = (idx, field, value) => {
     setForm((f) => {
       const rows = [...(f.ingredients || [])];
       const row = { ...(rows[idx] || {}) };
@@ -414,7 +457,7 @@ const Menu = () => {
       if (field === "product") row.product = value;
 
       if (field === "amount") {
-        const normalized = normalizeDecimalInput(value);
+        const normalized = normalizeDecimalValue(value);
         if (normalized !== null) row.amount = normalized;
       }
 
@@ -429,51 +472,56 @@ const Menu = () => {
       ingredients: (f.ingredients || []).filter((_, i) => i !== idx),
     }));
 
-  const openCreateCat = () => {
+  // Управление категориями
+  const openCreateCategoryModal = () => {
     setCatEditId(null);
     setCatTitle("");
     setCatModalOpen(true);
   };
 
-  const openEditCat = (row) => {
-    setCatEditId(row.id);
-    setCatTitle(row.title || "");
+  const openEditCategoryModal = (cat) => {
+    setCatEditId(cat.id);
+    setCatTitle(cat.title || "");
     setCatModalOpen(true);
   };
 
-  const saveCat = async (e) => {
+  const saveCategoryToAPI = async (e) => {
     e.preventDefault();
     const payload = { title: (catTitle || "").trim() };
     if (!payload.title) return;
 
     try {
       if (catEditId) {
-        const res = await api.put(`/cafe/categories/${encodeURIComponent(String(catEditId))}/`, payload);
+        const res = await api.put(
+          `/cafe/categories/${encodeURIComponent(String(catEditId))}/`,
+          payload
+        );
         setCategories((prev) => prev.map((c) => (c.id === catEditId ? res.data : c)));
       } else {
         const res = await api.post("/cafe/categories/", payload);
         setCategories((prev) => [...prev, res.data]);
       }
       setCatModalOpen(false);
-    } catch (e2) {
-      console.error("Ошибка сохранения категории:", e2);
+    } catch (err) {
+      // Ошибка сохранения категории
     }
   };
 
   const isItemsTab = activeTab === "items";
 
   return (
-    <section className="menu">
-      <div className="menu__topRow">
-        <div className="menu__topGrow">
+    <section className="cafeMenu">
+      {/* Верхняя строка: Header + Переключатель видов */}
+      <div className="cafeMenu__topRow">
+        <div className="cafeMenu__topGrow">
           <MenuHeader activeTab={activeTab} onTabChange={setActiveTab} />
         </div>
 
         {isItemsTab && (
-          <div className="menu__viewToggle" aria-label="Переключение вида">
+          <div className="cafeMenu__viewToggle" aria-label="Переключение вида">
             <button
               type="button"
-              className={`menu__viewBtn ${viewMode === "list" ? "menu__viewBtn--active" : ""}`}
+              className={`cafeMenu__viewBtn ${viewMode === "list" ? "cafeMenu__viewBtn--active" : ""}`}
               onClick={() => setViewMode("list")}
               title="Список"
             >
@@ -482,7 +530,7 @@ const Menu = () => {
 
             <button
               type="button"
-              className={`menu__viewBtn ${viewMode === "cards" ? "menu__viewBtn--active" : ""}`}
+              className={`cafeMenu__viewBtn ${viewMode === "cards" ? "cafeMenu__viewBtn--active" : ""}`}
               onClick={() => setViewMode("cards")}
               title="Карточки"
             >
@@ -492,37 +540,41 @@ const Menu = () => {
         )}
       </div>
 
+      {/* Вкладка с блюдами */}
       {isItemsTab && (
         <MenuItemsTab
           loadingItems={loadingItems}
           filteredItems={filteredItems}
           queryItems={queryItems}
           setQueryItems={setQueryItems}
-          onCreate={openCreate}
-          onEdit={openEdit}
+          categories={categories}
+          selectedCategoryFilter={selectedCategoryFilter}
+          setSelectedCategoryFilter={setSelectedCategoryFilter}
+          onCreate={openCreateItemModal}
+          onEdit={openEditItemModal}
           onDelete={openConfirmDeleteItem}
           hasCategories={!!categories.length}
-          categoryTitle={categoryTitle}
-          fmtMoney={fmtMoney}
-          toNum={toNum}
-          productTitle={productTitle}
-          productUnit={productUnit}
+          categoryTitle={getCategoryTitle}
+          formatMoney={formatMoney}
+          toNumber={toNumber}
           viewMode={viewMode}
         />
       )}
 
+      {/* Вкладка с категориями */}
       {activeTab === "categories" && (
         <MenuCategoriesTab
           loadingCats={loadingCats}
-          filteredCats={filteredCats}
+          filteredCats={filteredCategories}
           queryCats={queryCats}
           setQueryCats={setQueryCats}
-          onCreateCat={openCreateCat}
-          onEditCat={openEditCat}
-          onDeleteCat={openConfirmDeleteCat}
+          onCreateCat={openCreateCategoryModal}
+          onEditCat={openEditCategoryModal}
+          onDeleteCat={openConfirmDeleteCategory}
         />
       )}
 
+      {/* Модал для создания/редактирования блюда */}
       <MenuItemModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -532,48 +584,52 @@ const Menu = () => {
         categories={categories}
         kitchens={kitchens}
         warehouse={warehouse}
-        onSubmit={saveItem}
+        onSubmit={saveMenuItem}
         imageFile={imageFile}
         imagePreview={imagePreview}
-        onPickImage={onPickImage}
+        onPickImage={handlePickImage}
         addIngredientRow={addIngredientRow}
-        changeIngredientRow={changeIngredientRow}
+        changeIngredientRow={updateIngredientRow}
         removeIngredientRow={removeIngredientRow}
       />
 
+      {/* Модал для создания/редактирования категории */}
       <MenuCategoryModal
         isOpen={catModalOpen}
         onClose={() => setCatModalOpen(false)}
         catEditId={catEditId}
         catTitle={catTitle}
         setCatTitle={setCatTitle}
-        onSubmit={saveCat}
+        onSubmit={saveCategoryToAPI}
       />
 
+      {/* Модал подтверждения удаления */}
       {confirmOpen && (
-        <div className="menu-modal__overlay" onMouseDown={closeConfirm}>
-          <div className="menu-modal__card" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="menu-modal__header">
-              <div className="menu-modal__headLeft">
-                <h3 className="menu-modal__title">{confirmTitle || "Подтверждение"}</h3>
-                <div className="menu-modal__sub">Действие нельзя отменить.</div>
-              </div>
-
-              <button type="button" className="menu-modal__close" onClick={closeConfirm} aria-label="Закрыть">
-                <FaTimes />
+        <div className="cafeMenuconfirm__overlay" onClick={closeConfirmModal}>
+          <div className="cafeMenuconfirm__card" onClick={(e) => e.stopPropagation()}>
+            <h3 className="cafeMenuconfirm__title">
+              {confirmKind === "item" ? "Удалить позицию меню?" : "Удалить категорию?"}
+            </h3>
+            <p className="cafeMenuconfirm__message">
+              {confirmKind === "item"
+                ? "Это действие невозможно будет отменить"
+                : "Убедитесь, что в этой категории нет блюд"}
+            </p>
+            <div className="cafeMenuconfirm__actions">
+              <button
+                type="button"
+                className="cafeMenu__btn cafeMenu__btn--secondary"
+                onClick={closeConfirmModal}
+              >
+                Отмена
               </button>
-            </div>
-
-            <div className="menu__form">
-              <div className="menu__formActions">
-                <button type="button" className="menu__btn menu__btn--secondary" onClick={closeConfirm}>
-                  Отмена
-                </button>
-
-                <button type="button" className="menu__btn menu__btn--danger" onClick={confirmDelete}>
-                  <FaTrash /> Удалить
-                </button>
-              </div>
+              <button
+                type="button"
+                className="cafeMenu__btn cafeMenu__btn--danger"
+                onClick={confirmDelete}
+              >
+                Удалить
+              </button>
             </div>
           </div>
         </div>
