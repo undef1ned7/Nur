@@ -172,6 +172,13 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
+        label: "Заявки",
+        to: "/crm/barber/requests",
+        icon: menuIcons.clipboardList,
+        permission: "can_view_barber_records",
+        implemented: true,
+      },
+      {
         label: "Сотрудники",
         to: "/crm/barber/masters",
         icon: menuIcons.user,

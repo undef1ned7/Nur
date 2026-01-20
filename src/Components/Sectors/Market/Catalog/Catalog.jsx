@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { FaSearch, FaShoppingCart, FaTimes, FaTrash, FaMinus, FaPlus } from "react-icons/fa";
-import api from "../../../api";
+import { FaSearch, FaShoppingCart, FaTimes, FaTrash, FaMinus, FaPlus, FaStar, FaTag, FaInfoCircle } from "react-icons/fa";
+import api from "../../../../api";
 import "./Catalog.scss";
 
 /* =======================
@@ -92,6 +92,8 @@ const ShowcaseCard = ({ item, onAdd, onOpen }) => {
   const title = String(item?.name || item?.title || "Без названия");
   const cat = String(item?.category_title || "").toUpperCase();
   const price = toNum(item?.final_price ?? item?.price);
+  const hasDiscount = item?.discount_percent && Number(item.discount_percent) > 0;
+  const originalPrice = item?.price && item?.final_price && Number(item.price) !== Number(item.final_price) ? toNum(item.price) : null;
 
   return (
     <article className="sfcard">
@@ -105,14 +107,37 @@ const ShowcaseCard = ({ item, onAdd, onOpen }) => {
             if (e?.currentTarget?.src !== FALLBACK_IMG) e.currentTarget.src = FALLBACK_IMG;
           }}
         />
-        <div className="sfcard__priceTag">{money(price)} сом</div>
+        <div className="sfcard__priceTag">
+          {money(price)} сом
+        </div>
+        {hasDiscount && (
+          <div className="sfcard__discount">
+            <FaTag /> -{Math.round(Number(item.discount_percent) || 0)}%
+          </div>
+        )}
+        {item?.is_new && (
+          <div className="sfcard__badge">
+            <FaStar /> Новинка
+          </div>
+        )}
       </button>
 
       <div className="sfcard__body">
-        <div className="sfcard__meta">{cat || "\u00A0"}</div>
+        {cat ? (
+          <div className="sfcard__meta">
+            <FaTag /> {cat}
+          </div>
+        ) : (
+          <div className="sfcard__meta">{"\u00A0"}</div>
+        )}
         <div className="sfcard__title" title={title}>
           {title}
         </div>
+        {originalPrice && originalPrice > price && (
+          <div className="sfcard__oldPrice">
+            <span className="sfcard__oldPriceValue">{money(originalPrice)} сом</span>
+          </div>
+        )}
 
         <button type="button" className="sfcard__cta" onClick={() => onAdd?.(item, 1)}>
           <span className="sfcard__ctaPlus">+</span>
@@ -220,15 +245,37 @@ const ShowcaseModal = ({ open, slug, productId, onClose, onAdd }) => {
               </div>
 
               <div className="sfmodal__right">
-                {cat ? <div className="sfmodal__pill">{cat}</div> : null}
+                <div className="sfmodal__header">
+                  {cat ? (
+                    <div className="sfmodal__pill">
+                      <FaTag /> {cat}
+                    </div>
+                  ) : null}
+                  {data?.is_new && (
+                    <div className="sfmodal__newBadge">
+                      <FaStar /> Новинка
+                    </div>
+                  )}
+                </div>
                 <div className="sfmodal__title">{title}</div>
-                <div className="sfmodal__price">{money(price)} сом</div>
+                <div className="sfmodal__priceRow">
+                  <div className="sfmodal__price">{money(price)} сом</div>
+                  {data?.price && data?.final_price && Number(data.price) !== Number(data.final_price) && (
+                    <div className="sfmodal__oldPrice">{money(toNum(data.price))} сом</div>
+                  )}
+                </div>
 
-                {data?.description ? <div className="sfmodal__desc">{String(data.description)}</div> : null}
+                {data?.description ? (
+                  <div className="sfmodal__desc">
+                    <FaInfoCircle /> {String(data.description)}
+                  </div>
+                ) : null}
 
                 {charsRu.length > 0 ? (
                   <div className="sfmodal__block">
-                    <div className="sfmodal__blockTitle">Характеристики:</div>
+                    <div className="sfmodal__blockTitle">
+                      <FaInfoCircle /> Характеристики:
+                    </div>
                     <ul className="sfmodal__list">
                       {charsRu.map((b, i) => (
                         <li key={`${b}-${i}`}>{b}</li>
@@ -442,19 +489,6 @@ const Catalog = () => {
         else if (status) setCompanyErr(`Ошибка загрузки компании (${status}).`);
         else setCompanyErr("Ошибка загрузки компании (проверь baseURL / CORS).");
         setCompany(null);
-      });
-
-    api
-      .get(`/users/company/`)
-      .then((res) => {
-        if (!alive) return;
-        const d = res?.data || null;
-        if (d && typeof d === "object") {
-          setCompany((prev) => ({ ...(prev || {}), ...d }));
-        }
-      })
-      .catch((e) => {
-        if (e?.response?.status && e.response.status !== 401) console.error(e);
       })
       .finally(() => {
         if (!alive) return;
@@ -692,49 +726,109 @@ const Catalog = () => {
       </header>
 
       <div className="shopfront__shell">
-        {/* Categories */}
-        <div className="sfcats">
-          <div className="sfcats__title">Категории</div>
-
-          <div className="sfcats__row" aria-label="Categories">
-            <button
-              type="button"
-              className={`sfchip ${qState.category ? "" : "sfchip--active"}`}
-              onClick={() => setQS({ category: "" })}
-            >
-              Все
-            </button>
-
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`sfchip ${String(qState.category) === String(c.id) ? "sfchip--active" : ""}`}
-                onClick={() => setQS({ category: c.id })}
-                title={c.title}
-              >
-                {c.title}
-              </button>
-            ))}
+        {/* Hero Section */}
+        {company && !companyLoading && (
+          <div className="shopfront__hero">
+            <div className="shopfront__heroContent">
+              <h1 className="shopfront__heroTitle">{company.name || "Добро пожаловать"}</h1>
+              {company.description && (
+                <p className="shopfront__heroDesc">{company.description}</p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Categories */}
+        {categories.length > 0 && (
+          <div className="sfcats">
+            <div className="sfcats__header">
+              <div className="sfcats__title">
+                <FaTag /> Категории
+              </div>
+              <div className="sfcats__count">{categories.length} категорий</div>
+            </div>
+
+            <div className="sfcats__row" aria-label="Categories">
+              <button
+                type="button"
+                className={`sfchip ${qState.category ? "" : "sfchip--active"}`}
+                onClick={() => setQS({ category: "" })}
+              >
+                <FaStar /> Все
+              </button>
+
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`sfchip ${String(qState.category) === String(c.id) ? "sfchip--active" : ""}`}
+                  onClick={() => setQS({ category: c.id })}
+                  title={c.title}
+                >
+                  {c.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Products header */}
         <div className="sfhead">
-          <div className="sfhead__title">Все товары</div>
+          <div className="sfhead__left">
+            <div className="sfhead__title">
+              <FaShoppingCart /> Все товары
+            </div>
+            {qState.q && (
+              <div className="sfhead__searchInfo">
+                Результаты поиска: "{qState.q}"
+              </div>
+            )}
+          </div>
           <div className="sfhead__count">
-            {companyErr ? <span className="sfhead__err">{companyErr}</span> : `${count} товаров`}
+            {companyErr ? (
+              <span className="sfhead__err">{companyErr}</span>
+            ) : loading ? (
+              "Загрузка..."
+            ) : (
+              `${count} ${count === 1 ? "товар" : count < 5 ? "товара" : "товаров"}`
+            )}
           </div>
         </div>
 
-        {err ? <div className="sfalert">{err}</div> : null}
+        {err ? (
+          <div className="sfalert">
+            <FaInfoCircle /> {err}
+          </div>
+        ) : null}
 
         {/* Grid */}
         <div className="sfgrid">
-          {loading ? <div className="sfgrid__info">Загрузка...</div> : null}
-          {!loading && items.length === 0 ? <div className="sfgrid__info">Товары не найдены.</div> : null}
+          {loading ? (
+            <div className="sfgrid__info">
+              <div className="sfgrid__loader">
+                <div className="sfgrid__loaderSpinner"></div>
+                <div>Загрузка товаров...</div>
+              </div>
+            </div>
+          ) : null}
+          {!loading && items.length === 0 && !err ? (
+            <div className="sfgrid__info">
+              <div className="sfgrid__empty">
+                <FaShoppingCart />
+                <div className="sfgrid__emptyTitle">Товары не найдены</div>
+                <div className="sfgrid__emptyText">
+                  {qState.q || qState.category
+                    ? "Попробуйте изменить параметры поиска или выберите другую категорию"
+                    : "В каталоге пока нет товаров"}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-          {!loading && items.map((p) => <ShowcaseCard key={p.id} item={p} onAdd={addToCart} onOpen={openProduct} />)}
+          {!loading &&
+            items.map((p) => (
+              <ShowcaseCard key={p.id} item={p} onAdd={addToCart} onOpen={openProduct} />
+            ))}
         </div>
       </div>
 

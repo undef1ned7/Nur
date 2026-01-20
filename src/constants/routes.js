@@ -8,7 +8,7 @@ export const ALLOWED_PATHS_WITHOUT_TOKEN = [
 
 
   "/cafe/:company_slug/menu",
-  // "/catalog/:slug"
+  "/catalog/:slug",
 ];
 
 // Публичные пути, на которые нужно редиректить если токен валиден

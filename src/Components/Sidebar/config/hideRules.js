@@ -88,6 +88,7 @@ export const HIDE_RULES = [
         "/crm/zakaz",
         "crm/raspisanie",
         "/crm/debts",
+        "/crm/barber/requests",
         // "/crm/sklad",
         "/crm/barber/warehouse",
       ],

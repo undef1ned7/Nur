@@ -59,6 +59,7 @@ import Recorda from "../Components/Sectors/Barber/Recorda/Recorda";
 import BarberClients from "../Components/Sectors/Barber/Clients/Clients";
 import BarberAnalitika from "../Components/Sectors/Barber/BarberAnalitika/BarberAnalitika";
 import MastersTabs from "../Components/Sectors/Barber/Masters/MastersTabs/MastersTabs";
+import BarberRequests from "../Components/Sectors/Barber/Requests/Requests";
 
 // Hostel
 import RoomsHalls from "../Components/Sectors/Hostel/RoomsHalls/RoomsHalls";
@@ -154,7 +155,7 @@ import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/
 
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
-// import OnlineCatalog from "../Components/Online/Market/Catalog";
+import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
 
 
 /**
@@ -201,17 +202,18 @@ export const publicRoutes = [
 
 
 
-  // ✅ Публичное онлайн-меню кафе по slug
-  //     <Route
-  //   key="/catalog/:slug"
-  //   path="/catalog/:slug"
-  //   element={<OnlineCatalog />}
-  // />,
+ // Public routes
+<Route
+    key="/catalog/:slug"
+    path="/catalog/:slug"
+    element={<OnlineCatalog />}
+  />,
   <Route
     key="/cafe/:company_slug/menu"
     path="/cafe/:company_slug/menu"
     element={<CafeMenuOnline />}
   />,
+
 
 
   <Route
@@ -280,6 +282,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("barber/records", Recorda),
   createProtectedRoute("barber/clients", BarberClients),
   createProtectedRoute("barber/cash-reports", BarberAnalitika),
+  createProtectedRoute("barber/requests", BarberRequests),
 
   // Hostel routes
   createProtectedRoute("hostel/rooms", RoomsHalls),
