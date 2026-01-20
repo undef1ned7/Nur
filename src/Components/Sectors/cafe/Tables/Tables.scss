@@ -9,9 +9,7 @@
  * ✅ Proper scroll heights
  */
 
-@import "../../../common/SearchableCombobox/SearchableCombobox.scss";
-
-@import "../variables.scss";
+@use "../../../common/SearchableCombobox/SearchableCombobox.scss";
 
 /* ===== MAIN CONTAINER ===== */
 .cafeTables {
