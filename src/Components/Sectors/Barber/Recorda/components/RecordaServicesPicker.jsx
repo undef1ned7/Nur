@@ -1,7 +1,7 @@
 // RecordaServicesPicker.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaSearch, FaTimes, FaChevronDown } from "react-icons/fa";
-import "./Recorda.scss";
+import "../Recorda.scss";
 import { fmtMoney } from "./RecordaUtils";
 
 const RecordaServicesPicker = ({
@@ -23,7 +23,7 @@ const RecordaServicesPicker = ({
 
   renderMeta = true,
 
-  // ✅ для создания снаружи (кнопка рядом с +)
+  // для создания снаружи (кнопка рядом с +)
   allowCreate = false,
   onQueryChange,
   onCreateAvailabilityChange,
@@ -105,7 +105,7 @@ const RecordaServicesPicker = ({
     window.requestAnimationFrame(() => inputRef.current?.focus?.());
   }, [open]);
 
-  // ✅ отдаём наружу: текущий запрос + можно ли создавать
+  // отдаём наружу: текущий запрос + можно ли создавать
   useEffect(() => {
     if (!isSingle) return;
     onQueryChange?.(qTrim);
@@ -269,16 +269,15 @@ const RecordaServicesPicker = ({
           {summary && (
             <div className="barberrecorda__svcSummaryCard">
               <div className="barberrecorda__svcSummaryCol">
-                <div className="barberrecorda__svcSummaryLabel">Услуг</div>
-                <div className="barberrecorda__svcSummaryValue">{summary.count}</div>
+                <span className="barberrecorda__svcSummaryValue">{summary.count}</span>
+                <span className="barberrecorda__svcSummaryLabel">услуг</span>
               </div>
               <div className="barberrecorda__svcSummaryCol">
-                <div className="barberrecorda__svcSummaryLabel">Время</div>
-                <div className="barberrecorda__svcSummaryValue">{summary.totalMinutes}м</div>
+                <span className="barberrecorda__svcSummaryValue">{summary.totalMinutes}</span>
+                <span className="barberrecorda__svcSummaryLabel">мин</span>
               </div>
               <div className="barberrecorda__svcSummaryCol">
-                <div className="barberrecorda__svcSummaryLabel">Сумма</div>
-                <div className="barberrecorda__svcSummaryValue">{fmtMoney(summary.totalPrice)}</div>
+                <span className="barberrecorda__svcSummaryValue">{fmtMoney(summary.totalPrice)}</span>
               </div>
             </div>
           )}

@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import "./History.scss";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { FaSearch, FaThLarge, FaList, FaExclamationTriangle, FaFilter, FaTimes, FaUser, FaCut, FaCalendarAlt, FaClock, FaMoneyBillWave, FaPercent, FaTag } from "react-icons/fa";
 import api from "../../../../api";
-import { useSelector } from "react-redux";
-import { FaCalendarAlt } from "react-icons/fa";
-
+import { useUser } from "../../../../store/slices/userSlice";
+import BarberSelect from "../common/BarberSelect";
+import { Pager } from "./components";
 import {
   PAGE_SIZE,
   asArray,
@@ -18,9 +18,29 @@ import {
   basePriceOfAppointment,
   discountPercentOfAppointment,
   statusLabel,
+  getYMD,
+  monthNames,
+  pad,
 } from "./HistoryUtils";
+import "./History.scss";
 
-import HistoryPager from "./HistoryPager";
+const getId = (v) => (v && typeof v === "object" ? v.id : v);
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "Все статусы" },
+  { value: "completed", label: "Завершено" },
+  { value: "booked", label: "Забронировано" },
+  { value: "confirmed", label: "Подтверждено" },
+  { value: "canceled", label: "Отменено" },
+  { value: "no_show", label: "Не пришёл" },
+];
+
+const SORT_OPTIONS = [
+  { value: "newest", label: "Сначала новые" },
+  { value: "oldest", label: "Сначала старые" },
+  { value: "price_desc", label: "Цена ↓" },
+  { value: "price_asc", label: "Цена ↑" },
+];
 
 const pluralRecords = (n) => {
   const mod10 = n % 10;
@@ -30,35 +50,12 @@ const pluralRecords = (n) => {
   return "записей";
 };
 
-const toTsFrom = (isoDate) => {
-  if (!isoDate) return null; // YYYY-MM-DD
-  const t = Date.parse(`${isoDate}T00:00:00`);
-  return Number.isFinite(t) ? t : null;
-};
-
-const toTsTo = (isoDate) => {
-  if (!isoDate) return null; // YYYY-MM-DD
-  const t = Date.parse(`${isoDate}T23:59:59`);
-  return Number.isFinite(t) ? t : null;
-};
-
-const getId = (v) => (v && typeof v === "object" ? v.id : v);
-
-const openPicker = (ref) => {
-  const el = ref?.current;
-  if (!el) return;
-  // Chrome/Edge: showPicker()
-  if (typeof el.showPicker === "function") el.showPicker();
-  else el.focus();
-};
-
 const History = () => {
-  const { isAuthenticated, currentUser } = useSelector((s) => s.user) || {};
-  const userEmail =
-    (currentUser?.email && String(currentUser.email)) ||
-    (currentUser?.user?.email && String(currentUser.user.email)) ||
-    "";
-  const userId = currentUser?.id || currentUser?.user?.id || null;
+  const { currentUser, userId, isAuthenticated } = useUser();
+  const userEmail = currentUser?.email || currentUser?.user?.email || "";
+  
+  /* Проверяем, авторизован ли пользователь */
+  const isLoggedIn = isAuthenticated && (userId || userEmail);
 
   const [employees, setEmployees] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -68,14 +65,22 @@ const History = () => {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // YYYY-MM-DD (native date input)
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [viewMode, setViewMode] = useState("table");
+
+  const [yearFilter, setYearFilter] = useState("");
+  const [monthFilter, setMonthFilter] = useState("");
+  const [dayFilter, setDayFilter] = useState("");
 
   const [page, setPage] = useState(1);
 
-  const fromRef = useRef(null);
-  const toRef = useRef(null);
+  /* Filters panel state */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  /* Modal state */
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
   const fetchEmployees = useCallback(async () => asArray((await api.get("/users/employees/")).data), []);
   const fetchAppointments = useCallback(async () => asArray((await api.get("/barbershop/appointments/")).data), []);
@@ -84,19 +89,6 @@ const History = () => {
 
   useEffect(() => {
     let alive = true;
-
-    if (!isAuthenticated) {
-      setEmployees([]);
-      setAppointments([]);
-      setServices([]);
-      setClients([]);
-      setErr("");
-      setLoading(false);
-      return () => {
-        alive = false;
-      };
-    }
-
     (async () => {
       try {
         setLoading(true);
@@ -119,30 +111,29 @@ const History = () => {
         if (alive) setLoading(false);
       }
     })();
-
     return () => {
       alive = false;
     };
-  }, [fetchEmployees, fetchAppointments, fetchServices, fetchClients, isAuthenticated]);
+  }, [fetchEmployees, fetchAppointments, fetchServices, fetchClients]);
 
+
+  /* Определяем ID сотрудников текущего пользователя */
   const myEmployeeIds = useMemo(() => {
-    if (!isAuthenticated) return new Set();
-    const email = norm(userEmail);
     const ids = new Set();
+    const email = norm(userEmail);
 
     employees.forEach((e) => {
       const em = norm(e?.email);
       if (email && em && em === email) ids.add(String(e.id));
-
       const eu = getId(e?.user) ?? e?.user_id;
       if (userId && eu === userId) ids.add(String(e.id));
     });
 
     return ids;
-  }, [employees, isAuthenticated, userEmail, userId]);
+  }, [employees, userEmail, userId]);
 
+  /* Фильтруем записи текущего пользователя */
   const myAppointments = useMemo(() => {
-    if (!isAuthenticated) return [];
     const email = norm(userEmail);
 
     const belongs = (a) => {
@@ -160,68 +151,114 @@ const History = () => {
       if (userId && createdById === userId) return true;
 
       const emails = [
-        a?.barber_email,
-        a?.employee_email,
-        a?.master_email,
-        a?.user_email,
-        a?.created_by_email,
-        a?.user?.email,
-        a?.created_by?.email,
-        a?.barber?.email,
-        a?.employee?.email,
-        a?.master?.email,
-      ]
-        .filter(Boolean)
-        .map(norm);
+        a?.barber_email, a?.employee_email, a?.master_email,
+        a?.user_email, a?.created_by_email, a?.user?.email,
+        a?.created_by?.email, a?.barber?.email, a?.employee?.email, a?.master?.email,
+      ].filter(Boolean).map(norm);
 
       return email && emails.some((x) => x === email);
     };
 
-    return appointments
-      .filter(belongs)
-      .slice()
-      .sort((a, b) => (Date.parse(b?.start_at) || 0) - (Date.parse(a?.start_at) || 0));
-  }, [appointments, isAuthenticated, myEmployeeIds, userEmail, userId]);
+    return appointments.filter(belongs);
+  }, [appointments, myEmployeeIds, userEmail, userId]);
 
-  const range = useMemo(() => {
-    const fromTs = toTsFrom(from);
-    const toTs = toTsTo(to);
-    return { fromTs, toTs };
-  }, [from, to]);
+  /* Options for year/month/day filters */
+  const yearOptions = useMemo(
+    () => [
+      { value: "", label: "Все годы" },
+      { value: "2025", label: "2025" },
+      { value: "2026", label: "2026" },
+      { value: "2027", label: "2027" },
+    ],
+    []
+  );
 
-  const invalidRange = useMemo(() => {
-    const { fromTs, toTs } = range;
-    return fromTs !== null && toTs !== null && fromTs > toTs;
-  }, [range]);
+  const monthOptions = useMemo(
+    () => [
+      { value: "", label: "Все месяцы" },
+      ...monthNames.map((label, idx) => ({ value: String(idx + 1), label })),
+    ],
+    []
+  );
+
+  const daysInMonth = useMemo(() => {
+    if (!yearFilter || !monthFilter) return 31;
+    const y = Number(yearFilter);
+    const m = Number(monthFilter);
+    if (!Number.isFinite(y) || !Number.isFinite(m)) return 31;
+    return new Date(y, m, 0).getDate();
+  }, [yearFilter, monthFilter]);
+
+  const dayOptions = useMemo(
+    () => [
+      { value: "", label: "Все дни" },
+      ...Array.from({ length: daysInMonth }).map((_, i) => ({
+        value: String(i + 1),
+        label: pad(i + 1),
+      })),
+    ],
+    [daysInMonth]
+  );
+
+  const sortAppointments = (arr, sortKey) => {
+    const sorted = [...arr];
+    switch (sortKey) {
+      case "oldest":
+        return sorted.sort((a, b) => (Date.parse(a?.start_at) || 0) - (Date.parse(b?.start_at) || 0));
+      case "price_desc":
+        return sorted.sort((a, b) => (priceOfAppointment(b, services) || 0) - (priceOfAppointment(a, services) || 0));
+      case "price_asc":
+        return sorted.sort((a, b) => (priceOfAppointment(a, services) || 0) - (priceOfAppointment(b, services) || 0));
+      case "newest":
+      default:
+        return sorted.sort((a, b) => (Date.parse(b?.start_at) || 0) - (Date.parse(a?.start_at) || 0));
+    }
+  };
 
   const filtered = useMemo(() => {
-    if (!isAuthenticated) return [];
-    if (invalidRange) return [];
+    let arr = myAppointments.slice();
 
-    let arr = myAppointments;
+    // Year/Month/Day filter
+    if (yearFilter) {
+      const yStr = String(yearFilter);
+      const mStr = monthFilter ? pad(Number(monthFilter)) : "";
+      const dStr = dayFilter ? pad(Number(dayFilter)) : "";
 
-    if (range.fromTs !== null) {
       arr = arr.filter((x) => {
-        const t = Date.parse(x?.start_at);
-        return Number.isFinite(t) && t >= range.fromTs;
+        const ymd = getYMD(x?.start_at);
+        if (!ymd) return false;
+        if (String(ymd.year) !== yStr) return false;
+        if (mStr && pad(ymd.month) !== mStr) return false;
+        if (dStr && pad(ymd.day) !== dStr) return false;
+        return true;
       });
     }
 
-    if (range.toTs !== null) {
+    // Status filter
+    if (statusFilter !== "all") {
+      arr = arr.filter((x) => String(x?.status || "").toLowerCase() === statusFilter);
+    }
+
+    // Search filter
+    const q = search.trim().toLowerCase();
+    if (q) {
       arr = arr.filter((x) => {
-        const t = Date.parse(x?.start_at);
-        return Number.isFinite(t) && t <= range.toTs;
+        const client = clientNameOf(x, clients).toLowerCase();
+        const service = serviceNamesFromRecord(x, services).toLowerCase();
+        const barber = barberNameOf(x, employees).toLowerCase();
+        const date = dateISO(x?.start_at).toLowerCase();
+        return client.includes(q) || service.includes(q) || barber.includes(q) || date.includes(q);
       });
     }
 
-    return arr;
-  }, [myAppointments, range, invalidRange, isAuthenticated]);
+    return sortAppointments(arr, sortBy);
+  }, [myAppointments, yearFilter, monthFilter, dayFilter, statusFilter, search, sortBy, clients, services, employees]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
   useEffect(() => {
     setPage(1);
-  }, [from, to]);
+  }, [yearFilter, monthFilter, dayFilter, search, statusFilter, sortBy]);
 
   useEffect(() => {
     setPage((p) => Math.min(Math.max(1, p), totalPages));
@@ -230,155 +267,429 @@ const History = () => {
   const safePage = Math.min(page, totalPages);
   const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const totalLabel = loading
+  const counterText = loading
     ? "Загрузка…"
-    : `${filtered.length} ${pluralRecords(filtered.length)}${
-        filtered.length > PAGE_SIZE ? ` · стр. ${safePage}/${totalPages}` : ""
-      }`;
+    : `${filtered.length} ${pluralRecords(filtered.length)}`;
+
+  /* Check if filters are active */
+  const activeFiltersCount = [
+    statusFilter && statusFilter !== "all" ? statusFilter : null,
+    sortBy !== "newest" ? sortBy : null,
+    yearFilter,
+  ].filter(Boolean).length;
+
+  const hasFilters = search || activeFiltersCount > 0;
 
   const handleReset = () => {
-    setFrom("");
-    setTo("");
+    setSearch("");
+    setStatusFilter("all");
+    setSortBy("newest");
+    setYearFilter("");
+    setMonthFilter("");
+    setDayFilter("");
     setPage(1);
+    setFiltersOpen(false);
   };
 
-  const handlePrevPage = () => setPage((p) => Math.max(1, p - 1));
-  const handleNextPage = () => setPage((p) => Math.min(totalPages, p + 1));
+  const handleClearFilters = () => {
+    setStatusFilter("all");
+    setSortBy("newest");
+    setYearFilter("");
+    setMonthFilter("");
+    setDayFilter("");
+  };
+
+  /* Handlers with cascade reset */
+  const handleYearChange = (val) => {
+    setYearFilter(val);
+    setMonthFilter("");
+    setDayFilter("");
+  };
+
+  const handleMonthChange = (val) => {
+    setMonthFilter(val);
+    setDayFilter("");
+  };
+
+  /* Get record data */
+  const getRecordData = (a) => {
+    const date = dateISO(a?.start_at);
+    const time = timeISO(a?.start_at);
+    const client = clientNameOf(a, clients);
+    const service = serviceNamesFromRecord(a, services);
+    const barber = barberNameOf(a, employees);
+    const totalPrice = priceOfAppointment(a, services);
+    const basePrice = basePriceOfAppointment(a, services);
+    const discountPct = discountPercentOfAppointment(a, basePrice, totalPrice);
+    const statusKey = String(a?.status || "").toLowerCase();
+    const statusText = a?.status_display || statusLabel(statusKey);
+
+    return { date, time, client, service, barber, totalPrice, basePrice, discountPct, statusKey, statusText };
+  };
+
+  /* Modal */
+  const renderModal = () => {
+    if (!selectedRecord) return null;
+
+    const data = getRecordData(selectedRecord);
+
+    return (
+      <>
+        <div className="barberhistory__overlay" onClick={() => setSelectedRecord(null)} />
+        <div className="barberhistory__modal">
+          <div className="barberhistory__modalHeader">
+            <h3 className="barberhistory__modalTitle">Детали записи</h3>
+            <button
+              type="button"
+              className="barberhistory__modalClose"
+              onClick={() => setSelectedRecord(null)}
+            >
+              <FaTimes />
+            </button>
+          </div>
+
+          <div className="barberhistory__modalBody">
+            <div className="barberhistory__modalStatus">
+              <span className={`barberhistory__badge barberhistory__badge--${data.statusKey}`}>
+                {data.statusText}
+              </span>
+            </div>
+
+            <div className="barberhistory__modalGrid">
+              <div className="barberhistory__modalItem">
+                <div className="barberhistory__modalIcon">
+                  <FaCalendarAlt />
+                </div>
+                <div className="barberhistory__modalInfo">
+                  <span className="barberhistory__modalLabel">Дата</span>
+                  <span className="barberhistory__modalValue">{data.date}</span>
+                </div>
+              </div>
+
+              <div className="barberhistory__modalItem">
+                <div className="barberhistory__modalIcon">
+                  <FaClock />
+                </div>
+                <div className="barberhistory__modalInfo">
+                  <span className="barberhistory__modalLabel">Время</span>
+                  <span className="barberhistory__modalValue">{data.time}</span>
+                </div>
+              </div>
+
+              <div className="barberhistory__modalItem">
+                <div className="barberhistory__modalIcon">
+                  <FaUser />
+                </div>
+                <div className="barberhistory__modalInfo">
+                  <span className="barberhistory__modalLabel">Мастер</span>
+                  <span className="barberhistory__modalValue">{data.barber}</span>
+                </div>
+              </div>
+
+              <div className="barberhistory__modalItem">
+                <div className="barberhistory__modalIcon">
+                  <FaUser />
+                </div>
+                <div className="barberhistory__modalInfo">
+                  <span className="barberhistory__modalLabel">Клиент</span>
+                  <span className="barberhistory__modalValue">{data.client}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="barberhistory__modalSection">
+              <div className="barberhistory__modalItem barberhistory__modalItem--full">
+                <div className="barberhistory__modalIcon">
+                  <FaCut />
+                </div>
+                <div className="barberhistory__modalInfo">
+                  <span className="barberhistory__modalLabel">Услуги</span>
+                  <span className="barberhistory__modalValue">{data.service}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="barberhistory__modalPricing">
+              <div className="barberhistory__modalPriceRow">
+                <span className="barberhistory__modalPriceLabel">
+                  <FaTag /> Цена
+                </span>
+                <span className="barberhistory__modalPriceValue">{fmtMoney(data.basePrice)}</span>
+              </div>
+
+              {data.discountPct > 0 && (
+                <div className="barberhistory__modalPriceRow barberhistory__modalPriceRow--discount">
+                  <span className="barberhistory__modalPriceLabel">
+                    <FaPercent /> Скидка
+                  </span>
+                  <span className="barberhistory__modalPriceValue">-{data.discountPct}%</span>
+                </div>
+              )}
+
+              <div className="barberhistory__modalPriceRow barberhistory__modalPriceRow--total">
+                <span className="barberhistory__modalPriceLabel">
+                  <FaMoneyBillWave /> Итого
+                </span>
+                <span className="barberhistory__modalPriceValue">{fmtMoney(data.totalPrice)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const renderCard = (a) => {
+    const data = getRecordData(a);
+
+    return (
+      <article
+        key={a?.id ?? `${a?.start_at}-${data.client}`}
+        className="barberhistory__card"
+        onClick={() => setSelectedRecord(a)}
+      >
+        <div className="barberhistory__cardHead">
+          <h4 className="barberhistory__cardTitle">{data.date}</h4>
+          <span className={`barberhistory__badge barberhistory__badge--${data.statusKey}`}>
+            {data.statusText}
+          </span>
+        </div>
+        <div className="barberhistory__cardBody">
+          <div className="barberhistory__cardRow">
+            <span>Клиент: <strong>{data.client}</strong></span>
+          </div>
+          <div className="barberhistory__cardTotal">
+            <span className="barberhistory__cardTotalLabel">Итого:</span>
+            <span className="barberhistory__cardTotalValue">{fmtMoney(data.totalPrice)}</span>
+          </div>
+        </div>
+      </article>
+    );
+  };
+
+  const renderTable = () => (
+    <div className="barberhistory__tableWrap">
+      <table className="barberhistory__table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th>Клиент</th>
+            <th>Итого</th>
+            <th>Статус</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((a) => {
+            const data = getRecordData(a);
+
+            return (
+              <tr
+                key={a?.id ?? `${a?.start_at}-${data.client}`}
+                className="barberhistory__row"
+                onClick={() => setSelectedRecord(a)}
+              >
+                <td>{data.date}</td>
+                <td>{data.client}</td>
+                <td className="barberhistory__cellPrice">{fmtMoney(data.totalPrice)}</td>
+                <td>
+                  <span className={`barberhistory__badge barberhistory__badge--${data.statusKey}`}>
+                    {data.statusText}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <section className="barberhistory">
-      <header className="barberhistory__header">
-        <span className="barberhistory__subtitle">{totalLabel}</span>
-
-        <div className="barberhistory__filters">
-          <label className={`barberhistory__field ${invalidRange ? "barberhistory__field--invalid" : ""}`}>
-            <span className="barberhistory__label">От</span>
-            <div className="barberhistory__control">
-              <input
-                ref={fromRef}
-                type="date"
-                className="barberhistory__input barberhistory__input--date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                onKeyDown={(e) => e.preventDefault()} // не печатать
-              />
-              <button
-                type="button"
-                className="barberhistory__iconBtn"
-                onClick={() => openPicker(fromRef)}
-                aria-label="Выбрать дату (От)"
-              >
-                <FaCalendarAlt />
-              </button>
-            </div>
-          </label>
-
-          <label className={`barberhistory__field ${invalidRange ? "barberhistory__field--invalid" : ""}`}>
-            <span className="barberhistory__label">До</span>
-            <div className="barberhistory__control">
-              <input
-                ref={toRef}
-                type="date"
-                className="barberhistory__input barberhistory__input--date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                onKeyDown={(e) => e.preventDefault()} // не печатать
-              />
-              <button
-                type="button"
-                className="barberhistory__iconBtn"
-                onClick={() => openPicker(toRef)}
-                aria-label="Выбрать дату (До)"
-              >
-                <FaCalendarAlt />
-              </button>
-            </div>
-          </label>
-
+      <div className="barberhistory__topRow">
+        <span className="barberhistory__counter">{counterText}</span>
+        {hasFilters && (
           <button
             type="button"
-            className="barberhistory__btn barberhistory__btn--secondary"
+            className="barberhistory__resetBtn"
             onClick={handleReset}
           >
-            Сброс
+            Сбросить всё
           </button>
-        </div>
-      </header>
-
-      {!!err && <div className="barberhistory__alert">{err}</div>}
-      {invalidRange && <div className="barberhistory__alert">Диапазон дат неверен.</div>}
-      {!isAuthenticated && <div className="barberhistory__alert">Войдите, чтобы увидеть ваши записи.</div>}
-
-      <div className="barberhistory__list">
-        {loading ? (
-          <div className="barberhistory__alert">Загрузка…</div>
-        ) : rows.length === 0 ? (
-          <div className="barberhistory__alert">Записей нет</div>
-        ) : (
-          rows.map((a) => {
-            const date = dateISO(a?.start_at);
-            const time = timeISO(a?.start_at);
-            const client = clientNameOf(a, clients);
-            const service = serviceNamesFromRecord(a, services);
-
-            const totalPrice = priceOfAppointment(a, services);
-            const basePrice = basePriceOfAppointment(a, services);
-            const discountPct = discountPercentOfAppointment(a, basePrice, totalPrice);
-
-            const statusKey = String(a?.status || "").toLowerCase();
-            const statusText = a?.status_display || statusLabel(statusKey);
-
-            const statusClass =
-              statusKey === "completed"
-                ? "barberhistory__status barberhistory__status--completed"
-                : statusKey === "canceled"
-                ? "barberhistory__status barberhistory__status--canceled"
-                : "barberhistory__status";
-
-            const barber = barberNameOf(a, employees);
-            const discountLabel = discountPct !== null ? `${discountPct}%` : "0%";
-
-            return (
-              <article
-                key={a?.id ?? `${a?.start_at}-${client}-${service}`}
-                className="barberhistory__card"
-              >
-                <div className="barberhistory__cardHead">
-                  <h4 className="barberhistory__name">
-                    {date} • {time}
-                  </h4>
-                  <span className={statusClass}>{statusText}</span>
-                </div>
-
-                <div className="barberhistory__meta">
-                  <div className="barberhistory__metaRow">
-                    <span className="bh-item">Сотрудник: {barber}</span>
-                    <span className="bh-item">Клиент: {client}</span>
-                  </div>
-
-                  <div className="barberhistory__metaRow">
-                    <span className="bh-item">Услуга: {service}</span>
-                  </div>
-
-                  <div className="barberhistory__metaRow barberhistory__metaRow--summary">
-                    <span className="bh-item">Цена без скидки: {fmtMoney(basePrice)}</span>
-                    <span className="bh-item">Скидка: {discountLabel}</span>
-                    <span className="bh-item bh-item--bold">Итого: {fmtMoney(totalPrice)}</span>
-                  </div>
-                </div>
-              </article>
-            );
-          })
         )}
       </div>
 
-      <HistoryPager
-        filteredCount={filtered.length}
-        safePage={safePage}
-        totalPages={totalPages}
-        onPrev={handlePrevPage}
-        onNext={handleNextPage}
-      />
+      <div className="barberhistory__actions">
+        <div className="barberhistory__searchWrap">
+          <FaSearch className="barberhistory__searchIcon" />
+          <input
+            className="barberhistory__searchInput"
+            placeholder="Поиск..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Поиск"
+          />
+        </div>
+
+        {/* Кнопка "Фильтры" */}
+        <div className="barberhistory__filtersWrap">
+          <button
+            type="button"
+            className={`barberhistory__filtersBtn ${filtersOpen ? "is-open" : ""} ${activeFiltersCount > 0 ? "has-active" : ""}`}
+            onClick={() => setFiltersOpen(!filtersOpen)}
+          >
+            <FaFilter />
+            <span>Фильтры</span>
+            {activeFiltersCount > 0 && (
+              <span className="barberhistory__filtersBadge">{activeFiltersCount}</span>
+            )}
+          </button>
+        </div>
+
+        <div className="barberhistory__viewToggle">
+          <button
+            className={`barberhistory__viewBtn ${viewMode === "table" ? "is-active" : ""}`}
+            onClick={() => setViewMode("table")}
+            title="Таблица"
+            aria-label="Вид таблицей"
+          >
+            <FaList />
+          </button>
+          <button
+            className={`barberhistory__viewBtn ${viewMode === "cards" ? "is-active" : ""}`}
+            onClick={() => setViewMode("cards")}
+            title="Карточки"
+            aria-label="Вид карточками"
+          >
+            <FaThLarge />
+          </button>
+        </div>
+      </div>
+
+      {/* Модальное окно фильтров */}
+      {filtersOpen && (
+        <>
+          <div className="barberhistory__filtersOverlay" onClick={() => setFiltersOpen(false)} />
+          <div className="barberhistory__filtersPanel">
+              <div className="barberhistory__filtersPanelHeader">
+                <span className="barberhistory__filtersPanelTitle">Фильтры</span>
+                <button
+                  type="button"
+                  className="barberhistory__filtersPanelClose"
+                  onClick={() => setFiltersOpen(false)}
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="barberhistory__filtersPanelBody">
+                <div className="barberhistory__filtersPanelRow">
+                  <label className="barberhistory__filtersPanelLabel">Статус</label>
+                  <BarberSelect
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={STATUS_OPTIONS}
+                    placeholder="Все статусы"
+                  />
+                </div>
+
+                <div className="barberhistory__filtersPanelRow">
+                  <label className="barberhistory__filtersPanelLabel">Сортировка</label>
+                  <BarberSelect
+                    value={sortBy}
+                    onChange={setSortBy}
+                    options={SORT_OPTIONS}
+                    placeholder="Сортировка"
+                  />
+                </div>
+
+                <div className="barberhistory__filtersPanelRow">
+                  <label className="barberhistory__filtersPanelLabel">Год</label>
+                  <BarberSelect
+                    value={yearFilter}
+                    onChange={handleYearChange}
+                    options={yearOptions}
+                    placeholder="Все годы"
+                  />
+                </div>
+
+                <div className="barberhistory__filtersPanelRow">
+                  <label className="barberhistory__filtersPanelLabel">Месяц</label>
+                  <BarberSelect
+                    value={monthFilter}
+                    onChange={handleMonthChange}
+                    options={monthOptions}
+                    placeholder="Все месяцы"
+                    disabled={!yearFilter}
+                  />
+                </div>
+
+                <div className="barberhistory__filtersPanelRow">
+                  <label className="barberhistory__filtersPanelLabel">День</label>
+                  <BarberSelect
+                    value={dayFilter}
+                    onChange={setDayFilter}
+                    options={dayOptions}
+                    placeholder="Все дни"
+                    disabled={!yearFilter || !monthFilter}
+                  />
+                </div>
+              </div>
+
+              {activeFiltersCount > 0 && (
+                <div className="barberhistory__filtersPanelFooter">
+                  <button
+                    type="button"
+                    className="barberhistory__filtersPanelClear"
+                    onClick={handleClearFilters}
+                  >
+                    Очистить фильтры
+                  </button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+      {!!err && <div className="barberhistory__alert">{err}</div>}
+
+      {!isLoggedIn && !loading && (
+        <div className="barberhistory__warning">
+          <FaExclamationTriangle className="barberhistory__warningIcon" />
+          <span>Войдите в систему, чтобы увидеть вашу историю записей. Если вы уже вошли — обновите страницу.</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="barberhistory__skeletonList" aria-hidden="true">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="barberhistory__skeletonCard" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="barberhistory__empty">
+          {hasFilters ? "Ничего не найдено" : "Записей нет"}
+        </div>
+      ) : (
+        <>
+          {viewMode === "cards" ? (
+            <div className="barberhistory__list">
+              {rows.map(renderCard)}
+            </div>
+          ) : (
+            renderTable()
+          )}
+
+          <Pager
+            filteredCount={filtered.length}
+            page={safePage}
+            totalPages={totalPages}
+            onChange={setPage}
+          />
+        </>
+      )}
+
+      {renderModal()}
     </section>
   );
 };

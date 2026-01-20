@@ -1,7 +1,7 @@
 // BarberAnalitikaDetailsModal.jsx
 import React, { useEffect } from "react";
-import { X } from "lucide-react";
-import { usePaged } from "./BarberAnalitikaUtils";
+import { FiX } from "react-icons/fi";
+import { usePaged } from "../BarberAnalitikaUtils";
 
 const BarberAnalitikaDetailsModal = ({
   title,
@@ -20,24 +20,24 @@ const BarberAnalitikaDetailsModal = ({
   }, [onClose]);
 
   return (
-    <div className="ba-modal" role="dialog" aria-modal="true">
-      <div className="ba-modal__overlay" onClick={onClose} />
-      <div className="ba-modal__card" aria-label={title}>
-        <div className="ba-modal__head">
-          <h3 className="ba-modal__title">{title}</h3>
+    <div className="barber-analitika-modal" role="dialog" aria-modal="true">
+      <div className="barber-analitika-modal__overlay" onClick={onClose} />
+      <div className="barber-analitika-modal__card" aria-label={title}>
+        <div className="barber-analitika-modal__head">
+          <h3 className="barber-analitika-modal__title">{title}</h3>
           <button
-            className="ba-modal__icon"
+            className="barber-analitika-modal__icon"
             onClick={onClose}
             aria-label="Закрыть"
             type="button"
           >
-            <X size={18} />
+            <FiX size={18} />
           </button>
         </div>
 
-        <div className="ba-modal__body">
-          <div className="ba-tableWrap ba-tableWrap--modal">
-            <table className="ba-table">
+        <div className="barber-analitika-modal__body">
+          <div className="barber-analitika-table-wrap barber-analitika-table-wrap--modal">
+            <table className="barber-analitika-table">
               <thead>
                 <tr>
                   {columns.map((c) => (
@@ -50,7 +50,7 @@ const BarberAnalitikaDetailsModal = ({
               <tbody>
                 {slice.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length} className="ba-empty">
+                    <td colSpan={columns.length} className="barber-analitika-table__empty">
                       Нет данных
                     </td>
                   </tr>
@@ -70,10 +70,10 @@ const BarberAnalitikaDetailsModal = ({
           </div>
         </div>
 
-        <div className="ba-modal__footer">
-          <div className="ba-pager" aria-label="Пагинация">
+        <div className="barber-analitika-modal__footer">
+          <div className="barber-analitika-pager" aria-label="Пагинация">
             <button
-              className="ba-pager__btn"
+              className="barber-analitika-pager__btn"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
               aria-label="Назад"
@@ -81,11 +81,11 @@ const BarberAnalitikaDetailsModal = ({
             >
               ←
             </button>
-            <span className="ba-pager__info">
+            <span className="barber-analitika-pager__info">
               Страница {page} из {pages}
             </span>
             <button
-              className="ba-pager__btn"
+              className="barber-analitika-pager__btn"
               onClick={() => setPage((p) => Math.min(pages, p + 1))}
               disabled={page >= pages}
               aria-label="Вперёд"

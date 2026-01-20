@@ -1,5 +1,5 @@
 // RecordaCalendar.jsx
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const STATUS_LABELS = {
   booked: "Забронировано",
@@ -7,6 +7,14 @@ const STATUS_LABELS = {
   completed: "Завершено",
   canceled: "Отменено",
   no_show: "Не пришёл",
+};
+
+const STATUS_LABELS_SHORT = {
+  booked: "Бронь",
+  confirmed: "Подтв.",
+  completed: "Готово",
+  canceled: "Отмена",
+  no_show: "Неявка",
 };
 
 /* компактная шкала */
@@ -94,7 +102,7 @@ const layoutForBarber = (
       r,
       tStart: startM,
       tEnd: endM,
-top: topMin * PX_PER_MIN,
+      top: topMin * PX_PER_MIN,
       height: Math.max(MIN_EVENT_H, heightByTime, heightByText),
     };
   });
@@ -148,6 +156,7 @@ const RecordaCalendar = ({
   COL_HEADER_H,
   SLOT_PX,
   onRecordClick,
+  isToday,
 }) => {
   const visibleBarbers = useMemo(
     () =>
@@ -157,29 +166,36 @@ const RecordaCalendar = ({
     [barbers, fltBarber]
   );
 
-  return (
-    <div className="barberrecorda__calendar">
-      <div
-        className="barberrecorda__timeGutter"
-        style={{ height: calendarHeight }}
-      >
-        <div
-          className="barberrecorda__timeHeader"
-          style={{ height: COL_HEADER_H }}
-        />
-        {timesAll.slice(0, -1).map((t, i) => (
-          <div
-            key={i}
-            className={`barberrecorda__timeCell ${
-              busySlots.has(i) ? "is-busy" : ""
-            }`}
-            style={{ height: SLOT_PX }}
-          >
-            <span>{t}</span>
-          </div>
-        ))}
-      </div>
+  // Линия текущего времени
+  const [nowLineTop, setNowLineTop] = useState(null);
 
+  useEffect(() => {
+    if (!isToday) {
+      setNowLineTop(null);
+      return;
+    }
+
+    const updateNowLine = () => {
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      
+      // Проверяем, что время в рабочем диапазоне
+      if (nowMins < OPEN_HOUR * 60 || nowMins > CLOSE_HOUR * 60) {
+        setNowLineTop(null);
+        return;
+      }
+      
+      const topMin = nowMins - OPEN_HOUR * 60;
+      setNowLineTop(topMin * PX_PER_MIN);
+    };
+
+    updateNowLine();
+    const timer = setInterval(updateNowLine, 60_000); // обновляем каждую минуту
+    return () => clearInterval(timer);
+  }, [isToday]);
+
+  return (
+    <div className="barberrecorda__calendar barberrecorda__calendar--noGutter">
       <div className="barberrecorda__colsWrap">
         <div
           className="barberrecorda__cols"
@@ -210,6 +226,10 @@ const RecordaCalendar = ({
                     </span>
                     <span className="barberrecorda__name">{b.name}</span>
                   </div>
+                  {/* Счётчик записей у мастера */}
+                  <span className="barberrecorda__colCount">
+                    {list.length}
+                  </span>
                 </header>
 
                 <div
@@ -225,10 +245,17 @@ const RecordaCalendar = ({
                   ))}
                 </div>
 
-<div
-  className="barberrecorda__eventsArea"
-  style={{ height: calendarHeight - COL_HEADER_H }}
->
+                <div
+                  className="barberrecorda__eventsArea"
+                  style={{ height: calendarHeight - COL_HEADER_H }}
+                >
+                  {/* Линия текущего времени */}
+                  {nowLineTop !== null && (
+                    <div 
+                      className="barberrecorda__nowLine"
+                      style={{ top: nowLineTop }}
+                    />
+                  )}
 
                   {layout.length === 0 && !loading && (
                     <div className="barberrecorda__emptyInCol">
@@ -238,7 +265,6 @@ const RecordaCalendar = ({
 
                   {layout.map((it) => {
                     const r = it.r;
-                    const svc = serviceNamesFromRecord(r);
                     const cl = clientName(r);
                     const phone = clientPhone(r);
 
@@ -248,7 +274,7 @@ const RecordaCalendar = ({
                         className="barberrecorda__event"
                         style={it.style}
                         onClick={() => onRecordClick(r)}
-                        title={`${svc} • ${cl}`}
+                        title={cl}
                       >
                         <div className="barberrecorda__eventHeader">
                           <div className="barberrecorda__eventTime">
@@ -258,12 +284,11 @@ const RecordaCalendar = ({
                           </div>
                           <span
                             className={`barberrecorda__badge barberrecorda__badge--${r.status}`}
+                            title={STATUS_LABELS[r.status] || r.status}
                           >
-                            {STATUS_LABELS[r.status] || r.status}
+                            <span className="barberrecorda__badgeFull">{STATUS_LABELS[r.status] || r.status}</span>
+                            <span className="barberrecorda__badgeShort">{STATUS_LABELS_SHORT[r.status] || r.status}</span>
                           </span>
-                        </div>
-                        <div className="barberrecorda__eventSvc">
-                          {svc}
                         </div>
                         <div className="barberrecorda__eventClient">
                           {cl}

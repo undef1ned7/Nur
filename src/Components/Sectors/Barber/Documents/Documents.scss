@@ -1,16 +1,5 @@
-/* src/components/Documents/Documents.module.scss */
-
-/* ===== Токены ===== */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-  --radius: 12px;
-  --shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-}
+/* Documents.scss */
+@import "../styles/barbershop.scss";
 
 /* ===== Контейнер ===== */
 .docs {

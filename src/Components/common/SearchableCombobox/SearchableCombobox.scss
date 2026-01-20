@@ -12,11 +12,10 @@
       border-radius: 12px;
       border: 1px solid var(--border);
       background: #fff;
-      display: grid;
-      grid-template-columns: 34px 1fr auto;
+      display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 0 8px 0 6px;
+      gap: 8px;
+      padding: 0 8px 0 12px;
       transition: 0.15s all ease;
 
       &:hover {
@@ -33,8 +32,8 @@
     &__icon,
     &Icon {
       color: var(--muted);
-      font-size: 14px;
-      justify-self: center;
+      font-size: 12px;
+      flex-shrink: 0;
     }
 
     &__input,
@@ -45,9 +44,9 @@
       font-size: 14px;
       font-weight: 600;
       color: var(--text);
-      width: 100%;
+      flex: 1;
       min-width: 0;
-      padding: 0 2px;
+      padding: 0;
 
       &::placeholder {
         color: #94a3b8;
@@ -64,14 +63,15 @@
     &Right {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 2px;
+      flex-shrink: 0;
     }
 
     &__btn,
     &Btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 10px;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
       border: 1px solid #e5e7eb;
       background: #fff;
       color: #475569;
@@ -80,6 +80,8 @@
       justify-content: center;
       cursor: pointer;
       transition: 0.12s all ease;
+      font-size: 9px;
+      flex-shrink: 0;
 
       &:hover {
         background: #f3f4f6;
@@ -186,13 +188,13 @@
       &Control {
         height: 40px;
         border-radius: 10px;
-        padding: 0 6px 0 4px;
-        gap: 4px;
+        padding: 0 6px 0 10px;
+        gap: 6px;
       }
 
       &__icon,
       &Icon {
-        font-size: 12px;
+        font-size: 11px;
       }
 
       &__input,
@@ -200,16 +202,21 @@
         font-size: 13px;
 
         &::placeholder {
-          font-size: 12px;
+          font-size: 13px;
         }
       }
 
       &__btn,
       &Btn {
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
-        font-size: 11px;
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        font-size: 8px;
+      }
+
+      &__right,
+      &Right {
+        gap: 2px;
       }
 
       &__dropdown,
@@ -236,13 +243,13 @@
       &Control {
         height: 38px;
         border-radius: 8px;
-        padding: 0 6px 0 4px;
+        padding: 0 4px 0 8px;
         gap: 4px;
       }
 
       &__icon,
       &Icon {
-        font-size: 11px;
+        font-size: 10px;
       }
 
       &__input,
@@ -250,16 +257,21 @@
         font-size: 12px;
 
         &::placeholder {
-          font-size: 11px;
+          font-size: 12px;
         }
       }
 
       &__btn,
       &Btn {
-        width: 26px;
-        height: 26px;
-        border-radius: 6px;
-        font-size: 10px;
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        font-size: 7px;
+      }
+
+      &__right,
+      &Right {
+        gap: 1px;
       }
 
       &__dropdown,
@@ -292,19 +304,18 @@
       &Control {
         height: 36px;
         border-radius: 8px;
-        padding: 0 6px 0 4px;
-        gap: 3px;
-        grid-template-columns: 28px 1fr auto;
+        padding: 0 4px 0 6px;
+        gap: 4px;
       }
 
       &__icon,
       &Icon {
-        font-size: 10px;
+        font-size: 9px;
       }
 
       &__input,
       &Input {
-        font-size: 12px;
+        font-size: 11px;
 
         &::placeholder {
           font-size: 11px;
@@ -313,15 +324,15 @@
 
       &__btn,
       &Btn {
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        font-size: 10px;
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        font-size: 6px;
       }
 
       &__right,
       &Right {
-        gap: 4px;
+        gap: 1px;
       }
 
       &__dropdown,
@@ -362,6 +373,13 @@
 @include searchable-combo("cafeKassaCombo");
 @include searchable-combo("cafeStockCombo");
 @include searchable-combo("searchableCombo"); // Универсальный префикс
+@include searchable-combo("barberservices__combo"); // Barber Services
+@include searchable-combo("barberhistory__combo"); // Barber History
+@include searchable-combo("barberclient__combo"); // Barber Clients
+@include searchable-combo("barberrecorda__combo"); // Barber Recorda
+@include searchable-combo("mastershistory__combo"); // Masters History
+@include searchable-combo("recordarates__combo"); // RecordaRates
+@include searchable-combo("payrolldaily__combo"); // PayrollDaily
 
 @keyframes combo-in {
   from {

@@ -1,14 +1,7 @@
-// BarberServicesPager.jsx
 import React from "react";
-import "./Services.scss";
-import { PAGE_SIZE } from "./BarberServicesUtils";
+import { PAGE_SIZE } from "../BarberServicesUtils";
 
-const BarberServicesPager = ({
-  filteredCount,
-  page,
-  totalPages,
-  onChange,
-}) => {
+const Pager = ({ filteredCount, page, totalPages, onChange }) => {
   if (filteredCount <= PAGE_SIZE) return null;
 
   const pageSafe = Math.min(Math.max(1, page), totalPages);
@@ -70,4 +63,4 @@ const BarberServicesPager = ({
   );
 };
 
-export default BarberServicesPager;
+export default Pager;

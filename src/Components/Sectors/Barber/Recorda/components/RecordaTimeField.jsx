@@ -1,6 +1,6 @@
 // RecordaTimeField.jsx
 import React from "react";
-import "./Recorda.scss";
+import "../Recorda.scss";
 import { OPEN_HOUR, CLOSE_HOUR, pad } from "./RecordaUtils";
 
 const RecordaTimeField = ({ value, onChange, invalid }) => {

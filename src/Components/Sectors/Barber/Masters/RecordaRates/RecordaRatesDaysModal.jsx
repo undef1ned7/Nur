@@ -8,17 +8,17 @@ const DaysModal = ({ open, onClose, title, rows }) => {
 
   return (
     <div
-      className="recordarates__overlay"
+      className="barberrecordarates__overlay"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
-      <div className="recordarates__modal" onClick={(e) => e.stopPropagation()}>
-        <div className="recordarates__modalHead">
-          <h4 className="recordarates__modalTitle">{title}</h4>
+      <div className="barberrecordarates__modal" onClick={(e) => e.stopPropagation()}>
+        <div className="barberrecordarates__modalHead">
+          <h4 className="barberrecordarates__modalTitle">{title}</h4>
           <button
             type="button"
-            className="recordarates__iconBtn"
+            className="barberrecordarates__iconBtn"
             aria-label="Закрыть"
             onClick={onClose}
           >
@@ -26,8 +26,8 @@ const DaysModal = ({ open, onClose, title, rows }) => {
           </button>
         </div>
 
-        <div className="recordarates__tableWrap recordarates__tableWrap--modal">
-          <table className="recordarates__table">
+        <div className="barberrecordarates__tableWrap barberrecordarates__tableWrap--modal">
+          <table className="barberrecordarates__table">
             <thead>
               <tr>
                 <th>Дата</th>
@@ -39,7 +39,7 @@ const DaysModal = ({ open, onClose, title, rows }) => {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td className="recordarates__muted" colSpan={4}>
+                  <td className="barberrecordarates__muted" colSpan={4}>
                     Нет данных
                   </td>
                 </tr>
@@ -59,10 +59,10 @@ const DaysModal = ({ open, onClose, title, rows }) => {
           </table>
         </div>
 
-        <div className="recordarates__modalFoot">
+        <div className="barberrecordarates__modalFoot">
           <button
             type="button"
-            className="recordarates__btn recordarates__btn--secondary"
+            className="barberrecordarates__btn barberrecordarates__btn--secondary"
             onClick={onClose}
           >
             Закрыть

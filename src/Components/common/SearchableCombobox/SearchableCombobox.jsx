@@ -10,6 +10,7 @@ const SearchableCombobox = ({
   options,
   placeholder = "Поиск…",
   disabled = false,
+  hideClear = false, // Скрыть кнопку очистки
   classNamePrefix = "searchableCombo", // Префикс для BEM классов
 }) => {
   const rootRef = useRef(null);
@@ -113,7 +114,7 @@ const SearchableCombobox = ({
     }
   };
 
-  const hasClearButton = !disabled && (safeStr(value) || safeStr(query));
+  const hasClearButton = !disabled && !hideClear && (safeStr(value) || safeStr(query));
 
   // Генерация классов с префиксом
   const baseClass = classNamePrefix;

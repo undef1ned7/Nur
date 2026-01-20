@@ -1,8 +1,8 @@
 // RecordaModal.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import api from "../../../../api";
-import { FaPlus, FaTimes } from "react-icons/fa";
-import "./Recorda.scss";
+import api from "../../../../../api";
+import { FaPlus, FaTimes, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import "../Recorda.scss";
 
 import {
   pad,
@@ -23,6 +23,7 @@ import {
 import RecordaTimeField from "./RecordaTimeField";
 import RecordaServicesPicker from "./RecordaServicesPicker";
 import RecordaMiniClientModal from "./RecordaMiniClientModal";
+import RecordaTimeSlots from "./RecordaTimeSlots";
 
 /* ===== основной модальный компонент ===== */
 const RecordaModal = ({
@@ -41,14 +42,14 @@ const RecordaModal = ({
   const [formAlerts, setFormAlerts] = useState([]);
   const [fieldErrs, setFieldErrs] = useState({});
 
-  // форма
-  const [selClient, setSelClient] = useState("");
-  const [startDate, setStartDate] = useState(defaultDate);
+  // форма - НОВЫЙ ПОРЯДОК: Сотрудник → Услуги → Дата/Время → Клиент
+  const [selBarber, setSelBarber] = useState("");
   const [selServices, setSelServices] = useState([]);
+  const [startDate, setStartDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [autoEnd, setAutoEnd] = useState(true);
-  const [selBarber, setSelBarber] = useState("");
+  const [selClient, setSelClient] = useState("");
   const [status, setStatus] = useState("booked");
   const [comment, setComment] = useState("");
 
@@ -56,8 +57,14 @@ const RecordaModal = ({
   const [priceInput, setPriceInput] = useState("");
   const [isManualPrice, setIsManualPrice] = useState(false);
 
+  // UI состояния
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [useTimeSlots, setUseTimeSlots] = useState(true);
+
   // мини-клиент
   const [miniOpen, setMiniOpen] = useState(false);
+
+  const isEditing = !!currentRecord;
 
   const closeModal = () => {
     if (!saving) onClose();
@@ -68,6 +75,7 @@ const RecordaModal = ({
 
     setFormAlerts([]);
     setFieldErrs({});
+    setShowAdvanced(false);
 
     if (currentRecord) {
       const rec = currentRecord;
@@ -82,9 +90,6 @@ const RecordaModal = ({
       setStartTime(clampToRange(rec.start_at ? rec.start_at.slice(11, 16) : ""));
       setEndTime(clampToRange(rec.end_at ? rec.end_at.slice(11, 16) : ""));
 
-      // 🔥 РАНЬШЕ БЫЛО: setAutoEnd(false);
-      // Теперь при открытии существующей записи "Авто" остаётся включённым,
-      // пока пользователь сам не начнёт менять конец/время вручную.
       setAutoEnd(true);
 
       setSelBarber(String(rec.barber || ""));
@@ -99,11 +104,9 @@ const RecordaModal = ({
         rec.price !== null && rec.price !== undefined ? String(rec.price) : ""
       );
 
-      const hasSavedPrice =
-        rec.price !== null &&
-        rec.price !== undefined &&
-        String(rec.price) !== "";
-      setIsManualPrice(hasSavedPrice);
+      setIsManualPrice(false);
+      // При редактировании показываем расширенные поля
+      setShowAdvanced(true);
     } else {
       setSelClient("");
       setStartDate(defaultDate);
@@ -196,33 +199,20 @@ const RecordaModal = ({
   /* перерасчёт цены по услугам и скидке (для поля ввода) */
   useEffect(() => {
     if (!isOpen) return;
-
-    const hasSavedPrice =
-      currentRecord?.price !== null &&
-      currentRecord?.price !== undefined &&
-      String(currentRecord.price).trim() !== "";
-
-    // если цена сохранена — не трогаем
-    if (hasSavedPrice) return;
-
-    // если услуг нет/не посчитались — тоже не трогаем
     if (!basePrice) return;
-
-    // если пользователь вручную вводил цену — не трогаем
     if (isManualPrice) return;
 
-    // иначе подставляем авто-цену
     const d = parsePercent(discountInput);
     const final = calcFinalPrice(basePrice, d);
     setPriceInput(String(final == null ? basePrice : final));
-  }, [isOpen, currentRecord?.price, basePrice, discountInput, isManualPrice]);
+  }, [isOpen, basePrice, discountInput, isManualPrice]);
 
   const discountPercent = useMemo(() => parsePercent(discountInput), [discountInput]);
 
   const uiFinalPrice = useMemo(() => {
     const raw = String(priceInput || "").trim();
     const n = Number(raw.replace(/[^\d.-]/g, ""));
-    if (Number.isFinite(n) && n >= 0) return n; // ручная цена => скидку не считаем
+    if (Number.isFinite(n) && n >= 0) return n;
 
     if (!basePrice) return 0;
     const d = parsePercent(discountInput);
@@ -281,6 +271,15 @@ const RecordaModal = ({
     return arr;
   }, [barbers, busyBarbersOnInterval]);
 
+  // Простые barberItems без статуса занятости (для начального выбора)
+  const simpleBarberItems = useMemo(() => {
+    return barbers.map((b) => ({
+      id: String(b.id),
+      label: b.name,
+      search: b.name,
+    })).sort((a, b) => a.label.localeCompare(b.label, "ru"));
+  }, [barbers]);
+
   /* strict setters */
   const setStartStrict = (v) => {
     const vv = clampToRange(v);
@@ -302,8 +301,50 @@ const RecordaModal = ({
       vv = `${pad(H)}:${pad(H === CLOSE_HOUR ? 0 : M)}`;
     }
     setEndTime(vv);
-    setAutoEnd(false); // ручное изменение конца выключает "Авто"
+    setAutoEnd(false);
   };
+
+  // Обработчик выбора слота времени
+  const handleSlotSelect = (time) => {
+    setStartStrict(time);
+    setAutoEnd(true);
+  };
+
+  /* валидация в реальном времени */
+  const validationState = useMemo(() => {
+    const errors = {};
+    
+    if (!selBarber) errors.barber = true;
+    if (!selServices.length) errors.services = true;
+    if (!startDate) errors.startDate = true;
+    if (!startTime) errors.startTime = true;
+    if (!endTime) errors.endTime = true;
+
+    const sM = minsOf(startTime);
+    const eM = minsOf(endTime);
+
+    if (startTime && endTime) {
+      if (!(inRange(startTime) && inRange(endTime))) {
+        errors.startTime = true;
+        errors.endTime = true;
+      } else if (eM <= sM) {
+        errors.endTime = true;
+      }
+    }
+
+    // Проверка занятости мастера
+    if (selBarber && selectedStartISO && selectedEndISO) {
+      if (busyBarbersOnInterval.has(String(selBarber))) {
+        errors.barber = true;
+      }
+    }
+
+    return {
+      errors,
+      isValid: Object.keys(errors).length === 0,
+      missingFields: Object.keys(errors),
+    };
+  }, [selBarber, selServices, startDate, startTime, endTime, selectedStartISO, selectedEndISO, busyBarbersOnInterval]);
 
   /* валидация */
   const validate = () => {
@@ -481,12 +522,23 @@ const RecordaModal = ({
 
   if (!isOpen) return null;
 
+  // Формируем подсказку о недостающих полях
+  const getMissingFieldsHint = () => {
+    const missing = [];
+    if (!selBarber) missing.push("сотрудника");
+    if (!selServices.length) missing.push("услуги");
+    if (!startTime) missing.push("время");
+    return missing.length > 0 ? `Выберите ${missing.join(", ")}` : null;
+  };
+
+  const missingHint = getMissingFieldsHint();
+
   return (
     <>
       {/* основная модалка */}
       <div className="barberrecorda__overlay" onClick={closeModal}>
         <div
-          className="barberrecorda__modal"
+          className="barberrecorda__modal barberrecorda__modal--improved"
           role="dialog"
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
@@ -522,42 +574,58 @@ const RecordaModal = ({
           <form className="barberrecorda__form" onSubmit={handleSubmit} noValidate>
             <div className="barberrecorda__grid">
               <div className="barberrecorda__gridMain">
-                {/* Клиент (без *) */}
+                
+                {/* 1. СОТРУДНИК (первый!) */}
                 <label
                   className={`barberrecorda__field barberrecorda__field--full ${
-                    fieldErrs.client ? "is-invalid" : ""
+                    fieldErrs.barber || validationState.errors.barber ? "is-invalid" : ""
                   }`}
                 >
-                  <span className="barberrecorda__label">Клиент</span>
-                  <div className="barberrecorda__fieldRow">
-                    {/* ✅ только поиск/выбор, без создания через поиск */}
-                    <RecordaServicesPicker
-                      mode="single"
-                      items={activeClientItems}
-                      selectedId={selClient}
-                      onChange={(id) => setSelClient(String(id))}
-                      placeholder="Поиск клиента..."
-                      placeholderSelected="Выберите клиента"
-                      renderMeta={false}
-                    />
-
-                    {/* ✅ создание только через модалку */}
-                    <button
-                      type="button"
-                      className="barberrecorda__btn barberrecorda__btn--primary barberrecorda__btn--square"
-                      aria-label="Создать клиента"
-                      title="Создать клиента"
-                      onClick={openMini}
-                    >
-                      <FaPlus />
-                    </button>
-                  </div>
+                  <span className="barberrecorda__label">
+                    <span>
+                      Сотрудник <b className="barberrecorda__req">*</b>
+                    </span>
+                    {selBarber && (
+                      <span className="barberrecorda__labelHint">
+                        {busyBarbersOnInterval.has(String(selBarber)) 
+                          ? "⚠ Занят в это время" 
+                          : "✓ Свободен"}
+                      </span>
+                    )}
+                  </span>
+                  <RecordaServicesPicker
+                    mode="single"
+                    items={selServices.length && startTime ? barberItems : simpleBarberItems}
+                    selectedId={selBarber}
+                    onChange={(id) => setSelBarber(String(id))}
+                    placeholder="Поиск сотрудника..."
+                    placeholderSelected="Выберите сотрудника"
+                    renderMeta={false}
+                  />
                 </label>
 
-                {/* Дата */}
+                {/* 2. УСЛУГИ */}
+                <div
+                  className={`barberrecorda__field barberrecorda__field--full barberrecorda__field--services ${
+                    fieldErrs.services || validationState.errors.services ? "is-invalid" : ""
+                  }`}
+                >
+                  <span className="barberrecorda__label">
+                    Услуги <b className="barberrecorda__req">*</b>
+                  </span>
+                  
+                  <RecordaServicesPicker
+                    items={serviceItems}
+                    selectedIds={selServices}
+                    onChange={setSelServices}
+                    summary={servicesSummary}
+                  />
+                </div>
+
+                {/* 3. ДАТА */}
                 <label
                   className={`barberrecorda__field barberrecorda__field--full ${
-                    fieldErrs.startDate ? "is-invalid" : ""
+                    fieldErrs.startDate || validationState.errors.startDate ? "is-invalid" : ""
                   }`}
                 >
                   <span className="barberrecorda__label">
@@ -574,141 +642,123 @@ const RecordaModal = ({
                   </div>
                 </label>
 
-                {/* Услуги */}
-                <label
-                  className={`barberrecorda__field barberrecorda__field--full barberrecorda__field--services ${
-                    fieldErrs.services ? "is-invalid" : ""
-                  }`}
-                >
+                {/* 4. ВРЕМЯ - визуальные слоты */}
+                <div className={`barberrecorda__field barberrecorda__field--full ${
+                  fieldErrs.startTime || validationState.errors.startTime ? "is-invalid" : ""
+                }`}>
                   <span className="barberrecorda__label">
-                    Услуги <b className="barberrecorda__req">*</b>
-                  </span>
-                  <RecordaServicesPicker
-                    items={serviceItems}
-                    selectedIds={selServices}
-                    onChange={setSelServices}
-                    summary={servicesSummary}
-                  />
-                </label>
-
-                {/* Начало / Конец */}
-                <div className="barberrecorda__row barberrecorda__row--2">
-                  <label
-                    className={`barberrecorda__field ${
-                      fieldErrs.startTime ? "is-invalid" : ""
-                    }`}
-                  >
-                    <span className="barberrecorda__label">
-                      Начало <b className="barberrecorda__req">*</b>
+                    <span>
+                      Время <b className="barberrecorda__req">*</b>
                     </span>
-                    <RecordaTimeField
-                      value={startTime}
-                      onChange={setStartStrict}
-                      invalid={!!fieldErrs.startTime}
-                    />
-                  </label>
+                    <button
+                      type="button"
+                      className="barberrecorda__timeModeToggle"
+                      onClick={() => setUseTimeSlots(!useTimeSlots)}
+                    >
+                      {useTimeSlots ? "Ручной ввод" : "Слоты времени"}
+                    </button>
+                  </span>
 
-                  <label
-                    className={`barberrecorda__field ${
-                      fieldErrs.endTime ? "is-invalid" : ""
-                    }`}
-                  >
-                    <span className="barberrecorda__label">
-                      <span>Конец</span>
+                  {useTimeSlots ? (
+                    <RecordaTimeSlots
+                      selectedDate={startDate}
+                      selectedBarber={selBarber}
+                      appointments={appointments}
+                      currentRecordId={currentRecord?.id}
+                      startTime={startTime}
+                      endTime={endTime}
+                      totalMinutes={servicesSummary.totalMinutes || 30}
+                      onSelectSlot={handleSlotSelect}
+                      disabled={!selBarber}
+                    />
+                  ) : (
+                    <div className="barberrecorda__row barberrecorda__row--2">
+                      <div className={`barberrecorda__timeFieldWrap ${
+                        fieldErrs.startTime ? "is-invalid" : ""
+                      }`}>
+                        <span className="barberrecorda__timeFieldLabel">Начало</span>
+                        <RecordaTimeField
+                          value={startTime}
+                          onChange={setStartStrict}
+                          invalid={!!fieldErrs.startTime}
+                        />
+                      </div>
+
+                      <div className={`barberrecorda__timeFieldWrap ${
+                        fieldErrs.endTime ? "is-invalid" : ""
+                      }`}>
+                        <span className="barberrecorda__timeFieldLabel">
+                          <span>Конец</span>
+                          <span className="barberrecorda__autoEnd">
+                            <input
+                              id="autoEnd"
+                              type="checkbox"
+                              checked={autoEnd}
+                              onChange={(e) => setAutoEnd(e.target.checked)}
+                            />
+                            <label htmlFor="autoEnd">Авто</label>
+                          </span>
+                        </span>
+                        <RecordaTimeField
+                          value={endTime}
+                          onChange={setEndStrict}
+                          invalid={!!fieldErrs.endTime}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Показываем выбранное время при использовании слотов */}
+                  {useTimeSlots && startTime && (
+                    <div className="barberrecorda__selectedTimeInfo">
+                      <span>Выбрано: <b>{startTime}</b> — <b>{endTime}</b></span>
                       <span className="barberrecorda__autoEnd">
                         <input
-                          id="autoEnd"
+                          id="autoEndSlots"
                           type="checkbox"
                           checked={autoEnd}
                           onChange={(e) => setAutoEnd(e.target.checked)}
                         />
-                        <label htmlFor="autoEnd">Авто</label>
+                        <label htmlFor="autoEndSlots">Авто-конец</label>
                       </span>
-                    </span>
-                    <RecordaTimeField
-                      value={endTime}
-                      onChange={setEndStrict}
-                      invalid={!!fieldErrs.endTime}
-                    />
-                  </label>
+                    </div>
+                  )}
                 </div>
 
-                {/* Сотрудник */}
+                {/* 5. КЛИЕНТ (опционально, в конце) */}
                 <label
                   className={`barberrecorda__field barberrecorda__field--full ${
-                    fieldErrs.barber ? "is-invalid" : ""
+                    fieldErrs.client ? "is-invalid" : ""
                   }`}
                 >
                   <span className="barberrecorda__label">
-                    Сотрудник <b className="barberrecorda__req">*</b>
+                    Клиент
+                    <span className="barberrecorda__labelOptional">(необязательно)</span>
                   </span>
-                  <RecordaServicesPicker
-                    mode="single"
-                    items={barberItems}
-                    selectedId={selBarber}
-                    onChange={(id) => setSelBarber(String(id))}
-                    placeholder="Поиск сотрудника..."
-                    placeholderSelected="Выберите сотрудника"
-                    renderMeta={false}
-                  />
-                  <div className="barberrecorda__availHint">
-                    {selectedStartISO && selectedEndISO ? (
-                      <>
-                        Свободны:{" "}
-                        <b>{barberItems.filter((i) => !i.disabled).length}</b> /{" "}
-                        <b>{barberItems.length}</b>
-                      </>
-                    ) : (
-                      "Выберите дату, услуги и время, чтобы увидеть доступность"
-                    )}
+                  <div className="barberrecorda__fieldRow">
+                    <RecordaServicesPicker
+                      mode="single"
+                      items={activeClientItems}
+                      selectedId={selClient}
+                      onChange={(id) => setSelClient(String(id))}
+                      placeholder="Поиск клиента..."
+                      placeholderSelected="Выберите клиента"
+                      renderMeta={false}
+                    />
+
+                    <button
+                      type="button"
+                      className="barberrecorda__btn barberrecorda__btn--primary barberrecorda__btn--square"
+                      aria-label="Создать клиента"
+                      title="Создать клиента"
+                      onClick={openMini}
+                    >
+                      <FaPlus />
+                    </button>
                   </div>
                 </label>
 
-                {/* Статус */}
-                <label className="barberrecorda__field">
-                  <span className="barberrecorda__label">
-                    Статус <b className="barberrecorda__req">*</b>
-                  </span>
-                  <RecordaServicesPicker
-                    mode="single"
-                    items={statusItems}
-                    selectedId={status}
-                    onChange={(id) => setStatus(String(id))}
-                    placeholder="Поиск статуса..."
-                    placeholderSelected="Выберите статус"
-                    renderMeta={false}
-                  />
-                </label>
-
-                {/* Скидка / Цена */}
-                <div className="barberrecorda__row barberrecorda__row--2">
-                  <label className="barberrecorda__field">
-                    <span className="barberrecorda__label">Скидка, %</span>
-                    <input
-                      type="text"
-                      className="barberrecorda__input"
-                      value={discountInput}
-                      onChange={(e) => setDiscountInput(e.target.value)}
-                      placeholder="0"
-                    />
-                  </label>
-
-                  <label className="barberrecorda__field">
-                    <span className="barberrecorda__label">Цена</span>
-                    <input
-                      type="text"
-                      className="barberrecorda__input"
-                      value={priceInput}
-                      onChange={(e) => {
-                        setPriceInput(e.target.value);
-                        setIsManualPrice(true);
-                      }}
-                      placeholder="Сумма по услугам"
-                    />
-                  </label>
-                </div>
-
-                {/* К ОПЛАТЕ */}
+                {/* ===== К ОПЛАТЕ ===== */}
                 <div className="barberrecorda__totalCard">
                   <div className="barberrecorda__totalLabel">К ОПЛАТЕ</div>
                   <div className="barberrecorda__totalValue">
@@ -718,24 +768,89 @@ const RecordaModal = ({
                   </div>
                 </div>
 
-                {/* Комментарий */}
-                <label className="barberrecorda__field barberrecorda__field--full">
-                  <span className="barberrecorda__label">Комментарий</span>
-                  <textarea
-                    className="barberrecorda__textarea"
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Добавьте заметку или особые пожелания…"
-                  />
-                </label>
+                {/* ===== ДОПОЛНИТЕЛЬНО (скрываемая секция) ===== */}
+                <div className="barberrecorda__advancedSection">
+                  <button
+                    type="button"
+                    className="barberrecorda__advancedToggle"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                  >
+                    <span>Дополнительно</span>
+                    {showAdvanced ? <FaChevronUp /> : <FaChevronDown />}
+                  </button>
+
+                  {showAdvanced && (
+                    <div className="barberrecorda__advancedContent">
+                      {/* Статус - только при редактировании */}
+                      {isEditing && (
+                        <label className="barberrecorda__field">
+                          <span className="barberrecorda__label">Статус</span>
+                          <RecordaServicesPicker
+                            mode="single"
+                            items={statusItems}
+                            selectedId={status}
+                            onChange={(id) => setStatus(String(id))}
+                            placeholder="Поиск статуса..."
+                            placeholderSelected="Выберите статус"
+                            renderMeta={false}
+                          />
+                        </label>
+                      )}
+
+                      {/* Скидка / Цена */}
+                      <div className="barberrecorda__row barberrecorda__row--2">
+                        <label className="barberrecorda__field">
+                          <span className="barberrecorda__label">Скидка, %</span>
+                          <input
+                            type="text"
+                            className="barberrecorda__input"
+                            value={discountInput}
+                            onChange={(e) => {
+                              setDiscountInput(e.target.value);
+                              setIsManualPrice(false);
+                            }}
+                            placeholder="0"
+                          />
+                        </label>
+
+                        <label className="barberrecorda__field">
+                          <span className="barberrecorda__label">Цена</span>
+                          <input
+                            type="text"
+                            className="barberrecorda__input"
+                            value={priceInput}
+                            onChange={(e) => {
+                              setPriceInput(e.target.value);
+                              setIsManualPrice(true);
+                            }}
+                            placeholder="Сумма по услугам"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Комментарий */}
+                      <label className="barberrecorda__field barberrecorda__field--full">
+                        <span className="barberrecorda__label">Комментарий</span>
+                        <textarea
+                          className="barberrecorda__textarea"
+                          value={comment}
+                          onChange={(e) => setComment(e.target.value)}
+                          placeholder="Добавьте заметку или особые пожелания…"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Нижняя подсказка */}
-            <div className="barberrecorda__bottomHint">
-              <span className="barberrecorda__bottomHintIcon">⚠</span>
-              <span>Выберите сотрудника и добавьте услуги</span>
-            </div>
+            {missingHint && (
+              <div className="barberrecorda__bottomHint">
+                <span className="barberrecorda__bottomHintIcon">⚠</span>
+                <span>{missingHint}</span>
+              </div>
+            )}
 
             <div className="barberrecorda__footer">
               <span className="barberrecorda__spacer" />
@@ -749,7 +864,9 @@ const RecordaModal = ({
               </button>
               <button
                 type="submit"
-                className="barberrecorda__btn barberrecorda__btn--primary"
+                className={`barberrecorda__btn barberrecorda__btn--primary ${
+                  !validationState.isValid ? "is-disabled" : ""
+                }`}
                 disabled={
                   saving ||
                   (selectedStartISO &&
@@ -757,7 +874,9 @@ const RecordaModal = ({
                     busyBarbersOnInterval.has(String(selBarber)))
                 }
                 title={
-                  busyBarbersOnInterval.has(String(selBarber))
+                  !validationState.isValid
+                    ? missingHint
+                    : busyBarbersOnInterval.has(String(selBarber))
                     ? "Сотрудник занят в этот интервал"
                     : ""
                 }

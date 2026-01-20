@@ -1,7 +1,7 @@
 // BarberAnalitikaCard.jsx
 import React from "react";
-import { Info } from "lucide-react";
-import { usePaged } from "./BarberAnalitikaUtils";
+import { FiInfo } from "react-icons/fi";
+import { usePaged } from "../BarberAnalitikaUtils";
 
 const BarberAnalitikaCard = ({
   icon,
@@ -15,14 +15,14 @@ const BarberAnalitikaCard = ({
   const { page, pages, setPage, slice } = usePaged(rows, pageSize);
 
   return (
-    <div className="ba-card">
-      <div className="ba-card__head">
-        <div className="ba-card__title">
+    <div className="barber-analitika-card">
+      <div className="barber-analitika-card__head">
+        <div className="barber-analitika-card__title">
           {icon}
           <span>{title}</span>
         </div>
         <button
-          className="ba-card__more"
+          className="barber-analitika-card__more"
           aria-label="Подробнее"
           title="Подробнее"
           type="button"
@@ -30,12 +30,12 @@ const BarberAnalitikaCard = ({
             onOpenModal({ title: moreTitle || title, columns, rows })
           }
         >
-          <Info size={16} />
+          <FiInfo size={16} />
         </button>
       </div>
 
-      <div className="ba-tableWrap">
-        <table className="ba-table">
+      <div className="barber-analitika-table-wrap">
+        <table className="barber-analitika-table">
           <thead>
             <tr>
               {columns.map((c) => (
@@ -48,7 +48,7 @@ const BarberAnalitikaCard = ({
           <tbody>
             {slice.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="ba-empty">
+                <td colSpan={columns.length} className="barber-analitika-table__empty">
                   Нет данных
                 </td>
               </tr>
@@ -67,9 +67,9 @@ const BarberAnalitikaCard = ({
         </table>
       </div>
 
-      <div className="ba-card__pager">
+      <div className="barber-analitika-card__pager">
         <button
-          className="ba-pager__btn"
+          className="barber-analitika-pager__btn"
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page <= 1}
           aria-label="Назад"
@@ -77,11 +77,11 @@ const BarberAnalitikaCard = ({
         >
           ←
         </button>
-        <span className="ba-pager__info">
+        <span className="barber-analitika-pager__info">
           {page} / {pages}
         </span>
         <button
-          className="ba-pager__btn"
+          className="barber-analitika-pager__btn"
           onClick={() => setPage((p) => Math.min(pages, p + 1))}
           disabled={page >= pages}
           aria-label="Вперёд"

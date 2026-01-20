@@ -123,13 +123,12 @@
     height: calc(100vh - 80px); // Вычитаем высоту header
     width: 100%;
     margin-top: 80px; // Отступ сверху для фиксированного header
-    overflow-y: auto;
+    overflow-y: scroll;
     overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: rgba(247, 215, 79, 0.3) transparent;
     padding-top: 10px;
-    display: flex;
-    flex-direction: column;
+    // Убрали flex - теперь скролл работает правильно
   }
 
   &__arnament2 {
@@ -288,9 +287,8 @@
   &__menu {
     list-style: none;
     padding: 10px 0;
+    padding-bottom: 120px; // Отступ снизу чтобы скролл доходил до конца
     margin: 0;
-    flex: 1;
-    min-height: 0; // Важно для flex-скролла
   }
 
   &__menu-item {

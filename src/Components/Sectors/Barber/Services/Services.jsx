@@ -1,52 +1,51 @@
-// Services.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import "./Services.scss";
-import { FaPlus, FaEdit, FaSearch } from "react-icons/fa";
+import { FaPlus, FaThLarge, FaList, FaSearch, FaFilter, FaTimes } from "react-icons/fa";
 import api from "../../../../api";
-import ServiceModal from "./ServiceModal";
-import CategoryModal from "./CategoryModal";
-
+import BarberSelect from "../common/BarberSelect";
+import { ServiceModal, CategoryModal, Pager } from "./components";
 import {
   PAGE_SIZE,
   fmtMoney,
   mapService,
   mapCategory,
-  serviceSorter,
   categorySorter,
 } from "./BarberServicesUtils";
+import "./Services.scss";
 
-import BarberServicesSelect from "./BarberServicesSelect";
-import BarberServicesPager from "./BarberServicesPager";
+const SORT_OPTIONS = [
+  { value: "name_asc", label: "Название А-Я" },
+  { value: "name_desc", label: "Название Я-А" },
+  { value: "price_asc", label: "Цена по возр." },
+  { value: "price_desc", label: "Цена по убыв." },
+  { value: "newest", label: "Сначала новые" },
+  { value: "oldest", label: "Сначала старые" },
+];
 
 const Services = () => {
-  const [mainTab, setMainTab] = useState("services"); // "services" | "categories"
+  const [mainTab, setMainTab] = useState("services");
 
-  // услуги
   const [services, setServices] = useState([]);
   const [pageError, setPageError] = useState("");
 
-  // категории
   const [categories, setCategories] = useState([]);
   const [categoriesError, setCategoriesError] = useState("");
 
-  // общие фильтры / поиск
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // all | active | inactive
-  const [categoryFilter, setCategoryFilter] = useState("all"); // all | <categoryId>
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [viewMode, setViewMode] = useState("table"); // "cards" | "table"
 
-  // загрузка
   const [loading, setLoading] = useState(true);
 
-  // пагинация
   const [page, setPage] = useState(1);
-  const [lastAddedId, setLastAddedId] = useState(null);
 
-  // модалки
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [currentService, setCurrentService] = useState(null);
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [currentCategory, setCurrentCategory] = useState(null);
+
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const fetchServices = async () => {
     try {
@@ -81,8 +80,7 @@ const Services = () => {
       setCategories(listRaw.map(mapCategory));
     } catch (e) {
       setCategoriesError(
-        e?.response?.data?.detail ||
-          "Не удалось загрузить категории услуг."
+        e?.response?.data?.detail || "Не удалось загрузить категории услуг."
       );
       console.error(e);
     }
@@ -95,14 +93,53 @@ const Services = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [search, services.length, mainTab, statusFilter, categoryFilter]);
+  }, [search, services.length, mainTab, categoryFilter, sortBy]);
+
+  const categoryOptions = useMemo(
+    () => [
+      { value: "all", label: "Все категории" },
+      ...categories.map((c) => ({
+        value: String(c.id),
+        label: c.name,
+      })),
+    ],
+    [categories]
+  );
+
+  const sortServices = (arr, sortKey) => {
+    const sorted = [...arr];
+    switch (sortKey) {
+      case "name_asc":
+        return sorted.sort((a, b) => 
+          (a.name || "").localeCompare(b.name || "", "ru")
+        );
+      case "name_desc":
+        return sorted.sort((a, b) => 
+          (b.name || "").localeCompare(a.name || "", "ru")
+        );
+      case "price_asc":
+        return sorted.sort((a, b) => (a.price || 0) - (b.price || 0));
+      case "price_desc":
+        return sorted.sort((a, b) => (b.price || 0) - (a.price || 0));
+      case "oldest":
+        return sorted.sort((a, b) => {
+          const ad = new Date(a.createdAt || 0).getTime();
+          const bd = new Date(b.createdAt || 0).getTime();
+          return ad - bd;
+        });
+      case "newest":
+      default:
+        return sorted.sort((a, b) => {
+          const ad = new Date(a.createdAt || 0).getTime();
+          const bd = new Date(b.createdAt || 0).getTime();
+          return bd - ad;
+        });
+    }
+  };
 
   const servicesFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
     let base = services;
-
-    if (statusFilter === "active") base = base.filter((s) => s.active);
-    if (statusFilter === "inactive") base = base.filter((s) => !s.active);
 
     if (categoryFilter !== "all") {
       base = base.filter(
@@ -122,24 +159,18 @@ const Services = () => {
         })
       : base.slice();
 
-    arr.sort(serviceSorter(lastAddedId));
-    return arr;
-  }, [services, search, statusFilter, categoryFilter, lastAddedId]);
+    return sortServices(arr, sortBy);
+  }, [services, search, categoryFilter, sortBy]);
 
   const categoriesFiltered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let base = categories;
-
-    if (statusFilter === "active") base = base.filter((c) => c.active);
-    if (statusFilter === "inactive") base = base.filter((c) => !c.active);
-
     const arr = q
-      ? base.filter((c) => (c.name || "").toLowerCase().includes(q))
-      : base.slice();
+      ? categories.filter((c) => (c.name || "").toLowerCase().includes(q))
+      : categories.slice();
 
     arr.sort(categorySorter);
     return arr;
-  }, [categories, search, statusFilter]);
+  }, [categories, search]);
 
   const totalPages = Math.max(
     1,
@@ -147,16 +178,25 @@ const Services = () => {
   );
   const pageSafe = Math.min(page, totalPages);
   const startIdx = (pageSafe - 1) * PAGE_SIZE;
-  const pageSlice = servicesFiltered.slice(
-    startIdx,
-    startIdx + PAGE_SIZE
-  );
+  const pageSlice = servicesFiltered.slice(startIdx, startIdx + PAGE_SIZE);
 
   const isServicesTab = mainTab === "services";
 
+  const activeServicesCount = services.filter(s => s.active).length;
   const counterText = isServicesTab
-    ? `${services.length} услуг`
+    ? `${activeServicesCount} активных из ${services.length}`
     : `${categories.length} категорий`;
+
+  // Считаем активные фильтры
+  const activeFiltersCount = [
+    categoryFilter !== "all" ? categoryFilter : null,
+    sortBy !== "newest" ? sortBy : null,
+  ].filter(Boolean).length;
+
+  const handleClearFilters = () => {
+    setCategoryFilter("all");
+    setSortBy("newest");
+  };
 
   const openServiceModal = (service = null) => {
     setCurrentService(service);
@@ -178,8 +218,7 @@ const Services = () => {
     setCurrentCategory(null);
   };
 
-  const handleServiceSaved = (createdId = null) => {
-    if (createdId) setLastAddedId(createdId);
+  const handleServiceSaved = () => {
     fetchServices();
     closeServiceModal();
   };
@@ -199,54 +238,106 @@ const Services = () => {
     closeCategoryModal();
   };
 
+  const formatDuration = (time) => {
+    if (!time) return "—";
+    const num = parseInt(time, 10);
+    if (!isNaN(num) && String(num) === String(time).trim()) {
+      return `${num} мин`;
+    }
+    return time;
+  };
+
+  const renderServiceCard = (s) => (
+    <article
+      key={s.id}
+      className={`barberservices__card ${
+        s.active
+          ? "barberservices__card--active"
+          : "barberservices__card--inactive"
+      }`}
+      onClick={() => openServiceModal(s)}
+    >
+      <div className="barberservices__info">
+        <h4 className="barberservices__name">{s.name}</h4>
+        <div className="barberservices__meta">
+          <span className="barberservices__price">{fmtMoney(s.price)}</span>
+          {s.time && (
+            <span className="barberservices__tag">
+              {formatDuration(s.time)}
+            </span>
+          )}
+          <span className="barberservices__cat">
+            {s.categoryName || "Без категории"}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+
+  const renderServiceTable = () => (
+    <div className="barberservices__tableWrap">
+      <table className="barberservices__table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Цена</th>
+            <th>Длительность</th>
+            <th>Категория</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pageSlice.map((s) => (
+            <tr 
+              key={s.id} 
+              className={`barberservices__row ${!s.active ? "barberservices__row--inactive" : ""}`}
+              onClick={() => openServiceModal(s)}
+            >
+              <td className="barberservices__cellName">{s.name}</td>
+              <td className="barberservices__cellPrice">{fmtMoney(s.price)}</td>
+              <td>{formatDuration(s.time)}</td>
+              <td>{s.categoryName || "Без категории"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div className="barberservices">
-      {/* Табы */}
-      <div
-        className="barberservices__tabs"
-        role="tablist"
-        aria-label="Разделы"
-      >
-        <button
-          className={`barberservices__tab ${
-            isServicesTab ? "is-active" : ""
-          }`}
-          role="tab"
-          aria-selected={isServicesTab}
-          onClick={() => setMainTab("services")}
+      <div className="barberservices__tabs-wrap">
+        <div
+          className="barberservices__tabs"
+          role="tablist"
+          aria-label="Разделы"
         >
-          Услуга
-        </button>
-        <button
-          className={`barberservices__tab ${
-            !isServicesTab ? "is-active" : ""
-          }`}
-          role="tab"
-          aria-selected={!isServicesTab}
-          onClick={() => setMainTab("categories")}
-        >
-          Категория
-        </button>
+          <button
+            className={`barberservices__tab ${isServicesTab ? "is-active" : ""}`}
+            role="tab"
+            aria-selected={isServicesTab}
+            onClick={() => setMainTab("services")}
+          >
+            Услуги
+          </button>
+          <button
+            className={`barberservices__tab ${!isServicesTab ? "is-active" : ""}`}
+            role="tab"
+            aria-selected={!isServicesTab}
+            onClick={() => setMainTab("categories")}
+          >
+            Категории
+          </button>
+        </div>
       </div>
 
-      {/* счётчик */}
       <div className="barberservices__counter">{counterText}</div>
 
-      {/* Поиск + фильтры + плюс */}
-      <div
-        className={`barberservices__actions ${
-          isServicesTab ? "barberservices__actions--withCat" : ""
-        }`}
-      >
-        <div className="barberservices__search">
+      <div className="barberservices__actions">
+        <div className="barberservices__searchWrap">
           <FaSearch className="barberservices__searchIcon" />
           <input
             className="barberservices__searchInput"
-            placeholder={
-              isServicesTab
-                ? "Поиск по названию, цене, длит..."
-                : "Поиск по названию категории"
-            }
+            placeholder={isServicesTab ? "Поиск услуги..." : "Поиск категории..."}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Поиск"
@@ -254,139 +345,137 @@ const Services = () => {
         </div>
 
         {isServicesTab && (
-          <div
-            className="barberservices__filter"
-            aria-label="Фильтр по категории"
-          >
-            <BarberServicesSelect
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              ariaLabel="Фильтр по категории"
-              options={[
-                { value: "all", label: "Все категории" },
-                ...categories.map((c) => ({
-                  value: String(c.id),
-                  label: c.name,
-                })),
-              ]}
-            />
-          </div>
-        )}
+          <>
+            <div className="barberservices__filtersWrap">
+              <button
+                type="button"
+                className={`barberservices__filtersBtn ${filtersOpen ? "is-open" : ""} ${activeFiltersCount > 0 ? "has-active" : ""}`}
+                onClick={() => setFiltersOpen(!filtersOpen)}
+              >
+                <FaFilter />
+                <span>Фильтры</span>
+                {activeFiltersCount > 0 && (
+                  <span className="barberservices__filtersBadge">{activeFiltersCount}</span>
+                )}
+              </button>
+            </div>
 
-        <div
-          className="barberservices__filter"
-          aria-label="Фильтр по активности"
-        >
-          <BarberServicesSelect
-            value={statusFilter}
-            onChange={setStatusFilter}
-            ariaLabel="Фильтр по статусу"
-            options={[
-              { value: "all", label: "Все статусы" },
-              { value: "active", label: "Активна" },
-              { value: "inactive", label: "Неактивна" },
-            ]}
-          />
-        </div>
+            <div className="barberservices__viewToggle">
+              <button
+                className={`barberservices__viewBtn ${viewMode === "table" ? "is-active" : ""}`}
+                onClick={() => setViewMode("table")}
+                title="Таблица"
+                aria-label="Вид таблицей"
+              >
+                <FaList />
+              </button>
+              <button
+                className={`barberservices__viewBtn ${viewMode === "cards" ? "is-active" : ""}`}
+                onClick={() => setViewMode("cards")}
+                title="Карточки"
+                aria-label="Вид карточками"
+              >
+                <FaThLarge />
+              </button>
+            </div>
+          </>
+        )}
 
         <button
           className="barberservices__btn barberservices__btn--primary barberservices__btn--icon"
-          onClick={() =>
-            isServicesTab ? openServiceModal() : openCategoryModal()
-          }
-          aria-label={
-            isServicesTab ? "Добавить услугу" : "Добавить категорию"
-          }
-          title={
-            isServicesTab ? "Добавить услугу" : "Добавить категорию"
-          }
+          onClick={() => isServicesTab ? openServiceModal() : openCategoryModal()}
+          aria-label={isServicesTab ? "Добавить услугу" : "Добавить категорию"}
+          title={isServicesTab ? "Добавить услугу" : "Добавить категорию"}
         >
           <FaPlus />
         </button>
       </div>
 
+      {/* Модальное окно фильтров */}
+      {filtersOpen && (
+        <>
+          <div className="barberservices__filtersOverlay" onClick={() => setFiltersOpen(false)} />
+          <div className="barberservices__filtersPanel">
+            <div className="barberservices__filtersPanelHeader">
+              <span className="barberservices__filtersPanelTitle">Фильтры</span>
+              <button
+                type="button"
+                className="barberservices__filtersPanelClose"
+                onClick={() => setFiltersOpen(false)}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="barberservices__filtersPanelBody">
+              <div className="barberservices__filtersPanelRow">
+                <label className="barberservices__filtersPanelLabel">Категория</label>
+                <BarberSelect
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                  options={categoryOptions}
+                  placeholder="Все категории"
+                />
+              </div>
+
+              <div className="barberservices__filtersPanelRow">
+                <label className="barberservices__filtersPanelLabel">Сортировка</label>
+                <BarberSelect
+                  value={sortBy}
+                  onChange={setSortBy}
+                  options={SORT_OPTIONS}
+                  placeholder="Сортировка"
+                />
+              </div>
+            </div>
+
+            {activeFiltersCount > 0 && (
+              <div className="barberservices__filtersPanelFooter">
+                <button
+                  type="button"
+                  className="barberservices__filtersPanelClear"
+                  onClick={handleClearFilters}
+                >
+                  Очистить фильтры
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {pageError && !serviceModalOpen && isServicesTab && (
         <div className="barberservices__alert">{pageError}</div>
       )}
       {categoriesError && !categoryModalOpen && !isServicesTab && (
-        <div className="barberservices__alert">
-          {categoriesError}
-        </div>
+        <div className="barberservices__alert">{categoriesError}</div>
       )}
 
-      {/* ТАБ: УСЛУГА */}
       {isServicesTab && (
         <>
           {loading ? (
-            <div
-              className="barberservices__skeletonList"
-              aria-hidden="true"
-            >
+            <div className="barberservices__skeletonList" aria-hidden="true">
               {[...Array(4)].map((_, i) => (
-                <div
-                  key={i}
-                  className="barberservices__skeletonCard"
-                />
+                <div key={i} className="barberservices__skeletonCard" />
               ))}
+            </div>
+          ) : servicesFiltered.length === 0 ? (
+            <div className="barberservices__empty">
+              {search || categoryFilter !== "all"
+                ? "Ничего не найдено"
+                : "Нет услуг. Добавьте первую!"}
             </div>
           ) : (
             <>
-              <div className="barberservices__list">
-                {pageSlice.map((s) => (
-                  <article
-                    key={s.id}
-                    className={`barberservices__card ${
-                      s.active
-                        ? "barberservices__card--active"
-                        : "barberservices__card--inactive"
-                    }`}
-                  >
-                    <div className="barberservices__info">
-                      <h4 className="barberservices__name">
-                        {s.name}
-                      </h4>
-                      <div className="barberservices__meta">
-                        <span className="barberservices__price">
-                          {fmtMoney(s.price)}
-                        </span>
-                        {s.time ? (
-                          <span className="barberservices__tag">
-                            <span className="barberservices__timeIcon">
-                              ⏱
-                            </span>{" "}
-                            {s.time}
-                          </span>
-                        ) : null}
-                        <span className="barberservices__cat">
-                          {s.categoryName || "Без категории"}
-                        </span>
-                        <span
-                          className={`barberservices__badge ${
-                            s.active
-                              ? "barberservices__badge--active"
-                              : "barberservices__badge--inactive"
-                          }`}
-                        >
-                          {s.active ? "Активна" : "Неактивна"}
-                        </span>
-                      </div>
-                    </div>
+              {viewMode === "cards" ? (
+                <div className="barberservices__list">
+                  {pageSlice.map(renderServiceCard)}
+                </div>
+              ) : (
+                renderServiceTable()
+              )}
 
-                    <div className="barberservices__cardActions">
-                      <button
-                        className="barberservices__btn barberservices__btn--secondary barberservices__btn--circle"
-                        onClick={() => openServiceModal(s)}
-                        title="Редактировать"
-                        aria-label="Редактировать"
-                      >
-                        <FaEdit />
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <BarberServicesPager
+              <Pager
                 filteredCount={servicesFiltered.length}
                 page={pageSafe}
                 totalPages={totalPages}
@@ -397,20 +486,17 @@ const Services = () => {
         </>
       )}
 
-      {/* ТАБ: КАТЕГОРИЯ */}
       {!isServicesTab && (
         <>
           {loading ? (
-            <div
-              className="barberservices__skeletonList"
-              aria-hidden="true"
-            >
+            <div className="barberservices__skeletonList" aria-hidden="true">
               {[...Array(3)].map((_, i) => (
-                <div
-                  key={i}
-                  className="barberservices__skeletonCard"
-                />
+                <div key={i} className="barberservices__skeletonCard" />
               ))}
+            </div>
+          ) : categoriesFiltered.length === 0 ? (
+            <div className="barberservices__empty">
+              {search ? "Ничего не найдено" : "Нет категорий. Добавьте первую!"}
             </div>
           ) : (
             <div className="barberservices__list">
@@ -422,33 +508,15 @@ const Services = () => {
                       ? "barberservices__card--active"
                       : "barberservices__card--inactive"
                   }`}
+                  onClick={() => openCategoryModal(c)}
                 >
                   <div className="barberservices__info">
-                    <h4 className="barberservices__name">
-                      {c.name}
-                    </h4>
+                    <h4 className="barberservices__name">{c.name}</h4>
                     <div className="barberservices__meta">
-                      <span
-                        className={`barberservices__badge ${
-                          c.active
-                            ? "barberservices__badge--active"
-                            : "barberservices__badge--inactive"
-                        }`}
-                      >
-                        {c.active ? "Активна" : "Неактивна"}
+                      <span className="barberservices__catCount">
+                        {services.filter(s => String(s.categoryId) === String(c.id)).length} услуг
                       </span>
                     </div>
-                  </div>
-
-                  <div className="barberservices__cardActions">
-                    <button
-                      className="barberservices__btn barberservices__btn--secondary barberservices__btn--circle"
-                      onClick={() => openCategoryModal(c)}
-                      title="Редактировать категорию"
-                      aria-label="Редактировать категорию"
-                    >
-                      <FaEdit />
-                    </button>
                   </div>
                 </article>
               ))}
@@ -457,7 +525,6 @@ const Services = () => {
         </>
       )}
 
-      {/* МОДАЛКИ */}
       {serviceModalOpen && (
         <ServiceModal
           isOpen={serviceModalOpen}
