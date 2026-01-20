@@ -23,6 +23,7 @@ import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import "./CreateSaleDocument.scss";
+import { useAlert } from "../../../../hooks/useDialog";
 
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
@@ -30,7 +31,7 @@ const CreateSaleDocument = () => {
   const { company, profile: userProfile } = useUser();
   const { list: cashBoxes } = useCash();
   const { list: counterparties } = useCounterparty();
-
+  const alert = useAlert()
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
   const [products, setProducts] = useState([]);

@@ -8,6 +8,7 @@ import { publicRoutes, crmRoutes } from "./config/routes.jsx";
 import { ThemeModeProvider } from "./theme/ThemeModeProvider.jsx";
 import { Box } from "@mui/system";
 import "./i18n.js"
+import { ModalProvider } from "./context/modal";
 
 function App() {
   const [profile, setProfile] = useState(null);
@@ -20,17 +21,19 @@ function App() {
   return (
     <AuthGuard onProfileLoaded={handleProfileLoaded}>
       <ThemeModeProvider>
-         <Box sx={{ minHeight: "100vh", bgcolor: "transparent" }}>
-          <BrowserRouter>
-            <ScrollToTop />
-            <Routes>
-              {publicRoutes}
-              <Route path="/crm" element={<Layout />}>
-                {crmRoutes(profile)}
-              </Route>
-            </Routes>
-          </BrowserRouter>
-         </Box>
+        <ModalProvider>
+          <Box sx={{ minHeight: "100vh", bgcolor: "transparent" }}>
+            <BrowserRouter>
+              <ScrollToTop />
+              <Routes>
+                {publicRoutes}
+                <Route path="/crm" element={<Layout />}>
+                  {crmRoutes(profile)}
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </Box>
+        </ModalProvider>
       </ThemeModeProvider>
     </AuthGuard>
   );

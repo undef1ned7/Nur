@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
-import api from "../../../api";
 import { getCompany } from "../../../store/creators/userCreators";
 import { getProfile, useUser } from "../../../store/slices/userSlice";
 import {
