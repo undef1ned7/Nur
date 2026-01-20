@@ -1,80 +1,161 @@
 import React, { useMemo } from "react";
 import { FaPlus, FaPen, FaTrash, FaSearch } from "react-icons/fa";
+import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 
-const safeStr = (v) => String(v ?? "").trim();
+const safeStr = (value) => String(value ?? "").trim();
 
 const MenuItemsTab = ({
   loadingItems,
   filteredItems,
   queryItems,
   setQueryItems,
+  categories,
+  selectedCategoryFilter,
+  setSelectedCategoryFilter,
   onCreate,
   onEdit,
   onDelete,
   hasCategories,
   categoryTitle,
-  fmtMoney,
-  toNum,
-  productTitle,
-  productUnit,
-  viewMode, // "list" | "cards"
+  formatMoney,
+  toNumber,
+  viewMode,
 }) => {
   const items = Array.isArray(filteredItems) ? filteredItems : [];
 
-  const emptyText = useMemo(() => {
+  const categoryOptions = useMemo(() => {
+    const baseOptions = (Array.isArray(categories) ? categories : [])
+      .map((cat) => ({
+        value: String(cat.id),
+        label: safeStr(cat.title),
+      }))
+      .filter((opt) => opt.value && opt.label);
+
+    return [{ value: "", label: "Все категории" }, ...baseOptions];
+  }, [categories]);
+
+  const emptyMessage = useMemo(() => {
     if (loadingItems) return "";
-    if (!hasCategories) return "Сначала создайте категорию.";
-    if (safeStr(queryItems)) return "Ничего не найдено.";
-    return "Список блюд пуст.";
-  }, [loadingItems, hasCategories, queryItems]);
+    if (!hasCategories) return "Сначала создайте категорию";
+    if (safeStr(queryItems) || safeStr(selectedCategoryFilter)) return "Ничего не найдено";
+    return "Список блюд пуст";
+  }, [loadingItems, hasCategories, queryItems, selectedCategoryFilter]);
 
-const renderRecipeMini = () => null;
+  const renderListView = () => (
+    <div className="cafeMenu__list">
+      {items.map((item) => {
+        const title = safeStr(item?.title) || "—";
+        const category = categoryTitle(item?.category);
+        const price = formatMoney(item?.price);
+        const isActive = !!item?.is_active;
+        const image = item?.image_url || item?.image || "";
 
-
-  const renderList = () => {
-    return (
-      <div className="menu__list">
-        {items.map((m) => {
-          const title = safeStr(m?.title) || "—";
-          const cat = categoryTitle(m?.category);
-          const price = fmtMoney(m?.price);
-          const isOn = !!m?.is_active;
-          const img = m?.image_url || m?.image || "";
-
-          return (
-            <div className="menu__card" key={m?.id}>
-              <div className="menu__cardLeft">
-                <div className="menu__avatar" aria-hidden="true">
-                  {img ? (
-                    <img src={img} alt={title} />
-                  ) : (
-                    <span>{title.slice(0, 1).toUpperCase()}</span>
-                  )}
-                </div>
-
-                <div style={{ minWidth: 0 }}>
-                  <p className="menu__name" title={title}>
-                    {title}
-                  </p>
-
-                  <div className="menu__meta">
-                    <span className="menu__muted">{cat}</span>
-                    <span className="menu__muted">{price}</span>
-
-                    <span className={`menu__status ${isOn ? "menu__status--on" : "menu__status--off"}`}>
-                      {isOn ? "Активно" : "Не активно"}
-                    </span>
-                  </div>
-
-                  {renderRecipeMini(m)}
-                </div>
+        return (
+          <div className="cafeMenu__card" key={item?.id}>
+            <div className="cafeMenu__cardLeft">
+              <div className="cafeMenu__avatar" aria-hidden="true">
+                {image ? (
+                  <img src={image} alt={title} />
+                ) : (
+                  <span>{title.slice(0, 1).toUpperCase()}</span>
+                )}
               </div>
 
-              <div className="menu__rowActions">
+              <div style={{ minWidth: 0 }}>
+                <p className="cafeMenu__name" title={title}>
+                  {title}
+                </p>
+
+                <div className="cafeMenu__meta">
+                  <span className="cafeMenu__muted">{category}</span>
+                  <span className="cafeMenu__muted">{price}</span>
+
+                  <span
+                    className={`cafeMenu__status ${
+                      isActive ? "cafeMenu__status--on" : "cafeMenu__status--off"
+                    }`}
+                  >
+                    {isActive ? "Активно" : "Не активно"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="cafeMenu__rowActions">
+              <button
+                type="button"
+                className="cafeMenu__btn cafeMenu__btn--secondary"
+                onClick={() => onEdit(item)}
+                title="Редактировать"
+              >
+                <FaPen /> Изменить
+              </button>
+
+              <button
+                type="button"
+                className="cafeMenu__btn cafeMenu__btn--danger"
+                onClick={() => onDelete(item?.id)}
+                title="Удалить"
+              >
+                <FaTrash /> Удалить
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderCardsView = () => (
+    <div className="cafeMenu__grid">
+      {items.map((item) => {
+        const title = safeStr(item?.title) || "—";
+        const category = categoryTitle(item?.category);
+        const price = formatMoney(item?.price);
+        const isActive = !!item?.is_active;
+        const image = item?.image_url || item?.image || "";
+
+        return (
+          <article className="cafeMenu__tile" key={item?.id}>
+            <div className="cafeMenu__tileMedia">
+              {image ? (
+                <img src={image} alt={title} />
+              ) : (
+                <div className="cafeMenu__avatar" style={{ width: "100%", height: "100%", borderRadius: 0 }}>
+                  <span style={{ fontSize: 28, fontWeight: 900 }}>
+                    {title.slice(0, 1).toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="cafeMenu__tileBody">
+              <h4 className="cafeMenu__tileTitle" title={title}>
+                {title}
+              </h4>
+
+              <div className="cafeMenu__tileRow">
+                <span className="cafeMenu__tileCat">{category}</span>
+                <span className="cafeMenu__tilePrice">{price}</span>
+              </div>
+
+              <div className="cafeMenu__tileRow">
+                <span
+                  className={`cafeMenu__status ${
+                    isActive ? "cafeMenu__status--on" : "cafeMenu__status--off"
+                  }`}
+                >
+                  {isActive ? "Активно" : "Не активно"}
+                </span>
+              </div>
+            </div>
+
+            <div className="cafeMenu__tileActions">
+              <div className="cafeMenu__tileActionsRow">
                 <button
                   type="button"
-                  className="menu__btn menu__btn--secondary"
-                  onClick={() => onEdit(m)}
+                  className="cafeMenu__btn cafeMenu__btn--secondary"
+                  onClick={() => onEdit(item)}
                   title="Редактировать"
                 >
                   <FaPen /> Изменить
@@ -82,110 +163,54 @@ const renderRecipeMini = () => null;
 
                 <button
                   type="button"
-                  className="menu__btn menu__btn--danger"
-                  onClick={() => onDelete(m?.id)}
+                  className="cafeMenu__btn cafeMenu__btn--danger"
+                  onClick={() => onDelete(item?.id)}
                   title="Удалить"
                 >
                   <FaTrash /> Удалить
                 </button>
               </div>
             </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderCards = () => {
-    return (
-      <div className="menu__grid">
-        {items.map((m) => {
-          const title = safeStr(m?.title) || "—";
-          const cat = categoryTitle(m?.category);
-          const price = fmtMoney(m?.price);
-          const isOn = !!m?.is_active;
-          const img = m?.image_url || m?.image || "";
-
-          return (
-            <article className="menu__tile" key={m?.id}>
-              <div className="menu__tileMedia">
-                {img ? (
-                  <img src={img} alt={title} />
-                ) : (
-                  <div className="menu__avatar" style={{ width: "100%", height: "100%", borderRadius: 0 }}>
-                    <span style={{ fontSize: 28, fontWeight: 900 }}>
-                      {title.slice(0, 1).toUpperCase()}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="menu__tileBody">
-                <h4 className="menu__tileTitle" title={title}>
-                  {title}
-                </h4>
-
-                <div className="menu__tileRow">
-                  <span className="menu__tileCat">{cat}</span>
-                  <span className="menu__tilePrice">{price}</span>
-                </div>
-
-                <div className="menu__tileRow">
-                  <span className={`menu__status ${isOn ? "menu__status--on" : "menu__status--off"}`}>
-                    {isOn ? "Активно" : "Не активно"}
-                  </span>
-                </div>
-
-                {renderRecipeMini(m)}
-              </div>
-
-              <div className="menu__tileActions">
-                <div className="menu__tileActionsRow">
-                  <button
-                    type="button"
-                    className="menu__btn menu__btn--secondary"
-                    onClick={() => onEdit(m)}
-                    title="Редактировать"
-                  >
-                    <FaPen /> Изменить
-                  </button>
-
-                  <button
-                    type="button"
-                    className="menu__btn menu__btn--danger"
-                    onClick={() => onDelete(m?.id)}
-                    title="Удалить"
-                  >
-                    <FaTrash /> Удалить
-                  </button>
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-    );
-  };
+          </article>
+        );
+      })}
+    </div>
+  );
 
   return (
     <>
-      <div className="menu__header">
-        <div className="menu__actions">
-          <div className="menu__search">
-            <FaSearch className="menu__searchIcon" />
-            <input
-              className="menu__searchInput"
-              value={queryItems}
-              onChange={(e) => setQueryItems(e.target.value)}
-              placeholder="Поиск по названию или категории…"
-              type="text"
-              autoComplete="off"
-            />
+      <div className="cafeMenu__header">
+        <div className="cafeMenu__actions">
+          <div className="cafeMenu__filters">
+            <div className="cafeMenu__search">
+              <input
+                className="cafeMenu__searchInput"
+                value={queryItems}
+                onChange={(e) => setQueryItems(e.target.value)}
+                placeholder="Поиск по названию или категории…"
+                type="text"
+                autoComplete="off"
+              />
+              <FaSearch className="cafeMenu__searchIcon" aria-hidden="true" />
+            </div>
+
+            {hasCategories && (
+              <div className="cafeMenu__filterCategory">
+                <SearchableCombobox
+                  value={selectedCategoryFilter}
+                  onChange={(val) => setSelectedCategoryFilter(val || "")}
+                  options={categoryOptions}
+                  placeholder="Фильтр по категории…"
+                  disabled={!categoryOptions.length}
+                  classNamePrefix="cafeMenuCombo"
+                />
+              </div>
+            )}
           </div>
 
           <button
             type="button"
-            className="menu__btn menu__btn--primary"
+            className="cafeMenu__btn cafeMenu__btn--primary"
             onClick={onCreate}
             disabled={!hasCategories}
             title={!hasCategories ? "Сначала создайте категорию" : "Добавить блюдо"}
@@ -195,14 +220,14 @@ const renderRecipeMini = () => null;
         </div>
       </div>
 
-      {loadingItems && <div className="menu__alert">Загрузка…</div>}
+      {loadingItems && <div className="cafeMenu__alert">Загрузка…</div>}
 
-      {!loadingItems && (items?.length || 0) === 0 && (
-        <div className="menu__alert">{emptyText}</div>
+      {!loadingItems && items.length === 0 && (
+        <div className="cafeMenu__alert">{emptyMessage}</div>
       )}
 
-      {!loadingItems && (items?.length || 0) > 0 && (
-        <>{viewMode === "cards" ? renderCards() : renderList()}</>
+      {!loadingItems && items.length > 0 && (
+        <>{viewMode === "cards" ? renderCardsView() : renderListView()}</>
       )}
     </>
   );

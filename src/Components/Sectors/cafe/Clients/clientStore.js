@@ -127,11 +127,18 @@ const normalizeHistoryLite = (h) => ({
   table: h.table ?? null,
   table_name: h.table_number != null ? `Стол ${h.table_number}` : "",
   guests: h.guests ?? 0,
-  status: "архив",
+  status: h.status || "архив",
   created_at: h.created_at || h.archived_at || null,
   archived_at: h.archived_at || null,
   items: Array.isArray(h.items) ? h.items : [],
   total: 0,
+  total_amount: h.total_amount ?? null,
+  discount_amount: h.discount_amount ?? null,
+  is_paid: h.is_paid ?? false,
+  paid_at: h.paid_at ?? null,
+  payment_method: h.payment_method ?? null,
+  waiter: h.waiter ?? null,
+  waiter_label: h.waiter_label ?? null,
 });
 
 function calcHistoryTotal(items) {
@@ -147,7 +154,9 @@ async function getOrdersHistoryByClient(clientId) {
   const raw = await fetchAll(`/cafe/clients/${clientId}/orders/history/`);
   return raw.map((h) => {
     const base = normalizeHistoryLite(h);
-    return { ...base, total: calcHistoryTotal(base.items) };
+    // Используем total_amount из API, если есть, иначе считаем из items
+    const total = base.total_amount != null ? toNum(base.total_amount) : calcHistoryTotal(base.items);
+    return { ...base, total };
   });
 }
 

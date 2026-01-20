@@ -1,21 +1,8 @@
-/* В :root — только цвета */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-  --danger: #ef4444;
-  --danger-weak: rgba(239, 68, 68, 0.06);
-  --success: #16a34a;
-  --success-weak: #22c55e1a;
-  --warning: #f59e0b;
-  --warning-weak: rgba(245, 158, 11, 0.1);
-}
+@use "../variables.scss";
+@use "../../../common/SearchableCombobox/SearchableCombobox.scss";
 
-/* Изоляция блоком .inventory — стили не утекут */
-.inventory {
+/* Изоляция блоком .cafeInventory — стили не утекут */
+.cafeInventory {
   /* локальные токены */
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
@@ -32,9 +19,10 @@
   &__header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 16px;
+    width: 100%;
   }
 
   &__title {
@@ -53,18 +41,22 @@
     display: flex;
     gap: 10px;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    min-width: 0;
   }
 
   /* Search */
   &__search {
     position: relative;
+    flex: 1 1 auto;
+    min-width: 200px;
+    max-width: 400px;
   }
 
-  &__search-input {
-    width: 260px;
+  &__searchInput {
+    width: 100%;
     padding: 10px 12px 10px 32px;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid var(--border);
     font-size: 14px;
     background: #fff;
@@ -77,7 +69,7 @@
     }
   }
 
-  &__search-icon {
+  &__searchIcon {
     position: absolute;
     left: 10px;
     top: 50%;
@@ -93,6 +85,29 @@
     gap: 8px;
     border-bottom: 2px solid var(--border);
     padding-bottom: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    flex-wrap: nowrap;
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 2px;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.3);
+      }
+    }
   }
 
   &__tab {
@@ -124,11 +139,12 @@
   &__btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     padding: 10px 14px;
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 800;
     cursor: pointer;
     transition: 0.18s;
     border: 1px solid transparent;
@@ -139,12 +155,18 @@
       transform: translateY(1px);
     }
 
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
     &--primary {
       background: var(--primary);
       color: #111;
       border-color: var(--primary-dark);
 
-      &:hover {
+      &:hover:not(:disabled) {
         background: var(--primary-dark);
       }
     }
@@ -153,7 +175,7 @@
       background: #fff;
       border-color: var(--border);
 
-      &:hover {
+      &:hover:not(:disabled) {
         background: #f9fafb;
       }
     }
@@ -163,7 +185,7 @@
       border-color: #fecaca;
       color: #b91c1c;
 
-      &:hover {
+      &:hover:not(:disabled) {
         background: #fecaca;
       }
     }
@@ -173,14 +195,9 @@
       border-color: rgba(22, 163, 74, 0.35);
       color: var(--success);
 
-      &:hover {
+      &:hover:not(:disabled) {
         background: rgba(22, 163, 74, 0.2);
       }
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
     }
   }
 
@@ -193,23 +210,26 @@
   &__card {
     display: flex;
     justify-content: space-between;
-    align-items: stretch;
-    padding: 14px;
+    align-items: flex-start;
+    padding: 16px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: #fafafa;
     transition: background 0.18s;
+    gap: 16px;
 
     &:hover {
       background: #f1f5f9;
     }
   }
 
-  &__card-left {
+  &__cardLeft {
     display: flex;
     gap: 12px;
     align-items: flex-start;
+    flex: 1 1 auto;
     min-width: 0;
+    width: 100%;
   }
 
   &__avatar {
@@ -242,13 +262,15 @@
     gap: 8px;
     flex-wrap: wrap;
     align-items: center;
+    margin-top: 6px;
   }
 
   &__rowActions {
     display: flex;
     gap: 8px;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
   }
 
   &__alert {
@@ -320,7 +342,7 @@
   }
 
   /* ===== MODAL ===== */
-  &__modal-overlay {
+  &__modalOverlay {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.45);
@@ -335,6 +357,7 @@
   &__modal {
     background: #fff;
     border-radius: 16px;
+    padding: 20px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
     width: min(720px, calc(100vw - 24px));
     max-height: min(90vh, 760px);
@@ -343,14 +366,19 @@
     flex-direction: column;
     -webkit-overflow-scrolling: touch;
     animation: inv-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) 0.04s both;
+
+    &--confirm {
+      max-width: 480px;
+    }
   }
 
-  &__modal-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid #e5e7eb;
+  &__modalHeader {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
     gap: 10px;
     position: sticky;
     top: 0;
@@ -358,13 +386,13 @@
     z-index: 1;
   }
 
-  &__modal-title {
+  &__modalTitle {
     font-size: 18px;
     font-weight: 800;
     margin: 0;
   }
 
-  &__icon-btn {
+  &__iconBtn {
     background: #fff;
     border: 1px solid #e5e7eb;
     width: 32px;
@@ -376,11 +404,18 @@
     cursor: pointer;
     color: #475569;
     transition: 0.15s;
+    padding: 0;
+    flex-shrink: 0;
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: #f3f4f6;
       border-color: #cbd5e1;
       color: #0f172a;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   }
 
@@ -393,7 +428,7 @@
     gap: 16px;
   }
 
-  &__form-grid {
+  &__formGrid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
@@ -419,9 +454,11 @@
   &__textarea {
     padding: 10px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 14px;
     background: #fff;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
 
     &:focus {
       outline: none;
@@ -436,15 +473,17 @@
     margin-top: 6px;
   }
 
-  &__form-actions {
+  &__formActions {
     display: flex;
     align-items: center;
     gap: 10px;
     justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 4px;
   }
 
   /* Session items */
-  &__session-items {
+  &__sessionItems {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -455,7 +494,7 @@
     border: 1px solid var(--border);
   }
 
-  &__session-item {
+  &__sessionItem {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -466,11 +505,11 @@
     gap: 12px;
   }
 
-  &__session-items-list {
+  &__sessionItemsList {
     margin-top: 16px;
   }
 
-  &__session-item-view {
+  &__sessionItemView {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -481,7 +520,7 @@
     margin-bottom: 8px;
   }
 
-  &__session-info {
+  &__sessionInfo {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -491,10 +530,47 @@
     border-radius: 8px;
   }
 
-  &__session-details {
+  &__sessionDetails {
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  /* Новые элементы для SearchableCombobox */
+  &__selectGroup {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  &__checkboxLabel {
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+
+    input[type="checkbox"] {
+      cursor: pointer;
+    }
+  }
+
+  &__conditionSelect {
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  &__confirmBody {
+    padding: 8px 0;
+  }
+
+  &__confirmText {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    line-height: 1.5;
   }
 
   /* animations */
@@ -520,47 +596,186 @@
 
   /* ===== Adaptive ===== */
   @media (max-width: 1000px) {
-    &__rowActions {
+    &__header {
       flex-direction: column;
+      align-items: stretch;
+      gap: 16px;
     }
-    &__btn {
-      width: 150px;
-    }
-  }
 
-  @media (max-width: 860px) {
+    &__actions {
+      width: 100%;
+      flex-direction: row;
+      gap: 10px;
+      align-items: stretch;
+    }
+
     &__search {
-      width: 100%;
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: none;
     }
 
-    &__search-input {
-      width: 100%;
+    &__actions > .cafeInventory__btn {
+      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     &__card {
       flex-direction: column;
-      gap: 10px;
+      align-items: stretch;
     }
 
-    &__rowActions > .inventory__btn {
+    &__rowActions {
       width: 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+
+    &__rowActions > .cafeInventory__btn {
+      flex: 1 1 calc(50% - 4px);
+      min-width: 120px;
+    }
+  }
+
+  @media (max-width: 860px) {
+    &__actions {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    &__search {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    &__actions > .cafeInventory__btn {
+      width: 100%;
+    }
+
+    &__card {
+      padding: 14px;
+      gap: 14px;
+    }
+
+    &__rowActions {
+      width: 100%;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    &__rowActions > .cafeInventory__btn {
+      flex: 1 1 calc(50% - 4px);
+      min-width: 0;
       justify-content: center;
+    }
+
+    &__tabs {
+      gap: 4px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+
+      &::-webkit-scrollbar {
+        height: 4px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 2px;
+
+        &:hover {
+          background: rgba(0, 0, 0, 0.3);
+        }
+      }
+    }
+
+    &__tab {
+      padding: 10px 14px;
+      font-size: 13px;
+      flex-shrink: 0;
     }
   }
 
   @media (max-width: 720px) {
-    &__form-grid {
+    padding: 18px;
+    gap: 16px;
+
+    &__formGrid {
       grid-template-columns: 1fr;
+    }
+
+    &__tabs {
+      gap: 4px;
+      flex-wrap: nowrap;
+    }
+
+    &__tab {
+      padding: 10px 12px;
+      font-size: 13px;
+      flex-shrink: 0;
     }
   }
 
   @media (max-width: 560px) {
-    padding: 18px;
+    padding: 16px;
+    gap: 14px;
+
+    &__header {
+      gap: 12px;
+    }
 
     &__actions {
       width: 100%;
       flex-direction: column;
       align-items: stretch;
+      gap: 12px;
+    }
+
+    &__search {
+      width: 100%;
+      min-width: 0;
+    }
+
+    &__searchInput {
+      width: 100%;
+    }
+
+    &__card {
+      padding: 12px;
+      gap: 12px;
+    }
+
+    &__cardLeft {
+      gap: 10px;
+    }
+
+    &__meta {
+      gap: 6px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    &__muted {
+      display: block;
+      font-size: 12px;
+    }
+
+    &__rowActions {
+      width: 100%;
+      flex-direction: row;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    &__rowActions > .cafeInventory__btn {
+      flex: 1 1 calc(50% - 4px);
+      min-width: 0;
     }
 
     &__btn {
@@ -568,13 +783,36 @@
       justify-content: center;
     }
 
-    &__modal-header {
+    &__tabs {
+      gap: 3px;
+      border-bottom-width: 1px;
+      flex-wrap: nowrap;
+    }
+
+    &__tab {
+      padding: 9px 12px;
+      font-size: 12px;
+      margin-bottom: -1px;
+      border-bottom-width: 1px;
+      flex-shrink: 0;
+    }
+
+    &__modalHeader {
       padding: 12px;
     }
 
-    &__icon-btn {
+    &__iconBtn {
       width: 36px;
       height: 36px;
+    }
+
+    &__selectGroup {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    &__selectGroup > .cafeInventory__btn {
+      width: 100%;
     }
 
     &__form {
@@ -583,14 +821,69 @@
     }
   }
 
-  @media (max-width: 400px) {
+  @media (max-width: 480px) {
+    padding: 14px;
+    gap: 12px;
+
+    &__header {
+      gap: 10px;
+    }
+
     &__title {
       font-size: 18px;
+    }
+
+    &__subtitle {
+      font-size: 12px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__card {
+      padding: 12px;
+      gap: 12px;
+    }
+
+    &__cardLeft {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    &__avatar {
+      align-self: flex-start;
+    }
+
+    &__name {
+      font-size: 15px;
+    }
+
+    &__meta {
+      gap: 6px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    &__muted {
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    &__status {
+      font-size: 11px;
+      padding: 3px 8px;
     }
 
     &__btn {
       padding: 9px 12px;
       font-size: 13px;
+      width: 100%;
+    }
+
+    &__rowActions {
+      width: 100%;
+      flex-direction: column;
     }
 
     &__input,
@@ -599,43 +892,379 @@
       font-size: 13px;
     }
 
-    &__meta {
-      gap: 6px;
+    &__tabs {
+      gap: 2px;
+      border-bottom-width: 1px;
+      flex-wrap: nowrap;
     }
-  }
 
-  @media (max-width: 360px) {
-    padding: 16px;
+    &__tab {
+      padding: 8px 10px;
+      font-size: 12px;
+      margin-bottom: -1px;
+      border-bottom-width: 1px;
+      flex-shrink: 0;
+    }
 
-    &__search-input {
-      padding: 9px 10px 9px 30px;
+    &__sessionItem {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    &__conditionSelect {
+      width: 100%;
+    }
+
+    &__card {
+      padding: 12px;
     }
 
     &__avatar {
       min-width: 36px;
       height: 36px;
+      font-size: 13px;
     }
   }
 
-  @media (max-width: 320px) {
-    padding: 14px;
-    gap: 16px;
+  @media (max-width: 360px) {
+    padding: 12px;
+    gap: 12px;
 
     &__header {
+      gap: 10px;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__subtitle {
+      font-size: 11px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__searchInput {
+      padding: 9px 10px 9px 28px;
+      font-size: 13px;
+    }
+
+    &__searchIcon {
+      font-size: 12px;
+      left: 8px;
+    }
+
+    &__card {
+      padding: 10px;
+      gap: 10px;
+    }
+
+    &__cardLeft {
       gap: 8px;
+    }
+
+    &__avatar {
+      min-width: 32px;
+      height: 32px;
+      font-size: 12px;
+    }
+
+    &__name {
+      font-size: 14px;
+    }
+
+    &__meta {
+      gap: 4px;
+    }
+
+    &__muted {
+      font-size: 11px;
+    }
+
+    &__status {
+      font-size: 10px;
+      padding: 2px 6px;
     }
 
     &__btn {
       padding: 8px 10px;
-      font-size: 12.5px;
+      font-size: 12px;
     }
 
-    &__input {
+    &__tabs {
+      gap: 2px;
+      padding-left: 0;
+      padding-right: 0;
+      border-bottom-width: 1px;
+      flex-wrap: nowrap;
+    }
+
+    &__tab {
+      padding: 8px 10px;
+      font-size: 11px;
+      margin-bottom: -1px;
+      border-bottom-width: 1px;
+      flex-shrink: 0;
+    }
+
+    &__modal {
+      width: calc(100vw - 12px);
+      max-width: calc(100vw - 12px);
+      max-height: 85vh;
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    &__modalHeader {
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+    }
+
+    &__modalTitle {
+      font-size: 15px;
+    }
+
+    &__iconBtn {
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+    }
+
+    &__form {
+      gap: 12px;
+    }
+
+    &__formGrid {
+      gap: 10px;
+    }
+
+    &__selectGroup {
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+
+  @media (max-width: 320px) {
+    padding: 10px;
+    gap: 10px;
+
+    &__header {
+      gap: 10px;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__title {
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    &__subtitle {
+      font-size: 11px;
+    }
+
+    &__actions {
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    &__search {
+      width: 100%;
+      min-width: 0;
+    }
+
+    &__searchInput {
+      padding: 8px 10px 8px 26px;
+      font-size: 12px;
+    }
+
+    &__searchIcon {
+      font-size: 11px;
+      left: 8px;
+    }
+
+    &__card {
+      padding: 10px;
+      gap: 10px;
+      flex-direction: column;
+    }
+
+    &__cardLeft {
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    &__avatar {
+      min-width: 32px;
+      height: 32px;
+      font-size: 12px;
+    }
+
+    &__name {
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    &__meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      width: 100%;
+    }
+
+    &__muted {
+      font-size: 11px;
+      line-height: 1.5;
+      display: block;
+    }
+
+    &__status {
+      font-size: 10px;
+      padding: 2px 6px;
+    }
+
+    &__rowActions {
+      width: 100%;
+      flex-direction: row;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    &__rowActions > .cafeInventory__btn {
+      flex: 1 1 calc(50% - 4px);
+      min-width: 0;
+    }
+
+    &__btn {
+      padding: 8px 10px;
+      font-size: 12px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    &__input,
+    &__textarea {
       padding: 8px 9px;
-      font-size: 12.5px;
+      font-size: 12px;
     }
 
-    &__rowActions .inventory__btn {
+    &__tabs {
+      gap: 2px;
+      padding-left: 0;
+      padding-right: 0;
+      border-bottom-width: 1px;
+      flex-wrap: nowrap;
+    }
+
+    &__tab {
+      padding: 7px 8px;
+      font-size: 11px;
+      margin-bottom: -1px;
+      border-bottom-width: 1px;
+      flex-shrink: 0;
+      min-width: fit-content;
+    }
+
+    &__card {
+      padding: 10px;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    &__avatar {
+      min-width: 32px;
+      height: 32px;
+      font-size: 12px;
+    }
+
+    &__name {
+      font-size: 14px;
+    }
+
+    &__muted {
+      font-size: 11px;
+    }
+
+    &__rowActions {
+      width: 100%;
+      flex-direction: column;
+      gap: 8px;
+
+      & > .cafeInventory__btn {
+        width: 100%;
+      }
+    }
+
+    &__modal {
+      width: 100vw;
+      max-width: 100vw;
+      max-height: 100vh;
+      border-radius: 8px 8px 0 0;
+      padding: 12px;
+      margin: 0;
+    }
+
+    &__modalHeader {
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+    }
+
+    &__modalTitle {
+      font-size: 14px;
+    }
+
+    &__iconBtn {
+      width: 28px;
+      height: 28px;
+      font-size: 15px;
+    }
+
+    &__form {
+      gap: 10px;
+      padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    }
+
+    &__formGrid {
+      gap: 8px;
+    }
+
+    &__formActions {
+      flex-direction: column-reverse;
+      gap: 8px;
+
+      & > .cafeInventory__btn {
+        width: 100%;
+      }
+    }
+
+    &__confirmText {
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    &__selectGroup {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    &__sessionItem {
+      padding: 8px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    &__checkboxLabel {
+      font-size: 11px;
+    }
+
+    &__conditionSelect {
       width: 100%;
     }
   }

@@ -29,26 +29,26 @@ const ExportModal = ({ open, onClose, onExport }) => {
   ];
 
   return (
-    <div className="recordarates__overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="recordarates__modal" onClick={(e) => e.stopPropagation()}>
-        <div className="recordarates__modalHead">
-          <h4 className="recordarates__modalTitle">Скачать отчёт</h4>
-          <button type="button" className="recordarates__iconBtn" aria-label="Закрыть" onClick={onClose}>
+    <div className="barberrecordarates__overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="barberrecordarates__modal" onClick={(e) => e.stopPropagation()}>
+        <div className="barberrecordarates__modalHead">
+          <h4 className="barberrecordarates__modalTitle">Скачать отчёт</h4>
+          <button type="button" className="barberrecordarates__iconBtn" aria-label="Закрыть" onClick={onClose}>
             <FaTimes />
           </button>
         </div>
 
-        <div className="recordarates__exportBody">
-          <div className="recordarates__exportGrid">
-            <div className="recordarates__exportField">
-              <span className="recordarates__filterLabel">Отчёт</span>
+        <div className="barberrecordarates__exportBody">
+          <div className="barberrecordarates__exportGrid">
+            <div className="barberrecordarates__exportField">
+              <span className="barberrecordarates__filterLabel">Отчёт</span>
               <RRSelect value={mode} onChange={(v) => setMode(String(v))} options={modeOptions} placeholder="Выберите" />
             </div>
 
-            <div className="recordarates__exportField">
-              <span className="recordarates__filterLabel">Дата</span>
+            <div className="barberrecordarates__exportField">
+              <span className="barberrecordarates__filterLabel">Дата</span>
               <input
-                className="recordarates__productInput"
+                className="barberrecordarates__productInput"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
@@ -56,10 +56,10 @@ const ExportModal = ({ open, onClose, onExport }) => {
             </div>
 
             {mode === "weeks" ? (
-              <div className="recordarates__exportField">
-                <span className="recordarates__filterLabel">Недель</span>
+              <div className="barberrecordarates__exportField">
+                <span className="barberrecordarates__filterLabel">Недель</span>
                 <input
-                  className="recordarates__productInput"
+                  className="barberrecordarates__productInput"
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -69,17 +69,17 @@ const ExportModal = ({ open, onClose, onExport }) => {
                 />
               </div>
             ) : (
-              <div className="recordarates__exportField" />
+              <div className="barberrecordarates__exportField" />
             )}
           </div>
         </div>
 
-        <div className="recordarates__modalFoot">
-          <button type="button" className="recordarates__btn recordarates__btn--secondary" onClick={onClose}>
+        <div className="barberrecordarates__modalFoot">
+          <button type="button" className="barberrecordarates__btn barberrecordarates__btn--secondary" onClick={onClose}>
             Отмена
           </button>
 
-          <button type="button" className="recordarates__btn recordarates__btn--primary" onClick={() => onExport?.({ mode, date, weeks })}>
+          <button type="button" className="barberrecordarates__btn barberrecordarates__btn--primary" onClick={() => onExport?.({ mode, date, weeks })}>
             Скачать TXT
           </button>
         </div>

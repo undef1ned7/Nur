@@ -3,9 +3,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
 import "./Recorda.scss";
 
-import RecordaHeader from "./RecordaHeader.jsx";
-import RecordaCalendar from "./RecordaCalendar.jsx";
-import RecordaModal from "./RecordaModal.jsx";
+import {
+  RecordaHeader,
+  RecordaCalendar,
+  RecordaModal,
+} from "./components";
 
 /* ===== utils ===== */
 const pad = (n) => String(n).padStart(2, "0");
@@ -19,7 +21,6 @@ const toDate = (iso) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-
 const toTime = (iso) => {
   const s = String(iso || "");
   const m = s.match(/T(\d{2}):(\d{2})/);
@@ -30,17 +31,16 @@ const toTime = (iso) => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 
 const ts = (iso) => new Date(iso).getTime();
 
-/* ===== размеры тайм-линии (компактные, как на первом скрине) ===== */
-const SLOT_MIN = 30;      // шаг 30 минут
-const SLOT_PX = 32;       // высота слота ~32px
-const COL_HEADER_H = 60;  // высота шапки мастера
-const SAFE_PAD = 150;      // безопасный отступ снизу
+/* ===== размеры тайм-линии ===== */
+const SLOT_MIN = 30;
+const SLOT_PX = 32;
+const COL_HEADER_H = 60;
+const SAFE_PAD = 150;
 
 const OPEN_HOUR = 9;
 const CLOSE_HOUR = 21;
@@ -65,9 +65,30 @@ const Recorda = () => {
 
   const [fltDate, setFltDate] = useState(todayStr());
   const [fltBarber, setFltBarber] = useState("");
+  const [fltStatus, setFltStatus] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState(null);
+
+  /* Проверка, сегодня ли выбранная дата */
+  const isToday = fltDate === todayStr();
+
+  /* Навигация по датам */
+  const handlePrevDay = () => {
+    const d = new Date(fltDate);
+    d.setDate(d.getDate() - 1);
+    setFltDate(toDate(d.toISOString()));
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(fltDate);
+    d.setDate(d.getDate() + 1);
+    setFltDate(toDate(d.toISOString()));
+  };
+
+  const handleToday = () => {
+    setFltDate(todayStr());
+  };
 
   /* загрузка всех данных */
   const fetchAll = async () => {
@@ -134,10 +155,16 @@ const Recorda = () => {
   }, []);
 
   /* записи за выбранный день */
-  const dayRecords = useMemo(
-    () => appointments.filter((r) => toDate(r.start_at) === fltDate),
-    [appointments, fltDate]
-  );
+  const dayRecords = useMemo(() => {
+    let records = appointments.filter((r) => toDate(r.start_at) === fltDate);
+    
+    // Фильтр по статусу
+    if (fltStatus) {
+      records = records.filter((r) => r.status === fltStatus);
+    }
+    
+    return records;
+  }, [appointments, fltDate, fltStatus]);
 
   /* временная шкала для календаря */
   const timesAll = useMemo(() => {
@@ -256,21 +283,15 @@ const Recorda = () => {
             })
           )
         );
-        // обновим данные после авто-завершения
         await fetchAll();
       } catch (e) {
-        // тихо в консоль, чтобы не спамить пользователю
         console.error("Авто-завершение записей:", e);
       }
     };
 
-    // сразу после загрузки/обновления данных
     checkAndAutoComplete();
-
-    // затем проверка раз в минуту
     const timer = setInterval(checkAndAutoComplete, 60_000);
     return () => clearInterval(timer);
-    // appointments в зависимостях, чтобы при обновлении данных пересоздавать таймер
   }, [appointments]);
 
   return (
@@ -278,9 +299,16 @@ const Recorda = () => {
       <RecordaHeader
         fltDate={fltDate}
         fltBarber={fltBarber}
+        fltStatus={fltStatus}
         barbers={barbers}
+        recordsCount={dayRecords.length}
         onDateChange={setFltDate}
         onBarberChange={setFltBarber}
+        onStatusChange={setFltStatus}
+        onPrevDay={handlePrevDay}
+        onNextDay={handleNextDay}
+        onToday={handleToday}
+        isToday={isToday}
         onAddClick={handleOpenNew}
       />
 
@@ -305,6 +333,7 @@ const Recorda = () => {
         COL_HEADER_H={COL_HEADER_H}
         SLOT_PX={SLOT_PX}
         onRecordClick={handleOpenExisting}
+        isToday={isToday}
       />
 
       {modalOpen && (

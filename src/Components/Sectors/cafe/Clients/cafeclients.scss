@@ -7,15 +7,7 @@ html {
 }
 
 
-/* В :root — только цвета */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-}
+@import "../variables.scss";
 
 .cafeclients {
   --radius: 12px;
@@ -81,7 +73,13 @@ html {
   &__search {
     position: relative;
     flex: 1 1 420px;
-    min-width: 320px;
+    min-width: 280px;
+  }
+
+  &__filter {
+    flex: 0 0 200px;
+    min-width: 180px;
+    max-width: 240px;
   }
 
   &__searchInput {
@@ -568,7 +566,7 @@ html {
   /* ===== Адаптация ===== */
   @media (max-width: 980px) {
     &__actions {
-      flex-wrap: wrap; /* на средних — можно переносить, но без наложений */
+      flex-wrap: wrap;
       justify-content: flex-end;
     }
 
@@ -580,6 +578,12 @@ html {
     &__search {
       flex: 1 1 420px;
       min-width: 280px;
+    }
+
+    &__filter {
+      flex: 0 0 180px;
+      min-width: 160px;
+      max-width: 220px;
     }
 
     &__select {
@@ -598,12 +602,20 @@ html {
     &__filters {
       flex-wrap: wrap;
       justify-content: stretch;
+      gap: 10px;
     }
 
     &__search {
       min-width: 0;
       width: 100%;
       flex: 1 1 100%;
+    }
+
+    &__filter {
+      width: 100%;
+      flex: 1 1 100%;
+      min-width: 0;
+      max-width: 100%;
     }
 
     &__select {

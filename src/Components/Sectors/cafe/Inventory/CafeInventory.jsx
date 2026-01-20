@@ -11,6 +11,7 @@ import {
   FaBoxes,
 } from "react-icons/fa";
 import api from "../../../../api";
+import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import "./CafeInventory.scss";
 
 /* helpers */
@@ -48,6 +49,17 @@ const CafeInventory = () => {
   const [stockCheckSessions, setStockCheckSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+
+  // модалки подтверждения удаления
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [confirmSessionOpen, setConfirmSessionOpen] = useState(false);
+  const [confirmSessionId, setConfirmSessionId] = useState(null);
+  const [confirmSessionBusy, setConfirmSessionBusy] = useState(false);
+  const [confirmStockCheckOpen, setConfirmStockCheckOpen] = useState(false);
+  const [confirmStockCheckId, setConfirmStockCheckId] = useState(null);
+  const [confirmStockCheckBusy, setConfirmStockCheckBusy] = useState(false);
 
   // модалка оборудования
   const [modalOpen, setModalOpen] = useState(false);
@@ -108,7 +120,7 @@ const CafeInventory = () => {
       setWarehouseItems(listFrom(warehouseRes));
       setStockCheckSessions(listFrom(stockCheckRes));
     } catch (err) {
-      console.error("Ошибка загрузки:", err);
+      // Ошибка загрузки данных
     } finally {
       setLoading(false);
     }
@@ -221,23 +233,33 @@ const CafeInventory = () => {
       }
       setModalOpen(false);
     } catch (err) {
-      console.error("Ошибка сохранения оборудования:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Ошибка при сохранении";
-      alert(errorMsg);
+      // Ошибка сохранения оборудования
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Удалить оборудование?")) return;
+  const openDeleteConfirm = (id) => {
+    setDeleteId(id);
+    setConfirmDeleteOpen(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (deleteBusy) return;
+    setConfirmDeleteOpen(false);
+    setDeleteId(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId || deleteBusy) return;
+
+    setDeleteBusy(true);
     try {
-      await api.delete(`/cafe/equipment/${id}/`);
-      setEquipment((prev) => prev.filter((e) => e.id !== id));
+      await api.delete(`/cafe/equipment/${deleteId}/`);
+      setEquipment((prev) => prev.filter((e) => e.id !== deleteId));
+      closeDeleteConfirm();
     } catch (err) {
-      console.error("Ошибка удаления:", err);
-      alert("Не удалось удалить оборудование");
+      // Ошибка удаления
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -256,7 +278,6 @@ const CafeInventory = () => {
       (i) => i.equipment === selectedEquipment.id
     );
     if (exists) {
-      alert("Это оборудование уже добавлено в акт");
       return;
     }
     setSessionForm((prev) => ({
@@ -294,7 +315,6 @@ const CafeInventory = () => {
     e.preventDefault();
 
     if (sessionForm.items.length === 0) {
-      alert("Добавьте хотя бы одно оборудование в акт");
       return;
     }
 
@@ -305,14 +325,9 @@ const CafeInventory = () => {
       });
       setSessions((prev) => [res.data, ...prev]);
       setSessionModalOpen(false);
-      fetchAll(); // Обновляем список оборудования
+      fetchAll();
     } catch (err) {
-      console.error("Ошибка создания акта:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Ошибка при создании акта";
-      alert(errorMsg);
+      // Ошибка создания акта
     }
   };
 
@@ -324,33 +339,36 @@ const CafeInventory = () => {
       setViewingSession(res.data);
       setViewSessionModalOpen(true);
     } catch (err) {
-      console.error("Ошибка загрузки акта:", err);
-      alert("Не удалось загрузить акт");
+      // Ошибка загрузки акта
     }
   };
 
-  const confirmSession = async (sessionId) => {
-    if (
-      !window.confirm(
-        "Подтвердить акт инвентаризации? Это обновит состояние оборудования."
-      )
-    )
-      return;
+  const openConfirmSession = (sessionId) => {
+    setConfirmSessionId(sessionId);
+    setConfirmSessionOpen(true);
+  };
 
+  const closeConfirmSession = () => {
+    if (confirmSessionBusy) return;
+    setConfirmSessionOpen(false);
+    setConfirmSessionId(null);
+  };
+
+  const confirmSession = async () => {
+    if (!confirmSessionId || confirmSessionBusy) return;
+
+    setConfirmSessionBusy(true);
     try {
       await api.post(
-        `/cafe/equipment/inventory/sessions/${sessionId}/confirm/`
+        `/cafe/equipment/inventory/sessions/${confirmSessionId}/confirm/`
       );
       await fetchAll(); // Обновляем все данные
       setViewSessionModalOpen(false);
-      alert("Акт подтвержден, состояние оборудования обновлено");
+      closeConfirmSession();
     } catch (err) {
-      console.error("Ошибка подтверждения акта:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Ошибка при подтверждении акта";
-      alert(errorMsg);
+      // Ошибка подтверждения акта
+    } finally {
+      setConfirmSessionBusy(false);
     }
   };
 
@@ -374,7 +392,6 @@ const CafeInventory = () => {
       (i) => i.product === selectedProduct.id
     );
     if (exists) {
-      alert("Этот продукт уже добавлен в акт");
       return;
     }
     setStockCheckForm((prev) => ({
@@ -409,7 +426,6 @@ const CafeInventory = () => {
   const saveStockCheck = async (e) => {
     e.preventDefault();
     if (stockCheckForm.items.length === 0) {
-      alert("Добавьте хотя бы один продукт в акт");
       return;
     }
 
@@ -430,12 +446,7 @@ const CafeInventory = () => {
       setStockCheckModalOpen(false);
       await fetchAll(); // Обновляем список продуктов
     } catch (err) {
-      console.error("Ошибка создания акта сверки:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Ошибка при создании акта";
-      alert(errorMsg);
+      // Ошибка создания акта сверки
     }
   };
 
@@ -445,31 +456,34 @@ const CafeInventory = () => {
       setViewingStockCheck(res.data);
       setViewStockCheckModalOpen(true);
     } catch (err) {
-      console.error("Ошибка загрузки акта:", err);
-      alert("Не удалось загрузить акт");
+      // Ошибка загрузки акта
     }
   };
 
-  const confirmStockCheck = async (sessionId) => {
-    if (
-      !window.confirm(
-        "Подтвердить акт сверки? Это обновит остатки продуктов на складе."
-      )
-    )
-      return;
+  const openConfirmStockCheck = (sessionId) => {
+    setConfirmStockCheckId(sessionId);
+    setConfirmStockCheckOpen(true);
+  };
 
+  const closeConfirmStockCheck = () => {
+    if (confirmStockCheckBusy) return;
+    setConfirmStockCheckOpen(false);
+    setConfirmStockCheckId(null);
+  };
+
+  const confirmStockCheck = async () => {
+    if (!confirmStockCheckId || confirmStockCheckBusy) return;
+
+    setConfirmStockCheckBusy(true);
     try {
-      await api.post(`/cafe/inventory/sessions/${sessionId}/confirm/`);
+      await api.post(`/cafe/inventory/sessions/${confirmStockCheckId}/confirm/`);
       await fetchAll(); // Обновляем все данные
       setViewStockCheckModalOpen(false);
-      alert("Акт подтвержден, остатки продуктов обновлены");
+      closeConfirmStockCheck();
     } catch (err) {
-      console.error("Ошибка подтверждения акта:", err);
-      const errorMsg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        "Ошибка при подтверждении акта";
-      alert(errorMsg);
+      // Ошибка подтверждения акта
+    } finally {
+      setConfirmStockCheckBusy(false);
     }
   };
 
@@ -478,17 +492,17 @@ const CafeInventory = () => {
   };
 
   return (
-    <section className="inventory">
-      <div className="inventory__header">
+    <section className="cafeInventory">
+      <div className="cafeInventory__header">
         <div>
-          <h2 className="inventory__title">Инвентаризация</h2>
+          <h2 className="cafeInventory__title">Инвентаризация</h2>
         </div>
 
-        <div className="inventory__actions">
-          <div className="inventory__search">
-            <FaSearch className="inventory__search-icon" />
+        <div className="cafeInventory__actions">
+          <div className="cafeInventory__search">
+            <FaSearch className="cafeInventory__searchIcon" />
             <input
-              className="inventory__search-input"
+              className="cafeInventory__searchInput"
               placeholder={
                 activeTab === "equipment"
                   ? "Поиск оборудования…"
@@ -503,21 +517,21 @@ const CafeInventory = () => {
 
           {activeTab === "equipment" ? (
             <button
-              className="inventory__btn inventory__btn--primary"
+              className="cafeInventory__btn cafeInventory__btn--primary"
               onClick={openCreate}
             >
               <FaPlus /> Новое оборудование
             </button>
           ) : activeTab === "sessions" ? (
             <button
-              className="inventory__btn inventory__btn--primary"
+              className="cafeInventory__btn cafeInventory__btn--primary"
               onClick={openCreateSession}
             >
               <FaPlus /> Новый акт
             </button>
           ) : (
             <button
-              className="inventory__btn inventory__btn--primary"
+              className="cafeInventory__btn cafeInventory__btn--primary"
               onClick={openCreateStockCheck}
             >
               <FaPlus /> Новая сверка
@@ -527,26 +541,26 @@ const CafeInventory = () => {
       </div>
 
       {/* Tabs */}
-      <div className="inventory__tabs">
+      <div className="cafeInventory__tabs">
         <button
-          className={`inventory__tab ${
-            activeTab === "equipment" ? "inventory__tab--active" : ""
+          className={`cafeInventory__tab ${
+            activeTab === "equipment" ? "cafeInventory__tab--active" : ""
           }`}
           onClick={() => setActiveTab("equipment")}
         >
           <FaTools /> Оборудование
         </button>
         <button
-          className={`inventory__tab ${
-            activeTab === "sessions" ? "inventory__tab--active" : ""
+          className={`cafeInventory__tab ${
+            activeTab === "sessions" ? "cafeInventory__tab--active" : ""
           }`}
           onClick={() => setActiveTab("sessions")}
         >
           <FaClipboardList /> Акты инвентаризации
         </button>
         <button
-          className={`inventory__tab ${
-            activeTab === "stock-check" ? "inventory__tab--active" : ""
+          className={`cafeInventory__tab ${
+            activeTab === "stock-check" ? "cafeInventory__tab--active" : ""
           }`}
           onClick={() => setActiveTab("stock-check")}
         >
@@ -555,53 +569,53 @@ const CafeInventory = () => {
       </div>
 
       {/* List */}
-      <div className="inventory__list">
-        {loading && <div className="inventory__alert">Загрузка…</div>}
+      <div className="cafeInventory__list">
+        {loading && <div className="cafeInventory__alert">Загрузка…</div>}
 
         {activeTab === "equipment" && (
           <>
             {!loading &&
               filteredEquipment.map((item) => (
-                <article key={item.id} className="inventory__card">
-                  <div className="inventory__card-left">
-                    <div className="inventory__avatar">
+                <article key={item.id} className="cafeInventory__card">
+                  <div className="cafeInventory__cardLeft">
+                    <div className="cafeInventory__avatar">
                       <FaTools />
                     </div>
                     <div>
-                      <h3 className="inventory__name">{item.title}</h3>
-                      <div className="inventory__meta">
+                      <h3 className="cafeInventory__name">{item.title}</h3>
+                      <div className="cafeInventory__meta">
                         {item.serial_number && (
-                          <span className="inventory__muted">
+                          <span className="cafeInventory__muted">
                             Серийный: {item.serial_number}
                           </span>
                         )}
                         {item.category && (
-                          <span className="inventory__muted">
+                          <span className="cafeInventory__muted">
                             Категория: {item.category}
                           </span>
                         )}
                         {item.purchase_date && (
-                          <span className="inventory__muted">
+                          <span className="cafeInventory__muted">
                             Покупка: {formatDate(item.purchase_date)}
                           </span>
                         )}
                         {item.price && (
-                          <span className="inventory__muted">
+                          <span className="cafeInventory__muted">
                             Цена: {fmtMoney(item.price)} сом
                           </span>
                         )}
                         <span
-                          className={`inventory__status inventory__status--${getConditionColor(
+                          className={`cafeInventory__status cafeInventory__status--${getConditionColor(
                             item.condition
                           )}`}
                         >
                           {getConditionLabel(item.condition)}
                         </span>
                         <span
-                          className={`inventory__status ${
+                          className={`cafeInventory__status ${
                             item.is_active
-                              ? "inventory__status--active"
-                              : "inventory__status--inactive"
+                              ? "cafeInventory__status--active"
+                              : "cafeInventory__status--inactive"
                           }`}
                         >
                           {item.is_active ? "Активно" : "Неактивно"}
@@ -610,16 +624,16 @@ const CafeInventory = () => {
                     </div>
                   </div>
 
-                  <div className="inventory__rowActions">
+                  <div className="cafeInventory__rowActions">
                     <button
-                      className="inventory__btn inventory__btn--secondary"
+                      className="cafeInventory__btn cafeInventory__btn--secondary"
                       onClick={() => openEdit(item)}
                     >
                       <FaEdit /> Изменить
                     </button>
                     <button
-                      className="inventory__btn inventory__btn--danger"
-                      onClick={() => handleDelete(item.id)}
+                      className="cafeInventory__btn cafeInventory__btn--danger"
+                      onClick={() => openDeleteConfirm(item.id)}
                     >
                       <FaTrash /> Удалить
                     </button>
@@ -627,7 +641,7 @@ const CafeInventory = () => {
                 </article>
               ))}
             {!loading && !filteredEquipment.length && (
-              <div className="inventory__alert">
+              <div className="cafeInventory__alert">
                 {query ? `Ничего не найдено по «${query}»` : "Нет оборудования"}
               </div>
             )}
@@ -638,36 +652,36 @@ const CafeInventory = () => {
           <>
             {!loading &&
               filteredSessions.map((session) => (
-                <article key={session.id} className="inventory__card">
-                  <div className="inventory__card-left">
-                    <div className="inventory__avatar">
+                <article key={session.id} className="cafeInventory__card">
+                  <div className="cafeInventory__cardLeft">
+                    <div className="cafeInventory__avatar">
                       <FaClipboardList />
                     </div>
                     <div>
-                      <h3 className="inventory__name">
+                      <h3 className="cafeInventory__name">
                         {session.comment || "Акт инвентаризации"}
                       </h3>
-                      <div className="inventory__meta">
-                        <span className="inventory__muted">
+                      <div className="cafeInventory__meta">
+                        <span className="cafeInventory__muted">
                           Создан:{" "}
                           {new Date(session.created_at).toLocaleString("ru-RU")}
                         </span>
                         {session.confirmed_at && (
-                          <span className="inventory__muted">
+                          <span className="cafeInventory__muted">
                             Подтвержден:{" "}
                             {new Date(session.confirmed_at).toLocaleString(
                               "ru-RU"
                             )}
                           </span>
                         )}
-                        <span className="inventory__muted">
+                        <span className="cafeInventory__muted">
                           Позиций: {session.items?.length || 0}
                         </span>
                         <span
-                          className={`inventory__status ${
+                          className={`cafeInventory__status ${
                             session.is_confirmed
-                              ? "inventory__status--confirmed"
-                              : "inventory__status--pending"
+                              ? "cafeInventory__status--confirmed"
+                              : "cafeInventory__status--pending"
                           }`}
                         >
                           {session.is_confirmed ? "Подтвержден" : "Ожидает"}
@@ -676,17 +690,17 @@ const CafeInventory = () => {
                     </div>
                   </div>
 
-                  <div className="inventory__rowActions">
+                  <div className="cafeInventory__rowActions">
                     <button
-                      className="inventory__btn inventory__btn--secondary"
+                      className="cafeInventory__btn cafeInventory__btn--secondary"
                       onClick={() => viewSession(session.id)}
                     >
                       Просмотр
                     </button>
                     {!session.is_confirmed && (
                       <button
-                        className="inventory__btn inventory__btn--success"
-                        onClick={() => confirmSession(session.id)}
+                        className="cafeInventory__btn cafeInventory__btn--success"
+                        onClick={() => openConfirmSession(session.id)}
                       >
                         <FaCheckCircle /> Подтвердить
                       </button>
@@ -695,7 +709,7 @@ const CafeInventory = () => {
                 </article>
               ))}
             {!loading && !filteredSessions.length && (
-              <div className="inventory__alert">
+              <div className="cafeInventory__alert">
                 {query ? `Ничего не найдено по «${query}»` : "Нет актов"}
               </div>
             )}
@@ -706,36 +720,36 @@ const CafeInventory = () => {
           <>
             {!loading &&
               filteredStockCheckSessions.map((session) => (
-                <article key={session.id} className="inventory__card">
-                  <div className="inventory__card-left">
-                    <div className="inventory__avatar">
+                <article key={session.id} className="cafeInventory__card">
+                  <div className="cafeInventory__cardLeft">
+                    <div className="cafeInventory__avatar">
                       <FaBoxes />
                     </div>
                     <div>
-                      <h3 className="inventory__name">
+                      <h3 className="cafeInventory__name">
                         {session.comment || "Акт сверки продуктов"}
                       </h3>
-                      <div className="inventory__meta">
-                        <span className="inventory__muted">
+                      <div className="cafeInventory__meta">
+                        <span className="cafeInventory__muted">
                           Создан:{" "}
                           {new Date(session.created_at).toLocaleString("ru-RU")}
                         </span>
                         {session.confirmed_at && (
-                          <span className="inventory__muted">
+                          <span className="cafeInventory__muted">
                             Подтвержден:{" "}
                             {new Date(session.confirmed_at).toLocaleString(
                               "ru-RU"
                             )}
                           </span>
                         )}
-                        <span className="inventory__muted">
+                        <span className="cafeInventory__muted">
                           Позиций: {session.items?.length || 0}
                         </span>
                         <span
-                          className={`inventory__status ${
+                          className={`cafeInventory__status ${
                             session.is_confirmed
-                              ? "inventory__status--confirmed"
-                              : "inventory__status--pending"
+                              ? "cafeInventory__status--confirmed"
+                              : "cafeInventory__status--pending"
                           }`}
                         >
                           {session.is_confirmed ? "Подтвержден" : "Ожидает"}
@@ -744,17 +758,17 @@ const CafeInventory = () => {
                     </div>
                   </div>
 
-                  <div className="inventory__rowActions">
+                  <div className="cafeInventory__rowActions">
                     <button
-                      className="inventory__btn inventory__btn--secondary"
+                      className="cafeInventory__btn cafeInventory__btn--secondary"
                       onClick={() => viewStockCheck(session.id)}
                     >
                       Просмотр
                     </button>
                     {!session.is_confirmed && (
                       <button
-                        className="inventory__btn inventory__btn--success"
-                        onClick={() => confirmStockCheck(session.id)}
+                        className="cafeInventory__btn cafeInventory__btn--success"
+                        onClick={() => openConfirmStockCheck(session.id)}
                       >
                         <FaCheckCircle /> Подтвердить
                       </button>
@@ -763,7 +777,7 @@ const CafeInventory = () => {
                 </article>
               ))}
             {!loading && !filteredStockCheckSessions.length && (
-              <div className="inventory__alert">
+              <div className="cafeInventory__alert">
                 {query
                   ? `Ничего не найдено по «${query}»`
                   : "Нет актов сверки продуктов"}
@@ -776,32 +790,32 @@ const CafeInventory = () => {
       {/* Модалка оборудования */}
       {modalOpen && (
         <div
-          className="inventory__modal-overlay"
+          className="cafeInventory__modalOverlay"
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="inventory__modal"
+            className="cafeInventory__modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="inventory__modal-header">
-              <h3 className="inventory__modal-title">
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">
                 {editingId == null
                   ? "Новое оборудование"
                   : "Изменить оборудование"}
               </h3>
               <button
-                className="inventory__icon-btn"
+                className="cafeInventory__iconBtn"
                 onClick={() => setModalOpen(false)}
               >
                 <FaTimes />
               </button>
             </div>
-            <form className="inventory__form" onSubmit={saveEquipment}>
-              <div className="inventory__form-grid">
-                <div className="inventory__field inventory__field--full">
-                  <label className="inventory__label">Название *</label>
+            <form className="cafeInventory__form" onSubmit={saveEquipment}>
+              <div className="cafeInventory__formGrid">
+                <div className="cafeInventory__field cafeInventory__field--full">
+                  <label className="cafeInventory__label">Название *</label>
                   <input
-                    className="inventory__input"
+                    className="cafeInventory__input"
                     value={form.title}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, title: e.target.value }))
@@ -811,10 +825,10 @@ const CafeInventory = () => {
                   />
                 </div>
 
-                <div className="inventory__field">
-                  <label className="inventory__label">Серийный номер</label>
+                <div className="cafeInventory__field">
+                  <label className="cafeInventory__label">Серийный номер</label>
                   <input
-                    className="inventory__input"
+                    className="cafeInventory__input"
                     value={form.serial_number}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, serial_number: e.target.value }))
@@ -823,10 +837,10 @@ const CafeInventory = () => {
                   />
                 </div>
 
-                <div className="inventory__field">
-                  <label className="inventory__label">Категория</label>
+                <div className="cafeInventory__field">
+                  <label className="cafeInventory__label">Категория</label>
                   <input
-                    className="inventory__input"
+                    className="cafeInventory__input"
                     value={form.category}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, category: e.target.value }))
@@ -835,11 +849,11 @@ const CafeInventory = () => {
                   />
                 </div>
 
-                <div className="inventory__field">
-                  <label className="inventory__label">Дата покупки</label>
+                <div className="cafeInventory__field">
+                  <label className="cafeInventory__label">Дата покупки</label>
                   <input
                     type="date"
-                    className="inventory__input"
+                    className="cafeInventory__input"
                     value={form.purchase_date}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, purchase_date: e.target.value }))
@@ -847,13 +861,13 @@ const CafeInventory = () => {
                   />
                 </div>
 
-                <div className="inventory__field">
-                  <label className="inventory__label">Цена (сом)</label>
+                <div className="cafeInventory__field">
+                  <label className="cafeInventory__label">Цена (сом)</label>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
-                    className="inventory__input"
+                    className="cafeInventory__input"
                     value={form.price}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, price: e.target.value }))
@@ -861,42 +875,44 @@ const CafeInventory = () => {
                   />
                 </div>
 
-                <div className="inventory__field">
-                  <label className="inventory__label">Состояние</label>
-                  <select
-                    className="inventory__input"
+                <div className="cafeInventory__field">
+                  <label className="cafeInventory__label">Состояние</label>
+                  <SearchableCombobox
                     value={form.condition}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, condition: e.target.value }))
-                    }
-                  >
-                    <option value="good">Исправно</option>
-                    <option value="repair">На ремонте</option>
-                    <option value="broken">Списано</option>
-                  </select>
+                    onChange={(v) => setForm((f) => ({ ...f, condition: v }))}
+                    options={[
+                      { value: "good", label: "Исправно" },
+                      { value: "repair", label: "На ремонте" },
+                      { value: "broken", label: "Списано" },
+                    ]}
+                    placeholder="Выберите состояние…"
+                    classNamePrefix="cafeInventoryCombo"
+                  />
                 </div>
 
-                <div className="inventory__field">
-                  <label className="inventory__label">Активно</label>
-                  <select
-                    className="inventory__input"
+                <div className="cafeInventory__field">
+                  <label className="cafeInventory__label">Активно</label>
+                  <SearchableCombobox
                     value={form.is_active ? "true" : "false"}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       setForm((f) => ({
                         ...f,
-                        is_active: e.target.value === "true",
+                        is_active: v === "true",
                       }))
                     }
-                  >
-                    <option value="true">Да</option>
-                    <option value="false">Нет</option>
-                  </select>
+                    options={[
+                      { value: "true", label: "Да" },
+                      { value: "false", label: "Нет" },
+                    ]}
+                    placeholder="Выберите…"
+                    classNamePrefix="cafeInventoryCombo"
+                  />
                 </div>
 
-                <div className="inventory__field inventory__field--full">
-                  <label className="inventory__label">Примечания</label>
+                <div className="cafeInventory__field cafeInventory__field--full">
+                  <label className="cafeInventory__label">Примечания</label>
                   <textarea
-                    className="inventory__textarea"
+                    className="cafeInventory__textarea"
                     value={form.notes}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, notes: e.target.value }))
@@ -906,17 +922,17 @@ const CafeInventory = () => {
                 </div>
               </div>
 
-              <div className="inventory__form-actions">
+              <div className="cafeInventory__formActions">
                 <button
                   type="button"
-                  className="inventory__btn inventory__btn--secondary"
+                  className="cafeInventory__btn cafeInventory__btn--secondary"
                   onClick={() => setModalOpen(false)}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="inventory__btn inventory__btn--primary"
+                  className="cafeInventory__btn cafeInventory__btn--primary"
                 >
                   Сохранить
                 </button>
@@ -929,32 +945,32 @@ const CafeInventory = () => {
       {/* Модалка создания акта */}
       {sessionModalOpen && (
         <div
-          className="inventory__modal-overlay"
+          className="cafeInventory__modalOverlay"
           onClick={() => setSessionModalOpen(false)}
         >
           <div
-            className="inventory__modal"
+            className="cafeInventory__modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="inventory__modal-header">
-              <h3 className="inventory__modal-title">
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">
                 Новый акт инвентаризации
               </h3>
               <button
-                className="inventory__icon-btn"
+                className="cafeInventory__iconBtn"
                 onClick={() => setSessionModalOpen(false)}
               >
                 <FaTimes />
               </button>
             </div>
-            <form className="inventory__form" onSubmit={saveSession}>
-              <div className="inventory__form-grid">
-                <div className="inventory__field inventory__field--full">
-                  <label className="inventory__label">
+            <form className="cafeInventory__form" onSubmit={saveSession}>
+              <div className="cafeInventory__formGrid">
+                <div className="cafeInventory__field cafeInventory__field--full">
+                  <label className="cafeInventory__label">
                     Комментарий (необязательно)
                   </label>
                   <input
-                    className="inventory__input"
+                    className="cafeInventory__input"
                     value={sessionForm.comment}
                     onChange={(e) =>
                       setSessionForm((f) => ({
@@ -966,39 +982,34 @@ const CafeInventory = () => {
                   />
                 </div>
 
-                <div className="inventory__field inventory__field--full">
-                  <label className="inventory__label">
+                <div className="cafeInventory__field cafeInventory__field--full">
+                  <label className="cafeInventory__label">
                     Добавить оборудование
                   </label>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <select
-                      className="inventory__input"
+                  <div className="cafeInventory__selectGroup">
+                    <SearchableCombobox
                       value={selectedEquipment?.id || ""}
-                      onChange={(e) => {
-                        const eq = equipment.find(
-                          (eq) => eq.id === e.target.value
-                        );
+                      onChange={(v) => {
+                        const eq = equipment.find((eq) => eq.id === v);
                         setSelectedEquipment(eq || null);
                       }}
-                    >
-                      <option value="">— Выберите оборудование —</option>
-                      {equipment
+                      classNamePrefix="cafeInventoryCombo"
+                      options={equipment
                         .filter(
                           (eq) =>
                             !sessionForm.items.some(
                               (i) => i.equipment === eq.id
                             )
                         )
-                        .map((eq) => (
-                          <option key={eq.id} value={eq.id}>
-                            {eq.title}{" "}
-                            {eq.serial_number ? `(${eq.serial_number})` : ""}
-                          </option>
-                        ))}
-                    </select>
+                        .map((eq) => ({
+                          value: eq.id,
+                          label: `${eq.title}${eq.serial_number ? ` (${eq.serial_number})` : ""}`,
+                        }))}
+                      placeholder="Выберите оборудование…"
+                    />
                     <button
                       type="button"
-                      className="inventory__btn inventory__btn--secondary"
+                      className="cafeInventory__btn cafeInventory__btn--secondary"
                       onClick={addItemToSession}
                       disabled={!selectedEquipment}
                     >
@@ -1008,15 +1019,15 @@ const CafeInventory = () => {
                 </div>
 
                 {sessionForm.items.length > 0 && (
-                  <div className="inventory__field inventory__field--full">
-                    <label className="inventory__label">
+                  <div className="cafeInventory__field cafeInventory__field--full">
+                    <label className="cafeInventory__label">
                       Оборудование в акте ({sessionForm.items.length})
                     </label>
-                    <div className="inventory__session-items">
+                    <div className="cafeInventory__sessionItems">
                       {sessionForm.items.map((item, idx) => {
                         const eq = getEquipmentById(item.equipment);
                         return (
-                          <div key={idx} className="inventory__session-item">
+                          <div key={idx} className="cafeInventory__sessionItem">
                             <div style={{ flex: 1 }}>
                               <strong>{eq?.title || "Неизвестно"}</strong>
                               {eq?.serial_number && (
@@ -1033,7 +1044,7 @@ const CafeInventory = () => {
                                 alignItems: "center",
                               }}
                             >
-                              <label style={{ fontSize: 12 }}>
+                              <label className="cafeInventory__checkboxLabel">
                                 <input
                                   type="checkbox"
                                   checked={item.is_present}
@@ -1047,21 +1058,24 @@ const CafeInventory = () => {
                                 />{" "}
                                 На месте
                               </label>
-                              <select
-                                style={{ fontSize: 12, padding: "4px 8px" }}
-                                value={item.condition}
-                                onChange={(e) =>
-                                  updateSessionItem(
-                                    item.equipment,
-                                    "condition",
-                                    e.target.value
-                                  )
-                                }
-                              >
-                                <option value="good">Исправно</option>
-                                <option value="repair">На ремонте</option>
-                                <option value="broken">Списано</option>
-                              </select>
+                              <div className="cafeInventory__conditionSelect">
+                                <SearchableCombobox
+                                  value={item.condition}
+                                  onChange={(v) =>
+                                    updateSessionItem(
+                                      item.equipment,
+                                      "condition",
+                                      v
+                                    )
+                                  }
+                                  options={[
+                                    { value: "good", label: "Исправно" },
+                                    { value: "repair", label: "На ремонте" },
+                                    { value: "broken", label: "Списано" },
+                                  ]}
+                                  placeholder="Состояние…"
+                                />
+                              </div>
                               <input
                                 type="text"
                                 placeholder="Примечания"
@@ -1081,7 +1095,7 @@ const CafeInventory = () => {
                               />
                               <button
                                 type="button"
-                                className="inventory__icon-btn"
+                                className="cafeInventory__iconBtn"
                                 style={{ width: "24px", height: "24px" }}
                                 onClick={() =>
                                   removeItemFromSession(item.equipment)
@@ -1098,17 +1112,17 @@ const CafeInventory = () => {
                 )}
               </div>
 
-              <div className="inventory__form-actions">
+              <div className="cafeInventory__formActions">
                 <button
                   type="button"
-                  className="inventory__btn inventory__btn--secondary"
+                  className="cafeInventory__btn cafeInventory__btn--secondary"
                   onClick={() => setSessionModalOpen(false)}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="inventory__btn inventory__btn--primary"
+                  className="cafeInventory__btn cafeInventory__btn--primary"
                   disabled={sessionForm.items.length === 0}
                 >
                   Создать акт
@@ -1122,27 +1136,27 @@ const CafeInventory = () => {
       {/* Модалка просмотра акта */}
       {viewSessionModalOpen && viewingSession && (
         <div
-          className="inventory__modal-overlay"
+          className="cafeInventory__modalOverlay"
           onClick={() => setViewSessionModalOpen(false)}
         >
           <div
-            className="inventory__modal"
+            className="cafeInventory__modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="inventory__modal-header">
-              <h3 className="inventory__modal-title">
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">
                 Акт: {viewingSession.comment || "Инвентаризация"}
               </h3>
               <button
-                className="inventory__icon-btn"
+                className="cafeInventory__iconBtn"
                 onClick={() => setViewSessionModalOpen(false)}
               >
                 <FaTimes />
               </button>
             </div>
-            <div className="inventory__form">
-              <div className="inventory__session-details">
-                <div className="inventory__session-info">
+            <div className="cafeInventory__form">
+              <div className="cafeInventory__sessionDetails">
+                <div className="cafeInventory__sessionInfo">
                   <div>
                     <strong>Создан:</strong>{" "}
                     {new Date(viewingSession.created_at).toLocaleString(
@@ -1163,10 +1177,10 @@ const CafeInventory = () => {
                   </div>
                 </div>
 
-                <div className="inventory__session-items-list">
+                <div className="cafeInventory__sessionItemsList">
                   <h4>Оборудование ({viewingSession.items?.length || 0}):</h4>
                   {viewingSession.items?.map((item, idx) => (
-                    <div key={idx} className="inventory__session-item-view">
+                    <div key={idx} className="cafeInventory__sessionItemView">
                       <div>
                         <strong>{item.equipment_title || "Неизвестно"}</strong>
                         {item.serial_number && (
@@ -1183,14 +1197,14 @@ const CafeInventory = () => {
                         }}
                       >
                         <span
-                          className={`inventory__status inventory__status--${
+                          className={`cafeInventory__status cafeInventory__status--${
                             item.is_present ? "success" : "danger"
                           }`}
                         >
                           {item.is_present ? "На месте" : "Отсутствует"}
                         </span>
                         <span
-                          className={`inventory__status inventory__status--${getConditionColor(
+                          className={`cafeInventory__status cafeInventory__status--${getConditionColor(
                             item.condition
                           )}`}
                         >
@@ -1207,17 +1221,17 @@ const CafeInventory = () => {
                 </div>
 
                 {!viewingSession.is_confirmed && (
-                  <div className="inventory__form-actions">
+                  <div className="cafeInventory__formActions">
                     <button
                       type="button"
-                      className="inventory__btn inventory__btn--secondary"
+                      className="cafeInventory__btn cafeInventory__btn--secondary"
                       onClick={() => setViewSessionModalOpen(false)}
                     >
                       Закрыть
                     </button>
                     <button
                       type="button"
-                      className="inventory__btn inventory__btn--success"
+                      className="cafeInventory__btn cafeInventory__btn--success"
                       onClick={() => confirmSession(viewingSession.id)}
                     >
                       <FaCheckCircle /> Подтвердить акт
@@ -1233,30 +1247,30 @@ const CafeInventory = () => {
       {/* Модалка создания акта сверки продуктов */}
       {stockCheckModalOpen && (
         <div
-          className="inventory__modal-overlay"
+          className="cafeInventory__modalOverlay"
           onClick={() => setStockCheckModalOpen(false)}
         >
           <div
-            className="inventory__modal"
+            className="cafeInventory__modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="inventory__modal-header">
-              <h3 className="inventory__modal-title">
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">
                 Новый акт сверки продуктов
               </h3>
               <button
-                className="inventory__icon-btn"
+                className="cafeInventory__iconBtn"
                 onClick={() => setStockCheckModalOpen(false)}
               >
                 <FaTimes />
               </button>
             </div>
-            <form className="inventory__form" onSubmit={saveStockCheck}>
-              <div className="inventory__form-grid">
-                <div className="inventory__field inventory__field--full">
-                  <label className="inventory__label">Комментарий</label>
+            <form className="cafeInventory__form" onSubmit={saveStockCheck}>
+              <div className="cafeInventory__formGrid">
+                <div className="cafeInventory__field cafeInventory__field--full">
+                  <label className="cafeInventory__label">Комментарий</label>
                   <input
-                    className="inventory__input"
+                    className="cafeInventory__input"
                     value={stockCheckForm.comment}
                     onChange={(e) =>
                       setStockCheckForm((f) => ({
@@ -1268,36 +1282,32 @@ const CafeInventory = () => {
                   />
                 </div>
 
-                <div className="inventory__field inventory__field--full">
-                  <label className="inventory__label">Добавить продукт</label>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <select
-                      className="inventory__input"
+                <div className="cafeInventory__field cafeInventory__field--full">
+                  <label className="cafeInventory__label">Добавить продукт</label>
+                  <div className="cafeInventory__selectGroup">
+                    <SearchableCombobox
                       value={selectedProduct?.id || ""}
-                      onChange={(e) => {
-                        const prod = warehouseItems.find(
-                          (p) => p.id === e.target.value
-                        );
+                      onChange={(v) => {
+                        const prod = warehouseItems.find((p) => p.id === v);
                         setSelectedProduct(prod || null);
                       }}
-                    >
-                      <option value="">— Выберите продукт —</option>
-                      {warehouseItems
+                      classNamePrefix="cafeInventoryCombo"
+                      options={warehouseItems
                         .filter(
                           (p) =>
                             !stockCheckForm.items.some(
                               (i) => i.product === p.id
                             )
                         )
-                        .map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.title} ({toNum(p.remainder)} {p.unit || "шт"})
-                          </option>
-                        ))}
-                    </select>
+                        .map((p) => ({
+                          value: p.id,
+                          label: `${p.title} (${toNum(p.remainder)} ${p.unit || "шт"})`,
+                        }))}
+                      placeholder="Выберите продукт…"
+                    />
                     <button
                       type="button"
-                      className="inventory__btn inventory__btn--secondary"
+                      className="cafeInventory__btn cafeInventory__btn--secondary"
                       onClick={addProductToStockCheck}
                       disabled={!selectedProduct}
                     >
@@ -1307,18 +1317,18 @@ const CafeInventory = () => {
                 </div>
 
                 {stockCheckForm.items.length > 0 && (
-                  <div className="inventory__field inventory__field--full">
-                    <label className="inventory__label">
+                  <div className="cafeInventory__field cafeInventory__field--full">
+                    <label className="cafeInventory__label">
                       Продукты в акте ({stockCheckForm.items.length})
                     </label>
-                    <div className="inventory__session-items">
+                    <div className="cafeInventory__sessionItems">
                       {stockCheckForm.items.map((item, idx) => {
                         const prod = getProductById(item.product);
                         const qtyExpected = toNum(prod?.remainder || 0);
                         const qtyCounted = toNum(item.qty_counted);
                         const difference = qtyCounted - qtyExpected;
                         return (
-                          <div key={idx} className="inventory__session-item">
+                          <div key={idx} className="cafeInventory__sessionItem">
                             <div style={{ flex: 1 }}>
                               <strong>{prod?.title || "Неизвестно"}</strong>
                               <div style={{ fontSize: 12, color: "#6b7280" }}>
@@ -1373,7 +1383,7 @@ const CafeInventory = () => {
                               </span>
                               <button
                                 type="button"
-                                className="inventory__icon-btn"
+                                className="cafeInventory__iconBtn"
                                 style={{ width: "24px", height: "24px" }}
                                 onClick={() =>
                                   removeProductFromStockCheck(item.product)
@@ -1390,17 +1400,17 @@ const CafeInventory = () => {
                 )}
               </div>
 
-              <div className="inventory__form-actions">
+              <div className="cafeInventory__formActions">
                 <button
                   type="button"
-                  className="inventory__btn inventory__btn--secondary"
+                  className="cafeInventory__btn cafeInventory__btn--secondary"
                   onClick={() => setStockCheckModalOpen(false)}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="inventory__btn inventory__btn--primary"
+                  className="cafeInventory__btn cafeInventory__btn--primary"
                   disabled={stockCheckForm.items.length === 0}
                 >
                   Создать акт
@@ -1414,27 +1424,27 @@ const CafeInventory = () => {
       {/* Модалка просмотра акта сверки продуктов */}
       {viewStockCheckModalOpen && viewingStockCheck && (
         <div
-          className="inventory__modal-overlay"
+          className="cafeInventory__modalOverlay"
           onClick={() => setViewStockCheckModalOpen(false)}
         >
           <div
-            className="inventory__modal"
+            className="cafeInventory__modal"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="inventory__modal-header">
-              <h3 className="inventory__modal-title">
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">
                 Акт: {viewingStockCheck.comment || "Сверка продуктов"}
               </h3>
               <button
-                className="inventory__icon-btn"
+                className="cafeInventory__iconBtn"
                 onClick={() => setViewStockCheckModalOpen(false)}
               >
                 <FaTimes />
               </button>
             </div>
-            <div className="inventory__form">
-              <div className="inventory__session-details">
-                <div className="inventory__session-info">
+            <div className="cafeInventory__form">
+              <div className="cafeInventory__sessionDetails">
+                <div className="cafeInventory__sessionInfo">
                   <div>
                     <strong>Создан:</strong>{" "}
                     {new Date(viewingStockCheck.created_at).toLocaleString(
@@ -1455,14 +1465,14 @@ const CafeInventory = () => {
                   </div>
                 </div>
 
-                <div className="inventory__session-items-list">
+                <div className="cafeInventory__sessionItemsList">
                   <h4>Продукты ({viewingStockCheck.items?.length || 0}):</h4>
                   {viewingStockCheck.items?.map((item, idx) => {
                     const qtyExpected = toNum(item.qty_expected || 0);
                     const qtyCounted = toNum(item.qty_counted || 0);
                     const difference = toNum(item.difference || 0);
                     return (
-                      <div key={idx} className="inventory__session-item-view">
+                      <div key={idx} className="cafeInventory__sessionItemView">
                         <div>
                           <strong>{item.product_title || "Неизвестно"}</strong>
                           <div style={{ fontSize: 12, color: "#6b7280" }}>
@@ -1508,23 +1518,152 @@ const CafeInventory = () => {
                 </div>
 
                 {!viewingStockCheck.is_confirmed && (
-                  <div className="inventory__form-actions">
+                  <div className="cafeInventory__formActions">
                     <button
                       type="button"
-                      className="inventory__btn inventory__btn--secondary"
+                      className="cafeInventory__btn cafeInventory__btn--secondary"
                       onClick={() => setViewStockCheckModalOpen(false)}
                     >
                       Закрыть
                     </button>
                     <button
                       type="button"
-                      className="inventory__btn inventory__btn--success"
-                      onClick={() => confirmStockCheck(viewingStockCheck.id)}
+                      className="cafeInventory__btn cafeInventory__btn--success"
+                      onClick={() => openConfirmStockCheck(viewingStockCheck.id)}
                     >
                       <FaCheckCircle /> Подтвердить акт
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка подтверждения удаления оборудования */}
+      {confirmDeleteOpen && (
+        <div className="cafeInventory__modalOverlay" onClick={closeDeleteConfirm}>
+          <div className="cafeInventory__modal cafeInventory__modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">Удалить оборудование?</h3>
+              <button
+                className="cafeInventory__iconBtn"
+                onClick={closeDeleteConfirm}
+                type="button"
+                aria-label="Закрыть"
+                disabled={deleteBusy}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="cafeInventory__confirmBody">
+              <div className="cafeInventory__confirmText">Оборудование будет удалено. Это действие нельзя отменить.</div>
+
+              <div className="cafeInventory__formActions">
+                <button
+                  type="button"
+                  className="cafeInventory__btn cafeInventory__btn--secondary"
+                  onClick={closeDeleteConfirm}
+                  disabled={deleteBusy}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="cafeInventory__btn cafeInventory__btn--danger"
+                  onClick={handleDelete}
+                  disabled={deleteBusy}
+                >
+                  {deleteBusy ? "Удаление…" : "Удалить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка подтверждения акта инвентаризации */}
+      {confirmSessionOpen && (
+        <div className="cafeInventory__modalOverlay" onClick={closeConfirmSession}>
+          <div className="cafeInventory__modal cafeInventory__modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">Подтвердить акт инвентаризации?</h3>
+              <button
+                className="cafeInventory__iconBtn"
+                onClick={closeConfirmSession}
+                type="button"
+                aria-label="Закрыть"
+                disabled={confirmSessionBusy}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="cafeInventory__confirmBody">
+              <div className="cafeInventory__confirmText">Акт будет подтвержден. Это обновит состояние оборудования.</div>
+
+              <div className="cafeInventory__formActions">
+                <button
+                  type="button"
+                  className="cafeInventory__btn cafeInventory__btn--secondary"
+                  onClick={closeConfirmSession}
+                  disabled={confirmSessionBusy}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="cafeInventory__btn cafeInventory__btn--success"
+                  onClick={confirmSession}
+                  disabled={confirmSessionBusy}
+                >
+                  {confirmSessionBusy ? "Подтверждение…" : "Подтвердить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модалка подтверждения акта сверки продуктов */}
+      {confirmStockCheckOpen && (
+        <div className="cafeInventory__modalOverlay" onClick={closeConfirmStockCheck}>
+          <div className="cafeInventory__modal cafeInventory__modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeInventory__modalHeader">
+              <h3 className="cafeInventory__modalTitle">Подтвердить акт сверки продуктов?</h3>
+              <button
+                className="cafeInventory__iconBtn"
+                onClick={closeConfirmStockCheck}
+                type="button"
+                aria-label="Закрыть"
+                disabled={confirmStockCheckBusy}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="cafeInventory__confirmBody">
+              <div className="cafeInventory__confirmText">Акт будет подтвержден. Это обновит остатки продуктов на складе.</div>
+
+              <div className="cafeInventory__formActions">
+                <button
+                  type="button"
+                  className="cafeInventory__btn cafeInventory__btn--secondary"
+                  onClick={closeConfirmStockCheck}
+                  disabled={confirmStockCheckBusy}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="cafeInventory__btn cafeInventory__btn--success"
+                  onClick={confirmStockCheck}
+                  disabled={confirmStockCheckBusy}
+                >
+                  {confirmStockCheckBusy ? "Подтверждение…" : "Подтвердить"}
+                </button>
               </div>
             </div>
           </div>

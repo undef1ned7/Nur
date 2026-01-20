@@ -1,15 +1,7 @@
 /* src/.../Cook.scss */
-/* только цвета в :root */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-}
+@use "../variables.scss";
 
-.cook {
+.cafeCook {
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 
@@ -114,45 +106,10 @@
     }
   }
 
-  &__combo {
-    position: relative;
-    width: 190px;
-    height: 40px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: #fff;
-    display: flex;
-    align-items: center;
-    padding: 0 12px 0 34px;
-    overflow: hidden;
-  }
-
-  &__comboIcon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--muted);
-    font-size: 14px;
-    pointer-events: none;
-  }
-
-  &__comboSelect {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
-  }
-
-  &__comboValue {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  &__filter {
+    width: 240px;
+    min-width: 220px;
+    max-width: 300px;
   }
 
   &__action {
@@ -410,6 +367,7 @@
   &__row {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
     gap: 12px;
     padding: 10px 12px;
     border: 1px solid rgba(15, 23, 42, 0.06);
@@ -419,6 +377,7 @@
   }
 
   &__rowLeft {
+    flex: 1 1 auto;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -429,10 +388,10 @@
     font-size: 14px;
     font-weight: 800;
     color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 260px;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
   }
 
   &__rowSub {
@@ -443,15 +402,18 @@
   &__rowRight {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   &__rowPrice {
     font-size: 14px;
     font-weight: 700;
-    min-width: 44px;
+    min-width: 40px;
     text-align: right;
+    white-space: nowrap;
   }
 
   &__btn {
@@ -535,7 +497,13 @@
   @media (max-width: 980px) {
     &__search {
       width: 100%;
-      max-width: 520px;
+      max-width: 480px;
+    }
+
+    &__filter {
+      width: 220px;
+      min-width: 200px;
+      max-width: 260px;
     }
   }
 
@@ -546,6 +514,14 @@
 
     &__receiptTable {
       font-size: 20px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    &__filter {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
     }
   }
 
@@ -566,8 +542,10 @@
       max-width: none;
     }
 
-    &__combo {
+    &__filter {
       width: 100%;
+      min-width: 0;
+      max-width: 100%;
     }
 
     &__action {
@@ -596,8 +574,42 @@
       flex-shrink: 0;
     }
 
+    &__row {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    &__rowLeft {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
     &__rowTitle {
-      max-width: 170px;
+      word-wrap: break-word;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    &__rowRight {
+      width: 100%;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    &__rowPrice {
+      min-width: auto;
+      font-size: 13px;
+    }
+
+    &__btn--compact {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    &__receiptStatusBadge {
+      font-size: 11px;
+      padding: 3px 8px;
     }
   }
 
@@ -640,7 +652,7 @@
 }
 
 /* ===== Modal (Kitchen) ===== */
-.cookModal {
+.cafeCookModal {
   position: fixed;
   inset: 0;
   background: rgba(2, 6, 23, 0.55);
@@ -833,7 +845,7 @@
 
 
 /* ===== PrinterPicker (bind printer to kitchen) ===== */
-.ppick {
+.cafeCookPpick {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -937,7 +949,7 @@
 }
 
 /* ===== Modal grid tweak for kitchen form ===== */
-.cookModal {
+.cafeCookModal {
   &__grid {
     &--kitchen {
       grid-template-columns: 1fr;

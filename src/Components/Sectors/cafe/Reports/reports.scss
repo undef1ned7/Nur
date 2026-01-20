@@ -1,17 +1,5 @@
 /* src/.../reports.scss */
-
-/* только цвета в :root */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-
-  --danger: #ef4444;
-  --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-}
+@use "../variables.scss";
 
 /* ===== Блок CAFE ANALYTICS ===== */
 .cafeAnalytics {

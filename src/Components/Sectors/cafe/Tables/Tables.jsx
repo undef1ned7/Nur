@@ -1,9 +1,9 @@
 // src/.../Tables.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaChair, FaMapMarkedAlt, FaTimes, FaPlus } from "react-icons/fa";
+import { FaChair, FaTimes, FaPlus } from "react-icons/fa";
 import api from "../../../../api";
-import TablesHall from "./TablesHall";
-import TablesZones from "./TablesZones";
+import TablesHall from "./components/TablesHall";
+import TablesZones from "./components/TablesZones";
 import "./Tables.scss";
 
 const listFrom = (r) => r?.data?.results || r?.data || [];
@@ -98,7 +98,7 @@ const Tables = () => {
       const full = await hydrateOrdersDetails(active);
       setOrdersActive(full);
     } catch (e) {
-      console.error("Ошибка начальной загрузки:", e);
+      // Ошибка загрузки данных - неудачно при сетевых проблемах
     }
   }, [hydrateOrdersDetails]);
 
@@ -157,7 +157,7 @@ const Tables = () => {
           await api.patch(`/cafe/tables/${t.id}/`, { status: "free" });
           setTables((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: "free" } : x)));
         } catch (e) {
-          console.error("Не удалось освободить стол:", t.id, e);
+          // Не удалось обновить статус стола
         }
       }
     })();
@@ -170,7 +170,6 @@ const Tables = () => {
       setZones((prev) => [...prev, res.data]);
       return true;
     } catch (e) {
-      console.error("Ошибка создания зоны:", e);
       return false;
     }
   };
@@ -181,7 +180,6 @@ const Tables = () => {
       setZones((prev) => prev.map((z) => (z.id === id ? res.data : z)));
       return true;
     } catch (e) {
-      console.error("Ошибка обновления зоны:", e);
       return false;
     }
   };
@@ -193,7 +191,6 @@ const Tables = () => {
       setTables((prev) => prev.map((t) => ((t.zone?.id || t.zone) === id ? { ...t, zone: "" } : t)));
       return true;
     } catch (e) {
-      console.error("Ошибка удаления зоны:", e);
       return false;
     }
   };
@@ -205,7 +202,6 @@ const Tables = () => {
       setTables((prev) => [...prev, res.data]);
       return true;
     } catch (e) {
-      console.error("Ошибка создания стола:", e);
       return false;
     }
   };
@@ -216,7 +212,6 @@ const Tables = () => {
       setTables((prev) => prev.map((t) => (t.id === id ? res.data : t)));
       return true;
     } catch (e) {
-      console.error("Ошибка обновления стола:", e);
       return false;
     }
   };
@@ -227,7 +222,6 @@ const Tables = () => {
       setTables((prev) => prev.filter((t) => t.id !== id));
       return true;
     } catch (e) {
-      console.error("Ошибка удаления стола:", e);
       return false;
     }
   };
@@ -264,20 +258,20 @@ const Tables = () => {
   };
 
   return (
-    <section className="tables">
-      <div className="tables__header">
-        <div className="tables__headLeft">
-          <h2 className="tables__title">{headerTitle}</h2>
-          <div className="tables__subtitle">{headerSubtitle}</div>
+    <section className="cafeTables">
+      <div className="cafeTables__header">
+        <div className="cafeTables__headLeft">
+          <h2 className="cafeTables__title">{headerTitle}</h2>
+          <div className="cafeTables__subtitle">{headerSubtitle}</div>
         </div>
 
-        <div className="tables__headRight">
-          <div className="tables__topActions">
+        <div className="cafeTables__headRight">
+          <div className="cafeTables__topActions">
             {activeTab === "tables" && (
-              <div className="tables__viewSwitch" title="Режим отображения">
+              <div className="cafeTables__viewSwitch" title="Режим отображения">
                 <button
                   type="button"
-                  className={`tables__viewBtn ${tablesView === "manage" ? "tables__viewBtn--active" : ""}`}
+                  className={`cafeTables__viewBtn ${tablesView === "manage" ? "cafeTables__viewBtn--active" : ""}`}
                   onClick={() => setTablesView("manage")}
                   aria-label="Список"
                 >
@@ -285,7 +279,7 @@ const Tables = () => {
                 </button>
                 <button
                   type="button"
-                  className={`tables__viewBtn ${tablesView === "hall" ? "tables__viewBtn--active" : ""}`}
+                  className={`cafeTables__viewBtn ${tablesView === "hall" ? "cafeTables__viewBtn--active" : ""}`}
                   onClick={() => setTablesView("hall")}
                   aria-label="Зал"
                 >
@@ -294,27 +288,26 @@ const Tables = () => {
               </div>
             )}
 
-            {/* ✅ ВМЕСТЕ: переключатель + кнопка создания зоны (только в Зонах) */}
-            <div className="tables__headGroup">
-              <div className="tables__switch">
+            <div className="cafeTables__headGroup">
+              <div className="cafeTables__switch">
                 <button
                   type="button"
-                  className={`tables__switchBtn ${activeTab === "tables" ? "tables__switchBtn--active" : ""}`}
+                  className={`cafeTables__switchBtn ${activeTab === "tables" ? "cafeTables__switchBtn--active" : ""}`}
                   onClick={() => setActiveTab("tables")}
                 >
                   <FaChair /> Столы
                 </button>
                 <button
                   type="button"
-                  className={`tables__switchBtn ${activeTab === "zones" ? "tables__switchBtn--active" : ""}`}
+                  className={`cafeTables__switchBtn ${activeTab === "zones" ? "cafeTables__switchBtn--active" : ""}`}
                   onClick={() => setActiveTab("zones")}
                 >
-                  <FaMapMarkedAlt /> Зоны
+                  <FaPlus /> Зоны
                 </button>
               </div>
 
               {activeTab === "zones" && (
-                <button type="button" className="tables__btn tables__btn--success" onClick={pingCreateZone}>
+                <button type="button" className="cafeTables__btn cafeTables__btn--success" onClick={pingCreateZone}>
                   <FaPlus /> Новая зона
                 </button>
               )}
@@ -346,23 +339,23 @@ const Tables = () => {
       )}
 
       {confirmOpen && (
-        <div className="tables__modalOverlay" onClick={closeConfirm}>
-          <div className="tables__modal tables__modal--confirm" onClick={(e) => e.stopPropagation()}>
-            <div className="tables__modalHeader">
-              <h3 className="tables__modalTitle">{confirmText.title}</h3>
-              <button className="tables__iconBtn" type="button" onClick={closeConfirm} aria-label="Закрыть" disabled={confirmBusy}>
+        <div className="cafeTables__modalOverlay" onClick={closeConfirm}>
+          <div className="cafeTables__modal cafeTables__modal--confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeTables__modalHeader">
+              <h3 className="cafeTables__modalTitle">{confirmText.title}</h3>
+              <button className="cafeTables__iconBtn" type="button" onClick={closeConfirm} aria-label="Закрыть" disabled={confirmBusy}>
                 <FaTimes />
               </button>
             </div>
 
-            <div className="tables__confirmBody">
-              <div className="tables__confirmText">{confirmText.body}</div>
+            <div className="cafeTables__confirmBody">
+              <div className="cafeTables__confirmText">{confirmText.body}</div>
 
-              <div className="tables__formActions">
-                <button type="button" className="tables__btn tables__btn--secondary" onClick={closeConfirm} disabled={confirmBusy}>
+              <div className="cafeTables__formActions">
+                <button type="button" className="cafeTables__btn cafeTables__btn--secondary" onClick={closeConfirm} disabled={confirmBusy}>
                   Отмена
                 </button>
-                <button type="button" className="tables__btn tables__btn--danger" onClick={confirmDelete} disabled={confirmBusy}>
+                <button type="button" className="cafeTables__btn cafeTables__btn--danger" onClick={confirmDelete} disabled={confirmBusy}>
                   {confirmBusy ? "Удаление…" : "Удалить"}
                 </button>
               </div>

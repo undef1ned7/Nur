@@ -123,11 +123,12 @@
     height: calc(100vh - 80px); // Вычитаем высоту header
     width: 100%;
     margin-top: 80px; // Отступ сверху для фиксированного header
-    overflow-y: auto;
+    overflow-y: scroll;
     overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: rgba(247, 215, 79, 0.3) transparent;
     padding-top: 10px;
+    // Убрали flex - теперь скролл работает правильно
   }
 
   &__arnament2 {
@@ -286,33 +287,8 @@
   &__menu {
     list-style: none;
     padding: 10px 0;
+    padding-bottom: 120px; // Отступ снизу чтобы скролл доходил до конца
     margin: 0;
-    overflow-y: auto;
-    max-height: none;
-    height: auto;
-    flex-grow: 1;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable both-edges;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: linear-gradient(180deg, #f7d74f 0%, #f5c842 100%);
-      border-radius: 10px;
-      transition: background 0.2s ease;
-
-      &:hover {
-        background: linear-gradient(180deg, #f9e066 0%, #f7d74f 100%);
-      }
-    }
   }
 
   &__menu-item {

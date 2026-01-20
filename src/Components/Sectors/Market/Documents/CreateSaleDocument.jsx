@@ -24,6 +24,7 @@ import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
+import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
@@ -99,13 +100,17 @@ const CreateSaleDocument = () => {
     const loadProducts = async () => {
       setProductsLoading(true);
       try {
-        const result = await dispatch(
-          fetchWarehouseProducts({
-            search: debouncedProductSearch || undefined,
-            page_size: showMoreProducts ? 50 : 20,
-          })
-        );
-        if (fetchWarehouseProducts.fulfilled.match(result)) {
+        const result = await dispatch(fetchProductsAsync({
+          search: debouncedProductSearch || undefined,
+          page_size: showMoreProducts ? 50 : 20,
+        }));
+        // const result = await dispatch(
+        //   fetchWarehouseProducts({
+        //     search: debouncedProductSearch || undefined,
+        //     page_size: showMoreProducts ? 50 : 20,
+        //   })
+        // );
+        if (fetchProductsAsync.fulfilled.match(result)) {
           // Обрабатываем стандартный формат DRF пагинации
           setProducts(result.payload?.results || (Array.isArray(result.payload) ? result.payload : []));
         }
@@ -202,7 +207,7 @@ const CreateSaleDocument = () => {
       (sum, item) =>
         sum +
         (Number(item.price || item.unit_price) || 0) *
-          (Number(item.quantity) || 0),
+        (Number(item.quantity) || 0),
       0
     );
 
@@ -364,11 +369,11 @@ const CreateSaleDocument = () => {
       };
 
       const result = await dispatch(createWarehouseDocument(documentData));
-      
+
       if (createWarehouseDocument.fulfilled.match(result)) {
         // Документ успешно создан
         alert("Документ успешно сохранен");
-        
+
         // Очищаем корзину
         setCartItems([]);
         setSelectedProductIds(new Set());
@@ -379,7 +384,7 @@ const CreateSaleDocument = () => {
         setDocumentSearch("");
 
         // Переходим на страницу документов
-    navigate("/crm/market/documents");
+        navigate("/crm/market/documents");
       } else {
         // Ошибка при создании
         const error = result.payload || result.error;
@@ -452,7 +457,7 @@ const CreateSaleDocument = () => {
       };
 
       const createResult = await dispatch(createWarehouseDocument(documentData));
-      
+
       if (!createWarehouseDocument.fulfilled.match(createResult)) {
         const error = createResult.payload || createResult.error;
         const errorMessage = error?.detail || error?.message || "Ошибка при создании документа";
@@ -466,13 +471,13 @@ const CreateSaleDocument = () => {
       const selectedCounterparty = filteredCounterparties.find((c) => c.id === clientId);
       const warehouseName = warehouse
         ? warehouses.find((w) => w.id === warehouse)?.name ||
-          cashBoxes?.find((b) => b.id === warehouse)?.name ||
-          warehouse
+        cashBoxes?.find((b) => b.id === warehouse)?.name ||
+        warehouse
         : null;
       const warehouseToName = warehouseTo
         ? warehouses.find((w) => w.id === warehouseTo)?.name ||
-          cashBoxes?.find((b) => b.id === warehouseTo)?.name ||
-          warehouseTo
+        cashBoxes?.find((b) => b.id === warehouseTo)?.name ||
+        warehouseTo
         : null;
 
       // Получаем скидку по документу
@@ -546,16 +551,16 @@ const CreateSaleDocument = () => {
           },
           buyer: selectedCounterparty
             ? {
-                id: selectedCounterparty.id,
-                name: selectedCounterparty.name || "",
-                inn: selectedCounterparty.inn || "",
-                okpo: selectedCounterparty.okpo || "",
-                score: selectedCounterparty.score || "",
-                bik: selectedCounterparty.bik || "",
-                address: selectedCounterparty.address || "",
-                phone: selectedCounterparty.phone || null,
-                email: selectedCounterparty.email || null,
-              }
+              id: selectedCounterparty.id,
+              name: selectedCounterparty.name || "",
+              inn: selectedCounterparty.inn || "",
+              okpo: selectedCounterparty.okpo || "",
+              score: selectedCounterparty.score || "",
+              bik: selectedCounterparty.bik || "",
+              address: selectedCounterparty.address || "",
+              phone: selectedCounterparty.phone || null,
+              email: selectedCounterparty.email || null,
+            }
             : null,
           items: items,
           totals: {
@@ -597,9 +602,9 @@ const CreateSaleDocument = () => {
           },
           client: selectedCounterparty
             ? {
-                id: selectedCounterparty.id,
-                full_name: selectedCounterparty.name || "",
-              }
+              id: selectedCounterparty.id,
+              full_name: selectedCounterparty.name || "",
+            }
             : null,
           items: items,
           totals: {
@@ -675,13 +680,13 @@ const CreateSaleDocument = () => {
           </button>
 
           <div className="create-sale-document__products-list">
-            {productsLoading ? (
-              <div className="create-sale-document__loading">Загрузка...</div>
-            ) : products.length === 0 ? (
-              <div className="create-sale-document__empty">
+
+            {
+              products?.length === 0 && <div className="create-sale-document__empty">
                 Товары не найдены
               </div>
-            ) : (
+            }
+            {
               products.map((product) => {
                 const isSelected = selectedProductIds.has(product.id);
                 const isInCart = cartItems.some(
@@ -691,9 +696,8 @@ const CreateSaleDocument = () => {
                 return (
                   <div
                     key={product.id}
-                    className={`create-sale-document__product-item ${
-                      isSelected || isInCart ? "active" : ""
-                    }`}
+                    className={`create-sale-document__product-item ${isSelected || isInCart ? "active" : ""
+                      }`}
                     onClick={() => handleAddProduct(product.id)}
                     style={{
                       cursor: addingProduct ? "wait" : "pointer",
@@ -709,7 +713,7 @@ const CreateSaleDocument = () => {
                           {formatPrice(product.price)} сом
                         </span>
                         <span className="create-sale-document__product-qty">
-                          {product.qty_on_hand || 0} {product.unit || "шт"}
+                          {product.quantity || 0} {product.unit || "шт"}
                         </span>
                       </div>
                     </div>
@@ -722,9 +726,12 @@ const CreateSaleDocument = () => {
                   </div>
                 );
               })
-            )}
+            }
           </div>
-
+          
+          {
+            productsLoading && <div className="create-sale-document__loading">Загрузка...</div>
+          }
           {products.length > 0 && (
             <button
               className="create-sale-document__show-more"
@@ -923,9 +930,8 @@ const CreateSaleDocument = () => {
             {/* Вкладки */}
             <div className="create-sale-document__tabs">
               <button
-                className={`create-sale-document__tab ${
-                  activeTab === "products" ? "active" : ""
-                }`}
+                className={`create-sale-document__tab ${activeTab === "products" ? "active" : ""
+                  }`}
                 onClick={() => setActiveTab("products")}
               >
                 Товары
@@ -1099,11 +1105,11 @@ const CreateSaleDocument = () => {
                     <span>
                       {documentDiscount > 0 || totals.itemsDiscount > 0
                         ? `${(
-                            (totals.totalDiscount / totals.subtotal) *
-                            100
-                          ).toFixed(2)}% (${formatPrice(
-                            totals.totalDiscount
-                          )} сом)`
+                          (totals.totalDiscount / totals.subtotal) *
+                          100
+                        ).toFixed(2)}% (${formatPrice(
+                          totals.totalDiscount
+                        )} сом)`
                         : `% (${formatPrice(0)} сом)`}
                     </span>
                   </div>

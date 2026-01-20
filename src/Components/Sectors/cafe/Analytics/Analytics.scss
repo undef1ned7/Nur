@@ -1,15 +1,5 @@
 /* ===== Variables ===== */
-:root {
-  --primary: #f7d74f;
-  --primary-dark: #d4b800;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --surface: #ffffff;
-  --radius: 12px;
-  --shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
-  --shadow-strong: 0 10px 30px rgba(15, 23, 42, 0.1);
-}
+@import "../variables.scss";
 
 /* ===== Helpers ===== */
 @keyframes shimmer {

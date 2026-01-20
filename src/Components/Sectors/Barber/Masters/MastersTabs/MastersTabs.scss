@@ -10,16 +10,28 @@
   flex-direction: column;
   gap: 16px;
   max-width: 100%;
-  overflow-x: hidden;
+
+  /* обёртка для скролла табов */
+  &__tabbar-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+
+    &::-webkit-scrollbar {
+      display: none; /* Chrome/Safari */
+    }
+  }
 
   /* верхняя полоса с табами */
   &__tabbar {
-    display: flex;
+    display: inline-flex;
     align-items: flex-end;
     gap: 24px;
     border-bottom: 1px solid var(--border);
     padding-top: 8px;
-    max-width: 100%;
+    min-width: 100%;
     flex-wrap: nowrap;
   }
 
@@ -107,7 +119,6 @@
     }
   }
 
-  /* до 480 сохраняем в одну линию, ужимаем */
   @media (max-width: 480px) {
     &__tabbar {
       gap: 10px;
@@ -116,24 +127,18 @@
     &__tab {
       padding: 8px 12px;
       font-size: 13px;
+      flex-shrink: 0;
     }
   }
 
-  /* 320px: одна линия + горизонтальный скролл */
   @media (max-width: 360px) {
     &__tabbar {
       gap: 8px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 4px;
     }
 
     &__tab {
       padding: 8px 10px;
-      font-size: 13px;
-      /* фиксим минимальную ширину, чтобы было удобно тапать */
-      min-width: 120px;
+      font-size: 12px;
     }
   }
 }

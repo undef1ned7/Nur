@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./Documents.scss";
 import api from "../../../../api";
+import BarberSelect from "../common/BarberSelect";
 
 /* ===== helpers ===== */
 const normalizeResp = (data) =>
@@ -701,18 +702,18 @@ export default function BarberDocuments() {
 
             <div className="docs__filter">
               <label className="docs__filterLabel">Папка</label>
-              <select
-                className="docs__select"
+              <BarberSelect
                 value={docFolderFilter}
-                onChange={(e) => setDocFolderFilter(e.target.value)}
-              >
-                <option value="">Все</option>
-                {allFoldersForSelect.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name || "Без названия"}
-                  </option>
-                ))}
-              </select>
+                onChange={setDocFolderFilter}
+                options={[
+                  { value: "", label: "Все" },
+                  ...allFoldersForSelect.map((f) => ({
+                    value: String(f.id),
+                    label: f.name || "Без названия",
+                  })),
+                ]}
+                placeholder="Все"
+              />
             </div>
 
             {docErr ? <span className="docs__error">{docErr}</span> : null}
@@ -886,19 +887,19 @@ export default function BarberDocuments() {
                       <label className="docs__label">
                         Папка <span className="docs__req">*</span>
                       </label>
-                      <select
-                        className="docs__select"
+                      <BarberSelect
                         value={createDocFolder}
-                        onChange={(e) => setCreateDocFolder(e.target.value)}
-                        required
-                      >
-                        <option value="">Выберите папку</option>
-                        {allFoldersForSelect.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name || "Без названия"}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setCreateDocFolder}
+                        options={[
+                          { value: "", label: "Выберите папку" },
+                          ...allFoldersForSelect.map((f) => ({
+                            value: String(f.id),
+                            label: f.name || "Без названия",
+                          })),
+                        ]}
+                        placeholder="Выберите папку"
+                        hideClear
+                      />
                     </div>
 
                     <div className="docs__field">
@@ -974,19 +975,19 @@ export default function BarberDocuments() {
                       <label className="docs__label">
                         Папка <span className="docs__req">*</span>
                       </label>
-                      <select
-                        className="docs__select"
+                      <BarberSelect
                         value={editDocFolder}
-                        onChange={(e) => setEditDocFolder(e.target.value)}
-                        required
-                      >
-                        <option value="">Выберите папку</option>
-                        {allFoldersForSelect.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name || "Без названия"}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setEditDocFolder}
+                        options={[
+                          { value: "", label: "Выберите папку" },
+                          ...allFoldersForSelect.map((f) => ({
+                            value: String(f.id),
+                            label: f.name || "Без названия",
+                          })),
+                        ]}
+                        placeholder="Выберите папку"
+                        hideClear
+                      />
                     </div>
 
                     <div className="docs__field">
