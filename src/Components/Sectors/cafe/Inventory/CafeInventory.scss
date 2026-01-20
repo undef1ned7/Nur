@@ -1,4 +1,5 @@
-@import "../variables.scss";
+@use "../variables.scss";
+@use "../../../common/SearchableCombobox/SearchableCombobox.scss";
 
 /* Изоляция блоком .cafeInventory — стили не утекут */
 .cafeInventory {
@@ -1268,6 +1269,3 @@
     }
   }
 }
-
-/* импорт SearchableCombobox стилей */
-@import "../../../common/SearchableCombobox/SearchableCombobox.scss";

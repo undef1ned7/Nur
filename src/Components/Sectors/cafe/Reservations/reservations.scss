@@ -1,5 +1,6 @@
 /* src/Components/Sectors/cafe/Reservations/reservations.scss */
-@import "../variables.scss";
+@use "../variables.scss";
+@use "../../../common/SearchableCombobox/SearchableCombobox.scss";
 
 /* Блок cafeReservations — изоляция стилей */
 .cafeReservations {
@@ -864,4 +865,3 @@
 }
 
 /* импорт SearchableCombobox стилей */
-@import "../../../common/SearchableCombobox/SearchableCombobox.scss";

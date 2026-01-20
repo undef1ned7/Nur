@@ -10,7 +10,6 @@ import ReactPortal from "../Portal/ReactPortal";
 // - okText?: string
 // - onClose: () => void
 // - onConfirm?: () => void (defaults to onClose)
-
 const TYPE_STYLES = {
   success: { bg: "#e8f7ef", color: "#1e8e3e", iconBg: "#22c55e" },
   error: { bg: "#fdecea", color: "#b42318", iconBg: "#ef4444" },

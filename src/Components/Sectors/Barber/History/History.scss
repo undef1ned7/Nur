@@ -1,7 +1,7 @@
-@import "../styles/barbershop.scss";
-@import "../../../common/SearchableCombobox/SearchableCombobox.scss";
+@use "../styles/barbershop.scss";
+@use "../../../common/SearchableCombobox/SearchableCombobox.scss";
 
-@include searchable-combo("barberhistory__combo");
+// @include searchable-combo("barberhistory__combo");
 
 .barberhistory {
   box-sizing: border-box;
