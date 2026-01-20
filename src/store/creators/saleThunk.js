@@ -58,6 +58,18 @@ export const updateSale = createAsyncThunk(
   }
 );
 
+export const getSale = createAsyncThunk(
+  "sale/getting",
+  async ({ id }, { rejectWithValue }) => {
+    try {
+      const { data: response } = await api.get(`/main/pos/sales/${id}/`);
+      return response;
+    } catch (error) {
+      return rejectWithValue(plainAxiosError(error));
+    }
+  }
+);
+
 export const manualFilling = createAsyncThunk(
   "sale/manualFilling",
   async ({ id, productId, quantity, discount_total }, { rejectWithValue }) => {

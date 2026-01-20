@@ -10,7 +10,6 @@ import {
   fetchCategoriesAsync,
   createBrandAsync,
   createCategoryAsync,
-  sendBarCode,
   createKassa,
   createProductWithBarcode,
   getItemsMake,

@@ -36,6 +36,7 @@ const ProductCard = React.memo(
             alt={product.name || "Товар"}
             className="warehouse-table__product-image h-12 w-12 flex-none rounded-xl border border-slate-200 object-cover"
             loading="lazy"
+            decoding="async"
             onError={(e) => {
               e.currentTarget.src = noImage;
             }}
@@ -65,7 +66,6 @@ const ProductCard = React.memo(
             </div>
           </div>
         </div>
-
         <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-xl bg-slate-50 p-2">
             <div className="text-slate-500">Цена продажи</div>

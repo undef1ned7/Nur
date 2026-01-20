@@ -1,7 +1,7 @@
 // DepartmentDetails.module.scss (фрагмент, убедитесь, что он содержит эти стили)
 
 /* ... (предыдущие стили для контейнера, хедера, таблицы и т.д.) ... */
-
+@use "sass:color";
 // Modal Styling
 .modalOverlay {
   position: fixed;
@@ -93,7 +93,7 @@
       color: #333;
       font-weight: bold;
       &:hover {
-        background-color: darken(#f7d74f, 10%);
+        background-color: color.adjust(#f7d74f, $lightness: -10%);
       }
     }
   }
@@ -211,7 +211,10 @@
     transition: background-color 0.3s ease;
 
     &:hover {
-      background-color: darken(#f7d74f, 10%); // Затемнение при наведении
+      background-color: color.adjust(
+        #f7d74f,
+        $lightness: -10%
+      ); // Затемнение при наведении
     }
   }
 }
@@ -404,7 +407,7 @@
       color: #333;
       font-weight: bold;
       &:hover {
-        background-color: darken(#f7d74f, 10%);
+        background-color: color.adjust(#f7d74f, $lightness: -10%);
       }
     }
   }

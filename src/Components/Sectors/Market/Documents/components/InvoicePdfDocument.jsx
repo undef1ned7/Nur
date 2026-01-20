@@ -11,7 +11,7 @@ import {
 // Регистрируем шрифты Roboto из public папки
 let robotoRegistered = false;
 try {
-  const fontBase = process.env.PUBLIC_URL || "";
+  const fontBase = import.meta.env.PUBLIC_URL || "";
   const regularPath = fontBase
     ? `${fontBase}/fonts/roboto/Roboto-Regular.ttf`
     : "/fonts/roboto/Roboto-Regular.ttf";
@@ -409,10 +409,10 @@ export default function InvoicePdfDocument({ data }) {
   // Скидка на уровне документа (может быть в процентах или абсолютном значении)
   const documentDiscount = Number(
     doc.order_discount_total ??
-      doc.discount_total ??
-      doc.discount_percent ??
-      data.order_discount_total ??
-      0
+    doc.discount_total ??
+    doc.discount_percent ??
+    data.order_discount_total ??
+    0
   );
 
   // Вычисляем процент скидки документа, если он не указан напрямую
@@ -429,65 +429,65 @@ export default function InvoicePdfDocument({ data }) {
   // Поддержка обоих форматов: unit_price (API) и price (если где-то уже нормализовали)
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
-        const qty = Number(it.qty || it.quantity || 0);
-        const unit = Number(it.unit_price ?? it.price ?? 0);
-        const total = Number(it.total ?? qty * unit);
+      const qty = Number(it.qty || it.quantity || 0);
+      const unit = Number(it.unit_price ?? it.price ?? 0);
+      const total = Number(it.total ?? qty * unit);
 
-        // Скидка на уровне товара (если есть) - используем discount_percent в процентах
-        const itemDiscountPercent = Number(it.discount_percent ?? 0);
+      // Скидка на уровне товара (если есть) - используем discount_percent в процентах
+      const itemDiscountPercent = Number(it.discount_percent ?? 0);
 
-        // Цена без скидки товара (если есть original_price или price_before_discount)
-        let priceNoDiscount = Number(
-          it.original_price ??
-            it.price_before_discount ??
-            it.price_without_discount ??
-            0
-        );
+      // Цена без скидки товара (если есть original_price или price_before_discount)
+      let priceNoDiscount = Number(
+        it.original_price ??
+        it.price_before_discount ??
+        it.price_without_discount ??
+        0
+      );
 
-        // Если цена без скидки не указана, вычисляем её из текущей цены и скидок
-        if (priceNoDiscount === 0 || priceNoDiscount === unit) {
-          // Если есть скидка на товар, вычисляем цену без скидки товара
-          if (itemDiscountPercent > 0) {
-            priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
-          } else if (documentDiscountPercent > 0) {
-            // Если есть скидка на документ, вычисляем цену без скидки документа
-            priceNoDiscount = unit / (1 - documentDiscountPercent / 100);
-          } else {
-            // Если скидок нет, цена без скидки = текущая цена
-            priceNoDiscount = unit;
-          }
+      // Если цена без скидки не указана, вычисляем её из текущей цены и скидок
+      if (priceNoDiscount === 0 || priceNoDiscount === unit) {
+        // Если есть скидка на товар, вычисляем цену без скидки товара
+        if (itemDiscountPercent > 0) {
+          priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
+        } else if (documentDiscountPercent > 0) {
+          // Если есть скидка на документ, вычисляем цену без скидки документа
+          priceNoDiscount = unit / (1 - documentDiscountPercent / 100);
+        } else {
+          // Если скидок нет, цена без скидки = текущая цена
+          priceNoDiscount = unit;
         }
+      }
 
-        // Общая скидка для товара (скидка товара + скидка документа)
-        let finalDiscountPercent = itemDiscountPercent;
-        if (documentDiscountPercent > 0 && itemDiscountPercent === 0) {
-          // Если есть только скидка документа, используем её
-          finalDiscountPercent = documentDiscountPercent;
-        } else if (documentDiscountPercent > 0 && itemDiscountPercent > 0) {
-          // Если есть обе скидки, вычисляем общую эффективную скидку
-          const itemPriceBeforeDiscount = priceNoDiscount;
-          const itemPriceAfterItemDiscount =
-            itemPriceBeforeDiscount * (1 - itemDiscountPercent / 100);
-          const itemPriceAfterDocumentDiscount =
-            itemPriceAfterItemDiscount * (1 - documentDiscountPercent / 100);
-          finalDiscountPercent =
-            ((itemPriceBeforeDiscount - itemPriceAfterDocumentDiscount) /
-              itemPriceBeforeDiscount) *
-            100;
-        }
+      // Общая скидка для товара (скидка товара + скидка документа)
+      let finalDiscountPercent = itemDiscountPercent;
+      if (documentDiscountPercent > 0 && itemDiscountPercent === 0) {
+        // Если есть только скидка документа, используем её
+        finalDiscountPercent = documentDiscountPercent;
+      } else if (documentDiscountPercent > 0 && itemDiscountPercent > 0) {
+        // Если есть обе скидки, вычисляем общую эффективную скидку
+        const itemPriceBeforeDiscount = priceNoDiscount;
+        const itemPriceAfterItemDiscount =
+          itemPriceBeforeDiscount * (1 - itemDiscountPercent / 100);
+        const itemPriceAfterDocumentDiscount =
+          itemPriceAfterItemDiscount * (1 - documentDiscountPercent / 100);
+        finalDiscountPercent =
+          ((itemPriceBeforeDiscount - itemPriceAfterDocumentDiscount) /
+            itemPriceBeforeDiscount) *
+          100;
+      }
 
-        return {
-          id: it.id,
-          name: it.name || it.product_name || "Товар",
-          qty,
-          unit_price: unit,
-          price_no_discount: priceNoDiscount,
-          discount: finalDiscountPercent,
-          total,
-          unit: it.unit || "ШТ",
-          article: it.article || "",
-        };
-      })
+      return {
+        id: it.id,
+        name: it.name || it.product_name || "Товар",
+        qty,
+        unit_price: unit,
+        price_no_discount: priceNoDiscount,
+        discount: finalDiscountPercent,
+        total,
+        unit: it.unit || "ШТ",
+        article: it.article || "",
+      };
+    })
     : [];
 
   const invoiceNumber = doc.number || "";

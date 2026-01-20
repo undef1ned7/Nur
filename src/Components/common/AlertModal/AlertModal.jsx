@@ -1,4 +1,5 @@
 import React from "react";
+import ReactPortal from "../Portal/ReactPortal";
 
 // Simple, reusable alert modal with types: success | error | warning | info
 // Props:
@@ -49,90 +50,93 @@ const AlertModal = ({
   const handle = onConfirm || onClose;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-      }}
-    >
+    <ReactPortal wrapperId="alert_modal">
       <div
-        onClick={onClose}
         style={{
-          position: "absolute",
+          position: "fixed",
           inset: 0,
-          background: "rgba(0,0,0,0.35)",
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        style={{
-          position: "relative",
-          width: "min(420px, 92vw)",
-          margin: "10vh auto 0",
-          background: "#fff",
-          borderRadius: 16,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-          padding: 24,
-          zIndex: 1001,
-          textAlign: "center",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
         }}
       >
         <div
+          onClick={onClose}
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: "50%",
-            background: styles.iconBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 16px",
+            position: "absolute",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+          }}
+        />
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "relative",
+            width: "min(420px, 92vw)",
+            margin: "10vh auto 0",
+            background: "#fff",
+            borderRadius: 16,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+            padding: 24,
+            zIndex: 1001,
+            textAlign: "center",
           }}
         >
-          <CheckIcon />
-        </div>
-        {title ? (
-          <h3
+          <div
             style={{
-              margin: "0 0 6px",
-              fontSize: 18,
-              fontWeight: 700,
-              color: "#111827",
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              background: styles.iconBg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
             }}
           >
-            {title}
-          </h3>
-        ) : null}
-        <p
-          style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#111827" }}
-        >
-          {message}
-        </p>
+            <CheckIcon />
+          </div>
+          {title ? (
+            <h3
+              style={{
+                margin: "0 0 6px",
+                fontSize: 18,
+                fontWeight: 700,
+                color: "#111827",
+              }}
+            >
+              {title}
+            </h3>
+          ) : null}
+          <p
+            style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#111827" }}
+          >
+            {message}
+          </p>
 
-        <div style={{ marginTop: 20 }}>
-          <button
-            onClick={handle}
-            style={{
-              background: "#f7d617",
-              color: "#000",
-              border: "1px solid #00000033",
-              fontWeight: 600,
-              fontSize: 16,
-              borderRadius: 8,
-              padding: "10px 24px",
-              cursor: "pointer",
-              minWidth: 96,
-            }}
-          >
-            {okText}
-          </button>
+          <div style={{ marginTop: 20 }}>
+            <button
+              onClick={handle}
+              style={{
+                background: "#f7d617",
+                color: "#000",
+                border: "1px solid #00000033",
+                fontWeight: 600,
+                fontSize: 16,
+                borderRadius: 8,
+                padding: "10px 24px",
+                cursor: "pointer",
+                minWidth: 96,
+              }}
+            >
+              {okText}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </ReactPortal>
+
   );
 };
 

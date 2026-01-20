@@ -1,5 +1,5 @@
 // src/components/Booking/RoomsHalls.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaSearch, FaPlus, FaTimes } from "react-icons/fa";
 import api from "../../../../api";
 import "./rooms-halls.scss";
@@ -490,8 +490,8 @@ export default function RoomsHalls() {
 
   /* ===================== Render ===================== */
   const isHotels = tab === TABS.HOTELS;
-  const isHalls  = tab === TABS.HALLS;
-  const isBeds   = tab === TABS.BEDS;
+  const isHalls = tab === TABS.HALLS;
+  const isBeds = tab === TABS.BEDS;
 
   return (
     <section className="rh">
@@ -516,8 +516,8 @@ export default function RoomsHalls() {
             {isHotels
               ? "Создание, редактирование и список всех комнат"
               : isHalls
-              ? "Создание, редактирование и список всех залов"
-              : "Создание, редактирование и список всех койко-мест (хостел)"}
+                ? "Создание, редактирование и список всех залов"
+                : "Создание, редактирование и список всех койко-мест (хостел)"}
           </p>
         </div>
 
@@ -530,8 +530,8 @@ export default function RoomsHalls() {
                 isHotels
                   ? "Поиск по названию, описанию, вместимости, цене"
                   : isHalls
-                  ? "Поиск по названию, локации, вместимости и цене"
-                  : "Поиск по названию, описанию, количеству мест и цене"
+                    ? "Поиск по названию, локации, вместимости и цене"
+                    : "Поиск по названию, описанию, количеству мест и цене"
               }
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -657,57 +657,57 @@ export default function RoomsHalls() {
           </div>
         )
       ) : // Beds
-      loadingBeds ? (
-        <div className="rh__empty">Загрузка…</div>
-      ) : errorBeds ? (
-        <div className="rh__empty">{errorBeds}</div>
-      ) : (
-        <div className="rh__list">
-          {filteredBeds.map((b) => (
-            <div key={b.id} className="rh__row">
-              <div className="rh__rowLeft">
-                <div className="rh__name">{b.name}</div>
-                <div className="rh__meta">
-                  <span className="rh__badge">Мест: {b.capacity}</span>
-                  <span className="rh__price">{prettyPrice(b.price)} сом</span>
-                </div>
-                {b.description && (
-                  <div className="rh__desc" title={b.description}>
-                    {b.description.length > 140 ? b.description.slice(0, 140) + "…" : b.description}
+        loadingBeds ? (
+          <div className="rh__empty">Загрузка…</div>
+        ) : errorBeds ? (
+          <div className="rh__empty">{errorBeds}</div>
+        ) : (
+          <div className="rh__list">
+            {filteredBeds.map((b) => (
+              <div key={b.id} className="rh__row">
+                <div className="rh__rowLeft">
+                  <div className="rh__name">{b.name}</div>
+                  <div className="rh__meta">
+                    <span className="rh__badge">Мест: {b.capacity}</span>
+                    <span className="rh__price">{prettyPrice(b.price)} сом</span>
                   </div>
-                )}
+                  {b.description && (
+                    <div className="rh__desc" title={b.description}>
+                      {b.description.length > 140 ? b.description.slice(0, 140) + "…" : b.description}
+                    </div>
+                  )}
+                </div>
+                <div className="rh__rowRight">
+                  {confirmBedId === b.id ? (
+                    <>
+                      <span className="rh__badge">Удалить?</span>
+                      <button
+                        className="rh__btn rh__btn--secondary"
+                        onClick={() => onDeleteBed(b.id)}
+                        disabled={deletingId === b.id}
+                      >
+                        Да
+                      </button>
+                      <button
+                        className="rh__btn rh__btn--secondary"
+                        onClick={() => setConfirmBedId(null)}
+                        disabled={deletingId === b.id}
+                      >
+                        Нет
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="rh__btn rh__btn--secondary" onClick={() => openBedEdit(b)}>Изменить</button>
+                      <button className="rh__btn rh__btn--secondary" onClick={() => setConfirmBedId(b.id)}>Удалить</button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="rh__rowRight">
-                {confirmBedId === b.id ? (
-                  <>
-                    <span className="rh__badge">Удалить?</span>
-                    <button
-                      className="rh__btn rh__btn--secondary"
-                      onClick={() => onDeleteBed(b.id)}
-                      disabled={deletingId === b.id}
-                    >
-                      Да
-                    </button>
-                    <button
-                      className="rh__btn rh__btn--secondary"
-                      onClick={() => setConfirmBedId(null)}
-                      disabled={deletingId === b.id}
-                    >
-                      Нет
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button className="rh__btn rh__btn--secondary" onClick={() => openBedEdit(b)}>Изменить</button>
-                    <button className="rh__btn rh__btn--secondary" onClick={() => setConfirmBedId(b.id)}>Удалить</button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-          {filteredBeds.length === 0 && <div className="rh__empty">Ничего не найдено</div>}
-        </div>
-      )}
+            ))}
+            {filteredBeds.length === 0 && <div className="rh__empty">Ничего не найдено</div>}
+          </div>
+        )}
 
       {/* Модал: Комнаты */}
       {hotelModalOpen && (

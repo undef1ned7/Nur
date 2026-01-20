@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import Header from "../Header/Header";
 import { Outlet, useLocation } from "react-router-dom";
@@ -8,7 +8,6 @@ import arnament3 from "../Photo/Group 1215.png";
 import "./Layout.scss";
 import { X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
-import { getCompany } from "../../store/creators/userCreators";
 import { useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
 const useAnnouncement = (company, setHideAnnouncement) => {
@@ -40,7 +39,6 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 };
 
 const Layout = () => {
-  const dispatch = useDispatch();
   const { company } = useUser();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
@@ -58,10 +56,6 @@ const Layout = () => {
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
   const location = useLocation();
   const isCashierPage = location.pathname.startsWith("/crm/market/cashier");
-
-  useEffect(() => {
-    dispatch(getCompany());
-  }, [dispatch]);
 
   useEffect(() => {
     const savedSetting = localStorage.getItem("sidebarAutoClose");
@@ -138,7 +132,7 @@ const Layout = () => {
     if (lan === "en") return "app-en";
   };
   const { t, i18n } = useTranslation();
-  
+
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
     localStorage.setItem("i18nextLng", lng);
@@ -168,9 +162,8 @@ const Layout = () => {
         )}
 
         <div
-          className={`content ${languageFunc()} ${
-            isSidebarOpen && !isCashierPage ? "content--sidebar-open" : ""
-          } ${isCashierPage ? "content--full-width" : ""}`}
+          className={`content ${languageFunc()} ${isSidebarOpen && !isCashierPage ? "content--sidebar-open" : ""
+            } ${isCashierPage ? "content--full-width" : ""}`}
         >
           {daysLeft !== null && !hideAnnouncement && (
             <div className="announcement">

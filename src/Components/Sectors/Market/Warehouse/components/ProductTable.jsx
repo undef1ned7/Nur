@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { formatPrice, formatStock, getPrimaryImage } from "../utils";
 import noImage from "./placeholder.png";
 import "./ProductTable.scss";
@@ -38,9 +38,11 @@ const ProductRow = React.memo(
               alt={product.name || "Товар"}
               className="warehouse-table__product-image"
               loading="lazy"
+              decoding="async"
               onError={(e) => {
                 e.currentTarget.src = noImage;
               }}
+
             />
             <span>{product.name || "—"}</span>
           </div>
@@ -81,17 +83,22 @@ const ProductTable = ({
   onProductClick,
   getRowNumber,
 }) => {
-  // Мемоизация вычислений для всех товаров
-  // Используем selectedRows.size вместо selectedRows для более стабильного сравнения
-  const selectedRowsSize = selectedRows.size;
-  const productsData = useMemo(() => {
-    return products.map((product, index) => ({
-      product,
-      primaryImage: getPrimaryImage(product),
-      isSelected: selectedRows.has(product.id),
-      rowNumber: getRowNumber(index, products.length),
-    }));
-  }, [products, selectedRows, selectedRowsSize, getRowNumber]);
+  // Мемоизация вычислений для всех товаров (критическая оптимизация)
+  const primaryImagesMap = useMemo(() => {
+    const map = new Map();
+    products.forEach(product => {
+      map.set(product.id, getPrimaryImage(product));
+    });
+    return map;
+  }, [products]);
+
+  const rowNumbers = useMemo(() => {
+    return products.map((_, index) => getRowNumber(index, products.length));
+  }, [products, getRowNumber]);
+
+  const isSelected = useCallback((id) => {
+    return selectedRows.has(id);
+  }, [selectedRows]);
 
   // Показываем старые данные во время загрузки (оптимистичное обновление)
   // Только если данных нет вообще - показываем загрузку
@@ -156,13 +163,13 @@ const ProductTable = ({
           </tr>
         </thead>
         <tbody>
-          {productsData.map((productData) => (
+          {products.map((productData, index) => (
             <ProductRow
-              key={productData.product.id}
-              product={productData.product}
-              primaryImage={productData.primaryImage}
-              isSelected={productData.isSelected}
-              rowNumber={productData.rowNumber}
+              key={productData.id}
+              product={productData}
+              primaryImage={primaryImagesMap.get(productData.id)}
+              isSelected={isSelected(productData.id)}
+              rowNumber={rowNumbers[index]}
               onRowSelect={onRowSelect}
               onProductClick={onProductClick}
             />

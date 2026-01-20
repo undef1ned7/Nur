@@ -9,7 +9,6 @@ import SubmitApplication from "../Components/pages/SubmitApplication/SubmitAppli
 import ApplicationList from "../Components/pages/SubmitApplication/ApplicationList";
 
 // Layout
-import Layout from "../Components/Layout/Layout";
 
 // Common pages
 import Set from "../Components/pages/Info/Settings/Settings";
@@ -174,6 +173,21 @@ const createProtectedRoute = (path, Component) => (
 );
 
 
+/**
+ * Создает защищенный Layout
+ */
+const createProtectedLayoute = (path, children) => (
+  <Route
+    key={path}
+    path={path}
+    element={
+      <ProtectedRoute>
+        {children}
+      </ProtectedRoute>
+    }
+  />
+);
+
 
 
 
@@ -187,7 +201,7 @@ export const publicRoutes = [
 
 
 
-    // ✅ Публичное онлайн-меню кафе по slug
+  // ✅ Публичное онлайн-меню кафе по slug
   //     <Route
   //   key="/catalog/:slug"
   //   path="/catalog/:slug"
@@ -252,9 +266,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-        createProtectedRoute("kassa/*", Kassa),
-        createProtectedRoute("kassa/:id", KassaDet),
-      ]
+      createProtectedRoute("kassa/*", Kassa),
+      createProtectedRoute("kassa/:id", KassaDet),
+    ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
