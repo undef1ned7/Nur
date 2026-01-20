@@ -1,7 +1,6 @@
 /* RecordaRates.scss */
-@import "../../styles/barbershop.scss";
-@import "../../../../common/SearchableCombobox/SearchableCombobox.scss";
-@include searchable-combo("barberrecordarates__combo");
+@use "../../styles/barbershop.scss";
+@use "../../../../common/SearchableCombobox/SearchableCombobox.scss";
 
 .barberrecordarates,
 .barberrecordarates * {
