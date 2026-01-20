@@ -11,7 +11,7 @@ import {
 // Регистрируем шрифты Roboto из public папки (как в InvoicePdfDocument)
 let robotoRegistered = false;
 try {
-  const fontBase = process.env.PUBLIC_URL || "";
+  const fontBase = import.meta.env.PUBLIC_URL || "";
   const regularPath = fontBase
     ? `${fontBase}/fonts/roboto/Roboto-Regular.ttf`
     : "/fonts/roboto/Roboto-Regular.ttf";

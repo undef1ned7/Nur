@@ -2,7 +2,7 @@ import axios from "axios";
 import "../i18n.js"
 import "../i18n"
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL || "https://app.nurcrm.kg/api",
+  baseURL: import.meta.env.VITE_API_URL || "https://app.nurcrm.kg/api",
   timeout: 20000,
   headers: {
     "Content-Type": "application/json",

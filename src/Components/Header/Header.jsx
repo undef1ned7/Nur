@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { Bell, Menu, ShoppingCart } from "lucide-react";
@@ -95,7 +95,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const { company, profile: userProfile } = useUser();
 
   const [showNotifications, setShowNotifications] = useState(false);
-  const [profile, setProfile] = useState(null);
+  // const [profile, setProfile] = useState(null);
 
   // Проверяем, является ли сектор маркетом
   const isMarketSector = useMemo(() => {
@@ -114,36 +114,36 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     return userProfile.can_view_cashier === true;
   }, [userProfile]);
 
-  const fetchProfile = async () => {
-    try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) return;
+  // const fetchProfile = async () => {
+  //   try {
+  //     const token = localStorage.getItem("accessToken");
+  //     if (!token) return;
 
-      const response = await fetch("https://app.nurcrm.kg/api/users/profile/", {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  //     const response = await fetch("https://app.nurcrm.kg/api/users/profile/", {
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //         Authorization: `Bearer ${token}`,
+  //       },
+  //     });
 
-      if (response.ok) {
-        const data = await response.json();
-        setProfile(data);
-      } else {
-        console.error("Ошибка загрузки профиля");
-      }
-    } catch (err) {
-      console.error("Ошибка запроса профиля:", err);
-    }
-  };
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       setProfile(data);
+  //     } else {
+  //       console.error("Ошибка загрузки профиля");
+  //     }
+  //   } catch (err) {
+  //     console.error("Ошибка запроса профиля:", err);
+  //   }
+  // };
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  // useEffect(() => {
+  //   fetchProfile();
+  // }, []);
 
-  const usernameToDisplay = profile
-    ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() ||
-      profile.email
+  const usernameToDisplay = userProfile
+    ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() ||
+    userProfile.email
     : "Гость";
 
   return (

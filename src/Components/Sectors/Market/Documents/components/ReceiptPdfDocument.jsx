@@ -9,7 +9,7 @@ import {
 } from "@react-pdf/renderer";
 
 // Регистрируем шрифты
-const BASE = process.env.PUBLIC_URL || ""; // Для CRA/Vite
+const BASE = import.meta.env.PUBLIC_URL || ""; // Для CRA/Vite
 
 Font.register({
   family: "Roboto",
