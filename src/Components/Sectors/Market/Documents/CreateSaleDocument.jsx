@@ -4,10 +4,7 @@ import {
   createWarehouseDocument,
   fetchWarehouses,
 } from "../../../../store/creators/warehouseThunk";
-import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
-import { useUser } from "../../../../store/slices/userSlice";
-import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import { useCash } from "../../../../store/slices/cashSlice";
