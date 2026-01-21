@@ -1,26 +1,24 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import {
-  Search,
-  Plus,
-  Check,
-  X,
-  ChevronDown,
-  Pencil,
-  Folder,
-} from "lucide-react";
-import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { pdf } from "@react-pdf/renderer";
-import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
-import InvoicePdfDocument from "./components/InvoicePdfDocument";
+import {
+  Check,
+  ChevronDown,
+  Folder,
+  Pencil,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import InvoicePdfDocument from "./components/InvoicePdfDocument";
+import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
 import "./CreateSaleDocument.scss";
-import { useAlert } from "../../../../hooks/useDialog";
-import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
