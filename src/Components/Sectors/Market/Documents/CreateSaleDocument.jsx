@@ -1,17 +1,14 @@
 import { pdf } from "@react-pdf/renderer";
 import {
-  Check,
-  ChevronDown,
-  Folder,
-  Pencil,
-  Plus,
-  Search,
-  X,
-} from "lucide-react";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
-import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
+  fetchWarehouseCounterparties,
+  createWarehouseDocument,
+  fetchWarehouses,
+} from "../../../../store/creators/warehouseThunk";
+import { useCash } from "../../../../store/slices/cashSlice";
+import { useCounterparty } from "../../../../store/slices/counterpartySlice";
+import { useUser } from "../../../../store/slices/userSlice";
+import "./CreateSaleDocument.scss";
+import { useAlert } from "../../../../hooks/useDialog";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";

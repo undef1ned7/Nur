@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Button, Grid, TextField } from "@mui/material";
 
-const FileInput = ({ onChange, name, label }) => {
+const FileInput = ({ onChange, name, label, ...attrs }) => {
   const inputRef = useRef(null);
   const [fileName, setFileName] = useState("");
 
@@ -24,6 +24,7 @@ const FileInput = ({ onChange, name, label }) => {
         name={name}
         onChange={onFileChange}
         ref={inputRef}
+        {...attrs}
       />
       <Grid
         container
