@@ -10,25 +10,29 @@ import {
   Pencil,
   Folder,
 } from "lucide-react";
-import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { pdf } from "@react-pdf/renderer";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
-import { fetchProductsAsync } from "../../../../store/creators/productCreators";
+import {
+  fetchWarehouseProducts,
+  fetchWarehouseCounterparties,
+  fetchWarehouses,
+  postWarehouseDocument,
+} from "../../../../store/creators/warehouseThunk";
+import warehouseAPI from "../../../../api/warehouse";
 import { useCash } from "../../../../store/slices/cashSlice";
-import { useClient } from "../../../../store/slices/ClientSlice";
+import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
-import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { company, profile: userProfile } = useUser();
   const { list: cashBoxes } = useCash();
-  const { list: clients } = useClient();
-
+  const { list: counterparties } = useCounterparty();
+  const alert = useAlert()
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
   const [products, setProducts] = useState([]);
@@ -37,8 +41,11 @@ const CreateSaleDocument = () => {
   const [showMoreProducts, setShowMoreProducts] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
 
+  const [warehouses, setWarehouses] = useState([]);
   const [warehouse, setWarehouse] = useState("");
+  const [warehouseTo, setWarehouseTo] = useState("");
   const [clientId, setClientId] = useState("");
+  const [docType, setDocType] = useState("SALE");
   const [activeTab, setActiveTab] = useState("products");
   const [documentSearch, setDocumentSearch] = useState("");
   const [isDocumentPosted, setIsDocumentPosted] = useState(false);
@@ -88,22 +95,18 @@ const CreateSaleDocument = () => {
     };
   }, [productSearch]);
 
-  // Загрузка товаров
+  // Загрузка товаров через новый warehouse API
   useEffect(() => {
     const loadProducts = async () => {
       setProductsLoading(true);
       try {
-        const result = await dispatch(fetchProductsAsync({
-          search: debouncedProductSearch || undefined,
-          page_size: showMoreProducts ? 50 : 20,
-        }));
-        // const result = await dispatch(
-        //   fetchWarehouseProducts({
-        //     search: debouncedProductSearch || undefined,
-        //     page_size: showMoreProducts ? 50 : 20,
-        //   })
-        // );
-        if (fetchProductsAsync.fulfilled.match(result)) {
+        const result = await dispatch(
+          fetchWarehouseProducts({
+            search: debouncedProductSearch || undefined,
+            page_size: showMoreProducts ? 50 : 20,
+          })
+        );
+        if (fetchWarehouseProducts.fulfilled.match(result)) {
           // Обрабатываем стандартный формат DRF пагинации
           setProducts(result.payload?.results || (Array.isArray(result.payload) ? result.payload : []));
         }
@@ -116,9 +119,25 @@ const CreateSaleDocument = () => {
     loadProducts();
   }, [dispatch, debouncedProductSearch, showMoreProducts]);
 
-  // Загрузка клиентов
+  // Загрузка контрагентов через warehouse API
   useEffect(() => {
-    dispatch(fetchClientsAsync({ type: "client" }));
+    // Загружаем всех контрагентов (CLIENT, SUPPLIER, BOTH)
+    dispatch(fetchWarehouseCounterparties());
+  }, [dispatch]);
+
+  // Загрузка складов через новый warehouse API
+  useEffect(() => {
+    const loadWarehouses = async () => {
+      try {
+        const result = await dispatch(fetchWarehouses());
+        if (fetchWarehouses.fulfilled.match(result)) {
+          setWarehouses(result.payload?.results || (Array.isArray(result.payload) ? result.payload : []));
+        }
+      } catch (error) {
+        console.error("Ошибка загрузки складов:", error);
+      }
+    };
+    loadWarehouses();
   }, [dispatch]);
 
   // Синхронизация выбранных товаров с товарами в корзине
@@ -138,11 +157,34 @@ const CreateSaleDocument = () => {
     }
   }, [cartItems]);
 
-  // Фильтрация клиентов
-  const filterClient = useMemo(
-    () => (clients || []).filter((c) => c.type === "client"),
-    [clients]
-  );
+  // Фильтрация контрагентов в зависимости от типа документа
+  const filteredCounterparties = useMemo(() => {
+    const all = counterparties || [];
+    // Для SALE, SALE_RETURN, PURCHASE, PURCHASE_RETURN нужны контрагенты
+    if (["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType)) {
+      return all.filter((c) => {
+        if (docType === "SALE" || docType === "SALE_RETURN") {
+          return c.type === "CLIENT" || c.type === "BOTH";
+        }
+        if (docType === "PURCHASE" || docType === "PURCHASE_RETURN") {
+          return c.type === "SUPPLIER" || c.type === "BOTH";
+        }
+        return true;
+      });
+    }
+    // Для других типов документов показываем всех
+    return all;
+  }, [counterparties, docType]);
+
+  // Определяем, требуется ли контрагент для текущего типа документа
+  const isCounterpartyRequired = useMemo(() => {
+    return ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType);
+  }, [docType]);
+
+  // Определяем, требуется ли второй склад (для TRANSFER)
+  const isWarehouseToRequired = useMemo(() => {
+    return docType === "TRANSFER";
+  }, [docType]);
 
   // Фильтрация товаров в документе
   const filteredDocumentItems = useMemo(() => {
@@ -161,7 +203,7 @@ const CreateSaleDocument = () => {
       (sum, item) =>
         sum +
         (Number(item.price || item.unit_price) || 0) *
-        (Number(item.quantity) || 0),
+          (Number(item.quantity) || 0),
       0
     );
 
@@ -259,18 +301,27 @@ const CreateSaleDocument = () => {
 
   // Изменение количества товара
   const handleQuantityChange = (itemId, newQuantity) => {
+    const item = cartItems.find((i) => i.id === itemId);
+    if (!item) return;
+
     const qty = Number(newQuantity);
-    if (qty <= 0) {
+    if (qty <= 0 || isNaN(qty)) {
       // Удаляем товар из корзины
       setCartItems((prev) => prev.filter((item) => item.id !== itemId));
-    } else {
-      // Обновляем количество товара
-      setCartItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId ? { ...item, quantity: qty } : item
-        )
-      );
+      return;
     }
+
+    // Для piece items (шт) qty должно быть целым числом
+    const unit = item.unit || "шт";
+    const isPiece = unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
+    const finalQty = isPiece ? Math.floor(qty) : qty;
+
+    // Обновляем количество товара
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, quantity: finalQty } : item
+      )
+    );
   };
 
   // Удаление товара
@@ -278,31 +329,114 @@ const CreateSaleDocument = () => {
     setCartItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
-  // Сохранение документа
-  const handleSave = async () => {
+  // Валидация данных документа перед отправкой
+  const validateDocumentData = () => {
+    // Проверка товаров
     if (!cartItems || cartItems.length === 0) {
-      alert("Добавьте товары в документ");
-      return;
+      return { valid: false, error: "Добавьте товары в документ" };
     }
 
+    // Валидация каждого товара
+    for (const item of cartItems) {
+      const unit = item.unit || "шт";
+      const isPiece = unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
+      const qty = Number(item.quantity || 0);
+
+      // Для piece items qty должно быть целым числом
+      if (isPiece && !Number.isInteger(qty)) {
+        return {
+          valid: false,
+          error: `Для товара "${item.productName || item.name}" количество должно быть целым числом (единица измерения: ${unit})`,
+        };
+      }
+
+      // Проверка discount_percent в диапазоне 0-100
+      const discountPercent = Number(item.discount_percent || item.discount || 0);
+      if (discountPercent < 0 || discountPercent > 100) {
+        return {
+          valid: false,
+          error: `Скидка для товара "${item.productName || item.name}" должна быть в диапазоне 0-100%`,
+        };
+      }
+    }
+
+    // Проверка склада
     if (!warehouse) {
-      alert("Выберите склад");
-      return;
+      return { valid: false, error: "Выберите склад" };
     }
 
+    // Проверка склада получателя для TRANSFER
     if (isWarehouseToRequired && !warehouseTo) {
-      alert("Выберите склад получатель");
-      return;
+      return { valid: false, error: "Выберите склад получатель" };
     }
 
     if (isWarehouseToRequired && warehouse === warehouseTo) {
-      alert("Склад отправитель и склад получатель должны быть разными");
-      return;
+      return {
+        valid: false,
+        error: "Склад отправитель и склад получатель должны быть разными",
+      };
     }
 
+    // Проверка контрагента
     if (isCounterpartyRequired && !clientId) {
-      const counterpartyLabel = docType === "SALE" || docType === "SALE_RETURN" ? "клиента" : "поставщика";
-      alert(`Выберите ${counterpartyLabel}`);
+      const counterpartyLabel =
+        docType === "SALE" || docType === "SALE_RETURN" ? "клиента" : "поставщика";
+      return { valid: false, error: `Выберите ${counterpartyLabel}` };
+    }
+
+    return { valid: true };
+  };
+
+  // Форматирование ошибок от API
+  const formatApiError = (error) => {
+    if (!error) return "Неизвестная ошибка";
+
+    // Обработка поле-специфичных ошибок: {"field": ["error1", ...]}
+    if (typeof error === "object" && !error.detail && !error.message) {
+      const fieldErrors = Object.entries(error)
+        .map(([field, messages]) => {
+          const msgArray = Array.isArray(messages) ? messages : [messages];
+          return `${field}: ${msgArray.join(", ")}`;
+        })
+        .join("; ");
+      return fieldErrors || "Ошибка валидации";
+    }
+
+    // Обработка detail или message
+    return error.detail || error.message || "Ошибка при сохранении документа";
+  };
+
+  // Вспомогательный хелпер: выбор правильного эндпоинта для создания документа по типу
+  const createDocumentByType = async (payload) => {
+    switch (docType) {
+      case "SALE":
+        return warehouseAPI.createSaleDocument(payload);
+      case "PURCHASE":
+        return warehouseAPI.createPurchaseDocument(payload);
+      case "SALE_RETURN":
+        return warehouseAPI.createSaleReturnDocument(payload);
+      case "PURCHASE_RETURN":
+        return warehouseAPI.createPurchaseReturnDocument(payload);
+      case "INVENTORY":
+        return warehouseAPI.createInventoryDocument(payload);
+      case "RECEIPT":
+        return warehouseAPI.createReceiptDocument(payload);
+      case "WRITE_OFF":
+        return warehouseAPI.createWriteOffDocument(payload);
+      case "TRANSFER":
+        return warehouseAPI.createTransferDocument(payload);
+      default:
+        // Фолбэк на общий эндпоинт /documents/
+        return warehouseAPI.createDocument(payload);
+    }
+  };
+
+  // Сохранение документа (без печати)
+  const handleSave = async () => {
+    // Валидация перед отправкой
+    const validation = validateDocumentData();
+    if (!validation.valid) {
+      alert(validation.error);
       return;
     }
 
@@ -314,40 +448,70 @@ const CreateSaleDocument = () => {
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
         comment: comment || "",
-        items: cartItems.map((item) => ({
-          product: item.productId,
-          qty: String(item.quantity || 1),
-          price: String((item.price || item.unit_price || 0).toFixed(2)),
-          discount_percent: String(item.discount_percent || item.discount || 0),
-        })),
+        items: cartItems.map((item) => {
+          const unit = item.unit || "шт";
+          const isPiece =
+            unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
+          const qty = Number(item.quantity || 1);
+          const finalQty = isPiece ? Math.floor(qty) : qty;
+
+          return {
+            product: item.productId,
+            qty: String(finalQty),
+            price: String((item.price || item.unit_price || 0).toFixed(2)),
+            discount_percent: String(
+              Math.max(
+                0,
+                Math.min(100, Number(item.discount_percent || item.discount || 0))
+              )
+            ),
+          };
+        }),
       };
 
-      const result = await dispatch(createWarehouseDocument(documentData));
-
-      if (createWarehouseDocument.fulfilled.match(result)) {
-        // Документ успешно создан
-        alert("Документ успешно сохранен");
-
-        // Очищаем корзину
-        setCartItems([]);
-        setSelectedProductIds(new Set());
-        setClientId("");
-        setWarehouseTo("");
-        setDocumentDiscount("");
-        setComment("");
-        setDocumentSearch("");
-
-        // Переходим на страницу документов
-        navigate("/crm/market/documents");
-      } else {
-        // Ошибка при создании
-        const error = result.payload || result.error;
-        const errorMessage = error?.detail || error?.message || "Ошибка при сохранении документа";
+      // Используем типовой эндпоинт для соответствующего doc_type
+      let createdDocument;
+      try {
+        createdDocument = await createDocumentByType(documentData);
+      } catch (err) {
+        const errData = err?.response?.data || err;
+        const errorMessage = formatApiError(errData);
         alert("Ошибка: " + errorMessage);
+        return;
       }
+
+      // Если документ должен быть проведен, вызываем POST /documents/{id}/post/
+      if (isDocumentPosted) {
+        const postResult = await dispatch(
+          postWarehouseDocument({ id: createdDocument.id, allowNegative: false })
+        );
+        if (!postWarehouseDocument.fulfilled.match(postResult)) {
+          const postError = postResult.payload || postResult.error;
+          alert(
+            "Документ создан, но не проведен: " + formatApiError(postError)
+          );
+          navigate("/crm/warehouse/documents");
+          return;
+        }
+      }
+
+      alert(
+        "Документ успешно сохранен" + (isDocumentPosted ? " и проведен" : "")
+      );
+
+      // Очищаем локальное состояние
+      setCartItems([]);
+      setSelectedProductIds(new Set());
+      setClientId("");
+      setWarehouseTo("");
+      setDocumentDiscount("");
+      setComment("");
+      setDocumentSearch("");
+
+      navigate("/crm/warehouse/documents");
     } catch (error) {
       console.error("Ошибка при сохранении документа:", error);
-      alert("Ошибка: " + (error.message || "Не удалось сохранить документ"));
+      alert("Ошибка: " + formatApiError(error?.response?.data || error));
     }
   };
 
@@ -368,8 +532,10 @@ const CreateSaleDocument = () => {
 
   // Сохранение и печать
   const handleSaveAndPrint = async (printType) => {
-    if (!cartItems || cartItems.length === 0) {
-      alert("Добавьте товары в документ");
+    // Используем ту же валидацию, что и для handleSave
+    const validation = validateDocumentData();
+    if (!validation.valid) {
+      alert(validation.error);
       return;
     }
 
@@ -381,36 +547,60 @@ const CreateSaleDocument = () => {
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
         comment: comment || "",
-        items: cartItems.map((item) => ({
-          product: item.productId,
-          qty: String(item.quantity || 1),
-          price: String((item.price || item.unit_price || 0).toFixed(2)),
-          discount_percent: String(item.discount_percent || item.discount || 0),
-        })),
+        items: cartItems.map((item) => {
+          const unit = item.unit || "шт";
+          const isPiece = unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
+          const qty = Number(item.quantity || 1);
+          const finalQty = isPiece ? Math.floor(qty) : qty;
+
+          return {
+            product: item.productId,
+            qty: String(finalQty),
+            price: String((item.price || item.unit_price || 0).toFixed(2)),
+            discount_percent: String(
+              Math.max(0, Math.min(100, Number(item.discount_percent || item.discount || 0)))
+            ),
+          };
+        }),
       };
 
-      const createResult = await dispatch(createWarehouseDocument(documentData));
-
-      if (!createWarehouseDocument.fulfilled.match(createResult)) {
-        const error = createResult.payload || createResult.error;
-        const errorMessage = error?.detail || error?.message || "Ошибка при создании документа";
+      // Создаём документ через типовой эндпоинт
+      let createdDocument;
+      try {
+        createdDocument = await createDocumentByType(documentData);
+      } catch (err) {
+        const errData = err?.response?.data || err;
+        const errorMessage = formatApiError(errData);
         alert("Ошибка: " + errorMessage);
         return;
       }
 
-      const createdDocument = createResult.payload;
+      // При сохранении и печати тоже уважаем флаг «Документ проведён»
+      if (isDocumentPosted) {
+        const postResult = await dispatch(
+          postWarehouseDocument({ id: createdDocument.id, allowNegative: false })
+        );
+        if (!postWarehouseDocument.fulfilled.match(postResult)) {
+          const postError = postResult.payload || postResult.error;
+          alert(
+            "Документ создан, но не проведен: " + formatApiError(postError)
+          );
+          navigate("/crm/warehouse/documents");
+          return;
+        }
+      }
 
       // Получаем данные компании и контрагента
       const selectedCounterparty = filteredCounterparties.find((c) => c.id === clientId);
       const warehouseName = warehouse
         ? warehouses.find((w) => w.id === warehouse)?.name ||
-        cashBoxes?.find((b) => b.id === warehouse)?.name ||
-        warehouse
+          cashBoxes?.find((b) => b.id === warehouse)?.name ||
+          warehouse
         : null;
       const warehouseToName = warehouseTo
         ? warehouses.find((w) => w.id === warehouseTo)?.name ||
-        cashBoxes?.find((b) => b.id === warehouseTo)?.name ||
-        warehouseTo
+          cashBoxes?.find((b) => b.id === warehouseTo)?.name ||
+          warehouseTo
         : null;
 
       // Получаем скидку по документу
@@ -450,23 +640,25 @@ const CreateSaleDocument = () => {
         };
       });
 
-      // Формируем номер документа
-      const docNumber = documentId.substring(0, 8) || "00001";
-      const currentDate = documentDateValue
-        ? new Date(documentDateValue)
+      // Используем данные из созданного документа
+      const docNumber = createdDocument.number || documentId.substring(0, 8) || "00001";
+      const currentDate = createdDocument.date || documentDateValue
+        ? new Date(createdDocument.date || documentDateValue)
         : new Date();
 
       if (printType === "invoice") {
         // Формируем данные для накладной
         const invoiceData = {
+          doc_type: docType, // Передаем тип документа
           document: {
             type: "sale_invoice",
+            doc_type: docType,
             title: "Накладная",
-            id: documentId,
+            id: createdDocument.id || documentId,
             number: docNumber,
             date: currentDate.toISOString().split("T")[0],
             datetime: currentDate.toISOString(),
-            created_at: currentDate.toISOString(),
+            created_at: createdDocument.created_at || currentDate.toISOString(),
             discount_percent: discountPercent, // Передаем скидку по документу
           },
           seller: {
@@ -480,18 +672,18 @@ const CreateSaleDocument = () => {
             phone: company?.phone || null,
             email: company?.email || null,
           },
-          buyer: selectedClient
+          buyer: selectedCounterparty
             ? {
-              id: selectedCounterparty.id,
-              name: selectedCounterparty.name || "",
-              inn: selectedCounterparty.inn || "",
-              okpo: selectedCounterparty.okpo || "",
-              score: selectedCounterparty.score || "",
-              bik: selectedCounterparty.bik || "",
-              address: selectedCounterparty.address || "",
-              phone: selectedCounterparty.phone || null,
-              email: selectedCounterparty.email || null,
-            }
+                id: selectedCounterparty.id,
+                name: selectedCounterparty.name || "",
+                inn: selectedCounterparty.inn || "",
+                okpo: selectedCounterparty.okpo || "",
+                score: selectedCounterparty.score || "",
+                bik: selectedCounterparty.bik || "",
+                address: selectedCounterparty.address || "",
+                phone: selectedCounterparty.phone || null,
+                email: selectedCounterparty.email || null,
+              }
             : null,
           items: items,
           totals: {
@@ -501,6 +693,7 @@ const CreateSaleDocument = () => {
             total: String(totals.total.toFixed(2)),
           },
           warehouse: warehouseName,
+          warehouse_to: warehouseToName, // Склад получатель для TRANSFER
         };
 
         // Генерируем PDF накладной
@@ -514,11 +707,11 @@ const CreateSaleDocument = () => {
           document: {
             type: "receipt",
             title: "Товарный чек",
-            id: documentId,
+            id: createdDocument.id || documentId,
             number: docNumber,
             doc_no: docNumber,
             date: currentDate.toISOString().split("T")[0],
-            created_at: currentDate.toISOString(),
+            created_at: createdDocument.created_at || currentDate.toISOString(),
           },
           company: {
             id: company?.id || "",
@@ -530,11 +723,11 @@ const CreateSaleDocument = () => {
             id: userProfile?.id || "",
             name: userProfile?.full_name || userProfile?.name || "",
           },
-          client: selectedClient
+          client: selectedCounterparty
             ? {
-              id: selectedCounterparty.id,
-              full_name: selectedCounterparty.name || "",
-            }
+                id: selectedCounterparty.id,
+                full_name: selectedCounterparty.name || "",
+              }
             : null,
           items: items,
           totals: {
@@ -569,10 +762,15 @@ const CreateSaleDocument = () => {
       setComment("");
       setDocumentSearch("");
 
-      navigate("/crm/market/documents");
+      navigate("/crm/warehouse/documents");
     } catch (error) {
       console.error("Ошибка генерации PDF:", error);
-      alert("Ошибка: " + (error.message || "Не удалось сгенерировать PDF"));
+      // Если это ошибка API, используем formatApiError, иначе обычное сообщение
+      const errorMessage =
+        error?.response?.data || error?.payload || error?.error
+          ? formatApiError(error?.response?.data || error?.payload || error?.error)
+          : error?.message || "Не удалось сгенерировать PDF";
+      alert("Ошибка: " + errorMessage);
     }
   };
 
@@ -610,13 +808,13 @@ const CreateSaleDocument = () => {
           </button>
 
           <div className="create-sale-document__products-list">
-
-            {
-              products?.length === 0 && <div className="create-sale-document__empty">
+            {productsLoading ? (
+              <div className="create-sale-document__loading">Загрузка...</div>
+            ) : products.length === 0 ? (
+              <div className="create-sale-document__empty">
                 Товары не найдены
               </div>
-            }
-            {
+            ) : (
               products.map((product) => {
                 const isSelected = selectedProductIds.has(product.id);
                 const isInCart = cartItems.some(
@@ -626,8 +824,9 @@ const CreateSaleDocument = () => {
                 return (
                   <div
                     key={product.id}
-                    className={`create-sale-document__product-item ${isSelected || isInCart ? "active" : ""
-                      }`}
+                    className={`create-sale-document__product-item ${
+                      isSelected || isInCart ? "active" : ""
+                    }`}
                     onClick={() => handleAddProduct(product.id)}
                     style={{
                       cursor: addingProduct ? "wait" : "pointer",
@@ -643,7 +842,7 @@ const CreateSaleDocument = () => {
                           {formatPrice(product.price)} сом
                         </span>
                         <span className="create-sale-document__product-qty">
-                          {product.quantity || 0} {product.unit || "шт"}
+                          {product.qty_on_hand || 0} {product.unit || "шт"}
                         </span>
                       </div>
                     </div>
@@ -656,12 +855,9 @@ const CreateSaleDocument = () => {
                   </div>
                 );
               })
-            }
+            )}
           </div>
-          
-          {
-            productsLoading && <div className="create-sale-document__loading">Загрузка...</div>
-          }
+
           {products.length > 0 && (
             <button
               className="create-sale-document__show-more"
@@ -748,32 +944,121 @@ const CreateSaleDocument = () => {
           {/* Основной контент */}
           <div className="create-sale-document__content">
             <h2 className="create-sale-document__title">
-              Продажа{" "}
+              {docType === "SALE" && "Продажа"}
+              {docType === "PURCHASE" && "Покупка"}
+              {docType === "SALE_RETURN" && "Возврат продажи"}
+              {docType === "PURCHASE_RETURN" && "Возврат покупки"}
+              {docType === "INVENTORY" && "Инвентаризация"}
+              {docType === "RECEIPT" && "Приход"}
+              {docType === "WRITE_OFF" && "Списание"}
+              {docType === "TRANSFER" && "Перемещение"}
+              {!docType && "Документ"}{" "}
               {documentId ? `#${documentId.slice(0, 8)}` : "(новый документ)"}
             </h2>
 
             <div className="create-sale-document__fields">
               <div className="create-sale-document__field">
-                <label>Клиент</label>
+                <label>Тип документа *</label>
                 <select
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                  required
                 >
-                  <option value="">Выберите клиента</option>
-                  {filterClient.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.full_name || client.name}
-                    </option>
-                  ))}
+                  <option value="SALE">Продажа</option>
+                  <option value="PURCHASE">Покупка</option>
+                  <option value="SALE_RETURN">Возврат продажи</option>
+                  <option value="PURCHASE_RETURN">Возврат покупки</option>
+                  <option value="INVENTORY">Инвентаризация</option>
+                  <option value="RECEIPT">Приход</option>
+                  <option value="WRITE_OFF">Списание</option>
+                  <option value="TRANSFER">Перемещение</option>
                 </select>
               </div>
+              <div className="create-sale-document__field">
+                <label>Склад {isWarehouseToRequired ? "отправитель" : ""} *</label>
+                <select
+                  value={warehouse}
+                  onChange={(e) => setWarehouse(e.target.value)}
+                  required
+                >
+                  <option value="">Выберите склад</option>
+                  {warehouses
+                    .filter((wh) => !isWarehouseToRequired || wh.id !== warehouseTo)
+                    .map((wh) => (
+                      <option key={wh.id} value={wh.id}>
+                        {wh.name || wh.title || wh.id}
+                      </option>
+                    ))}
+                  {/* Также показываем склады из cashBoxes для обратной совместимости */}
+                  {cashBoxes
+                    ?.filter((box) => !isWarehouseToRequired || box.id !== warehouseTo)
+                    ?.map((box) => (
+                      <option key={box.id} value={box.id}>
+                        {box.name || box.title || box.id}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {isWarehouseToRequired && (
+                <div className="create-sale-document__field">
+                  <label>Склад получатель *</label>
+                  <select
+                    value={warehouseTo}
+                    onChange={(e) => setWarehouseTo(e.target.value)}
+                    required
+                  >
+                    <option value="">Выберите склад получатель</option>
+                    {warehouses
+                      .filter((wh) => wh.id !== warehouse)
+                      .map((wh) => (
+                        <option key={wh.id} value={wh.id}>
+                          {wh.name || wh.title || wh.id}
+                        </option>
+                      ))}
+                    {/* Также показываем склады из cashBoxes для обратной совместимости */}
+                    {cashBoxes
+                      ?.filter((box) => box.id !== warehouse)
+                      ?.map((box) => (
+                        <option key={box.id} value={box.id}>
+                          {box.name || box.title || box.id}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+              {isCounterpartyRequired && (
+                <div className="create-sale-document__field">
+                  <label>
+                    Контрагент *{" "}
+                    {(docType === "SALE" || docType === "SALE_RETURN") && "(Клиент)"}
+                    {(docType === "PURCHASE" || docType === "PURCHASE_RETURN") && "(Поставщик)"}
+                  </label>
+                  <select
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    required={isCounterpartyRequired}
+                  >
+                    <option value="">
+                      {docType === "SALE" || docType === "SALE_RETURN"
+                        ? "Выберите клиента"
+                        : "Выберите поставщика"}
+                    </option>
+                    {filteredCounterparties.map((counterparty) => (
+                      <option key={counterparty.id} value={counterparty.id}>
+                        {counterparty.name || "Без названия"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Вкладки */}
             <div className="create-sale-document__tabs">
               <button
-                className={`create-sale-document__tab ${activeTab === "products" ? "active" : ""
-                  }`}
+                className={`create-sale-document__tab ${
+                  activeTab === "products" ? "active" : ""
+                }`}
                 onClick={() => setActiveTab("products")}
               >
                 Товары
@@ -947,11 +1232,11 @@ const CreateSaleDocument = () => {
                     <span>
                       {documentDiscount > 0 || totals.itemsDiscount > 0
                         ? `${(
-                          (totals.totalDiscount / totals.subtotal) *
-                          100
-                        ).toFixed(2)}% (${formatPrice(
-                          totals.totalDiscount
-                        )} сом)`
+                            (totals.totalDiscount / totals.subtotal) *
+                            100
+                          ).toFixed(2)}% (${formatPrice(
+                            totals.totalDiscount
+                          )} сом)`
                         : `% (${formatPrice(0)} сом)`}
                     </span>
                   </div>

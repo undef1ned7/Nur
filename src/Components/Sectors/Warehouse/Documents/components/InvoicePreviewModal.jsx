@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { X, Printer } from "lucide-react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { pdf } from "@react-pdf/renderer";
 
-import { getInvoiceJson } from "../../../../../store/creators/saleThunk";
+import { getWarehouseDocumentById } from "../../../../../store/creators/warehouseThunk";
+import { useUser } from "../../../../../store/slices/userSlice";
 import InvoicePdfDocument from "./InvoicePdfDocument";
 
 import "./InvoicePreviewModal.scss";
@@ -11,14 +12,108 @@ import "./InvoicePreviewModal.scss";
 const InvoicePreviewModal = ({
   invoiceId,
   invoiceData: initialInvoiceData,
+  document: initialDocument,
   onClose,
   onEdit,
 }) => {
   const dispatch = useDispatch();
+  const { company } = useUser();
   const [invoiceData, setInvoiceData] = useState(initialInvoiceData);
-  const [loading, setLoading] = useState(!initialInvoiceData);
+  const [loading, setLoading] = useState(!initialInvoiceData && !initialDocument);
   const [printing, setPrinting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Функция для преобразования warehouse документа в формат для PDF
+  const transformWarehouseDocument = (doc) => {
+    if (!doc) return null;
+
+    // Получаем данные компании
+    const seller = {
+      id: company?.id || "",
+      name: company?.name || "",
+      inn: company?.inn || "",
+      okpo: company?.okpo || "",
+      score: company?.score || "",
+      bik: company?.bik || "",
+      address: company?.address || "",
+      phone: company?.phone || null,
+      email: company?.email || null,
+    };
+
+    // Получаем данные контрагента
+    const buyer = doc.counterparty
+      ? {
+          id: doc.counterparty.id,
+          name: doc.counterparty.name || "",
+          inn: doc.counterparty.inn || "",
+          okpo: doc.counterparty.okpo || "",
+          score: doc.counterparty.score || "",
+          bik: doc.counterparty.bik || "",
+          address: doc.counterparty.address || "",
+          phone: doc.counterparty.phone || null,
+          email: doc.counterparty.email || null,
+        }
+      : null;
+
+    // Преобразуем товары
+    const items = Array.isArray(doc.items)
+      ? doc.items.map((item) => ({
+          id: item.id,
+          name: item.product?.name || item.name || "Товар",
+          qty: String(item.qty || item.quantity || 0),
+          unit_price: String(Number(item.price || 0).toFixed(2)),
+          total: String(Number(item.total || item.qty * item.price || 0).toFixed(2)),
+          unit: item.product?.unit || item.unit || "ШТ",
+          article: item.product?.article || item.article || "",
+          discount_percent: Number(item.discount_percent || 0),
+          price_before_discount: String(Number(item.price || 0).toFixed(2)),
+        }))
+      : [];
+
+    // Вычисляем итоги
+    const subtotal = items.reduce(
+      (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
+      0
+    );
+    const discountTotal = items.reduce(
+      (sum, item) =>
+        sum +
+        (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
+          100,
+      0
+    );
+    const total = subtotal - discountTotal;
+
+    // Получаем название склада
+    const warehouseName = doc.warehouse_from?.name || doc.warehouse?.name || "";
+    const warehouseToName = doc.warehouse_to?.name || "";
+
+    return {
+      doc_type: doc.doc_type || "SALE",
+      document: {
+        type: doc.doc_type?.toLowerCase() || "sale_invoice",
+        doc_type: doc.doc_type || "SALE",
+        title: "Накладная",
+        id: doc.id,
+        number: doc.number || "",
+        date: doc.date || doc.created_at?.split("T")[0] || "",
+        datetime: doc.created_at || doc.date || "",
+        created_at: doc.created_at || "",
+        discount_percent: 0,
+      },
+      seller,
+      buyer,
+      items,
+      totals: {
+        subtotal: String(subtotal.toFixed(2)),
+        discount_total: String(discountTotal.toFixed(2)),
+        tax_total: "0.00",
+        total: String(total.toFixed(2)),
+      },
+      warehouse: warehouseName,
+      warehouse_to: warehouseToName,
+    };
+  };
 
   // Вспомогательная функция для скачивания blob
   const downloadBlob = (blob, filename) => {
@@ -43,14 +138,23 @@ const InvoicePreviewModal = ({
       return;
     }
 
-    // Иначе загружаем данные
+    // Если передан документ из warehouse API, преобразуем его
+    if (initialDocument) {
+      const transformed = transformWarehouseDocument(initialDocument);
+      setInvoiceData(transformed);
+      setLoading(false);
+      return;
+    }
+
+    // Иначе загружаем данные через новый warehouse API
     const loadInvoice = async () => {
       try {
         setLoading(true);
         setError(null);
-        const result = await dispatch(getInvoiceJson(invoiceId));
-        if (result.type === "products/getInvoiceJson/fulfilled") {
-          setInvoiceData(result.payload);
+        const result = await dispatch(getWarehouseDocumentById(invoiceId));
+        if (getWarehouseDocumentById.fulfilled.match(result)) {
+          const transformed = transformWarehouseDocument(result.payload);
+          setInvoiceData(transformed);
         } else {
           setError("Не удалось загрузить накладную");
         }
@@ -65,24 +169,24 @@ const InvoicePreviewModal = ({
     if (invoiceId) {
       loadInvoice();
     }
-  }, [invoiceId, initialInvoiceData, dispatch]);
+  }, [invoiceId, initialInvoiceData, initialDocument, dispatch, company]);
 
   const handlePrint = async () => {
-    if (!invoiceId) return;
+    if (!invoiceId && !invoiceData) return;
 
     setPrinting(true);
     try {
-      // Берём уже загруженный JSON
+      // Берём уже загруженные данные
       let data = invoiceData;
 
       // Если по какой-то причине данных нет — подгружаем
-      if (!data) {
-        const result = await dispatch(getInvoiceJson(invoiceId));
-        if (result.type === "products/getInvoiceJson/fulfilled") {
-          data = result.payload;
-          setInvoiceData(result.payload);
+      if (!data && invoiceId) {
+        const result = await dispatch(getWarehouseDocumentById(invoiceId));
+        if (getWarehouseDocumentById.fulfilled.match(result)) {
+          data = transformWarehouseDocument(result.payload);
+          setInvoiceData(data);
         } else {
-          throw new Error("Не удалось загрузить накладную (JSON)");
+          throw new Error("Не удалось загрузить накладную");
         }
       }
 
@@ -274,8 +378,21 @@ const InvoicePreviewModal = ({
             {/* Заголовок накладной */}
             <div className="invoice-preview-modal__invoice-header">
               <div className="invoice-preview-modal__invoice-title">
-                Расходная накладная № {invoiceNumber || "—"} от{" "}
-                {formatDate(invoiceDate)}
+                {(() => {
+                  const docType = invoiceData?.doc_type || invoiceData?.document?.doc_type || "SALE";
+                  const titles = {
+                    SALE: "Расходная накладная",
+                    PURCHASE: "Приходная накладная",
+                    SALE_RETURN: "Расходная накладная на возврат",
+                    PURCHASE_RETURN: "Приходная накладная на возврат",
+                    INVENTORY: "Бланк инвентаризации",
+                    RECEIPT: "Оприходование",
+                    WRITE_OFF: "Списание",
+                    TRANSFER: "Накладная на перемещение",
+                  };
+                  return titles[docType] || "Накладная";
+                })()}{" "}
+                № {invoiceNumber || "—"} от {formatDate(invoiceDate)}
               </div>
             </div>
 
