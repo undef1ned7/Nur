@@ -156,7 +156,8 @@ import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
 import CreateSaleDocumentForMarket from "../Components/Sectors/Market/Documents/CreateSaleDocumentForMarket";
-// import OnlineCatalog from "../Components/Online/Market/Catalog";
+import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
+import OnlineBooking from "../Components/Sectors/Barber/OnlineBooking/OnlineBooking";
 
 
 /**

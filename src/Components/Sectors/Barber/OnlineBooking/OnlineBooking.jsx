@@ -126,7 +126,6 @@ const OnlineBooking = () => {
   const { company_slug } = useParams();
 
   /* ===== Data state ===== */
-  const [company, setCompany] = useState(null);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [masters, setMasters] = useState([]);
@@ -165,40 +164,34 @@ const OnlineBooking = () => {
         return;
       }
 
-      // Публичные эндпоинты для барбершопа
-      const companyUrl = `/barbershop/public/${slug}/`;
+      // Публичные эндпоинты для барбершопа (согласно swagger)
       const servicesUrl = `/barbershop/public/${slug}/services/`;
-      const mastersUrl = `/barbershop/public/${slug}/barbers/`;
+      const categoriesUrl = `/barbershop/public/${slug}/service-categories/`;
+      const mastersUrl = `/barbershop/public/${slug}/masters/`;
 
-      const [companyRes, servicesData, mastersData] = await Promise.all([
-        api.get(companyUrl).catch((e) => {
-          console.warn("Company endpoint not available:", e?.response?.status);
-          return { data: null };
-        }),
+      const [servicesData, categoriesData, mastersData] = await Promise.all([
         fetchAll(servicesUrl).catch((e) => {
-          console.warn("Services endpoint not available:", e?.response?.status);
+          console.warn("Services endpoint error:", e?.response?.status);
+          return [];
+        }),
+        fetchAll(categoriesUrl).catch((e) => {
+          console.warn("Categories endpoint error:", e?.response?.status);
           return [];
         }),
         fetchAll(mastersUrl).catch((e) => {
-          console.warn("Masters endpoint not available:", e?.response?.status);
+          console.warn("Masters endpoint error:", e?.response?.status);
           return [];
         }),
       ]);
 
-      setCompany(companyRes?.data || null);
       setServices(servicesData || []);
       setMasters(mastersData || []);
 
-      // Extract unique categories from services
-      const catMap = new Map();
-      (servicesData || []).forEach((s) => {
-        const catId = s.category?.id || s.category_id;
-        const catName = s.category?.name || s.category_name || s.category_title;
-        if (catId && catName && !catMap.has(catId)) {
-          catMap.set(catId, { id: catId, name: catName });
-        }
-      });
-      setCategories(Array.from(catMap.values()));
+      // Категории приходят напрямую из API
+      setCategories((categoriesData || []).map((c) => ({
+        id: c.id,
+        name: c.name,
+      })));
 
       // Set default date to today
       if (dates.length > 0) {
@@ -222,7 +215,8 @@ const OnlineBooking = () => {
 
     if (activeCatId !== "all") {
       result = result.filter((s) => {
-        const catId = s.category?.id || s.category_id;
+        // По сваггеру: category - это UUID категории
+        const catId = s.category;
         return String(catId) === String(activeCatId);
       });
     }
@@ -230,13 +224,22 @@ const OnlineBooking = () => {
     const q = searchServices.trim().toLowerCase();
     if (q) {
       result = result.filter((s) => {
-        const name = String(s.service_name || s.name || "").toLowerCase();
-        return name.includes(q);
+        const name = String(s.name || "").toLowerCase();
+        const catName = String(s.category_name || "").toLowerCase();
+        return name.includes(q) || catName.includes(q);
       });
     }
 
     return result;
   }, [services, activeCatId, searchServices]);
+
+  /* ===== Parse duration from time field ===== */
+  const parseDuration = (svc) => {
+    // time может быть "30", "30 мин", "1 час" и т.д.
+    const timeStr = String(svc.time || svc.duration_min || svc.duration || "30");
+    const num = parseInt(timeStr, 10);
+    return Number.isFinite(num) && num > 0 ? num : 30;
+  };
 
   /* ===== Summary ===== */
   const summary = useMemo(() => {
@@ -245,7 +248,7 @@ const OnlineBooking = () => {
 
     selectedServices.forEach((svc) => {
       totalPrice += toNum(svc.price);
-      totalDuration += toNum(svc.duration_min || svc.duration || 30);
+      totalDuration += parseDuration(svc);
     });
 
     return { totalPrice, totalDuration, count: selectedServices.length };
@@ -311,14 +314,13 @@ const OnlineBooking = () => {
       const payload = {
         services: selectedServices.map((s) => ({
           service_id: s.id,
-          title: s.service_name || s.name || "Услуга",
+          title: s.name || "Услуга",
           price: toNum(s.price),
-          duration_min: toNum(s.duration_min || s.duration || 30),
+          duration_min: parseDuration(s),
         })),
         master_id: selectedMaster?.id || null,
-        master_name: selectedMaster
-          ? `${selectedMaster.first_name || ""} ${selectedMaster.last_name || ""}`.trim()
-          : null,
+        master_name: selectedMaster?.full_name || 
+          (selectedMaster ? `${selectedMaster.first_name || ""} ${selectedMaster.last_name || ""}`.trim() : null),
         date: selectedDate,
         time_start: selectedTime + ":00",
         time_end: timeEnd + ":00",
@@ -390,9 +392,7 @@ const OnlineBooking = () => {
           </div>
           <div>
             <h1 className="onlinebooking__title">Онлайн-запись</h1>
-            {company?.name && (
-              <div className="onlinebooking__subtitle">{company.name}</div>
-            )}
+            <div className="onlinebooking__subtitle">Барбершоп</div>
           </div>
         </header>
 
@@ -479,9 +479,9 @@ const OnlineBooking = () => {
                 <div className="onlinebooking__servicesList">
                   {filteredServices.map((svc) => {
                     const isSelected = selectedServices.some((s) => s.id === svc.id);
-                    const name = svc.service_name || svc.name || "Услуга";
+                    const name = svc.name || "Услуга";
                     const price = toNum(svc.price);
-                    const duration = toNum(svc.duration_min || svc.duration || 30);
+                    const duration = parseDuration(svc);
 
                     return (
                       <button
@@ -555,7 +555,8 @@ const OnlineBooking = () => {
 
                   {masters.map((master) => {
                     const isSelected = selectedMaster?.id === master.id;
-                    const name = `${master.first_name || ""} ${master.last_name || ""}`.trim() || "Мастер";
+                    const name = master.full_name || 
+                      `${master.first_name || ""} ${master.last_name || ""}`.trim() || "Мастер";
 
                     return (
                       <button
@@ -573,9 +574,6 @@ const OnlineBooking = () => {
                         </div>
                         <div className="onlinebooking__masterInfo">
                           <div className="onlinebooking__masterName">{name}</div>
-                          {master.specialization && (
-                            <div className="onlinebooking__masterDesc">{master.specialization}</div>
-                          )}
                         </div>
                         <div className="onlinebooking__masterCheck">
                           {isSelected && <FaCheck />}
@@ -713,7 +711,7 @@ const OnlineBooking = () => {
                   <div className="onlinebooking__confirmRow">
                     <span className="onlinebooking__confirmLabel">Услуги:</span>
                     <span className="onlinebooking__confirmValue">
-                      {selectedServices.map((s) => s.service_name || s.name).join(", ")}
+                      {selectedServices.map((s) => s.name).join(", ")}
                     </span>
                   </div>
 
@@ -721,7 +719,7 @@ const OnlineBooking = () => {
                     <span className="onlinebooking__confirmLabel">Мастер:</span>
                     <span className="onlinebooking__confirmValue">
                       {selectedMaster
-                        ? `${selectedMaster.first_name || ""} ${selectedMaster.last_name || ""}`.trim()
+                        ? (selectedMaster.full_name || `${selectedMaster.first_name || ""} ${selectedMaster.last_name || ""}`.trim())
                         : "Любой свободный"}
                     </span>
                   </div>
