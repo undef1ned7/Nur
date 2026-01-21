@@ -295,7 +295,7 @@
     padding: 10px 16px;
     border-radius: 10px;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid transparent;
@@ -431,7 +431,7 @@
 
   &__name {
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 500;
     margin: 0 0 4px;
   }
 
@@ -573,7 +573,7 @@
 
   &__tileCat {
     color: var(--muted);
-    font-weight: 700;
+    font-weight: 500;
     font-size: 12px;
     min-width: 0;
   }
@@ -631,7 +631,7 @@
 
   &__label {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--muted);
 
     &--sm {
@@ -974,7 +974,7 @@
       padding: 0 8px;
       height: 34px;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 500;
 
       svg {
         display: none;
@@ -1941,7 +1941,7 @@
     border-bottom: 1px solid #eef2f7;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--text);
     transition: 0.12s background ease;
 
@@ -1962,7 +1962,7 @@
   &__empty {
     padding: 12px;
     color: var(--muted);
-    font-weight: 700;
+    font-weight: 500;
     text-align: center;
   }
 

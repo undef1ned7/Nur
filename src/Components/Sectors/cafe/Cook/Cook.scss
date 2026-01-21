@@ -31,7 +31,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 500;
     margin: 0;
   }
 
@@ -302,7 +302,7 @@
     padding: 4px 10px;
     border-radius: 6px;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 500;
 
     &--pending {
       background: #fef3c7;
@@ -337,7 +337,7 @@
     background: rgba(15, 23, 42, 0.02);
     color: var(--text);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 500;
     padding: 8px 12px;
     border-radius: 10px;
     cursor: pointer;
@@ -410,7 +410,7 @@
 
   &__rowPrice {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     min-width: 40px;
     text-align: right;
     white-space: nowrap;
@@ -771,7 +771,7 @@
     padding: 10px 12px;
     border-radius: 10px;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 500;
     border: 1px solid rgba(15, 23, 42, 0.12);
     background: rgba(15, 23, 42, 0.04);
     color: var(--text);

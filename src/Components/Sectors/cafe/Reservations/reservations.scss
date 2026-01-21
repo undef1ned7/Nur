@@ -28,7 +28,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--text);
     margin: 0;
   }
@@ -120,7 +120,7 @@
     background: transparent;
     color: var(--muted);
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
@@ -236,7 +236,7 @@
     border-radius: 50%;
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: #fff;
-    font-weight: 700;
+    font-weight: 500;
     font-size: 14px;
     display: grid;
     place-items: center;
@@ -290,7 +290,7 @@
     padding: 6px 10px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     border: 1px solid var(--border);
     background: #fff;
 

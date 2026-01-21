@@ -26,7 +26,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 500;
     margin: 0;
     letter-spacing: 0.2px;
   }
@@ -213,7 +213,7 @@
 
   &__receiptItemQty,
   &__receiptItemPrice {
-    font-weight: 700;
+    font-weight: 500;
     white-space: nowrap;
   }
 
@@ -415,7 +415,7 @@
   }
 
   &__itemTitle {
-    font-weight: 700;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -493,7 +493,7 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    font-weight: 700;
+    font-weight: 500;
   }
 
   &__thumb {
@@ -620,7 +620,7 @@
 
   &__title {
     margin: 0;
-    font-weight: 700;
+    font-weight: 500;
     font-size: 16px;
   }
 
@@ -830,7 +830,7 @@
 }
 
 .cafeOrdersRpanel__title {
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .cafeOrdersRpanel__close {
@@ -928,7 +928,7 @@
 }
 
 .cafeOrdersRpanel__name {
-  font-weight: 700;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1059,7 +1059,7 @@
 
   &__qty,
   &__sum {
-    font-weight: 700;
+    font-weight: 500;
     white-space: nowrap;
   }
 
