@@ -161,11 +161,10 @@ const PendingModal = ({ onClose, onChanged }) => {
   };
 
   // ---------------- ФИЛЬТРАЦИЯ ТОЛЬКО PENDING ----------------
-  const filterReturns = returns.filter((item) => item.status === "pending");
+  const filterReturns = useMemo(() => returns.filter((item) => item.status === "pending"), [returns]);
   // -----------------------------------------------------------
 
   useEffect(() => {
-    dispatch(getProfile());
     dispatch(fetchReturnsAsync());
     // если владелец — тянем все передачи, иначе только по агенту
     dispatch(
@@ -205,9 +204,8 @@ const PendingModal = ({ onClose, onChanged }) => {
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при принятии возвратов: ${
-          error?.message || "неизвестная ошибка"
-        }`,
+        message: `Ошибка при принятии возвратов: ${error?.message || "неизвестная ошибка"
+          }`,
       });
     } finally {
       setAcceptingReturn(null);
@@ -440,9 +438,8 @@ const PendingModal = ({ onClose, onChanged }) => {
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при одобрении корзин: ${
-          e?.message || "неизвестная ошибка"
-        }`,
+        message: `Ошибка при одобрении корзин: ${e?.message || "неизвестная ошибка"
+          }`,
       });
     } finally {
       setActionLoadingId(null);
@@ -578,13 +575,13 @@ const PendingModal = ({ onClose, onChanged }) => {
                           <td data-label="Дата возврата">
                             {group.earliestDate
                               ? group.earliestDate.toLocaleString("ru-RU", {
-                                  timeZone: "Asia/Bishkek",
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
+                                timeZone: "Asia/Bishkek",
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
                               : "—"}
                           </td>
                           <td
@@ -916,9 +913,8 @@ const PendingModal = ({ onClose, onChanged }) => {
           {tabs.map((tab, index) => (
             <button
               key={index}
-              className={`pending-modal__tab ${
-                index === activeTab ? "pending-modal__tab--active" : ""
-              }`}
+              className={`pending-modal__tab ${index === activeTab ? "pending-modal__tab--active" : ""
+                }`}
               onClick={() => handleTabChange(index)}
             >
               {tab.label}
@@ -998,9 +994,8 @@ const ProductionWarehouse = () => {
             return (
               <span
                 key={index}
-                className={`vitrina__tab ${
-                  index === activeTab && "vitrina__tab--active"
-                }`}
+                className={`vitrina__tab ${index === activeTab && "vitrina__tab--active"
+                  }`}
                 style={{ cursor: "pointer" }}
                 onClick={() => setActiveTab(index)}
               >
@@ -1156,9 +1151,8 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при одобрении корзины: ${
-          e?.message || "неизвестная ошибка"
-        }`,
+        message: `Ошибка при одобрении корзины: ${e?.message || "неизвестная ошибка"
+          }`,
       });
     } finally {
       setActionLoadingId(null);
@@ -1287,8 +1281,7 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
                     <td data-label="№">{idx + 1}</td>
                     <td data-label="Агент">
                       {cart?.agent_name ||
-                        `${cart?.agent?.first_name || ""} ${
-                          cart?.agent?.last_name || ""
+                        `${cart?.agent?.first_name || ""} ${cart?.agent?.last_name || ""
                         }`}
                     </td>
                     <td data-label="Клиент">

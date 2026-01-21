@@ -7,7 +7,7 @@ import {
   LayoutGrid,
   Table2,
 } from "lucide-react";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 /* ---- Thunks / Creators ---- */
@@ -66,11 +66,14 @@ import FileInput from "./FileInput/FileInput";
 import "../../../Deposits/Sklad/Sklad.scss";
 import "./finishedGoods.scss";
 import noImage from "../../Market/Warehouse/components/placeholder.png";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import { useErrorModal } from "../../../../hooks/useDialog";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
    ============================================================ */
 const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
+  const error = useErrorModal()
   const dispatch = useDispatch();
   const { company } = useUser();
 
@@ -241,26 +244,26 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     setSupplier((prev) => ({ ...prev, [name]: value }));
   };
 
-  const createSupplier = async (e) => {
+  const createSupplier = useCallback(async (e) => {
     e.preventDefault();
     if (!supplier.full_name?.trim()) {
-      alert("Укажите ФИО поставщика");
+      error("Укажите ФИО поставщика");
       return;
     }
     try {
       await dispatch(createClientAsync(supplier)).unwrap();
       setShowSupplierForm(false);
     } catch (err) {
-      alert(`Не удалось создать поставщика: ${err?.message || "ошибка"}`);
+      error(`Не удалось создать поставщика: ${err?.message || "ошибка"}`);
     }
-  };
+  }, [supplier]);
 
   // Рецепт — выбор/изменение/удаление
   // ВАЖНО: Добавление сырья ВСЕГДА разрешено, независимо от:
   // - количества сырья на складе (даже если 0)
   // - количества товара (можно добавить до указания количества)
   // - недостаточности сырья (показывается предупреждение, но не блокируется)
-  const toggleRecipeItem = (materialId) => {
+  const toggleRecipeItem = useCallback((materialId) => {
     // Защита от отсутствия ID
     if (materialId === null || materialId === undefined || materialId === "") {
       return;
@@ -300,19 +303,18 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         // Но добавление НЕ блокируется!
         if (units > 0 && totalNeeded > availableQty) {
           setTimeout(() => {
-            alert(
-              `Внимание: может быть недостаточно сырья "${
-                material.name || material.title || `#${material.id}`
+            error(
+              `Внимание: может быть недостаточно сырья "${material.name || material.title || `#${material.id}`
               }"!\n` +
-                `Доступно: ${availableQty}\n` +
-                `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
-                `Вы можете изменить количество сырья в списке выбранных материалов.`
+              `Доступно: ${availableQty}\n` +
+              `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+              `Вы можете изменить количество сырья в списке выбранных материалов.`
             );
           }, 100);
         }
       }
     }
-  };
+  }, [recipeMap]);
 
   const changeRecipeQty = (materialId, qty) => {
     // Защита от отсутствия ID
@@ -333,13 +335,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
     // Блокируем только если количество товара указано и сырья действительно недостаточно
     if (material && units > 0 && totalNeeded > availableQty) {
-      alert(
-        `Недостаточно сырья "${
-          material.name || material.title || `#${material.id}`
+      error(
+        `Недостаточно сырья "${material.name || material.title || `#${material.id}`
         }"!\n` +
-          `Доступно: ${availableQty}\n` +
-          `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
-          `Пожалуйста, уменьшите количество сырья или количество товара.`
+        `Доступно: ${availableQty}\n` +
+        `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+        `Пожалуйста, уменьшите количество сырья или количество товара.`
       );
       return;
     }
@@ -380,7 +381,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       ([k]) => product[k] === "" || product[k] === null
     );
     if (missed.length) {
-      alert("Пожалуйста, заполните все обязательные поля.");
+      error("Пожалуйста, заполните все обязательные поля.");
       return false;
     }
 
@@ -393,7 +394,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         );
 
         if (!material) {
-          alert(`Сырьё с ID ${recipeItem.materialId} не найдено.`);
+          error(`Сырьё с ID ${recipeItem.materialId} не найдено.`);
           return false;
         }
 
@@ -402,12 +403,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         const totalNeeded = requestedQty * units;
 
         if (totalNeeded > availableQty) {
-          alert(
-            `Недостаточно сырья "${
-              material.name || material.title || `#${material.id}`
+          error(
+            `Недостаточно сырья "${material.name || material.title || `#${material.id}`
             }"!\n` +
-              `Доступно: ${availableQty}\n` +
-              `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)`
+            `Доступно: ${availableQty}\n` +
+            `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)`
           );
           return false;
         }
@@ -518,7 +518,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     } catch (err) {
       setCreating(false);
       setCreateError(err);
-      alert(
+      error(
         `Ошибка при добавлении товара: ${err?.message || "неизвестная ошибка"}`
       );
     }
@@ -946,6 +946,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                     onChange={(e) =>
                       handleImageChange(idx, e.target.files?.[0] || null)
                     }
+                    accept={`image/*`}
                     name="image"
                     label="Image"
                   />
@@ -976,8 +977,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               {materialsOpen
                 ? "Скрыть список"
                 : materialsLoading
-                ? "Загрузка…"
-                : "+ Добавить сырьё"}
+                  ? "Загрузка…"
+                  : "+ Добавить сырьё"}
             </button>
           </div>
 
@@ -2112,8 +2113,7 @@ const TransferProductModal = ({
     } catch (error) {
       console.error("Transfer creation failed:", error);
       alert(
-        `Ошибка при создании передачи: ${
-          error?.message || "неизвестная ошибка"
+        `Ошибка при создании передачи: ${error?.message || "неизвестная ошибка"
         }`
       );
     }
@@ -2200,12 +2200,11 @@ const TransferProductModal = ({
                   </div>
                   <button
                     type="button"
-                    className={`finished-goods-modal__add-product-btn ${
-                      selectedProducts.find((p) => p.id === product.id) ||
+                    className={`finished-goods-modal__add-product-btn ${selectedProducts.find((p) => p.id === product.id) ||
                       product.quantity <= 0
-                        ? "finished-goods-modal__add-product-btn--disabled"
-                        : ""
-                    }`}
+                      ? "finished-goods-modal__add-product-btn--disabled"
+                      : ""
+                      }`}
                     onClick={() => addProductToTransfer(product)}
                     disabled={
                       selectedProducts.find((p) => p.id === product.id) ||
@@ -2591,8 +2590,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     } catch (error) {
       console.error("Return creation failed:", error);
       alert(
-        `Ошибка при создании возврата: ${
-          error?.message || "неизвестная ошибка"
+        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка"
         }`
       );
     }
@@ -2707,7 +2705,8 @@ const FinishedGoods = ({ products, onChanged }) => {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Debounce для поиска
+  const debouncedSearch = useDebouncedValue(search, 400)
   const [categoryFilter, setCategoryFilter] = useState("");
 
   // Фильтр по дате
@@ -2724,7 +2723,6 @@ const FinishedGoods = ({ products, onChanged }) => {
     return isSmall ? "cards" : "table";
   };
   const [viewMode, setViewMode] = useState(getInitialViewMode);
-  const debounceTimerRef = useRef(null);
 
   // Сохраняем режим просмотра в localStorage
   useEffect(() => {
@@ -2733,22 +2731,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     }
   }, [viewMode]);
 
-  // Debounce для поиска
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
 
-    debounceTimerRef.current = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [search]);
 
   useEffect(() => {
     dispatch(fetchCategoriesAsync());
@@ -2770,48 +2753,48 @@ const FinishedGoods = ({ products, onChanged }) => {
     }
   }, [cashBoxes, selectCashBox]);
 
-  const onSaveSuccess = () => {
+  const onSaveSuccess = useCallback(() => {
     setShowAdd(false);
     dispatch(fetchProductsAsync());
     dispatch(getItemsMake());
-  };
+  }, []);
 
-  const onEditSaved = () => {
+  const onEditSaved = useCallback(() => {
     setShowEdit(false);
     setSelectedItem(null);
     dispatch(fetchProductsAsync());
-  };
-  const handleOpen = (id) => {
+  }, []);
+  const handleOpen = useCallback((id) => {
     setShowMarriageModal(true);
     setItemId(id);
-  };
+  }, []);
 
-  const handleOpen1 = (id) => {
+  const handleOpen1 = useCallback((id) => {
     setShowAddProductModal(true);
     setItemId1(id);
-  };
+  }, []);
 
-  const handleOpen2 = (item) => {
+  const handleOpen2 = useCallback((item) => {
     setShowAcceptProductModal(true);
     setItemId2(item);
-  };
-  const handleOpen3 = (item) => {
+  }, []);
+  const handleOpen3 = useCallback((item) => {
     setShowReturnProductModal(true);
     setItemId3(item);
-  };
+  }, []);
 
-  const onEditDeleted = () => {
+  const onEditDeleted = useCallback(() => {
     setShowEdit(false);
     setSelectedItem(null);
     dispatch(fetchProductsAsync());
-  };
+  }, []);
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setSearch("");
     setCategoryFilter("");
     setDateFrom("");
     setDateTo("");
-  };
+  }, []);
 
   // Фильтрация по названию, категории и ДАТЕ created_at
   const viewProducts = useMemo(() => {
@@ -2824,8 +2807,7 @@ const FinishedGoods = ({ products, onChanged }) => {
       const okCat =
         !categoryFilter ||
         String(p.category_id || p.category)?.toLowerCase() ===
-          String(categoryFilter).toLowerCase();
-
+        String(categoryFilter).toLowerCase();
       // фильтр по дате
       const created = safeDate(p.created_at);
       if (!created) return false;
@@ -2849,14 +2831,14 @@ const FinishedGoods = ({ products, onChanged }) => {
   };
 
   // get primary image
-  const getPrimaryImage = (product) => {
+  const getPrimaryImage = useCallback((product) => {
     if (!product?.images || !Array.isArray(product.images)) return null;
     const primaryImage = product.images.find((img) => img.is_primary);
     return primaryImage || product.images[0] || null;
-  };
+  }, []);
 
   // get image URL with fallback
-  const getImageUrl = (image) => {
+  const getImageUrl = useCallback((image) => {
     if (!image) return noImage;
     // Поддержка разных форматов URL изображений
     const url = image.image_url || image.image || image.url || image.preview;
@@ -2866,9 +2848,9 @@ const FinishedGoods = ({ products, onChanged }) => {
       return url;
     }
     return url;
-  };
+  }, [noImage]);
 
-  const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
+  const formatPrice = useCallback((price) => parseFloat(price || 0).toFixed(2), []);
 
   return (
     <div className="warehouse-page">
@@ -2955,11 +2937,10 @@ const FinishedGoods = ({ products, onChanged }) => {
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                viewMode === "table"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
             >
               <Table2 size={16} />
               Таблица
@@ -2968,11 +2949,10 @@ const FinishedGoods = ({ products, onChanged }) => {
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                viewMode === "cards"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
             >
               <LayoutGrid size={16} />
               Карточки
