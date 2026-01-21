@@ -154,6 +154,7 @@ import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/
 
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
+import CreateSaleDocumentForMarket from "../Components/Sectors/Market/Documents/CreateSaleDocumentForMarket";
 // import OnlineCatalog from "../Components/Online/Market/Catalog";
 
 
@@ -310,7 +311,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("clients/:id", MarketClientDetails),
   createProtectedRoute("market/history", MarketHistory),
   createProtectedRoute("market/documents", MarketDocuments),
-  createProtectedRoute("market/documents/create", CreateSaleDocument),
+  createProtectedRoute("market/documents/create", CreateSaleDocumentForMarket),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
   // Cafe routes

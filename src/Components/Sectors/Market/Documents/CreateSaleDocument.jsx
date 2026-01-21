@@ -14,7 +14,6 @@ import { pdf } from "@react-pdf/renderer";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import {
-  fetchWarehouseProducts,
   fetchWarehouseCounterparties,
   createWarehouseDocument,
   fetchWarehouses,
