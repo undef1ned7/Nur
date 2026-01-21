@@ -7,15 +7,23 @@ import {
   Pencil,
   Printer,
   Plus,
+  Check,
+  X,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { pdf } from "@react-pdf/renderer";
 import {
-  fetchDocuments,
   getReceiptJson,
   getInvoiceJson,
 } from "../../../../store/creators/saleThunk";
+import {
+  fetchWarehouseDocuments,
+  postWarehouseDocument,
+  unpostWarehouseDocument,
+  getWarehouseDocumentById,
+} from "../../../../store/creators/warehouseThunk";
+import { useUser } from "../../../../store/slices/userSlice";
 import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
@@ -30,6 +38,7 @@ import "./Documents.scss";
 const Documents = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { company } = useUser();
   const {
     documents,
     documentsCount,
@@ -42,6 +51,7 @@ const Documents = () => {
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
 
   const [activeTab, setActiveTab] = useState("receipts");
+  const [docType, setDocType] = useState(""); // Пустая строка = все типы
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
@@ -51,6 +61,19 @@ const Documents = () => {
   const [editReceiptId, setEditReceiptId] = useState(null);
   const [editReceiptData, setEditReceiptData] = useState(null);
   const debounceTimerRef = useRef(null);
+
+  // Опции типов документов
+  const docTypeOptions = [
+    { value: "", label: "Все типы" },
+    { value: "SALE", label: "Продажа" },
+    { value: "PURCHASE", label: "Покупка" },
+    { value: "SALE_RETURN", label: "Возврат продажи" },
+    { value: "PURCHASE_RETURN", label: "Возврат покупки" },
+    { value: "INVENTORY", label: "Инвентаризация" },
+    { value: "RECEIPT", label: "Приход" },
+    { value: "WRITE_OFF", label: "Списание" },
+    { value: "TRANSFER", label: "Перемещение" },
+  ];
 
   // Debounce для поиска
   useEffect(() => {
@@ -79,13 +102,14 @@ const Documents = () => {
   };
 
   // Маппинг данных из Redux в формат для отображения
+  // Новый API возвращает документы в формате warehouse
   const receiptsData = useMemo(() => {
     if (activeTab !== "receipts") return [];
-    return (documents || []).map((sale, index) => ({
-      id: sale.id,
-      number: getDocumentNumber(index, "ЧЕК"),
-      date: sale.created_at
-        ? new Date(sale.created_at).toLocaleString("ru-RU", {
+    return (documents || []).map((doc, index) => ({
+      id: doc.id,
+      number: doc.number || getDocumentNumber(index, "ЧЕК"),
+      date: doc.date || doc.created_at
+        ? new Date(doc.date || doc.created_at).toLocaleString("ru-RU", {
             year: "numeric",
             month: "long",
             day: "numeric",
@@ -94,38 +118,40 @@ const Documents = () => {
           })
         : "—",
       client:
-        sale.client?.full_name ||
-        sale.client_name ||
-        sale.client ||
+        doc.counterparty?.name ||
+        doc.counterparty_display_name ||
+        doc.counterparty ||
         "Без клиента",
-      products: sale.items?.length || 0,
-      amount: sale.total || "0.00",
-      status: sale.status === "paid" ? "Проведен" : "Черновик",
-      statusType: sale.status === "paid" ? "approved" : "draft",
+      products: doc.items?.length || 0,
+      amount: doc.total || "0.00",
+      status: doc.status === "POSTED" ? "Проведен" : "Черновик",
+      statusType: doc.status === "POSTED" ? "approved" : "draft",
+      document: doc, // Сохраняем полный объект документа
     }));
   }, [documents, activeTab, currentPage]);
 
   const invoicesData = useMemo(() => {
     if (activeTab !== "invoices") return [];
-    return (documents || []).map((sale, index) => ({
-      id: sale.id,
-      number: getDocumentNumber(index, "НАКЛ"),
-      date: sale.created_at
-        ? new Date(sale.created_at).toLocaleDateString("ru-RU", {
+    return (documents || []).map((doc, index) => ({
+      id: doc.id,
+      number: doc.number || getDocumentNumber(index, "НАКЛ"),
+      date: doc.date || doc.created_at
+        ? new Date(doc.date || doc.created_at).toLocaleDateString("ru-RU", {
             year: "numeric",
             month: "long",
             day: "numeric",
           })
         : "—",
       counterparty:
-        sale.client?.full_name ||
-        sale.client_name ||
-        sale.client ||
+        doc.counterparty?.name ||
+        doc.counterparty_display_name ||
+        doc.counterparty ||
         "Без контрагента",
-      positions: sale.items?.length || 0,
-      amount: sale.total || "0.00",
-      status: sale.status === "paid" ? "Проведен" : "Черновик",
-      statusType: sale.status === "paid" ? "approved" : "draft",
+      positions: doc.items?.length || 0,
+      amount: doc.total || "0.00",
+      status: doc.status === "POSTED" ? "Проведен" : "Черновик",
+      statusType: doc.status === "POSTED" ? "approved" : "draft",
+      document: doc, // Сохраняем полный объект документа
     }));
   }, [documents, activeTab, currentPage]);
 
@@ -144,22 +170,26 @@ const Documents = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
-  // Сброс страницы при смене таба
+  // Сброс страницы при смене таба или типа документа
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab]);
+  }, [activeTab, docType]);
 
-  // Загрузка данных через Redux при изменении таба, страницы или поиска
+  // Загрузка данных через Redux при изменении таба, страницы, типа документа или поиска
   useEffect(() => {
     if (activeTab === "receipts" || activeTab === "invoices") {
-      dispatch(
-        fetchDocuments({
-          page: currentPage,
-          search: debouncedSearchTerm,
-        })
-      );
+      // Используем новый warehouse API
+      const params = {
+        page: currentPage,
+        page_size: 100, // По умолчанию 100 согласно документации
+        ...(docType && { doc_type: docType }), // Добавляем doc_type только если выбран
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        // Дополнительные фильтры из документации:
+        // status, warehouse_from, warehouse_to, counterparty - можно добавить позже через UI
+      };
+      dispatch(fetchWarehouseDocuments(params));
     }
-  }, [dispatch, activeTab, currentPage, debouncedSearchTerm]);
+  }, [dispatch, activeTab, currentPage, debouncedSearchTerm, docType]);
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -218,12 +248,67 @@ const Documents = () => {
   const handleSaved = () => {
     // Перезагружаем документы после сохранения
     if (activeTab === "receipts" || activeTab === "invoices") {
-      dispatch(
-        fetchDocuments({
-          page: currentPage,
-          search: debouncedSearchTerm,
-        })
+      const params = {
+        page: currentPage,
+        page_size: 100,
+        ...(docType && { doc_type: docType }),
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+      };
+      dispatch(fetchWarehouseDocuments(params));
+    }
+  };
+
+  // Проведение документа
+  const handlePost = async (item) => {
+    if (!item?.id) return;
+    
+    if (!window.confirm(`Провести документ ${item.number}?`)) {
+      return;
+    }
+
+    try {
+      const result = await dispatch(
+        postWarehouseDocument({ id: item.id, allowNegative: false })
       );
+      
+      if (postWarehouseDocument.fulfilled.match(result)) {
+        alert("Документ успешно проведен");
+        // Перезагружаем список документов
+        handleSaved();
+      } else {
+        const error = result.payload || result.error;
+        const errorMessage = error?.detail || error?.message || "Ошибка при проведении документа";
+        alert("Ошибка: " + errorMessage);
+      }
+    } catch (error) {
+      console.error("Ошибка при проведении документа:", error);
+      alert("Ошибка: " + (error?.message || "Не удалось провести документ"));
+    }
+  };
+
+  // Отмена проведения документа
+  const handleUnpost = async (item) => {
+    if (!item?.id) return;
+    
+    if (!window.confirm(`Отменить проведение документа ${item.number}?`)) {
+      return;
+    }
+
+    try {
+      const result = await dispatch(unpostWarehouseDocument(item.id));
+      
+      if (unpostWarehouseDocument.fulfilled.match(result)) {
+        alert("Проведение документа отменено");
+        // Перезагружаем список документов
+        handleSaved();
+      } else {
+        const error = result.payload || result.error;
+        const errorMessage = error?.detail || error?.message || "Ошибка при отмене проведения";
+        alert("Ошибка: " + errorMessage);
+      }
+    } catch (error) {
+      console.error("Ошибка при отмене проведения документа:", error);
+      alert("Ошибка: " + (error?.message || "Не удалось отменить проведение документа"));
     }
   };
 
@@ -232,10 +317,89 @@ const Documents = () => {
 
     try {
       if (activeTab === "invoices") {
-        // Для накладной получаем JSON данные и генерируем PDF через InvoicePdfDocument
-        const result = await dispatch(getInvoiceJson(item.id));
-        if (getInvoiceJson.fulfilled.match(result)) {
-          const invoiceData = result.payload;
+        // Для накладной используем новый warehouse API
+        const result = await dispatch(getWarehouseDocumentById(item.id));
+        if (getWarehouseDocumentById.fulfilled.match(result)) {
+          const doc = result.payload;
+          
+          // Преобразуем данные в формат для PDF
+          const seller = {
+            id: company?.id || "",
+            name: company?.name || "",
+            inn: company?.inn || "",
+            okpo: company?.okpo || "",
+            score: company?.score || "",
+            bik: company?.bik || "",
+            address: company?.address || "",
+            phone: company?.phone || null,
+            email: company?.email || null,
+          };
+          const buyer = doc.counterparty
+            ? {
+                id: doc.counterparty.id,
+                name: doc.counterparty.name || "",
+                inn: doc.counterparty.inn || "",
+                okpo: doc.counterparty.okpo || "",
+                score: doc.counterparty.score || "",
+                bik: doc.counterparty.bik || "",
+                address: doc.counterparty.address || "",
+                phone: doc.counterparty.phone || null,
+                email: doc.counterparty.email || null,
+              }
+            : null;
+          const items = Array.isArray(doc.items)
+            ? doc.items.map((item) => ({
+                id: item.id,
+                name: item.product?.name || item.name || "Товар",
+                qty: String(item.qty || 0),
+                unit_price: String(Number(item.price || 0).toFixed(2)),
+                total: String(Number(item.total || item.qty * item.price || 0).toFixed(2)),
+                unit: item.product?.unit || item.unit || "ШТ",
+                article: item.product?.article || item.article || "",
+                discount_percent: Number(item.discount_percent || 0),
+                price_before_discount: String(Number(item.price || 0).toFixed(2)),
+              }))
+            : [];
+          const subtotal = items.reduce(
+            (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
+            0
+          );
+          const discountTotal = items.reduce(
+            (sum, item) =>
+              sum +
+              (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
+                100,
+            0
+          );
+          const total = subtotal - discountTotal;
+          const warehouseName = doc.warehouse_from?.name || doc.warehouse?.name || "";
+          const warehouseToName = doc.warehouse_to?.name || "";
+
+          const invoiceData = {
+            doc_type: doc.doc_type || "SALE",
+            document: {
+              type: doc.doc_type?.toLowerCase() || "sale_invoice",
+              doc_type: doc.doc_type || "SALE",
+              title: "Накладная",
+              id: doc.id,
+              number: doc.number || "",
+              date: doc.date || doc.created_at?.split("T")[0] || "",
+              datetime: doc.created_at || doc.date || "",
+              created_at: doc.created_at || "",
+              discount_percent: 0,
+            },
+            seller,
+            buyer,
+            items,
+            totals: {
+              subtotal: String(subtotal.toFixed(2)),
+              discount_total: String(discountTotal.toFixed(2)),
+              tax_total: "0.00",
+              total: String(total.toFixed(2)),
+            },
+            warehouse: warehouseName,
+            warehouse_to: warehouseToName,
+          };
 
           if (!invoiceData) {
             throw new Error("Нет данных для генерации PDF");
@@ -332,9 +496,28 @@ const Documents = () => {
           />
         </div>
         <div className="documents__header-actions">
+          <select
+            className="documents__doc-type-select"
+            value={docType}
+            onChange={(e) => setDocType(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "4px",
+              border: "1px solid #ddd",
+              fontSize: "14px",
+              marginRight: "10px",
+              cursor: "pointer",
+            }}
+          >
+            {docTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
           <button
             className="documents__create-btn"
-            onClick={() => navigate("/crm/market/documents/create")}
+            onClick={() => navigate("/crm/warehouse/documents/create")}
           >
             <Plus size={18} />
             Создать
@@ -459,6 +642,23 @@ const Documents = () => {
                           >
                             <Printer size={18} />
                           </button>
+                          {item.statusType === "draft" ? (
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handlePost(item)}
+                              title="Провести документ"
+                            >
+                              <Check size={18} />
+                            </button>
+                          ) : (
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handleUnpost(item)}
+                              title="Отменить проведение"
+                            >
+                              <X size={18} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </>
@@ -500,6 +700,23 @@ const Documents = () => {
                           >
                             <Printer size={18} />
                           </button>
+                          {item.statusType === "draft" ? (
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handlePost(item)}
+                              title="Провести документ"
+                            >
+                              <Check size={18} />
+                            </button>
+                          ) : (
+                            <button
+                              className="documents__action-btn"
+                              onClick={() => handleUnpost(item)}
+                              title="Отменить проведение"
+                            >
+                              <X size={18} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </>
@@ -551,6 +768,9 @@ const Documents = () => {
       {previewReceiptId && (
         <ReceiptPreviewModal
           receiptId={previewReceiptId}
+          document={
+            receiptsData.find((item) => item.id === previewReceiptId)?.document
+          }
           onClose={() => setPreviewReceiptId(null)}
           onEdit={handleEditFromPreview}
         />
@@ -559,6 +779,9 @@ const Documents = () => {
       {previewInvoiceId && (
         <InvoicePreviewModal
           invoiceId={previewInvoiceId}
+          document={
+            invoicesData.find((item) => item.id === previewInvoiceId)?.document
+          }
           onClose={() => setPreviewInvoiceId(null)}
           onEdit={handleEditFromPreview}
         />

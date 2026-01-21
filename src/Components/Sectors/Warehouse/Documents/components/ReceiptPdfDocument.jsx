@@ -165,9 +165,7 @@ function fmtDateTime(dt) {
 }
 
 export default function ReceiptPdfDocument({ data }) {
-  // Гарантируем регистрацию шрифтов один раз
   registerPdfFonts();
-
   const doc = data?.document || data?.sale || {};
   const company = data?.company || {};
   const cashier = data?.cashier || {};
