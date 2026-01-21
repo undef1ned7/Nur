@@ -23,7 +23,7 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-.docs__title { font-size: 20px; font-weight: 700; color: var(--text); margin: 0; }
+.docs__title { font-size: 20px; font-weight: 500; color: var(--text); margin: 0; }
 .docs__subtitle { font-size: 13px; color: var(--muted); }
 .docs__actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
@@ -41,7 +41,7 @@
   border-radius: 999px;
   border: 0;
   background: transparent;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 14px;
   color: #334155;
   cursor: pointer;
@@ -121,7 +121,7 @@
 .docs__card:hover { background: #f8fafc; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.06); }
 .docs__card--active { outline: 2px solid var(--primary); background: #fff; }
 .docs__cardMain { display: grid; gap: 6px; }
-.docs__name { font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.docs__name { font-size: 16px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 8px; }
 .docs__emoji { font-size: 18px; }
 .docs__meta { font-size: 12px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; }
 .docs__filename { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -137,7 +137,7 @@
 
 .docs__previewWrap { display: grid; gap: 10px; }
 .docs__previewHeader { display: grid; gap: 4px; }
-.docs__previewTitle { font-weight: 800; font-size: 16px; color: var(--text); }
+.docs__previewTitle { font-weight: 550; font-size: 16px; color: var(--text); }
 .docs__previewSub { font-size: 12px; color: var(--muted); }
 .docs__previewFrame { width: 100%; height: min(66vh, 640px); border: 0; border-radius: 10px; box-shadow: var(--shadow); background: #fff; }
 .docs__previewMedia { max-width: 100%; max-height: min(66vh, 640px); border-radius: 10px; box-shadow: var(--shadow); object-fit: contain; background: #fff; }
@@ -146,7 +146,7 @@
 .docs__modalOverlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 60; }
 .docs__modal { background: #fff; border-radius: 14px; padding: 20px; width: 420px; max-width: 92%; box-shadow: var(--shadow); border: 1px solid var(--border); }
 .docs__modalHeader { display: flex; justify-content: space-between; align-items: center; }
-.docs__modalTitle { font-size: 18px; font-weight: 800; }
+.docs__modalTitle { font-size: 18px; font-weight: 550; }
 .docs__iconBtn { background: none; border: none; cursor: pointer; font-size: 18px; }
 
 .docs__form { margin-top: 16px; display: flex; flex-direction: column; gap: 16px; }
