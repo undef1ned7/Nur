@@ -172,6 +172,13 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
+        label: "Заявки",
+        to: "/crm/barber/requests",
+        icon: menuIcons.clipboardList,
+        permission: "can_view_barber_records",
+        implemented: true,
+      },
+      {
         label: "Сотрудники",
         to: "/crm/barber/masters",
         icon: menuIcons.user,
@@ -482,7 +489,7 @@ export const MENU_CONFIG = {
       },
       {
         label: "Документы",
-        to: "/crm/warehouse/documents",
+        to: "/crm/market/documents",
         icon: menuIcons.documentScanner,
         permission: "can_view_document",
         implemented: true,
@@ -508,7 +515,6 @@ export const MENU_CONFIG = {
         permission: "can_view_clients",
         implemented: true,
       },
-
       // {
       //   label: "Справочники",
       //   to: "/crm/warehouse/directories",

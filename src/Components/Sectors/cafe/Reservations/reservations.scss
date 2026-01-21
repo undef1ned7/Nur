@@ -28,7 +28,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--text);
     margin: 0;
   }
@@ -120,7 +120,7 @@
     background: transparent;
     color: var(--muted);
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
     border-bottom: 2px solid transparent;
     margin-bottom: -2px;
@@ -147,7 +147,7 @@
     padding: 10px 14px;
     border-radius: 12px;
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 550;
     cursor: pointer;
     transition: var(--transition);
     border: 1px solid transparent;
@@ -236,7 +236,7 @@
     border-radius: 50%;
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: #fff;
-    font-weight: 700;
+    font-weight: 500;
     font-size: 14px;
     display: grid;
     place-items: center;
@@ -246,7 +246,7 @@
 
   &__name {
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 500;
     margin: 0 0 4px;
   }
 
@@ -290,7 +290,7 @@
     padding: 6px 10px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     border: 1px solid var(--border);
     background: #fff;
 
@@ -366,7 +366,7 @@
 
   &__modalTitle {
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 550;
     margin: 0;
     color: var(--text);
     flex: 1 1 auto;
@@ -426,7 +426,7 @@
 
   &__label {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--muted);
   }
 

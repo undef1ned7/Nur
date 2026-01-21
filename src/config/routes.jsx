@@ -59,6 +59,7 @@ import Recorda from "../Components/Sectors/Barber/Recorda/Recorda";
 import BarberClients from "../Components/Sectors/Barber/Clients/Clients";
 import BarberAnalitika from "../Components/Sectors/Barber/BarberAnalitika/BarberAnalitika";
 import MastersTabs from "../Components/Sectors/Barber/Masters/MastersTabs/MastersTabs";
+import BarberRequests from "../Components/Sectors/Barber/Requests/Requests";
 
 // Hostel
 import RoomsHalls from "../Components/Sectors/Hostel/RoomsHalls/RoomsHalls";
@@ -138,8 +139,6 @@ import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
 import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategory/BrandCategoryPage";
-import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
-import WarehouseCreateSaleDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
 
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
@@ -156,8 +155,8 @@ import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/
 
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
-import CreateSaleDocumentForMarket from "../Components/Sectors/Market/Documents/CreateSaleDocumentForMarket";
-// import OnlineCatalog from "../Components/Online/Market/Catalog";
+import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
+import OnlineBooking from "../Components/Sectors/Barber/OnlineBooking/OnlineBooking";
 
 
 /**
@@ -204,17 +203,23 @@ export const publicRoutes = [
 
 
 
-  // ✅ Публичное онлайн-меню кафе по slug
-  //     <Route
-  //   key="/catalog/:slug"
-  //   path="/catalog/:slug"
-  //   element={<OnlineCatalog />}
-  // />,
+ // Public routes
+<Route
+    key="/catalog/:slug"
+    path="/catalog/:slug"
+    element={<OnlineCatalog />}
+  />,
   <Route
     key="/cafe/:company_slug/menu"
     path="/cafe/:company_slug/menu"
     element={<CafeMenuOnline />}
   />,
+  <Route
+    key="/barber/:company_slug/booking"
+    path="/barber/:company_slug/booking"
+    element={<OnlineBooking />}
+  />,
+
 
 
   <Route
@@ -283,6 +288,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("barber/records", Recorda),
   createProtectedRoute("barber/clients", BarberClients),
   createProtectedRoute("barber/cash-reports", BarberAnalitika),
+  createProtectedRoute("barber/requests", BarberRequests),
 
   // Hostel routes
   createProtectedRoute("hostel/rooms", RoomsHalls),
@@ -313,7 +319,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("clients/:id", MarketClientDetails),
   createProtectedRoute("market/history", MarketHistory),
   createProtectedRoute("market/documents", MarketDocuments),
-  createProtectedRoute("market/documents/create", CreateSaleDocumentForMarket),
+  createProtectedRoute("market/documents/create", CreateSaleDocument),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
   // Cafe routes
@@ -367,8 +373,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
   createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
   createProtectedRoute("warehouse/counterparties", Counterparties),
-  createProtectedRoute("warehouse/documents", WarehouseDocuments),
-  createProtectedRoute("warehouse/documents/create", WarehouseCreateSaleDocument),
+
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),

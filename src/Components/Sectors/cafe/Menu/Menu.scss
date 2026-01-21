@@ -114,7 +114,7 @@
     background: #fff;
     color: var(--text);
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 550;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -150,7 +150,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 900;
+    font-weight: 550;
     color: var(--text);
     margin: 0;
   }
@@ -295,7 +295,7 @@
     padding: 10px 16px;
     border-radius: 10px;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid transparent;
@@ -431,7 +431,7 @@
 
   &__name {
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 500;
     margin: 0 0 4px;
   }
 
@@ -456,7 +456,7 @@
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 550;
     border: 1px solid var(--border);
 
     &--on {
@@ -546,7 +546,7 @@
 
   &__tileTitle {
     font-size: 15px;
-    font-weight: 900;
+    font-weight: 550;
     margin: 0;
     color: var(--text);
     line-height: 1.2;
@@ -567,13 +567,13 @@
   }
 
   &__tilePrice {
-    font-weight: 900;
+    font-weight: 550;
     color: #111;
   }
 
   &__tileCat {
     color: var(--muted);
-    font-weight: 700;
+    font-weight: 500;
     font-size: 12px;
     min-width: 0;
   }
@@ -631,12 +631,12 @@
 
   &__label {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--muted);
 
     &--sm {
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 550;
     }
   }
 
@@ -663,7 +663,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     background: #fff;
-    font-weight: 800;
+    font-weight: 550;
     color: var(--text);
 
     input {
@@ -974,7 +974,7 @@
       padding: 0 8px;
       height: 34px;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 500;
 
       svg {
         display: none;
@@ -1153,7 +1153,7 @@
 
     &__title {
       font-size: 14px;
-      font-weight: 800;
+      font-weight: 550;
     }
 
     &__btn {
@@ -1435,7 +1435,7 @@
 
   &__title {
     margin: 0;
-    font-weight: 900;
+    font-weight: 550;
     font-size: 18px;
     color: var(--text);
   }
@@ -1500,7 +1500,7 @@
     display: grid;
     place-items: center;
     color: var(--muted);
-    font-weight: 800;
+    font-weight: 550;
     background: #f3f4f6;
   }
 
@@ -1701,7 +1701,7 @@
   &__title {
     margin: 0 0 8px;
     font-size: 18px;
-    font-weight: 900;
+    font-weight: 550;
     color: var(--text);
   }
 
@@ -1840,7 +1840,7 @@
     outline: 0;
     background: transparent;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text);
     width: 100%;
     min-width: 0;
@@ -1848,7 +1848,7 @@
 
     &::placeholder {
       color: #94a3b8;
-      font-weight: 600;
+      font-weight: 500;
     }
 
     &:disabled {
@@ -1941,7 +1941,7 @@
     border-bottom: 1px solid #eef2f7;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--text);
     transition: 0.12s background ease;
 
@@ -1962,7 +1962,7 @@
   &__empty {
     padding: 12px;
     color: var(--muted);
-    font-weight: 700;
+    font-weight: 500;
     text-align: center;
   }
 

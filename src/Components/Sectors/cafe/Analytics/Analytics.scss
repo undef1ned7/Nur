@@ -40,7 +40,7 @@
   &__title {
     margin: 0;
     font-size: 20px;
-    font-weight: 800;
+    font-weight: 550;
     color: var(--text);
   }
 
@@ -84,7 +84,7 @@
     border: none;
     background: var(--primary);
     color: #101010;
-    font-weight: 700;
+    font-weight: 500;
     border-radius: 10px;
     padding: 10px 14px;
     font-size: 14px;
@@ -166,7 +166,7 @@
 
   &__value {
     font-size: 22px;
-    font-weight: 800;
+    font-weight: 550;
     line-height: 1.1;
   }
 
@@ -188,7 +188,7 @@
 
     .analytics__head {
       font-size: 14px;
-      font-weight: 800;
+      font-weight: 550;
       color: var(--text);
       padding: 14px 16px;
       border-bottom: 1px solid var(--border);
@@ -221,7 +221,7 @@
 .table__head {
   padding: 12px 16px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--muted);
   background: #fafbfc;
   border-bottom: 1px solid var(--border);

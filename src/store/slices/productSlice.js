@@ -125,7 +125,6 @@ const productSlice = createSlice({
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
         state.loading = false;
-        state.error = null;
         applyPagination(state, action.payload, "list");
         
         // Подсчет товаров с is_weight: true используя цикл

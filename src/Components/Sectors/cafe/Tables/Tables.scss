@@ -10,6 +10,7 @@
  */
 
 @use "../../../common/SearchableCombobox/SearchableCombobox.scss";
+@use "./components/TablesFiltersModal.scss";
 
 /* ===== MAIN CONTAINER ===== */
 .cafeTables {
@@ -52,7 +53,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 800;
+    font-weight: 550;
     margin: 0;
   }
 
@@ -118,7 +119,7 @@
     gap: 8px;
     padding: 10px 14px;
     border-radius: 12px;
-    font-weight: 900;
+    font-weight: 550;
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text);
@@ -155,7 +156,7 @@
     cursor: pointer;
     transition: var(--transition);
     font-size: 16px;
-    font-weight: 900;
+    font-weight: 550;
 
     &:hover {
       background: #f3f4f6;
@@ -252,7 +253,7 @@
     padding: 10px 14px;
     border-radius: 12px;
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 550;
     cursor: pointer;
     transition: var(--transition);
     border: 1px solid transparent;
@@ -307,6 +308,48 @@
         background: rgba(34, 197, 94, 0.18);
       }
     }
+
+    &--filter {
+      position: relative;
+      min-width: 44px;
+      padding: 10px;
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--muted);
+
+      &:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        color: var(--text);
+      }
+    }
+
+    &--filter-active {
+      background: rgba(247, 215, 79, 0.15);
+      border-color: var(--primary);
+      color: var(--primary-dark);
+
+      &:hover {
+        background: rgba(247, 215, 79, 0.25);
+      }
+    }
+  }
+
+  &__filterBadge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: var(--primary);
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
   }
 
   /* ===== Manage List View ===== */
@@ -354,7 +397,7 @@
     border-radius: 50%;
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: #fff;
-    font-weight: 900;
+    font-weight: 550;
     display: grid;
     place-items: center;
     box-shadow: var(--shadow);
@@ -363,13 +406,13 @@
 
   &__name {
     font-size: 16px;
-    font-weight: 900;
+    font-weight: 550;
     margin: 0 0 6px;
   }
 
   &__muted {
     color: var(--muted);
-    font-weight: 700;
+    font-weight: 500;
     font-size: 13px;
   }
 
@@ -384,7 +427,7 @@
   &__pill {
     padding: 6px 10px;
     border-radius: 999px;
-    font-weight: 900;
+    font-weight: 550;
     font-size: 12px;
     border: 1px solid var(--border);
     background: var(--surface);
@@ -453,14 +496,14 @@
 
   &__hallTitle {
     font-size: 20px;
-    font-weight: 900;
+    font-weight: 550;
     letter-spacing: 0.02em;
     text-transform: uppercase;
   }
 
   &__hallDate {
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 550;
     color: #94a3b8;
     white-space: nowrap;
   }
@@ -480,7 +523,7 @@
 
   &__dish {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 500;
     color: #111827;
     line-height: 1.25;
     display: -webkit-box;
@@ -495,7 +538,7 @@
     background: var(--surface);
     padding: 10px 12px;
     border-radius: 12px;
-    font-weight: 900;
+    font-weight: 550;
     cursor: pointer;
     display: inline-flex;
     gap: 8px;
@@ -512,14 +555,14 @@
 
   &__hallEmpty {
     color: var(--muted);
-    font-weight: 800;
+    font-weight: 550;
     font-size: 13px;
   }
 
   &__hallStatus {
     padding: 12px 14px;
     text-align: center;
-    font-weight: 900;
+    font-weight: 550;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     font-size: 14px;
@@ -579,14 +622,14 @@
 
   &__zoneTitle {
     font-size: 20px;
-    font-weight: 900;
+    font-weight: 550;
     letter-spacing: 0.02em;
     text-transform: uppercase;
   }
 
   &__zoneCount {
     font-size: 12px;
-    font-weight: 900;
+    font-weight: 550;
     color: #94a3b8;
     white-space: nowrap;
   }
@@ -607,13 +650,13 @@
 
   &__zoneLabel {
     color: var(--muted);
-    font-weight: 900;
+    font-weight: 550;
     font-size: 13px;
   }
 
   &__zoneValue {
     color: var(--text);
-    font-weight: 900;
+    font-weight: 550;
     font-size: 14px;
     text-align: right;
   }
@@ -630,7 +673,7 @@
   &__zoneStatus {
     padding: 12px 14px;
     text-align: center;
-    font-weight: 900;
+    font-weight: 550;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     font-size: 13px;
@@ -697,7 +740,7 @@
 
   &__modalTitle {
     margin: 0;
-    font-weight: 900;
+    font-weight: 550;
     font-size: 16px;
     flex: 1;
   }
@@ -754,7 +797,7 @@
 
   &__label {
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 550;
     color: var(--muted);
   }
 
@@ -788,7 +831,7 @@
   }
 
   &__confirmText {
-    font-weight: 800;
+    font-weight: 550;
     color: #111827;
     line-height: 1.35;
   }

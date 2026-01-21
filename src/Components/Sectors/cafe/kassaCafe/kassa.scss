@@ -43,7 +43,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--text);
     margin: 0;
   }
@@ -53,7 +53,7 @@
     border: 1px solid var(--border);
     border-radius: 10px;
     background: #fff;
-    font-weight: 700;
+    font-weight: 500;
     color: var(--text);
     text-decoration: none;
     cursor: pointer;
@@ -85,7 +85,7 @@
   }
 
   &__total {
-    font-weight: 800;
+    font-weight: 550;
   }
 
   &__controls {
@@ -144,7 +144,7 @@
     border: 1px solid var(--border);
     background: #fff;
 
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
     transition: 0.15s;
 
@@ -238,7 +238,7 @@
     background: #fff;
 
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 500;
     font-size: 14px;
     transition: 0.15s;
 
@@ -312,7 +312,7 @@
 
   &__modalTitle {
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 550;
     margin: 0;
     color: var(--text);
     min-width: 0;
@@ -327,14 +327,14 @@
   }
 
   &__amount {
-    font-weight: 900;
+    font-weight: 550;
   }
 
   &__pill {
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 550;
     border: 1px solid transparent;
 
     &--income {
@@ -414,7 +414,7 @@
   }
 
   &__boxTitle {
-    font-weight: 800;
+    font-weight: 550;
     margin-bottom: 2px;
   }
 
@@ -430,7 +430,7 @@
   }
 
   &__rowValue {
-    font-weight: 600;
+    font-weight: 500;
   }
 
   /* responsive */
@@ -573,7 +573,7 @@
     }
 
     &__rowValue {
-      font-weight: 700;
+      font-weight: 500;
     }
   }
 

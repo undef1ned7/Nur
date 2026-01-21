@@ -1,6 +1,50 @@
 /* ===== Единые CSS переменные для всех модулей cafe ===== */
 /* В :root — только цвета и общие токены */
 
+/* ===== Глобальные стили шрифтов для Cafe ===== */
+.cafe,
+[class^="cafe"],
+[class*=" cafe"],
+.payroll,
+[class^="payroll"],
+[class*=" payroll"] {
+  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Заголовки - средний вес, не жирные */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  /* Таблицы - легкий текст */
+  th {
+    font-weight: 500;
+  }
+
+  td {
+    font-weight: 400;
+  }
+
+  /* Кнопки - средний вес */
+  button {
+    font-weight: 500;
+  }
+
+  /* Лейблы и подсказки */
+  label {
+    font-weight: 450;
+  }
+
+  /* Убираем жирность где не нужно */
+  strong, b {
+    font-weight: 500;
+  }
+}
+
 :root {
   /* Основные цвета */
   --primary: #f7d74f;
@@ -17,4 +61,20 @@
   --success-weak: rgba(34, 197, 94, 0.12);
   --warning: #f59e0b;
   --warning-weak: rgba(245, 158, 11, 0.1);
+
+  /* ===== Типографика ===== */
+  --font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-weight-light: 400;
+  --font-weight-normal: 450;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 550;
+}
+
+/* ===== Mixin для легкой типографики ===== */
+@mixin cafe-typography {
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-light);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
