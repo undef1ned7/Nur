@@ -125,6 +125,7 @@ const productSlice = createSlice({
       })
       .addCase(fetchProductsAsync.fulfilled, (state, action) => {
         state.loading = false;
+        state.error = null;
         applyPagination(state, action.payload, "list");
         
         // Подсчет товаров с is_weight: true используя цикл
@@ -174,7 +175,7 @@ const productSlice = createSlice({
         state.brandsError = action.payload;
       })
       .addCase(updateItemsMake.pending, (state) => {
-        state.loading = true;
+        // state.loading = true;
         // state.brandsError = null;
       })
       .addCase(updateItemsMake.fulfilled, (state, action) => {
@@ -182,8 +183,8 @@ const productSlice = createSlice({
         // state.brands = action.payload.results || action.payload;
       })
       .addCase(updateItemsMake.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
+        // state.loading = false;
+        // state.error = action.payload;
       })
       .addCase(deleteItemsMake.pending, (state) => {
         state.loading = true;

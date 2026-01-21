@@ -10,6 +10,7 @@ import { useUser } from "../../../../store/slices/userSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { updateProductAsync } from "../../../../store/creators/productCreators";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 
 const toNum = (v) => {
   const n = Number(String(v ?? "").replace(",", "."));
@@ -17,6 +18,8 @@ const toNum = (v) => {
 };
 
 const AddProductModal = ({ onClose, onChanged, item }) => {
+  const alert = useAlert();
+  const confirm = useConfirm()
   const dispatch = useDispatch();
   const { list: cashBoxes } = useCash();
   const { company } = useUser();
@@ -47,9 +50,15 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
 
   const stockQty = useMemo(() => toNum(item?.quantity), [item]);
 
-  const q = toNum(qty);
-  const pp = toNum(purchasePrice);
-  const rp = toNum(retailPrice);
+  // const q = toNum(qty);
+  // const pp = toNum(purchasePrice);
+  // const rp = toNum(retailPrice);
+  const { q, pp, rp } = useMemo(() => ({
+    q: toNum(qty),
+    pp: toNum(purchasePrice),
+    rp: toNum(retailPrice)
+  }),
+    [qty, purchasePrice, retailPrice]);
 
   const expense = useMemo(() => +(q * pp).toFixed(2), [q, pp]);
 
@@ -97,12 +106,12 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
 
     // Дополнительная проверка кассы перед выполнением операции
     if (!selectCashBox) {
+      alert("Касса не выбрана. Создайте кассу в разделе «Кассы».", true)
       setError("Касса не выбрана. Создайте кассу в разделе «Кассы».");
       return;
     }
 
     setError("");
-
     try {
       // обновляем существующий товар: увеличиваем остаток и цены
       await dispatch(
@@ -131,30 +140,31 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
           // description: `Закупка ${q} шт. × ${pp} = ${expense}`,
         })
       ).unwrap();
-
-      onChanged?.();
-      onClose?.();
+      alert('Товар добавлен', () => {
+        onChanged?.();
+        onClose?.();
+      })
     } catch (e) {
       console.log(e);
-      setError("Не удалось сохранить. Попробуйте ещё раз.");
+      alert("Не удалось сохранить. Попробуйте ещё раз.", true)
     }
   };
 
   const disabled = !!validate();
 
   return (
-    <div className="add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ height: "auto" }}>
-        <div className="add-modal__header">
-          <h3>Добавление товара</h3>
+    <div className="add-modal z-50!">
+      <div className="add-modal__overlay z-50!" onClick={onClose} />
+      <div className="add-modal__content z-50!" style={{ height: "auto" }}>
+        <div className="add-modal__header ">
+          <h3 className="text-xl!">Добавление товара</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
         </div>
 
         <form onSubmit={onFormSubmit}>
-          <h4>Товар: {itemName}</h4>
+          <h4 className="">Товар: <span className="font-medium">{itemName}</span> </h4>
           {!!itemId && (
-            <div style={{ marginTop: 8, opacity: 0.8 }}>
+            <div className=" border rounded-lg p-2 w-full" style={{ marginTop: 8, opacity: 0.8 }}>
               В наличии сейчас: <b>{stockQty}</b> шт.
             </div>
           )}
@@ -164,11 +174,10 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
           </label>
 
           <input
-            style={{ width: "100%" }}
             type="number"
             name="qty"
             placeholder="Количество"
-            className="debt__input"
+            className=" border rounded-lg p-2 w-full"
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             min={1}
@@ -181,11 +190,11 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
           </label>
 
           <input
-            style={{ width: "100%" }}
+
             type="number"
             name="purchasePrice"
             placeholder="Закупочная цена (за 1 шт.)"
-            className="debt__input"
+            className="border rounded-lg p-2 w-full"
             value={purchasePrice}
             onChange={(e) => setPurchasePrice(e.target.value)}
             min={0}
@@ -198,11 +207,11 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
           </label>
 
           <input
-            style={{ width: "100%" }}
+
             type="number"
             name="retailPrice"
             placeholder="Розничная цена (за 1 шт.)"
-            className="debt__input"
+            className="border rounded-lg p-2 w-full"
             value={retailPrice}
             onChange={(e) => setRetailPrice(e.target.value)}
             min={0}
@@ -215,8 +224,8 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
           </label>
 
           <select
-            style={{ width: "100%" }}
-            className="debt__input"
+
+            className="border rounded-lg p-2 w-full"
             value={selectedSupplier}
             onChange={(e) => setSelectedSupplier(e.target.value)}
             disabled={!itemId}
@@ -249,8 +258,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
           )}
 
           <button
-            style={{ marginTop: 15, width: "100%", justifyContent: "center" }}
-            className="btn edit-btn"
+            className="btn edit-btn w-full py-2! text-lg! justify-center mt-2"
             type="submit"
             disabled={disabled}
           >

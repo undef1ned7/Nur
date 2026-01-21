@@ -4,11 +4,6 @@ import RawMaterialsWarehouse from "../RawMaterialsWarehouse/RawMaterialsWarehous
 import TransferStatusModal from "../TransferStatus/TransferStatus";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  getCashFlows,
-  updateCashFlows,
-  useCash,
-} from "../../../../store/slices/cashSlice";
-import {
   fetchProductsAsync,
   updateProductAsync,
 } from "../../../../store/creators/productCreators";
@@ -28,19 +23,19 @@ import "./PendingModal.scss";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import {
   fetchTransfersAsync,
-  createAcceptanceAsync,
   fetchReturnsAsync,
   approveReturnAsync,
 } from "../../../../store/creators/transferCreators";
 import { useDepartments } from "../../../../store/slices/departmentSlice";
 import { getEmployees } from "../../../../store/creators/departmentCreators";
-import { useTransfer } from "../../../../store/slices/transferSlice";
-import { getProfile, useUser } from "../../../../store/slices/userSlice";
+import { useUser } from "../../../../store/slices/userSlice";
 import {
   listAgentCartsAsync,
   approveAgentCartAsync,
   rejectAgentCartAsync,
 } from "../../../../store/creators/agentCartCreators";
+import ReactPortal from "../../../common/Portal/ReactPortal";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
 
 /**
  * Склеивает возвраты (returns) с передачами (transfers).
@@ -124,8 +119,6 @@ const PendingModal = ({ onClose, onChanged }) => {
   const { list: returns, loading: returnsLoading } = useSelector(
     (state) => state.return || { list: [], loading: false }
   );
-  const { list: transfers } = useTransfer(); // если не нужно — можно удалить
-  const { employees } = useDepartments();
   const { profile } = useUser();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
@@ -161,11 +154,10 @@ const PendingModal = ({ onClose, onChanged }) => {
   };
 
   // ---------------- ФИЛЬТРАЦИЯ ТОЛЬКО PENDING ----------------
-  const filterReturns = returns.filter((item) => item.status === "pending");
+  const filterReturns = useMemo(() => returns.filter((item) => item.status === "pending"), [returns]);
   // -----------------------------------------------------------
 
   useEffect(() => {
-    dispatch(getProfile());
     dispatch(fetchReturnsAsync());
     // если владелец — тянем все передачи, иначе только по агенту
     dispatch(
@@ -205,9 +197,8 @@ const PendingModal = ({ onClose, onChanged }) => {
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при принятии возвратов: ${
-          error?.message || "неизвестная ошибка"
-        }`,
+        message: `Ошибка при принятии возвратов: ${error?.message || "неизвестная ошибка"
+          }`,
       });
     } finally {
       setAcceptingReturn(null);
@@ -231,16 +222,8 @@ const PendingModal = ({ onClose, onChanged }) => {
 
   useEffect(() => {
     load();
-  }, []);
-
-  // const { employees } = useDepartments();
-  // const [selectedAgent, setSelectedAgent] = useState("");
-  // const [searchQuery, setSearchQuery] = useState("");
-
-  useEffect(() => {
     dispatch(getEmployees());
   }, []);
-
   // Группировка возвратов по агенту
   const groupedReturns = useMemo(() => {
     const grouped = new Map();
@@ -440,9 +423,8 @@ const PendingModal = ({ onClose, onChanged }) => {
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при одобрении корзин: ${
-          e?.message || "неизвестная ошибка"
-        }`,
+        message: `Ошибка при одобрении корзин: ${e?.message || "неизвестная ошибка"
+          }`,
       });
     } finally {
       setActionLoadingId(null);
@@ -578,13 +560,13 @@ const PendingModal = ({ onClose, onChanged }) => {
                           <td data-label="Дата возврата">
                             {group.earliestDate
                               ? group.earliestDate.toLocaleString("ru-RU", {
-                                  timeZone: "Asia/Bishkek",
-                                  day: "2-digit",
-                                  month: "2-digit",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
+                                timeZone: "Asia/Bishkek",
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
                               : "—"}
                           </td>
                           <td
@@ -792,11 +774,8 @@ const PendingModal = ({ onClose, onChanged }) => {
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div
-                              style={{
-                                display: "flex",
-                                gap: "8px",
-                                alignItems: "center",
-                              }}
+                              className="flex gap-2 items-center flex-wrap"
+
                             >
                               <button
                                 className="pending-modal__btn pending-modal__btn--primary"
@@ -898,7 +877,7 @@ const PendingModal = ({ onClose, onChanged }) => {
   ];
 
   return (
-    <div className="pending-modal-overlay" onClick={onClose}>
+    <div className="pending-modal-overlay z-101!" onClick={onClose}>
       <div
         className="pending-modal"
         onClick={(e) => e.stopPropagation()}
@@ -916,9 +895,8 @@ const PendingModal = ({ onClose, onChanged }) => {
           {tabs.map((tab, index) => (
             <button
               key={index}
-              className={`pending-modal__tab ${
-                index === activeTab ? "pending-modal__tab--active" : ""
-              }`}
+              className={`pending-modal__tab ${index === activeTab ? "pending-modal__tab--active" : ""
+                }`}
               onClick={() => handleTabChange(index)}
             >
               {tab.label}
@@ -959,6 +937,7 @@ const PendingModal = ({ onClose, onChanged }) => {
         onClose={() => setAlertModal({ ...alertModal, open: false })}
       />
     </div>
+
   );
 };
 
@@ -993,14 +972,13 @@ const ProductionWarehouse = () => {
   return (
     <section className="warehouseP sklad">
       <div className="vitrina__header" style={{ margin: "15px 0" }}>
-        <div className="vitrina__tabs flex-wrap">
+        <div className="vitrina__tabs flex-wrap px-0! md:w-full md:justify-center lg:justify-start">
           {tabs.map((tab, index) => {
             return (
               <span
                 key={index}
-                className={`vitrina__tab ${
-                  index === activeTab && "vitrina__tab--active"
-                }`}
+                className={`vitrina__tab ${index === activeTab && "vitrina__tab--active"
+                  } flex-1/2 md:flex-none`}
                 style={{ cursor: "pointer" }}
                 onClick={() => setActiveTab(index)}
               >
@@ -1012,7 +990,7 @@ const ProductionWarehouse = () => {
             <>
               <span
                 onClick={() => setShowPendingModal(true)}
-                className={`vitrina__tab`}
+                className={`vitrina__tab flex-3 md:flex-none`}
                 style={{ cursor: "pointer" }}
               >
                 Запросы
@@ -1156,9 +1134,8 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при одобрении корзины: ${
-          e?.message || "неизвестная ошибка"
-        }`,
+        message: `Ошибка при одобрении корзины: ${e?.message || "неизвестная ошибка"
+          }`,
       });
     } finally {
       setActionLoadingId(null);
@@ -1191,8 +1168,8 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
   const { employees } = useDepartments();
   const [selectedAgent, setSelectedAgent] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-
-  const filteredRows = (rows || []).filter((cart) => {
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+  const filteredRows = useMemo(() => (rows || []).filter((cart) => {
     // agent filter by id if available
     const agId = cart?.agent?.id || cart?.agent_id || "";
     if (selectedAgent && String(agId) !== String(selectedAgent)) return false;
@@ -1202,7 +1179,7 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
         .filter(Boolean)
         .join(" ");
     const clientName = cart?.client_name || cart?.client?.full_name || "";
-    const q = String(searchQuery || "")
+    const q = String(debouncedSearchQuery || "")
       .toLowerCase()
       .trim();
     if (!q) return true;
@@ -1214,7 +1191,7 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
         .toLowerCase()
         .includes(q)
     );
-  });
+  }), [selectedAgent, debouncedSearchQuery]);
 
   return (
     <div className="add-modal accept">
@@ -1287,8 +1264,7 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
                     <td data-label="№">{idx + 1}</td>
                     <td data-label="Агент">
                       {cart?.agent_name ||
-                        `${cart?.agent?.first_name || ""} ${
-                          cart?.agent?.last_name || ""
+                        `${cart?.agent?.first_name || ""} ${cart?.agent?.last_name || ""
                         }`}
                     </td>
                     <td data-label="Клиент">

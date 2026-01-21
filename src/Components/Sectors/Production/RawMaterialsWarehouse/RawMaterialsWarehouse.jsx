@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useDispatch } from "react-redux";
 import {
@@ -17,9 +17,9 @@ import {
 } from "../../../../store/slices/cashSlice";
 import { Plus, X, Search, LayoutGrid, Table2 } from "lucide-react";
 import { useUser } from "../../../../store/slices/userSlice";
-import AddProductModal from "../../../Deposits/Sklad/AddProduct/AddProductModal";
 import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
 import "../../Market/Warehouse/Warehouse.scss";
+import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -41,6 +41,8 @@ const safeDate = (s) => {
    AddModal — добавление сырья
    ========================================= */
 const AddModal = ({ onClose, selectCashBox, onSaved }) => {
+  const alert = useAlert()
+  const error = useErrorModal()
   const { company } = useUser();
   const [state, setState] = useState({
     name: "",
@@ -78,12 +80,13 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
           source_cashbox_flow_id: result.id,
         })
       ).unwrap();
-
-      onSaved?.();
-      onClose();
+      alert('Сырье добавлен!', () => {
+        onSaved?.();
+        onClose();
+      })
     } catch (e) {
       console.log(e);
-      alert(`Ошибка: ${e?.message || "не удалось добавить сырьё"}`);
+      error(`Ошибка: ${e?.message || "не удалось добавить сырьё"}`);
     }
   };
 
@@ -98,8 +101,8 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
 
   return (
     <div className="add-modal raw-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <form className="add-modal__content" onSubmit={onSubmit}>
+      <div className="add-modal__overlay z-50!" onClick={onClose} />
+      <form className="add-modal__content z-50!" onSubmit={onSubmit}>
         <div className="add-modal__header">
           <h3>Добавление сырья</h3>
           <button
@@ -157,6 +160,7 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
             type="number"
             min="0"
             step="0.0001"
+
             value={state.quantity}
             onChange={onChange}
             required
@@ -181,6 +185,8 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
    Поля: name, unit, price, quantity
    ========================================= */
 const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
+  const alert = useAlert()
+  const confirm = useConfirm()
   const dispatch = useDispatch();
   const [form, setForm] = useState({
     name: item?.name ?? "",
@@ -213,36 +219,45 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
       await dispatch(
         updateItemsMake({ id: item.id, updatedData: payload })
       ).unwrap();
-
-      setSaving(false);
-      onSaved?.();
-      onClose();
+      alert('Редактировано!', () => {
+        setSaving(false);
+        onSaved?.();
+        onClose();
+      })
     } catch (e) {
-      setSaving(false);
+
       console.error(e);
-      alert(`Не удалось обновить: ${e?.message || "ошибка"}`);
+      alert(`Не удалось обновить: ${e?.message || "ошибка"}`,
+        () => {
+          setSaving(false);
+        }, true);
     }
   };
 
   const onDelete = async () => {
-    if (!window.confirm(`Удалить сырьё «${item?.name}»?`)) return;
-    try {
-      setDeleting(true);
-      await dispatch(deleteItemsMake(item.id)).unwrap();
-      setDeleting(false);
-      onDeleted?.();
-      onClose();
-    } catch (e) {
-      setDeleting(false);
-      console.error(e);
-      alert(`Не удалось удалить: ${e?.message || "ошибка"}`);
-    }
+    confirm(`Удалить сырьё «${item?.name}»?`, async (result) => {
+      if (result) {
+        try {
+          setDeleting(true);
+          await dispatch(deleteItemsMake(item.id)).unwrap();
+          setDeleting(false);
+          onDeleted?.();
+          onClose();
+        } catch (e) {
+          setDeleting(false);
+          console.error(e);
+          alert(`Не удалось удалить: ${e?.message || "ошибка"}`);
+        }
+      } else {
+        setDeleting(false);
+      }
+    })
   };
 
   return (
     <div className="add-modal raw-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content">
+      <div className="add-modal__overlay z-50!" onClick={onClose} />
+      <div className="add-modal__content z-50!">
         <div className="add-modal__header">
           <h3>Редактирование сырья</h3>
           <X className="add-modal__close-icon" onClick={onClose} />
@@ -291,6 +306,7 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
             name="quantity"
             min="0"
             step="0.0001"
+            max={2147483647}
             value={form.quantity}
             onChange={onChange}
             required
@@ -300,14 +316,9 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
 
         <div className="add-modal__footer">
           <button
-            className="add-modal__cancel"
+            className="add-modal__save bg-red-400! text-white!"
             onClick={onDelete}
             disabled={saving || deleting}
-            style={{
-              background: "transparent",
-              border: "1px solid #e55",
-              color: "#e55",
-            }}
           >
             {deleting ? "Удаление..." : "Удалить"}
           </button>
@@ -545,11 +556,10 @@ const RawMaterialsWarehouse = () => {
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                viewMode === "table"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
-              }`}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
+                }`}
             >
               <Table2 size={16} />
               Таблица
@@ -558,11 +568,10 @@ const RawMaterialsWarehouse = () => {
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                viewMode === "cards"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
-              }`}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-black"
+                }`}
             >
               <LayoutGrid size={16} />
               Карточки
