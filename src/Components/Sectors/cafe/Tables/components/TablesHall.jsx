@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { FaSearch, FaPlus, FaTimes, FaEdit, FaTrash, FaChair, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+// SearchableCombobox используется в модалке создания/редактирования стола
 
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
 
@@ -53,9 +54,9 @@ const TablesHall = ({
   createTable,
   updateTable,
   openConfirm,
+  advancedFilters = { zone: "", status: "", places: "", sort: "number_asc" },
 }) => {
   const [query, setQuery] = useState("");
-  const [zoneFilter, setZoneFilter] = useState("");
 
   // ✅ раскрытие блюд по столам: key = tableId (string)
   const [expandedByTable, setExpandedByTable] = useState(() => ({}));
@@ -80,11 +81,32 @@ const TablesHall = ({
     let filtered = [...(tables || [])];
 
     // Фильтр по зоне
-    if (zoneFilter) {
-      const zoneKey = asKey(zoneFilter);
+    if (advancedFilters.zone) {
+      const zoneKey = asKey(advancedFilters.zone);
       filtered = filtered.filter((t) => {
         const tZoneKey = asKey(t.zone?.id || t.zone);
         return tZoneKey === zoneKey;
+      });
+    }
+
+    // Фильтр по статусу (из расширенных фильтров)
+    if (advancedFilters.status) {
+      filtered = filtered.filter((t) => {
+        const tKey = asKey(t?.id);
+        const hasActive = tKey ? activeByTable.has(tKey) : false;
+        const tableStatus = hasActive ? "busy" : "free";
+        return tableStatus === advancedFilters.status;
+      });
+    }
+
+    // Фильтр по количеству мест (из расширенных фильтров)
+    if (advancedFilters.places) {
+      filtered = filtered.filter((t) => {
+        const places = Number(t.places) || 0;
+        if (advancedFilters.places === "6+") {
+          return places >= 6;
+        }
+        return places === Number(advancedFilters.places);
       });
     }
 
@@ -101,12 +123,43 @@ const TablesHall = ({
 
     // Сортировка
     return filtered.sort((a, b) => {
-      const an = Number(a?.number) || 0;
-      const bn = Number(b?.number) || 0;
-      if (an !== bn) return an - bn;
-      return asKey(a?.id).localeCompare(asKey(b?.id));
+      const sortType = advancedFilters.sort || "number_asc";
+      
+      switch (sortType) {
+        case "number_desc": {
+          const an = Number(a?.number) || 0;
+          const bn = Number(b?.number) || 0;
+          if (bn !== an) return bn - an;
+          return asKey(b?.id).localeCompare(asKey(a?.id));
+        }
+        case "places_asc": {
+          const ap = Number(a?.places) || 0;
+          const bp = Number(b?.places) || 0;
+          if (ap !== bp) return ap - bp;
+          return (Number(a?.number) || 0) - (Number(b?.number) || 0);
+        }
+        case "places_desc": {
+          const ap = Number(a?.places) || 0;
+          const bp = Number(b?.places) || 0;
+          if (bp !== ap) return bp - ap;
+          return (Number(b?.number) || 0) - (Number(a?.number) || 0);
+        }
+        case "zone": {
+          const az = String(zoneTitleByAny(a.zone) || "").toLowerCase();
+          const bz = String(zoneTitleByAny(b.zone) || "").toLowerCase();
+          if (az !== bz) return az.localeCompare(bz, "ru");
+          return (Number(a?.number) || 0) - (Number(b?.number) || 0);
+        }
+        case "number_asc":
+        default: {
+          const an = Number(a?.number) || 0;
+          const bn = Number(b?.number) || 0;
+          if (an !== bn) return an - bn;
+          return asKey(a?.id).localeCompare(asKey(b?.id));
+        }
+      }
     });
-  }, [tables, query, zoneFilter, zoneTitleByAny]);
+  }, [tables, query, advancedFilters, zoneTitleByAny, activeByTable]);
 
   const openCreate = () => {
     setEditId(null);
@@ -296,18 +349,6 @@ const TablesHall = ({
             />
           </div>
 
-          <div className="cafeTables__filterZone">
-            <SearchableCombobox
-              value={zoneFilter}
-              onChange={setZoneFilter}
-              options={[
-                { value: "", label: "Все зоны" },
-                ...(zones || []).map((z) => ({ value: z.id, label: z.title })),
-              ]}
-              placeholder="Фильтр по зоне"
-              classNamePrefix="cafeTablesCombo"
-            />
-          </div>
         </div>
 
         <button

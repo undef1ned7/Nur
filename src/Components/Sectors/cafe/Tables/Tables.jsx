@@ -1,9 +1,10 @@
 // src/.../Tables.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaChair, FaTimes, FaPlus } from "react-icons/fa";
+import { FaChair, FaTimes, FaPlus, FaFilter } from "react-icons/fa";
 import api from "../../../../api";
 import TablesHall from "./components/TablesHall";
 import TablesZones from "./components/TablesZones";
+import TablesFiltersModal from "./components/TablesFiltersModal";
 import "./Tables.scss";
 
 const listFrom = (r) => r?.data?.results || r?.data || [];
@@ -42,6 +43,25 @@ const Tables = () => {
   // ✅ прокидываем в Zones: открыть создание зоны из header
   const [zonesCreatePing, setZonesCreatePing] = useState(0);
   const pingCreateZone = () => setZonesCreatePing((n) => n + 1);
+
+  // Фильтры модальное окно
+  const [filtersModalOpen, setFiltersModalOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState({
+    zone: "",
+    status: "",
+    places: "",
+    sort: "number_asc",
+  });
+
+  // Подсчёт активных фильтров
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (advancedFilters.zone) count++;
+    if (advancedFilters.status) count++;
+    if (advancedFilters.places) count++;
+    if (advancedFilters.sort && advancedFilters.sort !== "number_asc") count++;
+    return count;
+  }, [advancedFilters]);
 
   const openConfirm = (type, id) => {
     setConfirmType(type);
@@ -268,24 +288,17 @@ const Tables = () => {
         <div className="cafeTables__headRight">
           <div className="cafeTables__topActions">
             {activeTab === "tables" && (
-              <div className="cafeTables__viewSwitch" title="Режим отображения">
-                <button
-                  type="button"
-                  className={`cafeTables__viewBtn ${tablesView === "manage" ? "cafeTables__viewBtn--active" : ""}`}
-                  onClick={() => setTablesView("manage")}
-                  aria-label="Список"
-                >
-                  ≡
-                </button>
-                <button
-                  type="button"
-                  className={`cafeTables__viewBtn ${tablesView === "hall" ? "cafeTables__viewBtn--active" : ""}`}
-                  onClick={() => setTablesView("hall")}
-                  aria-label="Зал"
-                >
-                  ▦
-                </button>
-              </div>
+              <button
+                type="button"
+                className={`cafeTables__btn cafeTables__btn--filter ${activeFiltersCount > 0 ? "cafeTables__btn--filter-active" : ""}`}
+                onClick={() => setFiltersModalOpen(true)}
+                title="Фильтры"
+              >
+                <FaFilter />
+                {activeFiltersCount > 0 && (
+                  <span className="cafeTables__filterBadge">{activeFiltersCount}</span>
+                )}
+              </button>
             )}
 
             <div className="cafeTables__headGroup">
@@ -302,7 +315,7 @@ const Tables = () => {
                   className={`cafeTables__switchBtn ${activeTab === "zones" ? "cafeTables__switchBtn--active" : ""}`}
                   onClick={() => setActiveTab("zones")}
                 >
-                  <FaPlus /> Зоны
+                  Зоны
                 </button>
               </div>
 
@@ -326,6 +339,7 @@ const Tables = () => {
           createTable={createTable}
           updateTable={updateTable}
           openConfirm={openConfirm}
+          advancedFilters={advancedFilters}
         />
       ) : (
         <TablesZones
@@ -335,6 +349,18 @@ const Tables = () => {
           updateZone={updateZone}
           openConfirm={openConfirm}
           createPing={zonesCreatePing}
+        />
+      )}
+
+      {activeTab === "tables" && (
+        <TablesFiltersModal
+          isOpen={filtersModalOpen}
+          onClose={() => setFiltersModalOpen(false)}
+          filters={advancedFilters}
+          onApply={setAdvancedFilters}
+          zones={zones}
+          tablesView={tablesView}
+          onViewChange={setTablesView}
         />
       )}
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   FaPhone,
   FaUser,
@@ -10,6 +10,7 @@ import {
   FaBan,
   FaExclamationTriangle,
   FaCalendarAlt,
+  FaSpinner,
 } from "react-icons/fa";
 import BarberSelect from "../../common/BarberSelect";
 
@@ -42,6 +43,7 @@ const fmtTime = (timeStr) => {
 };
 
 const RequestCard = ({ request, onStatusChange, onClick }) => {
+  const [statusLoading, setStatusLoading] = useState(false);
   const statusInfo = STATUS_MAP[request.status] || STATUS_MAP.new;
   const StatusIcon = statusInfo.icon;
 
@@ -49,8 +51,14 @@ const RequestCard = ({ request, onStatusChange, onClick }) => {
     e.stopPropagation();
   };
 
-  const handleStatusChange = (newValue) => {
-    onStatusChange(request.id, newValue);
+  const handleStatusChange = async (newValue) => {
+    if (statusLoading) return;
+    setStatusLoading(true);
+    try {
+      await onStatusChange(request.id, newValue);
+    } finally {
+      setStatusLoading(false);
+    }
   };
 
   return (
@@ -58,7 +66,11 @@ const RequestCard = ({ request, onStatusChange, onClick }) => {
       <div className="barberrequests__cardHeader">
         <div className="barberrequests__statusWrap" onClick={handleStatusClick}>
           <div className={`barberrequests__statusIndicator barberrequests__statusIndicator--${request.status}`}>
-            <StatusIcon className="barberrequests__statusIndicatorIcon" />
+            {statusLoading ? (
+              <FaSpinner className="barberrequests__statusIndicatorIcon barberrequests__spinner" />
+            ) : (
+              <StatusIcon className="barberrequests__statusIndicatorIcon" />
+            )}
           </div>
           <BarberSelect
             value={request.status}
@@ -68,6 +80,7 @@ const RequestCard = ({ request, onStatusChange, onClick }) => {
             hideClear
             hideSearch
             className="barberrequests__statusSelect"
+            disabled={statusLoading}
           />
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaSearch, FaFilter } from "react-icons/fa";
 import {
   RequestCard,
@@ -7,11 +7,10 @@ import {
   Pager,
 } from "./components";
 import "./Requests.scss";
+import api from "../../../../api";
 
-// TODO: Раскомментировать когда бек будет готов
-// import api from "../../../../api";
-// const REQUESTS_EP = "/barbershop/online-requests/";
-// const EMPLOYEES_EP = "/users/employees/";
+const BOOKINGS_EP = "/barbershop/bookings/";
+const EMPLOYEES_EP = "/users/employees/";
 
 /* ===== Status tabs config ===== */
 const STATUS_TABS = [
@@ -24,9 +23,27 @@ const STATUS_TABS = [
 
 const PAGE_SIZE = 10;
 
+/* ===== helpers ===== */
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
+
+const fetchPaged = async (url, params = {}) => {
+  const acc = [];
+  let next = url;
+  const seen = new Set();
+  while (next && !seen.has(next)) {
+    seen.add(next);
+    const { data } = await api.get(next, { params: next === url ? params : {} });
+    acc.push(...asArray(data));
+    next = data?.next;
+  }
+  return acc;
+};
+
 const Requests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [employees, setEmployees] = useState([]);
 
   /* Filters */
   const [search, setSearch] = useState("");
@@ -42,17 +59,62 @@ const Requests = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  /* Master options for filter - пустой пока нет бека */
-  const masterOptions = useMemo(() => {
-    return [{ value: "", label: "Все мастера" }];
+  /* ===== Fetch bookings from backend ===== */
+  const fetchBookings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPaged(BOOKINGS_EP, { page_size: 100 });
+      setRequests(data);
+    } catch (err) {
+      console.error("Error fetching bookings:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  /* Handle status change - пока локально */
-  const handleStatusChange = (requestId, newStatus) => {
+  /* ===== Fetch employees for master filter ===== */
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const data = await fetchPaged(EMPLOYEES_EP);
+      setEmployees(data);
+    } catch (err) {
+      console.error("Error fetching employees:", err);
+    }
+  }, []);
+
+  /* ===== Initial load ===== */
+  useEffect(() => {
+    fetchBookings();
+    fetchEmployees();
+  }, [fetchBookings, fetchEmployees]);
+
+  /* Master options for filter */
+  const masterOptions = useMemo(() => {
+    const opts = [{ value: "", label: "Все мастера" }];
+    employees.forEach((e) => {
+      const first = e.first_name ?? "";
+      const last = e.last_name ?? "";
+      const name = [first, last].filter(Boolean).join(" ").trim() || e.email || "—";
+      opts.push({ value: e.id, label: name });
+    });
+    return opts;
+  }, [employees]);
+
+  /* Handle status change via API */
+  const handleStatusChange = useCallback(async (requestId, newStatus) => {
+    // Optimistic update
     setRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
     );
-  };
+    
+    try {
+      await api.patch(`${BOOKINGS_EP}${requestId}/status/`, { status: newStatus });
+    } catch (err) {
+      console.error("Error updating status:", err);
+      // Revert on error
+      fetchBookings();
+    }
+  }, [fetchBookings]);
 
   /* Filter & sort */
   const filtered = useMemo(() => {

@@ -156,6 +156,7 @@ import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
 import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
+import OnlineBooking from "../Components/Sectors/Barber/OnlineBooking/OnlineBooking";
 
 
 /**
@@ -212,6 +213,11 @@ export const publicRoutes = [
     key="/cafe/:company_slug/menu"
     path="/cafe/:company_slug/menu"
     element={<CafeMenuOnline />}
+  />,
+  <Route
+    key="/barber/:company_slug/booking"
+    path="/barber/:company_slug/booking"
+    element={<OnlineBooking />}
   />,
 
 

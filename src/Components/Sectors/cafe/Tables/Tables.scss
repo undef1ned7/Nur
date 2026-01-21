@@ -10,6 +10,7 @@
  */
 
 @use "../../../common/SearchableCombobox/SearchableCombobox.scss";
+@use "./components/TablesFiltersModal.scss";
 
 /* ===== MAIN CONTAINER ===== */
 .cafeTables {
@@ -307,6 +308,48 @@
         background: rgba(34, 197, 94, 0.18);
       }
     }
+
+    &--filter {
+      position: relative;
+      min-width: 44px;
+      padding: 10px;
+      background: var(--surface);
+      border-color: var(--border);
+      color: var(--muted);
+
+      &:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        color: var(--text);
+      }
+    }
+
+    &--filter-active {
+      background: rgba(247, 215, 79, 0.15);
+      border-color: var(--primary);
+      color: var(--primary-dark);
+
+      &:hover {
+        background: rgba(247, 215, 79, 0.25);
+      }
+    }
+  }
+
+  &__filterBadge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: var(--primary);
+    color: #1a1a1a;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
   }
 
   /* ===== Manage List View ===== */
