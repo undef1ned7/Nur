@@ -1017,37 +1017,7 @@
     resize: vertical;
   }
 
-  /* ===== Payment Options ===== */
-  &__paymentOptions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
 
-  &__paymentBtn {
-    flex: 1;
-    min-width: 100px;
-    padding: 14px 16px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 12px;
-    background: #fff;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text);
-    cursor: pointer;
-    transition: all 0.15s ease;
-
-    &:hover {
-      border-color: rgba(247, 215, 79, 0.5);
-    }
-
-    &.is-selected {
-      border-color: var(--primary);
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      color: #111;
-      box-shadow: 0 2px 8px rgba(247, 215, 79, 0.3);
-    }
-  }
 
   /* ===== Confirm Card ===== */
   &__confirmCard {
@@ -1517,15 +1487,7 @@
       grid-template-columns: repeat(3, 1fr);
     }
 
-    &__paymentOptions {
-      gap: 8px;
-    }
 
-    &__paymentBtn {
-      min-width: 80px;
-      padding: 12px 10px;
-      font-size: 13px;
-    }
 
     &__nav {
       gap: 8px;

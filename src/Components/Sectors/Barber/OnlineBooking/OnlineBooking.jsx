@@ -102,11 +102,7 @@ const START_OPTIONS = [
   { id: "master", label: "Выбрать мастера", icon: FaUser, desc: "Начните с выбора мастера" },
 ];
 
-const PAYMENT_METHODS = [
-  { value: "cash", label: "Наличными" },
-  { value: "card", label: "Картой" },
-  { value: "online", label: "Онлайн" },
-];
+
 
 /* ===== Generate time slots ===== */
 const generateTimeSlots = (startHour = 9, endHour = 21, interval = 30) => {
@@ -161,7 +157,7 @@ const OnlineBooking = () => {
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientComment, setClientComment] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+
 
   /* ===== UI state ===== */
   const [searchServices, setSearchServices] = useState("");
@@ -556,7 +552,7 @@ const OnlineBooking = () => {
         client_name: clientName.trim(),
         client_phone: clientPhone.trim(),
         client_comment: clientComment.trim() || null,
-        payment_method: paymentMethod,
+
       };
 
       await api.post(`/barbershop/public/${slug}/bookings/`, payload);
@@ -1046,24 +1042,6 @@ const OnlineBooking = () => {
                   />
                 </div>
 
-                <div className="ob__field">
-                  <label className="ob__label">
-                    <FaCreditCard className="ob__labelIcon" />
-                    Способ оплаты
-                  </label>
-                  <div className="ob__paymentOptions">
-                    {PAYMENT_METHODS.map((pm) => (
-                      <button
-                        key={pm.value}
-                        type="button"
-                        className={`ob__paymentBtn ${paymentMethod === pm.value ? "is-selected" : ""}`}
-                        onClick={() => setPaymentMethod(pm.value)}
-                      >
-                        {pm.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -1118,12 +1096,6 @@ const OnlineBooking = () => {
                     </div>
                   )}
 
-                  <div className="ob__confirmRow">
-                    <span className="ob__confirmLabel">Оплата</span>
-                    <span className="ob__confirmValue">
-                      {PAYMENT_METHODS.find((pm) => pm.value === paymentMethod)?.label}
-                    </span>
-                  </div>
 
                   <div className="ob__confirmTotal">
                     <span>К оплате</span>
