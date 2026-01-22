@@ -25,8 +25,8 @@ const CatalogControls = ({
   };
 
   return (
-    <div className="catalog-controls">
-      <form onSubmit={handleSearch} className="search-form">
+    <div className="catalog-controls w-full">
+      <form onSubmit={handleSearch} className="search-form w-full max-w-full! lg:max-w-100!">
         <div className="search-input-group">
           <Search size={20} className="search-icon" />
           <input

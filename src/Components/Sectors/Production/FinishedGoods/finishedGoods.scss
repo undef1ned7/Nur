@@ -339,6 +339,10 @@
 
   .warehouse-header {
     flex-wrap: wrap;
+
+    &__create-btn {
+      width: auto;
+    }
   }
 }
 
@@ -350,9 +354,9 @@
   .warehouse-header {
     flex-direction: column;
     align-items: flex-start;
-
     &__left {
       width: 100%;
+      justify-content: center;
     }
 
     &__create-btn {
@@ -403,7 +407,8 @@
   }
 
   .warehouse-cards {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     padding: 8px;
   }
 
@@ -415,7 +420,7 @@
 
 @media (max-width: 480px) {
   .warehouse-page {
-    padding: 12px;
+    padding: 0;
   }
 
   .warehouse-header {
@@ -1396,7 +1401,7 @@
 .finished-goods-modal {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
