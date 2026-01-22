@@ -42,6 +42,7 @@ import { useShifts } from "../../../../store/slices/shiftSlice";
 import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
 // Alert is handled by parent (ProductionCatalog) via onNotify
 import "./Cart.scss";
+import { useConfirm } from "../../../../hooks/useDialog";
 
 // Моковые данные для корзины
 const mockCartItems = [
@@ -84,6 +85,7 @@ const CartItem = ({
   onRemoveItem,
   editable,
 }) => {
+  const confirm = useConfirm();
   const [quantity, setQuantity] = useState(
     Number(item.quantity ?? item.quantity_requested ?? 0)
   );
@@ -172,13 +174,14 @@ const CartItem = ({
     }
   };
 
-  const handleRemove = (e) => {
-    e.stopPropagation();
-    if (window.confirm("Удалить товар из корзины?")) {
-      onRemoveItem(item.id);
-    }
-  };
-
+  const handleRemove = useCallback((e) => {
+    e?.stopPropagation();
+    confirm("Удалить товар из корзины?", (result) => {
+      if (result) {
+        onRemoveItem(item.id);
+      }
+    })
+  }, []);
   const handleGiftIncrement = (e) => {
     e.stopPropagation();
     if (!editable) return;
@@ -298,7 +301,7 @@ const CartItem = ({
             Общий:{" "}
             {Number(
               Number(item.unit_price || item.price_snapshot || 0) *
-                (Number(item.quantity || 0) + Number(giftQty || 0))
+              (Number(item.quantity || 0) + Number(giftQty || 0))
             ).toLocaleString()}
             .00
           </p>
@@ -579,16 +582,15 @@ const ClientSelector = ({
                     return (
                       <button
                         key={client?.id ?? `${name}-${client?.address ?? ""}`}
-                        className={`client-option ${
-                          selectedClient?.id && client?.id
-                            ? selectedClient.id === client.id
-                              ? "selected"
-                              : ""
-                            : getClientName(selectedClient) === name &&
-                              selectedClient?.address === client?.address
+                        className={`client-option ${selectedClient?.id && client?.id
+                          ? selectedClient.id === client.id
                             ? "selected"
                             : ""
-                        }`}
+                          : getClientName(selectedClient) === name &&
+                            selectedClient?.address === client?.address
+                            ? "selected"
+                            : ""
+                          }`}
                         onClick={() => {
                           onClientSelect(client);
                           setIsOpen(false);
@@ -820,10 +822,10 @@ const OrderSummary = ({
         {isSubmitted
           ? "Отправлено"
           : isApproved
-          ? "Одобрено"
-          : isRejected
-          ? "Отклонено"
-          : "Продать"}{" "}
+            ? "Одобрено"
+            : isRejected
+              ? "Отклонено"
+              : "Продать"}{" "}
         ({qty})
       </button>
     </div>
@@ -838,6 +840,7 @@ const Cart = ({
   onOpenChange,
   totalItemsCount = 0,
 }) => {
+  const confirm = useConfirm();
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
   const { shifts, currentShift } = useShifts();
@@ -1261,9 +1264,8 @@ const Cart = ({
         // Создаем сделку
         const dealPayload = {
           clientId: selectedClient.id,
-          title: `${paymentType} ${
-            selectedClient.full_name || selectedClient.phone || "Клиент"
-          }`,
+          title: `${paymentType} ${selectedClient.full_name || selectedClient.phone || "Клиент"
+            }`,
           statusRu: paymentType,
           amount: totalAmount,
           debtMonths: Number(debtMonths || 0),
@@ -1432,7 +1434,7 @@ const Cart = ({
       const isAtTop = !contentElement || contentElement.scrollTop <= 0;
       if (isAtTop && window.scrollY <= 0) {
         // Предотвращаем pull-to-refresh при начале касания в начале страницы
-        e.preventDefault();
+        e?.preventDefault?.();
       }
     }
   };
@@ -1714,7 +1716,7 @@ const Cart = ({
     <div className="cart-column cart-items-column">
       <div className="cart-items-section">
         {(agentItems || []).length === 0 &&
-        (cartItemsLocal || []).length === 0 ? (
+          (cartItemsLocal || []).length === 0 ? (
           <div className="empty-cart">
             <ShoppingCart size={64} />
             <h3>Корзина пуста</h3>
@@ -1779,7 +1781,7 @@ const Cart = ({
       {/* Модалка корзины - открывается при нажатии на кнопку корзины в ProductionCatalog */}
       {isOpen && (
         <div
-          className="cart-modal-overlay"
+          className="cart-modal-overlay z-50!"
           onClick={(e) => {
             // Закрываем модалку только при клике на overlay, а не на контент
             if (e.target === e.currentTarget) {
@@ -1826,7 +1828,7 @@ const Cart = ({
       {/* Overlay для блокировки заднего фона - для мобильных/планшетов */}
       {isMobile && isOrderSectionOpen && !isClosing && (
         <div
-          className="mobile-order-overlay"
+          className="mobile-order-overlay z-50!"
           onClick={handleCloseOrderSection}
         />
       )}
@@ -1834,9 +1836,8 @@ const Cart = ({
       {/* Секция заказа внизу экрана - для мобильных/планшетов */}
       {isMobile && (
         <div
-          className={`mobile-order-section ${
-            isOrderSectionOpen ? "open" : ""
-          } ${isClosing ? "closing" : ""}`}
+          className={`mobile-order-section ${isOrderSectionOpen ? "open" : ""
+            } ${isClosing ? "closing" : ""} z-50!`}
           onTouchStart={handleOrderTouchStart}
           onTouchMove={handleOrderTouchMove}
           onTouchEnd={handleOrderTouchEnd}

@@ -261,7 +261,6 @@ export const migrateUserPermissions = async () => {
         return { migrated: false, error: updateError.message };
       }
     }
-
     return { migrated: false, reason: "Permissions already up to date" };
   } catch (error) {
     console.error("Error migrating user permissions:", error);
