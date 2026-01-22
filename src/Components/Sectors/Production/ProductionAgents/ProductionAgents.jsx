@@ -514,6 +514,7 @@ const ProductionAgents = () => {
     agentProductsLoading,
     agentProductsError,
   } = useProducts();
+  
   const { start: startInAgent } = useAgent();
   const {isMobile} = useResize((media) => {
     const {isMobile} = media
@@ -668,6 +669,17 @@ const ProductionAgents = () => {
       })
       .catch((e) => console.log(e));
   }, []);
+
+  // Обработчик для кнопки "Продать товар"
+  const handleStartSale = async () => {
+    try {
+      await dispatch(startSaleInAgent()).unwrap();
+      setShowStart(true);
+    } catch (error) {
+      console.error("Ошибка при инициализации продажи:", error);
+      alert("Не удалось начать продажу. Попробуйте еще раз.");
+    }
+  };
 
   // Функция для загрузки истории продаж
   const loadSalesHistory = useCallback(async () => {
@@ -826,13 +838,18 @@ const ProductionAgents = () => {
                 </div>
                 <div className="flex mx-auto gap-3 lg:mr-0 flex-wrap justify-center">
                   {profile?.role !== "owner" ? (
-                    <button
-                      className="warehouse-header__create-btn"
-                      onClick={() => setShowPendingModal(true)}
-                    >
-                      <Plus size={16} />
-                      Мои передачи
-                    </button>
+                  <div className="flex gap-2 align-middle">  <button
+                  className="warehouse-header__create-btn"
+                  onClick={() => setShowPendingModal(true)}
+                >
+                  <Plus size={16} />
+                  Мои передачи
+                </button>
+                <button className="warehouse-header__create-btn" onClick={handleStartSale}>
+                  <Plus size={16} />
+                  Продать товар
+                </button>
+                </div>
                   ) : (
                     <button
                       className="warehouse-header__create-btn"
