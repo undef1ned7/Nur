@@ -94,14 +94,12 @@ const STEP_DEFS = {
 const STEP_ORDERS = {
   services: ["services", "master", "datetime", "info", "confirm"],
   master: ["master", "services", "datetime", "info", "confirm"],
-  datetime: ["datetime", "services", "master", "info", "confirm"],
 };
 
 /* ===== Start options ===== */
 const START_OPTIONS = [
   { id: "services", label: "Выбрать услугу", icon: FaCut, desc: "Начните с выбора услуги" },
   { id: "master", label: "Выбрать мастера", icon: FaUser, desc: "Начните с выбора мастера" },
-  { id: "datetime", label: "Выбрать дату", icon: FaCalendarAlt, desc: "Начните с выбора даты" },
 ];
 
 const PAYMENT_METHODS = [
@@ -148,13 +146,14 @@ const OnlineBooking = () => {
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [masters, setMasters] = useState([]);
-  const [bookings, setBookings] = useState([]);
+  const [availability, setAvailability] = useState(null); // данные о занятости мастеров
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
   /* ===== Booking state ===== */
   const [stepIndex, setStepIndex] = useState(-1); // -1 = start screen
-  const [startChoice, setStartChoice] = useState(null); // "services" | "master" | "datetime"
+  const [startChoice, setStartChoice] = useState(null); // "services" | "master"
   const [selectedServices, setSelectedServices] = useState([]);
   const [selectedMaster, setSelectedMaster] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -197,19 +196,15 @@ const OnlineBooking = () => {
       const servicesUrl = `/barbershop/public/${slug}/services/`;
       const categoriesUrl = `/barbershop/public/${slug}/service-categories/`;
       const mastersUrl = `/barbershop/public/${slug}/masters/`;
-      // TODO: Когда бэк даст эндпоинт для записей, добавить:
-      // const bookingsUrl = `/barbershop/public/${slug}/bookings/`;
 
       const [servicesData, categoriesData, mastersData] = await Promise.all([
         fetchAll(servicesUrl).catch(() => []),
         fetchAll(categoriesUrl).catch(() => []),
         fetchAll(mastersUrl).catch(() => []),
-        // TODO: fetchAll(bookingsUrl).catch(() => []),
       ]);
 
       setServices(servicesData || []);
       setMasters(mastersData || []);
-      // TODO: setBookings(bookingsData || []);
       setCategories((categoriesData || []).map((c) => ({
         id: c.id,
         name: c.name,
@@ -228,6 +223,63 @@ const OnlineBooking = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  /* ===== Load availability when date changes ===== */
+  const loadAvailability = useCallback(async (date, masterId = null) => {
+    if (!date || !company_slug) return;
+
+    setLoadingAvailability(true);
+    try {
+      const slug = normStr(company_slug);
+      let url;
+      
+      // Если выбран мастер, используем schedule endpoint
+      if (masterId) {
+        url = `/barbershop/public/${slug}/masters/${masterId}/schedule/?date=${date}&days=7`;
+      } else {
+        // Иначе используем общий availability
+        url = `/barbershop/public/${slug}/masters/availability/?date=${date}`;
+      }
+      
+      const res = await api.get(url);
+      const data = res?.data;
+      
+      // Если это schedule одного мастера, преобразуем в формат availability
+      if (masterId && data) {
+        setAvailability({
+          masters: [{
+            master_id: data.master_id || masterId,
+            work_start: data.work_start,
+            work_end: data.work_end,
+            busy_slots: data.busy_slots || []
+          }]
+        });
+      } else if (data) {
+        // Для общего availability проверяем формат
+        if (data.masters && Array.isArray(data.masters)) {
+          setAvailability(data);
+        } else {
+          // Если формат другой, пытаемся адаптировать
+          setAvailability({ masters: [data] });
+        }
+      } else {
+        setAvailability(null);
+      }
+    } catch (e) {
+      console.error("Error loading availability:", e);
+      setAvailability(null);
+    } finally {
+      setLoadingAvailability(false);
+    }
+  }, [company_slug]);
+
+  // Загружаем availability при изменении даты или мастера
+  useEffect(() => {
+    if (selectedDate) {
+      const masterId = selectedMaster?.id || null;
+      loadAvailability(selectedDate, masterId);
+    }
+  }, [selectedDate, selectedMaster, loadAvailability]);
 
   /* ===== Filtered services ===== */
   const filteredServices = useMemo(() => {
@@ -275,43 +327,125 @@ const OnlineBooking = () => {
 
   /* ===== Busy time slots for selected date and master ===== */
   const busySlots = useMemo(() => {
-    if (!selectedDate) return new Set();
+    if (!selectedDate || !availability?.masters) return new Set();
 
     const set = new Set();
     const SLOT_INTERVAL = 30;
+    const TIMEZONE_OFFSET_HOURS = 6; // UTC+6 для Кыргызстана
 
-    // Фильтруем записи по дате и мастеру (если выбран)
-    const relevantBookings = bookings.filter((b) => {
-      if (b.date !== selectedDate) return false;
-      // Только подтверждённые статусы
-      if (!["new", "confirmed"].includes(b.status)) return false;
-      // Если выбран мастер, фильтруем по нему
-      if (selectedMaster && b.master_id && String(b.master_id) !== String(selectedMaster.id)) {
-        return false;
-      }
-      return true;
-    });
+    // Получаем данные о занятости мастеров
+    let mastersToCheck = availability.masters;
 
-    relevantBookings.forEach((booking) => {
-      const startTime = booking.time_start?.slice(0, 5);
-      const endTime = booking.time_end?.slice(0, 5);
-      
-      if (!startTime || !endTime) return;
+    // Если выбран конкретный мастер, фильтруем только его
+    if (selectedMaster) {
+      mastersToCheck = mastersToCheck.filter(
+        (m) => String(m.master_id) === String(selectedMaster.id)
+      );
+    }
 
-      const [startH, startM] = startTime.split(":").map(Number);
-      const [endH, endM] = endTime.split(":").map(Number);
-      const startMins = startH * 60 + startM;
-      const endMins = endH * 60 + endM;
+    // Собираем все занятые слоты
+    mastersToCheck.forEach((master) => {
+      (master.busy_slots || []).forEach((slot) => {
+        // Парсим время из ISO формата: "2026-01-23T04:00:00Z" (UTC)
+        const startAt = slot.start_at;
+        const endAt = slot.end_at;
 
-      // Помечаем все слоты, которые пересекаются с записью
-      for (let mins = startMins; mins < endMins; mins += SLOT_INTERVAL) {
-        const slotTime = `${pad2(Math.floor(mins / 60))}:${pad2(mins % 60)}`;
-        set.add(slotTime);
-      }
+        if (!startAt || !endAt) return;
+
+        // Парсим UTC время напрямую (без учета локального часового пояса браузера)
+        // Формат: "2026-01-23T04:00:00Z" -> извлекаем дату и время
+        const startMatch = startAt.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+        const endMatch = endAt.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+        
+        if (!startMatch || !endMatch) return;
+        
+        // Извлекаем компоненты UTC времени
+        const startYear = parseInt(startMatch[1], 10);
+        const startMonth = parseInt(startMatch[2], 10) - 1; // месяцы 0-11
+        const startDay = parseInt(startMatch[3], 10);
+        const startHourUTC = parseInt(startMatch[4], 10);
+        const startMinUTC = parseInt(startMatch[5], 10);
+        
+        const endYear = parseInt(endMatch[1], 10);
+        const endMonth = parseInt(endMatch[2], 10) - 1;
+        const endDay = parseInt(endMatch[3], 10);
+        const endHourUTC = parseInt(endMatch[4], 10);
+        const endMinUTC = parseInt(endMatch[5], 10);
+        
+        // Добавляем 6 часов для перевода из UTC в местное время (UTC+6)
+        const startHourLocal = startHourUTC + TIMEZONE_OFFSET_HOURS;
+        const endHourLocal = endHourUTC + TIMEZONE_OFFSET_HOURS;
+        
+        // Создаем дату в местном времени для проверки даты
+        const startDateLocal = new Date(startYear, startMonth, startDay, startHourLocal, startMinUTC);
+        const endDateLocal = new Date(endYear, endMonth, endDay, endHourLocal, endMinUTC);
+        
+        // Проверяем, что запись относится к выбранной дате
+        const slotDateStr = formatDate(startDateLocal);
+        if (slotDateStr !== selectedDate) return;
+
+        // Вычисляем минуты в местном времени
+        const startMins = startHourLocal * 60 + startMinUTC;
+        const endMins = endHourLocal * 60 + endMinUTC;
+
+        // Помечаем все слоты, которые пересекаются с записью
+        for (let mins = startMins; mins < endMins; mins += SLOT_INTERVAL) {
+          const hours = Math.floor(mins / 60);
+          const minutes = mins % 60;
+          // Обрабатываем переход через полночь
+          if (hours >= 24) {
+            // Если вышли за пределы дня, пропускаем
+            continue;
+          }
+          const slotTime = `${pad2(hours)}:${pad2(minutes)}`;
+          set.add(slotTime);
+        }
+      });
     });
 
     return set;
-  }, [selectedDate, selectedMaster, bookings]);
+  }, [selectedDate, selectedMaster, availability]);
+
+  /* ===== Get work hours from availability ===== */
+  const workHours = useMemo(() => {
+    if (!availability?.masters?.length) {
+      return { start: 9, end: 21 }; // default
+    }
+
+    // Если выбран мастер, берём его рабочее время
+    if (selectedMaster) {
+      const masterData = availability.masters.find(
+        (m) => String(m.master_id) === String(selectedMaster.id)
+      );
+      if (masterData?.work_start && masterData?.work_end) {
+        const [startH] = masterData.work_start.split(":").map(Number);
+        const [endH] = masterData.work_end.split(":").map(Number);
+        return { start: startH, end: endH };
+      }
+    }
+
+    // Иначе берём общее время (минимум начала, максимум конца)
+    let minStart = 24;
+    let maxEnd = 0;
+    availability.masters.forEach((m) => {
+      if (m.work_start && m.work_end) {
+        const [startH] = m.work_start.split(":").map(Number);
+        const [endH] = m.work_end.split(":").map(Number);
+        if (startH < minStart) minStart = startH;
+        if (endH > maxEnd) maxEnd = endH;
+      }
+    });
+
+    return {
+      start: minStart < 24 ? minStart : 9,
+      end: maxEnd > 0 ? maxEnd : 21,
+    };
+  }, [availability, selectedMaster]);
+
+  /* ===== Generate time slots based on work hours ===== */
+  const timeSlots = useMemo(() => {
+    return generateTimeSlots(workHours.start, workHours.end, 30);
+  }, [workHours]);
 
   /* ===== Check if time slot can fit selected services ===== */
   const canFitSlot = useCallback((slotTime) => {
@@ -329,11 +463,11 @@ const OnlineBooking = () => {
       if (busySlots.has(checkTime)) return false;
     }
 
-    // Проверяем, что не выходим за рабочее время (до 21:00)
-    if (endMins > 21 * 60) return false;
+    // Проверяем, что не выходим за рабочее время
+    if (endMins > workHours.end * 60) return false;
 
     return true;
-  }, [busySlots, summary.totalDuration]);
+  }, [busySlots, summary.totalDuration, workHours.end]);
 
   /* ===== Calculate end time ===== */
   const timeEnd = useMemo(() => {
@@ -795,13 +929,34 @@ const OnlineBooking = () => {
                 </div>
 
                 <div className="ob__timeGrid">
-                  {TIME_SLOTS.map((time) => {
+                  {loadingAvailability && (
+                    <div className="ob__loadingSlots">
+                      <FaSpinner className="ob__spinner" />
+                      <span>Загрузка...</span>
+                    </div>
+                  )}
+                  {!loadingAvailability && timeSlots.map((time) => {
                     const isBusy = busySlots.has(time);
                     const canFit = canFitSlot(time);
                     const isSelected = selectedTime === time;
+                    
+                    // Проверяем, входит ли слот в выбранный диапазон
+                    let isInSelectedRange = false;
+                    if (selectedTime) {
+                      const [selectedH, selectedM] = selectedTime.split(":").map(Number);
+                      const selectedMins = selectedH * 60 + selectedM;
+                      const [timeH, timeM] = time.split(":").map(Number);
+                      const timeMins = timeH * 60 + timeM;
+                      const totalDuration = summary.totalDuration || 30;
+                      const endMins = selectedMins + totalDuration;
+                      
+                      // Слот входит в диапазон, если он между началом и концом выбранного времени
+                      isInSelectedRange = timeMins >= selectedMins && timeMins < endMins;
+                    }
 
                     let slotClass = "ob__timeSlot";
                     if (isSelected) slotClass += " is-selected";
+                    else if (isInSelectedRange) slotClass += " is-selected-range";
                     else if (isBusy) slotClass += " is-busy";
                     else if (!canFit) slotClass += " is-partial";
                     else slotClass += " is-free";
@@ -827,13 +982,18 @@ const OnlineBooking = () => {
                     );
                   })}
                 </div>
+                
+                {!loadingAvailability && timeSlots.length === 0 && (
+                  <div className="ob__empty">Нет доступного времени на эту дату</div>
+                )}
 
                 {selectedTime && (
                   <div className="ob__timePreview">
                     <FaClock />
-                    <span>
-                      {formatTime(selectedTime)} – {formatTime(timeEnd)} ({summary.totalDuration} мин)
+                    <span className="ob__timePreviewText">
+                      <strong>{formatTime(selectedTime)}</strong> – <strong>{formatTime(timeEnd)}</strong>
                     </span>
+                    <span className="ob__timePreviewDuration">({summary.totalDuration} мин)</span>
                   </div>
                 )}
               </div>
