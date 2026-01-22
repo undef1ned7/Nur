@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   X,
@@ -44,39 +44,6 @@ import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
 import "./Cart.scss";
 import { useConfirm } from "../../../../hooks/useDialog";
 
-// Моковые данные для корзины
-const mockCartItems = [
-  {
-    id: 1,
-    product: {
-      id: 1,
-      name: "Bitrix24 CRM Базовый тариф",
-      category: "Цифровые книги",
-      price: 2600,
-      image: "https://via.placeholder.com/100x100/4ECDC4/FFFFFF?text=Bitrix24",
-      rating: 4.5,
-      inStock: true,
-    },
-    quantity: 1,
-    store: "MyCloud.kg",
-    total: 2600,
-  },
-  {
-    id: 2,
-    product: {
-      id: 2,
-      name: "Товар 2",
-      category: "Электроника",
-      price: 15000,
-      image: "https://via.placeholder.com/100x100/96CEB4/FFFFFF?text=Product+2",
-      rating: 4.2,
-      inStock: true,
-    },
-    quantity: 1,
-    store: "TechStore.kg",
-    total: 15000,
-  },
-];
 
 const CartItem = ({
   item,
@@ -102,11 +69,6 @@ const CartItem = ({
     // Обновляем только если значения действительно изменились
     setQuantity((prev) => {
       if (prev !== newQuantity) {
-        // console.log("CartItem: syncing quantity", {
-        //   old: prev,
-        //   new: newQuantity,
-        //   itemId: item.id,
-        // });
         return newQuantity;
       }
       return prev;
@@ -131,9 +93,10 @@ const CartItem = ({
     onUpdateQuantity(item.id, newQuantity);
   };
 
-  const handleDecrement = (e) => {
+  const handleDecrement = (e, id) => {
     e.stopPropagation();
-    if (!editable || quantity <= 1) {
+    if (!editable || quantity <= 0) {
+      handleRemove(id)
       console.log(
         "CartItem: decrement disabled, editable:",
         editable,
@@ -205,7 +168,7 @@ const CartItem = ({
           src={
             item?.images?.[0]?.image_url
               ? `https://app.nurcrm.kg/${item.images[0].image_url}`
-              : item?.product_image_url || "https://via.placeholder.com/100x100"
+              : item?.product_image_url || "/images/placeholder.avif"
           }
           alt={item.product_name || "Товар"}
         />
@@ -217,8 +180,8 @@ const CartItem = ({
           {item.product?.category || "Без категории"}
         </p> */}
         <div className="item-price">
-          {Number(item.unit_price || item.price_snapshot || 0) *
-            Number(item.quantity || 0) || 0}{" "}
+          {(Number(item.unit_price || item.price_snapshot || 0) *
+            Number(item.quantity || 0) || 0).toFixed(2)}{" "}
           KGS
         </div>
         {/* <div className="item-rating">
@@ -230,8 +193,8 @@ const CartItem = ({
           <div className="quantity-controls">
             <button
               className="quantity-btn"
-              onClick={handleDecrement}
-              disabled={quantity <= 1 || !editable}
+              onClick={(e) => handleDecrement(e, item.id)}
+              disabled={quantity <= 0 || !editable}
               type="button"
               title="Уменьшить количество"
             >
@@ -239,7 +202,7 @@ const CartItem = ({
             </button>
             <input
               type="number"
-              min="1"
+              min="0"
               value={quantity}
               onChange={handleQuantityInputChange}
               onBlur={handleQuantityInputBlur}
@@ -638,16 +601,33 @@ const OrderSummary = ({
   const cartItems = useSelector(selectCartItems);
   const totalQuantityLocal = useSelector(selectCartItemsCount);
   const subtotalLocal = useSelector(selectCartTotal);
-  const discount = 0; // Моковая скидка
-  console.log("item", items);
+  const { discount,
+    usingServer,
+    isEditable,
+    isDraft,
+    isApproved,
+    isRejected,
+    isSubmitted } = useMemo(() => {
+      const discount = 0; // Моковая скидка
+      const usingServer = Array.isArray(items) && items.length > 0;
+      // Корзина редактируема, если статус "draft" или "active"
+      const isEditable = status === "draft" || status === "active";
+      const isDraft = status === "draft";
+      const isSubmitted = status === "submitted";
+      const isApproved = status === "approved";
+      const isRejected = status === "rejected";
 
-  const usingServer = Array.isArray(items) && items.length > 0;
-  // Корзина редактируема, если статус "draft" или "active"
-  const isEditable = status === "draft" || status === "active";
-  const isDraft = status === "draft";
-  const isSubmitted = status === "submitted";
-  const isApproved = status === "approved";
-  const isRejected = status === "rejected";
+      return {
+        discount,
+        usingServer,
+        isEditable,
+        isDraft,
+        isApproved,
+        isRejected,
+        isSubmitted
+      }
+    })
+
 
   const { qty, amount } = (() => {
     if (!usingServer) {
@@ -838,6 +818,7 @@ const Cart = ({
   onClose,
   isOpen = false,
   onOpenChange,
+  setAgentCartItemsCount,
   totalItemsCount = 0,
 }) => {
   const confirm = useConfirm();
@@ -982,7 +963,7 @@ const Cart = ({
       newQuantity,
       agentCartId,
     });
-    if (!newQuantity || newQuantity < 1) {
+    if (newQuantity < 0) {
       console.log("Cart: invalid quantity", newQuantity);
       return;
     }
@@ -1003,6 +984,7 @@ const Cart = ({
           })
         ).unwrap();
         console.log("Cart: update response", updated);
+        setAgentCartItemsCount(updated?.items?.length || 0)
         // Используем возвращенные данные корзины
         if (updated) {
           setAgentCart(updated);
@@ -1068,6 +1050,7 @@ const Cart = ({
         ).unwrap();
         // Используем возвращенные данные корзины
         if (updated) {
+          setAgentCartItemsCount(updated.items.reduce((acc, item) => acc + item.quantity, 0))
           setAgentCart(updated);
           setAgentItems(Array.isArray(updated.items) ? updated.items : []);
         } else {
@@ -1718,7 +1701,7 @@ const Cart = ({
         {(agentItems || []).length === 0 &&
           (cartItemsLocal || []).length === 0 ? (
           <div className="empty-cart">
-            <ShoppingCart size={64} />
+            <ShoppingCart className="mx-auto" size={64} />
             <h3>Корзина пуста</h3>
             <p>Добавьте товары в корзину</p>
           </div>

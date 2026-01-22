@@ -175,17 +175,14 @@ const ProductCard = ({
 
   const handleQuantityChange = (newQuantity) => {
     // Разрешаем пустое значение или 0 во время ввода
-    if (newQuantity === "" || isNaN(newQuantity) || newQuantity < 1) {
+    if (newQuantity === "" || isNaN(newQuantity) || newQuantity <= 0) {
       setQuantity("");
+      showQuantityControls(false)
       return;
     }
     const qty = Math.min(maxQuantity || 999, Math.max(1, newQuantity));
     setQuantity(qty);
   };
-
-  console.log('QUANTITY', maxQuantity);
-  console.log('PRODUCTS', product)
-
   // Валидация количества при потере фокуса
   const handleQuantityBlur = () => {
     if (quantity === "" || quantity < 1 || isNaN(quantity)) {
@@ -202,8 +199,15 @@ const ProductCard = ({
 
   const handleDecrement = (e) => {
     e.stopPropagation();
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
+    if (quantity > 0) {
+      setQuantity(prev => {
+        let last = quantity - 1;
+        if (last < 1) {
+          setShowQuantityControls(false);
+          return 1;
+        }
+        return quantity - 1
+      });
     }
   };
 
@@ -324,7 +328,7 @@ const ProductCard = ({
               <div className="product-cart-controls">
                 {onAddToCartWithoutCart && (
                   <div className="request-buttons-row">
-                    <button
+                    {/* <button
                       className="request-without-cart-btn"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -337,7 +341,7 @@ const ProductCard = ({
                     >
                       <Send size={14} />
                       Без корзины
-                    </button>
+                    </button> */}
                     <button
                       className="request-with-cart-btn"
                       onClick={handleQuickAdd}
@@ -372,14 +376,14 @@ const ProductCard = ({
                   <button
                     className="quantity-btn-small"
                     onClick={handleDecrement}
-                    disabled={quantity <= 1}
+                    disabled={quantity <= 0}
                     type="button"
                   >
                     <Minus size={14} />
                   </button>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     max={maxQuantity || 999}
                     value={quantity}
                     onChange={(e) =>
@@ -401,7 +405,7 @@ const ProductCard = ({
                 </div>
                 {onAddToCartWithoutCart && (
                   <div className="request-buttons-row">
-                    <button
+                    {/* <button
                       className="request-without-cart-btn"
                       onClick={handleAddToCartWithoutCartClick}
                       disabled={!available || quantity <= 0}
@@ -409,7 +413,7 @@ const ProductCard = ({
                     >
                       <Send size={14} />
                       Без корзины ({quantity})
-                    </button>
+                    </button> */}
                     <button
                       className="request-with-cart-btn"
                       onClick={handleAddToCartClick}
@@ -896,7 +900,7 @@ const ProductionCatalog = () => {
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
   const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
   const [showFilters, setShowFilters] = useState(false);
-  const [showCart, setShowCart] = useState(false);
+  // const [showCart, setShowCart] = useState(false);
   const [isCartSectionOpen, setIsCartSectionOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [agentCartId, setAgentCartId] = useState(null);
@@ -948,16 +952,11 @@ const ProductionCatalog = () => {
       if (cart?.items && Array.isArray(cart.items)) {
         // Подсчитываем общее количество товаров в корзине
         // Используем quantity из ответа API
-        const totalQuantity = cart.items.reduce(
-          (sum, item) => sum + Number(item.quantity || 0),
-          0
-        );
+        const totalQuantity = cart.items.length;
         setAgentCartItemsCount(totalQuantity);
         // Обновляем ID корзины если он изменился
         if (cart.id && cart.id !== agentCartId) {
           setAgentCartId(cart.id);
-          console.log("CART ID", cart.id);
-          
           localStorage.setItem("agentCartId", cart.id);
         }
       } else {
@@ -977,8 +976,6 @@ const ProductionCatalog = () => {
         setAgentProducts(result);
         // Создаем мапу product_id -> qty_on_hand
         const map = new Map();
-        console.log('RESULTS AGENT PRODUCT', result);
-
         result.forEach((item) => {
           if (item.product && item.qty_on_hand !== undefined) {
             map.set(item.product, Number(item.qty_on_hand) || 0);
@@ -1236,8 +1233,6 @@ const ProductionCatalog = () => {
     try {
       // Try server-backed agent cart first; fallback to local cart if not available
       let cartId = agentCartId || localStorage.getItem("agentCartId");
-      console.log('CARTID');
-
       if (!cartId) {
         // Создаем новую корзину, если её нет
         const created = await dispatch(
@@ -1268,10 +1263,7 @@ const ProductionCatalog = () => {
 
         // Используем возвращенные данные для обновления счетчика
         if (updated?.items && Array.isArray(updated.items)) {
-          const totalQuantity = updated.items.reduce(
-            (sum, item) => sum + Number(item.quantity || 0),
-            0
-          );
+          const totalQuantity = updated?.items?.length || 0;
           setAgentCartItemsCount(totalQuantity);
           // Обновляем ID корзины если он изменился
           if (updated.id && updated.id !== cartId) {
@@ -1735,6 +1727,7 @@ const ProductionCatalog = () => {
         onClose={handleCloseCart}
         isOpen={isCartSectionOpen}
         onOpenChange={setIsCartSectionOpen}
+        setAgentCartItemsCount={setAgentCartItemsCount}
         totalItemsCount={
           agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount
         }
