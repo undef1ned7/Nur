@@ -214,7 +214,7 @@ export const SearchSelect = ({
 /* =========================================================
    Правая панель меню
    ========================================================= */
-export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick, fmtMoney }) => {
+export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick, fmtMoney, currentItems = [] }) => {
   const [q, setQ] = useState("");
 
   useEffect(() => {
@@ -227,12 +227,28 @@ export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick,
     return (menuItems || []).filter((m) => String(m?.title || "").toLowerCase().includes(s));
   }, [menuItems, q]);
 
+  // Создаем карту количества добавленных блюд
+  const itemsCountMap = useMemo(() => {
+    const map = new Map();
+    currentItems.forEach((item) => {
+      const key = String(item.menu_item);
+      const currentQty = Number(item.quantity) || 0;
+      map.set(key, (map.get(key) || 0) + currentQty);
+    });
+    return map;
+  }, [currentItems]);
+
   if (!open) return null;
 
   return (
     <aside className="cafeOrdersRpanel" aria-label="Меню">
       <div className="cafeOrdersRpanel__head">
-        <div className="cafeOrdersRpanel__title">Меню</div>
+        <div className="cafeOrdersRpanel__title">
+          Меню
+          {currentItems.length > 0 && (
+            <span className="cafeOrdersRpanel__titleBadge">{currentItems.length}</span>
+          )}
+        </div>
         <button type="button" className="cafeOrdersRpanel__close" onClick={onClose} aria-label="Закрыть">
           <FaTimes />
         </button>
@@ -252,8 +268,17 @@ export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick,
         {filtered.length ? (
           filtered.map((m) => {
             const img = menuImageUrl?.(m.id);
+            const itemQty = itemsCountMap.get(String(m.id)) || 0;
+            const isAdded = itemQty > 0;
+
             return (
-              <button key={m.id} type="button" className="cafeOrdersRpanel__item" onClick={() => onPick(m)} title={m.title}>
+              <button
+                key={m.id}
+                type="button"
+                className={`cafeOrdersRpanel__item ${isAdded ? "cafeOrdersRpanel__item--added" : ""}`}
+                onClick={() => onPick(m)}
+                title={m.title}
+              >
                 <span className="cafeOrdersRpanel__thumb" aria-hidden>
                   {img ? <img src={img} alt="" /> : <FaClipboardList />}
                 </span>
@@ -264,7 +289,11 @@ export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick,
                 </span>
 
                 <span className="cafeOrdersRpanel__add" aria-hidden>
-                  <FaPlus />
+                  {isAdded ? (
+                    <span className="cafeOrdersRpanel__qtyBadge">{itemQty}</span>
+                  ) : (
+                    <FaPlus />
+                  )}
                 </span>
               </button>
             );

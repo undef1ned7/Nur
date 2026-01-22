@@ -899,7 +899,7 @@ const confirmPay = async () => {
       <div className="cafeOrders__header">
         <div>
           <h2 className="cafeOrders__title">Заказы</h2>
-          <div className="cafeOrders__subtitle">После оплаты заказ исчезает здесь и появляется в кассе как приход.</div>
+          <div className="cafeOrders__subtitle">После оплаты заказ появляется в кассе</div>
         </div>
 
         <div className="cafeOrders__actions">
@@ -907,7 +907,7 @@ const confirmPay = async () => {
             <FaSearch className="cafeOrders__searchIcon" />
             <input
               className="cafeOrders__searchInput"
-              placeholder="Поиск: стол, официант, гости, статус…"
+              placeholder="Поиск..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -984,13 +984,13 @@ const confirmPay = async () => {
 
                   {!expanded && rest > 0 && (
                     <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
-                      Ещё {rest} поз.
+                      Ещё {rest}
                     </button>
                   )}
 
                   {expanded && items.length > CARD_ITEMS_LIMIT && (
                     <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
-                      Свернуть позиции ({items.length})
+                      Свернуть
                     </button>
                   )}
                 </div>
@@ -1028,7 +1028,7 @@ const confirmPay = async () => {
           })}
 
         {!loading && !roleFiltered.length && (
-          <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
+          <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено</div>
         )}
       </div>
 
@@ -1048,7 +1048,7 @@ const confirmPay = async () => {
           <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
             <div className="cafeOrdersModal__card">
               <div className="cafeOrdersModal__header">
-                <h3 className="cafeOrdersModal__title">{isEditing ? "Редактировать заказ" : "Новый заказ"}</h3>
+                <h3 className="cafeOrdersModal__title">{isEditing ? "Редактировать" : "Новый заказ"}</h3>
                 <button
                   className="cafeOrdersModal__close"
                   onClick={() => {
@@ -1074,12 +1074,12 @@ const confirmPay = async () => {
                     openId={openSelectId}
                     setOpenId={setOpenSelectId}
                     label="Стол"
-                    placeholder="— Выберите стол —"
+                    placeholder="Выберите стол"
                     value={String(form.table ?? "")}
                     onChange={(val) => setForm((f) => ({ ...f, table: val }))}
                     options={tableOptions}
                     disabled={saving}
-                    hint={busyTableIds.size > 0 ? "Занятые столы скрыты до оплаты." : ""}
+                    hint={busyTableIds.size > 0 ? "Занятые столы скрыты" : ""}
                   />
 
                   <div className="cafeOrders__field">
@@ -1103,7 +1103,7 @@ const confirmPay = async () => {
                       openId={openSelectId}
                       setOpenId={setOpenSelectId}
                       label="Официант"
-                      placeholder="— Выберите официанта —"
+                      placeholder="Выберите официанта"
                       value={String(form.waiter ?? "")}
                       onChange={(val) => setForm((f) => ({ ...f, waiter: val }))}
                       options={waiterOptions}
@@ -1120,13 +1120,13 @@ const confirmPay = async () => {
                         id="client"
                         openId={openSelectId}
                         setOpenId={setOpenSelectId}
-                        label={clientsLoading ? "Клиент (загрузка…)" : "Клиент"}
-                        placeholder={clientsLoading ? "Загрузка…" : "— Выберите клиента —"}
+                        label={clientsLoading ? "Клиент" : "Клиент"}
+                        placeholder={clientsLoading ? "Загрузка..." : "Выберите клиента"}
                         value={String(form.client ?? "")}
                         onChange={(val) => setForm((f) => ({ ...f, client: val }))}
                         options={clientOptions}
                         disabled={saving || clientsLoading}
-                        hint={clientsErr ? clientsErr : "Поиск работает по имени и телефону."}
+                        hint={clientsErr ? clientsErr : ""}
                       />
                     </div>
 
@@ -1173,7 +1173,7 @@ const confirmPay = async () => {
                 {/* Позиции */}
                 <div className="cafeOrders__itemsBlock">
                   <div className="cafeOrders__itemsHead">
-                    <h4 className="cafeOrders__itemsHeadTitle">Позиции заказа</h4>
+                    <h4 className="cafeOrders__itemsHeadTitle">Блюда</h4>
 
                     <button
                       type="button"
@@ -1184,7 +1184,7 @@ const confirmPay = async () => {
                       }}
                       disabled={saving}
                     >
-                      <FaPlus /> Добавить блюда
+                      <FaPlus /> Добавить
                     </button>
                   </div>
 
@@ -1208,6 +1208,9 @@ const confirmPay = async () => {
                                   {it.title}
                                 </div>
                                 <div className="cafeOrders__itemMeta">
+                                  <span className="cafeOrders__itemQtyDisplay">
+                                    {qty} шт.
+                                  </span>
                                   <span>{fmtMoney(price)} сом</span>
                                   <span className="cafeOrders__dot">•</span>
                                   <span>{fmtMoney(sum)} сом</span>
@@ -1303,7 +1306,7 @@ const confirmPay = async () => {
                     className="cafeOrders__btn cafeOrders__btn--primary"
                     disabled={saving || !form.table || !form.items.length}
                   >
-                    {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
+                    {saving ? "Сохранение..." : isEditing ? "Сохранить" : "Создать"}
                   </button>
                 </div>
               </form>
@@ -1316,6 +1319,7 @@ const confirmPay = async () => {
               menuImageUrl={menuImageUrl}
               onPick={(m) => addOrIncMenuItem(m)}
               fmtMoney={fmtMoney}
+              currentItems={form.items}
             />
           </div>
         </div>
@@ -1327,7 +1331,7 @@ const confirmPay = async () => {
           <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
             <div className="cafeOrdersModal__card">
               <div className="cafeOrdersModal__header">
-                <h3 className="cafeOrdersModal__title">Чек перед оплатой</h3>
+                <h3 className="cafeOrdersModal__title">Оплата</h3>
                 <button
                   className="cafeOrdersModal__close"
                   onClick={closePay}
@@ -1374,7 +1378,7 @@ const confirmPay = async () => {
                             );
                           })
                         ) : (
-                          <div className="cafeOrdersPay__empty">Позиции заказа не найдены.</div>
+                          <div className="cafeOrdersPay__empty">Нет позиций</div>
                         )}
                       </div>
 

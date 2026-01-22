@@ -921,23 +921,17 @@
       height: 160px;
     }
 
-    &__request-statuses-list {
-      gap: 8px;
+    &__request-status-card {
+      padding: 14px;
     }
 
-    &__request-status-badge-item {
-      padding: 7px 10px;
+    &__request-status-badge {
+      padding: 5px 10px;
+      font-size: 11px;
     }
 
-    &__request-status-label {
-      font-size: 12px;
-    }
-
-    &__request-status-badge-count {
-      min-width: 20px;
-      height: 20px;
-      font-size: 10px;
-      padding: 0 5px;
+    &__request-status-count {
+      font-size: 16px;
     }
 
     &__top-service-item {
@@ -955,6 +949,9 @@
       font-size: 12px;
     }
 
+    &__top-service-sum {
+      font-size: 13px;
+    }
 
     &__chart {
       min-height: 160px;
