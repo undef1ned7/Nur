@@ -86,11 +86,9 @@ export const deleteWarehouseDocument = createAsyncThunk(
 // Проведение документа
 export const postWarehouseDocument = createAsyncThunk(
   "warehouse/postDocument",
-  async ({ id, allowNegative }, { rejectWithValue }) => {
+  async (id, { rejectWithValue }) => {
     try {
-      const data = await warehouseAPI.postDocument(id, {
-        allow_negative: allowNegative,
-      });
+      const data = await warehouseAPI.postDocument(id);
       return data;
     } catch (error) {
       return rejectWithValue(error);
