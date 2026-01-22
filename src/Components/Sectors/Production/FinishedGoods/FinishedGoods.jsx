@@ -26,10 +26,8 @@ import {
 /* ---- Transfer / Acceptance ---- */
 import {
   acceptInlineAsync,
-  createTransferAsync,
   createBulkTransferAsync,
   createReturnAsync,
-  updateProductQuantityAsync,
 } from "../../../../store/creators/transferCreators";
 
 /* ---- Cash ---- */
@@ -67,16 +65,16 @@ import "../../../Deposits/Sklad/Sklad.scss";
 import "./finishedGoods.scss";
 import noImage from "../../Market/Warehouse/components/placeholder.png";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
-import { useErrorModal } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
+import usePlurize from "../../../../hooks/usePlurize";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
    ============================================================ */
 const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   const error = useErrorModal()
+  const alert = useAlert()
   const dispatch = useDispatch();
-  const { company } = useUser();
-
   // Категории/бренды из product slice
   const { categories, brands } = useProducts();
 
@@ -110,30 +108,30 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   // Изображения (динамически добавляемые)
   const [images, setImages] = useState([]);
 
-  const handleImageChange = (idx, file) => {
+  const handleImageChange = useCallback((idx, file) => {
     setImages((prev) =>
       prev.map((it, i) => (i === idx ? { ...it, file } : it))
     );
-  };
+  }, []);
 
-  const handleImageAltChange = (idx, alt) => {
-    setImages((prev) => prev.map((it, i) => (i === idx ? { ...it, alt } : it)));
-  };
+  // const handleImageAltChange = (idx, alt) => {
+  //   setImages((prev) => prev.map((it, i) => (i === idx ? { ...it, alt } : it)));
+  // };
 
-  const handlePrimarySelect = (idx) => {
+  const handlePrimarySelect = useCallback((idx) => {
     setImages((prev) =>
       prev.map((it, i) => ({ ...it, is_primary: i === idx }))
     );
-  };
+  }, []);
 
-  const addImageSlot = () => {
+  const addImageSlot = useCallback(() => {
     setImages((prev) => {
       const hasPrimary = prev.some((p) => p.is_primary);
       return [...prev, { file: null, alt: "", is_primary: !hasPrimary }];
     });
-  };
+  }, []);
 
-  const removeImageSlot = (idx) => {
+  const removeImageSlot = useCallback((idx) => {
     setImages((prev) => {
       const next = prev.filter((_, i) => i !== idx);
       // если удалили главное, назначаем первое как главное
@@ -142,7 +140,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       }
       return next;
     });
-  };
+  }, []);
 
   // Движение по кассе
   const [cashData, setCashData] = useState({
@@ -205,6 +203,9 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     // Фильтруем по имени (даже если имя пустое, материал все равно показывается если нет поиска)
     return list.filter((m) => {
       const name = (m.name || m.title || "").toLowerCase();
+      if (!m || m.id == null) {
+        return false;
+      }
       return name.includes(q);
     });
   }, [materials, materialQuery]);
@@ -218,7 +219,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   }, [dispatch]);
 
   // Хэндлеры
-  const onProductChange = (e) => {
+  const onProductChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
 
     // Обработка чекбоксов
@@ -237,12 +238,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       ...prev,
       [name]: type === "number" ? (value === "" ? "" : Number(value)) : value,
     }));
-  };
+  }, []);
 
-  const onSupplierChange = (e) => {
+  const onSupplierChange = useCallback((e) => {
     const { name, value } = e.target;
     setSupplier((prev) => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
   const createSupplier = useCallback(async (e) => {
     e.preventDefault();
@@ -316,7 +317,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     }
   }, [recipeMap]);
 
-  const changeRecipeQty = (materialId, qty) => {
+  const changeRecipeQty = useCallback((materialId, qty) => {
     // Защита от отсутствия ID
     if (materialId === null || materialId === undefined || materialId === "") {
       return;
@@ -351,14 +352,14 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         String(it.materialId) === key ? { ...it, quantity: qty } : it
       )
     );
-  };
+  }, [materials, product]);
 
-  const removeRecipeItem = (materialId) => {
+  const removeRecipeItem = useCallback((materialId) => {
     const key = String(materialId);
     setRecipeItems((prev) =>
       prev.filter((it) => String(it.materialId) !== key)
     );
-  };
+  }, []);
 
   // НОВОЕ: авто-синхронизация количества сырья при изменении количества товара
   useEffect(() => {
@@ -369,7 +370,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
   }, [product.quantity]);
 
   // валидатор товара
-  const validateProduct = () => {
+  const validateProduct = useCallback(() => {
     const required = [
       ["name", "Название"],
       ["barcode", "Штрихкод"],
@@ -415,7 +416,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     }
 
     return true;
-  };
+  }, [product, recipeItems, materials]);
 
   // submit
   const handleSubmit = async () => {
@@ -511,10 +512,11 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         console.warn("Загрузка изображений не удалась:", e);
         // не блокируем основной флоу
       }
-
-      setCreating(false);
-      onClose?.();
-      onSaveSuccess?.();
+      alert('Товар добавлен!', () => {
+        onClose?.();
+        setCreating(false);
+        onSaveSuccess?.();
+      })
     } catch (err) {
       setCreating(false);
       setCreateError(err);
@@ -1012,14 +1014,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             >
               {
                 filteredMaterials
-                  ?.filter((m) => {
-                    // Фильтруем только материалы с валидными ID
-                    if (!m || m.id == null || m.id === "") {
-                      return false;
-                    }
-                    return true;
-                  })
-                  .map((m) => {
+                  ?.map((m) => {
                     try {
                       const materialId = m.id;
                       const materialKey = String(materialId);
@@ -1132,9 +1127,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                       return null;
                     }
                   })
-                  .filter((item) => item !== null) // Удаляем null элементы
               }
-
               {(!filteredMaterials || filteredMaterials.length === 0) &&
                 !materialsLoading && (
                   <div style={{ padding: 8, opacity: 0.7 }}>
@@ -1294,6 +1287,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
    ============================================================ */
 const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   const dispatch = useDispatch();
+  const alert = useAlert()
+  const confirm = useConfirm()
   const { updating, updateError, deleting, deleteError } = useSelector(
     (state) => state.product
   );
@@ -1363,15 +1358,18 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   };
 
   // Обработчики для существующих изображений
-  const handleDeleteExistingImage = async (imageId) => {
-    if (!window.confirm("Удалить это изображение?")) return;
-    try {
-      await api.delete(`/main/products/${item.id}/images/${imageId}/`);
-      setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
-    } catch (error) {
-      console.error("Ошибка удаления изображения:", error);
-      alert("Не удалось удалить изображение");
-    }
+  const handleDeleteExistingImage = (imageId) => {
+    confirm("Удалить это изображение?", async (result) => {
+      if (result) {
+        try {
+          await api.delete(`/main/products/${item.id}/images/${imageId}/`);
+          setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
+        } catch (error) {
+          console.error("Ошибка удаления изображения:", error);
+          alert("Не удалось удалить изображение", null, true);
+        }
+      }
+    })
   };
 
   const handleSetPrimaryExisting = async (imageId) => {
@@ -1468,36 +1466,42 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           });
         if (uploads.length) await Promise.allSettled(uploads);
       } catch (e) {
-        console.warn("Загрузка новых изображений не удалась:", e);
+        alert("Загрузка новых изображений не удалась", true);
         // не блокируем основной флоу
       }
-
-      onClose();
-      onSaveSuccess?.();
+      alert('Товар отредактирован!', () => {
+        onClose();
+        onSaveSuccess?.();
+      })
     } catch (err) {
       console.error("Failed to update product:", err);
       alert(
-        `Ошибка при обновлении товара: ${err.message || JSON.stringify(err)}`
+        `Ошибка при обновлении товара: ${err.message || JSON.stringify(err)}`,
+        true
       );
     }
   };
 
-  const handleDelete = async () => {
-    if (
-      window.confirm(`Вы уверены, что хотите удалить товар "${item?.name}"?`)
-    ) {
-      try {
-        await dispatch(deleteProductAsync(item.id)).unwrap();
-        onClose();
-        onDeleteConfirm?.();
-      } catch (err) {
-        console.error("Failed to delete product:", err);
-        alert(
-          `Ошибка при удалении товара: ${err.message || JSON.stringify(err)}`
-        );
+  const handleDelete = useCallback(async () => {
+    confirm(`Вы уверены, что хотите удалить товар "${item?.name}"?`, async (result) => {
+      if (result) {
+        try {
+          await dispatch(deleteProductAsync(item.id)).unwrap();
+          alert('Удалено!', () => {
+            onClose();
+            onDeleteConfirm?.();
+          })
+        } catch (err) {
+          console.error("Failed to delete product:", err);
+          alert(
+            `Ошибка при удалении товара: ${err.message || JSON.stringify(err)}`,
+            null,
+            true
+          );
+        }
       }
-    }
-  };
+    })
+  }, [item]);
 
   useEffect(() => {
     // Обновим справочники на случай, если не загружены
@@ -1507,7 +1511,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   }, [dispatch]);
 
   return (
-    <div className="product-edit-modal">
+    <div className="product-edit-modal z-50!">
       <div className="product-edit-modal__backdrop" onClick={onClose} />
       <div className="product-edit-modal__container">
         <div className="product-edit-modal__wrapper">
@@ -1888,6 +1892,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
                                 e.target.files?.[0] || null
                               )
                             }
+                            accept="image/*"
                             name="image"
                             label="Выберите файл"
                           />
@@ -1962,6 +1967,9 @@ const TransferProductModal = ({
   // materials: products = [],
   materialsLoading = false,
 }) => {
+  const { plurizeWithNumber } = usePlurize()
+  const alert = useAlert()
+  const error = useErrorModal()
   const { list: clients } = useClient();
   const { employees } = useDepartments();
   const { creating, createError } = useSelector((state) => state.transfer);
@@ -2017,11 +2025,6 @@ const TransferProductModal = ({
       )
     );
   };
-
-  const filterClient = useMemo(
-    () => clients.filter((c) => c.type === "implementers"),
-    [clients]
-  );
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -2052,13 +2055,13 @@ const TransferProductModal = ({
     );
   }
 
-  const onChange = (e) => {
+  const onChange = useCallback((e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
     setValidationError(""); // Очищаем ошибку при изменении
-  };
+  }, []);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     if (!state.agent) {
       setValidationError("Выберите агента");
       return false;
@@ -2086,7 +2089,7 @@ const TransferProductModal = ({
     }
 
     return true;
-  };
+  }, [selectedProducts, state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -2106,13 +2109,13 @@ const TransferProductModal = ({
         })
       ).unwrap();
 
-      alert(`Успешно передано ${selectedProducts.length} товаров агенту!`);
-
-      onChanged?.();
-      onClose();
+      alert(`Успешно передано ${plurizeWithNumber(selectedProducts.length, 'products')} товаров агенту!`, () => {
+        onChanged?.();
+        onClose();
+      });
     } catch (error) {
       console.error("Transfer creation failed:", error);
-      alert(
+      error(
         `Ошибка при создании передачи: ${error?.message || "неизвестная ошибка"
         }`
       );
@@ -2273,7 +2276,7 @@ const TransferProductModal = ({
 // export default TransferProductModal;
 
 const AcceptProductModal = ({ onClose, onChanged, item }) => {
-  const { list: clients } = useClient();
+  const alert = useAlert()
   const { acceptingInline, acceptInlineError } = useSelector(
     (state) => state.acceptance
   );
@@ -2287,11 +2290,6 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
   });
   const [selectedCashBox, setSelectedCashBox] = useState("");
   const [validationError, setValidationError] = useState("");
-
-  const filterClient = useMemo(
-    () => clients.filter((c) => c.type === "implementers"),
-    [clients]
-  );
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -2322,13 +2320,13 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
     );
   }
 
-  const onChange = (e) => {
+  const onChange = useCallback((e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
     setValidationError(""); // Очищаем ошибку при изменении
-  };
+  }, []);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     if (!state.agent_id) {
       setValidationError("Выберите агента");
       return false;
@@ -2342,7 +2340,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
       return false;
     }
     return true;
-  };
+  }, [state, selectedCashBox]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -2388,15 +2386,16 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
       ).unwrap();
 
       alert(
-        `Приёмка успешно создана!\nАгент: ${result.agent}\nТовар: ${result.product}\nПринято: ${result.qty_accept}\nОстаток: ${result.qty_remaining_after}`
+        `Приёмка успешно создана!\nАгент: ${result.agent}\nТовар: ${result.product}\nПринято: ${result.qty_accept}\nОстаток: ${result.qty_remaining_after}`, () => {
+          onChanged?.();
+          onClose();
+        }
       );
 
-      onChanged?.();
-      onClose();
     } catch (error) {
       console.error("Accept inline failed:", error);
       alert(
-        `Ошибка при создании приёмки: ${error?.message || "неизвестная ошибка"}`
+        `Ошибка при создании приёмки: ${error?.message || "неизвестная ошибка"}`, true
       );
     }
   };
@@ -2514,8 +2513,7 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
 };
 
 const ReturnProductModal = ({ onClose, onChanged, item }) => {
-  const { list: clients } = useClient();
-  const { employees } = useDepartments();
+  const alert = useAlert();
   const { creating, createError } = useSelector(
     (state) => state.return || { creating: false, createError: null }
   );
@@ -2554,19 +2552,19 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     );
   }
 
-  const onChange = (e) => {
+  const onChange = useCallback((e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
     setValidationError("");
-  };
+  }, []);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     if (!state.qty || Number(state.qty) <= 0) {
       setValidationError("Введите корректное количество");
       return false;
     }
     return true;
-  };
+  }, [state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -2582,15 +2580,15 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
           qty: Number(state.qty),
         })
       ).unwrap();
+      alert(`Возврат успешно создан!\nКоличество: ${state.qty}`, () => {
+        onChanged?.();
+        onClose();
+      });
 
-      alert(`Возврат успешно создан!\nКоличество: ${state.qty}`);
-
-      onChanged?.();
-      onClose();
     } catch (error) {
       console.error("Return creation failed:", error);
       alert(
-        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка"
+        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка", true
         }`
       );
     }
@@ -2682,10 +2680,9 @@ const safeDate = (s) => {
 
 const FinishedGoods = ({ products, onChanged }) => {
   const dispatch = useDispatch();
-  const { categories, loading, error } = useProducts();
+  const { loading, error } = useProducts();
   const { list: cashBoxes } = useCash();
 
-  const [cashboxId, setCashboxId] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
 
@@ -2715,13 +2712,13 @@ const FinishedGoods = ({ products, onChanged }) => {
 
   // View mode (table/cards) - сохраняем в localStorage
   const STORAGE_KEY = "finished_goods_view_mode";
-  const getInitialViewMode = () => {
+  const getInitialViewMode = useCallback(() => {
     if (typeof window === "undefined") return "table";
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === "table" || saved === "cards") return saved;
     const isSmall = window.matchMedia("(max-width: 1199px)").matches;
     return isSmall ? "cards" : "table";
-  };
+  }, []);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
 
   // Сохраняем режим просмотра в localStorage
@@ -2867,7 +2864,7 @@ const FinishedGoods = ({ products, onChanged }) => {
             </p>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <div className="flex gap-3 flex-wrap flex-1 justify-end md:w-full md:justify-center lg:justify-end">
           <button
             className="warehouse-header__create-btn"
             onClick={() => setShowAdd(true)}
@@ -2905,22 +2902,27 @@ const FinishedGoods = ({ products, onChanged }) => {
 
           {/* Date filters */}
           <div className="flex items-center gap-2 flex-wrap">
-            <label className="text-sm text-slate-600">От:</label>
-            <input
-              type="date"
-              className="warehouse-search__input"
-              style={{ width: "auto", minWidth: "140px" }}
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-            <label className="text-sm text-slate-600">До:</label>
-            <input
-              type="date"
-              className="warehouse-search__input"
-              style={{ width: "auto", minWidth: "140px" }}
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
+            <div className="flex-1 flex gap-2 justify-between items-center">
+              <label className="text-sm text-slate-600">От:</label>
+              <input
+                type="date"
+                className="warehouse-search__input flex-1"
+                style={{ width: "auto", minWidth: "140px" }}
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 items-center gap-2 flex justify-between">
+              <label className="text-sm  text-slate-600">До:</label>
+              <input
+                type="date"
+                className="warehouse-search__input flex-1"
+                style={{ width: "auto", minWidth: "140px" }}
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
+
             {(dateFrom || dateTo || search || categoryFilter) && (
               <button
                 type="button"
@@ -2933,7 +2935,7 @@ const FinishedGoods = ({ products, onChanged }) => {
           </div>
 
           {/* View toggle */}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto justify-center flex flex-1 items-center gap-2">
             <button
               type="button"
               onClick={() => setViewMode("table")}
@@ -2966,7 +2968,7 @@ const FinishedGoods = ({ products, onChanged }) => {
         {/* ===== TABLE ===== */}
         {viewMode === "table" && (
           <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="warehouse-table w-full min-w-[1100px]">
+            <table className="warehouse-table w-full min-w-275">
               <thead>
                 <tr>
                   <th></th>

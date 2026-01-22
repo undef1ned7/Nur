@@ -8,6 +8,7 @@ import {
 } from "../../../../store/creators/transferCreators";
 import { getProfile, useUser } from "../../../../store/slices/userSlice";
 
+
 const TransferStatusModal = ({ onClose, onChanged }) => {
   const { profile } = useUser();
   const dispatch = useDispatch();

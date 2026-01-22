@@ -489,7 +489,7 @@ export const MENU_CONFIG = {
       },
       {
         label: "Документы",
-        to: "/crm/market/documents",
+        to: "/crm/warehouse/documents",
         icon: menuIcons.documentScanner,
         permission: "can_view_document",
         implemented: true,
@@ -515,6 +515,7 @@ export const MENU_CONFIG = {
         permission: "can_view_clients",
         implemented: true,
       },
+
       // {
       //   label: "Справочники",
       //   to: "/crm/warehouse/directories",

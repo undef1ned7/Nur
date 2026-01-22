@@ -4,6 +4,10 @@ import { useModal } from "../context/modal";
 const useAlert = () => {
     const { openAlert } = useModal();
     const confirm = (message, callback, isError,) => {
+        if (typeof callback === 'boolean') {
+            isError = callback;
+            callback = () => null;
+        }
         openAlert({
             isError: Boolean(isError),
             message,

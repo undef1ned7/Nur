@@ -139,6 +139,8 @@ import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
 import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategory/BrandCategoryPage";
+import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
+import WarehouseCreateSaleDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
 
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
@@ -374,7 +376,8 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
   createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
   createProtectedRoute("warehouse/counterparties", Counterparties),
-
+  createProtectedRoute("warehouse/documents", WarehouseDocuments),
+  createProtectedRoute("warehouse/documents/create", WarehouseCreateSaleDocument),
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),
