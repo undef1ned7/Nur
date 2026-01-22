@@ -49,11 +49,19 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
     onUpdateQuantity(item.id, newQuantity);
   };
 
-  const handleDecrement = (e) => {
-    e.stopPropagation();
-    if (!editable || quantity <= 1) return;
+  const handleDecrement = (e, id) => {
+    e?.stopPropagation();
+    if (!editable || quantity <= 1) {
+      handleRemove(id)
+    };
     const newQuantity = quantity - 1;
-    setQuantity(newQuantity);
+    setQuantity(oldQuantity => {
+      const newQuantity = oldQuantity - 1;
+      if (newQuantity <= 0) {
+        handleRemove(id)
+      }
+      return newQuantity
+    });
     onUpdateQuantity(item.id, newQuantity);
   };
 
@@ -77,10 +85,8 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
   };
 
   const handleRemove = (e) => {
-    e.stopPropagation();
-    if (window.confirm("Удалить товар из запроса?")) {
-      onRemoveItem(item.id);
-    }
+    e?.stopPropagation?.();
+    onRemoveItem(item.id);
   };
 
   return (
@@ -90,7 +96,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
           src={
             item?.images?.[0]?.image_url
               ? `https://app.nurcrm.kg/${item.images[0].image_url}`
-              : item?.product_image_url || "https://via.placeholder.com/100x100"
+              : item?.product_image_url || "/images/placeholder.avif"
           }
           alt={item.product_name || "Товар"}
         />
@@ -99,8 +105,8 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
       <div className="item-details">
         <h3 className="item-name">{item.product_name || "Без названия"}</h3>
         <div className="item-price">
-          {Number(item.unit_price || item.price_snapshot || 0) *
-            Number(item.quantity || item.quantity_requested || 0) || 0}{" "}
+          {(Number(item.unit_price || item.price_snapshot || 0) *
+            Number(item.quantity || item.quantity_requested || 0) || 0).toFixed(2)}{" "}
           сом
         </div>
 
@@ -108,8 +114,8 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
           <div className="quantity-controls">
             <button
               className="quantity-btn"
-              onClick={handleDecrement}
-              disabled={quantity <= 1 || !editable}
+              onClick={(e) => handleDecrement(e, item.id)}
+              disabled={quantity < 1 || !editable}
               type="button"
               title="Уменьшить количество"
             >
@@ -158,7 +164,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
             Общий:{" "}
             {Number(
               Number(item.unit_price || item.price_snapshot || 0) *
-                Number(item.quantity || item.quantity_requested || 0)
+              Number(item.quantity || item.quantity_requested || 0)
             ).toLocaleString()}
             .00 сом
           </p>
@@ -370,17 +376,17 @@ const RequestCart = ({
     error: clientError,
   } = useClient();
   const { company } = useUser();
-  
+
   const [submitting, setSubmitting] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isClientSelectorOpen, setIsClientSelectorOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [formError, setFormError] = useState("");
-  
+
   // Ref для сохранения фокуса на активном инпуте
   const focusedInputRef = useRef(null);
-  
+
   // Состояние для долга
   const [paymentType, setPaymentType] = useState(""); // "", "Долги", "Предоплата"
   const [debtMonths, setDebtMonths] = useState("");
@@ -468,7 +474,7 @@ const RequestCart = ({
     const touch = e.targetTouches[0];
     setOrderTouchStart(touch.clientY);
     setOrderSwipeProgress(0);
-    
+
     // Если секция открыта и контент в начале - предотвращаем pull-to-refresh
     if (isOrderSectionOpen) {
       const contentElement = e.target.closest(".mobile-order-section-content");
@@ -487,7 +493,7 @@ const RequestCart = ({
     const section = e.target.closest(".mobile-order-section");
     const button = e.target.closest(".cart-trigger-btn");
     const container = e.target.closest(".cart-trigger-container");
-    
+
     // Если касание не в области секции или кнопки, сбрасываем
     if (!section && !button && !container) {
       setOrderTouchStart(null);
@@ -501,7 +507,7 @@ const RequestCart = ({
     // Если секция закрыта - обрабатываем свайп вверх для открытия
     if (!isOrderSectionOpen) {
       const swipeUp = -distance; // Инвертируем для свайпа вверх
-      
+
       // Если свайп вниз, это прокрутка страницы - не блокируем
       if (distance > 0) {
         setOrderTouchStart(null);
@@ -529,7 +535,7 @@ const RequestCart = ({
     // Сначала проверяем, где именно происходит касание
     const contentElement = e.target.closest(".mobile-order-section-content");
     const isInsideContent = !!contentElement;
-    
+
     // Если касание внутри контента - проверяем, можно ли скроллить
     if (isInsideContent) {
       const scrollTop = contentElement.scrollTop;
@@ -537,19 +543,19 @@ const RequestCart = ({
       const clientHeight = contentElement.clientHeight;
       const isAtTop = scrollTop <= 0;
       const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1; // Небольшой допуск для округления
-      
+
       // Если свайп вверх (отрицательное расстояние) - это скролл контента вверх
       if (distance < 0) {
         setOrderSwipeProgress(0);
         return; // Позволяем скролл контента
       }
-      
+
       // Если свайп вниз и контент НЕ в начале - это скролл контента вниз
       if (distance > 0 && !isAtTop) {
         setOrderSwipeProgress(0);
         return; // Позволяем скролл контента
       }
-      
+
       // Если свайп вниз и контент в начале - это может быть закрытие секции
       // Но только если свайп достаточно большой и явно направлен вниз
       if (distance > 0 && isAtTop) {
@@ -572,21 +578,21 @@ const RequestCart = ({
         setOrderSwipeProgress(0);
         return;
       }
-      
+
       // Если свайп вниз - проверяем, прокручен ли контент
       const contentEl = section?.querySelector(".mobile-order-section-content");
       const isAtTop = !contentEl || contentEl.scrollTop <= 0;
-      
+
       // Если контент прокручен вниз, разрешаем прокрутку
       if (!isAtTop) {
         setOrderSwipeProgress(0);
         return; // Позволяем прокрутку контента
       }
-      
+
       // Если секция открыта и контент в начале - предотвращаем pull-to-refresh
       if (distance > 0) {
         e.preventDefault(); // Предотвращаем pull-to-refresh и прокрутку страницы
-        
+
         // Если свайп небольшой - показываем индикатор
         if (distance < minSwipeDistance) {
           const progress = Math.min((distance / minSwipeDistance) * 100, 100);
@@ -695,7 +701,7 @@ const RequestCart = ({
       document.body.style.overscrollBehaviorY = "";
     };
   }, [isOrderSectionOpen, isMobile]);
-  
+
   const [clientFormState, setClientFormState] = useState({
     full_name: "",
     phone: "",
@@ -917,9 +923,8 @@ const RequestCart = ({
         // Создаем сделку
         const dealPayload = {
           clientId: selectedClient.id,
-          title: `${paymentType} ${
-            selectedClient.full_name || selectedClient.phone || "Клиент"
-          }`,
+          title: `${paymentType} ${selectedClient.full_name || selectedClient.phone || "Клиент"
+            }`,
           statusRu: paymentType,
           amount: totalAmount,
           debtMonths: Number(debtMonths || 0),
@@ -1184,16 +1189,15 @@ const RequestCart = ({
                         key={
                           client?.id ?? `${name}-${client?.phone ?? ""}`
                         }
-                        className={`client-option ${
-                          selectedClient?.id && client?.id
-                            ? selectedClient.id === client.id
-                              ? "selected"
-                              : ""
-                            : getClientName(selectedClient) === name &&
-                              selectedClient?.address === client?.address
+                        className={`client-option ${selectedClient?.id && client?.id
+                          ? selectedClient.id === client.id
                             ? "selected"
                             : ""
-                        }`}
+                          : getClientName(selectedClient) === name &&
+                            selectedClient?.address === client?.address
+                            ? "selected"
+                            : ""
+                          }`}
                         onClick={() => handleSelectClient(client)}
                       >
                         <div className="client-info">
@@ -1268,7 +1272,7 @@ const RequestCart = ({
       <div className="cart-items-section">
         {(items || []).length === 0 ? (
           <div className="empty-cart">
-            <ShoppingCart size={64} />
+            <ShoppingCart className="mx-auto" size={64} />
             <h3>Запрос пуст</h3>
             <p>Добавьте товары в запрос</p>
           </div>
@@ -1291,8 +1295,8 @@ const RequestCart = ({
     <>
       {/* Модалка корзины - открывается при нажатии на кнопку корзины в ProductionRequest */}
       {isOpen && (
-        <div 
-          className="cart-modal-overlay" 
+        <div
+          className="cart-modal-overlay"
           onClick={(e) => {
             // Закрываем модалку только при клике на overlay, а не на контент
             if (e.target === e.currentTarget) {
@@ -1347,9 +1351,8 @@ const RequestCart = ({
       {/* Секция заказа внизу экрана - для мобильных/планшетов */}
       {isMobile && (
         <div
-          className={`mobile-order-section ${
-            isOrderSectionOpen ? "open" : ""
-          } ${isClosing ? "closing" : ""}`}
+          className={`mobile-order-section ${isOrderSectionOpen ? "open" : ""
+            } ${isClosing ? "closing" : ""}`}
           onTouchStart={handleOrderTouchStart}
           onTouchMove={handleOrderTouchMove}
           onTouchEnd={handleOrderTouchEnd}
@@ -1359,24 +1362,24 @@ const RequestCart = ({
               if (!isOrderSectionOpen && !isClosing && orderSwipeProgress === 0) {
                 return "translateY(100%)";
               }
-              
+
               // Если секция закрыта и свайп вверх - показываем прогресс открытия
               if (!isOrderSectionOpen && !isClosing && orderSwipeProgress > 0) {
                 const progress = orderSwipeProgress / 100;
                 const maxHeight = window.innerHeight * 0.85 - 70; // 85vh - 70px для кнопки
                 return `translateY(${maxHeight * (1 - progress)}px)`;
               }
-              
+
               // Если секция открыта и нет прогресса свайпа - полностью видна
               if (isOrderSectionOpen && !isClosing && orderSwipeProgress === 0) {
                 return "translateY(0)";
               }
-              
+
               // Если секция открыта и свайп вниз - показываем прогресс закрытия
               if (isOrderSectionOpen && !isClosing && orderSwipeProgress > 0) {
                 return `translateY(${Math.min(orderSwipeProgress * 0.5, 50)}px)`;
               }
-              
+
               // По умолчанию
               return isOrderSectionOpen ? "translateY(0)" : "translateY(100%)";
             })(),
@@ -1447,7 +1450,7 @@ const RequestCart = ({
       {isMobile && (() => {
         // Вычисляем итог запроса по той же логике, что и в RequestSummary
         let total = 0;
-        
+
         if (Array.isArray(items) && items.length > 0) {
           for (const it of items) {
             const price = Number(it?.price_snapshot || it?.unit_price || 0);
@@ -1493,8 +1496,8 @@ const RequestCart = ({
                   <span className="cart-badge">{totalItemsCount}</span>
                 )}
                 {!isOrderSectionOpen && (
-                  <ChevronUp 
-                    size={20} 
+                  <ChevronUp
+                    size={20}
                     className="swipe-hint-icon"
                     style={{
                       opacity: swipeProgress > 0 ? Math.min(swipeProgress / 50, 1) : 0.6,

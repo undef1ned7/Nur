@@ -225,8 +225,8 @@ const PendingModal = ({ onClose, onChanged }) => {
 
   return (
     <div className="add-modal accept">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" role="dialog" aria-modal="true">
+      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__content z-100!" role="dialog" aria-modal="true">
         <div className="add-modal__header">
           <h3>
             {profile?.role !== "owner"
@@ -420,8 +420,8 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 
   return (
     <div className="add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ height: "auto" }}>
+      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__content z-100!" style={{ height: "auto" }}>
         <div className="add-modal__header">
           <h3>Вернуть товар</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
@@ -565,7 +565,6 @@ const ProductionAgents = () => {
     return isSmall ? "cards" : "table";
   };
   const [viewMode, setViewMode] = useState(getInitialViewMode);
-
   // Сохраняем режим просмотра в localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -573,29 +572,28 @@ const ProductionAgents = () => {
     }
   }, [viewMode]);
 
-
   useEffect(() => {
-    // Загружаем данные в зависимости от роли пользователя
     if (profile?.role === "owner") {
-      // dispatch(fetchProductsAsync());
+      dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync());
+      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
     }
-
+  }, [debouncedSearch])
+  useEffect(() => {
     // dispatch(fetchCategoriesAsync());
     // dispatch(getCashBoxes());
     dispatch(getItemsMake()); // сырьё для модалки
     dispatch(fetchBrandsAsync());
     // чтобы EditModal сразу имел список поставщиков:
     dispatch(fetchClientsAsync());
-  }, [dispatch, profile?.role]);
+  }, [dispatch]);
 
   const onSaveSuccess = () => {
     setShowAdd(false);
     if (profile?.role === "owner") {
-      // dispatch(fetchProductsAsync());
+      dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync());
+      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
     }
     dispatch(getItemsMake());
   };
@@ -606,7 +604,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync());
+      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
     }
   };
   const handleOpen = (id) => {
@@ -633,7 +631,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync());
+      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
     }
   };
 
@@ -693,7 +691,6 @@ const ProductionAgents = () => {
 
   // Фильтрация по названию, категории и ДАТЕ created_at
   const viewProducts = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
     const from = dateFrom ? toStartOfDay(dateFrom) : null;
     const to = dateTo ? toEndOfDay(dateTo) : null;
 
@@ -716,13 +713,6 @@ const ProductionAgents = () => {
     }
 
     let filteredProducts = (dataSource || []).filter((p) => {
-      const okName =
-        !q || (p.name || p.product_name || "").toLowerCase().includes(q);
-      const okCat =
-        !categoryFilter ||
-        String(p.category_id || p.category)?.toLowerCase() ===
-        String(categoryFilter).toLowerCase();
-
       // фильтр по дате (только для владельца, у агентов может не быть created_at)
       if (profile?.role === "owner") {
         const created = safeDate(p.created_at);
@@ -730,8 +720,7 @@ const ProductionAgents = () => {
         if (from && created < from) return false;
         if (to && created > to) return false;
       }
-
-      return okName && okCat;
+      return true
     });
 
     // Если это агент, показываем только товары с qty_on_hand > 0 (товары на руках)
@@ -751,7 +740,6 @@ const ProductionAgents = () => {
   }, [
     agents,
     agentProducts,
-    debouncedSearch,
     categoryFilter,
     dateFrom,
     dateTo,
@@ -759,7 +747,7 @@ const ProductionAgents = () => {
   ]);
 
   const formatPrice = useCallback((price) => parseFloat(price || 0).toFixed(2), []);
-
+  
   const kindTranslate = {
     new: "Новый",
     paid: "Оплаченный",
