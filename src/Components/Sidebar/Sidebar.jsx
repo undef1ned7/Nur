@@ -3,16 +3,18 @@ import { useDispatch } from "react-redux";
 import { useUser, getProfile } from "../../store/slices/userSlice";
 import { useMenuItems } from "./hooks/useMenuItems";
 import MenuItem from "./components/MenuItem";
-import Lang from "../Lang/Lang";
 import "./Sidebar.scss";
 import { X } from "lucide-react";
 
 import arnament1 from "../Photo/Group 1203.png";
 import arnament2 from "../Photo/Group 1204 (1).png";
 import Logo from "../Photo/logo2.png";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { getCompany } from "../../store/creators/userCreators";
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { company, profile, tariff, sector } = useUser();
   const [openDropdown, setOpenDropdown] = useState(null);
 
@@ -58,13 +60,23 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     setOpenDropdown(openDropdown === itemLabel ? null : itemLabel);
   };
 
-  const isLoading = !company || !profile;
+  useEffect(() => {
+    dispatch(getCompany());
+    dispatch(getProfile())
+  }, [])
 
+  const isLoading = !company || !profile;
+  useEffect(() => {
+    if (location.pathname.includes('crm') && location.pathname.split('/').map(el => el.trim()).filter(Boolean).length == 1 && menuItems.length && !isLoading) {
+      navigate(menuItems.at(0).to);
+      console.log('asdasdasdasdasdas');
+      
+    }
+  }, [menuItems, isLoading])
   return (
     <div
-      className={`sidebar ${
-        isOpen ? "sidebar--visible" : "sidebar--collapsed"
-      }`}
+      className={`sidebar ${isOpen ? "sidebar--visible" : "sidebar--collapsed"
+        }`}
     >
       <img src={arnament1} className="sidebar__arnament1" alt="Декор" />
       <img src={arnament2} className="sidebar__arnament2" alt="Декор" />

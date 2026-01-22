@@ -45,7 +45,7 @@ html {
 
   &__title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 500;
     margin: 0;
   }
 
@@ -138,7 +138,7 @@ html {
     padding: 10px 14px;
     border-radius: 10px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     transition: 0.2s;
     border: 1px solid transparent;
@@ -192,7 +192,7 @@ html {
     }
 
     thead th {
-      font-weight: 700;
+      font-weight: 500;
       font-size: 13px;
       color: var(--text);
       background: #fafafa;
@@ -262,7 +262,7 @@ html {
   }
 
   &__listName {
-    font-weight: 800;
+    font-weight: 550;
     font-size: 14px;
     line-height: 1.2;
     max-width: 70%;
@@ -277,7 +277,7 @@ html {
     border-radius: 999px;
     padding: 6px 10px;
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
     white-space: nowrap;
   }
 
@@ -320,13 +320,13 @@ html {
   }
 
   &__orderTitle {
-    font-weight: 800;
+    font-weight: 550;
     font-size: 14px;
     line-height: 1.2;
   }
 
   &__orderSum {
-    font-weight: 800;
+    font-weight: 550;
     font-size: 14px;
     white-space: nowrap;
   }
@@ -400,7 +400,7 @@ html {
 
   &__modalTitle {
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 550;
   }
 
   &__iconBtn {
@@ -457,7 +457,7 @@ html {
 
   &__label {
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   &__input {
@@ -514,7 +514,7 @@ html {
 
   &__statVal {
     font-size: 18px;
-    font-weight: 800;
+    font-weight: 550;
   }
 
   &__statLabel {

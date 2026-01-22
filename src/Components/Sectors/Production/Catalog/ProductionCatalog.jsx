@@ -51,6 +51,8 @@ import Cart from "./Cart";
 import "./ProductionCatalog.scss";
 import { display, margin } from "@mui/system";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import { useAlert } from "../../../../hooks/useDialog";
 
 // Моковые данные для демонстрации
 const mockProducts = [
@@ -181,6 +183,9 @@ const ProductCard = ({
     setQuantity(qty);
   };
 
+  console.log('QUANTITY', maxQuantity);
+  console.log('PRODUCTS', product)
+
   // Валидация количества при потере фокуса
   const handleQuantityBlur = () => {
     if (quantity === "" || quantity < 1 || isNaN(quantity)) {
@@ -262,9 +267,8 @@ const ProductCard = ({
 
   return (
     <div
-      className={`product-card ${isDragging ? "dragging" : ""} ${
-        isLongPress ? "long-press" : ""
-      }`}
+      className={`product-card ${isDragging ? "dragging" : ""} ${isLongPress ? "long-press" : ""
+        }`}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -568,9 +572,9 @@ const ProductDetailModal = ({
       if (e.key === "Escape") {
         handleCloseFullScreen();
       } else if (e.key === "ArrowLeft") {
-        handleFullScreenPrev({ stopPropagation: () => {} });
+        handleFullScreenPrev({ stopPropagation: () => { } });
       } else if (e.key === "ArrowRight") {
-        handleFullScreenNext({ stopPropagation: () => {} });
+        handleFullScreenNext({ stopPropagation: () => { } });
       }
     };
 
@@ -662,9 +666,8 @@ const ProductDetailModal = ({
                     key={image.id || index}
                     src={image.image_url || "https://via.placeholder.com/100"}
                     alt={`${product.name} ${index + 1}`}
-                    className={`thumbnail ${
-                      index === currentImageIndex ? "active" : ""
-                    }`}
+                    className={`thumbnail ${index === currentImageIndex ? "active" : ""
+                      }`}
                     onClick={() => setCurrentImageIndex(index)}
                   />
                 ))}
@@ -721,9 +724,8 @@ const ProductDetailModal = ({
                           image.image_url || "https://via.placeholder.com/100"
                         }
                         alt={`${product.name} ${index + 1}`}
-                        className={`fullscreen-thumbnail ${
-                          index === currentImageIndex ? "active" : ""
-                        }`}
+                        className={`fullscreen-thumbnail ${index === currentImageIndex ? "active" : ""
+                          }`}
                         onClick={(e) =>
                           handleFullScreenThumbnailClick(e, index)
                         }
@@ -875,6 +877,7 @@ const ProductDetailModal = ({
 };
 
 const ProductionCatalog = () => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { products, loading, error, selectedProduct, filters } = useSelector(
     (state) => state.catalog
@@ -890,7 +893,7 @@ const ProductionCatalog = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
   const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
   const [showFilters, setShowFilters] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -903,14 +906,13 @@ const ProductionCatalog = () => {
   const [alertMessage, setAlertMessage] = useState("");
   const [agentProducts, setAgentProducts] = useState([]);
   const [agentProductsMap, setAgentProductsMap] = useState(new Map());
-  const debounceTimerRef = useRef(null);
 
   // Получаем массив продуктов из results
   const rawProductsList = Array.isArray(products?.results)
     ? products.results
     : Array.isArray(products)
-    ? products
-    : [];
+      ? products
+      : [];
 
   // Сортируем товары: сначала те, что в наличии
   const productsList = useMemo(() => {
@@ -954,6 +956,8 @@ const ProductionCatalog = () => {
         // Обновляем ID корзины если он изменился
         if (cart.id && cart.id !== agentCartId) {
           setAgentCartId(cart.id);
+          console.log("CART ID", cart.id);
+          
           localStorage.setItem("agentCartId", cart.id);
         }
       } else {
@@ -973,6 +977,8 @@ const ProductionCatalog = () => {
         setAgentProducts(result);
         // Создаем мапу product_id -> qty_on_hand
         const map = new Map();
+        console.log('RESULTS AGENT PRODUCT', result);
+
         result.forEach((item) => {
           if (item.product && item.qty_on_hand !== undefined) {
             map.set(item.product, Number(item.qty_on_hand) || 0);
@@ -986,7 +992,7 @@ const ProductionCatalog = () => {
   }, [dispatch]);
 
   // helpers to parse page from DRF 'next/previous' URLs
-  const getPageFromUrl = (url) => {
+  const getPageFromUrl = useCallback((url) => {
     try {
       if (!url) return null;
       const u = new URL(url);
@@ -995,7 +1001,7 @@ const ProductionCatalog = () => {
     } catch {
       return null;
     }
-  };
+  }, []);
 
   // derive current page whenever API payload changes
   useEffect(() => {
@@ -1006,23 +1012,6 @@ const ProductionCatalog = () => {
     else if (prevPage) setPage(prevPage + 1);
     else setPage(1);
   }, [products]);
-
-  // Debounce для поиска
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 500);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [searchQuery]);
 
   // Загружаем товары с параметрами поиска
   useEffect(() => {
@@ -1142,10 +1131,10 @@ const ProductionCatalog = () => {
     };
   }, [isCartSectionOpen]);
 
-  const handleViewProduct = (product) => {
+  const handleViewProduct = useCallback((product) => {
     dispatch(setSelectedProduct(product));
     setIsModalOpen(true);
-  };
+  }, []);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -1203,12 +1192,11 @@ const ProductionCatalog = () => {
     // Поиск обрабатывается через debounce и useEffect
   };
 
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     setSearchQuery("");
-    setDebouncedSearchQuery("");
     dispatch(clearFilters());
     dispatch(fetchProducts());
-  };
+  }, []);
 
   const handleFilterChange = (filterType, value) => {
     const newFilters = { ...filters, [filterType]: value };
@@ -1220,31 +1208,35 @@ const ProductionCatalog = () => {
     dispatch(fetchProducts(params));
   };
 
-  const clearAllFilters = () => {
+  const clearAllFilters = useCallback(() => {
     dispatch(clearFilters());
     setSearchQuery("");
-    setDebouncedSearchQuery("");
     dispatch(fetchProducts());
-  };
+  }, []);
 
   // Pagination controls
-  const pageSize = productsList.length || 1;
-  const totalPages = products?.count
-    ? Math.max(1, Math.ceil(products.count / pageSize))
-    : 1;
-  const canPrev = Boolean(products?.previous) || page > 1;
-  const canNext = Boolean(products?.next) || page < totalPages;
-  const gotoPage = (p) => {
+  const { totalPages, canPrev, canNext } = useMemo(() => {
+    const pageSize = productsList.length || 1;
+    const totalPages = products?.count
+      ? Math.max(1, Math.ceil(products.count / pageSize))
+      : 1;
+    const canPrev = Boolean(products?.previous) || page > 1;
+    const canNext = Boolean(products?.next) || page < totalPages;
+    return { totalPages, canNext, canPrev }
+  }, [productsList, products, page]);
+
+  const gotoPage = useCallback((p) => {
     const target = Math.min(Math.max(1, p), totalPages);
     setPage(target);
     // keep current filters applied
     dispatch(fetchProducts({ ...(filters || {}), page: target }));
-  };
+  }, [totalPages, filters]);
 
   const handleAddToCart = async (product, quantity = 1) => {
     try {
       // Try server-backed agent cart first; fallback to local cart if not available
       let cartId = agentCartId || localStorage.getItem("agentCartId");
+      console.log('CARTID');
 
       if (!cartId) {
         // Создаем новую корзину, если её нет
@@ -1304,6 +1296,7 @@ const ProductionCatalog = () => {
         dispatch(addToCart({ product, quantity, store: "Default Store" }));
       }
     } catch (error) {
+      alert(error?.data?.detail || 'Ошибка при добавлении в корзину!')
       console.error("Error adding product to cart:", error);
       // Fallback to local cart on error
       dispatch(addToCart({ product, quantity, store: "Default Store" }));
@@ -1486,6 +1479,9 @@ const ProductionCatalog = () => {
     setTimeout(() => setAlertOpen(true), 150);
   };
 
+  useEffect(() => {
+    refreshAgentProducts();
+  }, [])
   return (
     <div className="production-catalog">
       {/* <div className="catalog-header">
@@ -1718,12 +1714,12 @@ const ProductionCatalog = () => {
         product={
           selectedProduct
             ? {
-                ...selectedProduct,
-                quantity: agentProductsMap.has(selectedProduct.id)
-                  ? agentProductsMap.get(selectedProduct.id) ?? 0
-                  : 0,
-                isAvailableInAgent: agentProductsMap.has(selectedProduct.id),
-              }
+              ...selectedProduct,
+              quantity: agentProductsMap.has(selectedProduct.id)
+                ? agentProductsMap.get(selectedProduct.id) ?? 0
+                : 0,
+              isAvailableInAgent: agentProductsMap.has(selectedProduct.id),
+            }
             : null
         }
         isOpen={isModalOpen}

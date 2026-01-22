@@ -39,6 +39,7 @@ const pageTitles = {
   "/crm/barber/masters": "Сотрудники",
   "/crm/barber/history": "История",
   "/crm/barber/records": "Записи",
+  "/crm/barber/requests": "Заявки",
   "/crm/barber/cash-reports": "Аналитика",
 
   // Гостиница

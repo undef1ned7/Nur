@@ -1970,7 +1970,7 @@ const TransferProductModal = ({
   const { plurizeWithNumber } = usePlurize()
   const alert = useAlert()
   const error = useErrorModal()
-  const { list: clients } = useClient();
+  // const { list: clients } = useClient();
   const { employees } = useDepartments();
   const { creating, createError } = useSelector((state) => state.transfer);
   const { list: products } = useProducts();
@@ -1985,17 +1985,7 @@ const TransferProductModal = ({
   // New state for bulk transfers
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Фильтрация товаров для bulk transfer
-  const filteredProducts = useMemo(() => {
-    if (!products || products.length === 0) return [];
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((p) => {
-      const name = String(p.name ?? p.title ?? `#${p.id}`).toLowerCase();
-      return name.includes(q);
-    });
-  }, [products, searchQuery]);
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
 
   // Добавление товара в список для передачи
   const addProductToTransfer = (product) => {
@@ -2029,10 +2019,12 @@ const TransferProductModal = ({
 
   useEffect(() => {
     dispatch(fetchClientsAsync());
-    dispatch(fetchProductsAsync());
     dispatch(getEmployees());
   }, [dispatch]);
 
+  useEffect(() => {
+    dispatch(fetchProductsAsync({ search: debouncedSearchQuery }));
+  }, [debouncedSearchQuery])
   // Проверяем, что товар существует и есть в наличии
   if (!item) {
     return (
@@ -2109,7 +2101,7 @@ const TransferProductModal = ({
         })
       ).unwrap();
 
-      alert(`Успешно передано ${plurizeWithNumber(selectedProducts.length, 'products')} товаров агенту!`, () => {
+      alert(`Успешно передано ${plurizeWithNumber(selectedProducts.length, 'products')} агенту!`, () => {
         onChanged?.();
         onClose();
       });
@@ -2192,7 +2184,7 @@ const TransferProductModal = ({
 
             {/* Список доступных товаров */}
             <div className="finished-goods-modal__products-list">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <div
                   key={product.id}
                   className="finished-goods-modal__product-item"
@@ -2706,6 +2698,12 @@ const FinishedGoods = ({ products, onChanged }) => {
   const debouncedSearch = useDebouncedValue(search, 400)
   const [categoryFilter, setCategoryFilter] = useState("");
 
+  useEffect(() => {
+    dispatch(fetchProductsAsync({
+      search: debouncedSearch
+    }))
+  }, [debouncedSearch])
+
   // Фильтр по дате
   const [dateFrom, setDateFrom] = useState(""); // YYYY-MM-DD
   const [dateTo, setDateTo] = useState(""); // YYYY-MM-DD
@@ -2731,6 +2729,7 @@ const FinishedGoods = ({ products, onChanged }) => {
 
 
   useEffect(() => {
+
     dispatch(fetchCategoriesAsync());
     dispatch(getCashBoxes());
     dispatch(getItemsMake()); // сырьё для модалки

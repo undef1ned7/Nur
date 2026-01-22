@@ -1,42 +1,35 @@
-import { MoreVertical, Plus, Search, LayoutGrid, Table2 } from "lucide-react";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { Plus, Search, LayoutGrid, Table2 } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useDispatch } from "react-redux";
 
 import {
   fetchBrandsAsync,
-  fetchCategoriesAsync,
+  // fetchCategoriesAsync,
   fetchProductsAsync,
   fetchAgentProductsAsync,
   getItemsMake,
 } from "../../../../store/creators/productCreators";
 
-import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
+// import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 
 import { useProducts } from "../../../../store/slices/productSlice";
 
 import { X } from "lucide-react";
 import { useSelector } from "react-redux";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
-import {
-  getCashFlows,
-  updateCashFlows,
-} from "../../../../store/slices/cashSlice";
-import { getProfile, useUser } from "../../../../store/slices/userSlice";
+import { useUser } from "../../../../store/slices/userSlice";
 import {
   createReturnAsync,
   fetchTransfersAsync,
   createAcceptanceAsync,
-  approveReturnAsync,
 } from "../../../../store/creators/transferCreators";
-import { useClient } from "../../../../store/slices/ClientSlice";
-import { useDepartments } from "../../../../store/slices/departmentSlice";
-import { getEmployees } from "../../../../store/creators/departmentCreators";
-import { useTransfer } from "../../../../store/slices/transferSlice";
+// import { useClient } from "../../../../store/slices/ClientSlice";
+// import { useDepartments } from "../../../../store/slices/departmentSlice";
+// import { getEmployees } from "../../../../store/creators/departmentCreators";
 import SellModal from "../../../pages/Sell/SellModal";
 import { useSale } from "../../../../store/slices/saleSlice";
 import { startSale } from "../../../../store/creators/saleThunk";
 import SellStart from "./SellStart/SellStart";
-import { startSaleInAgent } from "../../../../store/creators/agentCreators";
 import { useAgent } from "../../../../store/slices/agentSlice";
 import api from "../../../../api";
 import AddCashFlowsModal from "../../../Deposits/Kassa/AddCashFlowsModal/AddCashFlowsModal";
@@ -48,12 +41,13 @@ import {
 } from "../../../../store/creators/saleThunk";
 import "../../Market/Warehouse/Warehouse.scss";
 import "./productionAgents.scss";
+import { useAlert } from "../../../../hooks/useDialog";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
 
 // Компонент для детального просмотра продажи
 const SaleDetailModal = ({ onClose, saleId }) => {
   const dispatch = useDispatch();
   const { historyDetail: saleDetail } = useSale();
-  const { company } = useUser();
 
   useEffect(() => {
     if (saleId) {
@@ -165,6 +159,7 @@ const SaleDetailModal = ({ onClose, saleId }) => {
 };
 
 const PendingModal = ({ onClose, onChanged }) => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { list: transfers, loading: transfersLoading } = useSelector(
     (state) => state.transfer || { list: [], loading: false }
@@ -215,15 +210,15 @@ const PendingModal = ({ onClose, onChanged }) => {
         })
       ).unwrap();
 
-      alert(`Передача "${transfer.product_name}" успешно принята!`);
-      onChanged?.();
-      onClose?.();
+      alert(`Передача "${transfer.product_name}" успешно принята!`, () => {
+        onChanged?.();
+        onClose?.();
+      });
     } catch (error) {
       console.error("Accept transfer failed:", error);
       alert(
-        `Ошибка при принятии передачи: ${
-          error?.message || "неизвестная ошибка"
-        }`
+        `Ошибка при принятии передачи: ${error?.message || "неизвестная ошибка"
+        }`, true
       );
     }
   };
@@ -291,9 +286,8 @@ const PendingModal = ({ onClose, onChanged }) => {
                     </td>
                     <td data-label="Статус">
                       <span
-                        className={`sell__badge--${
-                          transfer.status === "open" ? "warning" : "success"
-                        }`}
+                        className={`sell__badge--${transfer.status === "open" ? "warning" : "success"
+                          }`}
                       >
                         {transfer.status === "open" ? "Открыта" : "Закрыта"}
                       </span>
@@ -347,8 +341,7 @@ const PendingModal = ({ onClose, onChanged }) => {
 };
 
 const ReturnProductModal = ({ onClose, onChanged, item }) => {
-  const { list: clients } = useClient();
-  const { employees } = useDepartments();
+  const alert = useAlert();
   const { creating, createError } = useSelector(
     (state) => state.return || { creating: false, createError: null }
   );
@@ -360,10 +353,10 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 
   const dispatch = useDispatch();
 
-  useEffect(() => {
-    dispatch(fetchClientsAsync());
-    dispatch(getEmployees());
-  }, [dispatch]);
+  // useEffect(() => {
+  // dispatch(fetchClientsAsync());
+  // dispatch(getEmployees());
+  // }, [dispatch]);
 
   // Проверяем, что товар существует и есть передачи
   if (!item || !item.subreals || item.subreals.length === 0) {
@@ -383,19 +376,19 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     );
   }
 
-  const onChange = (e) => {
+  const onChange = useCallback((e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
     setValidationError("");
-  };
+  }, []);
 
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     if (!state.qty || Number(state.qty) <= 0) {
       setValidationError("Введите корректное количество");
       return false;
     }
     return true;
-  };
+  }, [state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -412,16 +405,15 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
         })
       ).unwrap();
 
-      alert(`Возврат успешно создан!\nКоличество: ${state.qty}`);
-
-      onChanged?.();
-      onClose();
+      alert(`Возврат успешно создан!\nКоличество: ${state.qty}`, () => {
+        onChanged?.();
+        onClose();
+      });
     } catch (error) {
       console.error("Return creation failed:", error);
       alert(
-        `Ошибка при создании возврата: ${
-          error?.message || "неизвестная ошибка"
-        }`
+        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка"
+        }`, true
       );
     }
   };
@@ -512,9 +504,9 @@ const safeDate = (s) => {
 
 const ProductionAgents = () => {
   const dispatch = useDispatch();
+  const { profile } = useUser();
   const {
-    list: products,
-    categories,
+    // list: products,
     loading,
     error,
     agentProducts,
@@ -523,7 +515,7 @@ const ProductionAgents = () => {
   } = useProducts();
   const { start: startInAgent } = useAgent();
   // const {}
-  const { list: cashBoxes } = useCash();
+  // const { list: cashBoxes } = useCash();
   const [agents, setAgents] = useState([]);
   const [showAddCashboxModal, setShowAddCashboxModal] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -532,7 +524,7 @@ const ProductionAgents = () => {
   const [showSaleDetail, setShowSaleDetail] = useState(false);
   const [selectedSaleId, setSelectedSaleId] = useState(null);
 
-  const [cashboxId, setCashboxId] = useState("");
+  // const [cashboxId, setCashboxId] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showStart, setShowStart] = useState(false);
 
@@ -555,7 +547,8 @@ const ProductionAgents = () => {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // Debounce для поиска
+  const debouncedSearch = useDebouncedValue(search, 400);
   const [categoryFilter, setCategoryFilter] = useState("");
 
   // Фильтр по дате
@@ -572,24 +565,6 @@ const ProductionAgents = () => {
     return isSmall ? "cards" : "table";
   };
   const [viewMode, setViewMode] = useState(getInitialViewMode);
-  const debounceTimerRef = useRef(null);
-
-  // Debounce для поиска
-  useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [search]);
 
   // Сохраняем режим просмотра в localStorage
   useEffect(() => {
@@ -598,18 +573,17 @@ const ProductionAgents = () => {
     }
   }, [viewMode]);
 
-  const { profile } = useUser();
 
   useEffect(() => {
     // Загружаем данные в зависимости от роли пользователя
     if (profile?.role === "owner") {
-      dispatch(fetchProductsAsync());
+      // dispatch(fetchProductsAsync());
     } else {
       dispatch(fetchAgentProductsAsync());
     }
 
-    dispatch(fetchCategoriesAsync());
-    dispatch(getCashBoxes());
+    // dispatch(fetchCategoriesAsync());
+    // dispatch(getCashBoxes());
     dispatch(getItemsMake()); // сырьё для модалки
     dispatch(fetchBrandsAsync());
     // чтобы EditModal сразу имел список поставщиков:
@@ -619,7 +593,7 @@ const ProductionAgents = () => {
   const onSaveSuccess = () => {
     setShowAdd(false);
     if (profile?.role === "owner") {
-      dispatch(fetchProductsAsync());
+      // dispatch(fetchProductsAsync());
     } else {
       dispatch(fetchAgentProductsAsync());
     }
@@ -663,21 +637,21 @@ const ProductionAgents = () => {
     }
   };
 
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setSearch("");
     setCategoryFilter("");
     setDateFrom("");
     setDateTo("");
-  };
+  }, []);
 
   useEffect(() => {
-    dispatch(getProfile());
+    // dispatch(getProfile());
     dispatch(
       fetchTransfersAsync(
         profile?.role === "owner" ? {} : { agent: profile?.id }
       )
     );
-  }, [dispatch, profile?.role, profile?.id]);
+  }, [dispatch, profile]);
   useEffect(() => {
     if (showSellModal) dispatch(startSale());
   }, [showSellModal, dispatch]);
@@ -692,7 +666,7 @@ const ProductionAgents = () => {
   }, []);
 
   // Функция для загрузки истории продаж
-  const loadSalesHistory = async () => {
+  const loadSalesHistory = useCallback(async () => {
     setSalesHistoryLoading(true);
     try {
       const result = await dispatch(historySellProduct({})).unwrap();
@@ -702,9 +676,8 @@ const ProductionAgents = () => {
     } finally {
       setSalesHistoryLoading(false);
     }
-  };
+  }, []);
 
-  // Загружаем историю продаж при переключении на второй таб
   useEffect(() => {
     if (activeTab === 1 && company.sector.name === "Пилорама") {
       loadSalesHistory();
@@ -712,11 +685,11 @@ const ProductionAgents = () => {
   }, [activeTab, company.sector.name]);
 
   // Функция для открытия детального просмотра продажи
-  const handleShowSaleDetail = (saleId) => {
+  const handleShowSaleDetail = useCallback((saleId) => {
     setSelectedSaleId(saleId);
     setShowSaleDetail(true);
     dispatch(historySellProductDetail(saleId));
-  };
+  }, []);
 
   // Фильтрация по названию, категории и ДАТЕ created_at
   const viewProducts = useMemo(() => {
@@ -748,7 +721,7 @@ const ProductionAgents = () => {
       const okCat =
         !categoryFilter ||
         String(p.category_id || p.category)?.toLowerCase() ===
-          String(categoryFilter).toLowerCase();
+        String(categoryFilter).toLowerCase();
 
       // фильтр по дате (только для владельца, у агентов может не быть created_at)
       if (profile?.role === "owner") {
@@ -785,7 +758,7 @@ const ProductionAgents = () => {
     profile?.role,
   ]);
 
-  const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
+  const formatPrice = useCallback((price) => parseFloat(price || 0).toFixed(2), []);
 
   const kindTranslate = {
     new: "Новый",
@@ -857,7 +830,7 @@ const ProductionAgents = () => {
                     </p>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <div className="flex mx-auto gap-3 lg:mr-0 flex-wrap justify-center">
                   {profile?.role !== "owner" ? (
                     <button
                       className="warehouse-header__create-btn"
@@ -901,29 +874,32 @@ const ProductionAgents = () => {
                 </div>
 
                 <div className="warehouse-search__info flex flex-wrap items-center gap-2">
-                  <span>
+                  <span className="">
                     Всего: {viewProducts?.length || 0} • Найдено:{" "}
                     {viewProducts?.length || 0}
                   </span>
 
                   {/* Date filters */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-sm text-slate-600">От:</label>
-                    <input
-                      type="date"
-                      className="warehouse-search__input"
-                      style={{ width: "auto", minWidth: "140px" }}
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                    />
-                    <label className="text-sm text-slate-600">До:</label>
-                    <input
-                      type="date"
-                      className="warehouse-search__input"
-                      style={{ width: "auto", minWidth: "140px" }}
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                    />
+                  <div className="flex w-full justify-center md:w-auto items-center gap-2 flex-wrap">
+                    <div className="flex-1 md:flex-none flex items-center justify-between gap-2">
+                      <label className="text-sm text-slate-600">От:</label>
+                      <input
+                        type="date"
+                        className="warehouse-search__input flex-1 min-w-35"
+                        style={{ minWidth: "140px" }}
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1 md:flex-none flex items-center justify-between gap-2">
+                      <label className="text-sm text-slate-600">До:</label>
+                      <input
+                        type="date"
+                        className="warehouse-search__input flex-1 min-w-35"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                      />
+                    </div>
                     {(dateFrom || dateTo || search || categoryFilter) && (
                       <button
                         type="button"
@@ -936,15 +912,14 @@ const ProductionAgents = () => {
                   </div>
 
                   {/* View toggle */}
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <button
                       type="button"
                       onClick={() => setViewMode("table")}
-                      className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                        viewMode === "table"
-                          ? "bg-slate-900 text-white border-slate-900"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                      }`}
+                      className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        }`}
                     >
                       <Table2 size={16} />
                       Таблица
@@ -953,11 +928,10 @@ const ProductionAgents = () => {
                     <button
                       type="button"
                       onClick={() => setViewMode("cards")}
-                      className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                        viewMode === "cards"
-                          ? "bg-slate-900 text-white border-slate-900"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                      }`}
+                      className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                        }`}
                     >
                       <LayoutGrid size={16} />
                       Карточки
@@ -971,7 +945,7 @@ const ProductionAgents = () => {
                 {/* ===== TABLE ===== */}
                 {viewMode === "table" && (
                   <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <table className="warehouse-table w-full min-w-[900px]">
+                    <table className="warehouse-table w-full min-w-225">
                       <thead>
                         <tr>
                           <th>№</th>
@@ -983,7 +957,10 @@ const ProductionAgents = () => {
                               ? "На руках"
                               : "Количество / У агентов"}
                           </th>
-                          <th>Действия</th>
+                          {
+                            profile?.role !== 'owner' &&
+                            <th>Действия</th>
+                          }
                         </tr>
                       </thead>
 
@@ -1002,10 +979,10 @@ const ProductionAgents = () => {
                             </td>
                           </tr>
                         ) : (
-                            profile?.role === "owner"
-                              ? error
-                              : agentProductsError
-                          ) ? (
+                          profile?.role === "owner"
+                            ? error
+                            : agentProductsError
+                        ) ? (
                           <tr>
                             <td
                               colSpan={profile?.role === "owner" ? 6 : 5}
@@ -1039,25 +1016,22 @@ const ProductionAgents = () => {
                               </td>
                               {profile?.role === "owner" && (
                                 <td>
-                                  {`${item.agent_last_name || ""} ${
-                                    item.agent_first_name || ""
-                                  } ${
-                                    company.sector.name === "Пилорама"
-                                      ? `/ номер машины: ${
-                                          item.agent_track_number || ""
-                                        }`
+                                  {`${item.agent_last_name || ""} ${item.agent_first_name || ""
+                                    } ${company.sector.name === "Пилорама"
+                                      ? `/ номер машины: ${item.agent_track_number || ""
+                                      }`
                                       : ""
-                                  }`}
+                                    }`}
                                 </td>
                               )}
                               <td>
                                 {profile?.role === "owner"
                                   ? new Date(
-                                      item.created_at || item.last_movement_at
-                                    ).toLocaleDateString()
+                                    item.created_at || item.last_movement_at
+                                  ).toLocaleDateString()
                                   : new Date(
-                                      item.last_movement_at
-                                    ).toLocaleDateString()}
+                                    item.last_movement_at
+                                  ).toLocaleDateString()}
                               </td>
                               <td>
                                 {profile?.role !== "owner" ? (
@@ -1111,30 +1085,33 @@ const ProductionAgents = () => {
                                   </div>
                                 )}
                               </td>
-                              <td onClick={(e) => e.stopPropagation()}>
-                                {profile?.role !== "owner" && (
-                                  <button
-                                    className="warehouse-header__create-btn"
-                                    style={{
-                                      padding: "6px 12px",
-                                      fontSize: "12px",
-                                      background: "#ef4444",
-                                      color: "white",
-                                    }}
-                                    onClick={() => handleOpen3(item)}
-                                    disabled={
-                                      !item.qty_on_hand || item.qty_on_hand <= 0
-                                    }
-                                    title={
-                                      !item.qty_on_hand || item.qty_on_hand <= 0
-                                        ? "Нет товара для возврата"
-                                        : "Вернуть товар"
-                                    }
-                                  >
-                                    Вернуть
-                                  </button>
-                                )}
-                              </td>
+                              {
+                                profile?.role !== "owner" && (
+                                  <td onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                      className="warehouse-header__create-btn"
+                                      style={{
+                                        padding: "6px 12px",
+                                        fontSize: "12px",
+                                        background: "#ef4444",
+                                        color: "white",
+                                      }}
+                                      onClick={() => handleOpen3(item)}
+                                      disabled={
+                                        !item.qty_on_hand || item.qty_on_hand <= 0
+                                      }
+                                      title={
+                                        !item.qty_on_hand || item.qty_on_hand <= 0
+                                          ? "Нет товара для возврата"
+                                          : "Вернуть товар"
+                                      }
+                                    >
+                                      Вернуть
+                                    </button>
+                                  </td>
+                                )
+                              }
+
                             </tr>
                           ))
                         )}
@@ -1153,8 +1130,8 @@ const ProductionAgents = () => {
                         Загрузка...
                       </div>
                     ) : (
-                        profile?.role === "owner" ? error : agentProductsError
-                      ) ? (
+                      profile?.role === "owner" ? error : agentProductsError
+                    ) ? (
                       <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
                         Ошибка загрузки
                       </div>
@@ -1182,9 +1159,8 @@ const ProductionAgents = () => {
                                   <span className="whitespace-nowrap">
                                     Агент:{" "}
                                     <span className="font-medium">
-                                      {`${item.agent_last_name || ""} ${
-                                        item.agent_first_name || ""
-                                      }`}
+                                      {`${item.agent_last_name || ""} ${item.agent_first_name || ""
+                                        }`}
                                     </span>
                                   </span>
                                   {company.sector.name === "Пилорама" && (
@@ -1205,11 +1181,11 @@ const ProductionAgents = () => {
                                 <div className="mt-0.5 font-semibold text-slate-900">
                                   {profile?.role === "owner"
                                     ? new Date(
-                                        item.created_at || item.last_movement_at
-                                      ).toLocaleDateString()
+                                      item.created_at || item.last_movement_at
+                                    ).toLocaleDateString()
                                     : new Date(
-                                        item.last_movement_at
-                                      ).toLocaleDateString()}
+                                      item.last_movement_at
+                                    ).toLocaleDateString()}
                                 </div>
                               </div>
 
@@ -1370,14 +1346,14 @@ const ProductionAgents = () => {
                                     sale.status === "paid"
                                       ? "#d1fae5"
                                       : sale.status === "canceled"
-                                      ? "#fee2e2"
-                                      : "#fef3c7",
+                                        ? "#fee2e2"
+                                        : "#fef3c7",
                                   color:
                                     sale.status === "paid"
                                       ? "#059669"
                                       : sale.status === "canceled"
-                                      ? "#dc2626"
-                                      : "#d97706",
+                                        ? "#dc2626"
+                                        : "#d97706",
                                   borderRadius: "6px",
                                   fontSize: "12px",
                                   fontWeight: "600",

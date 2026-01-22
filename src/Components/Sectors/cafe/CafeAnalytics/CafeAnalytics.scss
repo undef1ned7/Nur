@@ -37,7 +37,7 @@
     align-items: center;
     gap: 10px;
     font-size: 20px;
-    font-weight: 900;
+    font-weight: 550;
     margin: 0;
   }
 
@@ -68,7 +68,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    font-weight: 900;
+    font-weight: 550;
     white-space: nowrap;
 
     svg {
@@ -84,7 +84,7 @@
     span {
       font-size: 12px;
       color: var(--muted);
-      font-weight: 900;
+      font-weight: 550;
       white-space: nowrap;
     }
   }
@@ -114,7 +114,7 @@
     border: 1px solid rgba(247, 215, 79, 0.6);
     background: rgba(247, 215, 79, 0.25);
     color: var(--text);
-    font-weight: 900;
+    font-weight: 550;
     font-size: 14px;
     cursor: pointer;
     transition: transform 0.12s, background 0.12s, border-color 0.12s;
@@ -203,7 +203,7 @@
 
   &__kpiLabel {
     font-size: 13px;
-    font-weight: 900;
+    font-weight: 550;
     letter-spacing: 0.6px;
     color: rgba(15, 23, 42, 0.65);
     text-transform: uppercase;
@@ -235,7 +235,7 @@
 
   &__kpiValue {
     font-size: 34px;
-    font-weight: 900;
+    font-weight: 550;
     line-height: 1.1;
     color: #0b1220;
     display: flex;
@@ -245,7 +245,7 @@
 
   &__kpiCur {
     font-size: 14px;
-    font-weight: 900;
+    font-weight: 550;
     color: rgba(15, 23, 42, 0.65);
     text-transform: lowercase;
   }
@@ -254,7 +254,7 @@
     margin-top: 8px;
     font-size: 13px;
     color: var(--muted);
-    font-weight: 700;
+    font-weight: 500;
   }
 
   /* card */
@@ -282,7 +282,7 @@
 
   &__cardTitle {
     font-size: 18px;
-    font-weight: 900;
+    font-weight: 550;
     color: #0b1220;
   }
 
@@ -331,7 +331,7 @@
       background: #f9fafb;
       border-bottom: 1px solid var(--border);
       font-size: 13px;
-      font-weight: 900;
+      font-weight: 550;
       color: #0b1220;
       text-align: left;
       padding: 10px 12px;
@@ -356,7 +356,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-weight: 800;
+    font-weight: 550;
   }
 
   &__tdEmpty {
@@ -428,7 +428,7 @@
 
   &__miniLabel {
     font-size: 13px;
-    font-weight: 900;
+    font-weight: 550;
     letter-spacing: 0.6px;
     color: rgba(15, 23, 42, 0.65);
     text-transform: uppercase;
@@ -436,7 +436,7 @@
 
   &__miniValue {
     font-size: 28px;
-    font-weight: 900;
+    font-weight: 550;
     color: #0b1220;
     margin-bottom: 6px;
   }
@@ -447,7 +447,7 @@
 
     b {
       color: var(--text);
-      font-weight: 900;
+      font-weight: 550;
     }
   }
 
@@ -500,7 +500,7 @@
 
   &__modalTitle {
     font-size: 18px;
-    font-weight: 900;
+    font-weight: 550;
     color: #0b1220;
   }
 
@@ -572,7 +572,7 @@
 
   &__modalKLabel {
     font-size: 12px;
-    font-weight: 900;
+    font-weight: 550;
     letter-spacing: 0.4px;
     color: rgba(15, 23, 42, 0.65);
     text-transform: uppercase;
@@ -581,7 +581,7 @@
 
   &__modalKVal {
     font-size: 20px;
-    font-weight: 900;
+    font-weight: 550;
     color: #0b1220;
   }
 
@@ -595,7 +595,7 @@
   &__modalBlockTitle {
     padding: 12px 14px;
     border-bottom: 1px solid var(--border);
-    font-weight: 900;
+    font-weight: 550;
     color: #0b1220;
   }
 
@@ -619,7 +619,7 @@
       background: #f9fafb;
       border-bottom: 1px solid var(--border);
       font-size: 13px;
-      font-weight: 900;
+      font-weight: 550;
       color: #0b1220;
       text-align: left;
       padding: 10px 12px;
@@ -644,14 +644,14 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-weight: 800;
+    font-weight: 550;
   }
 
   &__modalUnit {
     margin-left: 6px;
     color: var(--muted);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 500;
   }
 
   &__modalEmpty {
@@ -680,7 +680,7 @@
     span {
       font-size: 12px;
       color: var(--muted);
-      font-weight: 900;
+      font-weight: 550;
       white-space: nowrap;
     }
   }

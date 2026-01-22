@@ -1,8 +1,8 @@
 // src/components/Education/Login.jsx
-import React, { useState } from "react";
+import  { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { loginUserAsync } from "../../../store/creators/userCreators";
-import { logoutUser } from "../../../store/slices/userSlice";
+import {  loginUserAsync } from "../../../store/creators/userCreators";
+import {  logoutUser } from "../../../store/slices/userSlice";
 import { useNavigate } from "react-router-dom";
 import "./Login.scss";
 
@@ -67,6 +67,7 @@ const Login = () => {
     e.preventDefault(); // ← НЕ ДАДИМ БРАУЗЕРУ ПЕРЕЗАГРУЗИТЬ СТРАНИЦУ
     try {
       await dispatch(loginUserAsync(formData)).unwrap();
+     
       navigate("/crm/"); // навигация SPA, без reload
     } catch (e) {
       // Ошибка уже попадёт в Redux -> error, и покажется в errText

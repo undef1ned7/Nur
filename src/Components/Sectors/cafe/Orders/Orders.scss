@@ -26,7 +26,7 @@
 
   &__title {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 500;
     margin: 0;
     letter-spacing: 0.2px;
   }
@@ -91,7 +91,7 @@
     padding: 10px 14px;
     border-radius: 12px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     transition: 0.18s;
     border: 1px solid transparent;
@@ -166,7 +166,7 @@
 
   &__receiptTable {
     font-size: 22px;
-    font-weight: 800;
+    font-weight: 550;
     line-height: 1.2;
     letter-spacing: 0.2px;
   }
@@ -213,7 +213,7 @@
 
   &__receiptItemQty,
   &__receiptItemPrice {
-    font-weight: 700;
+    font-weight: 500;
     white-space: nowrap;
   }
 
@@ -222,7 +222,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-weight: 600;
+    font-weight: 500;
     font-size: 12.5px;
     padding: 2px 0;
     cursor: pointer;
@@ -247,7 +247,7 @@
 
   &__receiptTotalLabel,
   &__receiptTotalAmount {
-    font-weight: 800;
+    font-weight: 550;
   }
 
   &__receiptActions {
@@ -309,7 +309,7 @@
 
   &__label {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--muted);
   }
 
@@ -349,7 +349,7 @@
   &__itemsHeadTitle {
     margin: 0;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--muted);
     line-height: 1;
   }
@@ -415,7 +415,7 @@
   }
 
   &__itemTitle {
-    font-weight: 700;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -474,7 +474,7 @@
     height: 46px;
     border: 0;
     text-align: center;
-    font-weight: 600;
+    font-weight: 500;
     outline: none;
     background: #fff;
   }
@@ -493,7 +493,7 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    font-weight: 700;
+    font-weight: 500;
   }
 
   &__thumb {
@@ -620,7 +620,7 @@
 
   &__title {
     margin: 0;
-    font-weight: 700;
+    font-weight: 500;
     font-size: 16px;
   }
 
@@ -647,7 +647,7 @@
 
   &__label {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--muted);
     margin-bottom: 6px;
   }
@@ -689,7 +689,7 @@
     outline: none;
     background: transparent;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text);
     padding: 12px 0;
     min-width: 0;
@@ -763,7 +763,7 @@
   }
 
   &__itemLabel {
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -775,7 +775,7 @@
     padding: 14px;
     color: var(--muted);
     text-align: center;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   &__clear {
@@ -830,7 +830,7 @@
 }
 
 .cafeOrdersRpanel__title {
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .cafeOrdersRpanel__close {
@@ -928,7 +928,7 @@
 }
 
 .cafeOrdersRpanel__name {
-  font-weight: 700;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -937,7 +937,7 @@
 .cafeOrdersRpanel__price {
   font-size: 13px;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .cafeOrdersRpanel__add {
@@ -955,7 +955,7 @@
   padding: 14px;
   color: var(--muted);
   text-align: center;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .cafeOrdersRpanel__footer {
@@ -1012,7 +1012,7 @@
 
   &__table {
     font-size: 20px;
-    font-weight: 800;
+    font-weight: 550;
     letter-spacing: 0.2px;
   }
 
@@ -1054,12 +1054,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 600;
+    font-weight: 500;
   }
 
   &__qty,
   &__sum {
-    font-weight: 700;
+    font-weight: 500;
     white-space: nowrap;
   }
 
@@ -1069,7 +1069,7 @@
     background: #f9fafb;
     border: 1px solid #e5e7eb;
     color: var(--muted);
-    font-weight: 600;
+    font-weight: 500;
     text-align: center;
   }
 
@@ -1077,7 +1077,7 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
-    font-weight: 800;
+    font-weight: 550;
     font-size: 16px;
   }
 

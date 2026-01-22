@@ -89,7 +89,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -809,7 +809,7 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: 100;
   animation: fadeIn 0.3s ease-out;
 
   @keyframes fadeIn {
@@ -835,7 +835,7 @@
   background: white;
   border-top: 2px solid #007bff;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
-  z-index: 1001;
+  z-index: 100;
   max-height: calc(85vh - 70px);
   overflow: hidden;
   transform: translateY(100%); // Полностью скрыта по умолчанию

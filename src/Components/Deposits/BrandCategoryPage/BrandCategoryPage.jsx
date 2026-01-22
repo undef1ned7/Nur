@@ -245,9 +245,9 @@ export default function BrandCategoryPage() {
           {tabs.map((tab, index) => {
             return (
               <span
-                className={`vitrina__tab ${
-                  index === activeTab && "vitrina__tab--active"
-                }`}
+                key={tab.label}
+                className={`vitrina__tab ${index === activeTab && "vitrina__tab--active"
+                  }`}
                 onClick={() => setActiveTab(index)}
               >
                 {tab.label}
