@@ -4,6 +4,26 @@ import SearchableCombobox from "../../../../common/SearchableCombobox/Searchable
 
 const safeStr = (value) => String(value ?? "").trim();
 
+const toNumberSafe = (value) => {
+  if (value === null || value === undefined) return 0;
+
+  const cleaned = String(value)
+    .trim()
+    .replace(/\s/g, "")
+    .replace(/[^0-9.,-]/g, "")
+    .replace(",", ".");
+
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const percent = (num, den) => {
+  const n = toNumberSafe(num);
+  const d = toNumberSafe(den);
+  if (!d) return 0;
+  return (n / d) * 100;
+};
+
 const MenuItemsTab = ({
   loadingItems,
   filteredItems,
@@ -18,7 +38,6 @@ const MenuItemsTab = ({
   hasCategories,
   categoryTitle,
   formatMoney,
-  toNumber,
   viewMode,
 }) => {
   const items = Array.isArray(filteredItems) ? filteredItems : [];
@@ -41,12 +60,34 @@ const MenuItemsTab = ({
     return "Список блюд пуст";
   }, [loadingItems, hasCategories, queryItems, selectedCategoryFilter]);
 
+  const renderEconomics = (item) => {
+    const price = Math.max(0, toNumberSafe(item?.price));
+    const ing = Math.max(0, toNumberSafe(item?.ingredients_cost));
+    const other = Math.max(0, toNumberSafe(item?.other_expenses));
+
+    // ВАЖНО: прибыль = цена - ингредиенты
+    // (если цена = ингредиенты + прочие, то прибыль == прочие)
+    const profit = Math.max(0, price - ing);
+
+    // Маржа от цены продажи
+    const margin = percent(profit, price);
+
+    return (
+      <div className="cafeMenu__meta" style={{ marginTop: 6 }}>
+        <span className="cafeMenu__muted">Ингр.: {formatMoney(ing)} сом</span>
+        <span className="cafeMenu__muted">Прочие: {formatMoney(other)} сом</span>
+        <span className="cafeMenu__muted">Прибыль: {formatMoney(profit)} сом</span>
+        <span className="cafeMenu__muted">Маржа: {Math.round(margin)}%</span>
+      </div>
+    );
+  };
+
   const renderListView = () => (
     <div className="cafeMenu__list">
       {items.map((item) => {
         const title = safeStr(item?.title) || "—";
         const category = categoryTitle(item?.category);
-        const price = formatMoney(item?.price);
+        const priceTxt = `${formatMoney(item?.price)} сом`;
         const isActive = !!item?.is_active;
         const image = item?.image_url || item?.image || "";
 
@@ -68,7 +109,7 @@ const MenuItemsTab = ({
 
                 <div className="cafeMenu__meta">
                   <span className="cafeMenu__muted">{category}</span>
-                  <span className="cafeMenu__muted">{price}</span>
+                  <span className="cafeMenu__muted">{priceTxt}</span>
 
                   <span
                     className={`cafeMenu__status ${
@@ -78,6 +119,9 @@ const MenuItemsTab = ({
                     {isActive ? "Активно" : "Не активно"}
                   </span>
                 </div>
+
+                {/* Экономика: Ингр / Прочие / Прибыль / Маржа */}
+                {renderEconomics(item)}
               </div>
             </div>
 
@@ -111,7 +155,7 @@ const MenuItemsTab = ({
       {items.map((item) => {
         const title = safeStr(item?.title) || "—";
         const category = categoryTitle(item?.category);
-        const price = formatMoney(item?.price);
+        const priceTxt = `${formatMoney(item?.price)} сом`;
         const isActive = !!item?.is_active;
         const image = item?.image_url || item?.image || "";
 
@@ -121,7 +165,10 @@ const MenuItemsTab = ({
               {image ? (
                 <img src={image} alt={title} />
               ) : (
-                <div className="cafeMenu__avatar" style={{ width: "100%", height: "100%", borderRadius: 0 }}>
+                <div
+                  className="cafeMenu__avatar"
+                  style={{ width: "100%", height: "100%", borderRadius: 0 }}
+                >
                   <span style={{ fontSize: 28, fontWeight: 900 }}>
                     {title.slice(0, 1).toUpperCase()}
                   </span>
@@ -136,7 +183,7 @@ const MenuItemsTab = ({
 
               <div className="cafeMenu__tileRow">
                 <span className="cafeMenu__tileCat">{category}</span>
-                <span className="cafeMenu__tilePrice">{price}</span>
+                <span className="cafeMenu__tilePrice">{priceTxt}</span>
               </div>
 
               <div className="cafeMenu__tileRow">
@@ -148,6 +195,9 @@ const MenuItemsTab = ({
                   {isActive ? "Активно" : "Не активно"}
                 </span>
               </div>
+
+              {/* Экономика: Ингр / Прочие / Прибыль / Маржа */}
+              {renderEconomics(item)}
             </div>
 
             <div className="cafeMenu__tileActions">
