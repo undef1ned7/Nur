@@ -6,7 +6,6 @@ import {
   FaCalendarAlt,
   FaClock,
   FaComment,
-  FaCreditCard,
 } from "react-icons/fa";
 
 const fmtMoney = (n) =>
@@ -32,12 +31,6 @@ const STATUS_LABELS = {
   confirmed: "Подтверждена",
   no_show: "Не пришел",
   spam: "Спам/Ошибка",
-};
-
-const PAYMENT_LABELS = {
-  cash: "Наличными",
-  card: "Картой",
-  transfer: "Перевод",
 };
 
 const RequestDetailModal = ({ request, onClose }) => {
@@ -120,18 +113,6 @@ const RequestDetailModal = ({ request, onClose }) => {
                 <span className="barberrequests__modalLabel">Время</span>
                 <span className="barberrequests__modalValue">
                   {fmtTime(request.time_start)} - {fmtTime(request.time_end)}
-                </span>
-              </div>
-            </div>
-
-            <div className="barberrequests__modalItem">
-              <div className="barberrequests__modalIcon">
-                <FaCreditCard />
-              </div>
-              <div className="barberrequests__modalInfo">
-                <span className="barberrequests__modalLabel">Оплата</span>
-                <span className="barberrequests__modalValue barberrequests__modalValue--payment">
-                  {PAYMENT_LABELS[request.payment_method] || request.payment_method || "—"}
                 </span>
               </div>
             </div>
