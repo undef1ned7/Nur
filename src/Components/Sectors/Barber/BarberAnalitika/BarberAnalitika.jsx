@@ -47,7 +47,7 @@ ChartJS.register(
   ArcElement,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 );
 
 const BarberAnalitika = () => {
@@ -99,12 +99,12 @@ const BarberAnalitika = () => {
   /* ===== опции для комбобоксов ===== */
   const yearOptions = useMemo(
     () => years.map((y) => ({ value: String(y), label: String(y) })),
-    [years]
+    [years],
   );
 
   const monthOptions = useMemo(
     () => months.map((m, i) => ({ value: String(i), label: m })),
-    []
+    [],
   );
 
   /* ===== вычисляемые метрики ===== */
@@ -115,9 +115,10 @@ const BarberAnalitika = () => {
   // Самый загруженный день недели
   const weekDayNames = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
   const busiestDayIdx = weekChart.indexOf(Math.max(...weekChart));
-  const busiestDay = weekChart[busiestDayIdx] > 0 
-    ? { name: weekDayNames[busiestDayIdx], count: weekChart[busiestDayIdx] }
-    : null;
+  const busiestDay =
+    weekChart[busiestDayIdx] > 0
+      ? { name: weekDayNames[busiestDayIdx], count: weekChart[busiestDayIdx] }
+      : null;
 
   /* ===== KPI карточки ===== */
   const kpiCards = [
@@ -154,7 +155,12 @@ const BarberAnalitika = () => {
       title: "Конверсия записей",
       value: `${fmtInt(Math.round(conversionRate))}%`,
       icon: <FiTarget size={20} />,
-      iconMod: conversionRate >= 70 ? "green" : conversionRate >= 50 ? "orange" : "red",
+      iconMod:
+        conversionRate >= 70
+          ? "green"
+          : conversionRate >= 50
+            ? "orange"
+            : "red",
     },
     {
       key: "apps",
@@ -202,7 +208,13 @@ const BarberAnalitika = () => {
     datasets: [
       {
         data: popularServices.map((s) => s.count || 0),
-        backgroundColor: ["#f7d74f", "#22c55e", "#3b82f6", "#a855f7", "#9ca3af"],
+        backgroundColor: [
+          "#f7d74f",
+          "#22c55e",
+          "#3b82f6",
+          "#a855f7",
+          "#9ca3af",
+        ],
         borderWidth: 0,
       },
     ],
@@ -261,14 +273,18 @@ const BarberAnalitika = () => {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-      x: { 
+      x: {
         grid: { display: false },
         ticks: { font: { size: 12, weight: 400 }, color: "#6b7280" },
       },
       y: {
         beginAtZero: true,
         grid: { color: "rgba(0, 0, 0, 0.04)", drawBorder: false },
-        ticks: { stepSize: 2, font: { size: 11, weight: 400 }, color: "#9ca3af" },
+        ticks: {
+          stepSize: 2,
+          font: { size: 11, weight: 400 },
+          color: "#9ca3af",
+        },
       },
     },
   };
@@ -309,7 +325,7 @@ const BarberAnalitika = () => {
       legend: {
         display: true,
         position: "bottom",
-        labels: { 
+        labels: {
           boxWidth: 10,
           boxHeight: 10,
           borderRadius: 5,
@@ -327,7 +343,8 @@ const BarberAnalitika = () => {
         padding: 12,
         borderRadius: 8,
         callbacks: {
-          label: (ctx) => `${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y || 0)}`,
+          label: (ctx) =>
+            `${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y || 0)}`,
         },
       },
     },
@@ -335,12 +352,12 @@ const BarberAnalitika = () => {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-      x: { 
+      x: {
         grid: { display: false },
         ticks: { font: { size: 11, weight: 400 }, color: "#9ca3af" },
       },
-      y: { 
-        beginAtZero: true, 
+      y: {
+        beginAtZero: true,
         grid: { color: "rgba(0, 0, 0, 0.04)", drawBorder: false },
         ticks: { font: { size: 11, weight: 400 }, color: "#9ca3af" },
       },
@@ -620,7 +637,11 @@ const BarberAnalitika = () => {
           icon={<FiScissors size={16} />}
           title="Топ услуг (месяц)"
           columns={[
-            { key: "name", title: "Услуга", className: "barber-analitika-table__ellipsis" },
+            {
+              key: "name",
+              title: "Услуга",
+              className: "barber-analitika-table__ellipsis",
+            },
             { key: "count", title: "Кол-во" },
             {
               key: "sum",
@@ -637,7 +658,11 @@ const BarberAnalitika = () => {
           icon={<FiPackage size={16} />}
           title="Товары (продажи)"
           columns={[
-            { key: "name", title: "Товар", className: "barber-analitika-table__ellipsis" },
+            {
+              key: "name",
+              title: "Товар",
+              className: "barber-analitika-table__ellipsis",
+            },
             { key: "qty", title: "Кол-во" },
             {
               key: "revenue",
@@ -654,7 +679,11 @@ const BarberAnalitika = () => {
           icon={<FiUsers size={16} />}
           title="Клиенты (продажи)"
           columns={[
-            { key: "name", title: "Клиент", className: "barber-analitika-table__ellipsis" },
+            {
+              key: "name",
+              title: "Клиент",
+              className: "barber-analitika-table__ellipsis",
+            },
             { key: "orders", title: "Заказы" },
             {
               key: "revenue",
@@ -671,7 +700,11 @@ const BarberAnalitika = () => {
           icon={<FiCreditCard size={16} />}
           title="Кассы (месяц)"
           columns={[
-            { key: "name", title: "Касса", className: "barber-analitika-table__ellipsis" },
+            {
+              key: "name",
+              title: "Касса",
+              className: "barber-analitika-table__ellipsis",
+            },
             { key: "ops", title: "Операций" },
             {
               key: "income",
@@ -694,7 +727,11 @@ const BarberAnalitika = () => {
           icon={<FiTruck size={16} />}
           title="Поставщики (месяц)"
           columns={[
-            { key: "name", title: "Поставщик", className: "barber-analitika-table__ellipsis" },
+            {
+              key: "name",
+              title: "Поставщик",
+              className: "barber-analitika-table__ellipsis",
+            },
             { key: "items", title: "Позиций" },
             {
               key: "amount",

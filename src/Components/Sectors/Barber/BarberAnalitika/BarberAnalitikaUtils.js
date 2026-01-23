@@ -3,16 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
 
 /* ─── helpers ─── */
-export const toNum = (v) =>
-  Number.isFinite(Number(v)) ? Number(v) : 0;
+export const toNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 export const fmt = (x) =>
-  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(
-    toNum(x)
-  );
+  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(toNum(x));
 
-export const fmtInt = (n) =>
-  Number(n || 0).toLocaleString("ru-RU");
+export const fmtInt = (n) => Number(n || 0).toLocaleString("ru-RU");
 
 export const fmtMoney = (n) => `${fmt(n)} c`;
 
@@ -102,7 +98,7 @@ export const usePaged = (rows, pageSize) => {
 
   const slice = useMemo(
     () => rows.slice((page - 1) * pageSize, page * pageSize),
-    [rows, page, pageSize]
+    [rows, page, pageSize],
   );
 
   return { page, pages, setPage, slice };
