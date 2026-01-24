@@ -43,6 +43,7 @@ import "../../Market/Warehouse/Warehouse.scss";
 import "./productionAgents.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import useResize from "../../../../hooks/useResize";
 
 // Компонент для детального просмотра продажи
 const SaleDetailModal = ({ onClose, saleId }) => {
@@ -514,8 +515,13 @@ const ProductionAgents = () => {
     agentProductsError,
   } = useProducts();
   const { start: startInAgent } = useAgent();
-  // const {}
-  // const { list: cashBoxes } = useCash();
+  const {isMobile} = useResize((media) => {
+    const {isMobile} = media
+    if (isMobile) {
+        setViewMode('cards')
+    }
+  })
+  
   const [agents, setAgents] = useState([]);
   const [showAddCashboxModal, setShowAddCashboxModal] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -747,7 +753,7 @@ const ProductionAgents = () => {
   ]);
 
   const formatPrice = useCallback((price) => parseFloat(price || 0).toFixed(2), []);
-  
+
   const kindTranslate = {
     new: "Новый",
     paid: "Оплаченный",
@@ -900,31 +906,35 @@ const ProductionAgents = () => {
                   </div>
 
                   {/* View toggle */}
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("table")}
-                      className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                        }`}
-                    >
-                      <Table2 size={16} />
-                      Таблица
-                    </button>
+                  {
+                    !isMobile && (
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setViewMode("table")}
+                          className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
+                            ? "bg-slate-900 text-white border-slate-900"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                            }`}
+                        >
+                          <Table2 size={16} />
+                          Таблица
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("cards")}
-                      className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                        }`}
-                    >
-                      <LayoutGrid size={16} />
-                      Карточки
-                    </button>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => setViewMode("cards")}
+                          className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
+                            ? "bg-slate-900 text-white border-slate-900"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                            }`}
+                        >
+                          <LayoutGrid size={16} />
+                          Карточки
+                        </button>
+                      </div>
+                    )
+                  }
                 </div>
               </div>
 

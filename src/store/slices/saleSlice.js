@@ -192,8 +192,9 @@ const saleSlice = createSlice({
       .addCase(deleteProductInCart.pending, (state) => {
         state.loading = true;
       })
-      .addCase(deleteProductInCart.fulfilled, (state) => {
+      .addCase(deleteProductInCart.fulfilled, (state, action) => {
         state.loading = false;
+        state.start = action.payload
       })
       .addCase(deleteProductInCart.rejected, (state, action) => {
         state.error = ensureError(action);

@@ -1313,7 +1313,6 @@ const Cart = ({
       setSubmitting(false);
     }
   };
-  console.log(agentCart, "agent");
 
   // Обработка свайпа вверх для открытия секции заказа
   const handleTouchStart = (e) => {
@@ -1693,7 +1692,7 @@ const Cart = ({
       document.body.style.overscrollBehaviorY = "";
     };
   }, [isOrderSectionOpen, isMobile]);
-
+  
   // Список товаров в корзине (переиспользуемый компонент)
   const cartItemsList = (
     <div className="cart-column cart-items-column">
@@ -1764,7 +1763,7 @@ const Cart = ({
       {/* Модалка корзины - открывается при нажатии на кнопку корзины в ProductionCatalog */}
       {isOpen && (
         <div
-          className="cart-modal-overlay z-50!"
+          className="cart-modal-overlay z-100!"
           onClick={(e) => {
             // Закрываем модалку только при клике на overlay, а не на контент
             if (e.target === e.currentTarget) {

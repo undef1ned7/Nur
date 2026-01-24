@@ -1270,11 +1270,8 @@ const ProductionCatalog = () => {
             setAgentCartId(updated.id);
             localStorage.setItem("agentCartId", updated.id);
           }
-        } else {
-          // Если данных нет, обновляем через refreshCartItems
-          await refreshCartItems();
         }
-
+        await refreshCartItems();
         // Анимация кнопки корзины
         const cartBtn = document.querySelector(".cart-btn");
         if (cartBtn) {
@@ -1283,6 +1280,7 @@ const ProductionCatalog = () => {
             cartBtn.style.transform = "scale(1)";
           }, 200);
         }
+
       } else {
         // Fallback to local cart if agent cart creation failed
         dispatch(addToCart({ product, quantity, store: "Default Store" }));
@@ -1291,7 +1289,9 @@ const ProductionCatalog = () => {
       alert(error?.data?.detail || 'Ошибка при добавлении в корзину!')
       console.error("Error adding product to cart:", error);
       // Fallback to local cart on error
-      dispatch(addToCart({ product, quantity, store: "Default Store" }));
+      if (error?.status >= 500) {
+        dispatch(addToCart({ product, quantity, store: "Default Store" }));
+      }
     }
   };
 
