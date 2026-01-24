@@ -196,11 +196,10 @@ const ProductionRequest = () => {
         }, 200);
       }
     } catch (error) {
-      console.error("Error adding product to cart:", error);
+      console.log(error.response.data);
+      const firstErrorEntry = Object.values(error?.response?.data || {})[0];
       const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
+        (Array.isArray(firstErrorEntry) ? firstErrorEntry[0] : firstErrorEntry) ||
         "Не удалось добавить товар в запрос";
       setAlertType("error");
       setAlertMessage(errorMessage);
