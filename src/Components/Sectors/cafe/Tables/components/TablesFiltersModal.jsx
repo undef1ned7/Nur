@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { FaTimes, FaFilter, FaUndo, FaList, FaTh } from "react-icons/fa";
 import { CafeSelect } from "../../common";
 import "./TablesFiltersModal.scss";
@@ -98,7 +97,7 @@ const TablesFiltersModal = ({
 
   if (!isOpen) return null;
 
-  const modalContent = (
+  return (
     <div className="tables-filters-modal__overlay" onClick={handleOverlayClick}>
       <div className="tables-filters-modal">
         <div className="tables-filters-modal__header">
@@ -202,8 +201,6 @@ const TablesFiltersModal = ({
       </div>
     </div>
   );
-
-  return createPortal(modalContent, document.body);
 };
 
 export default TablesFiltersModal;
