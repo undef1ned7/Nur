@@ -845,10 +845,10 @@ const ProductionAgents = () => {
                   <Plus size={16} />
                   Мои передачи
                 </button>
-                <button className="warehouse-header__create-btn" onClick={handleStartSale}>
+                {/* <button className="warehouse-header__create-btn" onClick={handleStartSale}>
                   <Plus size={16} />
                   Продать товар
-                </button>
+                </button> */}
                 </div>
                   ) : (
                     <button

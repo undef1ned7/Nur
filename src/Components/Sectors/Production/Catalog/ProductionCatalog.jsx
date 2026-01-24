@@ -910,6 +910,7 @@ const ProductionCatalog = () => {
   const [alertMessage, setAlertMessage] = useState("");
   const [agentProducts, setAgentProducts] = useState([]);
   const [agentProductsMap, setAgentProductsMap] = useState(new Map());
+  const [isMobileView, setIsMobileView] = useState(false);
 
   // Получаем массив продуктов из results
   const rawProductsList = Array.isArray(products?.results)
@@ -1518,15 +1519,17 @@ const ProductionCatalog = () => {
             Фильтры
           </button> */}
 
-          <button className="cart-btn" onClick={handleOpenCart}>
-            <ShoppingCart size={20} />
-            Корзина
-            {(agentCartItemsCount > 0 || cartItemsCount > 0) && (
-              <span className="cart-badge">
-                {agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount}
-              </span>
-            )}
-          </button>
+          {!isMobileView && (
+            <button className="cart-btn" onClick={handleOpenCart}>
+              <ShoppingCart size={20} />
+              Корзина
+              {(agentCartItemsCount > 0 || cartItemsCount > 0) && (
+                <span className="cart-badge">
+                  {agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount}
+                </span>
+              )}
+            </button>
+          )}
 
           <div className="view-mode-toggle">
             <button
@@ -1731,6 +1734,7 @@ const ProductionCatalog = () => {
         totalItemsCount={
           agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount
         }
+        onMobileViewChange={setIsMobileView}
       />
 
       <AlertModal

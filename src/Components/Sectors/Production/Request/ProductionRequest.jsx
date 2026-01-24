@@ -334,6 +334,8 @@ const ProductionRequest = () => {
     }
   };
 
+  const [isMobileView, setIsMobileView] = useState(false);
+
   return (
     <div className="production-request">
       <CatalogControls
@@ -347,6 +349,7 @@ const ProductionRequest = () => {
         onViewModeChange={setViewMode}
         onOpenCart={handleOpenCart}
         totalItemsCount={totalItemsCount}
+        hideCartButton={isMobileView}
       />
 
       {loading && (
@@ -397,6 +400,7 @@ const ProductionRequest = () => {
         isOpen={isCartSectionOpen}
         onOpenChange={setIsCartSectionOpen}
         totalItemsCount={totalItemsCount}
+        onMobileOrderSectionChange={setIsMobileView}
       />
 
       <AlertModal

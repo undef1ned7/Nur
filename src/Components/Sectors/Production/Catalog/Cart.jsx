@@ -87,7 +87,8 @@ const CartItem = ({
       console.log("CartItem: increment disabled, editable:", editable);
       return;
     }
-    const newQuantity = quantity + 1;
+    const current = Number(quantity) || 0;
+    const newQuantity = current + 1;
     setQuantity(newQuantity);
     console.log("CartItem: incrementing", item.id, "to", newQuantity);
     onUpdateQuantity(item.id, newQuantity);
@@ -95,17 +96,16 @@ const CartItem = ({
 
   const handleDecrement = (e, id) => {
     e.stopPropagation();
-    if (!editable || quantity <= 0) {
-      handleRemove(id)
-      console.log(
-        "CartItem: decrement disabled, editable:",
-        editable,
-        "quantity:",
-        quantity
-      );
+    if (!editable) {
+      console.log("CartItem: decrement disabled, editable:", editable);
       return;
     }
-    const newQuantity = quantity - 1;
+    const current = Number(quantity) || 0;
+    if (current <= 1) {
+      handleRemove(e);
+      return;
+    }
+    const newQuantity = current - 1;
     setQuantity(newQuantity);
     console.log("CartItem: decrementing", item.id, "to", newQuantity);
     onUpdateQuantity(item.id, newQuantity);
@@ -113,7 +113,12 @@ const CartItem = ({
 
   const handleQuantityInputChange = (e) => {
     e.stopPropagation();
-    const value = Number(e.target.value);
+    const raw = e.target.value;
+    if (raw === "") {
+      setQuantity("");
+      return;
+    }
+    const value = Number(raw);
     if (!isNaN(value) && value >= 1) {
       setQuantity(value);
     }
@@ -121,8 +126,9 @@ const CartItem = ({
 
   const handleQuantityInputBlur = (e) => {
     e.stopPropagation();
-    const value = Number(e.target.value);
-    if (isNaN(value) || value < 1) {
+    const raw = e.target.value;
+    const value = Number(raw);
+    if (raw === "" || isNaN(value) || value < 1) {
       setQuantity(1);
       onUpdateQuantity(item.id, 1);
     } else {
@@ -201,8 +207,7 @@ const CartItem = ({
               <Minus size={16} />
             </button>
             <input
-              type="number"
-              min="0"
+              type="text"
               value={quantity}
               onChange={handleQuantityInputChange}
               onBlur={handleQuantityInputBlur}
@@ -820,6 +825,7 @@ const Cart = ({
   onOpenChange,
   setAgentCartItemsCount,
   totalItemsCount = 0,
+  onMobileViewChange,
 }) => {
   const confirm = useConfirm();
   const dispatch = useDispatch();
@@ -880,6 +886,10 @@ const Cart = ({
       window.removeEventListener("resize", checkIsMobile);
     };
   }, []);
+
+  useEffect(() => {
+    onMobileViewChange?.(isMobile);
+  }, [isMobile, onMobileViewChange]);
 
   // Load items for provided or discovered draft cart; do not create here
   useEffect(() => {

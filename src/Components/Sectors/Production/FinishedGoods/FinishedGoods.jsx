@@ -622,13 +622,13 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
         {/* Поставщик + быстрое создание */}
         <div className="finished-goods-add-modal__section">
-          <label>Поставщик *</label>
+          <label>Поставщик {dealStatus ? "*" : ""}</label>
           <select
             name="client"
             className="finished-goods-add-modal__input"
             value={product.client}
             onChange={onProductChange}
-            required
+            required={!!dealStatus}
           >
             <option value="">-- Выберите поставщика --</option>
             {suppliers.map((s) => (
