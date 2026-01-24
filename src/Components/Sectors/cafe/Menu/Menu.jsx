@@ -199,29 +199,29 @@ const Menu = () => {
   }, [imagePreview]);
 
   // Фильтрованные списки
-  const filteredItems = useMemo(() => {
-    let filtered = items;
+  // const filteredItems = useMemo(() => {
+  //   let filtered = items;
 
-    // Фильтр по категории
-    // if (selectedCategoryFilter) {
-    //   filtered = filtered.filter(
-    //     (item) => String(item?.category || "") === String(selectedCategoryFilter)
-    //   );
-    // }
+  //   // Фильтр по категории
+  //   // if (selectedCategoryFilter) {
+  //   //   filtered = filtered.filter(
+  //   //     (item) => String(item?.category || "") === String(selectedCategoryFilter)
+  //   //   );
+  //   // }
 
-    // Фильтр по поисковому запросу
-    // const query = queryItems.trim().toLowerCase();
-    // if (query) {
-    //   filtered = filtered.filter((item) => {
-    //     const title = (item.title || "").toLowerCase();
-    //     const category = getCategoryTitle(item.category).toLowerCase();
-    //     const kitchen = getKitchenTitle(item.kitchen).toLowerCase();
-    //     return title.includes(query) || category.includes(query) || kitchen.includes(query);
-    //   });
-    // }
+  //   // Фильтр по поисковому запросу
+  //   // const query = queryItems.trim().toLowerCase();
+  //   // if (query) {
+  //   //   filtered = filtered.filter((item) => {
+  //   //     const title = (item.title || "").toLowerCase();
+  //   //     const category = getCategoryTitle(item.category).toLowerCase();
+  //   //     const kitchen = getKitchenTitle(item.kitchen).toLowerCase();
+  //   //     return title.includes(query) || category.includes(query) || kitchen.includes(query);
+  //   //   });
+  //   // }
 
-    return filtered;
-  }, [items, debouncedItemSearch, selectedCategoryFilter, categoriesMap, kitchensMap]);
+  //   return filtered;
+  // }, [items, categoriesMap, kitchensMap]);
 
   const filteredCategories = useMemo(() => {
     const query = queryCats.trim().toLowerCase();
@@ -545,7 +545,7 @@ const Menu = () => {
       {isItemsTab && (
         <MenuItemsTab
           loadingItems={loadingItems}
-          filteredItems={filteredItems}
+          filteredItems={items}
           queryItems={queryItems}
           setQueryItems={setQueryItems}
           categories={categories}
