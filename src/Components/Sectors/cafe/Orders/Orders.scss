@@ -1,5 +1,4 @@
 /* src/.../Orders.scss */
-@use "../variables.scss";
 
 .cafeOrders {
   --radius: 12px;
@@ -541,6 +540,7 @@
       grid-template-columns: 1fr;
     }
   }
+ 
 
   @media (max-width: 560px) {
     padding: 18px;
@@ -603,12 +603,15 @@
   &__card {
     background: #fff;
     border-radius: 16px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.16), 0 4px 16px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.16),
+      0 4px 16px rgba(0, 0, 0, 0.06);
     width: 100%;
     overflow: hidden;
   }
 
   &__header {
+
     padding: 14px 16px;
     border-bottom: 1px solid #e5e7eb;
     display: flex;
@@ -871,7 +874,6 @@
   border: 1px solid var(--border);
   outline: none;
   min-height: 48px;
-
   &:focus {
     border-color: var(--primary-dark);
     box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.2);

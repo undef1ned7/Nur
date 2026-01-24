@@ -7,7 +7,7 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './src'),
+            '@': '/src',
         },
     },
     server: {
@@ -18,4 +18,11 @@ export default defineConfig({
         outDir: 'build',
         sourcemap: true,
     },
+    css: {
+        preprocessorOptions: {
+            scss: {
+                additionalData: `@use "@/assets/scss/main.scss" as *; @use "@/assets/scss/_mixin.scss" as *; @use "@/assets/scss/_variables.scss" as *;`
+            }
+        }
+    }
 })

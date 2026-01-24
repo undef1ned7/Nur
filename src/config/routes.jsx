@@ -157,12 +157,15 @@ import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
 import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
 import OnlineBooking from "../Components/Sectors/Barber/OnlineBooking/OnlineBooking";
-import CreateSaleDocumentForMarket from "../Components/Sectors/Market/Documents/CreateSaleDocumentForMarket";
+import CafeOrdersLayout from "../Components/Sectors/cafe/Orders";
+import Orders from "../Components/Sectors/cafe/Orders/Orders";
+import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistory";
+
 
 /**
  * Создает защищенный роут
  */
-const createProtectedRoute = (path, Component) => (
+const createProtectedRoute = (path, Component, props) => (
   <Route
     key={path}
     path={path}
@@ -171,6 +174,7 @@ const createProtectedRoute = (path, Component) => (
         <Component />
       </ProtectedRoute>
     }
+    {...props}
   />
 );
 
@@ -203,8 +207,8 @@ export const publicRoutes = [
 
 
 
- // Public routes
-<Route
+  // Public routes
+  <Route
     key="/catalog/:slug"
     path="/catalog/:slug"
     element={<OnlineCatalog />}
@@ -319,7 +323,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("clients/:id", MarketClientDetails),
   createProtectedRoute("market/history", MarketHistory),
   createProtectedRoute("market/documents", MarketDocuments),
-  createProtectedRoute("market/documents/create", CreateSaleDocumentForMarket),
+  createProtectedRoute("market/documents/create", CreateSaleDocument),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
   // Cafe routes
@@ -328,7 +332,14 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("cafe/cook", Cook),
   createProtectedRoute("cafe/inventory", CafeInventory),
   createProtectedRoute("cafe/menu", CafeMenu),
-  createProtectedRoute("cafe/orders", CafeOrders),
+
+  <Route path="cafe/orders" key={'cafe/orders'} element={<CafeOrdersLayout />}>
+    {
+      [
+        createProtectedRoute("*", CafeOrders, { index: true }),
+        createProtectedRoute("history", CafeOrderHistory, { index: true })
+      ]}
+  </Route>,
   createProtectedRoute("cafe/payroll", CafePayroll),
   createProtectedRoute("cafe/purchasing", CafePurchasing),
   createProtectedRoute("cafe/reports", CafeReports),
