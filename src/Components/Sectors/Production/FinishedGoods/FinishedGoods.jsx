@@ -67,6 +67,7 @@ import noImage from "../../Market/Warehouse/components/placeholder.png";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import usePlurize from "../../../../hooks/usePlurize";
+import useResize from "../../../../hooks/useResize";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -2720,12 +2721,21 @@ const FinishedGoods = ({ products, onChanged }) => {
   const [viewMode, setViewMode] = useState(getInitialViewMode);
 
   // Сохраняем режим просмотра в localStorage
+
+  const { isMobile } = useResize((media) => {
+    const { isMobile } = media
+    if (isMobile) {
+      setViewMode('cards')
+    } else {
+      setViewMode(getInitialViewMode())
+    }
+  })
   useEffect(() => {
+    if (isMobile) return;
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, viewMode);
     }
   }, [viewMode]);
-
 
 
   useEffect(() => {
@@ -2934,31 +2944,35 @@ const FinishedGoods = ({ products, onChanged }) => {
           </div>
 
           {/* View toggle */}
-          <div className="ml-auto justify-center flex flex-1 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                }`}
-            >
-              <Table2 size={16} />
-              Таблица
-            </button>
+          {
+            !isMobile && (
+              <div className="ml-auto justify-center flex flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("table")}
+                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "table"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                >
+                  <Table2 size={16} />
+                  Таблица
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                }`}
-            >
-              <LayoutGrid size={16} />
-              Карточки
-            </button>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("cards")}
+                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === "cards"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                >
+                  <LayoutGrid size={16} />
+                  Карточки
+                </button>
+              </div>
+            )
+          }
         </div>
       </div>
 

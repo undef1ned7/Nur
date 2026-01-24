@@ -1,8 +1,9 @@
 // src/Components/pages/Sell/SellMainStart.jsx
 import { Pencil } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useDebounce } from "../../../hooks/useDebounce";
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   doSearch,
   manualFilling,
@@ -54,6 +55,7 @@ import {
 } from "./components/PaymentModals";
 import DiscountModal from "./components/DiscountModal";
 import CustomServiceModal from "./components/CustomServiceModal";
+import { Button } from "@mui/material";
 
 const cx = (...args) => args.filter(Boolean).join(" ");
 
@@ -70,6 +72,7 @@ const SellMainStart = ({ show, setShow }) => {
 
   // Флаг для отслеживания недавнего сканирования (чтобы не открывать модалку при Enter от сканера)
   const lastScanTimeRef = useRef(0);
+  console.log('START', start);
 
   // Автодобавление товара по сканеру штрих-кода
   const { error: barcodeScanError } = useBarcodeToCart(start?.id, {
@@ -209,7 +212,9 @@ const SellMainStart = ({ show, setShow }) => {
   };
 
   const debouncedDiscount1 = useDebounce((v) => {
-    dispatch(startSale(v));
+    console.log('ASDKJNASKDKASDK', v);
+
+    dispatch(startSale({ discount_total: v }));
   }, 600);
   const onDiscountChange = (e) => debouncedDiscount1(e.target.value);
 
@@ -245,9 +250,15 @@ const SellMainStart = ({ show, setShow }) => {
     600
   );
 
-  const onRefresh = () => {
-    dispatch(startSale());
-  };
+  const currentItems = useMemo(() => start?.items || [], [start]);
+  const currentSubtotal = start?.subtotal;
+  const currentDiscount = start?.order_discount_total;
+  const currentTotal = start?.total;
+  const isEmpty = useMemo(() => !!start?.items?.length, [start?.items])
+
+  const onRefresh = useCallback(() => {
+    dispatch(startSale({ discount_total: currentDiscount }));
+  }, [currentDiscount]);
 
   useEffect(() => {
     dispatch(fetchClientsAsync());
@@ -539,7 +550,6 @@ const SellMainStart = ({ show, setShow }) => {
 
   const handleRemoveItem = async (item) => {
     if (!start?.id) return;
-
     try {
       await dispatch(
         deleteProductInCart({
@@ -547,8 +557,6 @@ const SellMainStart = ({ show, setShow }) => {
           productId: item.id,
         })
       ).unwrap();
-      onRefresh();
-
       if (selectedId === item.id) {
         setSelectedId(null);
       }
@@ -622,10 +630,7 @@ const SellMainStart = ({ show, setShow }) => {
     }
   };
 
-  const currentItems = start?.items || [];
-  const currentSubtotal = start?.subtotal;
-  const currentDiscount = start?.order_discount_total;
-  const currentTotal = start?.total;
+
 
   // Инициализация локальных значений количества для элементов таблицы
   useEffect(() => {
@@ -932,23 +937,22 @@ const SellMainStart = ({ show, setShow }) => {
         type: "success",
         message: "Операция успешно выполнена!",
       });
+      console.log('JKASHDKJAHSKDHASJDHKSA', 123123);
 
       setPaymentMethod(null);
       setCashReceived("");
       setCashPaymentConfirmed(false);
-
-      dispatch(startSale());
+      onRefresh()
     } catch (e) {
       setAlert({
         open: true,
         type: "error",
-        message: `Что то пошло не так.\n\n${
-          e?.data?.detail
-            ?.replace("у агента:", "товара")
-            ?.replace("Нужно 2, доступно 0.", "") ||
+        message: `Что то пошло не так.\n\n${e?.data?.detail
+          ?.replace("у агента:", "товара")
+          ?.replace("Нужно 2, доступно 0.", "") ||
           e?.message ||
           ""
-        }`,
+          }`,
       });
     }
   };
@@ -1086,6 +1090,7 @@ const SellMainStart = ({ show, setShow }) => {
       });
 
       setShowDebtModal(false);
+      onRefresh()
     } catch (error) {
       console.error("Ошибка при сохранении долга:", error);
       setAlert({
@@ -1104,6 +1109,10 @@ const SellMainStart = ({ show, setShow }) => {
     <section className="sell start">
       <div className="sell__header">
         <div className="sell__header-left">
+          <Button color="warning" variant="contained" className="mr-auto flex gap-4" onClick={() => setShow(false)}>
+            <ArrowBackIcon />
+            <p>Назад</p>
+          </Button>
           <ProductSearch
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
@@ -1333,7 +1342,7 @@ const SellMainStart = ({ show, setShow }) => {
           </div>
         </div>
 
-        <div className="w-[100%]! xl:w-[33%]!">
+        <div className="w-full! xl:w-[33%]!">
           <div className="start__total">
             <div className="start__total-top">
               <div className="start__total-row">
@@ -1380,7 +1389,8 @@ const SellMainStart = ({ show, setShow }) => {
 
             <div className="start__total-bottom">
               <button
-                className="start__total-debt"
+                disabled={!start?.id || !isEmpty}
+                className="start__total-debt text-white disabled:bg-gray-300!"
                 onClick={() => setShowDebtModal(true)}
               >
                 Долг
@@ -1388,9 +1398,8 @@ const SellMainStart = ({ show, setShow }) => {
 
               <div className="start__total-row1">
                 <button
-                  className={`start__total-pay ${
-                    paymentMethod === "cash" ? "active" : ""
-                  }`}
+                  className={`start__total-pay disabled:bg-gray-300! ${paymentMethod === "cash" ? "active" : ""
+                    }`}
                   onClick={() => {
                     if (paymentMethod === "cash") {
                       setPaymentMethod(null);
@@ -1400,7 +1409,7 @@ const SellMainStart = ({ show, setShow }) => {
                       setShowCashModal(true);
                     }
                   }}
-                  disabled={!start?.id}
+                  disabled={!start?.id || !isEmpty}
                   style={{
                     backgroundColor:
                       paymentMethod === "cash" ? "#f7d617" : undefined,
@@ -1416,9 +1425,9 @@ const SellMainStart = ({ show, setShow }) => {
                   Наличными
                 </button>
                 <button
-                  className={`start__total-pay ${
-                    paymentMethod === "card" ? "active" : ""
-                  }`}
+
+                  className={`start__total-pay disabled:bg-gray-300! ${paymentMethod === "card" ? "active" : ""
+                    }`}
                   onClick={() => {
                     if (paymentMethod === "card") {
                       setPaymentMethod(null);
@@ -1426,7 +1435,7 @@ const SellMainStart = ({ show, setShow }) => {
                       setPaymentMethod("card");
                     }
                   }}
-                  disabled={!start?.id}
+                  disabled={!start?.id || !isEmpty}
                   style={{
                     backgroundColor:
                       paymentMethod === "card" ? "#f7d617" : undefined,

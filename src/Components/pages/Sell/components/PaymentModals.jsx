@@ -13,8 +13,8 @@ export const PaymentChoiceModal = ({
   return (
     <UniversalModal onClose={onClose} title={"Выбор способа оплаты"}>
       <div
+        className="min-w-75!"
         style={{
-          width: "360px",
           display: "flex",
           flexDirection: "column",
           gap: "16px",
@@ -34,9 +34,8 @@ export const PaymentChoiceModal = ({
           <button
             type="button"
             onClick={() => setPaymentChoice("cash")}
-            className={`start__total-pay ${
-              paymentChoice === "cash" ? "active" : ""
-            }`}
+            className={`start__total-pay ${paymentChoice === "cash" ? "active" : ""
+              }`}
             style={{
               flex: 1,
               border:
@@ -49,9 +48,8 @@ export const PaymentChoiceModal = ({
           <button
             type="button"
             onClick={() => setPaymentChoice("card")}
-            className={`start__total-pay ${
-              paymentChoice === "card" ? "active" : ""
-            }`}
+            className={`start__total-pay ${paymentChoice === "card" ? "active" : ""
+              }`}
             style={{
               flex: 1,
               border:
@@ -113,7 +111,7 @@ export const CashModal = ({
       }}
       title={"Оплата наличными"}
     >
-      <div className="start__cash-payment" style={{ width: "400px" }}>
+      <div className="start__cash-payment min-w-75" >
         <div style={{ marginBottom: "20px" }}>
           <div
             style={{
@@ -317,11 +315,11 @@ export const ReceiptChoiceModal = ({
   return (
     <UniversalModal onClose={onClose} title={"Продажа с чеком или без"}>
       <div
+        className="min-w-75!"
         style={{
-          width: "360px",
           display: "flex",
           flexDirection: "column",
-          gap: "16px",
+          gap: "16px"
         }}
       >
         <p style={{ fontSize: "14px", color: "#555" }}>

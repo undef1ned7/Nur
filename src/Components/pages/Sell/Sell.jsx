@@ -132,9 +132,10 @@ const Sell = () => {
   const onChange = (e) => debouncedSearch(e.target.value);
 
   useEffect(() => {
+    if (showSellMainStart) return;
     dispatch(historySellProduct({ search: "" }));
     dispatch(historySellObjects({ search: "" }));
-  }, [dispatch]);
+  }, [dispatch, showSellMainStart]);
 
   useEffect(() => {
     if (showSellModal) dispatch(startSale({ discount_total: 0 }));
@@ -325,7 +326,7 @@ const Sell = () => {
           <div className="sell__header">
             <div className="sell__header-left">
               <div className="sell__header-input">
-                <input onChange={onChange} type="text" placeholder="Поиск" />
+                <input className="w-full" onChange={onChange} type="text" placeholder="Поиск" />
                 <span>
                   <Search size={15} color="#91929E" />
                 </span>
