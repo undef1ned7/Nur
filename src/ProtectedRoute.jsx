@@ -24,7 +24,6 @@ const ProtectedRoute = ({ children }) => {
   if (endDate < now) {
     return <Navigate to="/" replace />;
   }
-
   return children;
 };
 

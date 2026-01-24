@@ -25,6 +25,7 @@ import {
 import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { SimpleStamp } from "../../../UI/SimpleStamp";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -158,6 +159,7 @@ const Orders = () => {
 
   const [orders, setOrders] = useState([]);
   const [query, setQuery] = useState("");
+  const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
   const [statusFilter, setStatusFilter] = useState("");
 
   const userData = useMemo(() => safeUserData(), []);
@@ -241,8 +243,10 @@ const Orders = () => {
     });
   };
 
-  const fetchOrders = useCallback(async () => {
-    const base = listFrom(await api.get("/cafe/orders/")) || [];
+  const fetchOrders = useCallback(async (params = {}) => {
+    const base = listFrom(await api.get("/cafe/orders/", {
+      params
+    })) || [];
     const full = await hydrateOrdersDetails(base);
     setOrders(full);
   }, []);
@@ -257,7 +261,6 @@ const Orders = () => {
     (async () => {
       try {
         await Promise.all([fetchTables(), fetchEmployees(), fetchMenu(), fetchKitchens(), fetchCashboxes()]);
-        await fetchOrders();
       } catch (e) {
         console.error("Ошибка загрузки:", e);
       } finally {
@@ -265,6 +268,22 @@ const Orders = () => {
       }
     })();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    setLoading(true);
+    (async () => {
+      try {
+        await fetchOrders({
+          search: debouncedOrderSearchQuery,
+          status: statusFilter || null
+        });
+      } catch (e) {
+        console.error("Ошибка загрузки:", e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [debouncedOrderSearchQuery, statusFilter])
 
   useEffect(() => {
     const handler = () => fetchOrders();
@@ -281,8 +300,6 @@ const Orders = () => {
         .map((u) => ({ id: u.id, name: fullName(u) })),
     [employees]
   );
-  const waitersMap = useMemo(() => new Map(waiters.map((w) => [w.id, w])), [waiters]);
-
   const kitchensMap = useMemo(() => {
     const m = new Map();
     (kitchens || []).forEach((k) => {
@@ -323,37 +340,12 @@ const Orders = () => {
     return set;
   }, [orders]);
 
-
-
-  const filtered = useMemo(() => {
-    const qv = query.trim().toLowerCase();
-    const statusFilterVal = String(statusFilter || "").toLowerCase();
-
-    let base = orders || [];
-
-    if (statusFilterVal) {
-      base = base.filter((o) => String(o.status || "").toLowerCase() === statusFilterVal);
-    } else {
-      // base = base.filter((o) => isUnpaidStatus(o.status));
-    }
-
-    if (!qv) return base;
-
-    return base.filter((o) => {
-      const tNum = String(tablesMap.get(o.table)?.number ?? "").toLowerCase();
-      const wName = String(waitersMap.get(o.waiter)?.name ?? "").toLowerCase();
-      const guests = String(o.guests ?? "").toLowerCase();
-      const status = String(o.status ?? "").toLowerCase();
-      return tNum.includes(qv) || wName.includes(qv) || guests.includes(qv) || status.includes(qv);
-    });
-  }, [orders, query, statusFilter, tablesMap, waitersMap]);
-
   const roleFiltered = useMemo(() => {
     if (userRole === "официант") {
-      return filtered.filter((item) => String(item.waiter) === String(userId));
+      return base.filter((item) => String(item.waiter) === String(userId));
     }
-    return filtered;
-  }, [filtered, userRole, userId]);
+    return orders;
+  }, [orders, userRole, userId]);
 
   const visibleOrders = useMemo(() => {
     if (showAll) return roleFiltered;
@@ -958,7 +950,7 @@ const Orders = () => {
             const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
             return (
               <article key={o.id} className="cafeOrders__receipt relative">
-                <SimpleStamp date={o.paid_at} className="bottom-10" type={o.status} size={'md'} />
+                <SimpleStamp date={o.paid_at} className="bottom-10 left-20" type={o.status} size={'md'} />
                 <div className="cafeOrders__receiptHeader">
                   <div className="cafeOrders__receiptTable">СТОЛ {t?.number || "—"}</div>
                   {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
@@ -1004,14 +996,17 @@ const Orders = () => {
                   </div>
 
                   <div className="cafeOrders__receiptActions">
-                    <button
-                      className="cafeOrders__btn cafeOrders__btn--secondary"
-                      onClick={() => openEdit(o)}
-                      type="button"
-                      disabled={saving || paying || printingId === o.id}
-                    >
-                      <FaEdit /> Редактировать
-                    </button>
+                    {
+                      !o.is_paid && o.status == 'open' && (<button
+                        className="cafeOrders__btn cafeOrders__btn--secondary"
+                        onClick={() => openEdit(o)}
+                        type="button"
+                        disabled={saving || paying || printingId === o.id}
+                      >
+                        <FaEdit /> Редактировать
+                      </button>)
+                    }
+
                     {
                       !o.is_paid && o.status == 'open' && (<button
                         className="cafeOrders__btn cafeOrders__btn--primary"
