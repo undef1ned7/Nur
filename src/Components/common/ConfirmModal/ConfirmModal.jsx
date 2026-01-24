@@ -13,7 +13,7 @@ const ConfirmModal = ({ message, isOpen, onConfirm, onCancel }) => {
                             <svg className="feather feather-help-circle w-full h-full text-red-400" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
                         </div>
                         <h3 className='text-[20px] font-bold text-[#575b61] text-center my-2'>Подтвердите ваше действие</h3>
-                        <p className='text-center text-[14px] text-[#8f9296] mb-3.75'>
+                        <p className='text-center text-[14px] text-[#8f9296] mb-3.75 whitespace-pre-wrap'>
                             {message}
                         </p>
                     </div>
