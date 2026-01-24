@@ -24,6 +24,7 @@ import {
 
 import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
+import { SimpleStamp } from "../../../UI/SimpleStamp";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -131,6 +132,14 @@ const readKitchenPrinterMap = () => {
     return {};
   }
 };
+
+const statusFilterOptions =
+  [
+    { value: "", label: "Все статусы" },
+    { value: "open", label: "Открыт" },
+    { value: "closed", label: "Закрыт" },
+    { value: "cancelled", label: "Отменен" },
+  ]
 
 /* =========================================================
    Orders
@@ -314,16 +323,7 @@ const Orders = () => {
     return set;
   }, [orders]);
 
-  const statusFilterOptions = useMemo(
-    () => [
-      { value: "", label: "Все статусы" },
-      { value: "open", label: "Открыт" },
-      { value: "closed", label: "Закрыт" },
-      { value: "cancelled", label: "Отменен" },
-      { value: "paid", label: "Оплачен" },
-    ],
-    []
-  );
+
 
   const filtered = useMemo(() => {
     const qv = query.trim().toLowerCase();
@@ -334,7 +334,7 @@ const Orders = () => {
     if (statusFilterVal) {
       base = base.filter((o) => String(o.status || "").toLowerCase() === statusFilterVal);
     } else {
-      base = base.filter((o) => isUnpaidStatus(o.status));
+      // base = base.filter((o) => isUnpaidStatus(o.status));
     }
 
     if (!qv) return base;
@@ -641,11 +641,11 @@ const Orders = () => {
 
     const itemsNormalized = Array.isArray(order.items)
       ? order.items.map((it) => ({
-          menu_item: String(it.menu_item || it.id),
-          title: it.menu_item_title || it.title,
-          price: linePrice(it),
-          quantity: Number(it.quantity) || 1,
-        }))
+        menu_item: String(it.menu_item || it.id),
+        title: it.menu_item_title || it.title,
+        price: linePrice(it),
+        quantity: Number(it.quantity) || 1,
+      }))
       : [];
 
     setForm({
@@ -806,65 +806,65 @@ const Orders = () => {
 
 
   /* ===== ОПЛАТА (DELETE order после прихода) ===== */
-const [payOpen, setPayOpen] = useState(false);
-const [paying, setPaying] = useState(false);
-const [payOrder, setPayOrder] = useState(null);
+  const [payOpen, setPayOpen] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payOrder, setPayOrder] = useState(null);
 
-const openPay = (order) => {
-  setPayOrder(order);
-  setPayOpen(true);
-};
+  const openPay = (order) => {
+    setPayOrder(order);
+    setPayOpen(true);
+  };
 
-const closePay = () => {
-  if (paying) return;
-  setPayOpen(false);
-  setPayOrder(null);
-};
-
-const paidGuardKey = (orderId) => `orders_paid_income_created_${orderId}`;
-
-const confirmPay = async () => {
-  if (!payOrder?.id) return;
-
-  setPaying(true);
-  try {
-    const totals = calcTotals(payOrder);
-
-    // 1) Создаём приход (если ещё не создавали)
-    const guardKey = paidGuardKey(payOrder.id);
-    const alreadyCreated = localStorage.getItem(guardKey);
-
-    if (!alreadyCreated) {
-      const income = await createCashflowIncome(payOrder, totals.total);
-      localStorage.setItem(guardKey, String(income?.id || income?.uuid || "1"));
-    }
-
-    // 2) Оплачиваем заказ
-    await api.post(`/cafe/orders/${payOrder.id}/pay/`);
-
-    // 3) Освобождаем стол
-    await freeTable(payOrder.table);
-
-    // 4) Сразу убираем из UI
-    setOrders((prev) => (prev || []).filter((o) => String(o.id) !== String(payOrder.id)));
-
-    // 5) Закрываем модалку
+  const closePay = () => {
+    if (paying) return;
     setPayOpen(false);
     setPayOrder(null);
+  };
 
-    // 6) Синхронизация с сервером
-    await fetchOrders();
+  const paidGuardKey = useCallback((orderId) => `orders_paid_income_created_${orderId}`, []);
 
-    // успех — снимаем guard
-    localStorage.removeItem(guardKey);
-  } catch (e) {
-    console.error("Ошибка оплаты (delete order):", e);
+  const confirmPay = async () => {
+    if (!payOrder?.id) return;
 
-    // Ошибка оплаты заказа
-  } finally {
-    setPaying(false);
-  }
-};
+    setPaying(true);
+    try {
+      const totals = calcTotals(payOrder);
+
+      // 1) Создаём приход (если ещё не создавали)
+      const guardKey = paidGuardKey(payOrder.id);
+      const alreadyCreated = localStorage.getItem(guardKey);
+
+      if (!alreadyCreated) {
+        const income = await createCashflowIncome(payOrder, totals.total);
+        localStorage.setItem(guardKey, String(income?.id || income?.uuid || "1"));
+      }
+
+      // 2) Оплачиваем заказ
+      await api.post(`/cafe/orders/${payOrder.id}/pay/`);
+
+      // 3) Освобождаем стол
+      await freeTable(payOrder.table);
+
+      // 4) Сразу убираем из UI
+      setOrders((prev) => (prev || []).filter((o) => String(o.id) !== String(payOrder.id)));
+
+      // 5) Закрываем модалку
+      setPayOpen(false);
+      setPayOrder(null);
+
+      // 6) Синхронизация с сервером
+      await fetchOrders();
+
+      // успех — снимаем guard
+      localStorage.removeItem(guardKey);
+    } catch (e) {
+      console.error("Ошибка оплаты (delete order):", e);
+
+      // Ошибка оплаты заказа
+    } finally {
+      setPaying(false);
+    }
+  };
 
 
   /* options */
@@ -956,9 +956,9 @@ const confirmPay = async () => {
             const expanded = expandedOrders.has(String(o.id));
             const sliceItems = expanded ? items : items.slice(0, CARD_ITEMS_LIMIT);
             const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
-
             return (
-              <article key={o.id} className="cafeOrders__receipt">
+              <article key={o.id} className="cafeOrders__receipt relative">
+                <SimpleStamp date={o.paid_at} className="bottom-10" type={o.status} size={'md'} />
                 <div className="cafeOrders__receiptHeader">
                   <div className="cafeOrders__receiptTable">СТОЛ {t?.number || "—"}</div>
                   {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
@@ -1012,15 +1012,16 @@ const confirmPay = async () => {
                     >
                       <FaEdit /> Редактировать
                     </button>
-
-                    <button
-                      className="cafeOrders__btn cafeOrders__btn--primary"
-                      onClick={() => openPay(o)}
-                      type="button"
-                      disabled={saving || paying || printingId === o.id}
-                    >
-                      <FaCheckCircle /> Оплатить
-                    </button>
+                    {
+                      !o.is_paid && o.status == 'open' && (<button
+                        className="cafeOrders__btn cafeOrders__btn--primary"
+                        onClick={() => openPay(o)}
+                        type="button"
+                        disabled={saving || paying || printingId === o.id}
+                      >
+                        <FaCheckCircle /> Оплатить
+                      </button>)
+                    }
                   </div>
                 </div>
               </article>
