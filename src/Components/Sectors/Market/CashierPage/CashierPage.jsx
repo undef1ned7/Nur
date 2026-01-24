@@ -17,11 +17,13 @@ import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import {
   addCustomItem,
   deleteProductInCart,
+  getSale,
   manualFilling,
   sendBarCode,
   startSale,
   updateManualFilling,
 } from "../../../../store/creators/saleThunk";
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
@@ -41,6 +43,7 @@ import ReceiptsModal from "./components/ReceiptsModal";
 import OpenShiftPage from "./OpenShiftPage";
 import PaymentPage from "./PaymentPage";
 import ShiftPage from "./ShiftPage";
+import { Button } from "@mui/material";
 
 const CashierPage = () => {
   const navigate = useNavigate();
@@ -57,6 +60,7 @@ const CashierPage = () => {
   const { shifts } = useShifts();
   const { list: cashBoxes } = useCash();
   const { currentUser, userId } = useUser();
+  console.log('SALEID', currentSale);
 
   // Функция для форматирования количества (убирает лишние нули)
   const formatQuantity = (qty) => {
@@ -151,6 +155,8 @@ const CashierPage = () => {
     message: "",
   });
 
+
+  const [mobileProductsList, setMobileProductsList] = useState(false);
   // Функция для показа AlertModal
   const showAlert = (type, title, message) => {
     setAlertModal({
@@ -166,7 +172,7 @@ const CashierPage = () => {
   };
 
   // Функция для обновления продажи после запросов
-  const refreshSale = async () => {
+  const refreshSale = useCallback(async () => {
     // Не обновляем продажу, если нет открытой смены
     if (currentSale?.id && openShiftId) {
       try {
@@ -183,7 +189,7 @@ const CashierPage = () => {
         console.error("Ошибка при обновлении продажи:", error);
       }
     }
-  };
+  }, [openShiftId, currentSale]);
 
   const debouncedDiscount = useDebounce((discount) => {
     if (!currentSale?.id || !openShiftId) return;
@@ -237,8 +243,8 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         error?.data?.detail ||
-          error?.message ||
-          "Ошибка при добавлении дополнительной услуги"
+        error?.message ||
+        "Ошибка при добавлении дополнительной услуги"
       );
     }
   };
@@ -791,6 +797,13 @@ const CashierPage = () => {
     showDiscountModal,
   ]);
 
+  useEffect(() => {
+    if (!openShiftId) return;
+    dispatch(
+      startSale({ discount_total: 0, shift: openShiftId })
+    );
+  },[openShiftId])
+
   const addToCart = async (product) => {
     // Проверяем наличие товара
     // Для весовых товаров stock может быть false, но quantity > 0
@@ -825,7 +838,7 @@ const CashierPage = () => {
             "error",
             "Ошибка",
             "Ошибка при создании продажи: " +
-              (result.payload?.message || "Неизвестная ошибка")
+            (result.payload?.message || "Неизвестная ошибка")
           );
           return;
         }
@@ -863,7 +876,7 @@ const CashierPage = () => {
           })
         );
         // Обновляем продажу после успешного обновления
-        await refreshSale();
+        // await refreshSale();
       } else {
         // Добавляем новый товар
         await dispatch(
@@ -876,7 +889,7 @@ const CashierPage = () => {
         );
         // Обновляем продажу после успешного добавления
         // cartOrderRef будет обновлен автоматически в useEffect при обновлении currentSale
-        await refreshSale();
+        // await refreshSale();
       }
     } catch (error) {
       console.error("Ошибка при добавлении товара в корзину:", error);
@@ -884,7 +897,7 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         "Ошибка при добавлении товара: " +
-          (error.message || "Неизвестная ошибка")
+        (error.message || "Неизвестная ошибка")
       );
     }
   };
@@ -952,7 +965,7 @@ const CashierPage = () => {
           return newQuantities;
         });
         // Обновляем продажу после успешного удаления
-        await refreshSale();
+        // await refreshSale();
       } else {
         // Обновляем количество
         await dispatch(
@@ -969,7 +982,7 @@ const CashierPage = () => {
           [productId]: String(newQuantity),
         }));
         // Обновляем продажу после успешного обновления
-        await refreshSale();
+        // await refreshSale();
       }
     } catch (error) {
       console.error("Ошибка при обновлении количества:", error);
@@ -977,7 +990,7 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         "Ошибка при обновлении количества: " +
-          (error.message || "Неизтвестная ошибка")
+        (error.message || "Неизтвестная ошибка")
       );
     }
   };
@@ -1032,7 +1045,7 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         "Ошибка при обновлении количества: " +
-          (error.message || "Неизвестная ошибка")
+        (error.message || "Неизвестная ошибка")
       );
     }
   };
@@ -1059,7 +1072,7 @@ const CashierPage = () => {
         return newQuantities;
       });
       // Обновляем продажу после успешного удаления
-      await refreshSale();
+      // await refreshSale();
     } catch (error) {
       console.error("Ошибка при удалении товара:", error);
       showAlert(
@@ -1235,7 +1248,10 @@ const CashierPage = () => {
       </div>
 
       <div className="cashier-page__content">
-        <div className="cashier-page__products">
+        <div className={`cashier-page__products ${mobileProductsList ? 'active' : ''} `}>
+          <div className="mobile-list-btn flex w-full justify-center py-2 md:hidden!">
+            <Button onClick={() => setMobileProductsList(false)} className="mx-auto">Скрыть</Button>
+          </div>
           <div className="cashier-page__search">
             <Search size={20} />
             <input
@@ -1326,9 +1342,8 @@ const CashierPage = () => {
                 return (
                   <div
                     key={product.id}
-                    className={`cashier-page__product-card ${
-                      cartItem ? "cashier-page__product-card--selected" : ""
-                    }`}
+                    className={`cashier-page__product-card ${cartItem ? "cashier-page__product-card--selected" : ""
+                      }`}
                     onClick={() => addToCart(product)}
                   >
                     {cartItem && (
@@ -1381,7 +1396,7 @@ const CashierPage = () => {
             </div>
           )}
         </div>
-
+        <Button className="md:hidden!" onClick={() => setMobileProductsList(true)} color="info">Добавить товар</Button>
         <div className="cashier-page__cart">
           <div className="cashier-page__cart-header">
             <h2 className="cashier-page__cart-title">Корзина</h2>
@@ -1478,8 +1493,7 @@ const CashierPage = () => {
                               showAlert(
                                 "warning",
                                 "Недостаточно товара",
-                                `Доступно только ${availableQuantity} ${
-                                  product.unit || "шт"
+                                `Доступно только ${availableQuantity} ${product.unit || "шт"
                                 }`
                               );
                               return;
@@ -1521,8 +1535,7 @@ const CashierPage = () => {
                               showAlert(
                                 "warning",
                                 "Недостаточно товара",
-                                `Доступно только ${availableQuantity} ${
-                                  product.unit || "шт"
+                                `Доступно только ${availableQuantity} ${product.unit || "шт"
                                 }`
                               );
                               setCartQuantities((prev) => ({

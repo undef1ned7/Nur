@@ -11,8 +11,9 @@ import {
   getOrdersStatsByClient,
 } from "./clientStore";
 import "./cafeclients.scss";
+import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 
-import { ClientForm, ClientCard, ConfirmDeleteModal } from "./ClientsModals";
+import { ClientForm, ClientCard, ConfirmDeleteModal } from "./components/ClientsModals";
 
 /* ===== helpers ===== */
 const fmtMoney = (v) =>
@@ -127,6 +128,8 @@ const CafeClients = () => {
   const [err, setErr] = useState("");
 
   const [q, setQ] = useState("");
+  const [filterOrders, setFilterOrders] = useState("");
+  const [filterDate, setFilterDate] = useState("");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -351,14 +354,84 @@ const CafeClients = () => {
   const onOpenCard = (id) => setOpenId(id);
   const onCloseCard = () => setOpenId(null);
 
-  /* ===== search ===== */
+  /* ===== фильтры ===== */
+  const ordersFilterOptions = [
+    { value: "", label: "Все заказы" },
+    { value: "0", label: "Без заказов" },
+    { value: "1-5", label: "1-5 заказов" },
+    { value: "6-10", label: "6-10 заказов" },
+    { value: "10+", label: "10+ заказов" },
+  ];
+
+  const dateFilterOptions = [
+    { value: "", label: "Все даты" },
+    { value: "today", label: "За сегодня" },
+    { value: "week", label: "За неделю" },
+    { value: "month", label: "За месяц" },
+    { value: "old", label: "Старые" },
+  ];
+
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter((r) =>
-      `${r.full_name || ""} ${r.phone || ""}`.toLowerCase().includes(s)
-    );
-  }, [rows, q]);
+    let result = rows;
+
+    // Поиск по имени и телефону
+    const searchQuery = q.trim().toLowerCase();
+    if (searchQuery) {
+      result = result.filter((r) =>
+        `${r.full_name || ""} ${r.phone || ""}`.toLowerCase().includes(searchQuery)
+      );
+    }
+
+    // Фильтр по количеству заказов
+    if (filterOrders) {
+      const count = (r) => Number(r.orders_count) || 0;
+      if (filterOrders === "0") {
+        result = result.filter((r) => count(r) === 0);
+      } else if (filterOrders === "1-5") {
+        result = result.filter((r) => {
+          const c = count(r);
+          return c >= 1 && c <= 5;
+        });
+      } else if (filterOrders === "6-10") {
+        result = result.filter((r) => {
+          const c = count(r);
+          return c >= 6 && c <= 10;
+        });
+      } else if (filterOrders === "10+") {
+        result = result.filter((r) => count(r) >= 10);
+      }
+    }
+
+    // Фильтр по дате обновления
+    if (filterDate) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const monthAgo = new Date(today);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+      result = result.filter((r) => {
+        const updatedStr = r.updated_at_derived || r.updated_at;
+        if (!updatedStr) return filterDate === "old";
+
+        const updated = new Date(updatedStr);
+
+        if (filterDate === "today") {
+          return updated >= today;
+        } else if (filterDate === "week") {
+          return updated >= weekAgo;
+        } else if (filterDate === "month") {
+          return updated >= monthAgo;
+        } else if (filterDate === "old") {
+          return updated < monthAgo;
+        }
+        return true;
+      });
+    }
+
+    return result;
+  }, [rows, q, filterOrders, filterDate]);
 
   return (
     <section className="cafeclients">
@@ -368,18 +441,40 @@ const CafeClients = () => {
         </div>
 
         <div className="cafeclients__actions">
-          <div className="cafeclients__search">
-            <span className="cafeclients__searchIcon" aria-hidden="true">
-              <FaSearch />
-            </span>
-            <input
-              className="cafeclients__searchInput"
-              placeholder="Поиск по имени и телефону…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              inputMode="search"
-              aria-label="Поиск гостей"
-            />
+          <div className="cafeclients__filters">
+            <div className="cafeclients__search">
+              <span className="cafeclients__searchIcon" aria-hidden="true">
+                <FaSearch />
+              </span>
+              <input
+                className="cafeclients__searchInput"
+                placeholder="Поиск по имени и телефону…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                inputMode="search"
+                aria-label="Поиск гостей"
+              />
+            </div>
+
+            <div className="cafeclients__filter">
+              <SearchableCombobox
+                value={filterOrders}
+                onChange={setFilterOrders}
+                options={ordersFilterOptions}
+                placeholder="Фильтр по заказам…"
+                classNamePrefix="cafeclients__combo"
+              />
+            </div>
+
+            <div className="cafeclients__filter">
+              <SearchableCombobox
+                value={filterDate}
+                onChange={setFilterDate}
+                options={dateFilterOptions}
+                placeholder="Фильтр по дате…"
+                classNamePrefix="cafeclients__combo"
+              />
+            </div>
           </div>
 
           <button

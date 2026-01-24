@@ -192,7 +192,6 @@ const Layout = () => {
                 toggleSidebar={toggleSidebar}
                 isSidebarOpen={isSidebarOpen}
               />
-              <hr />
             </>
           )}
           <div className="content_content">

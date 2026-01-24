@@ -1,0 +1,393 @@
+/* Общий SearchableCombobox компонент */
+/* Миксин для генерации стилей с любым BEM префиксом */
+
+@mixin searchable-combo($prefix) {
+  .#{$prefix} {
+    position: relative;
+    width: 100%;
+
+    &__control,
+    &Control {
+      height: 44px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px 0 12px;
+      transition: 0.15s all ease;
+
+      &:hover {
+        border-color: #dbe3ef;
+        background: #fff;
+      }
+
+      &--open {
+        border-color: var(--primary-dark);
+        box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+      }
+    }
+
+    &__icon,
+    &Icon {
+      color: var(--muted);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    &__input,
+    &Input {
+      border: 0;
+      outline: 0;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      min-width: 0;
+      padding: 0;
+
+      &::placeholder {
+        color: #94a3b8;
+        font-weight: 600;
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+    }
+
+    &__right,
+    &Right {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    &__btn,
+    &Btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #475569;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: 0.12s all ease;
+      font-size: 9px;
+      flex-shrink: 0;
+
+      &:hover {
+        background: #f3f4f6;
+        border-color: #cbd5e1;
+        color: #0f172a;
+      }
+
+      &:active {
+        transform: translateY(1px);
+      }
+    }
+
+    &__chev,
+    &Chev {
+      transition: 0.12s transform ease;
+
+      &--up {
+        transform: rotate(180deg);
+      }
+    }
+
+    &__dropdown,
+    &Dropdown {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 8px);
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      box-shadow: 0 22px 50px rgba(0, 0, 0, 0.14);
+      z-index: 80;
+      overflow: hidden;
+      animation: combo-in 0.15s ease-out both;
+    }
+
+    &__list,
+    &List {
+      max-height: 240px;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+
+      &::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+
+        &:hover {
+          background: #94a3b8;
+        }
+      }
+    }
+
+    &__item,
+    &Item {
+      width: 100%;
+      text-align: left;
+      padding: 12px;
+      background: #fff;
+      border: 0;
+      border-bottom: 1px solid #eef2f7;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      transition: 0.12s background ease;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background: #f8fafc;
+      }
+
+      &--active {
+        background: rgba(247, 215, 79, 0.25);
+        color: #111;
+      }
+    }
+
+    &__empty,
+    &Empty {
+      padding: 12px;
+      color: var(--muted);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    &--disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    @media (max-width: 480px) {
+      &__control,
+      &Control {
+        height: 40px;
+        border-radius: 10px;
+        padding: 0 6px 0 10px;
+        gap: 6px;
+      }
+
+      &__icon,
+      &Icon {
+        font-size: 11px;
+      }
+
+      &__input,
+      &Input {
+        font-size: 13px;
+
+        &::placeholder {
+          font-size: 13px;
+        }
+      }
+
+      &__btn,
+      &Btn {
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        font-size: 8px;
+      }
+
+      &__right,
+      &Right {
+        gap: 2px;
+      }
+
+      &__dropdown,
+      &Dropdown {
+        top: calc(100% + 6px);
+        border-radius: 10px;
+      }
+
+      &__item,
+      &Item {
+        padding: 10px;
+        font-size: 13px;
+      }
+
+      &__empty,
+      &Empty {
+        padding: 10px;
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      &__control,
+      &Control {
+        height: 38px;
+        border-radius: 8px;
+        padding: 0 4px 0 8px;
+        gap: 4px;
+      }
+
+      &__icon,
+      &Icon {
+        font-size: 10px;
+      }
+
+      &__input,
+      &Input {
+        font-size: 12px;
+
+        &::placeholder {
+          font-size: 12px;
+        }
+      }
+
+      &__btn,
+      &Btn {
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        font-size: 7px;
+      }
+
+      &__right,
+      &Right {
+        gap: 1px;
+      }
+
+      &__dropdown,
+      &Dropdown {
+        top: calc(100% + 4px);
+        border-radius: 8px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+      }
+
+      &__list,
+      &List {
+        max-height: 200px;
+      }
+
+      &__item,
+      &Item {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      &__empty,
+      &Empty {
+        padding: 8px 10px;
+        font-size: 11px;
+      }
+    }
+
+    @media (max-width: 320px) {
+      &__control,
+      &Control {
+        height: 36px;
+        border-radius: 8px;
+        padding: 0 4px 0 6px;
+        gap: 4px;
+      }
+
+      &__icon,
+      &Icon {
+        font-size: 9px;
+      }
+
+      &__input,
+      &Input {
+        font-size: 11px;
+
+        &::placeholder {
+          font-size: 11px;
+        }
+      }
+
+      &__btn,
+      &Btn {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        font-size: 6px;
+      }
+
+      &__right,
+      &Right {
+        gap: 1px;
+      }
+
+      &__dropdown,
+      &Dropdown {
+        top: calc(100% + 4px);
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+      }
+
+      &__list,
+      &List {
+        max-height: 180px;
+      }
+
+      &__item,
+      &Item {
+        padding: 8px;
+        font-size: 11px;
+      }
+
+      &__empty,
+      &Empty {
+        padding: 8px;
+        font-size: 11px;
+      }
+    }
+  }
+}
+
+// Генерируем стили для всех существующих префиксов
+@include searchable-combo("cafeMenuCombo");
+@include searchable-combo("cafeclients__combo");
+@include searchable-combo("cafeOrders__combo");
+@include searchable-combo("cafeInventoryCombo");
+@include searchable-combo("cafeTablesCombo");
+@include searchable-combo("cafeCook__combo");
+@include searchable-combo("cafeReservationsCombo");
+@include searchable-combo("cafeKassaCombo");
+@include searchable-combo("cafeStockCombo");
+@include searchable-combo("searchableCombo"); // Универсальный префикс
+@include searchable-combo("barberservices__combo"); // Barber Services
+@include searchable-combo("barberhistory__combo"); // Barber History
+@include searchable-combo("barberclient__combo"); // Barber Clients
+@include searchable-combo("barberrecorda__combo"); // Barber Recorda
+@include searchable-combo("mastershistory__combo"); // Masters History
+@include searchable-combo("recordarates__combo"); // RecordaRates
+@include searchable-combo("payrolldaily__combo"); // PayrollDaily
+
+@keyframes combo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

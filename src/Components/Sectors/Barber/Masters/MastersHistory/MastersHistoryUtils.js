@@ -1,6 +1,8 @@
 // MastersHistoryUtils.js
 
 /* ===== базовые утилиты ===== */
+export const PAGE_SIZE = 15;
+
 export const pad = (n) => String(n).padStart(2, "0");
 
 export const asArray = (d) =>
@@ -72,8 +74,13 @@ export const clientNameOf = (r, clients) => {
 };
 
 /* ===== price helpers ===== */
+/**
+ * Итоговая цена записи (после скидки) — то, что реально оплачено.
+ * В первую очередь берём поле price, которое пишет Recorda.
+ */
 export const priceOfAppointment = (a, services) => {
   const candidates = [
+    a.price, // главное поле из Recorda
     a.total,
     a.total_price,
     a.total_amount,
@@ -85,15 +92,16 @@ export const priceOfAppointment = (a, services) => {
     a.service_total,
     a.services_total,
     a.service_price,
-    a.price,
     a.discounted_total,
     a.price_total,
   ];
+
   for (const c of candidates) {
     const n = num(c);
     if (n !== null) return n;
   }
 
+  // если totals нет — пробуем собрать по услугам
   if (Array.isArray(a.services_details) && a.services_details.length) {
     const s = a.services_details.reduce(
       (acc, it) => acc + (num(it?.price) || 0),
@@ -114,6 +122,13 @@ export const priceOfAppointment = (a, services) => {
   return null;
 };
 
+/**
+ * Базовая цена без скидки.
+ * 1) base_price / price_before_discount / full_price / ...
+ * 2) если есть скидка и итоговая цена — восстанавливаем base
+ * 3) иначе — сумма цен услуг
+ * 4) в крайнем случае — такая же, как итоговая
+ */
 export const basePriceOfAppointment = (a, services) => {
   const candidates = [
     a.base_price,
@@ -125,7 +140,43 @@ export const basePriceOfAppointment = (a, services) => {
     const n = num(c);
     if (n !== null) return n;
   }
-  return priceOfAppointment(a, services);
+
+  const totalPrice = priceOfAppointment(a, services);
+  const discountRaw =
+    a.discount_percent ?? a.discount ?? a.discount_value ?? null;
+  const discountPct = num(discountRaw);
+
+  // 1) если есть процент скидки и итог — восстанавливаем базовую
+  if (
+    discountPct !== null &&
+    discountPct > 0 &&
+    discountPct < 100 &&
+    totalPrice !== null
+  ) {
+    const base = Math.round(totalPrice / (1 - discountPct / 100));
+    if (base > totalPrice) return base;
+  }
+
+  // 2) пробуем по услугам (без учёта скидки)
+  if (Array.isArray(a.services_details) && a.services_details.length) {
+    const s = a.services_details.reduce(
+      (acc, it) => acc + (num(it?.price) || 0),
+      0
+    );
+    if (s > 0) return s;
+  }
+
+  if (Array.isArray(a.services) && a.services.length) {
+    const m = new Map(services.map((s) => [String(s.id), s]));
+    const s = a.services.reduce(
+      (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
+      0
+    );
+    if (s > 0) return s;
+  }
+
+  // 3) последний шанс — считаем, что скидки нет
+  return totalPrice;
 };
 
 export const discountPercentOfAppointment = (a, basePrice, totalPrice) => {
@@ -140,6 +191,18 @@ export const discountPercentOfAppointment = (a, basePrice, totalPrice) => {
     if (pct > 0) return pct;
   }
   return null;
+};
+
+/* ===== status helper ===== */
+export const statusLabel = (s) => {
+  const labels = {
+    booked: "Забронировано",
+    confirmed: "Подтверждено",
+    completed: "Завершено",
+    canceled: "Отменено",
+    no_show: "Не пришёл",
+  };
+  return labels[s] || s || "—";
 };
 
 /* ===== дата / фильтры ===== */

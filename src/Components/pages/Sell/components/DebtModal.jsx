@@ -23,7 +23,7 @@ const DebtModal = ({
 
   return (
     <UniversalModal onClose={onClose} title={"Долг"}>
-      <div className="start__debt">
+      <div className="start__debt min-w-75">
         <p className="start__debt-amount">
           Cумма долга: <b>{currentTotal}</b>
         </p>

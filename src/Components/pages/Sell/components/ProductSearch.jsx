@@ -77,13 +77,14 @@ const ProductSearch = ({
   };
 
   return (
-    <div className="sell__header-input" style={{ position: "relative" }}>
+    <div className="sell__header-input flex-1" style={{ position: "relative" }}>
       <input
         onChange={onChange}
         onFocus={() => searchQuery.length > 0 && setShowDropdown(true)}
         onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
         value={searchQuery}
         type="text"
+        className="w-full!"
         placeholder="Введите название товара"
       />
       <span>

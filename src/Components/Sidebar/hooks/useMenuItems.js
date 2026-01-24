@@ -10,7 +10,6 @@ import { getAdditionalServicesForMenu } from "../config/additionalServicesConfig
  */
 export const useMenuItems = (company, sector, tariff, profile = null) => {
   const { hasPermission, isAllowed } = useMenuPermissions();
-
   /**
    * Вычисляет скрытые элементы на основе правил
    */
@@ -33,7 +32,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     });
 
     return result;
-  }, [sector, tariff]);
+  }, [sector, tariff,company, profile]);
 
   /**
    * Получает секторные пункты меню
@@ -84,7 +83,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     );
 
     return filteredItems;
-  }, [sector, company, hasPermission, tariff]);
+  }, [sector, company, hasPermission, profile, tariff]);
 
   /**
    * Получает дополнительные услуги
@@ -188,7 +187,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       implemented: true,
       children,
     };
-  }, [hasPermission, company, tariff]);
+  }, [hasPermission, company, tariff, profile]);
 
   /**
    * Собирает финальный список меню

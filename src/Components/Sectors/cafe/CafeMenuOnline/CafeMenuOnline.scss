@@ -67,7 +67,7 @@
     margin: 0;
     font-size: 28px;
     line-height: 1.1;
-    font-weight: 800;
+    font-weight: 550;
     letter-spacing: -0.02em;
   }
 
@@ -136,7 +136,7 @@
     color: var(--cmo-text);
     border-radius: 12px;
     padding: 10px 14px;
-    font-weight: 800;
+    font-weight: 550;
     font-size: 13px;
     cursor: pointer;
     white-space: nowrap;
@@ -167,12 +167,12 @@
   }
 
   &__hintTitle {
-    font-weight: 900;
+    font-weight: 550;
     font-size: 14px;
   }
 
   &__hintCount {
-    font-weight: 800;
+    font-weight: 550;
     font-size: 12px;
     color: var(--cmo-text-muted);
   }
@@ -242,7 +242,7 @@
   }
 
   &__name {
-    font-weight: 900;
+    font-weight: 550;
     font-size: 16px;
     line-height: 1.25;
     min-width: 0;
@@ -257,7 +257,7 @@
     padding: 7px 10px;
     background: #eef2f7;
     color: #111827;
-    font-weight: 800;
+    font-weight: 550;
     font-size: 12px;
   }
 
@@ -269,7 +269,7 @@
   }
 
   &__price {
-    font-weight: 900;
+    font-weight: 550;
     font-size: 28px;
     color: var(--cmo-primary);
     letter-spacing: -0.02em;
@@ -285,13 +285,13 @@
   }
 
   &__errorTitle {
-    font-weight: 900;
+    font-weight: 550;
     margin-bottom: 4px;
   }
 
   &__errorText {
     color: #991b1b;
-    font-weight: 700;
+    font-weight: 500;
     font-size: 13px;
   }
 
@@ -305,13 +305,13 @@
   }
 
   &__emptyTitle {
-    font-weight: 900;
+    font-weight: 550;
     margin-bottom: 6px;
   }
 
   &__emptyText {
     color: var(--cmo-text-muted);
-    font-weight: 700;
+    font-weight: 500;
     font-size: 13px;
   }
 

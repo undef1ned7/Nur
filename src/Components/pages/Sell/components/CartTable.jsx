@@ -84,7 +84,7 @@ const CartTable = ({
                     </button>
                   </div>
                 </td>
-                <td>{Number(item.unit_price) * Number(item.quantity)}</td>
+                <td className="min-w-18">{(Number(item.unit_price) * Number(item.quantity)).toFixed(2)}</td>
                 <td>
                   <button
                     className="start__table-btn start__table-btn--delete"

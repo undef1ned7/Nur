@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 
 export const useDebounce = (callback, delay = 1000) => {
@@ -13,6 +13,24 @@ export const useDebounce = (callback, delay = 1000) => {
       callback(arg);
     }, delay);
   };
+};
+
+
+export const useDebouncedValue = (value, delay = 400, callback) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+      callback?.()
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
 };
 
 export const useDebouncedAction = (

@@ -59,9 +59,5 @@ export const useMasterAggregates = (appointments, year, month) => {
   return { doneByMaster, revenueByMaster, daysByMaster };
 };
 
-export const useYearOptions = (year) =>
-  useMemo(() => {
-    const set = new Set([year - 1, year, year + 1]);
-    set.delete(2024);
-    return [...set].sort((a, b) => a - b);
-  }, [year]);
+export const useYearOptions = () =>
+  useMemo(() => [2025, 2026, 2027], []);

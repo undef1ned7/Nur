@@ -95,19 +95,19 @@ const ProductSaleModal = ({
 
   return (
     <div
-      className="recordarates__overlay"
+      className="barberrecordarates__overlay"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
-      <div className="recordarates__modal" onClick={(e) => e.stopPropagation()}>
-        <div className="recordarates__modalHead">
-          <h4 className="recordarates__modalTitle">
+      <div className="barberrecordarates__modal" onClick={(e) => e.stopPropagation()}>
+        <div className="barberrecordarates__modalHead">
+          <h4 className="barberrecordarates__modalTitle">
             Товарные продажи — {periodLabel} — {employeeName}
           </h4>
           <button
             type="button"
-            className="recordarates__iconBtn"
+            className="barberrecordarates__iconBtn"
             aria-label="Закрыть"
             onClick={onClose}
           >
@@ -115,11 +115,11 @@ const ProductSaleModal = ({
           </button>
         </div>
 
-        <div className="recordarates__productTabs">
+        <div className="barberrecordarates__productTabs">
           <button
             type="button"
-            className={`recordarates__productTab ${
-              tab === "list" ? "recordarates__productTab--active" : ""
+            className={`barberrecordarates__productTab ${
+              tab === "list" ? "barberrecordarates__productTab--active" : ""
             }`}
             onClick={() => setTab("list")}
           >
@@ -127,8 +127,8 @@ const ProductSaleModal = ({
           </button>
           <button
             type="button"
-            className={`recordarates__productTab ${
-              tab === "sale" ? "recordarates__productTab--active" : ""
+            className={`barberrecordarates__productTab ${
+              tab === "sale" ? "barberrecordarates__productTab--active" : ""
             }`}
             onClick={() => setTab("sale")}
           >
@@ -137,14 +137,14 @@ const ProductSaleModal = ({
         </div>
 
         {(error || localError) && (
-          <div className="recordarates__alert">
+          <div className="barberrecordarates__alert">
             {localError || error}
           </div>
         )}
 
         {tab === "list" ? (
-          <div className="recordarates__tableWrap recordarates__tableWrap--modal">
-            <table className="recordarates__table">
+          <div className="barberrecordarates__tableWrap barberrecordarates__tableWrap--modal">
+            <table className="barberrecordarates__table">
               <thead>
                 <tr>
                   <th>Дата</th>
@@ -158,13 +158,13 @@ const ProductSaleModal = ({
               <tbody>
                 {loading ? (
                   <tr>
-                    <td className="recordarates__muted" colSpan={6}>
+                    <td className="barberrecordarates__muted" colSpan={6}>
                       Загрузка…
                     </td>
                   </tr>
                 ) : payouts.length === 0 ? (
                   <tr>
-                    <td className="recordarates__muted" colSpan={6}>
+                    <td className="barberrecordarates__muted" colSpan={6}>
                       Нет продаж по товарам.
                     </td>
                   </tr>
@@ -187,13 +187,13 @@ const ProductSaleModal = ({
           </div>
         ) : (
           <form
-            className="recordarates__productForm"
+            className="barberrecordarates__productForm"
             onSubmit={handleSubmit}
             autoComplete="off"
           >
-            <div className="recordarates__productRow">
-              <div className="recordarates__productField">
-                <span className="recordarates__productLabel">Товар</span>
+            <div className="barberrecordarates__productRow">
+              <div className="barberrecordarates__productField">
+                <span className="barberrecordarates__productLabel">Товар</span>
                 <RRSelect
                   value={form.product}
                   onChange={(val) => handleChange("product", val)}
@@ -209,8 +209,8 @@ const ProductSaleModal = ({
                 />
               </div>
 
-              <div className="recordarates__productField">
-                <span className="recordarates__productLabel">Сотрудник</span>
+              <div className="barberrecordarates__productField">
+                <span className="barberrecordarates__productLabel">Сотрудник</span>
                 <RRSelect
                   value={form.employee}
                   onChange={(val) => handleChange("employee", val)}
@@ -223,11 +223,11 @@ const ProductSaleModal = ({
               </div>
             </div>
 
-            <div className="recordarates__productRow">
-              <div className="recordarates__productField">
-                <span className="recordarates__productLabel">Процент %</span>
+            <div className="barberrecordarates__productRow">
+              <div className="barberrecordarates__productField">
+                <span className="barberrecordarates__productLabel">Процент %</span>
                 <input
-                  className="recordarates__productInput"
+                  className="barberrecordarates__productInput"
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -238,12 +238,12 @@ const ProductSaleModal = ({
                 />
               </div>
 
-              <div className="recordarates__productField">
-                <span className="recordarates__productLabel">
+              <div className="barberrecordarates__productField">
+                <span className="barberrecordarates__productLabel">
                   Сумма сотруднику
                 </span>
                 <input
-                  className="recordarates__productInput"
+                  className="barberrecordarates__productInput"
                   type="text"
                   value={payoutPreview ? fmtInt(payoutPreview) : 0}
                   readOnly
@@ -252,10 +252,10 @@ const ProductSaleModal = ({
               </div>
             </div>
 
-            <div className="recordarates__productFooter">
+            <div className="barberrecordarates__productFooter">
               <button
                 type="submit"
-                className="recordarates__btn recordarates__btn--primary"
+                className="barberrecordarates__btn barberrecordarates__btn--primary"
                 disabled={saving || loading}
               >
                 {saving ? "Сохранение…" : "Сохранить продажу"}

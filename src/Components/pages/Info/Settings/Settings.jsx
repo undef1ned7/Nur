@@ -1520,26 +1520,39 @@ const Settings = () => {
   const { mode, toggleMode } = React.useContext(ThemeModeContext);
 
   /* ===== Онлайн: ссылки ===== */
+  const sectorName = useMemo(() => String(company?.sector?.name || "").toLowerCase().trim(), [company?.sector?.name]);
+  
+  const isBarberSector = useMemo(() => {
+    return sectorName === "барбершоп" || sectorName === "салон красоты" || sectorName.includes("барбер") || sectorName.includes("парикмахер");
+  }, [sectorName]);
+
+  const isCafeSector = useMemo(() => {
+    return sectorName === "кафе" || sectorName.includes("кафе") || sectorName.includes("ресторан");
+  }, [sectorName]);
+
   const onlineMenuUrl = useMemo(() => {
     if (!company?.slug) return "";
     
     // Определяем тип сектора
-    const sectorName = String(company?.sector?.name || "").toLowerCase().trim();
     const isMarket = sectorName === "магазин" || 
                      sectorName === "цветочный магазин" || 
                      sectorName.includes("магазин");
-    const isCafe = sectorName === "кафе" || sectorName.includes("кафе");
     
     // Генерируем URL в зависимости от типа сектора
     if (isMarket) {
       return `${safeOrigin()}/catalog/${company.slug}`;
-    } else if (isCafe) {
+    } else if (isCafeSector) {
       return `${safeOrigin()}/cafe/${company.slug}/menu`;
     }
     
     // По умолчанию для кафе
     return `${safeOrigin()}/cafe/${company.slug}/menu`;
-  }, [company?.slug, company?.sector?.name]);
+  }, [company?.slug, sectorName, isCafeSector]);
+
+  const onlineBookingUrl = useMemo(() => {
+    if (!company?.slug || !isBarberSector) return "";
+    return `${safeOrigin()}/barber/${company.slug}/booking`;
+  }, [company?.slug, isBarberSector]);
 
 
   const copyText = useCallback(
@@ -1905,48 +1918,118 @@ case "Онлайн":
         </h2>
 
         <div className="settings__onlineGrid">
-          <div className="settings__onlineCard">
-            <div className="settings__onlineHead">
-              <div className="settings__onlineTitle">Ссылка на онлайн</div>
-              <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
-            </div>
+          {/* Онлайн-запись для барбершопа */}
+          {isBarberSector && (
+            <div className="settings__onlineCard">
+              <div className="settings__onlineHead">
+                <div className="settings__onlineTitle">📅 Онлайн-запись</div>
+                <div className="settings__onlineHint">Клиенты могут записаться онлайн по этой ссылке</div>
+              </div>
 
-            <div className="settings__onlineRow">
-              <div className="settings__onlineLabel">Slug</div>
-              <div className="settings__onlineValue">{company?.slug || "—"}</div>
-            </div>
+              <div className="settings__onlineRow">
+                <div className="settings__onlineLabel">Slug</div>
+                <div className="settings__onlineValue">{company?.slug || "—"}</div>
+              </div>
 
-            <div className="settings__onlineRow">
-              <div className="settings__onlineLabel">URL</div>
-              <div className="settings__onlineLinkBox">
-                <input className="settings__onlineInput" value={onlineMenuUrl || ""} readOnly />
-                <div className="settings__onlineBtns">
-                  <button
-                    type="button"
-                    className="settings__btnSmall settings__btnSmall--secondary"
-                    onClick={() => copyText(onlineMenuUrl)}
-                    disabled={!onlineMenuUrl}
-                  >
-                    Копировать
-                  </button>
-                  <button
-                    type="button"
-                    className="settings__btnSmall settings__btnSmall--primary"
-                    onClick={() => openUrl(onlineMenuUrl)}
-                    disabled={!onlineMenuUrl}
-                  >
-                    Открыть
-                  </button>
+              <div className="settings__onlineRow">
+                <div className="settings__onlineLabel">URL</div>
+                <div className="settings__onlineLinkBox">
+                  <input className="settings__onlineInput" value={onlineBookingUrl || ""} readOnly />
+                  <div className="settings__onlineBtns">
+                    <button
+                      type="button"
+                      className="settings__btnSmall settings__btnSmall--secondary"
+                      onClick={() => copyText(onlineBookingUrl)}
+                      disabled={!onlineBookingUrl}
+                    >
+                      Копировать
+                    </button>
+                    <button
+                      type="button"
+                      className="settings__btnSmall settings__btnSmall--primary"
+                      onClick={() => openUrl(onlineBookingUrl)}
+                      disabled={!onlineBookingUrl}
+                    >
+                      Открыть
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {!onlineMenuUrl && (
-              <div className="settings__warnBox">
-                Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
+              {!onlineBookingUrl && (
+                <div className="settings__warnBox">
+                  Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Онлайн-меню/каталог для кафе и магазинов */}
+          {(isCafeSector || isMarketSector) && (
+            <div className="settings__onlineCard">
+              <div className="settings__onlineHead">
+                <div className="settings__onlineTitle">{isCafeSector ? "🍽️ Онлайн-меню" : "🛒 Онлайн-каталог"}</div>
+                <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
               </div>
-            )}
-          </div>
+
+              <div className="settings__onlineRow">
+                <div className="settings__onlineLabel">Slug</div>
+                <div className="settings__onlineValue">{company?.slug || "—"}</div>
+              </div>
+
+              <div className="settings__onlineRow">
+                <div className="settings__onlineLabel">URL</div>
+                <div className="settings__onlineLinkBox">
+                  <input className="settings__onlineInput" value={onlineMenuUrl || ""} readOnly />
+                  <div className="settings__onlineBtns">
+                    <button
+                      type="button"
+                      className="settings__btnSmall settings__btnSmall--secondary"
+                      onClick={() => copyText(onlineMenuUrl)}
+                      disabled={!onlineMenuUrl}
+                    >
+                      Копировать
+                    </button>
+                    <button
+                      type="button"
+                      className="settings__btnSmall settings__btnSmall--primary"
+                      onClick={() => openUrl(onlineMenuUrl)}
+                      disabled={!onlineMenuUrl}
+                    >
+                      Открыть
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {!onlineMenuUrl && (
+                <div className="settings__warnBox">
+                  Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Fallback если не определён тип сектора */}
+          {!isBarberSector && !isCafeSector && !isMarketSector && (
+            <div className="settings__onlineCard">
+              <div className="settings__onlineHead">
+                <div className="settings__onlineTitle">Ссылка на онлайн</div>
+                <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
+              </div>
+
+              <div className="settings__onlineRow">
+                <div className="settings__onlineLabel">Slug</div>
+                <div className="settings__onlineValue">{company?.slug || "—"}</div>
+              </div>
+
+              {!company?.slug && (
+                <div className="settings__warnBox">
+                  Нет slug у компании — без него ссылку собрать нельзя.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

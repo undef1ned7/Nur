@@ -20,6 +20,7 @@ import { useCounterpartySelection } from "./hooks/useCounterpartySelection";
 import { useCounterpartyData } from "./hooks/useCounterpartyData";
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
+import ReactPortal from "../../../common/Portal/ReactPortal";
 
 const Counterparties = () => {
   const dispatch = useDispatch();
@@ -136,7 +137,7 @@ const Counterparties = () => {
       console.error("Ошибка при удалении контрагентов:", e);
       alert(
         "Не удалось удалить контрагентов: " +
-          (e?.message || e?.detail || "Неизвестная ошибка")
+        (e?.message || e?.detail || "Неизвестная ошибка")
       );
     } finally {
       setBulkDeleting(false);
@@ -228,9 +229,12 @@ const Counterparties = () => {
       />
 
       {showCreateModal && (
-        <CreateCounterpartyModal
-          onClose={() => setShowCreateModal(false)}
-        />
+        <ReactPortal wrapperId="create_counter_modal">
+          <CreateCounterpartyModal
+            onClose={() => setShowCreateModal(false)}
+          />
+        </ReactPortal>
+
       )}
     </div>
   );

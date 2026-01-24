@@ -18,7 +18,7 @@ const DiscountModal = ({
       }}
       title={"Общая скидка"}
     >
-      <div className="start__discount" style={{ width: "379px" }}>
+      <div className="start__discount min-w-75">
         <div>
           <label>Сумма скидки</label>
           <input

@@ -1,5 +1,5 @@
 // Импортируем стили из Warehouse, так как дизайн должен быть одинаковым
-@import "../Warehouse/Warehouse.scss";
+@use "../Warehouse/Warehouse.scss";
 
 // Дополнительные стили для контрагентов можно добавить здесь
 

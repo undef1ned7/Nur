@@ -27,7 +27,7 @@ import branchReducer from "./slices/branchSlice";
 import shiftReducer from "./slices/shiftSlice";
 import warehouseReducer from "./slices/warehouseSlice";
 import counterpartyReducer from "./slices/counterpartySlice";
-import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
+// import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
   reducer: {

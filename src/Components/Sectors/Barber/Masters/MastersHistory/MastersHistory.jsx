@@ -1,308 +1,20 @@
 // MastersHistory.jsx
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "./MastersHistory.scss";
 import api from "../../../../../api";
-
-/* ===== utils ===== */
-const pad = (n) => String(n).padStart(2, "0");
-const asArray = (d) =>
-  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
-const norm = (s) =>
-  String(s || "")
-    .trim()
-    .toLowerCase();
-
-const dateISO = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d)) return "";
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
-const timeISO = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d)) return "";
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
-const num = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-const fmtMoney = (v) =>
-  v === null || v === undefined || v === ""
-    ? "—"
-    : `${Number(v).toLocaleString("ru-RU")} сом`;
-
-/* ===== name helpers ===== */
-const fullNameEmp = (e) =>
-  [e?.last_name || "", e?.first_name || ""].filter(Boolean).join(" ").trim() ||
-  e?.email ||
-  "—";
-
-const barberNameOf = (a, employees) => {
-  if (a?.barber_name) return a.barber_name;
-  if (a?.employee_name) return a.employee_name;
-  if (a?.master_name) return a.master_name;
-  const e = employees.find((x) => String(x.id) === String(a?.barber));
-  return e ? fullNameEmp(e) : "—";
-};
-
-const serviceNamesFromRecord = (r, services) => {
-  if (Array.isArray(r.services_names) && r.services_names.length)
-    return r.services_names.join(", ");
-  if (Array.isArray(r.services) && r.services.length) {
-    const m = new Map(services.map((s) => [String(s.id), s]));
-    const names = r.services.map(
-      (id) => m.get(String(id))?.service_name || m.get(String(id))?.name || id
-    );
-    return names.join(", ");
-  }
-  return r.service_name || "—";
-};
-
-const clientNameOf = (r, clients) => {
-  if (r.client_name) return r.client_name;
-  const c = clients.find((x) => String(x.id) === String(r.client));
-  return c?.full_name || c?.name || "—";
-};
-
-/* ===== price helpers ===== */
-/**
- * Итоговая цена записи (после скидки) — то, что реально оплачено.
- * В первую очередь берём поле price, которое пишет Recorda.
- */
-const priceOfAppointment = (a, services) => {
-  const candidates = [
-    a.price, // главное поле из Recorda
-    a.total,
-    a.total_price,
-    a.total_amount,
-    a.final_total,
-    a.payable_total,
-    a.grand_total,
-    a.sum,
-    a.amount,
-    a.service_total,
-    a.services_total,
-    a.service_price,
-    a.discounted_total,
-    a.price_total,
-  ];
-
-  for (const c of candidates) {
-    const n = num(c);
-    if (n !== null) return n;
-  }
-
-  // если totals нет — пробуем собрать по услугам
-  if (Array.isArray(a.services_details) && a.services_details.length) {
-    const s = a.services_details.reduce(
-      (acc, it) => acc + (num(it?.price) || 0),
-      0
-    );
-    if (s > 0) return s;
-  }
-
-  if (Array.isArray(a.services) && a.services.length) {
-    const m = new Map(services.map((s) => [String(s.id), s]));
-    const s = a.services.reduce(
-      (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
-      0
-    );
-    if (s > 0) return s;
-  }
-
-  return null;
-};
-
-/**
- * Базовая цена без скидки.
- * 1) base_price / price_before_discount / full_price / ...
- * 2) если есть скидка и итоговая цена — восстанавливаем base
- * 3) иначе — сумма цен услуг
- * 4) в крайнем случае — такая же, как итоговая
- */
-const basePriceOfAppointment = (a, services) => {
-  const candidates = [
-    a.base_price,
-    a.price_before_discount,
-    a.full_price,
-    a.sum_before_discount,
-  ];
-  for (const c of candidates) {
-    const n = num(c);
-    if (n !== null) return n;
-  }
-
-  const totalPrice = priceOfAppointment(a, services);
-  const discountRaw =
-    a.discount_percent ?? a.discount ?? a.discount_value ?? null;
-  const discountPct = num(discountRaw);
-
-  // 1) если есть процент скидки и итог — восстанавливаем базовую
-  if (
-    discountPct !== null &&
-    discountPct > 0 &&
-    discountPct < 100 &&
-    totalPrice !== null
-  ) {
-    const base = Math.round(totalPrice / (1 - discountPct / 100));
-    if (base > totalPrice) return base;
-  }
-
-  // 2) пробуем по услугам (без учёта скидки)
-  if (Array.isArray(a.services_details) && a.services_details.length) {
-    const s = a.services_details.reduce(
-      (acc, it) => acc + (num(it?.price) || 0),
-      0
-    );
-    if (s > 0) return s;
-  }
-
-  if (Array.isArray(a.services) && a.services.length) {
-    const m = new Map(services.map((s) => [String(s.id), s]));
-    const s = a.services.reduce(
-      (acc, id) => acc + (num(m.get(String(id))?.price) || 0),
-      0
-    );
-    if (s > 0) return s;
-  }
-
-  // 3) последний шанс — считаем, что скидки нет
-  return totalPrice;
-};
-
-const discountPercentOfAppointment = (a, basePrice, totalPrice) => {
-  const direct = a.discount_percent ?? a.discount ?? a.discount_value ?? null;
-  const nDirect = num(direct);
-  if (nDirect !== null) return nDirect;
-
-  const base = num(basePrice);
-  const total = num(totalPrice);
-  if (base && total && base > total) {
-    const pct = Math.round((1 - total / base) * 100);
-    if (pct > 0) return pct;
-  }
-  return null;
-};
-
-/* ===== helpers: дата ===== */
-const getYMD = (iso) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d)) return null;
-  return {
-    year: d.getFullYear(),
-    month: d.getMonth() + 1,
-    day: d.getDate(),
-  };
-};
-
-const monthNames = [
-  "Январь",
-  "Февраль",
-  "Март",
-  "Апрель",
-  "Май",
-  "Июнь",
-  "Июль",
-  "Август",
-  "Сентябрь",
-  "Октябрь",
-  "Ноябрь",
-  "Декабрь",
-];
-
-/* ===== кастомный селект ===== */
-
-const MHSelect = ({
-  value,
-  onChange,
-  options,
-  placeholder = "Все",
-  disabled = false,
-}) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (!ref.current) return;
-      if (!ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const current =
-    options.find((o) => String(o.value) === String(value)) || null;
-
-  const handleSelect = (val) => {
-    onChange(val);
-    setOpen(false);
-  };
-
-  return (
-    <div
-      className={`mh-select ${disabled ? "mh-select--disabled" : ""}`}
-      ref={ref}
-    >
-      <button
-        type="button"
-        className={`mh-select__control ${
-          open ? "mh-select__control--open" : ""
-        }`}
-        onClick={() => {
-          if (!disabled) setOpen((o) => !o);
-        }}
-      >
-        <span className="mh-select__value">
-          {current ? current.label : placeholder}
-        </span>
-        <span
-          className={`mh-select__arrow ${
-            open ? "mh-select__arrow--open" : ""
-          }`}
-        />
-      </button>
-
-      {open && !disabled && (
-        <div className="mh-select__dropdown">
-          <ul className="mh-select__list">
-            <li
-              className={`mh-select__option ${
-                value === "" ? "mh-select__option--active" : ""
-              }`}
-              onClick={() => handleSelect("")}
-            >
-              {placeholder}
-            </li>
-            {options.map((opt) => (
-              <li
-                key={opt.value}
-                className={`mh-select__option ${
-                  String(opt.value) === String(value)
-                    ? "mh-select__option--active"
-                    : ""
-                }`}
-                onClick={() => handleSelect(opt.value)}
-              >
-                {opt.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ===== main ===== */
+import { MastersHistoryHeader, MastersHistoryList, Pager } from "./components";
+import {
+  asArray,
+  fullNameEmp,
+  PAGE_SIZE,
+  pad,
+  getYMD,
+  monthNames,
+  clientNameOf,
+  serviceNamesFromRecord,
+  barberNameOf,
+  dateISO,
+} from "./MastersHistoryUtils";
 
 const MastersHistory = () => {
   const [employees, setEmployees] = useState([]);
@@ -313,11 +25,17 @@ const MastersHistory = () => {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  /* Filters */
+  const [search, setSearch] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [dayFilter, setDayFilter] = useState("");
+  const [viewMode, setViewMode] = useState("table");
+  const [page, setPage] = useState(1);
 
+  /* Fetch functions */
   const fetchEmployees = useCallback(
     async () => asArray((await api.get("/users/employees/")).data),
     []
@@ -364,8 +82,32 @@ const MastersHistory = () => {
     };
   }, [fetchEmployees, fetchAppointments, fetchServices, fetchClients]);
 
-  /* фиксированные годы 2025–2026 */
-  const yearOptions = useMemo(() => [2025, 2026], []);
+  /* Options for filters */
+  const employeeOptions = useMemo(
+    () => [
+      { value: "", label: "Все сотрудники" },
+      ...employees.map((e) => ({ value: String(e.id), label: fullNameEmp(e) })),
+    ],
+    [employees]
+  );
+
+  const yearOptions = useMemo(
+    () => [
+      { value: "", label: "Все годы" },
+      { value: "2025", label: "2025" },
+      { value: "2026", label: "2026" },
+      { value: "2027", label: "2027" },
+    ],
+    []
+  );
+
+  const monthOptions = useMemo(
+    () => [
+      { value: "", label: "Все месяцы" },
+      ...monthNames.map((label, idx) => ({ value: String(idx + 1), label })),
+    ],
+    []
+  );
 
   const daysInMonth = useMemo(() => {
     if (!yearFilter || !monthFilter) return 31;
@@ -375,15 +117,35 @@ const MastersHistory = () => {
     return new Date(y, m, 0).getDate();
   }, [yearFilter, monthFilter]);
 
-  /* фильтрация */
+  const dayOptions = useMemo(
+    () => [
+      { value: "", label: "Все дни" },
+      ...Array.from({ length: daysInMonth }).map((_, i) => ({
+        value: String(i + 1),
+        label: pad(i + 1),
+      })),
+    ],
+    [daysInMonth]
+  );
+
+  /* Filtering */
   const filtered = useMemo(() => {
     let arr = appointments.slice();
 
+    // Employee filter
     if (employeeFilter) {
       const idStr = String(employeeFilter);
       arr = arr.filter((a) => String(a.barber) === idStr);
     }
 
+    // Status filter
+    if (statusFilter !== "all") {
+      arr = arr.filter(
+        (a) => String(a?.status || "").toLowerCase() === statusFilter
+      );
+    }
+
+    // Date filter (year/month/day)
     if (yearFilter) {
       const yStr = String(yearFilter);
       const mStr = monthFilter ? pad(Number(monthFilter)) : "";
@@ -399,184 +161,120 @@ const MastersHistory = () => {
       });
     }
 
-    return arr.sort((a, b) => new Date(b.start_at) - new Date(a.start_at));
-  }, [appointments, employeeFilter, yearFilter, monthFilter, dayFilter]);
+    // Search filter
+    const q = search.trim().toLowerCase();
+    if (q) {
+      arr = arr.filter((a) => {
+        const client = clientNameOf(a, clients).toLowerCase();
+        const service = serviceNamesFromRecord(a, services).toLowerCase();
+        const barber = barberNameOf(a, employees).toLowerCase();
+        const date = dateISO(a?.start_at).toLowerCase();
+        return (
+          client.includes(q) ||
+          service.includes(q) ||
+          barber.includes(q) ||
+          date.includes(q)
+        );
+      });
+    }
 
-  const rows = filtered;
+    // Sort by newest first
+    return arr.sort(
+      (a, b) => (Date.parse(b?.start_at) || 0) - (Date.parse(a?.start_at) || 0)
+    );
+  }, [
+    appointments,
+    employeeFilter,
+    statusFilter,
+    yearFilter,
+    monthFilter,
+    dayFilter,
+    search,
+    clients,
+    services,
+    employees,
+  ]);
 
-  const statusLabel = (s) => {
-    if (s === "booked") return "Забронировано";
-    if (s === "confirmed") return "Подтверждено";
-    if (s === "completed") return "Завершено";
-    if (s === "canceled") return "Отменено";
-    if (s === "no_show") return "Не пришёл";
-    return s || "—";
+  /* Pagination */
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, employeeFilter, statusFilter, yearFilter, monthFilter, dayFilter]);
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const safePage = Math.min(page, totalPages);
+  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  /* Check if filters are active */
+  const hasFilters =
+    search || employeeFilter || statusFilter !== "all" || yearFilter;
+
+  /* Reset all filters */
+  const handleReset = () => {
+    setSearch("");
+    setEmployeeFilter("");
+    setStatusFilter("all");
+    setYearFilter("");
+    setMonthFilter("");
+    setDayFilter("");
+    setPage(1);
   };
 
-  const statusKeyFromAppointment = (a) => {
-    const raw = norm(a.status || "");
-    if (raw === "booked") return "booked";
-    if (raw === "confirmed") return "confirmed";
-    if (raw === "completed") return "completed";
-    if (raw === "canceled") return "canceled";
-    if (raw === "no_show" || raw === "no-show") return "no-show";
-    return "other";
+  /* Handlers with cascade reset */
+  const handleYearChange = (val) => {
+    setYearFilter(val);
+    setMonthFilter("");
+    setDayFilter("");
   };
 
-  const totalLabel = loading ? "Загрузка…" : `${filtered.length} записей`;
+  const handleMonthChange = (val) => {
+    setMonthFilter(val);
+    setDayFilter("");
+  };
 
   return (
-    <section className="mastershistory">
-      <header className="mastershistory__header">
-        <span className="mastershistory__subtitle">{totalLabel}</span>
+    <section className="barbermastershistory">
+      <MastersHistoryHeader
+        totalCount={filtered.length}
+        search={search}
+        statusFilter={statusFilter}
+        viewMode={viewMode}
+        employeeFilter={employeeFilter}
+        employeeOptions={employeeOptions}
+        yearFilter={yearFilter}
+        monthFilter={monthFilter}
+        dayFilter={dayFilter}
+        yearOptions={yearOptions}
+        monthOptions={monthOptions}
+        dayOptions={dayOptions}
+        onSearchChange={setSearch}
+        onStatusChange={setStatusFilter}
+        onViewModeChange={setViewMode}
+        onEmployeeChange={setEmployeeFilter}
+        onYearChange={handleYearChange}
+        onMonthChange={handleMonthChange}
+        onDayChange={setDayFilter}
+        onReset={handleReset}
+        hasFilters={hasFilters}
+        loading={loading}
+      />
 
-        <div className="mastershistory__filters">
-          <label className="mastershistory__field">
-            <span className="mastershistory__label">Сотрудник</span>
-            <MHSelect
-              value={employeeFilter}
-              onChange={setEmployeeFilter}
-              options={employees.map((e) => ({
-                value: String(e.id),
-                label: fullNameEmp(e),
-              }))}
-              placeholder="Все"
-            />
-          </label>
+      {!!err && <div className="barbermastershistory__alert">{err}</div>}
 
-          <label className="mastershistory__field">
-            <span className="mastershistory__label">Год</span>
-            <MHSelect
-              value={yearFilter}
-              onChange={(val) => {
-                setYearFilter(val);
-                setMonthFilter("");
-                setDayFilter("");
-              }}
-              options={yearOptions.map((y) => ({
-                value: String(y),
-                label: String(y),
-              }))}
-              placeholder="Все"
-            />
-          </label>
+      <MastersHistoryList
+        records={rows}
+        employees={employees}
+        services={services}
+        clients={clients}
+        loading={loading}
+        viewMode={viewMode}
+      />
 
-          <label className="mastershistory__field">
-            <span className="mastershistory__label">Месяц</span>
-            <MHSelect
-              value={monthFilter}
-              onChange={(val) => {
-                setMonthFilter(val);
-                setDayFilter("");
-              }}
-              options={monthNames.map((label, idx) => ({
-                value: String(idx + 1),
-                label,
-              }))}
-              placeholder="Все"
-              disabled={!yearFilter}
-            />
-          </label>
-
-          <label className="mastershistory__field">
-            <span className="mastershistory__label">День</span>
-            <MHSelect
-              value={dayFilter}
-              onChange={setDayFilter}
-              options={Array.from({ length: daysInMonth }).map((_, i) => ({
-                value: String(i + 1),
-                label: pad(i + 1),
-              }))}
-              placeholder="Все"
-              disabled={!yearFilter || !monthFilter}
-            />
-          </label>
-        </div>
-      </header>
-
-      {!!err && <div className="mastershistory__alert">{err}</div>}
-
-      <div className="mastershistory__list">
-        {loading ? (
-          <div className="mastershistory__alert">Загрузка…</div>
-        ) : rows.length === 0 ? (
-          <div className="mastershistory__alert">Записей нет</div>
-        ) : (
-          rows.map((a) => {
-            const date = dateISO(a.start_at);
-            const time = timeISO(a.start_at);
-            const client = clientNameOf(a, clients);
-            const service = serviceNamesFromRecord(a, services);
-
-            const totalPrice = priceOfAppointment(a, services);
-            const basePrice = basePriceOfAppointment(a, services);
-            const discountPct = discountPercentOfAppointment(
-              a,
-              basePrice,
-              totalPrice
-            );
-
-            const statusText = a.status_display || statusLabel(a.status);
-            const statusKey = statusKeyFromAppointment(a);
-            const barber = barberNameOf(a, employees);
-            const discountLabel =
-              discountPct !== null ? `${discountPct}%` : "0%";
-
-            return (
-              <article
-                key={a.id ?? `${a.start_at}-${client}-${service}`}
-                className={`mastershistory__card mastershistory__card--${statusKey}`}
-              >
-                <div className="mastershistory__cardHead">
-                  <h4 className="mastershistory__name">
-                    {date} • {time}
-                  </h4>
-                  <span
-                    className={`mastershistory__status mastershistory__status--${statusKey}`}
-                  >
-                    {statusText}
-                  </span>
-                </div>
-
-                <div className="mastershistory__body">
-                  <div className="mastershistory__line">
-                    <span className="mastershistory__key">Сотрудник:</span>
-                    <span className="mastershistory__value">{barber}</span>
-                  </div>
-                  <div className="mastershistory__line">
-                    <span className="mastershistory__key">Клиент:</span>
-                    <span className="mastershistory__value">{client}</span>
-                  </div>
-                  <div className="mastershistory__line">
-                    <span className="mastershistory__key">Услуга:</span>
-                    <span className="mastershistory__value">{service}</span>
-                  </div>
-                  <div className="mastershistory__line mastershistory__line--summary">
-                    <span className="mastershistory__key">
-                      Цена без скидки:
-                    </span>
-                    <span className="mastershistory__value">
-                      {fmtMoney(basePrice)}
-                    </span>
-
-                    <span className="mastershistory__key">Скидка:</span>
-                    <span className="mastershistory__value">
-                      {discountLabel}
-                    </span>
-
-                    <span className="mastershistory__key mastershistory__key--bold">
-                      Итого:
-                    </span>
-                    <span className="mastershistory__value mastershistory__value--bold">
-                      {fmtMoney(totalPrice)}
-                    </span>
-                  </div>
-                </div>
-              </article>
-            );
-          })
-        )}
-      </div>
+      <Pager page={safePage} totalPages={totalPages} onChange={setPage} />
     </section>
   );
 };

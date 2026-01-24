@@ -1,16 +1,13 @@
 // BarberClients.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
 import "./Clients.scss";
-import BarberClientModals from "./BarberClientModals";
 
 import {
   UI_TO_API_STATUS,
   API_TO_UI_STATUS,
   STATUS_OPTIONS_UI,
-  STATUS_FILTER_ALL,
   PAGE_SIZE,
-  rankOf,
 } from "./barberClientConstants";
 
 import {
@@ -22,13 +19,13 @@ import {
   parseApiError,
 } from "./barberClientUtils";
 
-import BarberClientsHeader from "./BarberClientsHeader";
-import BarberClientsList from "./BarberClientsList";
+import { ClientsHeader, ClientsList, ClientModals } from "./components";
 
 export const BarberClients = () => {
   const [clients, setClients] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [services, setServices] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
@@ -49,7 +46,7 @@ export const BarberClients = () => {
   /* === CRM создание: прогресс, итоговый статус, тосты === */
   const [creatingClientIds, setCreatingClientIds] = useState(new Set());
   const [crmCreatedIds, setCrmCreatedIds] = useState(new Set());
-  const [toast, setToast] = useState(null); // { type: "success"|"error", text: string }
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -57,9 +54,10 @@ export const BarberClients = () => {
     return () => clearTimeout(t);
   }, [toast]);
 
-  /* фильтр статуса */
-  const [fltStatus, setFltStatus] = useState(STATUS_FILTER_ALL);
-  const [statusOpen, setStatusOpen] = useState(false); // кастомный дропдаун
+  /* фильтры */
+  const [fltStatus, setFltStatus] = useState("all");
+  const [sortBy, setSortBy] = useState("newest");
+  const [viewMode, setViewMode] = useState("table");
 
   /* для подъёма новых в верх верхней группы */
   const [lastAddedId, setLastAddedId] = useState(null);
@@ -109,6 +107,17 @@ export const BarberClients = () => {
     setServices(acc);
   };
 
+  const fetchAllEmployees = async () => {
+    const acc = [];
+    let next = "/users/employees/";
+    while (next) {
+      const { data } = await api.get(next);
+      acc.push(...(data?.results || data || []));
+      next = data?.next;
+    }
+    setEmployees(acc);
+  };
+
   useEffect(() => {
     const loadAll = async () => {
       try {
@@ -118,6 +127,7 @@ export const BarberClients = () => {
           fetchClients(),
           fetchAllAppointments(),
           fetchAllServices(),
+          fetchAllEmployees(),
         ]);
       } catch (e) {
         console.error(e);
@@ -148,46 +158,78 @@ export const BarberClients = () => {
     return map;
   }, [services]);
 
-  /* === сортировка клиентов === */
-  const clientsSorter = (a, b) => {
-    const ra = rankOf(a.status);
-    const rb = rankOf(b.status);
-    if (ra !== rb) return ra - rb;
-
-    // верхняя группа: «новый» сразу наверху
-    if (ra === 0 && lastAddedId && (a.id === lastAddedId || b.id === lastAddedId)) {
-      return a.id === lastAddedId ? -1 : 1;
-    }
-
-    // затем по дате создания (новее выше)
-    const ad = Date.parse(a.createdAt || 0) || 0;
-    const bd = Date.parse(b.createdAt || 0) || 0;
-    if (ad !== bd) return bd - ad;
-
-    // стабильно по ФИО
-    return String(a.fullName || "").localeCompare(
-      String(b.fullName || ""),
-      "ru",
-      { sensitivity: "base" }
+  /* Последний визит клиента */
+  const getLastVisit = useCallback((clientId) => {
+    const appts = apptsByClient.get(clientId) || [];
+    if (!appts.length) return null;
+    const sorted = [...appts].sort((a, b) => 
+      new Date(b.start_at) - new Date(a.start_at)
     );
-  };
+    return sorted[0]?.start_at || null;
+  }, [apptsByClient]);
+
+  /* === сортировка клиентов === */
+  const sortClients = useCallback((arr, sortKey) => {
+    const sorted = [...arr];
+    switch (sortKey) {
+      case "oldest":
+        return sorted.sort((a, b) => {
+          const ad = Date.parse(a.createdAt || 0) || 0;
+          const bd = Date.parse(b.createdAt || 0) || 0;
+          return ad - bd;
+        });
+      case "name_asc":
+        return sorted.sort((a, b) => 
+          (a.fullName || "").localeCompare(b.fullName || "", "ru")
+        );
+      case "name_desc":
+        return sorted.sort((a, b) => 
+          (b.fullName || "").localeCompare(a.fullName || "", "ru")
+        );
+      case "visits_desc":
+        return sorted.sort((a, b) => {
+          const va = apptsByClient.get(a.id)?.length || 0;
+          const vb = apptsByClient.get(b.id)?.length || 0;
+          return vb - va;
+        });
+      case "last_visit":
+        return sorted.sort((a, b) => {
+          const la = getLastVisit(a.id);
+          const lb = getLastVisit(b.id);
+          if (!la && !lb) return 0;
+          if (!la) return 1;
+          if (!lb) return -1;
+          return new Date(lb) - new Date(la);
+        });
+      case "newest":
+      default:
+        return sorted.sort((a, b) => {
+          if (lastAddedId && (a.id === lastAddedId || b.id === lastAddedId)) {
+            return a.id === lastAddedId ? -1 : 1;
+          }
+          const ad = Date.parse(a.createdAt || 0) || 0;
+          const bd = Date.parse(b.createdAt || 0) || 0;
+          return bd - ad;
+        });
+    }
+  }, [apptsByClient, getLastVisit, lastAddedId]);
 
   /* === фильтр + поиск + сортировка === */
   const filteredClients = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = clients.filter((c) => {
-      const passStatus =
-        fltStatus === STATUS_FILTER_ALL ? true : c.status === fltStatus;
-      if (!passStatus) return false;
-      if (!q) return true;
 
+    const base = clients.filter((c) => {
+      const passStatus = fltStatus === "all" ? true : c.status === fltStatus;
+      if (!passStatus) return false;
+
+      if (!q) return true;
       const name = (c.fullName || "").toLowerCase();
       const phone = (c.phone || "").toLowerCase();
       return name.includes(q) || phone.includes(q);
     });
 
-    return base.sort(clientsSorter);
-  }, [clients, search, fltStatus, lastAddedId]);
+    return sortClients(base, sortBy);
+  }, [clients, search, fltStatus, sortBy, sortClients]);
 
   const totalPages = Math.max(
     1,
@@ -202,7 +244,18 @@ export const BarberClients = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [search, clients.length, fltStatus]);
+  }, [search, clients.length, fltStatus, sortBy]);
+
+  /* Проверка есть ли активные фильтры */
+  const hasFilters = search || fltStatus !== "all" || sortBy !== "newest";
+
+  /* Сброс всех фильтров */
+  const handleReset = () => {
+    setSearch("");
+    setFltStatus("all");
+    setSortBy("newest");
+    setPage(1);
+  };
 
   /* === модальные окна === */
   const openModal = (client = null) => {
@@ -525,22 +578,21 @@ export const BarberClients = () => {
         </div>
       )}
 
-      <BarberClientsHeader
-        loading={loading}
-        totalCount={clients.length}
+      <ClientsHeader
         fltStatus={fltStatus}
-        statusOpen={statusOpen}
-        onToggleStatusOpen={setStatusOpen}
-        onStatusChange={(s) => {
-          setFltStatus(s);
-          setStatusOpen(false);
-        }}
+        onStatusChange={setFltStatus}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
         search={search}
         onSearchChange={setSearch}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onReset={handleReset}
         onAdd={() => openModal()}
+        hasFilters={hasFilters}
       />
 
-      <BarberClientsList
+      <ClientsList
         pageError={pageError}
         loading={loading}
         pageSlice={pageSlice}
@@ -548,16 +600,14 @@ export const BarberClients = () => {
         pageSafe={pageSafe}
         totalPages={totalPages}
         apptsByClient={apptsByClient}
-        creatingClientIds={creatingClientIds}
-        crmCreatedIds={crmCreatedIds}
-        onOpenHistory={openHistory}
+        viewMode={viewMode}
         onOpenModal={openModal}
-        onMakeMarketClient={makeMarketClient}
-        onPrevPage={() => setPage((p) => Math.max(1, p - 1))}
-        onNextPage={() => setPage((p) => Math.min(totalPages, p + 1))}
+        onPageChange={setPage}
+        getLastVisit={getLastVisit}
+        onOpenHistory={openHistory}
       />
 
-      <BarberClientModals
+      <ClientModals
         modalOpen={modalOpen}
         confirmOpen={confirmOpen}
         historyOpen={historyOpen}
@@ -577,6 +627,7 @@ export const BarberClients = () => {
         onCloseHistory={closeHistory}
         fmtMoney={fmtMoney}
         servicesById={servicesById}
+        employees={employees}
       />
     </>
   );

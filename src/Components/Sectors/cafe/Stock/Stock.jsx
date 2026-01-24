@@ -1,9 +1,9 @@
-// src/page/homePage/components/Stock.jsx (или твой путь)
+// src/Components/Sectors/cafe/Stock/Stock.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { FaSearch, FaPlus, FaBoxes, FaEdit, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import "./stock.scss";
-import { StockItemModal, StockMoveModal, StockDeleteModal } from "./StockModals";
+import { StockItemModal, StockMoveModal, StockDeleteModal } from "./components/StockModals";
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -32,10 +32,6 @@ const Stock = () => {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
-  // кассы
-  const [boxes, setBoxes] = useState([]);
-  const [cashboxId, setCashboxId] = useState("");
-
   // модалка товара
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -44,14 +40,12 @@ const Stock = () => {
     unit: "",
     remainder: "",
     minimum: "",
-    expense: "",
   });
 
   // модалка движения (приход)
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveItem, setMoveItem] = useState(null);
   const [moveQty, setMoveQty] = useState("");
-  const [moveSum, setMoveSum] = useState("");
 
   // модалка подтверждения удаления
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -60,16 +54,10 @@ const Stock = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [rStock, rBoxes] = await Promise.all([
-          api.get("/cafe/warehouse/"),
-          api.get("/construction/cashboxes/").catch(() => ({ data: [] })),
-        ]);
+        const rStock = await api.get("/cafe/warehouse/");
         setItems(listFrom(rStock));
-        const bx = listFrom(rBoxes) || [];
-        setBoxes(bx);
-        setCashboxId(bx[0]?.id || bx[0]?.uuid || "");
       } catch (err) {
-        console.error("Ошибка загрузки склада/касс:", err);
+        // Ошибка загрузки склада
       } finally {
         setLoading(false);
       }
@@ -96,7 +84,6 @@ const Stock = () => {
       unit: "",
       remainder: "",
       minimum: "",
-      expense: "",
     });
     setModalOpen(true);
   };
@@ -108,7 +95,6 @@ const Stock = () => {
       unit: row.unit || "",
       remainder: String(row.remainder ?? ""),
       minimum: String(row.minimum ?? ""),
-      expense: "", // при редактировании расход не используем
     });
     setModalOpen(true);
   };
@@ -121,7 +107,6 @@ const Stock = () => {
 
     const remainderNum = toNum(form.remainder);
     const minimumNum = toNum(form.minimum);
-    const expenseNum = toNum(form.expense);
 
     if (!title || !unit) return;
 
@@ -135,40 +120,17 @@ const Stock = () => {
     try {
       if (editingId == null) {
         // Создание товара
-        if (!cashboxId) {
-          alert("Создайте/выберите кассу, чтобы записать расход.");
-          return;
-        }
-        if (!(expenseNum > 0)) {
-          alert("Укажите сумму для расхода.");
-          return;
-        }
-
         const res = await api.post("/cafe/warehouse/", payload);
         setItems((prev) => [...prev, res.data]);
-
-        // Расход в кассу
-        try {
-          await api.post("/construction/cashflows/", {
-            cashbox: cashboxId,
-            type: "expense",
-            name: `Новый товар: ${payload.title} (ввод ${payload.remainder} ${payload.unit})`,
-            amount: numStr(expenseNum),
-          });
-        } catch (err) {
-          console.error("Не удалось записать расход в кассу:", err);
-          alert("Товар создан, но расход в кассу записать не удалось.");
-        }
-
         setModalOpen(false);
       } else {
-        // Редактирование товара (без записи расхода)
+        // Редактирование товара
         const res = await api.put(`/cafe/warehouse/${editingId}/`, payload);
         setItems((prev) => prev.map((s) => (s.id === editingId ? res.data : s)));
         setModalOpen(false);
       }
     } catch (err) {
-      console.error("Ошибка сохранения товара:", err);
+      // Ошибка сохранения товара
     }
   };
 
@@ -185,14 +147,13 @@ const Stock = () => {
       setDeleteOpen(false);
       setDeleteItem(null);
     } catch (err) {
-      console.error("Ошибка удаления товара:", err);
+      // Ошибка удаления товара
     }
   };
 
   const openMove = (item) => {
     setMoveItem(item);
     setMoveQty("");
-    setMoveSum("");
     setMoveOpen(true);
   };
 
@@ -202,21 +163,11 @@ const Stock = () => {
     if (!moveItem) return;
 
     const qtyNum = toNum(moveQty);
-    const sumNum = toNum(moveSum);
 
     if (!(qtyNum > 0)) return;
 
-    if (!cashboxId) {
-      alert("Выберите кассу для записи расхода.");
-      return;
-    }
-    if (!(sumNum > 0)) {
-      alert("Укажите сумму (сом) для расхода.");
-      return;
-    }
-
     const current = toNum(moveItem.remainder);
-    const nextQty = current + qtyNum; // только приход
+    const nextQty = current + qtyNum;
 
     const payload = {
       title: moveItem.title,
@@ -226,66 +177,36 @@ const Stock = () => {
     };
 
     try {
-      // 1) Обновляем склад (приход)
       const res = await api.put(`/cafe/warehouse/${moveItem.id}/`, payload);
       setItems((prev) => prev.map((s) => (s.id === moveItem.id ? res.data : s)));
-
-      // 2) Пишем расход в кассу
-      try {
-        await api.post("/construction/cashflows/", {
-          cashbox: cashboxId,
-          type: "expense",
-          name: `Приход на склад: ${moveItem.title} (${numStr(qtyNum)} ${moveItem.unit})`,
-          amount: numStr(sumNum),
-        });
-      } catch (err) {
-        console.error("Не удалось записать расход в кассу:", err);
-        alert("Приход применён, но расход в кассу записать не удалось.");
-      }
-
       setMoveOpen(false);
     } catch (err) {
-      console.error("Ошибка применения движения:", err);
+      // Ошибка применения движения
     }
   };
 
   return (
-    <section className="stock">
-      <div className="stock__header">
+    <section className="cafeStock">
+      <div className="cafeStock__header">
         <div>
-          <h2 className="stock__title">Склад</h2>
+          <h2 className="cafeStock__title">Склад</h2>
         </div>
 
-        <div className="stock__actions">
-          <div className="stock__search">
-            <FaSearch className="stock__search-icon" />
+        <div className="cafeStock__actions">
+          <div className="cafeStock__search">
+            <FaSearch className="cafeStock__searchIcon" />
             <input
-              className="stock__search-input"
+              className="cafeStock__searchInput"
               placeholder="Поиск ингредиента…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              type="text"
+              autoComplete="off"
             />
           </div>
 
-          <select
-            className="stock__select"
-            value={cashboxId}
-            onChange={(e) => setCashboxId(e.target.value)}
-            title="Касса для записи расхода"
-          >
-            {boxes.map((b) => (
-              <option key={b.id || b.uuid} value={b.id || b.uuid}>
-                {b.department_name || b.name || "Касса"}
-              </option>
-            ))}
-          </select>
-
-          <button className="stock__btn stock__btn--secondary" type="button">
-            Экспорт
-          </button>
-
           <button
-            className="stock__btn stock__btn--primary"
+            className="cafeStock__btn cafeStock__btn--primary"
             onClick={openCreate}
             type="button"
           >
@@ -294,25 +215,25 @@ const Stock = () => {
         </div>
       </div>
 
-      <div className="stock__list">
-        {loading && <div className="stock__alert">Загрузка…</div>}
+      <div className="cafeStock__list">
+        {loading && <div className="cafeStock__alert">Загрузка…</div>}
 
         {!loading &&
           filtered.map((s) => (
-            <article key={s.id} className="stock__card">
-              <div className="stock__card-left">
-                <div className="stock__avatar">
+            <article key={s.id} className="cafeStock__card">
+              <div className="cafeStock__cardLeft">
+                <div className="cafeStock__avatar">
                   <FaBoxes />
                 </div>
                 <div>
-                  <h3 className="stock__name">{s.title}</h3>
-                  <div className="stock__meta">
-                    <span className="stock__muted">
+                  <h3 className="cafeStock__name">{s.title}</h3>
+                  <div className="cafeStock__meta">
+                    <span className="cafeStock__muted">
                       Остаток: {toNum(s.remainder)} {s.unit}
                     </span>
                     <span
-                      className={`stock__status ${
-                        isLow(s) ? "stock__status--low" : "stock__status--ok"
+                      className={`cafeStock__status ${
+                        isLow(s) ? "cafeStock__status--low" : "cafeStock__status--ok"
                       }`}
                     >
                       {isLow(s) ? "Мало" : "Ок"}
@@ -321,23 +242,23 @@ const Stock = () => {
                 </div>
               </div>
 
-              <div className="stock__rowActions">
+              <div className="cafeStock__rowActions">
                 <button
-                  className="stock__btn stock__btn--success"
+                  className="cafeStock__btn cafeStock__btn--success"
                   onClick={() => openMove(s)}
                   type="button"
                 >
                   Приход
                 </button>
                 <button
-                  className="stock__btn stock__btn--secondary"
+                  className="cafeStock__btn cafeStock__btn--secondary"
                   onClick={() => openEdit(s)}
                   type="button"
                 >
                   <FaEdit /> Изменить
                 </button>
                 <button
-                  className="stock__btn stock__btn--danger"
+                  className="cafeStock__btn cafeStock__btn--danger"
                   onClick={() => openDelete(s)}
                   type="button"
                 >
@@ -348,7 +269,7 @@ const Stock = () => {
           ))}
 
         {!loading && !filtered.length && (
-          <div className="stock__alert">Ничего не найдено по «{query}».</div>
+          <div className="cafeStock__alert">Ничего не найдено по «{query}».</div>
         )}
       </div>
 
@@ -370,8 +291,6 @@ const Stock = () => {
           moveItem={moveItem}
           moveQty={moveQty}
           setMoveQty={setMoveQty}
-          moveSum={moveSum}
-          setMoveSum={setMoveSum}
           onClose={() => setMoveOpen(false)}
           onSubmit={applyMove}
           sanitizeDecimalInput={sanitizeDecimalInput}

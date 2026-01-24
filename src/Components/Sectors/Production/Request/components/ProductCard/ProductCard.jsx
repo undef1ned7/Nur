@@ -35,9 +35,14 @@ const ProductCard = ({
 
   const handleDecrement = (e) => {
     e.stopPropagation();
-    if (quantity > 1) {
-      setQuantity(quantity - 1);
-    }
+    setQuantity(oldQty => {
+      const newQty = oldQty - 1;
+      if (newQty <= 0) {
+        setShowQuantityControls(false)
+        return 1
+      }
+      return newQty
+    })
   };
 
   const handleRequestWithCart = (e) => {
@@ -121,7 +126,7 @@ const ProductCard = ({
                 {!showQuantityControls ? (
                   <div className="product-cart-controls">
                     <div className="request-buttons-row">
-                      <button
+                      {/* <button
                         className="request-without-cart-btn"
                         onClick={handleQuickRequestWithoutCart}
                         disabled={!available}
@@ -129,7 +134,7 @@ const ProductCard = ({
                       >
                         <Send size={14} />
                         Без корзины
-                      </button>
+                      </button> */}
                       <button
                         className="request-with-cart-btn"
                         onClick={handleQuickRequestWithCart}
@@ -154,14 +159,14 @@ const ProductCard = ({
                       <button
                         className="quantity-btn-small"
                         onClick={handleDecrement}
-                        disabled={quantity <= 1}
+                        disabled={quantity < 1}
                         type="button"
                       >
                         <Minus size={14} />
                       </button>
                       <input
                         type="number"
-                        min="1"
+                        min="0"
                         max={maxQuantity || 999}
                         value={quantity}
                         onChange={handleQuantityChange}
@@ -177,7 +182,7 @@ const ProductCard = ({
                       </button>
                     </div>
                     <div className="request-buttons-row">
-                      <button
+                      {/* <button
                         className="request-without-cart-btn"
                         onClick={handleRequestWithoutCart}
                         disabled={!available || quantity <= 0}
@@ -185,7 +190,7 @@ const ProductCard = ({
                       >
                         <Send size={14} />
                         Без корзины ({quantity})
-                      </button>
+                      </button> */}
                       <button
                         className="request-with-cart-btn"
                         onClick={handleRequestWithCart}

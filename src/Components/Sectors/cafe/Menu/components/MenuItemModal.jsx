@@ -1,17 +1,15 @@
-// src/Components/Sectors/cafe/Menu/components/MenuItemModal.jsx
 import React, { useMemo } from "react";
 import { FaTimes, FaPlus, FaTrash } from "react-icons/fa";
-import SearchableCombobox from "./SearchableCombobox";
+import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 
-const safeStr = (v) => String(v ?? "").trim();
+const safeStr = (value) => String(value ?? "").trim();
 
-const asTextNumber = (v) => {
-  const s = String(v ?? "").replace(",", ".");
-  if (s === "") return "";
-  const cleaned = s.replace(/[^\d.]/g, "");
-  const parts = cleaned.split(".");
-  if (parts.length <= 2) return cleaned;
-  return `${parts[0]}.${parts.slice(1).join("")}`;
+const formatDecimalInput = (value) => {
+  const cleaned = String(value ?? "").replace(",", ".");
+  if (cleaned === "") return "";
+  const numbers = cleaned.replace(/[^\d.]/g, "");
+  const parts = numbers.split(".");
+  return parts.length <= 2 ? numbers : `${parts[0]}.${parts.slice(1).join("")}`;
 };
 
 const MenuItemModal = ({
@@ -24,114 +22,137 @@ const MenuItemModal = ({
   kitchens,
   warehouse,
   onSubmit,
-  imageFile, // eslint-disable-line no-unused-vars
+  imageFile,
   imagePreview,
   onPickImage,
   addIngredientRow,
   changeIngredientRow,
   removeIngredientRow,
 }) => {
+  // Опции для select'ов
   const categoryOptions = useMemo(() => {
     return (Array.isArray(categories) ? categories : [])
-      .map((c) => ({ value: String(c.id), label: safeStr(c.title) }))
-      .filter((o) => o.value && o.label);
+      .map((cat) => ({ value: String(cat.id), label: safeStr(cat.title) }))
+      .filter((opt) => opt.value && opt.label);
   }, [categories]);
 
   const kitchenOptions = useMemo(() => {
-    const base = (Array.isArray(kitchens) ? kitchens : [])
-      .map((k) => {
-        const title = safeStr(k.title || k.name || k.kitchen_title);
-        const number = k.number ?? k.kitchen_number;
+    const baseOptions = (Array.isArray(kitchens) ? kitchens : [])
+      .map((kitchen) => {
+        const title = safeStr(
+          kitchen.title || kitchen.name || kitchen.kitchen_title
+        );
+        const number = kitchen.number ?? kitchen.kitchen_number;
         const label = `${title || "Кухня"}${
-          number !== undefined && number !== null && number !== "" ? ` №${number}` : ""
+          number !== undefined && number !== null && number !== "" 
+            ? ` №${number}` 
+            : ""
         }`;
-        return { value: String(k.id), label: safeStr(label) };
+        return { value: String(kitchen.id), label: safeStr(label) };
       })
-      .filter((o) => o.value && o.label);
+      .filter((opt) => opt.value && opt.label);
 
-    return [{ value: "", label: "Без кухни" }, ...base];
+    return [{ value: "", label: "Без кухни" }, ...baseOptions];
   }, [kitchens]);
 
   const productOptions = useMemo(() => {
     return (Array.isArray(warehouse) ? warehouse : [])
-      .map((w) => ({
-        value: String(w.id),
-        label: `${safeStr(w.title)}${safeStr(w.unit) ? ` (${safeStr(w.unit)})` : ""}`,
+      .map((product) => ({
+        value: String(product.id),
+        label: `${safeStr(product.title)}${
+          safeStr(product.unit) ? ` (${safeStr(product.unit)})` : ""
+        }`,
       }))
-      .filter((o) => o.value && o.label);
+      .filter((opt) => opt.value && opt.label);
   }, [warehouse]);
 
   if (!isOpen) return null;
 
-  const setField = (patch) => setForm((f) => ({ ...f, ...patch }));
+  const updateField = (patch) => setForm((prev) => ({ ...prev, ...patch }));
 
   const titleValue = safeStr(form?.title);
-  const priceValue = asTextNumber(form?.price);
+  const priceValue = formatDecimalInput(form?.price);
   const categoryValue = String(form?.category ?? "");
-  const kitchenValue = String(form?.kitchen ?? ""); // "" => null при сохранении
+  const kitchenValue = String(form?.kitchen ?? "");
 
-  const previewSrc = imagePreview || "";
+  const imageSrc = imagePreview || "";
 
-  const onChangePrice = (e) => setField({ price: asTextNumber(e.target.value) });
+  const handlePriceChange = (e) => 
+    updateField({ price: formatDecimalInput(e.target.value) });
 
   return (
-    <div className="menu-modal__overlay" onMouseDown={onClose}>
-      <div className="menu-modal__card" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="menu-modal__header">
-          <div className="menu-modal__headLeft">
-            <h3 className="menu-modal__title">
+    <div className="cafeMenuModal__overlay" onClick={onClose}>
+      <div
+        className="cafeMenuModal__card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cafeMenuModal__header">
+          <div className="cafeMenuModal__headLeft">
+            <h3 className="cafeMenuModal__title">
               {editingId == null ? "Новая позиция" : "Изменить позицию"}
             </h3>
-            <div className="menu-modal__sub">Позиция меню и рецептура.</div>
+            <div className="cafeMenuModal__sub">Позиция меню и рецептура</div>
           </div>
 
-          <button type="button" className="menu-modal__close" onClick={onClose} aria-label="Закрыть">
+          <button
+            type="button"
+            className="cafeMenuModal__close"
+            onClick={onClose}
+            aria-label="Закрыть"
+            title="Закрыть"
+          >
             <FaTimes />
           </button>
         </div>
 
-        <form className="menu__form" onSubmit={onSubmit}>
-          <div className="menu-modal__grid">
-            <div className="menu-modal__preview">
-              {previewSrc ? (
-                <img src={previewSrc} alt="Превью" />
+        <form className="cafeMenu__form" onSubmit={onSubmit}>
+          {/* Превью и основная информация */}
+          <div className="cafeMenuModal__grid">
+            <div className="cafeMenuModal__preview">
+              {imageSrc ? (
+                <img src={imageSrc} alt="Превью" />
               ) : (
-                <div className="menu-modal__previewEmpty">Фото</div>
+                <div className="cafeMenuModal__previewEmpty">Фото</div>
               )}
             </div>
 
-            <div className="menu-modal__fields">
-              <div className="menu-modal__fieldsGrid">
-                <div className="menu__field">
-                  <label className="menu__label">Название</label>
+            <div className="cafeMenuModal__fields">
+              <div className="cafeMenuModal__fieldsGrid">
+                {/* Название */}
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">Название</label>
                   <input
-                    className="menu__input"
+                    className="cafeMenu__input"
                     value={titleValue}
-                    onChange={(e) => setField({ title: e.target.value })}
+                    onChange={(e) => updateField({ title: e.target.value })}
                     required
                     maxLength={255}
                     type="text"
                     autoComplete="off"
+                    placeholder="Название блюда"
                   />
                 </div>
 
-                <div className="menu__field">
-                  <label className="menu__label">Категория</label>
+                {/* Категория */}
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">Категория</label>
                   <SearchableCombobox
                     value={categoryValue}
-                    onChange={(v) => setField({ category: String(v) })}
+                    onChange={(val) => updateField({ category: String(val) })}
                     options={categoryOptions}
                     placeholder="Поиск категории…"
                     disabled={!categoryOptions.length}
+                    classNamePrefix="cafeMenuCombo"
                   />
                 </div>
 
-                <div className="menu__field">
-                  <label className="menu__label">Цена, сом</label>
+                {/* Цена */}
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">Цена, сом</label>
                   <input
-                    className="menu__input"
+                    className="cafeMenu__input"
                     value={priceValue}
-                    onChange={onChangePrice}
+                    onChange={handlePriceChange}
                     placeholder="Например: 250"
                     type="text"
                     inputMode="decimal"
@@ -140,60 +161,79 @@ const MenuItemModal = ({
                   />
                 </div>
 
-                <div className="menu__field">
-                  <label className="menu__label">Фото (jpg/png/webp)</label>
-                  <input type="file" accept="image/*" className="menu__input" onChange={onPickImage} />
+                {/* Фото */}
+                <div className="cafeMenu__field">
+                  <label className="cafeMenu__label">Фото (jpg/png/webp)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="cafeMenu__input"
+                    onChange={onPickImage}
+                  />
                 </div>
 
-                {/* ✅ Кухня слева, Активно справа */}
-                <div className="menu-modal__row2">
-                  <div className="menu__field menu-modal__kitchen">
-                    <label className="menu__label">Кухня</label>
+                {/* Кухня и Активно */}
+                <div className="cafeMenuModal__row2">
+                  <div className="cafeMenu__field cafeMenuModal__kitchen">
+                    <label className="cafeMenu__label">Кухня</label>
                     <SearchableCombobox
                       value={kitchenValue}
-                      onChange={(v) => setField({ kitchen: String(v) })}
+                      onChange={(val) => updateField({ kitchen: String(val) })}
                       options={kitchenOptions}
                       placeholder="Выберите кухню…"
                       disabled={!kitchenOptions.length}
+                      classNamePrefix="cafeMenuCombo"
                     />
                   </div>
 
-                  <div className="menu__field menu-modal__active">
-                    <label className="menu__check">
+                  <div className="cafeMenu__field cafeMenuModal__active">
+                    <label className="cafeMenu__check">
                       <input
                         type="checkbox"
                         checked={!!form?.is_active}
-                        onChange={(e) => setField({ is_active: e.target.checked })}
+                        onChange={(e) => updateField({ is_active: e.target.checked })}
                       />
                       <span>Активно</span>
                     </label>
                   </div>
                 </div>
-                {/* конец row2 */}
               </div>
             </div>
           </div>
 
-          <div className="menu__recipeBlock">
-            <div className="menu__ingList">
+          {/* Ингредиенты */}
+          <div className="cafeMenu__recipeBlock">
+            <div className="cafeMenu__ingList">
               {(form?.ingredients || []).map((row, idx) => (
-                <div key={`${row?.product || "row"}-${idx}`} className="menu__ingRow">
-                  <div className="menu__ingCol">
-                    <label className="menu__label menu__label--sm">Товар</label>
+                <div
+                  key={`${row?.product || "new"}-${idx}`}
+                  className="cafeMenu__ingRow"
+                >
+                  <div className="cafeMenu__ingCol">
+                    <label className="cafeMenu__label cafeMenu__label--sm">Товар</label>
                     <SearchableCombobox
                       value={String(row?.product ?? "")}
-                      onChange={(v) => changeIngredientRow(idx, "product", String(v))}
+                      onChange={(val) =>
+                        changeIngredientRow(idx, "product", String(val))
+                      }
                       options={productOptions}
                       placeholder="Поиск товара…"
+                      classNamePrefix="cafeMenuCombo"
                     />
                   </div>
 
-                  <div className="menu__ingCol menu__ingCol--amount">
-                    <label className="menu__label menu__label--sm">Норма</label>
+                  <div className="cafeMenu__ingCol cafeMenu__ingCol--amount">
+                    <label className="cafeMenu__label cafeMenu__label--sm">Норма</label>
                     <input
-                      className="menu__input"
-                      value={asTextNumber(row?.amount)}
-                      onChange={(e) => changeIngredientRow(idx, "amount", asTextNumber(e.target.value))}
+                      className="cafeMenu__input"
+                      value={formatDecimalInput(row?.amount)}
+                      onChange={(e) =>
+                        changeIngredientRow(
+                          idx,
+                          "amount",
+                          formatDecimalInput(e.target.value)
+                        )
+                      }
                       placeholder="1"
                       type="text"
                       inputMode="decimal"
@@ -202,14 +242,14 @@ const MenuItemModal = ({
                     />
                   </div>
 
-                  <div className="menu__ingCol menu__ingCol--trash">
-                    <label className="menu__label menu__label--sm">&nbsp;</label>
+                  <div className="cafeMenu__ingCol cafeMenu__ingCol--trash">
+                    <label className="cafeMenu__label cafeMenu__label--sm">&nbsp;</label>
                     <button
                       type="button"
-                      className="menu__iconBtn menu__iconBtn--danger"
+                      className="cafeMenu__iconBtn cafeMenu__iconBtn--danger"
                       onClick={() => removeIngredientRow(idx)}
                       aria-label="Удалить"
-                      title="Удалить"
+                      title="Удалить ингредиент"
                     >
                       <FaTrash />
                     </button>
@@ -218,16 +258,28 @@ const MenuItemModal = ({
               ))}
             </div>
 
-            <button type="button" className="menu__btn menu__btn--secondary" onClick={addIngredientRow}>
+            <button
+              type="button"
+              className="cafeMenu__btn cafeMenu__btn--secondary"
+              onClick={addIngredientRow}
+            >
               <FaPlus /> Добавить ингредиент
             </button>
           </div>
 
-          <div className="menu__formActions">
-            <button type="button" className="menu__btn menu__btn--secondary" onClick={onClose}>
+          {/* Кнопки действий */}
+          <div className="cafeMenu__formActions">
+            <button
+              type="button"
+              className="cafeMenu__btn cafeMenu__btn--secondary"
+              onClick={onClose}
+            >
               Отмена
             </button>
-            <button type="submit" className="menu__btn menu__btn--primary">
+            <button
+              type="submit"
+              className="cafeMenu__btn cafeMenu__btn--primary"
+            >
               Сохранить
             </button>
           </div>

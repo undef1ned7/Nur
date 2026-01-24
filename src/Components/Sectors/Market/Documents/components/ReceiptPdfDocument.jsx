@@ -1,23 +1,6 @@
 import React from "react";
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  Font,
-} from "@react-pdf/renderer";
-
-// Регистрируем шрифты
-const BASE = process.env.PUBLIC_URL || ""; // Для CRA/Vite
-
-Font.register({
-  family: "Roboto",
-  fonts: [
-    { src: `${BASE}/fonts/robot/Roboto-Regular.ttf`, fontWeight: "normal" },
-    { src: `${BASE}/fonts/robot/Roboto-Bold.ttf`, fontWeight: "bold" },
-  ],
-});
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { registerPdfFonts } from "@/pdf/registerFonts";
 
 const s = StyleSheet.create({
   page: {
@@ -182,6 +165,9 @@ function fmtDateTime(dt) {
 }
 
 export default function ReceiptPdfDocument({ data }) {
+  // Гарантируем регистрацию шрифтов один раз
+  registerPdfFonts();
+
   const doc = data?.document || data?.sale || {};
   const company = data?.company || {};
   const cashier = data?.cashier || {};

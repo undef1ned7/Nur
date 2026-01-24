@@ -24,6 +24,7 @@ import {
   updateSellProduct,
   deleteSale, // <-- обработаем статусы создания сделок
   fetchDocuments,
+  getSale,
 } from "../creators/saleThunk";
 import {
   fetchWarehouseDocuments,
@@ -81,6 +82,17 @@ const saleSlice = createSlice({
         state.loading = false;
       })
       .addCase(startSale.rejected, (state, action) => {
+        state.error = ensureError(action);
+        state.loading = false;
+      })
+      .addCase(getSale.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(getSale.fulfilled, (state, { payload }) => {
+        state.start = payload;
+        state.loading = false;
+      })
+      .addCase(getSale.rejected, (state, action) => {
         state.error = ensureError(action);
         state.loading = false;
       })
@@ -180,8 +192,9 @@ const saleSlice = createSlice({
       .addCase(deleteProductInCart.pending, (state) => {
         state.loading = true;
       })
-      .addCase(deleteProductInCart.fulfilled, (state) => {
+      .addCase(deleteProductInCart.fulfilled, (state, action) => {
         state.loading = false;
+        state.start = action.payload
       })
       .addCase(deleteProductInCart.rejected, (state, action) => {
         state.error = ensureError(action);

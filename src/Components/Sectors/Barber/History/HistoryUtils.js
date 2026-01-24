@@ -230,3 +230,29 @@ export const statusLabel = (s) =>
     : s === "no_show"
     ? "Не пришёл"
     : s || "—";
+
+/* ===== дата / фильтры ===== */
+export const getYMD = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+  };
+};
+
+export const monthNames = [
+  "Январь",
+  "Февраль",
+  "Март",
+  "Апрель",
+  "Май",
+  "Июнь",
+  "Июль",
+  "Август",
+  "Сентябрь",
+  "Октябрь",
+  "Ноябрь",
+  "Декабрь",
+];

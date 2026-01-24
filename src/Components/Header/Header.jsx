@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { Bell, Menu, ShoppingCart } from "lucide-react";
@@ -39,6 +39,7 @@ const pageTitles = {
   "/crm/barber/masters": "Сотрудники",
   "/crm/barber/history": "История",
   "/crm/barber/records": "Записи",
+  "/crm/barber/requests": "Заявки",
   "/crm/barber/cash-reports": "Аналитика",
 
   // Гостиница
@@ -143,7 +144,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
   const usernameToDisplay = userProfile
     ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() ||
-      userProfile.email
+    userProfile.email
     : "Гость";
 
   return (

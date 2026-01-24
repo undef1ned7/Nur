@@ -1,25 +1,82 @@
 /* ===== ГЛОБАЛЬНЫЙ ROOT ДЛЯ ВСЕХ БАРБЕР-БЛОКОВ ===== */
+/* Этот файл импортируется во все SCSS компоненты Barber сектора */
+
+/* ===== Глобальные стили шрифтов для Barber ===== */
+.barber,
+[class^="barber"],
+[class*=" barber"] {
+  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Заголовки - средний вес, не жирные */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  /* Таблицы - легкий текст */
+  th {
+    font-weight: 500;
+  }
+
+  td {
+    font-weight: 400;
+  }
+
+  /* Кнопки - средний вес */
+  button {
+    font-weight: 500;
+  }
+
+  /* Лейблы и подсказки */
+  label {
+    font-weight: 450;
+  }
+
+  /* Убираем жирность где не нужно */
+  strong, b {
+    font-weight: 500;
+  }
+}
+
 :root {
-/* базовая палитра (уже есть, просто напоминание) */
+  /* ===== Базовая палитра ===== */
   --primary: #f7d74f;
   --primary-dark: #d4b800;
+  --primary-light: #fef3c7;
   --text: #0f172a;
   --muted: #6b7280;
   --border: #e5e7eb;
   --surface: #ffffff;
+  --overlay: rgba(15, 23, 42, 0.45);
 
-  /* RecordaRates (recordarates) */
-  --rr-primary: var(--primary);
-  --rr-primary-dark: var(--primary-dark);
-  --rr-text: var(--text);
-  --rr-muted: var(--muted);
-  --rr-border: var(--border);
-  --rr-surface: var(--surface);
-  --rr-danger-bg: #fee2e2;
-  --rr-danger-border: #fecaca;
-  --rr-danger-text: #7f1d1d;
+  /* Общие размеры */
+  --radius: 12px;
+  --shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
 
-  /* PayrollDaily (payrolldaily) — тёмная тема отдельно */
+  /* Дополнительные цвета */
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+  --danger-weak: rgba(239, 68, 68, 0.06);
+  --success: #22c55e;
+  --success-light: #dcfce7;
+  --success-weak: rgba(34, 197, 94, 0.12);
+  --warning: #f59e0b;
+  --warning-weak: rgba(245, 158, 11, 0.1);
+
+  /* ===== RecordaRates (barberrecordarates) ===== */
+  --barberrecordarates-primary: #facc15;
+  --barberrecordarates-primary-dark: #eab308;
+  --barberrecordarates-text: #111827;
+  --barberrecordarates-muted: #6b7280;
+  --barberrecordarates-border: #e5e7eb;
+  --barberrecordarates-danger: #ef4444;
+  --barberrecordarates-success: #10b981;
+
+  /* ===== PayrollDaily (barberpayrolldaily) — тёмная тема ===== */
   --pd-bg: #0b0c0f;
   --pd-card: #12141a;
   --pd-text: #e6e8ee;
@@ -30,38 +87,35 @@
   --pd-danger: #ef4444;
   --pd-success: #16a34a;
 
-  /* MastersPayouts (masterspayouts) */
+  /* ===== MastersPayouts (barbermasterspayouts) ===== */
   --mp-bg: #f9fafb;
   --mp-surface: #ffffff;
   --mp-border: #e5e7eb;
   --mp-text: #0f172a;
   --mp-muted: #6b7280;
 
-  /* History (barberhistory) */
+  /* ===== MastersHistory (barbermastershistory) ===== */
   --bh-primary: var(--primary);
   --bh-primary-dark: var(--primary-dark);
   --bh-text: var(--text);
   --bh-muted: var(--muted);
   --bh-border: var(--border);
   --bh-surface: var(--surface);
-
   --bh-danger: #e74c3c;
   --bh-danger-bg: rgba(231, 76, 60, 0.08);
   --bh-danger-br: rgba(231, 76, 60, 0.3);
-
   --bh-status-canceled-bg: #fff4e5;
   --bh-status-canceled-text: #c05621;
 
-  /* Catalog analytics (catalog-analytics) */
-  --ca-bg: var(--surface);
-  --ca-text: #111111;
-  --ca-muted: var(--muted);
-  --ca-border: var(--border);
-  --ca-accent: #111827;
-  --ca-accent-2: #f3f4f6;
-  --ca-danger: #ef4444;
+  /* ===== History (barberhistory) ===== */
+  --barberhistory-primary: var(--primary);
+  --barberhistory-primary-dark: var(--primary-dark);
+  --barberhistory-text: var(--text);
+  --barberhistory-muted: var(--muted);
+  --barberhistory-border: var(--border);
+  --barberhistory-surface: var(--surface);
 
-  /* Barber analitika (barber-analitika + ba-*) */
+  /* ===== Barber Analitika (barberanalitika) ===== */
   --ba-text: var(--text);
   --ba-muted: var(--muted);
   --ba-border: var(--border);
@@ -72,4 +126,29 @@
   --ba-danger: #ef4444;
   --ba-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
   --ba-radius: 18px;
+
+  /* ===== Catalog analytics ===== */
+  --ca-bg: var(--surface);
+  --ca-text: #111111;
+  --ca-muted: var(--muted);
+  --ca-border: var(--border);
+  --ca-accent: #111827;
+  --ca-accent-2: #f3f4f6;
+  --ca-danger: #ef4444;
+
+  /* ===== Типографика ===== */
+  --font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-weight-light: 400;
+  --font-weight-normal: 450;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 550;
+}
+
+/* ===== Mixin для легкой типографики ===== */
+@mixin barber-typography {
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-light);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

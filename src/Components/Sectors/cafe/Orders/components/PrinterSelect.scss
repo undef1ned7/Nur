@@ -1,0 +1,54 @@
+.cafeOrdersPrinterSelect {
+  display: flex;
+  align-items: center;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__select {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 10px;
+    background: var(--surface, #fff);
+    color: var(--text, #0f172a);
+    outline: none;
+    min-width: 320px;
+  }
+
+  &__btn {
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border, #e5e7eb);
+    background: var(--surface, #fff);
+    color: var(--text, #0f172a);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &--primary {
+      background: var(--primary, #f7d74f);
+      border-color: var(--primary, #f7d74f);
+    }
+
+    &--secondary {
+      background: #fff;
+    }
+
+    &--ghost {
+      width: 40px;
+      padding: 0;
+      justify-content: center;
+    }
+  }
+}

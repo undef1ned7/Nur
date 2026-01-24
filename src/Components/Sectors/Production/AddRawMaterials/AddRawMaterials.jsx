@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { X } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
   updateItemsMake,
   updateProductAsync,
 } from "../../../../store/creators/productCreators";
+import { useAlert } from "../../../../hooks/useDialog";
 
 const toNum = (v) => {
   const n = Number(String(v ?? "").replace(",", "."));
@@ -18,18 +19,17 @@ const toNum = (v) => {
 };
 
 const AddRawMaterials = ({ onClose, onChanged, item }) => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { list: cashBoxes } = useCash();
   const { company } = useUser();
 
   // если item не передан — блокируем форму
-  const itemId = item?.id;
-  const itemName = item?.name ?? "—";
-
+  const { itemId, itemName } = useMemo(() => ({ itemId: item.id, itemName: item.name }), [item]);
   const [qty, setQty] = useState("");
-  const [purchasePrice, setPurchasePrice] = useState(
-    item?.purchase_price != null ? String(item.purchase_price) : ""
-  );
+  // const [purchasePrice, setPurchasePrice] = useState(
+  //   item?.purchase_price != null ? String(item.purchase_price) : ""
+  // );
   const [retailPrice, setRetailPrice] = useState(
     item?.price != null ? String(item.price) : ""
   );
@@ -37,11 +37,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
   const [error, setError] = useState("");
 
   const stockQty = useMemo(() => toNum(item?.quantity), [item]);
-
-  const q = toNum(qty);
-  const pp = toNum(purchasePrice);
-  const rp = toNum(retailPrice);
-
+  const { q, rp } = useMemo(() => ({ q: toNum(qty), rp: toNum(retailPrice) }), [qty, retailPrice]);
   const expense = useMemo(() => +(q * rp).toFixed(2), [q, rp]);
 
   useEffect(() => {
@@ -59,7 +55,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
     }
   }, [cashBoxes, selectCashBox]);
 
-  const validate = () => {
+  const validate = useCallback(() => {
     if (!itemId) return "Нет выбранного товара.";
     if (!q) return "Введите количество";
     if (q <= 0) return "Количество должно быть больше 0";
@@ -75,7 +71,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
       return "Нет доступных касс. Создайте кассу в разделе «Кассы».";
     }
     return "";
-  };
+  }, [itemId, q, rp, cashBoxes, selectCashBox]);
 
   const onFormSubmit = async (e) => {
     e.preventDefault();
@@ -119,30 +115,30 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
           // description: `Закупка ${q} шт. × ${pp} = ${expense}`,
         })
       ).unwrap();
-
-      onChanged?.();
-      onClose?.();
+      alert('Товар добавлен!', () => {
+        onChanged?.();
+        onClose?.();
+      })
     } catch (e) {
       console.log(e);
-      setError("Не удалось сохранить. Попробуйте ещё раз.");
+      alert("Не удалось сохранить. Попробуйте ещё раз.", true)
     }
   };
-
   const disabled = !!validate();
 
   return (
-    <div className="add-modal">
-      <div className="add-modal__overlay" onClick={onClose} />
-      <div className="add-modal__content" style={{ height: "auto" }}>
+    <div className="add-modal z-50!">
+      <div className="add-modal__overlay z-50!" onClick={onClose} />
+      <div className="add-modal__content z-50!" style={{ height: "auto" }}>
         <div className="add-modal__header">
           <h3>Добавление товара</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
         </div>
 
         <form onSubmit={onFormSubmit}>
-          <h4>Товар: {itemName}</h4>
+          <h4>Товар: <span className="font-medium">{itemName}</span></h4>
           {!!itemId && (
-            <div style={{ marginTop: 8, opacity: 0.8 }}>
+            <div className="border rounded-lg p-2" style={{ marginTop: 8, opacity: 0.8 }}>
               В наличии сейчас: <b>{stockQty}</b> шт.
             </div>
           )}
@@ -156,7 +152,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
             type="number"
             name="qty"
             placeholder="Количество"
-            className="debt__input"
+            className=" border rounded-lg p-2"
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             min={1}
@@ -173,7 +169,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
             type="number"
             name="retailPrice"
             placeholder="Розничная цена (за 1 шт.)"
-            className="debt__input"
+            className="border rounded-lg p-2"
             value={retailPrice}
             onChange={(e) => setRetailPrice(e.target.value)}
             min={0}
@@ -202,7 +198,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
 
           <button
             style={{ marginTop: 15, width: "100%", justifyContent: "center" }}
-            className="btn edit-btn"
+            className="btn edit-btn py-2! text-lg!"
             type="submit"
             disabled={disabled}
           >

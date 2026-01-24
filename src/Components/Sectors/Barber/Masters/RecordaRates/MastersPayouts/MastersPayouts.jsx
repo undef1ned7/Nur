@@ -2,9 +2,7 @@
 import React, { useEffect, useState } from "react";
 import "./MastersPayouts.scss";
 
-// ✅ правильный путь
-import RecordaRates from "../RecordaRates";
-
+import { MastersPayoutsContainer } from "./components";
 import {
   pad2,
   loadBarbershopData,
@@ -12,7 +10,6 @@ import {
   persistRatesForPeriod,
 } from "./MastersPayoutsUtils";
 
-/* ===== основной контейнер ===== */
 const MastersPayouts = () => {
   const now = new Date();
 
@@ -29,7 +26,6 @@ const MastersPayouts = () => {
   const [ratesError, setRatesError] = useState("");
   const [rates, setRates] = useState({});
 
-  /* ===== изменение значения ставки ===== */
   const setRateValue = (barberId, field, value) => {
     const raw = String(value).trim();
     if (raw === "") {
@@ -47,14 +43,16 @@ const MastersPayouts = () => {
     }));
   };
 
-  /* ===== первая загрузка ===== */
   useEffect(() => {
     (async () => {
       setRatesLoading(true);
       setRatesError("");
       try {
-        const { appointments: apps, employees: emps, services: svcs } =
-          await loadBarbershopData();
+        const {
+          appointments: apps,
+          employees: emps,
+          services: svcs,
+        } = await loadBarbershopData();
 
         setAppointments(apps);
         setEmployees(emps);
@@ -73,7 +71,6 @@ const MastersPayouts = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ===== смена периода ===== */
   useEffect(() => {
     (async () => {
       setRatesLoading(true);
@@ -92,16 +89,11 @@ const MastersPayouts = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month]);
 
-  /* ===== сохранение ставок + фонда ===== */
   const handleSaveRates = async ({ totalFund }) => {
     setRatesLoading(true);
     setRatesError("");
     try {
-      const newRates = await persistRatesForPeriod(
-        periodLabel,
-        rates,
-        totalFund // <-- фонд из UI (Итого фонд выплат)
-      );
+      const newRates = await persistRatesForPeriod(periodLabel, rates, totalFund);
       setRates(newRates);
     } catch (e) {
       console.error(e);
@@ -112,23 +104,21 @@ const MastersPayouts = () => {
   };
 
   return (
-    <div className="masterspayouts">
-      <div className="masterspayouts__inner">
-        <RecordaRates
-          year={year}
-          month={month}
-          onChangeYear={setYear}
-          onChangeMonth={setMonth}
-          employees={employees}
-          appointments={appointments}
-          services={services}
-          rates={rates}
-          ratesLoading={ratesLoading}
-          ratesError={ratesError}
-          onChangeRate={setRateValue}
-          onSaveRates={handleSaveRates}
-        />
-      </div>
+    <div className="barbermasterspayouts">
+      <MastersPayoutsContainer
+        year={year}
+        month={month}
+        onChangeYear={setYear}
+        onChangeMonth={setMonth}
+        employees={employees}
+        appointments={appointments}
+        services={services}
+        rates={rates}
+        ratesLoading={ratesLoading}
+        ratesError={ratesError}
+        onChangeRate={setRateValue}
+        onSaveRates={handleSaveRates}
+      />
     </div>
   );
 };

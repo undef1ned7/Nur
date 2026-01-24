@@ -1,11 +1,12 @@
 /* PayrollDaily.scss */
 @import "../../../styles/barbershop.scss";
 
-.payrolldaily {
-  color: var(--pd-text);
+.barberpayrolldaily {
+  color: var(--text);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  padding: 4px 0;
 
   &__head {
     display: flex;
@@ -18,24 +19,27 @@
   &__titleWrap {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   &__title {
-    font-size: 20px;
+    font-size: 17px;
+    font-weight: 500;
     line-height: 1.2;
     margin: 0;
+    color: var(--text);
   }
 
   &__subtitle {
     font-size: 13px;
-    color: var(--pd-muted);
+    font-weight: 400;
+    color: #9ca3af;
   }
 
   &__filters {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex-wrap: wrap;
   }
 
@@ -43,44 +47,62 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: var(--pd-card);
-    border: 1px solid var(--pd-border);
-    border-radius: 10px;
-    padding: 6px 10px;
+    gap: 10px;
+    background: #fafafa;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 10px 14px;
+    transition: all 0.15s ease;
+
+    &:focus-within {
+      background: #fff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.15);
+    }
   }
 
   &__dateIcon {
     font-size: 14px;
-    color: var(--pd-muted);
+    color: #9ca3af;
   }
 
   &__dateInput {
     background: transparent;
-    color: var(--pd-text);
+    color: var(--text);
     border: 0;
     outline: none;
+    font-size: 14px;
+    font-weight: 400;
   }
 
   &__btn {
-    height: 36px;
-    border-radius: 10px;
-    border: 1px solid var(--pd-border);
-    background: var(--pd-card);
-    color: var(--pd-text);
-    padding: 0 12px;
+    height: 42px;
+    border-radius: 12px;
+    border: none;
+    background: #f5f5f5;
+    color: #6b7280;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 450;
     cursor: pointer;
-    transition:
-      border-color 0.12s ease-in-out,
-      background 0.12s ease-in-out;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: #ebebeb;
+      color: var(--text);
+    }
 
     &--primary {
-      background: linear-gradient(180deg, var(--pd-accent), var(--pd-accent-2));
-      border-color: transparent;
+      background: var(--primary);
+      color: #111827;
+
+      &:hover {
+        background: var(--primary-dark);
+      }
     }
 
     &--secondary:hover {
-      border-color: var(--pd-accent-2);
+      background: #ebebeb;
     }
 
     &--icon {
@@ -91,22 +113,24 @@
   }
 
   &__btnText {
-    font-weight: 600;
+    font-weight: 450;
   }
 
   &__alert {
-    background: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.4);
-    color: #fecaca;
-    padding: 10px 12px;
-    border-radius: 10px;
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #dc2626;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 400;
   }
 
   /* table */
   &__tableWrap {
-    background: var(--pd-card);
-    border: 1px solid var(--pd-border);
-    border-radius: 12px;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
     overflow: hidden;
     max-height: 70vh;
     overflow: auto;
@@ -123,8 +147,8 @@
 
     th,
     td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--pd-border);
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.04);
       vertical-align: middle;
       text-align: left;
     }
@@ -132,33 +156,56 @@
     thead th {
       position: sticky;
       top: 0;
-      background: var(--pd-card);
+      background: #fff;
       z-index: 1;
-      font-weight: 600;
-      font-size: 12px;
-      color: var(--pd-muted);
+      font-weight: 450;
+      font-size: 11px;
+      color: #9ca3af;
       text-transform: uppercase;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    tbody td {
+      font-weight: 400;
+      color: var(--text);
+    }
+
+    tbody tr {
+      transition: background 0.12s ease;
+    }
+
+    tbody tr:hover td {
+      background: #fafafa;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
     }
 
     tfoot th {
-      background: rgba(79, 70, 229, 0.08);
-      font-weight: 700;
+      background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+      font-weight: 500;
+      color: var(--text);
     }
 
     .is-money {
       text-align: right;
       white-space: nowrap;
+      font-weight: 500;
+      color: #16a34a;
     }
   }
 
   &__muted {
-    color: var(--pd-muted);
+    color: #9ca3af;
   }
 
   &__empty {
-    color: var(--pd-muted);
+    color: #9ca3af;
     text-align: center;
+    padding: 40px 20px;
+    font-size: 14px;
   }
 
   &__ellipsis {
@@ -176,14 +223,18 @@
     appearance: none;
     background: none;
     border: 0;
-    color: var(--pd-accent-2);
-    text-decoration: underline;
+    color: #2563eb;
+    text-decoration: none;
     cursor: pointer;
-    padding: 0;
+    padding: 6px 10px;
     font: inherit;
+    font-weight: 400;
+    border-radius: 8px;
+    transition: background 0.15s ease;
 
     &:hover {
-      color: var(--pd-accent);
+      background: rgba(37, 99, 235, 0.08);
+      text-decoration: underline;
     }
   }
 
@@ -191,7 +242,8 @@
   &__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(2, 6, 23, 0.64);
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -201,144 +253,123 @@
 
   &__modal {
     width: min(980px, 100%);
-    background: var(--pd-card);
-    border: 1px solid var(--pd-border);
-    border-radius: 14px;
+    background: #fff;
+    border-radius: 20px;
     display: flex;
     flex-direction: column;
     max-height: 90vh;
     overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   }
 
   &__modalHead {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--pd-border);
+    padding: 18px 22px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   }
 
   &__modalTitle {
     margin: 0;
-    font-size: 16px;
+    font-size: 17px;
+    font-weight: 500;
   }
 
   &__iconBtn {
-    background: none;
+    background: #f5f5f5;
     border: 0;
-    color: var(--pd-muted);
+    color: #6b7280;
     cursor: pointer;
+    padding: 8px;
+    border-radius: 10px;
+    transition: all 0.15s ease;
 
     &:hover {
-      color: var(--pd-text);
+      background: #ebebeb;
+      color: var(--text);
     }
   }
 
   &__modalBody {
-    padding: 12px;
+    padding: 16px 22px;
+    overflow-y: auto;
   }
 
   &__modalFoot {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
-    padding: 12px 14px;
-    border-top: 1px solid var(--pd-border);
-  }
-}
-
-/* ===================== ComboBox ===================== */
-.pd-combo {
-  position: relative;
-  min-width: 220px;
-
-  &__trigger {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: 10px;
-    border: 1px solid var(--pd-border);
-    background: var(--pd-card);
-    color: var(--pd-text);
-    cursor: pointer;
+    gap: 10px;
+    padding: 16px 22px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
   }
 
-  &__text {
-    flex: 1;
-    text-align: left;
+  /* Фильтры используют SearchableCombobox из common */
+  &__filter {
+    min-width: 200px;
+  }
 
-    &--ph {
-      color: var(--pd-muted);
+  /* ===== Responsive ===== */
+  @media (max-width: 768px) {
+    gap: 14px;
+
+    &__head {
+      gap: 12px;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__filters {
+      gap: 8px;
+    }
+
+    &__date {
+      padding: 8px 12px;
+    }
+
+    &__btn {
+      height: 40px;
+      padding: 0 14px;
+      font-size: 13px;
     }
   }
 
-  &__caret {
-    opacity: 0.7;
-  }
+  @media (max-width: 480px) {
+    gap: 12px;
 
-  &__popup {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    background: var(--pd-card);
-    border: 1px solid var(--pd-border);
-    border-radius: 12px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
-    z-index: 20;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  &__search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--pd-border);
-  }
-
-  &__searchIcon {
-    color: var(--pd-muted);
-  }
-
-  &__searchInput {
-    border: 0;
-    outline: none;
-    background: transparent;
-    color: var(--pd-text);
-    width: 100%;
-  }
-
-  &__list {
-    overflow-y: auto;
-  }
-
-  &__option {
-    width: 100%;
-    text-align: left;
-    padding: 10px 12px;
-    background: transparent;
-    color: var(--pd-text);
-    border: 0;
-    border-bottom: 1px solid var(--pd-border);
-    cursor: pointer;
-
-    &:hover {
-      background: rgba(79, 70, 229, 0.12);
+    &__head {
+      flex-direction: column;
+      align-items: flex-start;
     }
 
-    &:last-child {
-      border-bottom: 0;
+    &__filters {
+      width: 100%;
     }
-  }
 
-  &__empty {
-    color: var(--pd-muted);
-    padding: 12px;
-    text-align: center;
+    &__date {
+      flex: 1;
+    }
+
+    &__table {
+      th,
+      td {
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+    }
+
+    &__modal {
+      border-radius: 0;
+      max-height: 100vh;
+      height: 100%;
+    }
+
+    &__modalHead,
+    &__modalBody,
+    &__modalFoot {
+      padding: 14px 16px;
+    }
   }
 }

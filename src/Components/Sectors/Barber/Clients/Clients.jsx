@@ -10,26 +10,28 @@ export const Clients = () => {
 
   return (
     <div className="barberclient">
-      <nav className="barberclient__tabs" aria-label="Секции">
-        <button
-          type="button"
-          onClick={() => setActiveTab("barber")}
-          className={`barberclient__tab ${
-            activeTab === "barber" ? "barberclient__tab--active" : ""
-          }`}
-        >
-          Клиенты барбершоп
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("market")}
-          className={`barberclient__tab ${
-            activeTab === "market" ? "barberclient__tab--active" : ""
-          }`}
-        >
-          Клиенты Продаж
-        </button>
-      </nav>
+      <div className="barberclient__tabs-wrap">
+        <nav className="barberclient__tabs" aria-label="Секции">
+          <button
+            type="button"
+            onClick={() => setActiveTab("barber")}
+            className={`barberclient__tab ${
+              activeTab === "barber" ? "barberclient__tab--active" : ""
+            }`}
+          >
+            Клиенты барбершоп
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("market")}
+            className={`barberclient__tab ${
+              activeTab === "market" ? "barberclient__tab--active" : ""
+            }`}
+          >
+            Клиенты Продаж
+          </button>
+        </nav>
+      </div>
 
       {activeTab === "barber" ? (
         <BarberClients />
