@@ -84,26 +84,6 @@ const StockItemModal = ({
                 placeholder="Введите минимум"
               />
             </div>
-
-            <div className="cafeStock__field cafeStock__field--full">
-              <label className="cafeStock__label">Цена за единицу (₸)</label>
-              <input
-                type="text"
-                inputMode="decimal"
-                className="cafeStock__input"
-                value={form.unit_price}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    unit_price: sanitizeDecimalInput(e.target.value),
-                  }))
-                }
-                placeholder="Закупочная цена (опционально)"
-              />
-              <span className="cafeStock__hint">
-                Закупочная цена за единицу измерения (для расчета себестоимости блюд)
-              </span>
-            </div>
           </div>
 
           <div className="cafeStock__formActions">
