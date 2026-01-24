@@ -67,6 +67,7 @@ const pageTitles = {
   "/crm/cafe/analytics": "Аналитика выплат",
   "/crm/cafe/menu": "Меню",
   "/crm/cafe/orders": "Заказы",
+  "/crm/cafe/orders/history": "Заказы",
   "/crm/cafe/payroll": "Зарплата",
   "/crm/cafe/purchasing": "Закупки",
   "/crm/cafe/reports": "Отчёты",

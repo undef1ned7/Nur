@@ -1,7 +1,3 @@
-@use "../variables.scss";
-@use "../../../common/SearchableCombobox/SearchableCombobox.scss";
-
-/* Изоляция блоком .cafeInventory — стили не утекут */
 .cafeInventory {
   /* локальные токены */
   --radius: 12px;

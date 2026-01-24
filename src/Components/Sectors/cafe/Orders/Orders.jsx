@@ -151,6 +151,10 @@ const Orders = () => {
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
+  const [waiterFilter, setWaiterFilter] = useState(null);
+  const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
+    { value: null, label: 'Все сотрудники' }
+  ])
 
   const [kitchens, setKitchens] = useState([]);
 
@@ -181,6 +185,12 @@ const Orders = () => {
 
   const fetchEmployees = async () => {
     const arr = listFrom(await api.get("/users/employees/")) || [];
+    setWaiterOptionsFilter(prevOptions => {
+      const staticOption = prevOptions[0] || ({ value: null, label: 'Все официанты' });
+      const options = arr.map(el => ({ value: el.id, label: el.first_name + ' ' + el.last_name }))
+      options.unshift(staticOption)
+      return options
+    })
     setEmployees(arr.map(normalizeEmployee));
   };
 
@@ -275,7 +285,8 @@ const Orders = () => {
       try {
         await fetchOrders({
           search: debouncedOrderSearchQuery,
-          status: statusFilter || null
+          status: 'open',
+          waiter: waiterFilter
         });
       } catch (e) {
         console.error("Ошибка загрузки:", e);
@@ -283,7 +294,7 @@ const Orders = () => {
         setLoading(false);
       }
     })();
-  }, [debouncedOrderSearchQuery, statusFilter])
+  }, [debouncedOrderSearchQuery, waiterFilter])
 
   useEffect(() => {
     const handler = () => fetchOrders();
@@ -342,7 +353,7 @@ const Orders = () => {
 
   const roleFiltered = useMemo(() => {
     if (userRole === "официант") {
-      return base.filter((item) => String(item.waiter) === String(userId));
+      return orders.filter((item) => String(item.waiter) === String(userId));
     }
     return orders;
   }, [orders, userRole, userId]);
@@ -907,10 +918,10 @@ const Orders = () => {
 
           <div className="cafeOrders__filter">
             <SearchableCombobox
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={statusFilterOptions}
-              placeholder="Статус"
+              value={waiterFilter}
+              onChange={setWaiterFilter}
+              options={waiterOptionsFilter}
+              placeholder="Сотрудники"
               classNamePrefix="cafeOrders__combo"
             />
           </div>
@@ -1031,7 +1042,7 @@ const Orders = () => {
       {/* Modal create/edit */}
       {modalOpen && (
         <div
-          className="cafeOrdersModal__overlay"
+          className="cafeOrdersModal__overlay z-100!"
           onClick={() => {
             if (!saving) {
               setModalOpen(false);
@@ -1319,7 +1330,7 @@ const Orders = () => {
 
       {/* Pay modal */}
       {payOpen && payOrder && (
-        <div className="cafeOrdersModal__overlay" onClick={closePay}>
+        <div className="cafeOrdersModal__overlay z-100!" onClick={closePay}>
           <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
             <div className="cafeOrdersModal__card">
               <div className="cafeOrdersModal__header">
