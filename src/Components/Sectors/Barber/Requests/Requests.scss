@@ -5,8 +5,7 @@
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 18px;
+  gap: 20px;
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
@@ -25,7 +24,9 @@
   &__topRow {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
+    flex-wrap: wrap;
   }
 
   &__counter {
@@ -55,7 +56,8 @@
   &__tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
+    justify-content: flex-start;
   }
 
   &__tab {
@@ -105,15 +107,15 @@
   /* ===== Actions ===== */
   &__actions {
     display: flex;
-    gap: 10px;
-    align-items: center;
+    gap: 12px;
+    align-items: stretch;
     flex-wrap: wrap;
   }
 
   &__searchWrap {
-    flex: 1;
-    min-width: 180px;
-    max-width: 400px;
+    flex: 1 1 auto;
+    min-width: 200px;
+    max-width: 500px;
     position: relative;
   }
 
@@ -540,22 +542,23 @@
   &__cardBody {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    padding: 16px 18px;
+    gap: 20px;
+    padding: 18px 20px;
   }
 
   &__cardLeft,
   &__cardRight {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   &__infoRow {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
     font-size: 13px;
+    line-height: 1.5;
     color: #6b7280;
 
     strong {
@@ -566,12 +569,6 @@
     em {
       font-style: italic;
       color: #9ca3af;
-    }
-
-    &--price {
-      strong {
-        color: #16a34a;
-      }
     }
 
     &--comment {
@@ -894,11 +891,47 @@
   }
 
   /* ===== Responsive ===== */
-  @media (max-width: 768px) {
-    padding: 18px 16px;
+  @media (max-width: 1024px) {
+    padding: 20px 18px;
+    gap: 18px;
 
     &__tabs {
-      gap: 6px;
+      gap: 8px;
+    }
+
+    &__tab {
+      padding: 9px 16px;
+      font-size: 13px;
+    }
+
+    &__searchWrap {
+      max-width: 100%;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    padding: 18px 16px;
+    gap: 16px;
+
+    &__topRow {
+      gap: 10px;
+    }
+
+    &__counter {
+      font-size: 12px;
+    }
+
+    &__resetBtn {
+      padding: 7px 12px;
+      font-size: 12px;
+    }
+
+    &__tabs {
+      gap: 8px;
     }
 
     &__tab {
@@ -906,9 +939,41 @@
       font-size: 13px;
     }
 
+    &__tabCount {
+      min-width: 22px;
+      height: 22px;
+      font-size: 11px;
+    }
+
+    &__actions {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    &__searchWrap {
+      flex: 1 1 100%;
+      max-width: 100%;
+    }
+
+    &__filtersBtn {
+      width: 100%;
+      justify-content: center;
+    }
+
     &__cardBody {
       grid-template-columns: 1fr;
-      gap: 12px;
+      gap: 16px;
+      padding: 16px 18px;
+    }
+
+    &__cardLeft,
+    &__cardRight {
+      gap: 10px;
+    }
+
+    &__infoRow {
+      gap: 10px;
+      font-size: 12px;
     }
 
     &__modalGrid {
@@ -918,73 +983,32 @@
   }
 
   @media (max-width: 480px) {
-    padding: 14px 10px;
-    gap: 12px;
+    padding: 16px 12px;
+    gap: 14px;
+
+    &__topRow {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    &__counter {
+      font-size: 12px;
+    }
+
+    &__resetBtn {
+      padding: 6px 12px;
+      font-size: 12px;
+      align-self: flex-start;
+    }
 
     &__tabs {
-      gap: 4px;
-    }
-
-    &__tab {
-      padding: 6px 10px;
-      font-size: 12px;
-      border-radius: 10px;
-    }
-
-    &__tabCount {
-      min-width: 20px;
-      height: 20px;
-      font-size: 11px;
-    }
-
-    &__searchWrap {
-      flex: 1 1 100%;
-    }
-
-    &__searchInput {
-      height: 38px;
-      font-size: 12px;
-      padding-left: 36px;
-    }
-
-    &__searchIcon {
-      left: 12px;
-      font-size: 12px;
-    }
-
-    &__filtersBtn {
-      height: 38px;
-      padding: 0 10px;
       gap: 6px;
-
-      span {
-        display: none;
-      }
-    }
-
-    &__infoRow {
-      font-size: 12px;
-    }
-
-    &__statusSelect {
-      min-width: 120px;
-    }
-
-    &__dateBadge {
-      padding: 5px 10px;
-      font-size: 11px;
-    }
-  }
-
-  @media (max-width: 320px) {
-    padding: 10px 6px;
-
-    &__tabs {
       overflow-x: auto;
-      flex-wrap: nowrap;
-      gap: 4px;
       padding-bottom: 4px;
       -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
 
       &::-webkit-scrollbar {
         display: none;
@@ -992,9 +1016,139 @@
     }
 
     &__tab {
+      padding: 7px 12px;
+      font-size: 12px;
+      border-radius: 10px;
+      white-space: nowrap;
       flex-shrink: 0;
-      padding: 6px 8px;
+    }
+
+    &__tabCount {
+      min-width: 20px;
+      height: 20px;
       font-size: 11px;
+      padding: 0 5px;
+    }
+
+    &__actions {
+      gap: 8px;
+    }
+
+    &__searchWrap {
+      flex: 1 1 100%;
+    }
+
+    &__searchInput {
+      height: 40px;
+      font-size: 13px;
+      padding-left: 38px;
+      border-radius: 10px;
+    }
+
+    &__searchIcon {
+      left: 12px;
+      font-size: 13px;
+    }
+
+    &__filtersBtn {
+      height: 40px;
+      padding: 0 14px;
+      gap: 8px;
+      font-size: 13px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    &__cardHeader {
+      padding: 12px 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    &__cardBody {
+      padding: 14px 16px;
+      gap: 14px;
+    }
+
+    &__cardLeft,
+    &__cardRight {
+      gap: 10px;
+    }
+
+    &__infoRow {
+      font-size: 12px;
+      gap: 8px;
+      line-height: 1.4;
+    }
+
+    &__infoIcon {
+      font-size: 11px;
+      margin-top: 3px;
+    }
+
+    &__statusSelect {
+      min-width: 110px;
+    }
+
+    &__dateBadge {
+      padding: 5px 10px;
+      font-size: 11px;
+    }
+
+    &__modal {
+      width: 95%;
+      max-width: 100%;
+      border-radius: 16px;
+    }
+
+    &__modalHeader {
+      padding: 16px 18px;
+    }
+
+    &__modalBody {
+      padding: 18px;
+    }
+  }
+
+  @media (max-width: 360px) {
+    padding: 14px 10px;
+    gap: 12px;
+
+    &__tabs {
+      gap: 5px;
+    }
+
+    &__tab {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    &__tabCount {
+      min-width: 18px;
+      height: 18px;
+      font-size: 10px;
+      padding: 0 4px;
+    }
+
+    &__searchInput {
+      height: 38px;
+      font-size: 12px;
+    }
+
+    &__filtersBtn {
+      height: 38px;
+      font-size: 12px;
+      padding: 0 12px;
+    }
+
+    &__cardBody {
+      padding: 12px 14px;
+      gap: 12px;
+    }
+
+    &__infoRow {
+      font-size: 11px;
+      gap: 8px;
     }
   }
 }

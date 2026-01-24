@@ -1,26 +1,38 @@
-import { pdf } from "@react-pdf/renderer";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
+  Search,
+  Plus,
+  Check,
+  X,
+  ChevronDown,
+  Pencil,
+  Folder,
+} from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
+import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
+import InvoicePdfDocument from "./components/InvoicePdfDocument";
+import {
+  fetchWarehouseProducts,
   fetchWarehouseCounterparties,
   createWarehouseDocument,
   fetchWarehouses,
 } from "../../../../store/creators/warehouseThunk";
+import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
+import { useUser } from "../../../../store/slices/userSlice";
+import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
-import { useCash } from "../../../../store/slices/cashSlice";
-import { useClient } from "../../../../store/slices/ClientSlice";
-import { useUser } from "../../../../store/slices/userSlice";
-import InvoicePdfDocument from "./components/InvoicePdfDocument";
-import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
-import "./CreateSaleDocument.scss";
 
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { company, profile: userProfile } = useUser();
   const { list: cashBoxes } = useCash();
-  const { list: clients } = useClient();
-
+  const { list: counterparties } = useCounterparty();
+  const alert = useAlert()
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
   const [products, setProducts] = useState([]);
@@ -29,8 +41,11 @@ const CreateSaleDocument = () => {
   const [showMoreProducts, setShowMoreProducts] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
 
+  const [warehouses, setWarehouses] = useState([]);
   const [warehouse, setWarehouse] = useState("");
+  const [warehouseTo, setWarehouseTo] = useState("");
   const [clientId, setClientId] = useState("");
+  const [docType, setDocType] = useState("SALE");
   const [activeTab, setActiveTab] = useState("products");
   const [documentSearch, setDocumentSearch] = useState("");
   const [isDocumentPosted, setIsDocumentPosted] = useState(false);
@@ -80,7 +95,7 @@ const CreateSaleDocument = () => {
     };
   }, [productSearch]);
 
-  // Загрузка товаров
+  // Загрузка товаров через новый warehouse API
   useEffect(() => {
     const loadProducts = async () => {
       setProductsLoading(true);
@@ -108,9 +123,25 @@ const CreateSaleDocument = () => {
     loadProducts();
   }, [dispatch, debouncedProductSearch, showMoreProducts]);
 
-  // Загрузка клиентов
+  // Загрузка контрагентов через warehouse API
   useEffect(() => {
-    dispatch(fetchClientsAsync({ type: "client" }));
+    // Загружаем всех контрагентов (CLIENT, SUPPLIER, BOTH)
+    dispatch(fetchWarehouseCounterparties());
+  }, [dispatch]);
+
+  // Загрузка складов через новый warehouse API
+  useEffect(() => {
+    const loadWarehouses = async () => {
+      try {
+        const result = await dispatch(fetchWarehouses());
+        if (fetchWarehouses.fulfilled.match(result)) {
+          setWarehouses(result.payload?.results || (Array.isArray(result.payload) ? result.payload : []));
+        }
+      } catch (error) {
+        console.error("Ошибка загрузки складов:", error);
+      }
+    };
+    loadWarehouses();
   }, [dispatch]);
 
   // Синхронизация выбранных товаров с товарами в корзине
@@ -130,11 +161,34 @@ const CreateSaleDocument = () => {
     }
   }, [cartItems]);
 
-  // Фильтрация клиентов
-  const filterClient = useMemo(
-    () => (clients || []).filter((c) => c.type === "client"),
-    [clients]
-  );
+  // Фильтрация контрагентов в зависимости от типа документа
+  const filteredCounterparties = useMemo(() => {
+    const all = counterparties || [];
+    // Для SALE, SALE_RETURN, PURCHASE, PURCHASE_RETURN нужны контрагенты
+    if (["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType)) {
+      return all.filter((c) => {
+        if (docType === "SALE" || docType === "SALE_RETURN") {
+          return c.type === "CLIENT" || c.type === "BOTH";
+        }
+        if (docType === "PURCHASE" || docType === "PURCHASE_RETURN") {
+          return c.type === "SUPPLIER" || c.type === "BOTH";
+        }
+        return true;
+      });
+    }
+    // Для других типов документов показываем всех
+    return all;
+  }, [counterparties, docType]);
+
+  // Определяем, требуется ли контрагент для текущего типа документа
+  const isCounterpartyRequired = useMemo(() => {
+    return ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(docType);
+  }, [docType]);
+
+  // Определяем, требуется ли второй склад (для TRANSFER)
+  const isWarehouseToRequired = useMemo(() => {
+    return docType === "TRANSFER";
+  }, [docType]);
 
   // Фильтрация товаров в документе
   const filteredDocumentItems = useMemo(() => {
@@ -365,6 +419,27 @@ const CreateSaleDocument = () => {
       return;
     }
 
+    if (!warehouse) {
+      alert("Выберите склад");
+      return;
+    }
+
+    if (isWarehouseToRequired && !warehouseTo) {
+      alert("Выберите склад получатель");
+      return;
+    }
+
+    if (isWarehouseToRequired && warehouse === warehouseTo) {
+      alert("Склад отправитель и склад получатель должны быть разными");
+      return;
+    }
+
+    if (isCounterpartyRequired && !clientId) {
+      const counterpartyLabel = docType === "SALE" || docType === "SALE_RETURN" ? "клиента" : "поставщика";
+      alert(`Выберите ${counterpartyLabel}`);
+      return;
+    }
+
     try {
       // Сначала создаем документ через новый API
       const documentData = {
@@ -442,23 +517,25 @@ const CreateSaleDocument = () => {
         };
       });
 
-      // Формируем номер документа
-      const docNumber = documentId.substring(0, 8) || "00001";
-      const currentDate = documentDateValue
-        ? new Date(documentDateValue)
+      // Используем данные из созданного документа
+      const docNumber = createdDocument.number || documentId.substring(0, 8) || "00001";
+      const currentDate = createdDocument.date || documentDateValue
+        ? new Date(createdDocument.date || documentDateValue)
         : new Date();
 
       if (printType === "invoice") {
         // Формируем данные для накладной
         const invoiceData = {
+          doc_type: docType, // Передаем тип документа
           document: {
             type: "sale_invoice",
+            doc_type: docType,
             title: "Накладная",
-            id: documentId,
+            id: createdDocument.id || documentId,
             number: docNumber,
             date: currentDate.toISOString().split("T")[0],
             datetime: currentDate.toISOString(),
-            created_at: currentDate.toISOString(),
+            created_at: createdDocument.created_at || currentDate.toISOString(),
             discount_percent: discountPercent, // Передаем скидку по документу
           },
           seller: {
@@ -472,7 +549,7 @@ const CreateSaleDocument = () => {
             phone: company?.phone || null,
             email: company?.email || null,
           },
-          buyer: selectedClient
+          buyer: selectedCounterparty
             ? {
               id: selectedCounterparty.id,
               name: selectedCounterparty.name || "",
@@ -493,6 +570,7 @@ const CreateSaleDocument = () => {
             total: String(totals.total.toFixed(2)),
           },
           warehouse: warehouseName,
+          warehouse_to: warehouseToName, // Склад получатель для TRANSFER
         };
 
         // Генерируем PDF накладной
@@ -506,11 +584,11 @@ const CreateSaleDocument = () => {
           document: {
             type: "receipt",
             title: "Товарный чек",
-            id: documentId,
+            id: createdDocument.id || documentId,
             number: docNumber,
             doc_no: docNumber,
             date: currentDate.toISOString().split("T")[0],
-            created_at: currentDate.toISOString(),
+            created_at: createdDocument.created_at || currentDate.toISOString(),
           },
           company: {
             id: company?.id || "",
@@ -522,7 +600,7 @@ const CreateSaleDocument = () => {
             id: userProfile?.id || "",
             name: userProfile?.full_name || userProfile?.name || "",
           },
-          client: selectedClient
+          client: selectedCounterparty
             ? {
               id: selectedCounterparty.id,
               full_name: selectedCounterparty.name || "",
@@ -740,25 +818,113 @@ const CreateSaleDocument = () => {
           {/* Основной контент */}
           <div className="create-sale-document__content">
             <h2 className="create-sale-document__title">
-              Продажа{" "}
+              {docType === "SALE" && "Продажа"}
+              {docType === "PURCHASE" && "Покупка"}
+              {docType === "SALE_RETURN" && "Возврат продажи"}
+              {docType === "PURCHASE_RETURN" && "Возврат покупки"}
+              {docType === "INVENTORY" && "Инвентаризация"}
+              {docType === "RECEIPT" && "Приход"}
+              {docType === "WRITE_OFF" && "Списание"}
+              {docType === "TRANSFER" && "Перемещение"}
+              {!docType && "Документ"}{" "}
               {documentId ? `#${documentId.slice(0, 8)}` : "(новый документ)"}
             </h2>
 
             <div className="create-sale-document__fields">
               <div className="create-sale-document__field">
-                <label>Клиент</label>
+                <label>Тип документа *</label>
                 <select
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value)}
+                  required
                 >
-                  <option value="">Выберите клиента</option>
-                  {filterClient.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.full_name || client.name}
-                    </option>
-                  ))}
+                  <option value="SALE">Продажа</option>
+                  <option value="PURCHASE">Покупка</option>
+                  <option value="SALE_RETURN">Возврат продажи</option>
+                  <option value="PURCHASE_RETURN">Возврат покупки</option>
+                  <option value="INVENTORY">Инвентаризация</option>
+                  <option value="RECEIPT">Приход</option>
+                  <option value="WRITE_OFF">Списание</option>
+                  <option value="TRANSFER">Перемещение</option>
                 </select>
               </div>
+              <div className="create-sale-document__field">
+                <label>Склад {isWarehouseToRequired ? "отправитель" : ""} *</label>
+                <select
+                  value={warehouse}
+                  onChange={(e) => setWarehouse(e.target.value)}
+                  required
+                >
+                  <option value="">Выберите склад</option>
+                  {warehouses
+                    .filter((wh) => !isWarehouseToRequired || wh.id !== warehouseTo)
+                    .map((wh) => (
+                      <option key={wh.id} value={wh.id}>
+                        {wh.name || wh.title || wh.id}
+                      </option>
+                    ))}
+                  {/* Также показываем склады из cashBoxes для обратной совместимости */}
+                  {cashBoxes
+                    ?.filter((box) => !isWarehouseToRequired || box.id !== warehouseTo)
+                    ?.map((box) => (
+                      <option key={box.id} value={box.id}>
+                        {box.name || box.title || box.id}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {isWarehouseToRequired && (
+                <div className="create-sale-document__field">
+                  <label>Склад получатель *</label>
+                  <select
+                    value={warehouseTo}
+                    onChange={(e) => setWarehouseTo(e.target.value)}
+                    required
+                  >
+                    <option value="">Выберите склад получатель</option>
+                    {warehouses
+                      .filter((wh) => wh.id !== warehouse)
+                      .map((wh) => (
+                        <option key={wh.id} value={wh.id}>
+                          {wh.name || wh.title || wh.id}
+                        </option>
+                      ))}
+                    {/* Также показываем склады из cashBoxes для обратной совместимости */}
+                    {cashBoxes
+                      ?.filter((box) => box.id !== warehouse)
+                      ?.map((box) => (
+                        <option key={box.id} value={box.id}>
+                          {box.name || box.title || box.id}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+              {isCounterpartyRequired && (
+                <div className="create-sale-document__field">
+                  <label>
+                    Контрагент *{" "}
+                    {(docType === "SALE" || docType === "SALE_RETURN") && "(Клиент)"}
+                    {(docType === "PURCHASE" || docType === "PURCHASE_RETURN") && "(Поставщик)"}
+                  </label>
+                  <select
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    required={isCounterpartyRequired}
+                  >
+                    <option value="">
+                      {docType === "SALE" || docType === "SALE_RETURN"
+                        ? "Выберите клиента"
+                        : "Выберите поставщика"}
+                    </option>
+                    {filteredCounterparties.map((counterparty) => (
+                      <option key={counterparty.id} value={counterparty.id}>
+                        {counterparty.name || "Без названия"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Вкладки */}

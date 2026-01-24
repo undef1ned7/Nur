@@ -40,6 +40,7 @@ const Stock = () => {
     unit: "",
     remainder: "",
     minimum: "",
+    unit_price: "",
   });
 
   // модалка движения (приход)
@@ -84,6 +85,7 @@ const Stock = () => {
       unit: "",
       remainder: "",
       minimum: "",
+      unit_price: "",
     });
     setModalOpen(true);
   };
@@ -95,6 +97,7 @@ const Stock = () => {
       unit: row.unit || "",
       remainder: String(row.remainder ?? ""),
       minimum: String(row.minimum ?? ""),
+      unit_price: String(row.unit_price ?? ""),
     });
     setModalOpen(true);
   };
@@ -110,11 +113,14 @@ const Stock = () => {
 
     if (!title || !unit) return;
 
+    const unitPriceNum = toNum(form.unit_price);
+
     const payload = {
       title,
       unit,
       remainder: numStr(Math.max(0, remainderNum)),
       minimum: numStr(Math.max(0, minimumNum)),
+      unit_price: unitPriceNum > 0 ? numStr(unitPriceNum) : null,
     };
 
     try {
@@ -174,6 +180,7 @@ const Stock = () => {
       unit: moveItem.unit,
       remainder: numStr(nextQty),
       minimum: numStr(toNum(moveItem.minimum)),
+      unit_price: moveItem.unit_price || null,
     };
 
     try {
@@ -231,6 +238,11 @@ const Stock = () => {
                     <span className="cafeStock__muted">
                       Остаток: {toNum(s.remainder)} {s.unit}
                     </span>
+                    {s.unit_price && (
+                      <span className="cafeStock__muted">
+                        Цена: {toNum(s.unit_price)} ₸/{s.unit}
+                      </span>
+                    )}
                     <span
                       className={`cafeStock__status ${
                         isLow(s) ? "cafeStock__status--low" : "cafeStock__status--ok"

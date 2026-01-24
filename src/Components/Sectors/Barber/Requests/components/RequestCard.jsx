@@ -4,7 +4,6 @@ import {
   FaUser,
   FaCut,
   FaClock,
-  FaMoneyBillWave,
   FaComment,
   FaCheck,
   FaBan,
@@ -27,9 +26,6 @@ const STATUS_OPTIONS = [
   { value: "no_show", label: "Не пришел" },
   { value: "spam", label: "Спам/Ошибка" },
 ];
-
-const fmtMoney = (n) =>
-  new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 0 }).format(n || 0);
 
 const fmtDate = (dateStr) => {
   if (!dateStr) return "—";
@@ -85,10 +81,6 @@ const RequestCard = ({ request, onStatusChange, onClick }) => {
         </div>
 
         <div className="barberrequests__dateBadge">{fmtDate(request.date)}</div>
-
-        <button className="barberrequests__chatBtn" title="Комментарий">
-          <FaComment />
-        </button>
       </div>
 
       <div className="barberrequests__cardBody">
@@ -119,10 +111,6 @@ const RequestCard = ({ request, onStatusChange, onClick }) => {
           <div className="barberrequests__infoRow">
             <FaUser className="barberrequests__infoIcon" />
             <span>Клиент: <strong>{request.client_name || "—"}</strong></span>
-          </div>
-          <div className="barberrequests__infoRow barberrequests__infoRow--price">
-            <FaMoneyBillWave className="barberrequests__infoIcon" />
-            <span>Сумма: <strong>{fmtMoney(request.total_price)} сом</strong></span>
           </div>
           <div className="barberrequests__infoRow">
             <FaClock className="barberrequests__infoIcon" />

@@ -1,5 +1,28 @@
 /* TablesFiltersModal - Modal Filters для Tables */
 
+.tables-filters-modal__overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  min-width: 100vw;
+  min-height: 100vh;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  margin: 0;
+}
+
 .tables-filters-modal {
   background: var(--surface);
   border-radius: 16px;
@@ -11,20 +34,10 @@
   display: flex;
   flex-direction: column;
   animation: filters-modal-in 0.2s ease-out;
-
-  /* ===== Overlay ===== */
-  &__overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 16px;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-  }
+  margin: auto;
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
 
   /* ===== Header ===== */
   &__header {
@@ -228,11 +241,6 @@
     border-radius: 0;
     margin: 0;
 
-    &__overlay {
-      padding: 0;
-      align-items: flex-end;
-    }
-
     &__header {
       padding: 14px 16px;
     }
@@ -398,10 +406,17 @@
 
 /* ===== Mobile slide-up animation ===== */
 @media (max-width: 480px) {
+  .tables-filters-modal__overlay {
+    padding: 0;
+    justify-content: center;
+  }
+
   .tables-filters-modal {
     animation: filters-modal-slide-up 0.25s ease-out;
     border-radius: 16px 16px 0 0;
     max-height: 85vh;
+    width: 100%;
+    max-width: 100%;
   }
 
   @keyframes filters-modal-slide-up {

@@ -50,15 +50,9 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
 
   const stockQty = useMemo(() => toNum(item?.quantity), [item]);
 
-  // const q = toNum(qty);
-  // const pp = toNum(purchasePrice);
-  // const rp = toNum(retailPrice);
-  const { q, pp, rp } = useMemo(() => ({
-    q: toNum(qty),
-    pp: toNum(purchasePrice),
-    rp: toNum(retailPrice)
-  }),
-    [qty, purchasePrice, retailPrice]);
+  const q = toNum(qty);
+  const pp = toNum(purchasePrice);
+  const rp = toNum(retailPrice);
 
   const expense = useMemo(() => +(q * pp).toFixed(2), [q, pp]);
 

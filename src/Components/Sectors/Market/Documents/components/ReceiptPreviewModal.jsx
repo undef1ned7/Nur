@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, Printer, Download } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { pdf } from "@react-pdf/renderer";
-import { getReceiptJson } from "../../../../../store/creators/saleThunk";
+import { getWarehouseDocumentById } from "../../../../../store/creators/warehouseThunk";
+import { useUser } from "../../../../../store/slices/userSlice";
 import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
@@ -13,15 +14,94 @@ import "./ReceiptPreviewModal.scss";
 const ReceiptPreviewModal = ({
   receiptId,
   receiptData: initialReceiptData,
+  document: initialDocument,
   onClose,
   onEdit,
 }) => {
   const dispatch = useDispatch();
+  const { company, profile: userProfile } = useUser();
   const [receiptData, setReceiptData] = useState(initialReceiptData);
-  const [loading, setLoading] = useState(!initialReceiptData);
+  const [loading, setLoading] = useState(!initialReceiptData && !initialDocument);
   const [printing, setPrinting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState(null);
+
+  // Функция для преобразования warehouse документа в формат для PDF
+  const transformWarehouseDocument = (doc) => {
+    if (!doc) return null;
+
+    const companyData = {
+      id: company?.id || "",
+      name: company?.name || "",
+      address: company?.address || "",
+      phone: company?.phone || null,
+    };
+
+    const cashierData = {
+      id: userProfile?.id || "",
+      name: userProfile?.full_name || userProfile?.name || "",
+    };
+
+    const clientData = doc.counterparty
+      ? {
+          id: doc.counterparty.id,
+          full_name: doc.counterparty.name || "",
+        }
+      : null;
+
+    const items = Array.isArray(doc.items)
+      ? doc.items.map((item) => ({
+          id: item.id,
+          name: item.product?.name || item.name || "Товар",
+          qty: String(item.qty || item.quantity || 0),
+          unit_price: String(Number(item.price || 0).toFixed(2)),
+          total: String(Number(item.total || item.qty * item.price || 0).toFixed(2)),
+          unit: item.product?.unit || item.unit || "ШТ",
+        }))
+      : [];
+
+    const subtotal = items.reduce(
+      (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
+      0
+    );
+    const discountTotal = items.reduce(
+      (sum, item) =>
+        sum +
+        (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
+          100,
+      0
+    );
+    const total = subtotal - discountTotal;
+
+    return {
+      document: {
+        type: "receipt",
+        title: "Товарный чек",
+        id: doc.id,
+        number: doc.number || "",
+        doc_no: doc.number || "",
+        date: doc.date || doc.created_at?.split("T")[0] || "",
+        created_at: doc.created_at || "",
+      },
+      company: companyData,
+      cashier: cashierData,
+      client: clientData,
+      items,
+      totals: {
+        subtotal: String(subtotal.toFixed(2)),
+        discount_total: String(discountTotal.toFixed(2)),
+        tax_total: "0.00",
+        total: String(total.toFixed(2)),
+      },
+      payment: {
+        method: "cash",
+        cash_received: String(total.toFixed(2)),
+        change: "0.00",
+        paid_at: doc.created_at || new Date().toISOString(),
+      },
+      warehouse: doc.warehouse_from?.name || doc.warehouse?.name || "",
+    };
+  };
 
   useEffect(() => {
     // Если данные уже переданы, используем их
@@ -31,14 +111,23 @@ const ReceiptPreviewModal = ({
       return;
     }
 
-    // Иначе загружаем данные
+    // Если передан документ из warehouse API, преобразуем его
+    if (initialDocument) {
+      const transformed = transformWarehouseDocument(initialDocument);
+      setReceiptData(transformed);
+      setLoading(false);
+      return;
+    }
+
+    // Иначе загружаем данные через новый warehouse API
     const loadReceipt = async () => {
       try {
         setLoading(true);
         setError(null);
-        const result = await dispatch(getReceiptJson(receiptId));
-        if (result.type === "products/getReceiptJson/fulfilled") {
-          setReceiptData(result.payload);
+        const result = await dispatch(getWarehouseDocumentById(receiptId));
+        if (getWarehouseDocumentById.fulfilled.match(result)) {
+          const transformed = transformWarehouseDocument(result.payload);
+          setReceiptData(transformed);
         } else {
           setError("Не удалось загрузить чек");
         }
@@ -53,7 +142,7 @@ const ReceiptPreviewModal = ({
     if (receiptId) {
       loadReceipt();
     }
-  }, [receiptId, initialReceiptData, dispatch]);
+  }, [receiptId, initialReceiptData, initialDocument, dispatch, company, userProfile]);
 
   const handlePrint = async () => {
     if (!receiptData && !receiptId) return;
@@ -74,9 +163,10 @@ const ReceiptPreviewModal = ({
 
       // Если данных нет, загружаем их заново
       if (!dataToPrint && receiptId) {
-        const result = await dispatch(getReceiptJson(receiptId));
-        if (result.type === "products/getReceiptJson/fulfilled") {
-          dataToPrint = result.payload;
+        const result = await dispatch(getWarehouseDocumentById(receiptId));
+        if (getWarehouseDocumentById.fulfilled.match(result)) {
+          dataToPrint = transformWarehouseDocument(result.payload);
+          setReceiptData(dataToPrint);
         } else {
           throw new Error("Не удалось загрузить данные чека для печати");
         }
@@ -122,10 +212,10 @@ const ReceiptPreviewModal = ({
 
       // Если данных нет, загружаем их заново
       if (!dataToDownload && receiptId) {
-        const result = await dispatch(getReceiptJson(receiptId));
-        if (result.type === "products/getReceiptJson/fulfilled") {
-          dataToDownload = result.payload;
-          setReceiptData(result.payload);
+        const result = await dispatch(getWarehouseDocumentById(receiptId));
+        if (getWarehouseDocumentById.fulfilled.match(result)) {
+          dataToDownload = transformWarehouseDocument(result.payload);
+          setReceiptData(dataToDownload);
         } else {
           throw new Error("Не удалось загрузить данные чека");
         }
@@ -249,9 +339,9 @@ const ReceiptPreviewModal = ({
     : [];
 
   const doc = receiptData?.document || receiptData?.sale || {};
-  const company = receiptData?.company || {};
-  const cashier = receiptData?.cashier || {};
-  const client = receiptData?.client || null;
+  const companyData = receiptData?.company || {};
+  const cashierData = receiptData?.cashier || {};
+  const clientData = receiptData?.client || null;
 
   const subtotal = parseFloat(receiptData?.totals?.subtotal || 0);
   const discount = parseFloat(receiptData?.totals?.discount_total || 0);
@@ -297,11 +387,11 @@ const ReceiptPreviewModal = ({
             {/* Информация о продавце */}
             <div className="receipt-preview-modal__company-info">
               <div className="receipt-preview-modal__company-name">
-                {company?.name || "market"}
+                {companyData?.name || "market"}
               </div>
-              {company?.address && (
+              {companyData?.address && (
                 <div className="receipt-preview-modal__company-address">
-                  {company.address}
+                  {companyData.address}
                 </div>
               )}
             </div>
@@ -348,18 +438,18 @@ const ReceiptPreviewModal = ({
             </div>
 
             {/* Информация о кассире и клиенте */}
-            {(cashier?.name || client?.full_name) && (
+            {(cashierData?.name || clientData?.full_name) && (
               <div className="receipt-preview-modal__receipt-info">
-                {cashier?.name && (
+                {cashierData?.name && (
                   <div className="receipt-preview-modal__info-row">
                     <span>Кассир:</span>
-                    <span>{cashier.name}</span>
+                    <span>{cashierData.name}</span>
                   </div>
                 )}
-                {client?.full_name && (
+                {clientData?.full_name && (
                   <div className="receipt-preview-modal__info-row">
                     <span>Покупатель:</span>
-                    <span>{client.full_name}</span>
+                    <span>{clientData.full_name}</span>
                   </div>
                 )}
               </div>

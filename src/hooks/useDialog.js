@@ -17,18 +17,6 @@ const useAlert = () => {
     return confirm;
 };
 
-const useErrorModal = () => {
-    const { openAlert } = useModal();
-    const confirm = (message, callback) => {
-        openAlert({
-            isError: true,
-            message,
-            onConfirm: (result) => callback?.(result),
-        });
-    };
-    return confirm;
-};
-
 const useConfirm = () => {
     const { openModal } = useModal();
 
@@ -45,4 +33,4 @@ const useConfirm = () => {
 
 
 
-export { useAlert, useConfirm, useErrorModal }
+export { useAlert, useConfirm }

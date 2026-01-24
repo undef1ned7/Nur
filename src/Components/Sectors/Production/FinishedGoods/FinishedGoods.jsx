@@ -7,7 +7,7 @@ import {
   LayoutGrid,
   Table2,
 } from "lucide-react";
-import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 /* ---- Thunks / Creators ---- */
@@ -246,26 +246,26 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     setSupplier((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const createSupplier = useCallback(async (e) => {
+  const createSupplier = async (e) => {
     e.preventDefault();
     if (!supplier.full_name?.trim()) {
-      error("Укажите ФИО поставщика");
+      alert("Укажите ФИО поставщика");
       return;
     }
     try {
       await dispatch(createClientAsync(supplier)).unwrap();
       setShowSupplierForm(false);
     } catch (err) {
-      error(`Не удалось создать поставщика: ${err?.message || "ошибка"}`);
+      alert(`Не удалось создать поставщика: ${err?.message || "ошибка"}`);
     }
-  }, [supplier]);
+  };
 
   // Рецепт — выбор/изменение/удаление
   // ВАЖНО: Добавление сырья ВСЕГДА разрешено, независимо от:
   // - количества сырья на складе (даже если 0)
   // - количества товара (можно добавить до указания количества)
   // - недостаточности сырья (показывается предупреждение, но не блокируется)
-  const toggleRecipeItem = useCallback((materialId) => {
+  const toggleRecipeItem = (materialId) => {
     // Защита от отсутствия ID
     if (materialId === null || materialId === undefined || materialId === "") {
       return;
@@ -305,18 +305,19 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         // Но добавление НЕ блокируется!
         if (units > 0 && totalNeeded > availableQty) {
           setTimeout(() => {
-            error(
-              `Внимание: может быть недостаточно сырья "${material.name || material.title || `#${material.id}`
+            alert(
+              `Внимание: может быть недостаточно сырья "${
+                material.name || material.title || `#${material.id}`
               }"!\n` +
-              `Доступно: ${availableQty}\n` +
-              `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
-              `Вы можете изменить количество сырья в списке выбранных материалов.`
+                `Доступно: ${availableQty}\n` +
+                `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+                `Вы можете изменить количество сырья в списке выбранных материалов.`
             );
           }, 100);
         }
       }
     }
-  }, [recipeMap]);
+  };
 
   const changeRecipeQty = useCallback((materialId, qty) => {
     // Защита от отсутствия ID
@@ -337,12 +338,13 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
     // Блокируем только если количество товара указано и сырья действительно недостаточно
     if (material && units > 0 && totalNeeded > availableQty) {
-      error(
-        `Недостаточно сырья "${material.name || material.title || `#${material.id}`
+      alert(
+        `Недостаточно сырья "${
+          material.name || material.title || `#${material.id}`
         }"!\n` +
-        `Доступно: ${availableQty}\n` +
-        `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
-        `Пожалуйста, уменьшите количество сырья или количество товара.`
+          `Доступно: ${availableQty}\n` +
+          `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)\n\n` +
+          `Пожалуйста, уменьшите количество сырья или количество товара.`
       );
       return;
     }
@@ -383,7 +385,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       ([k]) => product[k] === "" || product[k] === null
     );
     if (missed.length) {
-      error("Пожалуйста, заполните все обязательные поля.");
+      alert("Пожалуйста, заполните все обязательные поля.");
       return false;
     }
 
@@ -396,7 +398,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         );
 
         if (!material) {
-          error(`Сырьё с ID ${recipeItem.materialId} не найдено.`);
+          alert(`Сырьё с ID ${recipeItem.materialId} не найдено.`);
           return false;
         }
 
@@ -405,11 +407,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         const totalNeeded = requestedQty * units;
 
         if (totalNeeded > availableQty) {
-          error(
-            `Недостаточно сырья "${material.name || material.title || `#${material.id}`
+          alert(
+            `Недостаточно сырья "${
+              material.name || material.title || `#${material.id}`
             }"!\n` +
-            `Доступно: ${availableQty}\n` +
-            `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)`
+              `Доступно: ${availableQty}\n` +
+              `Требуется: ${totalNeeded} (${requestedQty} × ${units} единиц товара)`
           );
           return false;
         }
@@ -521,7 +524,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     } catch (err) {
       setCreating(false);
       setCreateError(err);
-      error(
+      alert(
         `Ошибка при добавлении товара: ${err?.message || "неизвестная ошибка"}`
       );
     }
@@ -949,7 +952,6 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                     onChange={(e) =>
                       handleImageChange(idx, e.target.files?.[0] || null)
                     }
-                    accept={`image/*`}
                     name="image"
                     label="Image"
                   />
@@ -980,8 +982,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
               {materialsOpen
                 ? "Скрыть список"
                 : materialsLoading
-                  ? "Загрузка…"
-                  : "+ Добавить сырьё"}
+                ? "Загрузка…"
+                : "+ Добавить сырьё"}
             </button>
           </div>
 
@@ -2196,11 +2198,12 @@ const TransferProductModal = ({
                   </div>
                   <button
                     type="button"
-                    className={`finished-goods-modal__add-product-btn ${selectedProducts.find((p) => p.id === product.id) ||
+                    className={`finished-goods-modal__add-product-btn ${
+                      selectedProducts.find((p) => p.id === product.id) ||
                       product.quantity <= 0
-                      ? "finished-goods-modal__add-product-btn--disabled"
-                      : ""
-                      }`}
+                        ? "finished-goods-modal__add-product-btn--disabled"
+                        : ""
+                    }`}
                     onClick={() => addProductToTransfer(product)}
                     disabled={
                       selectedProducts.find((p) => p.id === product.id) ||
@@ -2695,8 +2698,7 @@ const FinishedGoods = ({ products, onChanged }) => {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const [search, setSearch] = useState("");
-  // Debounce для поиска
-  const debouncedSearch = useDebouncedValue(search, 400)
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
   useEffect(() => {
@@ -2719,6 +2721,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     return isSmall ? "cards" : "table";
   }, []);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
+  const debounceTimerRef = useRef(null);
 
   // Сохраняем режим просмотра в localStorage
 
@@ -2736,7 +2739,6 @@ const FinishedGoods = ({ products, onChanged }) => {
       localStorage.setItem(STORAGE_KEY, viewMode);
     }
   }, [viewMode]);
-
 
   useEffect(() => {
 
@@ -2759,48 +2761,48 @@ const FinishedGoods = ({ products, onChanged }) => {
     }
   }, [cashBoxes, selectCashBox]);
 
-  const onSaveSuccess = useCallback(() => {
+  const onSaveSuccess = () => {
     setShowAdd(false);
     dispatch(fetchProductsAsync());
     dispatch(getItemsMake());
-  }, []);
+  };
 
-  const onEditSaved = useCallback(() => {
+  const onEditSaved = () => {
     setShowEdit(false);
     setSelectedItem(null);
     dispatch(fetchProductsAsync());
-  }, []);
-  const handleOpen = useCallback((id) => {
+  };
+  const handleOpen = (id) => {
     setShowMarriageModal(true);
     setItemId(id);
-  }, []);
+  };
 
-  const handleOpen1 = useCallback((id) => {
+  const handleOpen1 = (id) => {
     setShowAddProductModal(true);
     setItemId1(id);
-  }, []);
+  };
 
-  const handleOpen2 = useCallback((item) => {
+  const handleOpen2 = (item) => {
     setShowAcceptProductModal(true);
     setItemId2(item);
-  }, []);
-  const handleOpen3 = useCallback((item) => {
+  };
+  const handleOpen3 = (item) => {
     setShowReturnProductModal(true);
     setItemId3(item);
-  }, []);
+  };
 
-  const onEditDeleted = useCallback(() => {
+  const onEditDeleted = () => {
     setShowEdit(false);
     setSelectedItem(null);
     dispatch(fetchProductsAsync());
-  }, []);
+  };
 
-  const resetFilters = useCallback(() => {
+  const resetFilters = () => {
     setSearch("");
     setCategoryFilter("");
     setDateFrom("");
     setDateTo("");
-  }, []);
+  };
 
   // Фильтрация по названию, категории и ДАТЕ created_at
   const viewProducts = useMemo(() => {
@@ -2813,7 +2815,8 @@ const FinishedGoods = ({ products, onChanged }) => {
       const okCat =
         !categoryFilter ||
         String(p.category_id || p.category)?.toLowerCase() ===
-        String(categoryFilter).toLowerCase();
+          String(categoryFilter).toLowerCase();
+
       // фильтр по дате
       const created = safeDate(p.created_at);
       if (!created) return false;
@@ -2837,14 +2840,14 @@ const FinishedGoods = ({ products, onChanged }) => {
   };
 
   // get primary image
-  const getPrimaryImage = useCallback((product) => {
+  const getPrimaryImage = (product) => {
     if (!product?.images || !Array.isArray(product.images)) return null;
     const primaryImage = product.images.find((img) => img.is_primary);
     return primaryImage || product.images[0] || null;
-  }, []);
+  };
 
   // get image URL with fallback
-  const getImageUrl = useCallback((image) => {
+  const getImageUrl = (image) => {
     if (!image) return noImage;
     // Поддержка разных форматов URL изображений
     const url = image.image_url || image.image || image.url || image.preview;
@@ -2854,9 +2857,9 @@ const FinishedGoods = ({ products, onChanged }) => {
       return url;
     }
     return url;
-  }, [noImage]);
+  };
 
-  const formatPrice = useCallback((price) => parseFloat(price || 0).toFixed(2), []);
+  const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
 
   return (
     <div className="warehouse-page">
