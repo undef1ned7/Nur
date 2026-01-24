@@ -7,6 +7,7 @@ import { Pager } from "./components";
 import {
   PAGE_SIZE,
   asArray,
+  norm,
   dateISO,
   timeISO,
   fmtMoney,
@@ -23,7 +24,7 @@ import {
 } from "./HistoryUtils";
 import "./History.scss";
 
-
+const getId = (v) => (v && typeof v === "object" ? v.id : v);
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Все статусы" },
@@ -50,9 +51,11 @@ const pluralRecords = (n) => {
 };
 
 const History = () => {
-  const { isAuthenticated } = useUser();
-  const isLoggedIn = isAuthenticated;
+  const { currentUser, userId, isAuthenticated } = useUser();
+  const userEmail = currentUser?.email || currentUser?.user?.email || "";
   
+  /* Проверяем, авторизован ли пользователь */
+  const isLoggedIn = isAuthenticated && (userId || userEmail);
 
   const [employees, setEmployees] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -78,11 +81,9 @@ const History = () => {
 
   /* Modal state */
   const [selectedRecord, setSelectedRecord] = useState(null);
-  
 
   const fetchEmployees = useCallback(async () => asArray((await api.get("/users/employees/")).data), []);
-  const fetchAppointments = useCallback(async () => asArray((await api.get("/barbershop/appointments/my/")).data), []);
-
+  const fetchAppointments = useCallback(async () => asArray((await api.get("/barbershop/appointments/")).data), []);
   const fetchServices = useCallback(async () => asArray((await api.get("/barbershop/services/")).data), []);
   const fetchClients = useCallback(async () => asArray((await api.get("/barbershop/clients/")).data), []);
 
@@ -116,7 +117,50 @@ const History = () => {
   }, [fetchEmployees, fetchAppointments, fetchServices, fetchClients]);
 
 
-  
+  /* Определяем ID сотрудников текущего пользователя */
+  const myEmployeeIds = useMemo(() => {
+    const ids = new Set();
+    const email = norm(userEmail);
+
+    employees.forEach((e) => {
+      const em = norm(e?.email);
+      if (email && em && em === email) ids.add(String(e.id));
+      const eu = getId(e?.user) ?? e?.user_id;
+      if (userId && eu === userId) ids.add(String(e.id));
+    });
+
+    return ids;
+  }, [employees, userEmail, userId]);
+
+  /* Фильтруем записи текущего пользователя */
+  const myAppointments = useMemo(() => {
+    const email = norm(userEmail);
+
+    const belongs = (a) => {
+      const barberId =
+        getId(a?.barber) ??
+        a?.barber_id ??
+        getId(a?.employee) ??
+        a?.employee_id ??
+        getId(a?.master) ??
+        a?.master_id;
+
+      if (barberId && myEmployeeIds.has(String(barberId))) return true;
+
+      const createdById = getId(a?.created_by) ?? a?.created_by_id ?? a?.created_by;
+      if (userId && createdById === userId) return true;
+
+      const emails = [
+        a?.barber_email, a?.employee_email, a?.master_email,
+        a?.user_email, a?.created_by_email, a?.user?.email,
+        a?.created_by?.email, a?.barber?.email, a?.employee?.email, a?.master?.email,
+      ].filter(Boolean).map(norm);
+
+      return email && emails.some((x) => x === email);
+    };
+
+    return appointments.filter(belongs);
+  }, [appointments, myEmployeeIds, userEmail, userId]);
 
   /* Options for year/month/day filters */
   const yearOptions = useMemo(
@@ -172,8 +216,7 @@ const History = () => {
   };
 
   const filtered = useMemo(() => {
-    let arr = appointments.slice();
-
+    let arr = myAppointments.slice();
 
     // Year/Month/Day filter
     if (yearFilter) {
@@ -209,8 +252,7 @@ const History = () => {
     }
 
     return sortAppointments(arr, sortBy);
-  }, [appointments, yearFilter, monthFilter, dayFilter, statusFilter, search, sortBy, clients, services, employees]);
-
+  }, [myAppointments, yearFilter, monthFilter, dayFilter, statusFilter, search, sortBy, clients, services, employees]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 

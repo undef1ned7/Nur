@@ -48,7 +48,6 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
 
   /* ===== загрузка данных барбершопа ===== */
   const [appointments, setAppointments] = useState([]);
-  const [bookings, setBookings] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [services, setServices] = useState([]);
   const [clientsBarber, setClientsBarber] = useState([]);
@@ -73,9 +72,8 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
       setLoading(true);
       setErrorMsg("");
       try {
-        const [apps, books, emps, svcs, clBarber, clMarket] = await Promise.all([
+        const [apps, emps, svcs, clBarber, clMarket] = await Promise.all([
           fetchPaged("/barbershop/appointments/"),
-          fetchPaged("/barbershop/bookings/"),
           fetchPaged("/users/employees/"),
           fetchPaged("/barbershop/services/"),
           fetchPaged("/barbershop/clients/"),
@@ -102,7 +100,6 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
 
         if (!cancelled) {
           setAppointments(apps);
-          setBookings(books);
           setEmployees(normEmp);
           setServices(normSvc);
           setClientsBarber(clBarber);
@@ -113,7 +110,6 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
         if (!cancelled) {
           setErrorMsg("Не удалось загрузить данные барбершопа.");
           setAppointments([]);
-          setBookings([]);
           setEmployees([]);
           setServices([]);
           setClientsBarber([]);
@@ -291,69 +287,6 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   const completedSum = totalsByStatus.get("completed")?.sum || 0;
   const canceledCount = totalsByStatus.get("canceled")?.count || 0;
   const noShowCount = totalsByStatus.get("no_show")?.count || 0;
-
-  /* ===== фильтр bookings по периоду ===== */
-  const filteredBookings = useMemo(() => {
-    return bookings.filter((b) => {
-      const t = tsOf(b);
-      return t >= startTs && t <= endTs;
-    });
-  }, [bookings, startTs, endTs]);
-
-  /* ===== статусы заявок (bookings, кроме new) ===== */
-  const bookingsStatusesData = useMemo(() => {
-    const statusLabels = {
-      confirmed: "Подтверждены",
-      no_show: "Не пришли",
-      spam: "Спам",
-    };
-
-    const statusMap = new Map();
-    filteredBookings.forEach((b) => {
-      const status = b.status || "";
-      if (status === "new" || !status) return;
-      
-      const prev = statusMap.get(status) || { count: 0 };
-      prev.count += 1;
-      statusMap.set(status, prev);
-    });
-
-    return Array.from(statusMap.entries())
-      .map(([status, data]) => ({
-        status,
-        label: statusLabels[status] || status,
-        count: data.count || 0,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [filteredBookings]);
-
-  /* ===== топ 5 услуг по заявкам (bookings) ===== */
-  const topServicesByBookings = useMemo(() => {
-    const serviceMap = new Map();
-
-    filteredBookings.forEach((b) => {
-      const servicesList = b.services || [];
-      if (!Array.isArray(servicesList) || servicesList.length === 0) return;
-
-      servicesList.forEach((s) => {
-        const serviceName = 
-          typeof s === "object" 
-            ? (s.title || s.name || s.service_name || "—")
-            : (svcById(s)?.name || "—");
-
-        if (!serviceName || serviceName === "—") return;
-
-        const key = serviceName;
-        const prev = serviceMap.get(key) || { id: key, name: serviceName, count: 0 };
-        prev.count += 1;
-        serviceMap.set(key, prev);
-      });
-    });
-
-    return Array.from(serviceMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [filteredBookings, services]);
 
   /* ===== агрегаты по мастерам (для рейтингов) ===== */
   const doneByMaster = useMemo(() => {
@@ -815,7 +748,5 @@ if (!hadItems) {
     saleFund,
     weekChart,
     dayLineChart,
-    bookingsStatusesData,
-    topServicesByBookings,
   };
 };
