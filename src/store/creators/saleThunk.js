@@ -104,7 +104,8 @@ export const deleteProductInCart = createAsyncThunk(
   "sale/deleteProductInCart",
   async ({ id, productId }, { rejectWithValue }) => {
     try {
-      await api.delete(`/main/pos/carts/${id}/items/${productId}/`);
+      const {data} =await api.delete(`/main/pos/carts/${id}/items/${productId}/`);
+      return data;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
