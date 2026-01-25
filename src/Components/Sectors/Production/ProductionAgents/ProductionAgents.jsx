@@ -942,7 +942,7 @@ const ProductionAgents = () => {
               <div className="warehouse-table-container w-full">
                 {/* ===== TABLE ===== */}
                 {viewMode === "table" && (
-                  <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div key={'table'} className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <table className="warehouse-table w-full min-w-225">
                       <thead>
                         <tr>
@@ -1001,7 +1001,7 @@ const ProductionAgents = () => {
                         ) : (
                           viewProducts?.map((item, idx) => (
                             <tr
-                              key={item.id || item.product}
+                              key={item.id}
                               className="warehouse-table__row"
                             >
                               <td>{idx + 1}</td>
@@ -1120,7 +1120,7 @@ const ProductionAgents = () => {
 
                 {/* ===== CARDS ===== */}
                 {viewMode === "cards" && (
-                  <div className="block">
+                  <div key={'cards'} className="block">
                     {(
                       profile?.role === "owner" ? loading : agentProductsLoading
                     ) ? (
@@ -1141,7 +1141,7 @@ const ProductionAgents = () => {
                       <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {viewProducts?.map((item, idx) => (
                           <div
-                            key={item.id || item.product}
+                            key={item.id}
                             className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
                           >
                             <div className="min-w-0 flex-1">
