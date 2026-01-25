@@ -44,16 +44,29 @@ const DaysModal = ({ open, onClose, title, rows }) => {
                   </td>
                 </tr>
               ) : (
-                rows.map((r) => (
-                  <tr key={r.date}>
-                    <td>{r.date}</td>
-                    <td>{fmtInt(r.completed)}</td>
-                    <td>{fmtMoney(r.revenue)}</td>
-                    <td>
-                      <b>{fmtMoney(r.payout)}</b>
-                    </td>
-                  </tr>
-                ))
+                rows.map((r, idx) => {
+                  const isTotal = r.date === "Итого";
+                  const isSpecial = r.date === "Фикс (месяц)" || r.date === "Товар (месяц)";
+                  
+                  return (
+                    <tr key={r.date + idx} style={isTotal ? { 
+                      background: '#fef3c7',
+                      fontWeight: '600'
+                    } : isSpecial ? {
+                      background: '#f9fafb',
+                      fontWeight: '500'
+                    } : {}}>
+                      <td>{r.date}</td>
+                      <td>{isTotal || isSpecial ? '—' : fmtInt(r.completed)}</td>
+                      <td>{isTotal || isSpecial ? '—' : fmtMoney(r.revenue)}</td>
+                      <td>
+                        <b style={{ color: isTotal ? '#16a34a' : '#374151' }}>
+                          {fmtMoney(r.payout)}
+                        </b>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
