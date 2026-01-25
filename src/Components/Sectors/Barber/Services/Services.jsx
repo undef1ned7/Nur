@@ -13,16 +13,24 @@ import {
 import "./Services.scss";
 
 const SORT_OPTIONS = [
-  { value: "name_asc", label: "Название А-Я" },
-  { value: "name_desc", label: "Название Я-А" },
-  { value: "price_asc", label: "Цена по возр." },
-  { value: "price_desc", label: "Цена по убыв." },
-  { value: "newest", label: "Сначала новые" },
-  { value: "oldest", label: "Сначала старые" },
+  { value: "name_asc", label: "А-Я" },
+  { value: "name_desc", label: "Я-А" },
+  { value: "price_asc", label: "Дешевле" },
+  { value: "price_desc", label: "Дороже" },
+  { value: "newest", label: "Новые" },
+  { value: "oldest", label: "Старые" },
 ];
 
 const Services = () => {
   const [mainTab, setMainTab] = useState("services");
+
+  // Определяем начальный режим просмотра в зависимости от размера экрана
+  const getInitialViewMode = () => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 600 ? "cards" : "table";
+    }
+    return "table";
+  };
 
   // Server-side список услуг: состояние query
   const [servicesSearch, setServicesSearch] = useState("");
@@ -65,7 +73,7 @@ const Services = () => {
   const categoriesRequestIdRef = useRef(0);
   const categoriesDebounceTimerRef = useRef(null);
 
-  const [viewMode, setViewMode] = useState("table");
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
@@ -190,7 +198,7 @@ const Services = () => {
       }
 
       setServicesError(
-        e?.response?.data?.detail || "Не удалось загрузить услуги."
+        e?.response?.data?.detail || "Ошибка загрузки услуг."
       );
       console.error(e);
     } finally {
@@ -249,7 +257,7 @@ const Services = () => {
       }
 
       setCategoriesError(
-        e?.response?.data?.detail || "Не удалось загрузить категории услуг."
+        e?.response?.data?.detail || "Ошибка загрузки категорий."
       );
       console.error(e);
     } finally {
@@ -307,7 +315,7 @@ const Services = () => {
 
   const categoryOptions = useMemo(
     () => [
-      { value: "all", label: "Все категории" },
+      { value: "all", label: "Все" },
       ...categoriesForFilter.map((c) => ({
         value: String(c.id),
         label: c.name,
@@ -406,7 +414,7 @@ const Services = () => {
             </span>
           )}
           <span className="barberservices__cat">
-            {s.categoryName || "Без категории"}
+            {s.categoryName || "Общее"}
           </span>
         </div>
       </div>
@@ -434,7 +442,7 @@ const Services = () => {
               <td className="barberservices__cellName">{s.name}</td>
               <td className="barberservices__cellPrice">{fmtMoney(s.price)}</td>
               <td>{formatDuration(s.time)}</td>
-              <td>{s.categoryName || "Без категории"}</td>
+              <td>{s.categoryName || "Общее"}</td>
             </tr>
           ))}
         </tbody>
@@ -476,12 +484,21 @@ const Services = () => {
           <FaSearch className="barberservices__searchIcon" />
           <input
             className="barberservices__searchInput"
-            placeholder={isServicesTab ? "Поиск услуги..." : "Поиск категории..."}
+            placeholder={isServicesTab ? "Поиск..." : "Поиск..."}
             value={isServicesTab ? servicesSearch : categoriesSearch}
             onChange={(e) => isServicesTab ? setServicesSearch(e.target.value) : setCategoriesSearch(e.target.value)}
             aria-label="Поиск"
           />
         </div>
+
+        <button
+          className="barberservices__btn barberservices__btn--primary barberservices__btn--icon"
+          onClick={() => isServicesTab ? openServiceModal() : openCategoryModal()}
+          aria-label={isServicesTab ? "Добавить" : "Добавить"}
+          title={isServicesTab ? "Добавить услугу" : "Добавить категорию"}
+        >
+          <FaPlus />
+        </button>
 
         {isServicesTab && (
           <>
@@ -519,15 +536,6 @@ const Services = () => {
             </div>
           </>
         )}
-
-        <button
-          className="barberservices__btn barberservices__btn--primary barberservices__btn--icon"
-          onClick={() => isServicesTab ? openServiceModal() : openCategoryModal()}
-          aria-label={isServicesTab ? "Добавить услугу" : "Добавить категорию"}
-          title={isServicesTab ? "Добавить услугу" : "Добавить категорию"}
-        >
-          <FaPlus />
-        </button>
       </div>
 
       {/* Модальное окно фильтров */}
@@ -553,7 +561,7 @@ const Services = () => {
                   value={categoryFilter}
                   onChange={setCategoryFilter}
                   options={categoryOptions}
-                  placeholder="Все категории"
+                  placeholder="Все"
                 />
               </div>
 
@@ -563,7 +571,7 @@ const Services = () => {
                   value={sortBy}
                   onChange={setSortBy}
                   options={SORT_OPTIONS}
-                  placeholder="Сортировка"
+                  placeholder="По умолчанию"
                 />
               </div>
             </div>
@@ -575,7 +583,7 @@ const Services = () => {
                   className="barberservices__filtersPanelClear"
                   onClick={handleClearFilters}
                 >
-                  Очистить фильтры
+                  Сбросить
                 </button>
               </div>
             )}
@@ -598,7 +606,7 @@ const Services = () => {
             <div className="barberservices__empty">
               {servicesDebouncedSearch || categoryFilter !== "all"
                 ? "Ничего не найдено"
-                : "Нет услуг. Добавьте первую!"}
+                : "Нет услуг"}
             </div>
           ) : (
             <>
@@ -630,7 +638,7 @@ const Services = () => {
             <div className="barberservices__empty">
               {categoriesDebouncedSearch
                 ? "Ничего не найдено"
-                : "Нет категорий. Добавьте первую!"}
+                : "Нет категорий"}
             </div>
           ) : (
             <>

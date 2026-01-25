@@ -17,7 +17,7 @@ const validateCategory = ({ name, categories, currentCategory }) => {
 
   if (!nn) {
     errs.name = true;
-    alerts.push("Укажите название категории.");
+    alerts.push("Введите название.");
   } else {
     const duplicate = categories.some(
       (c) =>
@@ -26,7 +26,7 @@ const validateCategory = ({ name, categories, currentCategory }) => {
     );
     if (duplicate) {
       errs.name = true;
-      alerts.push("Категория с таким названием уже существует.");
+      alerts.push("Такая категория уже есть.");
     }
   }
 
@@ -106,7 +106,7 @@ const CategoryModal = ({
           msgs.push(String(Array.isArray(v) ? v[0] : v))
         );
       }
-      if (!msgs.length) msgs.push("Не удалось сохранить категорию.");
+      if (!msgs.length) msgs.push("Ошибка сохранения.");
       setCatAlerts(msgs);
       console.error(err);
     } finally {
@@ -139,7 +139,7 @@ const CategoryModal = ({
       const msg =
         typeof data === "string"
           ? data
-          : data?.detail || "Не удалось удалить категорию.";
+          : data?.detail || "Ошибка удаления.";
       setCatAlerts([msg]);
       console.error(e);
     } finally {
@@ -167,7 +167,7 @@ const CategoryModal = ({
           >
             <div className="barberservices__modalHeader">
               <h3 className="barberservices__modalTitle">
-                {currentCategory ? "Редактировать категорию" : "Новая категория"}
+                {currentCategory ? "Редактировать" : "Новая категория"}
               </h3>
               <button
                 type="button"
@@ -209,7 +209,7 @@ const CategoryModal = ({
                   style={{ gridColumn: "1 / -1" }}
                 >
                   <span className="barberservices__label">
-                    Название категории <b className="barberservices__req">*</b>
+                    Название <b className="barberservices__req">*</b>
                   </span>
                   <input
                     name="cat_name"
@@ -219,7 +219,7 @@ const CategoryModal = ({
                         ? "barberservices__input barberservices__input--invalid"
                         : "barberservices__input"
                     }`}
-                    placeholder="Например: Стрижки, Окрашивание…"
+                    placeholder="Волосы"
                     autoFocus
                     required
                   />
@@ -232,7 +232,7 @@ const CategoryModal = ({
                   <span className="barberservices__label">Активна</span>
                   <label
                     className="barberservices__switch"
-                    title="Активность категории"
+                    title="Активность"
                   >
                     <input
                       type="checkbox"

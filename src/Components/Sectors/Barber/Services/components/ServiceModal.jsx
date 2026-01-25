@@ -33,7 +33,7 @@ const validateService = ({ name, price, services, currentService }) => {
 
   if (!nn) {
     errs.name = true;
-    alerts.push("Укажите название услуги.");
+    alerts.push("Введите название.");
   } else {
     const duplicate = services.some(
       (s) =>
@@ -42,19 +42,19 @@ const validateService = ({ name, price, services, currentService }) => {
     );
     if (duplicate) {
       errs.name = true;
-      alerts.push("Услуга с таким названием уже существует.");
+      alerts.push("Такая услуга уже есть.");
     }
   }
 
   if (String(price).trim() === "") {
     errs.price = true;
-    alerts.push("Укажите цену.");
+    alerts.push("Введите цену.");
   }
 
   const priceNum = parseMoney(price);
   if (!Number.isFinite(priceNum) || priceNum < 0) {
     errs.price = true;
-    alerts.push("Цена должна быть неотрицательным числом.");
+    alerts.push("Цена должна быть числом.");
   }
 
   return {
@@ -96,7 +96,7 @@ const ServiceModal = ({
 
   // Опции для BarberSelect
   const categoryOptions = [
-    { value: "", label: "Без категории" },
+    { value: "", label: "Общее" },
     ...categoriesForSelect.map((c) => ({ value: String(c.id), label: c.name })),
   ];
 
@@ -166,7 +166,7 @@ const ServiceModal = ({
           msgs.push(String(Array.isArray(v) ? v[0] : v))
         );
       }
-      if (!msgs.length) msgs.push("Не удалось сохранить услугу.");
+      if (!msgs.length) msgs.push("Ошибка сохранения.");
       setModalAlerts(msgs);
       console.error(e2);
     } finally {
@@ -199,7 +199,7 @@ const ServiceModal = ({
       const msg =
         typeof data === "string"
           ? data
-          : data?.detail || "Не удалось удалить услугу.";
+          : data?.detail || "Ошибка удаления.";
       setModalAlerts([msg]);
       console.error(e);
     } finally {
@@ -227,7 +227,7 @@ const ServiceModal = ({
           >
             <div className="barberservices__modalHeader">
               <h3 className="barberservices__modalTitle">
-                {currentService ? "Редактировать услугу" : "Новая услуга"}
+                {currentService ? "Редактировать" : "Новая услуга"}
               </h3>
               <button
                 type="button"
@@ -274,7 +274,7 @@ const ServiceModal = ({
                         ? "barberservices__input barberservices__input--invalid"
                         : "barberservices__input"
                     }
-                    placeholder="Например: Стрижка"
+                    placeholder="Стрижка"
                     autoFocus
                     required
                   />
@@ -300,28 +300,21 @@ const ServiceModal = ({
                         ? "barberservices__input barberservices__input--invalid"
                         : "barberservices__input"
                     }
-                    placeholder="0"
+                    placeholder="500"
                     inputMode="decimal"
                   />
                 </label>
 
                 <label className="barberservices__field">
-                  <span className="barberservices__label">Длительность</span>
+                  <span className="barberservices__label">Длительность (мин)</span>
                   <input
                     name="time"
+                    type="text"
                     defaultValue={currentService?.time || ""}
                     className="barberservices__input"
-                    placeholder="45 мин"
-                    list="durationSuggestions"
+                    placeholder="30"
+                    inputMode="numeric"
                   />
-                  <datalist id="durationSuggestions">
-                    <option value="15 мин" />
-                    <option value="30 мин" />
-                    <option value="45 мин" />
-                    <option value="1 час" />
-                    <option value="1 час 30 мин" />
-                    <option value="2 часа" />
-                  </datalist>
                 </label>
 
                 <div className="barberservices__field">
@@ -331,13 +324,13 @@ const ServiceModal = ({
                     value={selectedCategory}
                     onChange={setSelectedCategory}
                     options={categoryOptions}
-                    placeholder="Без категории"
+                    placeholder="Не выбрана"
                   />
                 </div>
 
                 <div className="barberservices__field barberservices__field--switch">
                   <span className="barberservices__label">Активна</span>
-                  <label className="barberservices__switch" title="Активность услуги">
+                  <label className="barberservices__switch" title="Активность">
                     <input
                       type="checkbox"
                       name="active"
