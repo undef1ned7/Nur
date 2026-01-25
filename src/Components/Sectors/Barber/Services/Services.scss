@@ -675,6 +675,13 @@
     padding: 0;
   }
 
+  &__pageInfo {
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
   &__pageBtn {
     border-radius: 8px;
     border: none;

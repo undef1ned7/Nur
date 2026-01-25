@@ -1,7 +1,9 @@
 // ClientModals.jsx
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import BarberSelect from "../../common/BarberSelect";
+import Loading from "../../../../common/Loading/Loading";
+import Pager from "./Pager";
 
 const ClientModals = ({
   modalOpen,
@@ -10,6 +12,15 @@ const ClientModals = ({
   currentClient,
   historyClient,
   historyList,
+  historyCount,
+  historyNext,
+  historyPrevious,
+  historyPage,
+  historyLoading,
+  historyError,
+  historySearch,
+  onHistorySearchChange,
+  onHistoryPageChange,
   clientAlerts,
   formErrors,
   saving,
@@ -22,10 +33,7 @@ const ClientModals = ({
   onConfirmDelete,
   onCloseHistory,
   fmtMoney,
-  servicesById,
-  employees = [],
 }) => {
-  const [historySearch, setHistorySearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState(currentClient?.status || "Активен");
 
   // Обновляем статус при смене клиента
@@ -38,33 +46,16 @@ const ClientModals = ({
     return statusOptions.map((s) => ({ value: s, label: s }));
   }, [statusOptions]);
 
-  // Создаём Map сотрудников для быстрого поиска
-  const employeesById = useMemo(() => {
-    const map = new Map();
-    employees.forEach((e) => {
-      const name = [e.last_name, e.first_name].filter(Boolean).join(" ").trim() || e.email || "—";
-      map.set(e.id, { ...e, displayName: name });
-    });
-    return map;
-  }, [employees]);
-
-  const getEmployeeName = (barberId) => {
-    if (!barberId) return "—";
-    const emp = employeesById.get(barberId);
-    return emp?.displayName || `ID ${barberId}`;
-  };
-
-  const filteredHistory = historyList.filter((a) => {
-    if (!historySearch.trim()) return true;
-    const q = historySearch.toLowerCase();
-    const date = a.start_at || "";
-    const svcNames = (a.services || [])
-      .map((sid) => servicesById.get(sid)?.name || "")
-      .join(" ")
-      .toLowerCase();
-    const masterName = getEmployeeName(a.barber || a.employee || a.master).toLowerCase();
-    return date.includes(q) || svcNames.includes(q) || masterName.includes(q);
-  });
+  // Вычисляем totalPages для истории
+  const historyTotalPages = useMemo(() => {
+    if (historyCount === 0) return 1;
+    const pageSize = historyList.length || 1;
+    if (pageSize === 0) return 1;
+    if (historyNext) {
+      return Math.ceil(historyCount / pageSize);
+    }
+    return historyPage;
+  }, [historyCount, historyList.length, historyNext, historyPage]);
 
   const fmtDate = (iso) => {
     if (!iso) return "—";
@@ -91,10 +82,40 @@ const ClientModals = ({
     return status || "—";
   };
 
+  const num = (v) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const getMasterName = (a) => {
+    const direct = a?.barber_name || a?.barber_public?.full_name;
+    if (direct) return direct;
+    const pub = a?.barber_public;
+    if (pub) {
+      const fallback = [pub.last_name, pub.first_name].filter(Boolean).join(" ").trim();
+      if (fallback) return fallback;
+    }
+    return "—";
+  };
+
+  const getServiceNames = (a) => {
+    if (Array.isArray(a?.services_names) && a.services_names.length) {
+      return a.services_names.filter(Boolean);
+    }
+    if (Array.isArray(a?.services_public) && a.services_public.length) {
+      return a.services_public.map((s) => s?.name).filter(Boolean);
+    }
+    if (a?.service_name) {
+      return [a.service_name];
+    }
+    return [];
+  };
+
   return (
     <>
       {/* Модалка редактирования клиента */}
-      {modalOpen && (
+      {modalOpen && !confirmOpen && (
         <div className="barberclient__modalOverlay" onClick={onCloseModal}>
           <div className="barberclient__modal" onClick={(e) => e.stopPropagation()}>
             <div className="barberclient__modalHeader">
@@ -305,39 +326,43 @@ const ClientModals = ({
                   className="barberclient__historySearch-input"
                   placeholder="Поиск по истории..."
                   value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
+                  onChange={(e) => onHistorySearchChange(e.target.value)}
                 />
               </div>
 
-              {filteredHistory.length === 0 ? (
+              {historyLoading ? (
+                <Loading message="Загрузка истории..." />
+              ) : historyError ? (
+                <div className="barberclient__loading">{historyError}</div>
+              ) : historyList.length === 0 ? (
                 <div className="barberclient__loading">
-                  {historyList.length === 0 ? "Записей нет" : "Ничего не найдено"}
+                  {historySearch.trim() ? "Ничего не найдено" : "Записей нет"}
                 </div>
               ) : (
-                <div className="barberclient__historyList">
-                  {filteredHistory.map((a, idx) => {
-                    // Получаем услуги - могут быть ID или объекты
-                    const rawServices = a.services || [];
-                    const svcs = rawServices.map((s) => {
-                      if (typeof s === "object" && s !== null) {
-                        return { 
-                          id: s.id, 
-                          name: s.service_name || s.name || "Услуга",
-                          price: s.price || s.amount || 0 
-                        };
-                      }
-                      const found = servicesById.get(s);
-                      return found ? { id: found.id, name: found.name, price: found.price } : null;
-                    }).filter(Boolean);
+                <>
+                  <div className="barberclient__historyList">
+                    {historyList.map((a, idx) => {
+                    const serviceNames = getServiceNames(a);
+                    const servicesPublic = Array.isArray(a?.services_public)
+                      ? a.services_public
+                      : [];
+                    const servicesPriceSum = servicesPublic.reduce(
+                      (sum, s) => sum + (num(s?.price) || 0),
+                      0
+                    );
 
-                    // Цена из записи или сумма услуг
-                    const basePrice = a.service_price ?? a.base_price ?? a.original_price ?? a.price ?? 
-                      svcs.reduce((s, sv) => s + (sv.price || 0), 0);
-                    const discountPct = a.discount ?? a.discount_percent ?? 0;
-                    const total = a.total_price ?? a.final_price ?? 
-                      (discountPct > 0 ? Math.round(basePrice * (1 - discountPct / 100)) : basePrice);
-                    
-                    const masterName = getEmployeeName(a.barber || a.employee || a.master);
+                    const basePriceRaw = num(a?.price);
+                    const discountPct = num(a?.discount) || 0;
+                    const basePrice =
+                      basePriceRaw !== null
+                        ? basePriceRaw
+                        : servicesPriceSum || null;
+                    const total =
+                      basePrice !== null && discountPct > 0
+                        ? Math.round(basePrice * (1 - discountPct / 100))
+                        : basePrice;
+
+                    const masterName = getMasterName(a);
                     const status = getStatus(a.status);
                     const statusClass = String(a.status || "").toLowerCase();
 
@@ -359,13 +384,13 @@ const ClientModals = ({
                             <span className="barberclient__historyMaster">{masterName}</span>
                           </div>
 
-                          {svcs.length > 0 && (
+                          {serviceNames.length > 0 && (
                             <div className="barberclient__historyServicesRow">
                               <span className="barberclient__historyLabel">Услуги</span>
                               <div className="barberclient__historyServices">
-                                {svcs.map((sv, i) => (
-                                  <span key={sv.id || i} className="barberclient__historyServiceTag">
-                                    {sv.name}
+                                {serviceNames.map((name, i) => (
+                                  <span key={`${name}-${i}`} className="barberclient__historyServiceTag">
+                                    {name}
                                   </span>
                                 ))}
                               </div>
@@ -392,7 +417,16 @@ const ClientModals = ({
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                  <Pager
+                    count={historyCount}
+                    page={historyPage}
+                    totalPages={historyTotalPages}
+                    next={historyNext}
+                    previous={historyPrevious}
+                    onChange={onHistoryPageChange}
+                  />
+                </>
               )}
             </div>
           </div>

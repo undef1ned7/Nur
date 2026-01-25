@@ -1,7 +1,5 @@
 // BarberServicesUtils.js
 
-export const PAGE_SIZE = 12;
-
 export const fmtMoney = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? `${n.toLocaleString("ru-RU")} сом` : "—";
@@ -24,29 +22,3 @@ export const mapCategory = (c) => ({
   name: c.name ?? "",
   active: Boolean(c.is_active ?? true),
 });
-
-const baseServiceSorter = (lastAddedId) => (a, b) => {
-  if (a.active !== b.active) return a.active ? -1 : 1;
-
-  if (lastAddedId && (a.id === lastAddedId || b.id === lastAddedId)) {
-    if (a.id === lastAddedId && b.id !== lastAddedId) return -1;
-    if (b.id === lastAddedId && a.id !== lastAddedId) return 1;
-  }
-
-  if (a.createdAt && b.createdAt) {
-    const ad = new Date(a.createdAt).getTime() || 0;
-    const bd = new Date(b.createdAt).getTime() || 0;
-    if (ad !== bd) return bd - ad;
-  }
-
-  return String(a.name || "").localeCompare(String(b.name || ""), "ru", {
-    sensitivity: "base",
-  });
-};
-
-export const serviceSorter = (lastAddedId) => baseServiceSorter(lastAddedId);
-
-export const categorySorter = (a, b) =>
-  String(a.name || "").localeCompare(String(b.name || ""), "ru", {
-    sensitivity: "base",
-  });

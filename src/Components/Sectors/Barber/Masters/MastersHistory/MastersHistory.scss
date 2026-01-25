@@ -749,6 +749,26 @@
     max-height: calc(90vh - 80px);
   }
 
+  &__modalLoading {
+    text-align: center;
+    padding: 12px;
+    font-size: 13px;
+    color: #9ca3af;
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.08) 0%, rgba(234, 179, 8, 0.08) 100%);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
+  &__modalError {
+    text-align: center;
+    padding: 12px;
+    font-size: 13px;
+    color: #dc2626;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.08) 100%);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
   &__modalStatus {
     display: flex;
     justify-content: center;

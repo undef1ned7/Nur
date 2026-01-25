@@ -80,10 +80,22 @@ const BarberSelect = ({
   useEffect(() => {
     if (isOpen) {
       calculatePosition();
-      window.addEventListener("scroll", calculatePosition, true);
+      
+      // Throttle для скролла - не чаще чем раз в 16мс (60fps)
+      let rafId = null;
+      const handleScroll = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          calculatePosition();
+          rafId = null;
+        });
+      };
+      
+      window.addEventListener("scroll", handleScroll, true);
       window.addEventListener("resize", calculatePosition);
       return () => {
-        window.removeEventListener("scroll", calculatePosition, true);
+        if (rafId) cancelAnimationFrame(rafId);
+        window.removeEventListener("scroll", handleScroll, true);
         window.removeEventListener("resize", calculatePosition);
       };
     }
@@ -107,7 +119,9 @@ const BarberSelect = ({
   }, [opts, query, hideSearch]);
 
   // Выбрать опцию
-  const selectOption = (val) => {
+  const selectOption = (val, e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (typeof onChange === "function") {
       onChange(val);
     }
@@ -116,7 +130,8 @@ const BarberSelect = ({
 
   // Очистить значение
   const clearValue = (e) => {
-    e.stopPropagation();
+    e?.preventDefault();
+    e?.stopPropagation();
     if (typeof onChange === "function") {
       onChange("");
     }
@@ -128,6 +143,7 @@ const BarberSelect = ({
   const toggleDropdown = (e) => {
     if (disabled) return;
     e?.preventDefault();
+    e?.stopPropagation();
     setIsOpen((prev) => !prev);
   };
 
@@ -149,7 +165,7 @@ const BarberSelect = ({
       const firstOption = filteredOptions[0];
       if (firstOption?.value != null) {
         e.preventDefault();
-        selectOption(String(firstOption.value));
+        selectOption(String(firstOption.value), e);
       }
     }
 
@@ -199,7 +215,7 @@ const BarberSelect = ({
                 key={`${optValue}-${optLabel}`}
                 type="button"
                 className={`barber-select__item ${isActive ? "barber-select__item--active" : ""}`}
-                onClick={() => selectOption(optValue)}
+                onClick={(e) => selectOption(optValue, e)}
               >
                 {optLabel}
               </button>
