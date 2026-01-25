@@ -64,23 +64,31 @@ const RequestDetailModal = ({ request, onClose }) => {
           </div>
 
           <div className="barberrequests__modalSection">
-            <h4 className="barberrequests__modalSectionTitle">Услуги</h4>
-            <div className="barberrequests__modalServices">
-              {services.map((service, idx) => (
-                <div key={idx} className="barberrequests__modalServiceRow">
-                  <span className="barberrequests__modalServiceName">{service.title}</span>
-                  <span className="barberrequests__modalServicePrice">{fmtMoney(service.price)} сом</span>
-                </div>
-              ))}
-              <div className="barberrequests__modalServiceTotal">
-                <div className="barberrequests__modalServiceRow barberrequests__modalServiceRow--total">
-                  <span>Итого:</span>
-                  <span className="barberrequests__modalTotalPrice">{fmtMoney(request.total_price)} сом</span>
-                </div>
-                <div className="barberrequests__modalDuration">
-                  Длительность: {totalDuration} мин
+            <h4 className="barberrequests__modalSectionTitle">
+              <FaUser className="barberrequests__modalSectionIcon" />
+              Информация о клиенте
+            </h4>
+            <div className="barberrequests__modalClientInfo">
+              <div className="barberrequests__modalClientRow">
+                <div className="barberrequests__modalClientLabel">Имя клиента</div>
+                <div className="barberrequests__modalClientValue">{request.client_name || "—"}</div>
+              </div>
+              <div className="barberrequests__modalClientRow">
+                <div className="barberrequests__modalClientLabel">Телефон</div>
+                <div className="barberrequests__modalClientValue">
+                  <FaPhone className="barberrequests__modalInlineIcon" />
+                  {request.client_phone || "—"}
                 </div>
               </div>
+              {request.client_comment && (
+                <div className="barberrequests__modalClientRow barberrequests__modalClientRow--full">
+                  <div className="barberrequests__modalClientLabel">Комментарий</div>
+                  <div className="barberrequests__modalClientComment">
+                    <FaComment className="barberrequests__modalInlineIcon" />
+                    {request.client_comment}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -105,12 +113,12 @@ const RequestDetailModal = ({ request, onClose }) => {
               </div>
             </div>
 
-            <div className="barberrequests__modalItem">
+            <div className="barberrequests__modalItem barberrequests__modalItem--full">
               <div className="barberrequests__modalIcon">
                 <FaClock />
               </div>
               <div className="barberrequests__modalInfo">
-                <span className="barberrequests__modalLabel">Время</span>
+                <span className="barberrequests__modalLabel">Время записи</span>
                 <span className="barberrequests__modalValue">
                   {fmtTime(request.time_start)} - {fmtTime(request.time_end)}
                 </span>
@@ -119,22 +127,35 @@ const RequestDetailModal = ({ request, onClose }) => {
           </div>
 
           <div className="barberrequests__modalSection">
-            <h4 className="barberrequests__modalSectionTitle">Клиент</h4>
-            <div className="barberrequests__modalClientInfo">
-              <div className="barberrequests__modalClientRow">
-                <FaUser className="barberrequests__modalClientIcon" />
-                <span>Имя: <strong>{request.client_name || "—"}</strong></span>
-              </div>
-              <div className="barberrequests__modalClientRow">
-                <FaPhone className="barberrequests__modalClientIcon" />
-                <span>Телефон: <strong>{request.client_phone || "—"}</strong></span>
-              </div>
-              {request.client_comment && (
-                <div className="barberrequests__modalClientRow">
-                  <FaComment className="barberrequests__modalClientIcon" />
-                  <span>Комментарий: <em>{request.client_comment}</em></span>
+            <h4 className="barberrequests__modalSectionTitle">
+              <FaClock className="barberrequests__modalSectionIcon" />
+              Услуги и стоимость
+            </h4>
+            <div className="barberrequests__modalServices">
+              {services.map((service, idx) => (
+                <div key={idx} className="barberrequests__modalServiceRow">
+                  <div className="barberrequests__modalServiceInfo">
+                    <span className="barberrequests__modalServiceName">{service.title}</span>
+                    {service.duration_min && (
+                      <span className="barberrequests__modalServiceDuration">
+                        {service.duration_min} мин
+                      </span>
+                    )}
+                  </div>
+                  <span className="barberrequests__modalServicePrice">{fmtMoney(service.price)} сом</span>
                 </div>
-              )}
+              ))}
+              <div className="barberrequests__modalServiceTotal">
+                <div className="barberrequests__modalServiceRow barberrequests__modalServiceRow--total">
+                  <div className="barberrequests__modalServiceInfo">
+                    <span className="barberrequests__modalServiceName">Итого</span>
+                    <span className="barberrequests__modalServiceDuration">
+                      {totalDuration} мин
+                    </span>
+                  </div>
+                  <span className="barberrequests__modalTotalPrice">{fmtMoney(request.total_price)} сом</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

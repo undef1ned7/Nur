@@ -57,6 +57,14 @@ const RequestCard = ({ request, onStatusChange, onClick }) => {
     }
   };
 
+  // Получаем первую услугу или показываем количество
+  const servicesText = (() => {
+    const services = request.services || [];
+    if (services.length === 0) return "—";
+    if (services.length === 1) return services[0].title;
+    return `${services[0].title} +${services.length - 1}`;
+  })();
+
   return (
     <article className="barberrequests__card" onClick={() => onClick(request)}>
       <div className="barberrequests__cardHeader">
@@ -84,39 +92,31 @@ const RequestCard = ({ request, onStatusChange, onClick }) => {
       </div>
 
       <div className="barberrequests__cardBody">
-        <div className="barberrequests__cardLeft">
-          <div className="barberrequests__infoRow">
-            <FaUser className="barberrequests__infoIcon" />
-            <span>Мастер: <strong>{request.master_name || "—"}</strong></span>
-          </div>
-          <div className="barberrequests__infoRow">
-            <FaPhone className="barberrequests__infoIcon" />
-            <span>Телефон: {request.client_phone || "—"}</span>
-          </div>
-          <div className="barberrequests__infoRow">
-            <FaCut className="barberrequests__infoIcon" />
-            <span>
-              Услуги: {(request.services || []).map((s) => s.title).join(", ") || "—"}
-            </span>
-          </div>
-          {request.client_comment && (
-            <div className="barberrequests__infoRow barberrequests__infoRow--comment">
-              <FaComment className="barberrequests__infoIcon" />
-              <span>Комментарий: <em>{request.client_comment}</em></span>
+        <div className="barberrequests__cardMain">
+          <div className="barberrequests__clientInfo">
+            <FaUser className="barberrequests__clientIcon" />
+            <div className="barberrequests__clientDetails">
+              <div className="barberrequests__clientName">{request.client_name || "—"}</div>
+              <div className="barberrequests__clientPhone">{request.client_phone || "—"}</div>
             </div>
-          )}
+          </div>
+
+          <div className="barberrequests__timeInfo">
+            <FaClock className="barberrequests__timeIcon" />
+            <div className="barberrequests__timeText">
+              {fmtTime(request.time_start)} - {fmtTime(request.time_end)}
+            </div>
+          </div>
         </div>
 
-        <div className="barberrequests__cardRight">
-          <div className="barberrequests__infoRow">
-            <FaUser className="barberrequests__infoIcon" />
-            <span>Клиент: <strong>{request.client_name || "—"}</strong></span>
+        <div className="barberrequests__cardFooter">
+          <div className="barberrequests__servicePreview">
+            <FaCut className="barberrequests__serviceIcon" />
+            <span className="barberrequests__serviceText">{servicesText}</span>
           </div>
-          <div className="barberrequests__infoRow">
-            <FaClock className="barberrequests__infoIcon" />
-            <span>
-              Время: {fmtTime(request.time_start)} - {fmtTime(request.time_end)}
-            </span>
+          <div className="barberrequests__masterPreview">
+            <span className="barberrequests__masterLabel">Мастер:</span>
+            <span className="barberrequests__masterName">{request.master_name || "—"}</span>
           </div>
         </div>
       </div>
