@@ -746,23 +746,30 @@
 
   &__modal {
     position: fixed;
-    inset: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 900px;
+    max-height: 90vh;
     background: #fff;
     z-index: 1001;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     animation: barberrequests-modalSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   @keyframes barberrequests-modalSlideIn {
     from {
       opacity: 0;
-      transform: translateY(20px);
+      transform: translate(-50%, -50%) scale(0.95);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translate(-50%, -50%) scale(1);
     }
   }
 
@@ -1165,6 +1172,29 @@
     &__timeInfo {
       width: 100%;
       justify-content: center;
+    }
+
+    /* Модальное окно на весь экран для планшетов */
+    &__modal {
+      inset: 0;
+      width: 100%;
+      max-width: 100%;
+      max-height: 100vh;
+      border-radius: 0;
+      transform: none;
+      top: auto;
+      left: auto;
+    }
+
+    @keyframes barberrequests-modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
   }
 

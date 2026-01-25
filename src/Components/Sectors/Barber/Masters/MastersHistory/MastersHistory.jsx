@@ -26,8 +26,9 @@ const MastersHistory = () => {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // UI state - по умолчанию карточки на мобильных, таблица на десктопе
+  // UI state - по умолчанию таблица на планшетах/ноутбуках/ПК, карточки только на телефонах
   const [viewMode, setViewMode] = useState(() => {
+    // Телефоны (до 768px) - карточки, всё остальное (планшеты/ноутбуки/ПК) - таблица
     return window.innerWidth <= 768 ? "cards" : "table";
   });
 
@@ -97,17 +98,6 @@ const MastersHistory = () => {
       }
     };
   }, [search]);
-
-  // Обработка изменения размера экрана для автоматического переключения режима просмотра
-  useEffect(() => {
-    const handleResize = () => {
-      const isMobile = window.innerWidth <= 768;
-      setViewMode(isMobile ? "cards" : "table");
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // Main effect for fetching appointments (server-side) - БЕЗ ПАГИНАЦИИ
   useEffect(() => {

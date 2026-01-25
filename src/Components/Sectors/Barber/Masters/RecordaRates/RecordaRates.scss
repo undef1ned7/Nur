@@ -134,7 +134,8 @@
     border: none;
     border-top: 1px solid #e5e7eb;
     box-shadow: none;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
 
     &--modal {
       box-shadow: none;
