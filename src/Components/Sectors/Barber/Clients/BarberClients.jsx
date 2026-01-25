@@ -76,7 +76,16 @@ export const BarberClients = () => {
 
   /* фильтры */
   const [fltStatus, setFltStatus] = useState("all");
-  const [viewMode, setViewMode] = useState("table");
+  
+  // Определяем начальный viewMode в зависимости от размера экрана
+  const getInitialViewMode = () => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 600 ? "cards" : "table";
+    }
+    return "table";
+  };
+  
+  const [viewMode, setViewMode] = useState(getInitialViewMode());
 
 
   // Маппинг сортировки UI -> API
@@ -261,6 +270,28 @@ export const BarberClients = () => {
       }
     };
   }, [debouncedSearch, sortBy, page, fltStatus]);
+
+  // Обработчик изменения размера окна для автоматического переключения viewMode
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth <= 600;
+      const shouldBeCards = isMobile;
+      const shouldBeTable = !isMobile;
+      
+      // Автоматически переключаем на карточки для мобильных, если сейчас таблица
+      if (shouldBeCards && viewMode === "table") {
+        setViewMode("cards");
+      }
+      // Автоматически переключаем на таблицу для десктопа, если сейчас карточки
+      // (можно убрать эту часть, если хотите сохранить выбор пользователя на десктопе)
+      // if (shouldBeTable && viewMode === "cards") {
+      //   setViewMode("table");
+      // }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [viewMode]);
 
   // Cleanup при размонтировании компонента
   useEffect(() => {

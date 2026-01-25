@@ -1,6 +1,6 @@
 // ClientModals.jsx
 import React, { useMemo, useEffect, useState } from "react";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaTrash } from "react-icons/fa";
 import BarberSelect from "../../common/BarberSelect";
 import Loading from "../../../../common/Loading/Loading";
 import Pager from "./Pager";
@@ -239,31 +239,31 @@ const ClientModals = ({
                 {currentClient?.id && (
                   <button
                     type="button"
-                    className="barberclient__btn barberclient__btn--danger"
+                    className="barberclient__deleteBtn"
                     onClick={onOpenConfirm}
                     disabled={saving || deleting}
+                    aria-label="Удалить клиента"
+                    title="Удалить клиента"
                   >
-                    Удалить
+                    <FaTrash />
                   </button>
                 )}
                 <div className="barberclient__actionsSpacer" />
-                <div className="barberclient__actionsRight">
-                  <button
-                    type="button"
-                    className="barberclient__btn barberclient__btn--secondary"
-                    onClick={onCloseModal}
-                    disabled={saving || deleting}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="barberclient__btn barberclient__btn--primary"
-                    disabled={saving || deleting}
-                  >
-                    {saving ? "Сохранение..." : "Сохранить"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="barberclient__btn barberclient__btn--secondary"
+                  onClick={onCloseModal}
+                  disabled={saving || deleting}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="barberclient__btn barberclient__btn--primary"
+                  disabled={saving || deleting}
+                >
+                  {saving ? "Сохранение..." : "Сохранить"}
+                </button>
               </div>
             </form>
           </div>
