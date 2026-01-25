@@ -102,7 +102,7 @@ const RecordaRates = ({
       seen.add(id);
       arr.push({ id, name: e?.name || "—" });
     }
-    return arr.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    return arr;
   }, [employees]);
 
   const { doneByMaster, revenueByMaster, daysByMaster } = useMasterAggregates(
@@ -358,6 +358,8 @@ const RecordaRates = ({
   const productPayoutsForModal = useMemo(() => {
     if (!productSales.length) return [];
 
+    // NOTE: Client-side filtering is a temporary solution
+    // TODO: Move filtering to backend with query params: ?period=YYYY-MM&employee=ID
     return productSales
       .filter((p) => {
         const ym = y_m_fromISO(p.created_at);
@@ -375,7 +377,6 @@ const RecordaRates = ({
 
         return sameEmployeeId || sameEmployeeName;
       })
-      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
       .map((p) => ({ ...p, dateFormatted: dateKG(p.created_at) }));
   }, [
     productSales,
@@ -428,6 +429,8 @@ const RecordaRates = ({
 
     const monthKey = endIso.slice(0, 7);
 
+    // NOTE: Client-side filtering is a temporary solution for export
+    // TODO: Backend should support ?status=completed&start_date=&end_date= params
     const rangeApps = (Array.isArray(appointments) ? appointments : []).filter(
       (a) => {
         const s = String(a?.status || "").trim().toLowerCase();

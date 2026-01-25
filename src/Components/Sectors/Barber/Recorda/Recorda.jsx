@@ -96,45 +96,43 @@ const Recorda = () => {
       setLoading(true);
       setPageError("");
       const [cl, em, sv, ap] = await Promise.all([
-        api.get("/barbershop/clients/"),
-        api.get("/users/employees/"),
-        api.get("/barbershop/services/"),
-        api.get("/barbershop/appointments/"),
+        api.get("/barbershop/clients/", {
+          params: { page_size: 1000, ordering: "full_name" },
+        }),
+        api.get("/users/employees/", {
+          params: { page_size: 1000, ordering: "last_name,first_name" },
+        }),
+        api.get("/barbershop/services/", {
+          params: { page_size: 1000, is_active: true, ordering: "service_name" },
+        }),
+        api.get("/barbershop/appointments/", {
+          params: { page_size: 1000 },
+        }),
       ]);
 
-      const cls = asArray(cl.data)
-        .filter((c) =>
-          ["active", "vip", ""].includes(String(c.status || "").toLowerCase())
-        )
-        .map((c) => ({
-          id: c.id,
-          name: c.full_name || c.name || "",
-          phone: c.phone || c.phone_number || "",
-          status: c.status || "active",
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+      const cls = asArray(cl.data).map((c) => ({
+        id: c.id,
+        name: c.full_name || c.name || "",
+        phone: c.phone || c.phone_number || "",
+        status: c.status || "active",
+      }));
 
-      const emps = asArray(em.data)
-        .map((e) => {
-          const first = e.first_name ?? "";
-          const last = e.last_name ?? "";
-          const name =
-            ([last, first].filter(Boolean).join(" ").trim()) || e.email || "—";
-          return { id: e.id, name };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+      const emps = asArray(em.data).map((e) => {
+        const first = e.first_name ?? "";
+        const last = e.last_name ?? "";
+        const name =
+          ([last, first].filter(Boolean).join(" ").trim()) || e.email || "—";
+        return { id: e.id, name };
+      });
 
-      const svcs = asArray(sv.data)
-        .filter((s) => s.is_active !== false)
-        .map((s) => ({
-          id: s.id,
-          name: s.service_name || s.name || "",
-          price: s.price == null ? null : Number(s.price),
-          time: s.time || "",
-          minutes: parseDurationMin(s.time || ""),
-          active: s.is_active !== false,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+      const svcs = asArray(sv.data).map((s) => ({
+        id: s.id,
+        name: s.service_name || s.name || "",
+        price: s.price == null ? null : Number(s.price),
+        time: s.time || "",
+        minutes: parseDurationMin(s.time || ""),
+        active: s.is_active !== false,
+      }));
 
       setClients(cls);
       setBarbers(emps);
@@ -155,6 +153,8 @@ const Recorda = () => {
   }, []);
 
   /* записи за выбранный день */
+  // NOTE: Client-side filtering is a temporary solution
+  // TODO: Backend should support ?date=YYYY-MM-DD&status= params for appointments
   const dayRecords = useMemo(() => {
     let records = appointments.filter((r) => toDate(r.start_at) === fltDate);
     

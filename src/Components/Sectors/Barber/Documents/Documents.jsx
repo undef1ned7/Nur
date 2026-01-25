@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./Documents.scss";
 import api from "../../../../api";
 import BarberSelect from "../common/BarberSelect";
+import ConfirmModal from "../../../common/ConfirmModal/ConfirmModal";
 
 /* ===== helpers ===== */
 const normalizeResp = (data) =>
@@ -62,6 +63,14 @@ const fmtISO = (iso) => {
 /* ===== main component ===== */
 export default function BarberDocuments() {
   const [tab, setTab] = useState("folders"); // "folders" | "docs"
+
+  /* ---------- CONFIRM MODAL ---------- */
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
 
   /* ---------- FOLDERS ---------- */
   const [foldRows, setFoldRows] = useState([]);
@@ -198,7 +207,28 @@ export default function BarberDocuments() {
   };
 
   const onDeleteFolder = async (f) => {
-    if (!window.confirm(`Удалить папку «${f.name || "Без названия"}»?`)) return;
+    setConfirmModal({
+      open: true,
+      title: "Удаление папки",
+      message: `Удалить папку «${f.name || "Без названия"}»?`,
+      onConfirm: async () => {
+        setFoldErr("");
+        try {
+          await api.delete(`/barbershop/folders/${f.id}/`);
+          await loadFolders();
+          if (selectedFolderId === f.id) {
+            setSelectedFolderId("");
+            setFolderDetail(null);
+          }
+        } catch (err) {
+          setFoldErr(err?.response?.data?.detail || "Ошибка удаления папки");
+        }
+        setConfirmModal({ open: false, title: "", message: "", onConfirm: null });
+      },
+    });
+  };
+
+  const onDeleteFolderLegacy = async (f) => {
     setFoldErr("");
     try {
       await api.delete(`/barbershop/folders/${f.id}/`);
@@ -371,8 +401,28 @@ export default function BarberDocuments() {
   };
 
   const onDeleteDoc = async (d) => {
-    if (!window.confirm(`Удалить документ «${d.name || "Без названия"}»?`))
-      return;
+    setConfirmModal({
+      open: true,
+      title: "Удаление документа",
+      message: `Удалить документ «${d.name || "Без названия"}»?`,
+      onConfirm: async () => {
+        setDocErr("");
+        try {
+          await api.delete(`/barbershop/documents/${d.id}/`);
+          await loadDocs();
+          if (selectedDocId === d.id) {
+            setSelectedDocId("");
+            setDocViewerUrl("");
+          }
+        } catch (err) {
+          setDocErr(err?.response?.data?.detail || "Ошибка удаления документа");
+        }
+        setConfirmModal({ open: false, title: "", message: "", onConfirm: null });
+      },
+    });
+  };
+
+  const onDeleteDocLegacy = async (d) => {
     setDocErr("");
     try {
       await api.delete(`/barbershop/documents/${d.id}/`);
@@ -1027,6 +1077,16 @@ export default function BarberDocuments() {
           )}
         </>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.open}
+        onClose={() =>
+          setConfirmModal({ open: false, title: "", message: "", onConfirm: null })
+        }
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+      />
     </div>
   );
 }
