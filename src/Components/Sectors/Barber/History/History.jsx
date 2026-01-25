@@ -19,19 +19,19 @@ import "./History.scss";
 
 
 const STATUS_OPTIONS = [
-  { value: "all", label: "Все статусы" },
+  { value: "all", label: "Все" },
   { value: "completed", label: "Завершено" },
   { value: "booked", label: "Забронировано" },
   { value: "confirmed", label: "Подтверждено" },
   { value: "canceled", label: "Отменено" },
-  { value: "no_show", label: "Не пришёл" },
+  { value: "no_show", label: "Не явился" },
 ];
 
 const SORT_OPTIONS = [
-  { value: "newest", label: "Сначала новые" },
-  { value: "oldest", label: "Сначала старые" },
-  { value: "price_desc", label: "Цена ↓" },
-  { value: "price_asc", label: "Цена ↑" },
+  { value: "newest", label: "Новые" },
+  { value: "oldest", label: "Старые" },
+  { value: "price_desc", label: "Дороже" },
+  { value: "price_asc", label: "Дешевле" },
 ];
 
 const pluralRecords = (n) => {
@@ -69,9 +69,41 @@ const History = () => {
   const requestIdRef = useRef(0);
   const debounceTimerRef = useRef(null);
 
-  const [viewMode, setViewMode] = useState("table");
+  // Определяем начальный viewMode на основе размера экрана
+  const getInitialViewMode = () => {
+    if (typeof window !== 'undefined') {
+      // Телефоны (≤768px) → карточки
+      // Планшеты/ноутбуки/ПК (>768px) → список
+      return window.innerWidth <= 768 ? "cards" : "table";
+    }
+    return "table";
+  };
+
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [userChangedView, setUserChangedView] = useState(false);
+
+  // Обработчик изменения режима просмотра
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    setUserChangedView(true);
+  };
+
+  // Обновляем viewMode при изменении размера экрана (только если пользователь не менял вручную)
+  useEffect(() => {
+    const handleResize = () => {
+      if (!userChangedView) {
+        const newMode = window.innerWidth <= 768 ? "cards" : "table";
+        if (newMode !== viewMode) {
+          setViewMode(newMode);
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode, userChangedView]);
 
   // Маппинг сортировки UI -> API
   const getOrderingForAPI = (sortKey) => {
@@ -273,7 +305,7 @@ const History = () => {
   /* Options for year/month/day filters */
   const yearOptions = useMemo(
     () => [
-      { value: "", label: "Все годы" },
+      { value: "", label: "Все" },
       { value: "2025", label: "2025" },
       { value: "2026", label: "2026" },
       { value: "2027", label: "2027" },
@@ -283,7 +315,7 @@ const History = () => {
 
   const monthOptions = useMemo(
     () => [
-      { value: "", label: "Все месяцы" },
+      { value: "", label: "Все" },
       ...monthNames.map((label, idx) => ({ value: String(idx + 1), label })),
     ],
     []
@@ -299,7 +331,7 @@ const History = () => {
 
   const dayOptions = useMemo(
     () => [
-      { value: "", label: "Все дни" },
+      { value: "", label: "Все" },
       ...Array.from({ length: daysInMonth }).map((_, i) => ({
         value: String(i + 1),
         label: pad(i + 1),
@@ -320,7 +352,9 @@ const History = () => {
   }, [appointmentsCount, appointments.length, appointmentsNext, page]);
 
   const counterText = loading
-    ? "Загрузка…"
+    ? "Загрузка..."
+    : appointmentsCount === 0
+    ? "Нет записей"
     : `${appointmentsCount} ${pluralRecords(appointmentsCount)}`;
 
   /* Check if filters are active */
@@ -578,7 +612,7 @@ const History = () => {
             className="barberhistory__resetBtn"
             onClick={handleReset}
           >
-            Сбросить всё
+            Сбросить
           </button>
         )}
       </div>
@@ -613,17 +647,17 @@ const History = () => {
         <div className="barberhistory__viewToggle">
           <button
             className={`barberhistory__viewBtn ${viewMode === "table" ? "is-active" : ""}`}
-            onClick={() => setViewMode("table")}
-            title="Таблица"
-            aria-label="Вид таблицей"
+            onClick={() => handleViewModeChange("table")}
+            title="Список"
+            aria-label="Список"
           >
             <FaList />
           </button>
           <button
             className={`barberhistory__viewBtn ${viewMode === "cards" ? "is-active" : ""}`}
-            onClick={() => setViewMode("cards")}
+            onClick={() => handleViewModeChange("cards")}
             title="Карточки"
-            aria-label="Вид карточками"
+            aria-label="Карточки"
           >
             <FaThLarge />
           </button>
@@ -707,7 +741,7 @@ const History = () => {
                     className="barberhistory__filtersPanelClear"
                     onClick={handleClearFilters}
                   >
-                    Очистить фильтры
+                    Очистить
                   </button>
                 </div>
               )}
@@ -720,15 +754,15 @@ const History = () => {
       {!isLoggedIn && !loading && appointments.length === 0 && (
         <div className="barberhistory__warning">
           <FaExclamationTriangle className="barberhistory__warningIcon" />
-          <span>Войдите в систему, чтобы увидеть вашу историю записей. Если вы уже вошли — обновите страницу.</span>
+          <span>Войдите, чтобы увидеть историю записей</span>
         </div>
       )}
 
       {loading ? (
-        <Loading message="Загрузка истории..." />
+        <Loading message="Загрузка..." />
       ) : appointments.length === 0 ? (
         <div className="barberhistory__empty">
-          {hasFilters ? "Ничего не найдено" : "Записей нет"}
+          {hasFilters ? "Не найдено" : "Нет записей"}
         </div>
       ) : (
         <>
