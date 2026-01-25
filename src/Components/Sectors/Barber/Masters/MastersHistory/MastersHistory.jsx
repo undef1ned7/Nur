@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import "./MastersHistory.scss";
 import api from "../../../../../api";
-import { MastersHistoryHeader, MastersHistoryList, Pager } from "./components";
+import { MastersHistoryHeader, MastersHistoryList } from "./components";
 import {
   asArray,
   pad,
@@ -19,18 +19,17 @@ const MastersHistory = () => {
   const [yearFilter, setYearFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [dayFilter, setDayFilter] = useState("");
-  const [page, setPage] = useState(1);
 
   // Server-side data state
   const [appointments, setAppointments] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [appointmentsNext, setAppointmentsNext] = useState(null);
-  const [appointmentsPrevious, setAppointmentsPrevious] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // UI state
-  const [viewMode, setViewMode] = useState("table");
+  // UI state - по умолчанию карточки на мобильных, таблица на десктопе
+  const [viewMode, setViewMode] = useState(() => {
+    return window.innerWidth <= 768 ? "cards" : "table";
+  });
 
   // Refs for request cancellation and race condition protection
   const abortControllerRef = useRef(null);
@@ -99,12 +98,18 @@ const MastersHistory = () => {
     };
   }, [search]);
 
-  // Reset page to 1 when search/ordering/filters change
+  // Обработка изменения размера экрана для автоматического переключения режима просмотра
   useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, ordering, statusFilter, employeeFilter, yearFilter, monthFilter, dayFilter]);
+    const handleResize = () => {
+      const isMobile = window.innerWidth <= 768;
+      setViewMode(isMobile ? "cards" : "table");
+    };
 
-  // Main effect for fetching appointments (server-side)
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Main effect for fetching appointments (server-side) - БЕЗ ПАГИНАЦИИ
   useEffect(() => {
     // Cancel previous request
     if (abortControllerRef.current) {
@@ -119,16 +124,16 @@ const MastersHistory = () => {
     const currentRequestId = ++requestIdRef.current;
 
     // Build query params
-    const params = {};
+    const params = {
+      page_size: 10000, // Загружаем все записи
+    };
+    
     if (debouncedSearch.trim()) {
       params.search = debouncedSearch.trim();
     }
     const orderingAPI = getOrderingForAPI(ordering);
     if (orderingAPI) {
       params.ordering = orderingAPI;
-    }
-    if (page > 1) {
-      params.page = page;
     }
     if (statusFilter !== "all") {
       params.status = statusFilter;
@@ -168,8 +173,6 @@ const MastersHistory = () => {
         const data = response.data;
         setAppointments(asArray(data));
         setTotalCount(data.count || 0);
-        setAppointmentsNext(data.next || null);
-        setAppointmentsPrevious(data.previous || null);
         setLoading(false);
       })
       .catch((error) => {
@@ -191,7 +194,7 @@ const MastersHistory = () => {
     return () => {
       abortController.abort();
     };
-  }, [debouncedSearch, ordering, page, statusFilter, employeeFilter, yearFilter, monthFilter, dayFilter, getDateRange]);
+  }, [debouncedSearch, ordering, statusFilter, employeeFilter, yearFilter, monthFilter, dayFilter, getDateRange]);
 
   // Options for filters
   const employeeOptions = useMemo(
@@ -241,18 +244,6 @@ const MastersHistory = () => {
     [daysInMonth]
   );
 
-  // Calculate total pages based on server data (не используем фронтовый PAGE_SIZE!)
-  const totalPages = useMemo(() => {
-    if (totalCount === 0) return 1;
-    const pageSize = appointments.length || 1;
-    if (pageSize === 0) return 1;
-    // Если есть next, значит есть еще страницы
-    if (appointmentsNext) {
-      return Math.ceil(totalCount / pageSize);
-    }
-    // Если next нет, то текущая страница - последняя
-    return page;
-  }, [totalCount, appointments.length, appointmentsNext, page]);
 
   // Check if filters are active
   const hasFilters =
@@ -267,7 +258,6 @@ const MastersHistory = () => {
     setMonthFilter("");
     setDayFilter("");
     setOrdering("newest");
-    setPage(1);
   };
 
   // Handlers with cascade reset
@@ -318,8 +308,6 @@ const MastersHistory = () => {
         loading={loading}
         viewMode={viewMode}
       />
-
-      <Pager page={page} totalPages={totalPages} onChange={setPage} />
     </section>
   );
 };
