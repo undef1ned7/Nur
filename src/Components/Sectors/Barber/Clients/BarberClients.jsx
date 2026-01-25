@@ -255,7 +255,7 @@ export const BarberClients = () => {
         const errorMessage =
           err?.response?.data?.detail ||
           err?.message ||
-          "Не удалось загрузить клиентов.";
+          "Не удалось загрузить клиентов";
 
         setPageError(errorMessage);
         setLoading(false);
@@ -381,9 +381,10 @@ export const BarberClients = () => {
     const nameNorm = normalizeName(form.fullName);
     const phoneNorm = normalizePhone(form.phone);
 
+    // ФИО - обязательное поле
     if (!nameNorm) {
       errs.fullName = true;
-      alerts.push("Укажите ФИО.");
+      alerts.push("Укажите ФИО");
     } else {
       // Проверяем дубликаты через API
       try {
@@ -397,7 +398,7 @@ export const BarberClients = () => {
         );
         if (existsName) {
           errs.fullName = true;
-          alerts.push("Клиент с таким ФИО уже существует.");
+          alerts.push("Клиент с таким ФИО уже существует");
         }
       } catch (e) {
         // Игнорируем ошибки при проверке, бекенд сам проверит
@@ -405,52 +406,53 @@ export const BarberClients = () => {
       }
     }
 
-    if (!form.phone) {
-      errs.phone = true;
-      alerts.push("Укажите телефон.");
-    } else if (!isValidPhone(form.phone)) {
-      errs.phone = true;
-      alerts.push("Телефон должен содержать минимум 10 цифр.");
-    } else {
-      // Проверяем дубликаты через API
-      try {
-        const params = { search: phoneNorm };
-        const { data } = await api.get("/barbershop/clients/", { params });
-        const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-        const existsPhone = list.some(
-          (c) =>
-            normalizePhone(c.phone || "") === phoneNorm &&
-            (!currentClient?.id || c.id !== currentClient.id)
-        );
-        if (existsPhone) {
-          errs.phone = true;
-          alerts.push("Клиент с таким телефоном уже существует.");
+    // Телефон - необязательное поле, но если указан, проверяем валидность и дубликаты
+    if (form.phone) {
+      if (!isValidPhone(form.phone)) {
+        errs.phone = true;
+        alerts.push("Минимум 10 цифр");
+      } else {
+        // Проверяем дубликаты через API
+        try {
+          const params = { search: phoneNorm };
+          const { data } = await api.get("/barbershop/clients/", { params });
+          const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+          const existsPhone = list.some(
+            (c) =>
+              normalizePhone(c.phone || "") === phoneNorm &&
+              (!currentClient?.id || c.id !== currentClient.id)
+          );
+          if (existsPhone) {
+            errs.phone = true;
+            alerts.push("Клиент с таким телефоном уже существует");
+          }
+        } catch (e) {
+          // Игнорируем ошибки при проверке, бекенд сам проверит
+          console.error("Не удалось проверить дубликаты по телефону:", e);
         }
-      } catch (e) {
-        // Игнорируем ошибки при проверке, бекенд сам проверит
-        console.error("Не удалось проверить дубликаты по телефону:", e);
       }
     }
 
+    // Дата рождения - необязательное поле, но если указана, проверяем валидность
     if (form.birthDate) {
       const d = new Date(form.birthDate);
       const now = new Date(todayStr());
 
       if (Number.isNaN(d.getTime())) {
         errs.birthDate = true;
-        alerts.push("Дата рождения указана некорректно.");
+        alerts.push("Некорректная дата");
       } else if (d > now) {
         errs.birthDate = true;
-        alerts.push("Дата рождения в будущем недопустима.");
+        alerts.push("Дата в будущем");
       } else if (d.getFullYear() < 1900) {
         errs.birthDate = true;
-        alerts.push("Слишком ранняя дата рождения.");
+        alerts.push("Слишком ранняя дата");
       }
     }
 
     if (!STATUS_OPTIONS_UI.includes(form.status)) {
       errs.status = true;
-      alerts.push("Выберите статус из списка.");
+      alerts.push("Выберите статус");
     }
 
     return { errs, alerts };
@@ -502,8 +504,8 @@ export const BarberClients = () => {
       setFormErrors({});
       setClientAlerts([]);
     } catch (e) {
-      const alerts = [parseApiError(e, "Не удалось сохранить клиента.")];
-      setClientAlerts(["Исправьте ошибки в форме", ...alerts]);
+      const alerts = [parseApiError(e, "Ошибка сохранения")];
+      setClientAlerts(alerts);
       console.error(e);
     } finally {
       setSaving(false);
@@ -526,7 +528,7 @@ export const BarberClients = () => {
 
     if (alerts.length) {
       setFormErrors(errs);
-      setClientAlerts(["Исправьте ошибки в форме", ...alerts]);
+      setClientAlerts(alerts);
       focusFirstError(errs);
       return;
     }
@@ -568,7 +570,7 @@ export const BarberClients = () => {
       console.error(e);
       // При ошибке закрываем окно подтверждения и показываем ошибку в модальном окне
       setConfirmOpen(false);
-      setClientAlerts(["Не удалось удалить клиента."]);
+      setClientAlerts(["Ошибка удаления"]);
       // Модальное окно редактирования остается открытым, чтобы показать ошибку
     } finally {
       setDeleting(false);
@@ -600,14 +602,14 @@ export const BarberClients = () => {
     if (!c || creatingClientIds.has(c.id)) return;
 
     if (!normalizeName(c.fullName)) {
-      setToast({ type: "error", text: "Укажите ФИО клиента." });
+      setToast({ type: "error", text: "Укажите ФИО клиента" });
       return;
     }
 
-    if (!isValidPhone(c.phone)) {
+    if (c.phone && !isValidPhone(c.phone)) {
       setToast({
         type: "error",
-        text: "Телефон должен содержать минимум 10 цифр.",
+        text: "Минимум 10 цифр",
       });
       return;
     }
@@ -622,7 +624,7 @@ export const BarberClients = () => {
       if (exists) {
         setToast({
           type: "error",
-          text: "Такой клиент уже есть в Продажах.",
+          text: "Клиент уже есть в Продажах",
         });
         return;
       }
@@ -637,19 +639,19 @@ export const BarberClients = () => {
       setCrmCreatedIds((prev) => new Set(prev).add(c.id));
       setToast({
         type: "success",
-        text: "Клиент создан в Продажах.",
+        text: "Клиент создан в Продажах",
       });
     } catch (e) {
       const status = e?.response?.status;
       if (status === 409 || status === 400) {
         setToast({
           type: "error",
-          text: "Такой клиент уже есть в Продажах.",
+          text: "Клиент уже есть в Продажах",
         });
       } else {
         setToast({
           type: "error",
-          text: parseApiError(e, "Не удалось создать клиента в CRM."),
+          text: parseApiError(e, "Ошибка создания в CRM"),
         });
       }
     } finally {
@@ -753,7 +755,7 @@ export const BarberClients = () => {
         const message =
           err?.response?.data?.detail ||
           err?.message ||
-          "Не удалось загрузить историю визитов.";
+          "Не удалось загрузить историю";
         setHistoryError(message);
         setHistoryLoading(false);
       });

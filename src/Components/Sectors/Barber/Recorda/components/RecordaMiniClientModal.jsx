@@ -83,14 +83,14 @@ const RecordaMiniClientModal = ({
 
     if (!name) {
       errs.name = true;
-      alerts.push("Укажите ФИО.");
+      alerts.push("Укажите ФИО");
     }
 
     // телефон НЕ обязателен — проверяем только если ввели
     if (phone) {
       if (!isValidPhone(phone)) {
         errs.phone = true;
-        alerts.push("Телефон должен содержать минимум 10 цифр.");
+        alerts.push("Минимум 10 цифр");
       }
     }
 
@@ -106,7 +106,7 @@ const RecordaMiniClientModal = ({
     if (!errs.name && !errs.phone && dupLocal) {
       errs.name = true;
       errs.phone = true;
-      alerts.push("Клиент уже существует — выберите его по ФИО.");
+      alerts.push("Клиент уже существует");
     }
 
     if (alerts.length) {
@@ -160,7 +160,7 @@ const RecordaMiniClientModal = ({
         );
       }
 
-      if (!msgs.length) msgs.push("Не удалось создать клиента.");
+      if (!msgs.length) msgs.push("Ошибка создания клиента");
       setMiniAlerts(msgs);
       console.error("Create client error:", e2);
     } finally {
@@ -217,7 +217,7 @@ const RecordaMiniClientModal = ({
               value={miniName}
               onChange={(e) => setMiniName(e.target.value)}
               onFocus={() => setIsNameActive(true)}
-              placeholder="Фамилия Имя Отчество"
+              placeholder="ФИО клиента"
               autoFocus
               required
               autoComplete="off"
@@ -236,10 +236,10 @@ const RecordaMiniClientModal = ({
                     type="button"
                     className="barberrecorda__suggestItem"
                     onClick={() => pickExisting(c)}
-                    title="Выбрать существующего клиента"
+                    title="Выбрать клиента"
                   >
                     <span className="barberrecorda__suggestName">
-                      {c.name || "Без имени"}
+                      {c.name || "—"}
                     </span>
                     {c.phone ? (
                       <span className="barberrecorda__suggestPhone">{c.phone}</span>

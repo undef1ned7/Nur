@@ -170,7 +170,7 @@ const ClientModals = ({
                   }`}
                 >
                   <label className="barberclient__label" htmlFor="phone">
-                    Телефон <span className="barberclient__req">*</span>
+                    Телефон
                   </label>
                   <input
                     id="phone"
@@ -209,7 +209,7 @@ const ClientModals = ({
                   }`}
                 >
                   <label className="barberclient__label">
-                    Статус <span className="barberclient__req">*</span>
+                    Статус
                   </label>
                   <input type="hidden" name="status" value={selectedStatus} />
                   <BarberSelect
@@ -230,7 +230,7 @@ const ClientModals = ({
                     name="notes"
                     className="barberclient__textarea"
                     defaultValue={currentClient?.notes || ""}
-                    placeholder="Дополнительная информация о клиенте..."
+                    placeholder="Заметка..."
                   />
                 </div>
               </div>
@@ -276,8 +276,7 @@ const ClientModals = ({
           <div className="barberclient__confirm" onClick={(e) => e.stopPropagation()}>
             <h4 className="barberclient__confirm-title">Удалить клиента?</h4>
             <p className="barberclient__confirm-text">
-              Вы уверены, что хотите удалить клиента{" "}
-              <strong>{currentClient?.fullName}</strong>? Это действие нельзя отменить.
+              Удалить клиента <strong>{currentClient?.fullName}</strong>?
             </p>
             <div className="barberclient__confirm-actions">
               <button

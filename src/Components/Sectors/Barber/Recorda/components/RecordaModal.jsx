@@ -259,7 +259,7 @@ const RecordaModal = ({
         search: `${b.name} ${isBusy ? "занят" : "свободен"}`,
         disabled: isBusy,
         hint: isBusy
-          ? "Пересечение с другой записью в выбранный интервал"
+          ? "Занят в это время"
           : "Свободен",
       };
     });
@@ -353,23 +353,23 @@ const RecordaModal = ({
 
     if (!startDate) {
       errs.startDate = true;
-      alerts.push("Укажите дату.");
+      alerts.push("Укажите дату");
     }
     if (!selServices.length) {
       errs.services = true;
-      alerts.push("Добавьте хотя бы одну услугу.");
+      alerts.push("Добавьте услугу");
     }
     if (!startTime) {
       errs.startTime = true;
-      alerts.push("Укажите начало.");
+      alerts.push("Укажите начало");
     }
     if (!endTime) {
       errs.endTime = true;
-      alerts.push("Укажите конец.");
+      alerts.push("Укажите конец");
     }
     if (!selBarber) {
       errs.barber = true;
-      alerts.push("Выберите сотрудника.");
+      alerts.push("Выберите мастера");
     }
 
     const sM = minsOf(startTime);
@@ -379,10 +379,10 @@ const RecordaModal = ({
       if (!(inRange(startTime) && inRange(endTime))) {
         errs.startTime = true;
         errs.endTime = true;
-        alerts.push("Время должно быть в пределах 09:00–21:00.");
+        alerts.push("Время: 09:00–21:00");
       } else if (eM <= sM) {
         errs.endTime = true;
-        alerts.push("Конец должен быть позже начала.");
+        alerts.push("Конец позже начала");
       }
     }
 
@@ -406,7 +406,7 @@ const RecordaModal = ({
 
     if (dup) {
       errs.startTime = true;
-      alerts.push("Такая запись уже существует.");
+      alerts.push("Запись уже существует");
       return { alerts, errs };
     }
 
@@ -420,7 +420,7 @@ const RecordaModal = ({
     });
     if (conflictsMaster.length) {
       errs.barber = true;
-      alerts.push("Сотрудник занят в этот интервал.");
+      alerts.push("Мастер занят");
     }
 
     if (selClient) {
@@ -434,7 +434,7 @@ const RecordaModal = ({
       });
       if (conflictsClient.length) {
         errs.startTime = true;
-        alerts.push("У клиента уже есть запись в этот интервал.");
+        alerts.push("Клиент уже записан");
       }
     }
 
@@ -451,7 +451,7 @@ const RecordaModal = ({
 
     if (alerts.length) {
       setSaving(false);
-      setFormAlerts(["Исправьте ошибки в форме.", ...alerts]);
+      setFormAlerts(alerts);
       setFieldErrs(errs);
       return;
     }
@@ -508,7 +508,7 @@ const RecordaModal = ({
         );
       }
       if (!msgs.length) {
-        msgs.push("Не удалось сохранить запись.");
+        msgs.push("Ошибка сохранения");
       }
       setFormAlerts(msgs);
     } finally {
@@ -525,8 +525,8 @@ const RecordaModal = ({
   // Формируем подсказку о недостающих полях
   const getMissingFieldsHint = () => {
     const missing = [];
-    if (!selBarber) missing.push("сотрудника");
-    if (!selServices.length) missing.push("услуги");
+    if (!selBarber) missing.push("мастера");
+    if (!selServices.length) missing.push("услугу");
     if (!startTime) missing.push("время");
     return missing.length > 0 ? `Выберите ${missing.join(", ")}` : null;
   };
@@ -575,7 +575,7 @@ const RecordaModal = ({
             <div className="barberrecorda__grid">
               <div className="barberrecorda__gridMain">
                 
-                {/* 1. СОТРУДНИК (первый!) */}
+                {/* 1. МАСТЕР (первый!) */}
                 <label
                   className={`barberrecorda__field barberrecorda__field--full ${
                     fieldErrs.barber || validationState.errors.barber ? "is-invalid" : ""
@@ -583,12 +583,12 @@ const RecordaModal = ({
                 >
                   <span className="barberrecorda__label">
                     <span>
-                      Сотрудник <b className="barberrecorda__req">*</b>
+                      Мастер <b className="barberrecorda__req">*</b>
                     </span>
                     {selBarber && (
                       <span className="barberrecorda__labelHint">
                         {busyBarbersOnInterval.has(String(selBarber)) 
-                          ? "⚠ Занят в это время" 
+                          ? "⚠ Занят" 
                           : "✓ Свободен"}
                       </span>
                     )}
@@ -598,8 +598,8 @@ const RecordaModal = ({
                     items={selServices.length && startTime ? barberItems : simpleBarberItems}
                     selectedId={selBarber}
                     onChange={(id) => setSelBarber(String(id))}
-                    placeholder="Поиск сотрудника..."
-                    placeholderSelected="Выберите сотрудника"
+                    placeholder="Поиск мастера..."
+                    placeholderSelected="Выберите мастера"
                     renderMeta={false}
                   />
                 </label>
@@ -733,7 +733,7 @@ const RecordaModal = ({
                 >
                   <span className="barberrecorda__label">
                     Клиент
-                    <span className="barberrecorda__labelOptional">(необязательно)</span>
+                    <span className="barberrecorda__labelOptional">(опционально)</span>
                   </span>
                   <div className="barberrecorda__fieldRow">
                     <RecordaServicesPicker
@@ -741,7 +741,7 @@ const RecordaModal = ({
                       items={activeClientItems}
                       selectedId={selClient}
                       onChange={(id) => setSelClient(String(id))}
-                      placeholder="Поиск клиента..."
+                      placeholder="Поиск..."
                       placeholderSelected="Выберите клиента"
                       renderMeta={false}
                     />
@@ -749,7 +749,7 @@ const RecordaModal = ({
                     <button
                       type="button"
                       className="barberrecorda__btn barberrecorda__btn--primary barberrecorda__btn--square"
-                      aria-label="Создать клиента"
+                      aria-label="Создать"
                       title="Создать клиента"
                       onClick={openMini}
                     >
@@ -800,7 +800,7 @@ const RecordaModal = ({
                       {/* Скидка / Цена */}
                       <div className="barberrecorda__row barberrecorda__row--2">
                         <label className="barberrecorda__field">
-                          <span className="barberrecorda__label">Скидка, %</span>
+                          <span className="barberrecorda__label">Скидка %</span>
                           <input
                             type="text"
                             className="barberrecorda__input"
@@ -823,7 +823,7 @@ const RecordaModal = ({
                               setPriceInput(e.target.value);
                               setIsManualPrice(true);
                             }}
-                            placeholder="Сумма по услугам"
+                            placeholder="Авто"
                           />
                         </label>
                       </div>
@@ -835,7 +835,7 @@ const RecordaModal = ({
                           className="barberrecorda__textarea"
                           value={comment}
                           onChange={(e) => setComment(e.target.value)}
-                          placeholder="Добавьте заметку или особые пожелания…"
+                          placeholder="Заметка..."
                         />
                       </label>
                     </div>
@@ -877,7 +877,7 @@ const RecordaModal = ({
                   !validationState.isValid
                     ? missingHint
                     : busyBarbersOnInterval.has(String(selBarber))
-                    ? "Сотрудник занят в этот интервал"
+                    ? "Мастер занят"
                     : ""
                 }
               >

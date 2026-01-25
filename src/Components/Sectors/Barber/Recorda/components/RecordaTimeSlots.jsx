@@ -117,7 +117,7 @@ const RecordaTimeSlots = ({
   if (!selectedBarber) {
     return (
       <div className="barberrecorda__timeSlotsHint">
-        Выберите сотрудника, чтобы увидеть доступные слоты
+        Выберите мастера
       </div>
     );
   }
@@ -149,7 +149,7 @@ const RecordaTimeSlots = ({
                 isBusy
                   ? "Занято"
                   : !canFit
-                  ? "Недостаточно времени для услуги"
+                  ? "Мало времени"
                   : `Начать в ${slot.time}`
               }
             >

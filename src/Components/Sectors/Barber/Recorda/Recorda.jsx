@@ -143,7 +143,7 @@ const Recorda = () => {
     } catch (e) {
       const msg =
         e?.response?.data?.detail ||
-        "Не удалось загрузить данные. Попробуйте обновить страницу.";
+        "Не удалось загрузить данные.";
       setPageError(msg);
     } finally {
       setLoading(false);
