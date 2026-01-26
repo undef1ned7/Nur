@@ -312,6 +312,9 @@
   }
 
   .products-container {
+    @include ifmobile {
+      padding-bottom: 30px;
+    }
     &.list {
       .products-grid {
         display: flex;
@@ -363,7 +366,7 @@
       // Адаптивность для планшетов
       @media (max-width: 1200px) {
         gap: 16px;
-        
+
         .grid-item {
           flex: 0 0 calc(33.333% - 11px);
           max-width: calc(33.333% - 11px);
@@ -372,7 +375,7 @@
 
       @media (max-width: 1024px) {
         gap: 15px;
-        
+
         .grid-item {
           flex: 0 0 calc(50% - 7.5px); // 2 колонки
           max-width: calc(50% - 7.5px);
@@ -381,7 +384,7 @@
 
       @media (max-width: 768px) {
         gap: 12px;
-        
+
         .grid-item {
           flex: 0 0 calc(50% - 6px); // 2 колонки
           max-width: calc(50% - 6px);
@@ -390,7 +393,7 @@
 
       @media (max-width: 480px) {
         gap: 10px;
-        
+
         .grid-item {
           flex: 0 0 100%; // 1 колонка
           max-width: 100%;

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { act, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import api from "../../../../api";
 import {
@@ -11,6 +11,9 @@ import CookReceiptCard from "./components/CookReceiptCard";
 import KitchenCreateModal from "./components/KitchenCreateModal";
 import "./Cook.scss";
 import { useCafeOrdersWebSocket } from "../../../../hooks/useCafeWebSocket";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
+import Pagination from "../../Market/Warehouse/components/Pagination";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -122,7 +125,7 @@ const tryFetchTaskDetail = async (taskId) => {
     try {
       const r = await api.get(url);
       if (r?.data) return r.data;
-    } catch {}
+    } catch { }
   }
   return null;
 };
@@ -201,13 +204,26 @@ const toUserMessage = (err) => {
   return "Не удалось выполнить действие. Попробуйте ещё раз.";
 };
 
+
+const historyFilterOptions = [
+  { value: null, label: "Все статусы" },
+  { value: "cancelled", label: "Отменён" },
+  { value: "ready", label: "Готов" },
+];
+
+const currentFilterOptions = [
+  { value: null, label: "Все статусы" },
+  { value: "pending", label: "Ожидает" },
+  { value: "in_progress", label: "В работе" },
+];
+
 const Cook = () => {
   const dispatch = useDispatch();
   const { tasks, loading, error, updatingStatus } = useSelector((state) => state.cafeOrders);
-
   const [activeTab, setActiveTab] = useState("current");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const debouncedTaskSearchQuery = useDebouncedValue(query, 400);
+  const [statusFilter, setStatusFilter] = useState(null);
   const [collapsed, setCollapsed] = useState({});
   const [notice, setNotice] = useState(null);
 
@@ -218,10 +234,9 @@ const Cook = () => {
   const menuCacheRef = useRef(new Map()); // menuId -> full menu item
   const titleCacheRef = useRef(new Map()); // menuId -> title (быстрый доступ)
   const noticeTimerRef = useRef(null);
-  const {orders} = useCafeOrdersWebSocket()
+  const { orders } = useCafeOrdersWebSocket()
   // чтобы перерендерить, когда догрузили title
   const [titlesTick, setTitlesTick] = useState(0);
-
   // глушим возможный внешний orders:refresh сразу после смены статуса
   const suppressNextRefreshRef = useRef(false);
 
@@ -231,40 +246,50 @@ const Cook = () => {
     noticeTimerRef.current = window.setTimeout(() => setNotice(null), 3500);
   }, []);
 
+  const refetchTask = useCallback(async () => {
+    const params = {
+      search: debouncedTaskSearchQuery,
+      status: statusFilter
+    }
+    if (!statusFilter) {
+      if (activeTab === 'history') {
+        params['status'] = historyFilterOptions.map(el => el.value).filter(Boolean).toString()
+      } else {
+        params['status'] = currentFilterOptions.map(el => el.value).filter(Boolean).toString()
+      }
+    }
+
+    if (!debouncedTaskSearchQuery) delete params['search'];
+    dispatch(fetchKitchenTasksAsync(params));
+  }, [debouncedTaskSearchQuery, statusFilter, activeTab])
+
   const refetch = useCallback(async () => {
-    if (activeTab === "current") {
-      dispatch(fetchKitchenTasksAsync({}));
-    } else {
-      // История: закрытые заказы + готовые задачи (даже если заказ ещё открыт)
-      setHistoryLoading(true);
-      try {
-        // Получаем закрытые/отменённые заказы из истории
-        const [historyRes, readyTasksRes] = await Promise.all([
-          api.get("/cafe/orders/history/").catch(() => ({ data: { results: [] } })),
-          api.get("/cafe/kitchen/tasks/?status=ready").catch(() => ({ data: { results: [] } })),
-        ]);
-        
+    // История: закрытые заказы + готовые задачи (даже если заказ ещё открыт)
+    setHistoryLoading(true);
+    try {
+      await refetchTask()
+      if (activeTab === 'history') {
+        const historyRes = await api.get("/cafe/orders/history/").catch(() => ({ data: { results: [] } }));
         const historyData = historyRes?.data;
+        console.log(historyData);
+
         const orders = Array.isArray(historyData) ? historyData : (historyData?.results || []);
-        
-        const readyTasksData = readyTasksRes?.data;
-        const readyTasks = Array.isArray(readyTasksData) ? readyTasksData : (readyTasksData?.results || []);
-        
+        const readyTasks = tasks
         // Преобразуем OrderHistory в формат KitchenTask для совместимости
         // Группируем одинаковые позиции меню в рамках одного заказа, чтобы избежать дубликатов
         const tasksFromHistory = [];
-        
+
         // Добавляем позиции из закрытых заказов
         for (const order of orders) {
           const orderItems = Array.isArray(order.items) ? order.items : [];
           const orderStatus = String(order.status || "").toLowerCase();
-          
+
           // Группируем items по menu_item, суммируя quantity
           const itemsMap = new Map();
           for (const item of orderItems) {
             const menuItemId = String(item.menu_item || "");
             if (!menuItemId) continue;
-            
+
             const key = `${order.id}-${menuItemId}`;
             if (!itemsMap.has(key)) {
               itemsMap.set(key, {
@@ -286,12 +311,12 @@ const Cook = () => {
                 unit_index: 1,
               });
             }
-            
+
             // Суммируем quantity для одинаковых позиций
             const existing = itemsMap.get(key);
             existing.quantity += Number(item.quantity || 0) || 0;
           }
-          
+
           // Добавляем все сгруппированные задачи
           for (const task of itemsMap.values()) {
             if (task.quantity > 0) {
@@ -299,11 +324,11 @@ const Cook = () => {
             }
           }
         }
-        
+
         // Добавляем готовые задачи (статус "ready"), даже если заказ ещё открыт
         for (const task of readyTasks) {
           if (!task || !task.id) continue;
-          
+
           // Преобразуем готовую задачу в формат для истории
           const historyTask = {
             id: task.id,
@@ -323,18 +348,16 @@ const Cook = () => {
             quantity: task.quantity || 1,
             unit_index: task.unit_index || 1,
           };
-          
           tasksFromHistory.push(historyTask);
         }
-        
         setHistoryOrders(tasksFromHistory);
-      } catch (err) {
-        setHistoryOrders([]);
-      } finally {
-        setHistoryLoading(false);
       }
+    } catch (err) {
+      setHistoryOrders([]);
+    } finally {
+      setHistoryLoading(false);
     }
-  }, [dispatch, activeTab, orders]);
+  }, [orders, refetchTask, activeTab]);
 
   useEffect(() => {
     refetch();
@@ -468,7 +491,7 @@ const Cook = () => {
     try {
       await api.patch(`/cafe/warehouse/${item.id}/`, { remainder: numStr(nextRem) });
       return;
-    } catch {}
+    } catch { }
     await api.put(`/cafe/warehouse/${item.id}/`, {
       title: item.title,
       unit: item.unit,
@@ -517,7 +540,7 @@ const Cook = () => {
             const { item, prev } = applied[i];
             await updateWarehouseItem(item, prev);
           }
-        } catch {}
+        } catch { }
         throw e;
       }
     },
@@ -539,14 +562,14 @@ const Cook = () => {
         const next = cur + qty;
         try {
           await updateWarehouseItem(s, next);
-        } catch {}
+        } catch { }
       }
     },
     [updateWarehouseItem]
   );
 
   const groups = useMemo(() => {
-    const base = activeTab === "current" 
+    const base = activeTab === "current"
       ? (Array.isArray(tasks) ? tasks : [])
       : (Array.isArray(historyOrders) ? historyOrders : []);
     const map = new Map();
@@ -587,7 +610,7 @@ const Cook = () => {
 
       const g = map.get(key);
       g.items.push(tNorm);
-      
+
       // Сохраняем статус заказа в группе
       if (tNorm?.order_status && !g.order_status) {
         g.order_status = tNorm.order_status;
@@ -611,8 +634,8 @@ const Cook = () => {
       });
 
       // Для истории используем статус заказа, для текущих задач - статус из computeGroupStatus
-      const finalStatus = activeTab === "history" && g.order_status 
-        ? g.order_status 
+      const finalStatus = activeTab === "history" && g.order_status
+        ? g.order_status
         : computeGroupStatus(items);
 
       return { ...g, items, status: finalStatus };
@@ -634,16 +657,13 @@ const Cook = () => {
         const sf = statusFilter === "cancelled" ? "cancelled" : statusFilter;
         arr = arr.filter((g) => {
           const orderStatus = String(g.order_status || "").toLowerCase();
+          if (!orderStatus) return true;
           // "ready" в фильтре означает "closed" в истории
           if (sf === "ready") return orderStatus === "closed";
           if (sf === "cancelled" || sf === "canceled") return orderStatus === "cancelled" || orderStatus === "canceled";
           if (sf === "open") return orderStatus === "open";
           return orderStatus === sf;
         });
-      } else {
-        // В текущих задачах фильтруем по статусу задач кухни
-        const sf = statusFilter === "cancelled" ? "cancelled" : statusFilter;
-        arr = arr.filter((g) => String(g.status || "") === sf);
       }
     }
 
@@ -678,7 +698,7 @@ const Cook = () => {
 
     return arr.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
     // titlesTick нужен, чтобы после догрузки названий groups пересчитался
-  }, [tasks, historyOrders, activeTab, query, statusFilter, titlesTick]);
+  }, [tasks, historyOrders, activeTab, titlesTick]);
 
   useEffect(() => {
     if (!groups.length) return;
@@ -733,7 +753,7 @@ const Cook = () => {
         } catch (eReady) {
           try {
             await applyWarehouseIncreaseSafe(needMap);
-          } catch {}
+          } catch { }
           suppressNextRefreshRef.current = false;
           console.error("Ready error:", eReady);
           showNotice("error", toUserMessage(eReady));
@@ -751,29 +771,20 @@ const Cook = () => {
   const statusOptions = useMemo(
     () => {
       if (activeTab === "history") {
-        // Статусы для истории заказов
-        return [
-          { value: "all", label: "Все статусы" },
-          { value: "open", label: "Открыт" },
-          { value: "ready", label: "Закрыт" },
-          { value: "cancelled", label: "Отменён" },
-        ];
+        return historyFilterOptions;
       } else {
-        // Статусы для текущих задач кухни
-        return [
-          { value: "all", label: "Все статусы" },
-          { value: "pending", label: "Ожидает" },
-          { value: "in_progress", label: "В работе" },
-          { value: "ready", label: "Готов" },
-          { value: "cancelled", label: "Отменён" },
-        ];
+        return currentFilterOptions;
       }
     },
     [activeTab]
   );
-
+  useEffect(() => {
+    setQuery('');
+    setStatusFilter(null);
+  }, [activeTab])
   return (
     <section className="cafeCook">
+      <NotificationCadeSound deps={orders} />
       <CookHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -810,14 +821,14 @@ const Cook = () => {
             {query.trim()
               ? `Ничего не найдено по запросу «${query}»`
               : activeTab === "current"
-              ? "Нет текущих задач"
-              : "История пуста"}
+                ? "Нет текущих задач"
+                : "История пуста"}
           </div>
         )}
 
         {!loading &&
           !error &&
-          groups.map((g) => (
+          tasks.map((g) => (
             <CookReceiptCard
               key={g.key}
               group={g}
@@ -834,14 +845,25 @@ const Cook = () => {
             />
           ))}
       </div>
-
+      {/* <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        next={next}
+        previous={previous}
+        loading={loading}
+        creating={creating}
+        updating={updating}
+        deleting={deleting}
+        onNextPage={onNextPage}
+        onPreviousPage={onPreviousPage}
+      /> */}
       <KitchenCreateModal
         open={kitchenModalOpen}
         onClose={() => setKitchenModalOpen(false)}
         onCreated={() => {
           try {
             window.dispatchEvent(new CustomEvent("orders:refresh"));
-          } catch {}
+          } catch { }
         }}
       />
     </section>
