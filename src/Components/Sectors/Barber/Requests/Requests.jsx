@@ -41,10 +41,20 @@ const Requests = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Counts by status - отдельное состояние для общих счетчиков
+  const [statusCounts, setStatusCounts] = useState({
+    all: 0,
+    new: 0,
+    confirmed: 0,
+    no_show: 0,
+    spam: 0,
+  });
+
   // Refs для отмены запросов и защиты от race conditions
   const abortControllerRef = useRef(null);
   const requestIdRef = useRef(0);
   const debounceTimerRef = useRef(null);
+  const countsAbortControllerRef = useRef(null);
 
   /* Modals */
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -207,6 +217,69 @@ const Requests = () => {
     };
   }, [debouncedSearch, sortBy, page, statusTab, statusFilter, masterFilter, dateFrom, dateTo]);
 
+  // Отдельный эффект для загрузки counts по статусам
+  useEffect(() => {
+    // Отменяем предыдущий запрос counts
+    if (countsAbortControllerRef.current) {
+      countsAbortControllerRef.current.abort();
+      countsAbortControllerRef.current = null;
+    }
+
+    const abortController = new AbortController();
+    countsAbortControllerRef.current = abortController;
+
+    // Параллельно запрашиваем count для каждого статуса
+    const fetchCounts = async () => {
+      try {
+        const statuses = ['new', 'confirmed', 'no_show', 'spam'];
+        const promises = [
+          // all - без фильтра по статусу
+          api.get(BOOKINGS_EP, { 
+            params: { page: 1, page_size: 1 }, 
+            signal: abortController.signal 
+          }),
+          // для каждого статуса
+          ...statuses.map(status => 
+            api.get(BOOKINGS_EP, { 
+              params: { status, page: 1, page_size: 1 }, 
+              signal: abortController.signal 
+            })
+          )
+        ];
+
+        const results = await Promise.all(promises);
+        
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        const newCounts = {
+          all: results[0].data.count || 0,
+          new: results[1].data.count || 0,
+          confirmed: results[2].data.count || 0,
+          no_show: results[3].data.count || 0,
+          spam: results[4].data.count || 0,
+        };
+
+        setStatusCounts(newCounts);
+      } catch (err) {
+        if (err.name === "AbortError" || err.name === "CanceledError") {
+          return;
+        }
+        console.error("Error fetching status counts:", err);
+      }
+    };
+
+    fetchCounts();
+
+    return () => {
+      if (countsAbortControllerRef.current === abortController) {
+        abortController.abort();
+        countsAbortControllerRef.current = null;
+      }
+    };
+  }, []); // Загружаем counts только при монтировании
+
   // Cleanup при размонтировании компонента
   useEffect(() => {
     return () => {
@@ -214,6 +287,10 @@ const Requests = () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
+      }
+      if (countsAbortControllerRef.current) {
+        countsAbortControllerRef.current.abort();
+        countsAbortControllerRef.current = null;
       }
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -252,6 +329,10 @@ const Requests = () => {
 
   /* Handle status change via API */
   const handleStatusChange = useCallback(async (requestId, newStatus) => {
+    // Находим старую заявку для получения предыдущего статуса
+    const oldRequest = requests.find((r) => r.id === requestId);
+    const oldStatus = oldRequest?.status;
+
     // Optimistic update
     setRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
@@ -259,6 +340,16 @@ const Requests = () => {
     
     try {
       await api.patch(`${BOOKINGS_EP}${requestId}/status/`, { status: newStatus });
+      
+      // Обновляем counts: уменьшаем старый статус, увеличиваем новый
+      if (oldStatus && oldStatus !== newStatus) {
+        setStatusCounts((prev) => ({
+          ...prev,
+          [oldStatus]: Math.max(0, prev[oldStatus] - 1),
+          [newStatus]: prev[newStatus] + 1,
+        }));
+      }
+
       // Обновляем список после успешного изменения статуса
       // Триггерим перезагрузку через изменение page
       if (page === 1) {
@@ -277,18 +368,8 @@ const Requests = () => {
         setPage(1);
       }
     }
-  }, [page]);
+  }, [page, requests]);
 
-  /* Counts by status - вычисляем из текущих данных (или можно запрашивать отдельно) */
-  const counts = useMemo(() => {
-    // Для точных counts нужно делать отдельный запрос или получать их с бекенда
-    // Пока используем только текущую страницу для приблизительного подсчета
-    const c = { all: requestsCount, new: 0, confirmed: 0, no_show: 0, spam: 0 };
-    requests.forEach((r) => {
-      if (c[r.status] !== undefined) c[r.status]++;
-    });
-    return c;
-  }, [requests, requestsCount]);
 
   /* Active filters count */
   const activeFiltersCount = [
@@ -349,7 +430,7 @@ const Requests = () => {
             onClick={() => setStatusTab(tab.value)}
           >
             {tab.label}
-            <span className="barberrequests__tabCount">{counts[tab.value]}</span>
+            <span className="barberrequests__tabCount">{statusCounts[tab.value]}</span>
           </button>
         ))}
       </div>
