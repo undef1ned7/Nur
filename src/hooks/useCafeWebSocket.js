@@ -37,7 +37,7 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
         const token = getToken();
         if (!token) return null;
 
-        const baseUrl = import.meta.env.VITE_WS_API_URL || 'ws://localhost:8000';
+        const baseUrl = import.meta.env.VITE_WS_API_URL || 'https://app.nurcrm.kg'
         let url = `${baseUrl}/ws/cafe/${endpoint}/?token=${token}`;
 
         // Добавляем branch_id только если пользователь owner/admin и branchId передан
@@ -377,18 +377,8 @@ export const useCafeOrdersWebSocket = (options = {}) => {
 
     const fetchOrdersStatus = useCallback(async () => {
         try {
-            const token = localStorage.getItem('accessToken');
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/cafe/orders/`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setOrders(data.results || data);
-                return data;
-            }
+            const { data } = await api.get(`/cafe/orders/`);
+            setOrders(data.results || data);
         } catch (error) {
             console.error('❌ Ошибка загрузки заказов:', error);
         }
