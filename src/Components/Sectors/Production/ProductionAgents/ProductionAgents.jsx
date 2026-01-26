@@ -488,20 +488,6 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 };
 
 /* ---- UI ---- */
-const toStartOfDay = (d) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
-const toEndOfDay = (d) => {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-};
-const safeDate = (s) => {
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-};
 
 const ProductionAgents = () => {
   const dispatch = useDispatch();
@@ -514,6 +500,7 @@ const ProductionAgents = () => {
     agentProductsLoading,
     agentProductsError,
   } = useProducts();
+  
   const { start: startInAgent } = useAgent();
   const {isMobile} = useResize((media) => {
     const {isMobile} = media
@@ -561,6 +548,14 @@ const ProductionAgents = () => {
   const [dateFrom, setDateFrom] = useState(""); // YYYY-MM-DD
   const [dateTo, setDateTo] = useState(""); // YYYY-MM-DD
 
+  const agentProductsParams = useMemo(() => {
+    const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    return params;
+  }, [debouncedSearch, dateFrom, dateTo]);
+
   // View mode (table/cards)
   const STORAGE_KEY = "production_agents_view_mode";
   const getInitialViewMode = () => {
@@ -582,9 +577,9 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
-  }, [debouncedSearch])
+  }, [agentProductsParams, dispatch, profile?.role]);
   useEffect(() => {
     // dispatch(fetchCategoriesAsync());
     // dispatch(getCashBoxes());
@@ -599,7 +594,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
     dispatch(getItemsMake());
   };
@@ -610,7 +605,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
   };
   const handleOpen = (id) => {
@@ -637,7 +632,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
   };
 
@@ -661,13 +656,28 @@ const ProductionAgents = () => {
   }, [showSellModal, dispatch]);
 
   useEffect(() => {
+    if (profile?.role !== "owner") return;
+    const params = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     api
-      .get("/main/owners/agents/products/")
+      .get("/main/owners/agents/products/", { params })
       .then(({ data }) => {
         setAgents(data);
       })
       .catch((e) => console.log(e));
-  }, []);
+  }, [profile?.role, dateFrom, dateTo]);
+
+  // Обработчик для кнопки "Продать товар"
+  const handleStartSale = async () => {
+    try {
+      await dispatch(startSaleInAgent()).unwrap();
+      setShowStart(true);
+    } catch (error) {
+      console.error("Ошибка при инициализации продажи:", error);
+      alert("Не удалось начать продажу. Попробуйте еще раз.");
+    }
+  };
 
   // Функция для загрузки истории продаж
   const loadSalesHistory = useCallback(async () => {
@@ -697,9 +707,6 @@ const ProductionAgents = () => {
 
   // Фильтрация по названию, категории и ДАТЕ created_at
   const viewProducts = useMemo(() => {
-    const from = dateFrom ? toStartOfDay(dateFrom) : null;
-    const to = dateTo ? toEndOfDay(dateTo) : null;
-
     // Выбираем источник данных в зависимости от роли
     let dataSource;
     if (profile?.role === "owner") {
@@ -718,16 +725,7 @@ const ProductionAgents = () => {
       dataSource = agentProducts;
     }
 
-    let filteredProducts = (dataSource || []).filter((p) => {
-      // фильтр по дате (только для владельца, у агентов может не быть created_at)
-      if (profile?.role === "owner") {
-        const created = safeDate(p.created_at);
-        if (!created) return false;
-        if (from && created < from) return false;
-        if (to && created > to) return false;
-      }
-      return true
-    });
+    let filteredProducts = (dataSource || []).filter(() => true);
 
     // Если это агент, показываем только товары с qty_on_hand > 0 (товары на руках)
     if (profile?.role === "agent") {
@@ -747,8 +745,6 @@ const ProductionAgents = () => {
     agents,
     agentProducts,
     categoryFilter,
-    dateFrom,
-    dateTo,
     profile?.role,
   ]);
 
@@ -826,13 +822,18 @@ const ProductionAgents = () => {
                 </div>
                 <div className="flex mx-auto gap-3 lg:mr-0 flex-wrap justify-center">
                   {profile?.role !== "owner" ? (
-                    <button
-                      className="warehouse-header__create-btn"
-                      onClick={() => setShowPendingModal(true)}
-                    >
-                      <Plus size={16} />
-                      Мои передачи
-                    </button>
+                  <div className="flex gap-2 align-middle">  <button
+                  className="warehouse-header__create-btn"
+                  onClick={() => setShowPendingModal(true)}
+                >
+                  <Plus size={16} />
+                  Мои передачи
+                </button>
+                {/* <button className="warehouse-header__create-btn" onClick={handleStartSale}>
+                  <Plus size={16} />
+                  Продать товар
+                </button> */}
+                </div>
                   ) : (
                     <button
                       className="warehouse-header__create-btn"

@@ -49,12 +49,18 @@ const initialState = {
   foundProduct: [],
   checkout: null,
   history: [],
+  historyCount: 0,
+  historyNext: null,
+  historyPrevious: null,
   historyDetail: null,
   pdf: null,
   objects: [], // список object-items
   cartObject: null,
   lastDeal: null,
   historyObjects: [],
+  historyObjectsCount: 0,
+  historyObjectsNext: null,
+  historyObjectsPrevious: null,
   historyObjectDetail: null,
   // Состояние для документов
   documents: [],
@@ -253,7 +259,10 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(historySellProduct.fulfilled, (state, { payload }) => {
-        state.history = payload;
+        state.history = payload?.results || (Array.isArray(payload) ? payload : []);
+        state.historyCount = payload?.count || payload?.length || 0;
+        state.historyNext = payload?.next || null;
+        state.historyPrevious = payload?.previous || null;
         state.loading = false;
       })
       .addCase(historySellProduct.rejected, (state, action) => {
@@ -265,7 +274,10 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(historySellObjects.fulfilled, (state, { payload }) => {
-        state.historyObjects = payload;
+        state.historyObjects = payload?.results || (Array.isArray(payload) ? payload : []);
+        state.historyObjectsCount = payload?.count || payload?.length || 0;
+        state.historyObjectsNext = payload?.next || null;
+        state.historyObjectsPrevious = payload?.previous || null;
         state.loading = false;
       })
       .addCase(historySellObjects.rejected, (state, action) => {

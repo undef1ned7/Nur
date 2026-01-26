@@ -31,12 +31,12 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
 
   const { startTs, endTs } = useMemo(
     () => monthRange(year, monthIdx),
-    [year, monthIdx]
+    [year, monthIdx],
   );
 
   const periodLabel = useMemo(
     () => `${year}-${pad2(monthIdx + 1)}`,
-    [year, monthIdx]
+    [year, monthIdx],
   );
 
   /* ===== загрузка каталога (продажи + товары) ===== */
@@ -87,9 +87,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
             const first = e.first_name ?? "";
             const last = e.last_name ?? "";
             const disp =
-              [last, first].filter(Boolean).join(" ").trim() ||
-              e.email ||
-              "—";
+              [last, first].filter(Boolean).join(" ").trim() || e.email || "—";
             return { id: e.id, name: disp };
           })
           .sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -140,7 +138,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
 
         // только текущий период
         const rows = asArray(data).filter(
-          (r) => String(r.period) === String(periodLabel)
+          (r) => String(r.period) === String(periodLabel),
         );
 
         if (cancelled) return;
@@ -153,7 +151,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
         // если несколько записей — берём последнюю
         const last = rows[rows.length - 1];
         const fund = toNum(
-          last?.new_total_fund ?? last?.total_fund ?? last?.total ?? 0
+          last?.new_total_fund ?? last?.total_fund ?? last?.total ?? 0,
         );
 
         setSaleFund(fund);
@@ -169,8 +167,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   }, [periodLabel]);
 
   /* ===== lookups ===== */
-  const svcById = (id) =>
-    services.find((x) => String(x.id) === String(id));
+  const svcById = (id) => services.find((x) => String(x.id) === String(id));
 
   const priceOf = (a) => {
     const svc = svcById(a.service);
@@ -187,7 +184,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
         if (!s) return;
 
         const rawId =
-          typeof s === "object" ? s.id ?? s.service ?? s.service_id : s;
+          typeof s === "object" ? (s.id ?? s.service ?? s.service_id) : s;
         const id = rawId != null ? String(rawId) : "";
 
         const meta = typeof s === "object" ? s : svcById(id);
@@ -203,7 +200,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
             a.service_price ??
             a.price ??
             meta?.price ??
-            0
+            0,
         );
 
         if (!id && name === "—") return;
@@ -216,8 +213,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     if (a.service || a.service_name) {
       const id = a.service ? String(a.service) : "";
       const meta = svcById(id);
-      const name =
-        a.service_name || meta?.name || (id ? `ID ${id}` : "—");
+      const name = a.service_name || meta?.name || (id ? `ID ${id}` : "—");
       const price = priceOf(a);
       rows.push({ key: id || name, name, price });
     }
@@ -226,8 +222,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   };
 
   const empName = (id) =>
-    employees.find((x) => String(x.id) === String(id))?.name ||
-    `ID ${id}`;
+    employees.find((x) => String(x.id) === String(id))?.name || `ID ${id}`;
 
   const clientNameBarber = (id) => {
     const c = clientsBarber.find((x) => String(x.id) === String(id));
@@ -235,11 +230,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   };
 
   const isSupplierLike = (c = {}) => {
-    if (
-      c.is_supplier === true ||
-      c.isVendor === true ||
-      c.supplier === true
-    )
+    if (c.is_supplier === true || c.isVendor === true || c.supplier === true)
       return true;
     const text = [
       c.type,
@@ -264,7 +255,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
         const t = tsOf(a);
         return t >= startTs && t <= endTs;
       }),
-    [appointments, startTs, endTs]
+    [appointments, startTs, endTs],
   );
 
   const totalApps = filteredApps.length;
@@ -272,7 +263,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   const totalClientsBarber = clientsBarber.length;
   const totalClientsMarket = useMemo(
     () => clientsMarket.filter((c) => !isSupplierLike(c)).length,
-    [clientsMarket]
+    [clientsMarket],
   );
 
   const totalsByStatus = useMemo(() => {
@@ -381,7 +372,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   /* ===== рейтинги ===== */
   const COUNTABLE_FOR_RANK = useMemo(
     () => new Set(["booked", "confirmed", "completed", "no_show"]),
-    []
+    [],
   );
 
   const rankBarbers = useMemo(() => {
@@ -389,15 +380,17 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     filteredApps.forEach((a) => {
       const key = String(a.barber);
       if (!key) return;
-      const rec =
-        m.get(key) || { id: key, name: empName(key), count: 0, sum: 0 };
+      const rec = m.get(key) || {
+        id: key,
+        name: empName(key),
+        count: 0,
+        sum: 0,
+      };
       if (COUNTABLE_FOR_RANK.has(a.status)) rec.count += 1;
       if (a.status === "completed") rec.sum += priceOf(a);
       m.set(key, rec);
     });
-    return [...m.values()].sort(
-      (x, y) => y.sum - x.sum || y.count - x.count
-    );
+    return [...m.values()].sort((x, y) => y.sum - x.sum || y.count - x.count);
   }, [filteredApps, employees, COUNTABLE_FOR_RANK]);
 
   const rankServices = useMemo(() => {
@@ -409,13 +402,12 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
 
       svcList.forEach(({ key, name, price }) => {
         const id = key || name;
-        const rec =
-          m.get(id) || {
-            id,
-            name,
-            count: 0,
-            sum: 0,
-          };
+        const rec = m.get(id) || {
+          id,
+          name,
+          count: 0,
+          sum: 0,
+        };
 
         if (COUNTABLE_FOR_RANK.has(a.status)) rec.count += 1;
         if (a.status === "completed") rec.sum += price;
@@ -424,9 +416,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
       });
     });
 
-    return [...m.values()].sort(
-      (x, y) => y.sum - x.sum || y.count - x.count
-    );
+    return [...m.values()].sort((x, y) => y.sum - x.sum || y.count - x.count);
   }, [filteredApps, services, COUNTABLE_FOR_RANK]);
 
   const rankClientsVisits = useMemo(() => {
@@ -434,20 +424,17 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     filteredApps.forEach((a) => {
       const key = String(a.client);
       if (!key || a.status !== "completed") return;
-      const rec =
-        m.get(key) || {
-          id: key,
-          name: clientNameBarber(key),
-          count: 0,
-          sum: 0,
-        };
+      const rec = m.get(key) || {
+        id: key,
+        name: clientNameBarber(key),
+        count: 0,
+        sum: 0,
+      };
       rec.count += 1;
       rec.sum += priceOf(a);
       m.set(key, rec);
     });
-    return [...m.values()].sort(
-      (x, y) => y.sum - x.sum || y.count - x.count
-    );
+    return [...m.values()].sort((x, y) => y.sum - x.sum || y.count - x.count);
   }, [filteredApps, clientsBarber]);
 
   /* ===== helper для направления кэшфлоу ===== */
@@ -477,7 +464,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
         const label = `Выплаты мастерам ${periodLabel}`;
         const isMasterPayoutFlow = (cf) => {
           const desc = String(
-            cf.description ?? cf.note ?? cf.comment ?? ""
+            cf.description ?? cf.note ?? cf.comment ?? "",
           ).toLowerCase();
           return desc.includes(label.toLowerCase());
         };
@@ -489,7 +476,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
 
         // выкидываем запись “Выплаты мастерам YYYY-MM”
         const periodFlows = periodFlowsRaw.filter(
-          (cf) => !isMasterPayoutFlow(cf)
+          (cf) => !isMasterPayoutFlow(cf),
         );
 
         if (!cancelled) setCashflowsPeriod(periodFlows);
@@ -507,28 +494,22 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
           const id = String(cf.cashbox ?? cf.cashbox_id ?? "");
           const direction = dirOf(cf);
           const amountAbs = Math.abs(
-            toNum(cf.amount ?? cf.value ?? cf.sum ?? 0)
+            toNum(cf.amount ?? cf.value ?? cf.sum ?? 0),
           );
 
           const prev = m.get(id) || { income: 0, expense: 0, ops: 0 };
           m.set(id, {
-            income:
-              prev.income + (direction === "income" ? amountAbs : 0),
-            expense:
-              prev.expense + (direction === "expense" ? amountAbs : 0),
+            income: prev.income + (direction === "income" ? amountAbs : 0),
+            expense: prev.expense + (direction === "expense" ? amountAbs : 0),
             ops: prev.ops + 1,
           });
         }
 
         const rows = Array.from(m, ([id, v]) => {
-          const meta = boxes.find(
-            (b) => String(b.id || b.uuid) === id
-          );
+          const meta = boxes.find((b) => String(b.id || b.uuid) === id);
           const name = clean(
-            meta?.department_name ||
-              meta?.name ||
-              (id ? `Касса #${id}` : "—"),
-            "—"
+            meta?.department_name || meta?.name || (id ? `Касса #${id}` : "—"),
+            "—",
           );
           return {
             name,
@@ -599,33 +580,38 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
         items.forEach(addItem);
       }
 
-if (!hadItems) {
-  const ids = take(periodSales.map((s) => s.id), 60);
+      if (!hadItems) {
+        const ids = take(
+          periodSales.map((s) => s.id),
+          60,
+        );
 
-  for (const id of ids) {
-    const sale = periodSales.find((x) => String(x.id) === String(id));
+        for (const id of ids) {
+          const sale = periodSales.find((x) => String(x.id) === String(id));
 
-    // если это object-sale (из historyObjects) — грузим только object detail
-    if (sale && (sale.object || sale.object_name || sale.object_sale === true)) {
-      try {
-        const d2 = await dispatch(historySellObjectDetail(id)).unwrap();
-        (Array.isArray(d2?.items) ? d2.items : []).forEach(addItem);
-      } catch (e) {
-        console.error(e);
+          // если это object-sale (из historyObjects) — грузим только object detail
+          if (
+            sale &&
+            (sale.object || sale.object_name || sale.object_sale === true)
+          ) {
+            try {
+              const d2 = await dispatch(historySellObjectDetail(id)).unwrap();
+              (Array.isArray(d2?.items) ? d2.items : []).forEach(addItem);
+            } catch (e) {
+              console.error(e);
+            }
+            continue;
+          }
+
+          // иначе считаем что это product-sale — грузим только product detail
+          try {
+            const d1 = await dispatch(historySellProductDetail(id)).unwrap();
+            (Array.isArray(d1?.items) ? d1.items : []).forEach(addItem);
+          } catch (e) {
+            console.error(e);
+          }
+        }
       }
-      continue;
-    }
-
-    // иначе считаем что это product-sale — грузим только product detail
-    try {
-      const d1 = await dispatch(historySellProductDetail(id)).unwrap();
-      (Array.isArray(d1?.items) ? d1.items : []).forEach(addItem);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-}
-
 
       if (!cancelled) {
         const rows = Array.from(m, ([k, v]) => ({
@@ -646,13 +632,10 @@ if (!hadItems) {
   const stockKpis = useMemo(() => {
     const list = products || [];
     const positions = list.length;
-    const totalQty = list.reduce(
-      (a, p) => a + toNum(p.quantity),
-      0
-    );
+    const totalQty = list.reduce((a, p) => a + toNum(p.quantity), 0);
     const stockValueRetail = list.reduce(
       (a, p) => a + toNum(p.price) * toNum(p.quantity),
-      0
+      0,
     );
     return { positions, totalQty, stockValueRetail };
   }, [products]);
@@ -670,9 +653,7 @@ if (!hadItems) {
       const k = keyOf(display, "—");
       names.set(k, display);
       const unit =
-        p.purchase_price != null
-          ? toNum(p.purchase_price)
-          : toNum(p.price);
+        p.purchase_price != null ? toNum(p.purchase_price) : toNum(p.price);
       const sum = unit * toNum(p.quantity);
       const prev = m.get(k) || { sum: 0, items: 0 };
       m.set(k, { sum: prev.sum + sum, items: prev.items + 1 });
@@ -706,13 +687,10 @@ if (!hadItems) {
 
   /* ===== доп. агрегаты для новых блоков интерфейса ===== */
   const goodsSummary = useMemo(() => {
-    const totalQty = productsRowsAgg.reduce(
-      (a, r) => a + toNum(r.qty),
-      0
-    );
+    const totalQty = productsRowsAgg.reduce((a, r) => a + toNum(r.qty), 0);
     const totalRevenue = productsRowsAgg.reduce(
       (a, r) => a + toNum(r.revenue),
-      0
+      0,
     );
     return { totalQty, totalRevenue };
   }, [productsRowsAgg]);
@@ -721,7 +699,7 @@ if (!hadItems) {
     const activeClients = clientsSalesRows.length;
     const totalRevenue = clientsSalesRows.reduce(
       (a, r) => a + toNum(r.revenue),
-      0
+      0,
     );
     return { activeClients, totalRevenue };
   }, [clientsSalesRows]);
@@ -765,18 +743,14 @@ if (!hadItems) {
       if (idx < 0 || idx >= daysInMonth) return;
 
       const direction = dirOf(cf);
-      const amountAbs = Math.abs(
-        toNum(cf.amount ?? cf.value ?? cf.sum ?? 0)
-      );
+      const amountAbs = Math.abs(toNum(cf.amount ?? cf.value ?? cf.sum ?? 0));
 
       if (direction === "income") income[idx] += amountAbs;
       else if (direction === "expense") expense[idx] += amountAbs;
     });
 
     return {
-      labels: Array.from({ length: daysInMonth }, (_, i) =>
-        String(i + 1)
-      ),
+      labels: Array.from({ length: daysInMonth }, (_, i) => String(i + 1)),
       income,
       expense,
     };

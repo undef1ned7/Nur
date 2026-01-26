@@ -72,7 +72,7 @@ const Documents = () => {
 
   // Функция для генерации порядкового номера чека/накладной
   // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
-  const PAGE_SIZE = 100;
+  const PAGE_SIZE = 50;
   const getDocumentNumber = (index, prefix = "ЧЕК") => {
     const sequentialNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
     return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;

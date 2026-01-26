@@ -14,6 +14,7 @@ const CatalogControls = ({
   onViewModeChange,
   onOpenCart,
   totalItemsCount,
+  hideCartButton = false,
 }) => {
   const { profile } = useUser();
   // Проверяем, является ли пользователь сотрудником (не владельцем)
@@ -72,7 +73,7 @@ const CatalogControls = ({
       )}
 
       <div className="controls-right">
-        {isEmployee && (
+        {isEmployee && !hideCartButton && (
           <button className="request-cart-btn" onClick={onOpenCart}>
             <ShoppingCart size={20} />
             Запросы

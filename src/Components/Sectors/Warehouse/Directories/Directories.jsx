@@ -10,7 +10,7 @@ import "./Directories.scss";
  * - БЭМ: .sklad-directories*
  */
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 const TABS = { CATEGORIES: "categories", BRANDS: "brands" };
 
 const WarehouseDirectories = () => {

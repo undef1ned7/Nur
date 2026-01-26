@@ -14,11 +14,11 @@ import { pdf } from "@react-pdf/renderer";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import {
-  fetchWarehouseProducts,
   fetchWarehouseCounterparties,
   fetchWarehouses,
   postWarehouseDocument,
 } from "../../../../store/creators/warehouseThunk";
+import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import warehouseAPI from "../../../../api/warehouse";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
@@ -96,17 +96,25 @@ const CreateSaleDocument = () => {
   }, [productSearch]);
 
   // Загрузка товаров через новый warehouse API
+  // Загружаем товары только выбранного склада (не используем /main/products/list/)
   useEffect(() => {
+    // Не загружаем товары, если склад не выбран
+    if (!warehouse) {
+      setProducts([]);
+      return;
+    }
+    
     const loadProducts = async () => {
       setProductsLoading(true);
       try {
-        const result = await dispatch(
-          fetchWarehouseProducts({
-            search: debouncedProductSearch || undefined,
-            page_size: showMoreProducts ? 50 : 20,
-          })
-        );
-        if (fetchWarehouseProducts.fulfilled.match(result)) {
+        const params = {
+          warehouse: warehouse, // Всегда передаем warehouse, чтобы использовать warehouse/${warehouse}/products/
+          search: debouncedProductSearch || undefined,
+          page_size: showMoreProducts ? 50 : 20,
+        };
+        
+        const result = await dispatch(fetchProductsAsync(params));
+        if (fetchProductsAsync.fulfilled.match(result)) {
           // Обрабатываем стандартный формат DRF пагинации
           setProducts(result.payload?.results || (Array.isArray(result.payload) ? result.payload : []));
         }
@@ -117,7 +125,7 @@ const CreateSaleDocument = () => {
       }
     };
     loadProducts();
-  }, [dispatch, debouncedProductSearch, showMoreProducts]);
+  }, [dispatch, debouncedProductSearch, showMoreProducts, warehouse]);
 
   // Загрузка контрагентов через warehouse API
   useEffect(() => {
@@ -131,7 +139,8 @@ const CreateSaleDocument = () => {
       try {
         const result = await dispatch(fetchWarehouses());
         if (fetchWarehouses.fulfilled.match(result)) {
-          setWarehouses(result.payload?.results || (Array.isArray(result.payload) ? result.payload : []));
+          const loadedWarehouses = result.payload?.results || (Array.isArray(result.payload) ? result.payload : []);
+          setWarehouses(loadedWarehouses);
         }
       } catch (error) {
         console.error("Ошибка загрузки складов:", error);
@@ -139,6 +148,25 @@ const CreateSaleDocument = () => {
     };
     loadWarehouses();
   }, [dispatch]);
+
+  // Автоматически выбираем первый склад по умолчанию
+  useEffect(() => {
+    // Если склад уже выбран, не меняем его
+    if (warehouse) return;
+    
+    // Сначала пробуем выбрать из warehouses
+    if (warehouses.length > 0) {
+      const firstWarehouse = warehouses[0];
+      setWarehouse(firstWarehouse.id || firstWarehouse.uuid || "");
+      return;
+    }
+    
+    // Если warehouses пуст, пробуем выбрать из cashBoxes
+    if (cashBoxes && cashBoxes.length > 0) {
+      const firstCashBox = cashBoxes[0];
+      setWarehouse(firstCashBox.id || firstCashBox.uuid || "");
+    }
+  }, [warehouses, cashBoxes, warehouse]);
 
   // Синхронизация выбранных товаров с товарами в корзине
   useEffect(() => {
