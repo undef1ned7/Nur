@@ -6,6 +6,7 @@ import TablesHall from "./components/TablesHall";
 import TablesZones from "./components/TablesZones";
 import TablesFiltersModal from "./components/TablesFiltersModal";
 import "./Tables.scss";
+import { useCafeTablesWebSocket } from "../../../../hooks/useCafeWebSocket";
 
 const listFrom = (r) => r?.data?.results || r?.data || [];
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
@@ -33,6 +34,7 @@ const Tables = () => {
   const [zones, setZones] = useState([]);
   const [tables, setTables] = useState([]);
   const [ordersActive, setOrdersActive] = useState([]);
+  const socket = useCafeTablesWebSocket()
 
   // confirm modal (no window.confirm)
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -120,11 +122,12 @@ const Tables = () => {
     } catch (e) {
       // Ошибка загрузки данных - неудачно при сетевых проблемах
     }
-  }, [hydrateOrdersDetails]);
+  }, [hydrateOrdersDetails, socket.tables]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
 
   useEffect(() => {
     const handler = () => loadAll();
