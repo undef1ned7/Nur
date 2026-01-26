@@ -249,7 +249,8 @@ const Cook = () => {
   const refetchTask = useCallback(async () => {
     const params = {
       search: debouncedTaskSearchQuery,
-      status: statusFilter
+      status: statusFilter,
+      ordering: '-created_at'
     }
     if (!statusFilter) {
       if (activeTab === 'history') {
@@ -268,90 +269,6 @@ const Cook = () => {
     setHistoryLoading(true);
     try {
       await refetchTask()
-      if (activeTab === 'history') {
-        const historyRes = await api.get("/cafe/orders/history/").catch(() => ({ data: { results: [] } }));
-        const historyData = historyRes?.data;
-        console.log(historyData);
-
-        const orders = Array.isArray(historyData) ? historyData : (historyData?.results || []);
-        const readyTasks = tasks
-        // Преобразуем OrderHistory в формат KitchenTask для совместимости
-        // Группируем одинаковые позиции меню в рамках одного заказа, чтобы избежать дубликатов
-        const tasksFromHistory = [];
-
-        // Добавляем позиции из закрытых заказов
-        for (const order of orders) {
-          const orderItems = Array.isArray(order.items) ? order.items : [];
-          const orderStatus = String(order.status || "").toLowerCase();
-
-          // Группируем items по menu_item, суммируя quantity
-          const itemsMap = new Map();
-          for (const item of orderItems) {
-            const menuItemId = String(item.menu_item || "");
-            if (!menuItemId) continue;
-
-            const key = `${order.id}-${menuItemId}`;
-            if (!itemsMap.has(key)) {
-              itemsMap.set(key, {
-                id: `${order.id}-${item.id || menuItemId}`,
-                order: order.original_order_id || order.id,
-                order_item: item.id,
-                menu_item: item.menu_item,
-                menu_item_title: item.menu_item_title || "",
-                table_number: order.table_number || "—",
-                guest: "",
-                waiter_label: order.waiter_label || "",
-                waiter: order.waiter,
-                status: orderStatus === "closed" ? "ready" : orderStatus === "cancelled" ? "cancelled" : "pending",
-                order_status: orderStatus,
-                created_at: order.created_at,
-                finished_at: order.archived_at || order.paid_at,
-                price: item.menu_item_price || "0",
-                quantity: 0,
-                unit_index: 1,
-              });
-            }
-
-            // Суммируем quantity для одинаковых позиций
-            const existing = itemsMap.get(key);
-            existing.quantity += Number(item.quantity || 0) || 0;
-          }
-
-          // Добавляем все сгруппированные задачи
-          for (const task of itemsMap.values()) {
-            if (task.quantity > 0) {
-              tasksFromHistory.push(task);
-            }
-          }
-        }
-
-        // Добавляем готовые задачи (статус "ready"), даже если заказ ещё открыт
-        for (const task of readyTasks) {
-          if (!task || !task.id) continue;
-
-          // Преобразуем готовую задачу в формат для истории
-          const historyTask = {
-            id: task.id,
-            order: task.order,
-            order_item: task.order_item,
-            menu_item: task.menu_item,
-            menu_item_title: task.menu_item_title || "",
-            table_number: task.table_number || "—",
-            guest: task.guest || "",
-            waiter_label: task.waiter_label || "",
-            waiter: task.waiter,
-            status: "ready",
-            order_status: "open", // Заказ ещё открыт, но позиция готова
-            created_at: task.created_at,
-            finished_at: task.finished_at,
-            price: task.price || "0",
-            quantity: task.quantity || 1,
-            unit_index: task.unit_index || 1,
-          };
-          tasksFromHistory.push(historyTask);
-        }
-        setHistoryOrders(tasksFromHistory);
-      }
     } catch (err) {
       setHistoryOrders([]);
     } finally {
