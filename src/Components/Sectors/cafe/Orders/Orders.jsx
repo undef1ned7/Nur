@@ -26,7 +26,8 @@ import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
-import { useCafeWebSocket, useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
+import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
+import { useUser } from "../../../../store/slices/userSlice";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -147,7 +148,7 @@ const statusFilterOptions =
    Orders
    ========================================================= */
 const Orders = () => {
-
+  const { profile } = useUser();
   const [tables, setTables] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -157,7 +158,7 @@ const Orders = () => {
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
-  const { tables: socketTables, orders: socketOrders } = useCafeWebSocketManager()
+  const { orders: socketOrders } = useCafeWebSocketManager()
 
   const [kitchens, setKitchens] = useState([]);
 
@@ -169,17 +170,16 @@ const Orders = () => {
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
   const [statusFilter, setStatusFilter] = useState("");
 
-  const { userRole, userData, userId } = useMemo(() => {
-    const userData = safeUserData();
-    const userRole = userData?.role || "";
-    const userId = localStorage.getItem("userId");
+  const { isStaff, userRole, userData, userId } = useMemo(() => {
+    const userRole = profile?.role || "";
+    const isStaff = !(profile?.role === 'owner' || profile.role === 'admin');
     return {
-      userData,
+      userData: profile,
       userRole,
-      userId,
+      userId: profile.id,
+      isStaff
     }
-  }, [])
-
+  }, [profile])
   const [printingId, setPrintingId] = useState(null);
 
   const [showAll, setShowAll] = useState(false);
@@ -191,13 +191,13 @@ const Orders = () => {
   const [openSelectId, setOpenSelectId] = useState(null);
 
   /* ===== API ===== */
-  const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/")));
+  const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/", { params: { status: 'free' } })));
 
   const fetchEmployees = async () => {
     const arr = listFrom(await api.get("/users/employees/")) || [];
     setWaiterOptionsFilter(prevOptions => {
       const staticOption = prevOptions[0] || ({ value: null, label: 'Все официанты' });
-      const options = arr.map(el => ({ value: el.id, label: el.first_name + ' ' + el.last_name }))
+      const options = arr.filter(el => !(el.role === 'owner' || el.role === 'admin')).map(el => ({ value: el.id, label: el.first_name + ' ' + el.last_name }))
       options.unshift(staticOption)
       return options
     })
@@ -263,13 +263,21 @@ const Orders = () => {
     });
   };
 
-  const fetchOrders = useCallback(async (params = {}) => {
+  const fetchOrders = useCallback(async () => {
+    const params = {
+      search: debouncedOrderSearchQuery,
+      status: 'open',
+      waiter: waiterFilter
+    }
+    if (isStaff) {
+      params['waiter'] = userId
+    }
     const base = listFrom(await api.get("/cafe/orders/", {
       params
     })) || [];
     const full = await hydrateOrdersDetails(base);
     setOrders(full);
-  }, []);
+  }, [debouncedOrderSearchQuery, waiterFilter, socketOrders?.orders, isStaff]);
 
   useEffect(() => {
     try {
@@ -284,11 +292,12 @@ const Orders = () => {
         console.error("Ошибка загрузки:", e);
       }
     })();
-  }, [fetchOrders]);
+  }, []);
   useEffect(() => {
     (async () => {
       try {
         await fetchTables();
+        setForm(prev => ({ ...prev, table: '' }))
       } catch (e) {
         console.error("Ошибка загрузки:", e);
       }
@@ -299,18 +308,14 @@ const Orders = () => {
     setLoading(true);
     (async () => {
       try {
-        await fetchOrders({
-          search: debouncedOrderSearchQuery,
-          status: 'open',
-          waiter: waiterFilter
-        });
+        await fetchOrders();
       } catch (e) {
         console.error("Ошибка загрузки:", e);
       } finally {
         setLoading(false);
       }
     })();
-  }, [debouncedOrderSearchQuery, waiterFilter, socketTables?.tables])
+  }, [fetchOrders])
 
   useEffect(() => {
     const handler = () => fetchOrders();
@@ -323,7 +328,7 @@ const Orders = () => {
   const waiters = useMemo(
     () =>
       employees
-        .filter((u) => /официант|waiter/i.test(u.role_display || ""))
+        .filter(el => !(el.role === 'owner' || el.role === 'admin'))
         .map((u) => ({ id: u.id, name: fullName(u) })),
     [employees]
   );
@@ -382,7 +387,6 @@ const Orders = () => {
 
   useEffect(() => {
     if (roleFiltered.length <= ORDERS_COLLAPSE_LIMIT && showAll) setShowAll(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFiltered.length]);
 
   const linePrice = (it) => {
@@ -400,7 +404,7 @@ const Orders = () => {
     return { count, total };
   };
 
-  const formatReceiptDate = (dateStr) => {
+  const formatReceiptDate = useCallback((dateStr) => {
     if (!dateStr) return "";
     try {
       const d = new Date(dateStr);
@@ -413,17 +417,16 @@ const Orders = () => {
     } catch {
       return dateStr;
     }
-  };
+  }, []);
 
-  const toggleExpandedOrder = (id) => {
+  const toggleExpandedOrder = useCallback((id) => {
     setExpandedOrders((prev) => {
       const next = new Set(prev);
       if (next.has(String(id))) next.delete(String(id));
       else next.add(String(id));
       return next;
     });
-  };
-
+  }, []);
   /* ===== печать (оплата/чек) ===== */
   const buildPrintPayload = useCallback(
     (order) => {
@@ -507,7 +510,6 @@ const Orders = () => {
       const k = kitchensMap.get(kid);
       const direct = String(k?.printer_key || k?.printerKey || k?.printer || k?.printer_id || "").trim();
       if (direct) return direct;
-
       const ls = readKitchenPrinterMap();
       return String(ls?.[kid] || "").trim();
     },
@@ -575,7 +577,7 @@ const Orders = () => {
   const [form, setForm] = useState({
     table: "",
     guests: 2,
-    waiter: "",
+    waiter: userId,
     client: "",
     items: [],
   });
@@ -640,9 +642,8 @@ const Orders = () => {
   };
 
   const openCreate = () => {
-    const free = tables.find((t) => !busyTableIds.has(t.id));
     setForm({
-      table: free?.id ?? "",
+      table: "",
       guests: 2,
       waiter: "",
       client: "",
@@ -765,6 +766,7 @@ const Orders = () => {
     try {
       if (!isEditing) {
         const basePayload = normalizeOrderPayload(form, true);
+        if (isStaff) basePayload['waiter'] = userId;
         const res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
 
         try {
@@ -872,11 +874,7 @@ const Orders = () => {
       setPayOrder(null);
 
       // 6) Синхронизация с сервером
-      await fetchOrders({
-        search: debouncedOrderSearchQuery,
-        status: 'open',
-        waiter: waiterFilter
-      });
+      await fetchOrders();
 
       // успех — снимаем guard
       localStorage.removeItem(guardKey);
@@ -917,6 +915,9 @@ const Orders = () => {
     }));
   }, [clients]);
 
+  console.log('FORM', form);
+
+
   return (
     <section className="cafeOrders">
       <div className="cafeOrders__header">
@@ -935,16 +936,19 @@ const Orders = () => {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
+          {
+            userRole == 'owner' && (
+              <div className="cafeOrders__filter">
+                <SearchableCombobox
+                  value={waiterFilter}
+                  onChange={setWaiterFilter}
+                  options={waiterOptionsFilter}
+                  placeholder="Сотрудники"
+                  classNamePrefix="cafeOrders__combo"
+                />
+              </div>)
+          }
 
-          <div className="cafeOrders__filter">
-            <SearchableCombobox
-              value={waiterFilter}
-              onChange={setWaiterFilter}
-              options={waiterOptionsFilter}
-              placeholder="Сотрудники"
-              classNamePrefix="cafeOrders__combo"
-            />
-          </div>
 
           {userRole === "повара" ? null : (
             <button className="cafeOrders__btn cafeOrders__btn--primary" onClick={openCreate} type="button">
@@ -1123,20 +1127,21 @@ const Orders = () => {
                       disabled={saving}
                     />
                   </div>
-
-                  <div className="cafeOrders__field" style={{ gridColumn: "1 / -1" }}>
-                    <SearchSelect
-                      id="waiter"
-                      openId={openSelectId}
-                      setOpenId={setOpenSelectId}
-                      label="Официант"
-                      placeholder="— Выберите официанта —"
-                      value={String(form.waiter ?? "")}
-                      onChange={(val) => setForm((f) => ({ ...f, waiter: val }))}
-                      options={waiterOptions}
-                      disabled={saving}
-                    />
-                  </div>
+                  {
+                    !isStaff && <div className="cafeOrders__field" style={{ gridColumn: "1 / -1" }}>
+                      <SearchSelect
+                        id="waiter"
+                        openId={openSelectId}
+                        setOpenId={setOpenSelectId}
+                        label="Официант"
+                        placeholder="— Выберите официанта —"
+                        value={String(form.waiter ?? "")}
+                        onChange={(val) => setForm((f) => ({ ...f, waiter: val }))}
+                        options={waiterOptions}
+                        disabled={saving}
+                      />
+                    </div>
+                  }
                 </div>
 
                 {/* Клиент */}
@@ -1313,7 +1318,7 @@ const Orders = () => {
                         try {
                           await api.patch(`/cafe/orders/${editingId}/`, { status: "cancelled" });
                           setModalOpen(false);
-                          await fetchOrders();
+                          await fetchOrders()
                         } catch (err) {
                           // Ошибка при отмене заказа
                         } finally {
