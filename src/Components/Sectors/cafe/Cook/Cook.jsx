@@ -10,6 +10,7 @@ import CookHeader from "./components/CookHeader";
 import CookReceiptCard from "./components/CookReceiptCard";
 import KitchenCreateModal from "./components/KitchenCreateModal";
 import "./Cook.scss";
+import { useCafeOrdersWebSocket } from "../../../../hooks/useCafeWebSocket";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -217,7 +218,7 @@ const Cook = () => {
   const menuCacheRef = useRef(new Map()); // menuId -> full menu item
   const titleCacheRef = useRef(new Map()); // menuId -> title (быстрый доступ)
   const noticeTimerRef = useRef(null);
-
+  const {orders} = useCafeOrdersWebSocket()
   // чтобы перерендерить, когда догрузили title
   const [titlesTick, setTitlesTick] = useState(0);
 
@@ -333,7 +334,7 @@ const Cook = () => {
         setHistoryLoading(false);
       }
     }
-  }, [dispatch, activeTab]);
+  }, [dispatch, activeTab, orders]);
 
   useEffect(() => {
     refetch();
