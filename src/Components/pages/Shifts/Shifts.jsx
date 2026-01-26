@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState, useMemo, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Calendar,
@@ -13,17 +13,111 @@ import {
 import { fetchShiftsAsync } from "../../../store/creators/shiftThunk";
 import "./Shifts.scss";
 
+const PAGE_SIZE = 50;
+
 const Shifts = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { shifts, loading } = useSelector((state) => state.shifts);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { 
+    shifts, 
+    loading,
+    shiftsCount,
+    shiftsNext,
+    shiftsPrevious
+  } = useSelector((state) => state.shifts);
   const [activeTab, setActiveTab] = useState("open"); // "open" или "closed"
+  
+  // Refs для отслеживания изменений данных
+  const isInitialMountRef = useRef(true);
+  const prevShiftsRef = useRef([]);
+
+  // Получаем текущую страницу из URL
+  const currentPage = useMemo(
+    () => parseInt(searchParams.get("page") || "1", 10),
+    [searchParams]
+  );
+
+  // Расчет общего количества страниц
+  const totalPages = useMemo(
+    () => (shiftsCount && PAGE_SIZE ? Math.ceil(shiftsCount / PAGE_SIZE) : 1),
+    [shiftsCount]
+  );
+
+  const hasNextPage = !!shiftsNext;
+  const hasPrevPage = !!shiftsPrevious;
+
+  // Синхронизация URL с состоянием страницы
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    } else {
+      params.delete("page");
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [currentPage, searchParams, setSearchParams]);
+
+  // Обработчик смены страницы
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    const params = new URLSearchParams(searchParams);
+    if (newPage > 1) {
+      params.set("page", newPage.toString());
+    } else {
+      params.delete("page");
+    }
+    setSearchParams(params, { replace: true });
+  };
+
 
   useEffect(() => {
     // Загружаем смены с фильтром по статусу в зависимости от активного таба
-    const params = activeTab === "open" ? { status: "open" } : { status: "closed" };
+    const params = {
+      ...(activeTab === "open" ? { status: "open" } : { status: "closed" }),
+      page: currentPage,
+    };
     dispatch(fetchShiftsAsync(params));
-  }, [dispatch, activeTab]);
+  }, [dispatch, activeTab, currentPage]);
+
+  // Плавно прокручиваем страницу вверх при изменении данных смен
+  useEffect(() => {
+    if (loading) return;
+    // Пропускаем первый рендер
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      prevShiftsRef.current = shifts || [];
+      return;
+    }
+
+    // Проверяем, что смены изменились (новый запрос)
+    const prevShifts = prevShiftsRef.current;
+    const currentShifts = shifts || [];
+
+    // Сравниваем первые смены - если они разные, значит новый запрос
+    const isNewData =
+      prevShifts.length > 0 &&
+      currentShifts.length > 0 &&
+      prevShifts[0]?.id !== currentShifts[0]?.id;
+
+    if (isNewData) {
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        rootElement.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      } else {
+        // Fallback на window, если root не найден
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+    prevShiftsRef.current = currentShifts;
+  }, [shifts, loading]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -67,7 +161,13 @@ const Shifts = () => {
           className={`shifts-page__tab ${
             activeTab === "open" ? "shifts-page__tab--active" : ""
           }`}
-          onClick={() => setActiveTab("open")}
+          onClick={() => {
+            setActiveTab("open");
+            // Сбрасываем на первую страницу при переключении таба
+            const params = new URLSearchParams(searchParams);
+            params.delete("page");
+            setSearchParams(params, { replace: true });
+          }}
         >
           <CheckCircle size={18} />
           <span>Открытые</span>
@@ -79,7 +179,13 @@ const Shifts = () => {
           className={`shifts-page__tab ${
             activeTab === "closed" ? "shifts-page__tab--active" : ""
           }`}
-          onClick={() => setActiveTab("closed")}
+          onClick={() => {
+            setActiveTab("closed");
+            // Сбрасываем на первую страницу при переключении таба
+            const params = new URLSearchParams(searchParams);
+            params.delete("page");
+            setSearchParams(params, { replace: true });
+          }}
         >
           <XCircle size={18} />
           <span>Закрытые</span>
@@ -217,6 +323,32 @@ const Shifts = () => {
           </ul>
         )}
       </div>
+
+      {/* Пагинация */}
+      {totalPages > 1 && (
+        <div className="shifts-page__pagination">
+          <button
+            type="button"
+            className="shifts-page__pagination-btn"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1 || loading || !hasPrevPage}
+          >
+            Назад
+          </button>
+          <span className="shifts-page__pagination-info">
+            Страница {currentPage} из {totalPages}
+            {shiftsCount ? ` (${shiftsCount} смен)` : ""}
+          </span>
+          <button
+            type="button"
+            className="shifts-page__pagination-btn"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={loading || !hasNextPage || (totalPages && currentPage >= totalPages)}
+          >
+            Вперед
+          </button>
+        </div>
+      )}
     </div>
   );
 };

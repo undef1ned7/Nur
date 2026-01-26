@@ -9,6 +9,9 @@ import {
 
 const initialState = {
   shifts: [],
+  shiftsCount: 0,
+  shiftsNext: null,
+  shiftsPrevious: null,
   currentShift: null,
   loading: false,
   error: null,
@@ -34,7 +37,10 @@ const shiftSlice = createSlice({
       })
       .addCase(fetchShiftsAsync.fulfilled, (state, action) => {
         state.loading = false;
-        state.shifts = action.payload?.results || action.payload || [];
+        state.shifts = action.payload?.results || (Array.isArray(action.payload) ? action.payload : []);
+        state.shiftsCount = action.payload?.count || action.payload?.length || 0;
+        state.shiftsNext = action.payload?.next || null;
+        state.shiftsPrevious = action.payload?.previous || null;
       })
       .addCase(fetchShiftsAsync.rejected, (state, action) => {
         state.loading = false;

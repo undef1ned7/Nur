@@ -20,6 +20,12 @@ const MenuItemsTab = ({
   formatMoney,
   toNumber,
   viewMode,
+  currentPage,
+  totalPages,
+  itemsCount,
+  hasNextPage,
+  hasPrevPage,
+  onPageChange,
 }) => {
   const items = Array.isArray(filteredItems) ? filteredItems : [];
 
@@ -227,7 +233,35 @@ const MenuItemsTab = ({
       )}
 
       {!loadingItems && items.length > 0 && (
-        <>{viewMode === "cards" ? renderCardsView() : renderListView()}</>
+        <>
+          {viewMode === "cards" ? renderCardsView() : renderListView()}
+          
+          {/* Пагинация */}
+          {totalPages > 1 && (
+            <div className="cafeMenu__pagination">
+              <button
+                type="button"
+                className="cafeMenu__pagination-btn"
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1 || loadingItems || !hasPrevPage}
+              >
+                Назад
+              </button>
+              <span className="cafeMenu__pagination-info">
+                Страница {currentPage} из {totalPages}
+                {itemsCount ? ` (${itemsCount} блюд)` : ""}
+              </span>
+              <button
+                type="button"
+                className="cafeMenu__pagination-btn"
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={loadingItems || !hasNextPage || (totalPages && currentPage >= totalPages)}
+              >
+                Вперед
+              </button>
+            </div>
+          )}
+        </>
       )}
     </>
   );

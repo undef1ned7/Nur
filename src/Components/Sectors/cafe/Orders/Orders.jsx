@@ -169,6 +169,10 @@ const Orders = () => {
   const [query, setQuery] = useState("");
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
   const [statusFilter, setStatusFilter] = useState("");
+  
+  // Состояние пагинации меню
+  const [menuCurrentPage, setMenuCurrentPage] = useState(1);
+  const [menuLoading, setMenuLoading] = useState(false);
 
   const { isStaff, userRole, userData, userId } = useMemo(() => {
     const userRole = profile?.role || "";
@@ -214,17 +218,77 @@ const Orders = () => {
     }
   };
 
-  const fetchMenu = async () => {
-    const arr = listFrom(await api.get("/cafe/menu-items/")) || [];
-    setMenuItems(arr);
-
-    for (const m of arr) {
-      menuCacheRef.current.set(String(m.id), {
-        ...m,
-        kitchen: m.kitchen ?? null,
+  const fetchMenu = async (page = 1) => {
+    setMenuLoading(true);
+    try {
+      const res = await api.get("/cafe/menu-items/", {
+        params: page > 1 ? { page } : {}
       });
+      const data = res?.data || {};
+      
+      // Сохраняем полный объект пагинации или массив
+      const itemsData = data?.results ? data : (Array.isArray(data) ? data : []);
+      setMenuItems(data?.results ? data : itemsData);
+
+      // Извлекаем массив для кэша
+      const arr = Array.isArray(itemsData) ? itemsData : (data?.results || []);
+      for (const m of arr) {
+        menuCacheRef.current.set(String(m.id), {
+          ...m,
+          kitchen: m.kitchen ?? null,
+        });
+      }
+    } catch (err) {
+      console.error("Ошибка загрузки меню:", err);
+    } finally {
+      setMenuLoading(false);
     }
   };
+  
+  // Обработчик смены страницы меню
+  const handleMenuPageChange = useCallback(async (newPage, searchQuery = "") => {
+    if (newPage < 1) return;
+    
+    const hasSearch = searchQuery.trim().length > 0;
+    const isPaginatedObject = menuItems?.results && menuItems?.count;
+    
+    // Если есть поиск или нет объекта с пагинацией - используем клиентскую пагинацию
+    if (hasSearch || !isPaginatedObject) {
+      setMenuCurrentPage(newPage);
+      return;
+    }
+    
+    // Серверная пагинация - загружаем данные с сервера
+    setMenuLoading(true);
+    try {
+      const res = await api.get("/cafe/menu-items/", {
+        params: {
+          page: newPage,
+        }
+      });
+      const data = res?.data || {};
+      
+      // Сохраняем полный объект пагинации (с count, next, previous, results)
+      // или массив, если это не объект пагинации
+      const itemsData = data?.results ? data : (Array.isArray(data) ? data : []);
+      setMenuItems(itemsData);
+      
+      // Обновляем кэш
+      const arr = Array.isArray(itemsData) ? itemsData : (data?.results || []);
+      for (const m of arr) {
+        menuCacheRef.current.set(String(m.id), {
+          ...m,
+          kitchen: m.kitchen ?? null,
+        });
+      }
+      
+      setMenuCurrentPage(newPage);
+    } catch (err) {
+      console.error("Ошибка загрузки меню:", err);
+    } finally {
+      setMenuLoading(false);
+    }
+  }, [menuItems]);
 
   const fetchCashboxes = async () => {
     try {
@@ -287,7 +351,7 @@ const Orders = () => {
     }
     (async () => {
       try {
-        await Promise.all([fetchEmployees(), fetchMenu(), fetchKitchens(), fetchCashboxes()]);
+        await Promise.all([fetchEmployees(), fetchMenu(1), fetchKitchens(), fetchCashboxes()]);
       } catch (e) {
         console.error("Ошибка загрузки:", e);
       }
@@ -345,7 +409,9 @@ const Orders = () => {
 
   const menuMap = useMemo(() => {
     const m = new Map();
-    menuItems.forEach((mi) =>
+    // Извлекаем массив из объекта пагинации или используем как массив
+    const itemsArray = menuItems?.results || (Array.isArray(menuItems) ? menuItems : []);
+    itemsArray.forEach((mi) =>
       m.set(String(mi.id), {
         title: mi.title,
         price: toNum(mi.price),
@@ -1343,11 +1409,17 @@ const Orders = () => {
 
             <RightMenuPanel
               open={menuOpen}
-              onClose={() => setMenuOpen(false)}
+              onClose={() => {
+                setMenuOpen(false);
+                setMenuCurrentPage(1);
+              }}
               menuItems={menuItems}
               menuImageUrl={menuImageUrl}
               onPick={(m) => addOrIncMenuItem(m)}
               fmtMoney={fmtMoney}
+              currentPage={menuCurrentPage}
+              loading={menuLoading}
+              onPageChange={handleMenuPageChange}
             />
           </div>
         </div>
