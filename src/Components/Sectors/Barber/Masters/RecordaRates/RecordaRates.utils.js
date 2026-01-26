@@ -1,5 +1,5 @@
 // RecordaRates.utils.js
-export const PAGE_SIZE = 12;
+export const PAGE_SIZE = 50;
 
 export const pad2 = (n) => String(n).padStart(2, "0");
 

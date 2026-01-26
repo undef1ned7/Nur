@@ -726,7 +726,7 @@ const SOURCE_OPTIONS = [
   { value: "telegram", label: "Telegram" },
 ];
 const LS = { INVOICES: "invoices" };
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 
 /* ===== utils ===== */
 const asArray = (data) =>
