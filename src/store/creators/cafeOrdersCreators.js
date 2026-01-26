@@ -153,22 +153,7 @@ export const fetchKitchenTasksAsync = createAsyncThunk(
           results: tasks,
         };
       }
-
-      // Реальные API вызовы
-      const queryParams = new URLSearchParams();
-      if (params.status) queryParams.append("status", params.status);
-      if (params.mine)
-        queryParams.append("mine", params.mine === true ? "1" : params.mine);
-      if (params.ordering) queryParams.append("ordering", params.ordering);
-      if (params.cook) queryParams.append("cook", params.cook);
-      if (params.waiter) queryParams.append("waiter", params.waiter);
-      if (params.menu_item) queryParams.append("menu_item", params.menu_item);
-      if (params.order) queryParams.append("order", params.order);
-
-      const url = `/cafe/kitchen/tasks${
-        queryParams.toString() ? `?${queryParams.toString()}` : ""
-      }`;
-      const response = await api.get(url);
+      const response = await api.get("/cafe/kitchen/tasks", { params });
 
       // Обрабатываем ответ - может быть {results: [], count: 0} или просто массив
       const data = response.data;

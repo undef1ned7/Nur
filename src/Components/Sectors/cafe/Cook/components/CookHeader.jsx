@@ -11,7 +11,7 @@ const CookHeader = ({
   statusOptions,
   onCreateKitchen,
 }) => {
-
+  
   return (
     <>
       <div className="cafeCook__header">
