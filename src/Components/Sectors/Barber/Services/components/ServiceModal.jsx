@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { FaTimes, FaTrash } from "react-icons/fa";
 import api from "../../../../../api";
 import BarberSelect from "../../common/BarberSelect";
+import ReactPortal from "../../../../common/Portal/ReactPortal";
+import ConfirmModal from "../../../../common/ConfirmModal/ConfirmModal";
 
 const normalizeName = (s) =>
   String(s || "")
@@ -31,7 +33,7 @@ const validateService = ({ name, price, services, currentService }) => {
 
   if (!nn) {
     errs.name = true;
-    alerts.push("Укажите название услуги.");
+    alerts.push("Введите название.");
   } else {
     const duplicate = services.some(
       (s) =>
@@ -40,19 +42,19 @@ const validateService = ({ name, price, services, currentService }) => {
     );
     if (duplicate) {
       errs.name = true;
-      alerts.push("Услуга с таким названием уже существует.");
+      alerts.push("Такая услуга уже есть.");
     }
   }
 
   if (String(price).trim() === "") {
     errs.price = true;
-    alerts.push("Укажите цену.");
+    alerts.push("Введите цену.");
   }
 
   const priceNum = parseMoney(price);
   if (!Number.isFinite(priceNum) || priceNum < 0) {
     errs.price = true;
-    alerts.push("Цена должна быть неотрицательным числом.");
+    alerts.push("Цена должна быть числом.");
   }
 
   return {
@@ -94,7 +96,7 @@ const ServiceModal = ({
 
   // Опции для BarberSelect
   const categoryOptions = [
-    { value: "", label: "Без категории" },
+    { value: "", label: "Общее" },
     ...categoriesForSelect.map((c) => ({ value: String(c.id), label: c.name })),
   ];
 
@@ -164,7 +166,7 @@ const ServiceModal = ({
           msgs.push(String(Array.isArray(v) ? v[0] : v))
         );
       }
-      if (!msgs.length) msgs.push("Не удалось сохранить услугу.");
+      if (!msgs.length) msgs.push("Ошибка сохранения.");
       setModalAlerts(msgs);
       console.error(e2);
     } finally {
@@ -197,7 +199,7 @@ const ServiceModal = ({
       const msg =
         typeof data === "string"
           ? data
-          : data?.detail || "Не удалось удалить услугу.";
+          : data?.detail || "Ошибка удаления.";
       setModalAlerts([msg]);
       console.error(e);
     } finally {
@@ -206,202 +208,185 @@ const ServiceModal = ({
   };
 
   return (
-    <div className="barberservices__overlay" onClick={handleClose}>
-      <div
-        className="barberservices__modal"
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="barberservices__modalHeader">
-          <h3 className="barberservices__modalTitle">
-            {currentService ? "Редактировать услугу" : "Новая услуга"}
-          </h3>
-          <button
-            className="barberservices__iconBtn"
-            onClick={handleClose}
-            aria-label="Закрыть"
-            title="Закрыть"
+    <>
+      <ReactPortal wrapperId="barber-service-modal">
+        <div 
+          className="barberservices__overlay" 
+          onClick={handleClose} 
+          style={{ 
+            opacity: confirmDelete ? 0 : 1,
+            pointerEvents: confirmDelete ? 'none' : 'auto',
+            transition: 'opacity 0.2s ease'
+          }}
+        >
+          <div
+            className="barberservices__modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
           >
-            <FaTimes />
-          </button>
-        </div>
-
-        {modalAlerts.length > 0 && (
-          <div className="barberservices__alert barberservices__alert--inModal">
-            {modalAlerts.length === 1 ? (
-              modalAlerts[0]
-            ) : (
-              <ul className="barberservices__alertList">
-                {modalAlerts.map((m, i) => (
-                  <li key={i}>{m}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-
-        <form className="barberservices__form" onSubmit={handleSubmit} noValidate>
-          <div className="barberservices__grid">
-            <label
-              className={
-                fieldErrors.name
-                  ? "barberservices__field barberservices__field--invalid"
-                  : "barberservices__field"
-              }
-            >
-              <span className="barberservices__label">
-                Название <b className="barberservices__req">*</b>
-              </span>
-              <input
-                name="name"
-                defaultValue={currentService?.name || ""}
-                className={
-                  fieldErrors.name
-                    ? "barberservices__input barberservices__input--invalid"
-                    : "barberservices__input"
-                }
-                placeholder="Например: Стрижка"
-                autoFocus
-                required
-              />
-            </label>
-
-            <label
-              className={
-                fieldErrors.price
-                  ? "barberservices__field barberservices__field--invalid"
-                  : "barberservices__field"
-              }
-            >
-              <span className="barberservices__label">
-                Цена <b className="barberservices__req">*</b>
-              </span>
-              <input
-                name="price"
-                defaultValue={
-                  currentService?.price !== undefined ? String(currentService.price) : ""
-                }
-                className={
-                  fieldErrors.price
-                    ? "barberservices__input barberservices__input--invalid"
-                    : "barberservices__input"
-                }
-                placeholder="0"
-                inputMode="decimal"
-              />
-            </label>
-
-            <label className="barberservices__field">
-              <span className="barberservices__label">Длительность</span>
-              <input
-                name="time"
-                defaultValue={currentService?.time || ""}
-                className="barberservices__input"
-                placeholder="45 мин"
-                list="durationSuggestions"
-              />
-              <datalist id="durationSuggestions">
-                <option value="15 мин" />
-                <option value="30 мин" />
-                <option value="45 мин" />
-                <option value="1 час" />
-                <option value="1 час 30 мин" />
-                <option value="2 часа" />
-              </datalist>
-            </label>
-
-            <div className="barberservices__field">
-              <span className="barberservices__label">Категория</span>
-              <input type="hidden" name="category" value={selectedCategory} />
-              <BarberSelect
-                value={selectedCategory}
-                onChange={setSelectedCategory}
-                options={categoryOptions}
-                placeholder="Без категории"
-              />
-            </div>
-
-            <div className="barberservices__field barberservices__field--switch">
-              <span className="barberservices__label">Активна</span>
-              <label className="barberservices__switch" title="Активность услуги">
-                <input
-                  type="checkbox"
-                  name="active"
-                  defaultChecked={currentService?.active ?? true}
-                />
-                <span className="barberservices__slider" />
-              </label>
-            </div>
-          </div>
-
-          <div className="barberservices__footer">
-            {currentService?.id ? (
-              confirmDelete ? (
-                <div className="barberservices__confirm">
-                  <span className="barberservices__confirmText">
-                    Удалить «{currentService.name}» безвозвратно?
-                  </span>
-                  <div className="barberservices__confirmActions">
-                    <button
-                      type="button"
-                      className="barberservices__btn barberservices__btn--secondary"
-                      onClick={() => setConfirmDelete(false)}
-                      disabled={deleting}
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="button"
-                      className="barberservices__btn barberservices__btn--danger"
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      title="Удалить навсегда"
-                    >
-                      <FaTrash />
-                      <span className="barberservices__btnText">
-                        {deleting ? "Удаление…" : "Удалить"}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="barberservices__btn barberservices__btn--danger"
-                  onClick={() => setConfirmDelete(true)}
-                  disabled={deleting || saving}
-                  title="Удалить услугу"
-                >
-                  <FaTrash />
-                  <span className="barberservices__btnText">Удалить</span>
-                </button>
-              )
-            ) : (
-              <span className="barberservices__spacer" />
-            )}
-
-            <div className="barberservices__footerRight">
+            <div className="barberservices__modalHeader">
+              <h3 className="barberservices__modalTitle">
+                {currentService ? "Редактировать" : "Новая услуга"}
+              </h3>
               <button
                 type="button"
-                className="barberservices__btn barberservices__btn--secondary"
+                className="barberservices__iconBtn"
                 onClick={handleClose}
-                disabled={saving || deleting}
+                aria-label="Закрыть"
+                title="Закрыть"
               >
-                Отмена
-              </button>
-              <button
-                type="submit"
-                className="barberservices__btn barberservices__btn--primary"
-                disabled={saving || deleting}
-              >
-                {saving ? "Сохранение…" : "Сохранить"}
+                <FaTimes />
               </button>
             </div>
+
+            {modalAlerts.length > 0 && (
+              <div className="barberservices__alert barberservices__alert--inModal">
+                {modalAlerts.length === 1 ? (
+                  modalAlerts[0]
+                ) : (
+                  <ul className="barberservices__alertList">
+                    {modalAlerts.map((m, i) => (
+                      <li key={i}>{m}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <form className="barberservices__form" onSubmit={handleSubmit} noValidate>
+              <div className="barberservices__grid">
+                <label
+                  className={
+                    fieldErrors.name
+                      ? "barberservices__field barberservices__field--invalid"
+                      : "barberservices__field"
+                  }
+                >
+                  <span className="barberservices__label">
+                    Название <b className="barberservices__req">*</b>
+                  </span>
+                  <input
+                    name="name"
+                    defaultValue={currentService?.name || ""}
+                    className={
+                      fieldErrors.name
+                        ? "barberservices__input barberservices__input--invalid"
+                        : "barberservices__input"
+                    }
+                    placeholder="Стрижка"
+                    autoFocus
+                    required
+                  />
+                </label>
+
+                <label
+                  className={
+                    fieldErrors.price
+                      ? "barberservices__field barberservices__field--invalid"
+                      : "barberservices__field"
+                  }
+                >
+                  <span className="barberservices__label">
+                    Цена <b className="barberservices__req">*</b>
+                  </span>
+                  <input
+                    name="price"
+                    defaultValue={
+                      currentService?.price !== undefined ? String(currentService.price) : ""
+                    }
+                    className={
+                      fieldErrors.price
+                        ? "barberservices__input barberservices__input--invalid"
+                        : "barberservices__input"
+                    }
+                    placeholder="500"
+                    inputMode="decimal"
+                  />
+                </label>
+
+                <label className="barberservices__field">
+                  <span className="barberservices__label">Длительность (мин)</span>
+                  <input
+                    name="time"
+                    type="text"
+                    defaultValue={currentService?.time || ""}
+                    className="barberservices__input"
+                    placeholder="30"
+                    inputMode="numeric"
+                  />
+                </label>
+
+                <div className="barberservices__field">
+                  <span className="barberservices__label">Категория</span>
+                  <input type="hidden" name="category" value={selectedCategory} />
+                  <BarberSelect
+                    value={selectedCategory}
+                    onChange={setSelectedCategory}
+                    options={categoryOptions}
+                    placeholder="Не выбрана"
+                  />
+                </div>
+
+                <div className="barberservices__field barberservices__field--switch">
+                  <span className="barberservices__label">Активна</span>
+                  <label className="barberservices__switch" title="Активность">
+                    <input
+                      type="checkbox"
+                      name="active"
+                      defaultChecked={currentService?.active ?? true}
+                    />
+                    <span className="barberservices__slider" />
+                  </label>
+                </div>
+              </div>
+
+              <div className="barberservices__footer">
+                {currentService?.id ? (
+                  <button
+                    type="button"
+                    className="barberservices__btn barberservices__btn--danger"
+                    onClick={() => setConfirmDelete(true)}
+                    disabled={deleting || saving}
+                    title="Удалить услугу"
+                  >
+                    <FaTrash />
+                    <span className="barberservices__btnText">Удалить</span>
+                  </button>
+                ) : (
+                  <span className="barberservices__spacer" />
+                )}
+
+                <div className="barberservices__footerRight">
+                  <button
+                    type="button"
+                    className="barberservices__btn barberservices__btn--secondary"
+                    onClick={handleClose}
+                    disabled={saving || deleting}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="barberservices__btn barberservices__btn--primary"
+                    disabled={saving || deleting}
+                  >
+                    {saving ? "Сохранение…" : "Сохранить"}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </ReactPortal>
+
+      <ConfirmModal
+        isOpen={confirmDelete}
+        message={`Удалить услугу «${currentService?.name}» безвозвратно?`}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
+    </>
   );
 };
 

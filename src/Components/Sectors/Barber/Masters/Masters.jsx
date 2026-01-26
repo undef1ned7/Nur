@@ -268,6 +268,11 @@ const Masters = () => {
   };
 
   /* ========= Fetch ========= */
+  // TODO: Implement server-side mode for employees and roles
+  // - Add query params: ?search=&ordering=&page=
+  // - Add debounce for search (400ms)
+  // - Remove client-side filter/sort (lines 341-413)
+  // - Use {count, next, previous, results} for pagination
   const fetchEmployees = useCallback(async () => {
     const res = await api.get(EMPLOYEES_LIST_URL);
     setEmployees(asArray(res.data).map(normalizeEmployee));
@@ -338,6 +343,8 @@ const Masters = () => {
     [roleOptions]
   );
 
+  // TODO: Remove client-side filtering - should be done on backend
+  // Backend should support: ?search=&role=&custom_role=&page=
   const filteredEmployees = useMemo(() => {
     const t = q.trim().toLowerCase();
     let base = employees;
@@ -362,6 +369,8 @@ const Masters = () => {
     );
   }, [employees, q, filterRole]);
 
+  // TODO: Remove client-side filtering/sorting - should be done on backend
+  // Backend should support: ?search=&ordering=name&page=
   const rolesForList = useMemo(() => {
     const sys = SYSTEM_ROLES.map((code) => ({
       id: `sys:${code}`,
@@ -393,6 +402,9 @@ const Masters = () => {
     setPageRole(1);
   }, [q, tab, filteredEmployees.length, rolesForList.length, filterRole]);
 
+  // TODO: Remove client-side pagination - should use backend pagination
+  // Use count from API response instead of .length
+  // Remove .slice() - backend should return only current page
   const totalPagesEmp = Math.max(
     1,
     Math.ceil(filteredEmployees.length / PAGE_SIZE)

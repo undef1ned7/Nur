@@ -1,45 +1,37 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { FaSearch, FaThLarge, FaList, FaExclamationTriangle, FaFilter, FaTimes, FaUser, FaCut, FaCalendarAlt, FaClock, FaMoneyBillWave, FaPercent, FaTag } from "react-icons/fa";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import BarberSelect from "../common/BarberSelect";
+import Loading from "../../../common/Loading/Loading";
 import { Pager } from "./components";
 import {
-  PAGE_SIZE,
-  asArray,
-  norm,
   dateISO,
   timeISO,
   fmtMoney,
-  barberNameOf,
-  serviceNamesFromRecord,
-  clientNameOf,
-  priceOfAppointment,
-  basePriceOfAppointment,
-  discountPercentOfAppointment,
   statusLabel,
-  getYMD,
   monthNames,
   pad,
+  num,
 } from "./HistoryUtils";
 import "./History.scss";
 
-const getId = (v) => (v && typeof v === "object" ? v.id : v);
+
 
 const STATUS_OPTIONS = [
-  { value: "all", label: "Все статусы" },
+  { value: "all", label: "Все" },
   { value: "completed", label: "Завершено" },
   { value: "booked", label: "Забронировано" },
   { value: "confirmed", label: "Подтверждено" },
   { value: "canceled", label: "Отменено" },
-  { value: "no_show", label: "Не пришёл" },
+  { value: "no_show", label: "Не явился" },
 ];
 
 const SORT_OPTIONS = [
-  { value: "newest", label: "Сначала новые" },
-  { value: "oldest", label: "Сначала старые" },
-  { value: "price_desc", label: "Цена ↓" },
-  { value: "price_asc", label: "Цена ↑" },
+  { value: "newest", label: "Новые" },
+  { value: "oldest", label: "Старые" },
+  { value: "price_desc", label: "Дороже" },
+  { value: "price_asc", label: "Дешевле" },
 ];
 
 const pluralRecords = (n) => {
@@ -51,121 +43,269 @@ const pluralRecords = (n) => {
 };
 
 const History = () => {
-  const { currentUser, userId, isAuthenticated } = useUser();
-  const userEmail = currentUser?.email || currentUser?.user?.email || "";
-  
-  /* Проверяем, авторизован ли пользователь */
-  const isLoggedIn = isAuthenticated && (userId || userEmail);
+  const { isAuthenticated } = useUser();
+  const isLoggedIn = isAuthenticated;
 
-  const [employees, setEmployees] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [services, setServices] = useState([]);
-  const [clients, setClients] = useState([]);
-
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-
+  // Server-side список: состояние query
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
-  const [viewMode, setViewMode] = useState("table");
-
   const [yearFilter, setYearFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [dayFilter, setDayFilter] = useState("");
-
   const [page, setPage] = useState(1);
 
-  /* Filters panel state */
+  // Server-side список: состояние данных
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsCount, setAppointmentsCount] = useState(0);
+  const [appointmentsNext, setAppointmentsNext] = useState(null);
+  const [appointmentsPrevious, setAppointmentsPrevious] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  // Refs для отмены запросов и защиты от race conditions
+  const abortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const debounceTimerRef = useRef(null);
+
+  // Определяем начальный viewMode на основе размера экрана
+  const getInitialViewMode = () => {
+    if (typeof window !== 'undefined') {
+      // Телефоны (≤768px) → карточки
+      // Планшеты/ноутбуки/ПК (>768px) → список
+      return window.innerWidth <= 768 ? "cards" : "table";
+    }
+    return "table";
+  };
+
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  /* Modal state */
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [userChangedView, setUserChangedView] = useState(false);
 
-  const fetchEmployees = useCallback(async () => asArray((await api.get("/users/employees/")).data), []);
-  const fetchAppointments = useCallback(async () => asArray((await api.get("/barbershop/appointments/")).data), []);
-  const fetchServices = useCallback(async () => asArray((await api.get("/barbershop/services/")).data), []);
-  const fetchClients = useCallback(async () => asArray((await api.get("/barbershop/clients/")).data), []);
+  // Обработчик изменения режима просмотра
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    setUserChangedView(true);
+  };
 
+  // Обновляем viewMode при изменении размера экрана (только если пользователь не менял вручную)
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        const [emps, appts, svcs, cls] = await Promise.all([
-          fetchEmployees(),
-          fetchAppointments(),
-          fetchServices(),
-          fetchClients(),
-        ]);
-        if (!alive) return;
-        setEmployees(emps);
-        setAppointments(appts);
-        setServices(svcs);
-        setClients(cls);
-      } catch {
-        if (!alive) return;
-        setErr("Не удалось загрузить историю.");
-      } finally {
-        if (alive) setLoading(false);
+    const handleResize = () => {
+      if (!userChangedView) {
+        const newMode = window.innerWidth <= 768 ? "cards" : "table";
+        if (newMode !== viewMode) {
+          setViewMode(newMode);
+        }
       }
-    })();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [viewMode, userChangedView]);
+
+  // Маппинг сортировки UI -> API
+  const getOrderingForAPI = (sortKey) => {
+    switch (sortKey) {
+      case "oldest":
+        return "start_at";
+      case "price_asc":
+        return "price";
+      case "price_desc":
+        return "-price";
+      case "newest":
+      default:
+        return "-start_at";
+    }
+  };
+
+  // Формирование date_start и date_end из фильтров
+  const getDateRange = useCallback(() => {
+    if (!yearFilter) return { date_start: null, date_end: null };
+
+    const year = Number(yearFilter);
+    if (!Number.isFinite(year)) return { date_start: null, date_end: null };
+
+    let dateStart = `${year}-01-01`;
+    let dateEnd = `${year}-12-31`;
+
+    if (monthFilter) {
+      const month = Number(monthFilter);
+      if (Number.isFinite(month) && month >= 1 && month <= 12) {
+        const daysInMonth = new Date(year, month, 0).getDate();
+        dateStart = `${year}-${pad(month)}-01`;
+        dateEnd = `${year}-${pad(month)}-${pad(daysInMonth)}`;
+
+        if (dayFilter) {
+          const day = Number(dayFilter);
+          if (Number.isFinite(day) && day >= 1 && day <= daysInMonth) {
+            dateStart = `${year}-${pad(month)}-${pad(day)}`;
+            dateEnd = dateStart;
+          }
+        }
+      }
+    }
+
+    return { date_start: dateStart, date_end: dateEnd };
+  }, [yearFilter, monthFilter, dayFilter]);
+
+  // Debounce для search (400ms)
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+
     return () => {
-      alive = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
-  }, [fetchEmployees, fetchAppointments, fetchServices, fetchClients]);
+  }, [search]);
 
+  // Сброс page при изменении search или ordering или фильтров
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, sortBy, statusFilter, yearFilter, monthFilter, dayFilter]);
 
-  /* Определяем ID сотрудников текущего пользователя */
-  const myEmployeeIds = useMemo(() => {
-    const ids = new Set();
-    const email = norm(userEmail);
+  // Основной эффект для загрузки appointments (server-side)
+  useEffect(() => {
+    // Отменяем предыдущий запрос
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-    employees.forEach((e) => {
-      const em = norm(e?.email);
-      if (email && em && em === email) ids.add(String(e.id));
-      const eu = getId(e?.user) ?? e?.user_id;
-      if (userId && eu === userId) ids.add(String(e.id));
-    });
+    // Создаем новый AbortController
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
-    return ids;
-  }, [employees, userEmail, userId]);
+    // Увеличиваем requestId для защиты от race conditions
+    const currentRequestId = ++requestIdRef.current;
 
-  /* Фильтруем записи текущего пользователя */
-  const myAppointments = useMemo(() => {
-    const email = norm(userEmail);
+    // Формируем query params
+    const params = {};
+    if (debouncedSearch.trim()) {
+      params.search = debouncedSearch.trim();
+    }
+    const ordering = getOrderingForAPI(sortBy);
+    if (ordering) {
+      params.ordering = ordering;
+    }
+    if (page > 1) {
+      params.page = page;
+    }
+    if (statusFilter !== "all") {
+      params.status = statusFilter;
+    }
 
-    const belongs = (a) => {
-      const barberId =
-        getId(a?.barber) ??
-        a?.barber_id ??
-        getId(a?.employee) ??
-        a?.employee_id ??
-        getId(a?.master) ??
-        a?.master_id;
+    // Добавляем фильтры по дате
+    const { date_start, date_end } = getDateRange();
+    if (date_start) {
+      params.date_start = date_start;
+    }
+    if (date_end) {
+      params.date_end = date_end;
+    }
 
-      if (barberId && myEmployeeIds.has(String(barberId))) return true;
+    // Выполняем запрос
+    setLoading(true);
+    setErr("");
 
-      const createdById = getId(a?.created_by) ?? a?.created_by_id ?? a?.created_by;
-      if (userId && createdById === userId) return true;
+    api.get("/barbershop/appointments/my/", {
+      params,
+      signal: abortController.signal,
+    })
+      .then((response) => {
+        // Проверяем, что это актуальный запрос
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
 
-      const emails = [
-        a?.barber_email, a?.employee_email, a?.master_email,
-        a?.user_email, a?.created_by_email, a?.user?.email,
-        a?.created_by?.email, a?.barber?.email, a?.employee?.email, a?.master?.email,
-      ].filter(Boolean).map(norm);
+        // Проверяем, что запрос не был отменен
+        if (abortController.signal.aborted) {
+          return;
+        }
 
-      return email && emails.some((x) => x === email);
+        const data = response.data;
+
+        // Обрабатываем ответ (может быть {results, count, next, previous} или просто массив)
+        let results = [];
+        let count = 0;
+        let next = null;
+        let previous = null;
+
+        if (Array.isArray(data)) {
+          results = data;
+          count = data.length;
+        } else {
+          results = data.results || [];
+          count = data.count || results.length;
+          next = data.next || null;
+          previous = data.previous || null;
+        }
+
+        setAppointments(results);
+        setAppointmentsCount(count);
+        setAppointmentsNext(next);
+        setAppointmentsPrevious(previous);
+        setLoading(false);
+      })
+      .catch((err) => {
+        // Игнорируем ошибки отмененных запросов
+        if (err.name === "AbortError" || err.name === "CanceledError") {
+          return;
+        }
+
+        // Проверяем, что это актуальный запрос
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
+        const errorMessage =
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Не удалось загрузить историю.";
+
+        setErr(errorMessage);
+        setLoading(false);
+      });
+
+    // Cleanup: отменяем запрос при размонтировании или изменении зависимостей
+    return () => {
+      // Отменяем только если это текущий запрос
+      if (abortControllerRef.current === abortController) {
+        abortController.abort();
+        abortControllerRef.current = null;
+      }
     };
+  }, [debouncedSearch, sortBy, page, statusFilter, getDateRange]);
 
-    return appointments.filter(belongs);
-  }, [appointments, myEmployeeIds, userEmail, userId]);
+  // Cleanup при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      // Отменяем все активные запросы при размонтировании
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, []);
+
+
+  
 
   /* Options for year/month/day filters */
   const yearOptions = useMemo(
     () => [
-      { value: "", label: "Все годы" },
+      { value: "", label: "Все" },
       { value: "2025", label: "2025" },
       { value: "2026", label: "2026" },
       { value: "2027", label: "2027" },
@@ -175,7 +315,7 @@ const History = () => {
 
   const monthOptions = useMemo(
     () => [
-      { value: "", label: "Все месяцы" },
+      { value: "", label: "Все" },
       ...monthNames.map((label, idx) => ({ value: String(idx + 1), label })),
     ],
     []
@@ -191,7 +331,7 @@ const History = () => {
 
   const dayOptions = useMemo(
     () => [
-      { value: "", label: "Все дни" },
+      { value: "", label: "Все" },
       ...Array.from({ length: daysInMonth }).map((_, i) => ({
         value: String(i + 1),
         label: pad(i + 1),
@@ -200,76 +340,22 @@ const History = () => {
     [daysInMonth]
   );
 
-  const sortAppointments = (arr, sortKey) => {
-    const sorted = [...arr];
-    switch (sortKey) {
-      case "oldest":
-        return sorted.sort((a, b) => (Date.parse(a?.start_at) || 0) - (Date.parse(b?.start_at) || 0));
-      case "price_desc":
-        return sorted.sort((a, b) => (priceOfAppointment(b, services) || 0) - (priceOfAppointment(a, services) || 0));
-      case "price_asc":
-        return sorted.sort((a, b) => (priceOfAppointment(a, services) || 0) - (priceOfAppointment(b, services) || 0));
-      case "newest":
-      default:
-        return sorted.sort((a, b) => (Date.parse(b?.start_at) || 0) - (Date.parse(a?.start_at) || 0));
+  // Вычисляем totalPages на основе count
+  const totalPages = useMemo(() => {
+    if (appointmentsCount === 0) return 1;
+    const pageSize = appointments.length || 1;
+    if (pageSize === 0) return 1;
+    if (appointmentsNext) {
+      return Math.ceil(appointmentsCount / pageSize);
     }
-  };
-
-  const filtered = useMemo(() => {
-    let arr = myAppointments.slice();
-
-    // Year/Month/Day filter
-    if (yearFilter) {
-      const yStr = String(yearFilter);
-      const mStr = monthFilter ? pad(Number(monthFilter)) : "";
-      const dStr = dayFilter ? pad(Number(dayFilter)) : "";
-
-      arr = arr.filter((x) => {
-        const ymd = getYMD(x?.start_at);
-        if (!ymd) return false;
-        if (String(ymd.year) !== yStr) return false;
-        if (mStr && pad(ymd.month) !== mStr) return false;
-        if (dStr && pad(ymd.day) !== dStr) return false;
-        return true;
-      });
-    }
-
-    // Status filter
-    if (statusFilter !== "all") {
-      arr = arr.filter((x) => String(x?.status || "").toLowerCase() === statusFilter);
-    }
-
-    // Search filter
-    const q = search.trim().toLowerCase();
-    if (q) {
-      arr = arr.filter((x) => {
-        const client = clientNameOf(x, clients).toLowerCase();
-        const service = serviceNamesFromRecord(x, services).toLowerCase();
-        const barber = barberNameOf(x, employees).toLowerCase();
-        const date = dateISO(x?.start_at).toLowerCase();
-        return client.includes(q) || service.includes(q) || barber.includes(q) || date.includes(q);
-      });
-    }
-
-    return sortAppointments(arr, sortBy);
-  }, [myAppointments, yearFilter, monthFilter, dayFilter, statusFilter, search, sortBy, clients, services, employees]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-
-  useEffect(() => {
-    setPage(1);
-  }, [yearFilter, monthFilter, dayFilter, search, statusFilter, sortBy]);
-
-  useEffect(() => {
-    setPage((p) => Math.min(Math.max(1, p), totalPages));
-  }, [totalPages]);
-
-  const safePage = Math.min(page, totalPages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+    return page;
+  }, [appointmentsCount, appointments.length, appointmentsNext, page]);
 
   const counterText = loading
-    ? "Загрузка…"
-    : `${filtered.length} ${pluralRecords(filtered.length)}`;
+    ? "Загрузка..."
+    : appointmentsCount === 0
+    ? "Нет записей"
+    : `${appointmentsCount} ${pluralRecords(appointmentsCount)}`;
 
   /* Check if filters are active */
   const activeFiltersCount = [
@@ -311,16 +397,28 @@ const History = () => {
     setDayFilter("");
   };
 
-  /* Get record data */
+  /* Get record data - используем данные напрямую из API */
   const getRecordData = (a) => {
     const date = dateISO(a?.start_at);
     const time = timeISO(a?.start_at);
-    const client = clientNameOf(a, clients);
-    const service = serviceNamesFromRecord(a, services);
-    const barber = barberNameOf(a, employees);
-    const totalPrice = priceOfAppointment(a, services);
-    const basePrice = basePriceOfAppointment(a, services);
-    const discountPct = discountPercentOfAppointment(a, basePrice, totalPrice);
+    
+    // Используем данные напрямую из API ответа
+    const client = a?.client_name || "—";
+    const service = Array.isArray(a?.services_names) && a.services_names.length
+      ? a.services_names.join(", ")
+      : (a?.service_name || "—");
+    const barber = a?.barber_name || a?.barber_public?.full_name || "—";
+    
+    // Цена из API
+    const totalPrice = num(a?.price) || null;
+    
+    // Базовая цена (если есть скидка, вычисляем из totalPrice и discount)
+    let basePrice = totalPrice;
+    const discountPct = num(a?.discount) || null;
+    if (discountPct && discountPct > 0 && discountPct < 100 && totalPrice) {
+      basePrice = Math.round(totalPrice / (1 - discountPct / 100));
+    }
+    
     const statusKey = String(a?.status || "").toLowerCase();
     const statusText = a?.status_display || statusLabel(statusKey);
 
@@ -479,7 +577,7 @@ const History = () => {
           </tr>
         </thead>
         <tbody>
-          {rows.map((a) => {
+          {appointments.map((a) => {
             const data = getRecordData(a);
 
             return (
@@ -514,7 +612,7 @@ const History = () => {
             className="barberhistory__resetBtn"
             onClick={handleReset}
           >
-            Сбросить всё
+            Сбросить
           </button>
         )}
       </div>
@@ -549,17 +647,17 @@ const History = () => {
         <div className="barberhistory__viewToggle">
           <button
             className={`barberhistory__viewBtn ${viewMode === "table" ? "is-active" : ""}`}
-            onClick={() => setViewMode("table")}
-            title="Таблица"
-            aria-label="Вид таблицей"
+            onClick={() => handleViewModeChange("table")}
+            title="Список"
+            aria-label="Список"
           >
             <FaList />
           </button>
           <button
             className={`barberhistory__viewBtn ${viewMode === "cards" ? "is-active" : ""}`}
-            onClick={() => setViewMode("cards")}
+            onClick={() => handleViewModeChange("cards")}
             title="Карточки"
-            aria-label="Вид карточками"
+            aria-label="Карточки"
           >
             <FaThLarge />
           </button>
@@ -643,7 +741,7 @@ const History = () => {
                     className="barberhistory__filtersPanelClear"
                     onClick={handleClearFilters}
                   >
-                    Очистить фильтры
+                    Очистить
                   </button>
                 </div>
               )}
@@ -653,37 +751,35 @@ const History = () => {
 
       {!!err && <div className="barberhistory__alert">{err}</div>}
 
-      {!isLoggedIn && !loading && (
+      {!isLoggedIn && !loading && appointments.length === 0 && (
         <div className="barberhistory__warning">
           <FaExclamationTriangle className="barberhistory__warningIcon" />
-          <span>Войдите в систему, чтобы увидеть вашу историю записей. Если вы уже вошли — обновите страницу.</span>
+          <span>Войдите, чтобы увидеть историю записей</span>
         </div>
       )}
 
       {loading ? (
-        <div className="barberhistory__skeletonList" aria-hidden="true">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="barberhistory__skeletonCard" />
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
+        <Loading message="Загрузка..." />
+      ) : appointments.length === 0 ? (
         <div className="barberhistory__empty">
-          {hasFilters ? "Ничего не найдено" : "Записей нет"}
+          {hasFilters ? "Не найдено" : "Нет записей"}
         </div>
       ) : (
         <>
           {viewMode === "cards" ? (
             <div className="barberhistory__list">
-              {rows.map(renderCard)}
+              {appointments.map(renderCard)}
             </div>
           ) : (
             renderTable()
           )}
 
           <Pager
-            filteredCount={filtered.length}
-            page={safePage}
+            count={appointmentsCount}
+            page={page}
             totalPages={totalPages}
+            next={appointmentsNext}
+            previous={appointmentsPrevious}
             onChange={setPage}
           />
         </>

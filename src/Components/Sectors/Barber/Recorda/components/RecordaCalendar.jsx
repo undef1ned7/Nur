@@ -6,7 +6,7 @@ const STATUS_LABELS = {
   confirmed: "Подтверждено",
   completed: "Завершено",
   canceled: "Отменено",
-  no_show: "Не пришёл",
+  no_show: "Не явился",
 };
 
 const STATUS_LABELS_SHORT = {
@@ -14,7 +14,7 @@ const STATUS_LABELS_SHORT = {
   confirmed: "Подтв.",
   completed: "Готово",
   canceled: "Отмена",
-  no_show: "Неявка",
+  no_show: "Не явился",
 };
 
 /* компактная шкала */

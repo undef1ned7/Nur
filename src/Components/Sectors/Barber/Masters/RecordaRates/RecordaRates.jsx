@@ -84,7 +84,7 @@ const RecordaRates = ({
               : Number(r.perRecord) || 0,
           fixed: r.fixed === "" || r.fixed == null ? 0 : Number(r.fixed) || 0,
           percent:
-            r.percent == null && r.perPercent == null && r.perMonth != null
+            r.perMonth != null && r.percent == null && r.perPercent == null
               ? Number(r.perMonth) || 0
               : Number(r.percent ?? r.perPercent ?? 0) || 0,
         };
@@ -102,7 +102,7 @@ const RecordaRates = ({
       seen.add(id);
       arr.push({ id, name: e?.name || "—" });
     }
-    return arr.sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    return arr;
   }, [employees]);
 
   const { doneByMaster, revenueByMaster, daysByMaster } = useMasterAggregates(
@@ -161,9 +161,9 @@ const RecordaRates = ({
 
         const percent =
           draft.percent ??
-          (base.percent == null &&
-          base.perPercent == null &&
-          base.perMonth != null
+          (base.perMonth != null &&
+          base.percent == null &&
+          base.perPercent == null
             ? Number(base.perMonth) || 0
             : Number(base.percent ?? base.perPercent ?? 0) || 0);
 
@@ -358,6 +358,8 @@ const RecordaRates = ({
   const productPayoutsForModal = useMemo(() => {
     if (!productSales.length) return [];
 
+    // NOTE: Client-side filtering is a temporary solution
+    // TODO: Move filtering to backend with query params: ?period=YYYY-MM&employee=ID
     return productSales
       .filter((p) => {
         const ym = y_m_fromISO(p.created_at);
@@ -375,7 +377,6 @@ const RecordaRates = ({
 
         return sameEmployeeId || sameEmployeeName;
       })
-      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
       .map((p) => ({ ...p, dateFormatted: dateKG(p.created_at) }));
   }, [
     productSales,
@@ -428,6 +429,8 @@ const RecordaRates = ({
 
     const monthKey = endIso.slice(0, 7);
 
+    // NOTE: Client-side filtering is a temporary solution for export
+    // TODO: Backend should support ?status=completed&start_date=&end_date= params
     const rangeApps = (Array.isArray(appointments) ? appointments : []).filter(
       (a) => {
         const s = String(a?.status || "").trim().toLowerCase();
@@ -493,6 +496,12 @@ const RecordaRates = ({
             ? 0
             : Number(base.fixed) || 0);
 
+        const perRecord =
+          draft.perRecord ??
+          (base.perRecord === "" || base.perRecord == null
+            ? 0
+            : Number(base.perRecord) || 0);
+
         const percent =
           draft.percent ??
           (base.percent == null &&
@@ -504,13 +513,19 @@ const RecordaRates = ({
         const fixedMonth = toNum(fixed);
         const productMonth = toNum(prodByEmpMonth[String(e.id)] || 0);
 
-        const payoutRangePart = Math.round((agg.revenue * toNum(percent)) / 100);
+        const perRecordPayout = agg.completed * toNum(perRecord);
+        const percentPayout = Math.round((agg.revenue * toNum(percent)) / 100);
+        const payoutRangePart = perRecordPayout + percentPayout;
         const payoutTotal = payoutRangePart + fixedMonth + productMonth;
 
         return {
           name: e.name,
           completed: agg.completed,
           revenue: agg.revenue,
+          perRecordRate: toNum(perRecord),
+          perRecordPayout,
+          percentRate: toNum(percent),
+          percentPayout,
           payoutTotal,
           fixedMonth,
           productMonth,
@@ -530,17 +545,21 @@ const RecordaRates = ({
       (acc, r) => ({
         completed: acc.completed + num(r.completed),
         revenue: acc.revenue + num(r.revenue),
+        perRecordPayout: acc.perRecordPayout + num(r.perRecordPayout),
+        percentPayout: acc.percentPayout + num(r.percentPayout),
         payout: acc.payout + num(r.payoutTotal),
         fixed: acc.fixed + num(r.fixedMonth),
         product: acc.product + num(r.productMonth),
       }),
-      { completed: 0, revenue: 0, payout: 0, fixed: 0, product: 0 }
+      { completed: 0, revenue: 0, perRecordPayout: 0, percentPayout: 0, payout: 0, fixed: 0, product: 0 }
     );
 
     const W = {
-      name: 26,
-      completed: 10,
+      name: 20,
+      completed: 8,
       revenue: 10,
+      perRecord: 12,
+      percent: 12,
       payout: 10,
       fixed: 10,
       product: 10,
@@ -556,8 +575,10 @@ const RecordaRates = ({
 
     const header =
       `${cellL("Мастер", W.name)}  ` +
-      `${cellR("Завершено", W.completed)}  ` +
+      `${cellR("Записей", W.completed)}  ` +
       `${cellR("Выручка", W.revenue)}  ` +
+      `${cellR("За запись", W.perRecord)}  ` +
+      `${cellR("Процент", W.percent)}  ` +
       `${cellR("К выплате", W.payout)}  ` +
       `${cellR("Фикс(мес)", W.fixed)}  ` +
       `${cellR("Товар(мес)", W.product)}`;
@@ -572,10 +593,19 @@ const RecordaRates = ({
     lines.push(sep);
 
     rowsOut.forEach((r) => {
+      const perRecordLabel = r.perRecordRate > 0 
+        ? `${r.completed}×${num(r.perRecordRate)}=${money(r.perRecordPayout)}`
+        : "—";
+      const percentLabel = r.percentRate > 0
+        ? `${num(r.percentRate)}%=${money(r.percentPayout)}`
+        : "—";
+      
       lines.push(
         `${cellL(r.name, W.name)}  ` +
           `${cellR(r.completed, W.completed)}  ` +
           `${cellR(money(r.revenue), W.revenue)}  ` +
+          `${cellR(perRecordLabel, W.perRecord)}  ` +
+          `${cellR(percentLabel, W.percent)}  ` +
           `${cellR(money(r.payoutTotal), W.payout)}  ` +
           `${cellR(money(r.fixedMonth), W.fixed)}  ` +
           `${cellR(money(r.productMonth), W.product)}`
@@ -587,6 +617,8 @@ const RecordaRates = ({
       `${cellL("ИТОГО", W.name)}  ` +
         `${cellR(totalsStat.completed, W.completed)}  ` +
         `${cellR(money(totalsStat.revenue), W.revenue)}  ` +
+        `${cellR(money(totalsStat.perRecordPayout), W.perRecord)}  ` +
+        `${cellR(money(totalsStat.percentPayout), W.percent)}  ` +
         `${cellR(money(totalsStat.payout), W.payout)}  ` +
         `${cellR(money(totalsStat.fixed), W.fixed)}  ` +
         `${cellR(money(totalsStat.product), W.product)}`

@@ -80,6 +80,8 @@ const BarberAnalitika = () => {
     unifiedExpense,
     weekChart,
     dayLineChart,
+    bookingsStatusesData,
+    topServicesByBookings,
   } = useBarberAnalitikaData({ year, monthIdx });
 
   const [modal, setModal] = useState({
@@ -464,6 +466,56 @@ const BarberAnalitika = () => {
           )}
         </div>
       </section>
+
+      {/* Статусы заявок (кроме новых) */}
+      {bookingsStatusesData && bookingsStatusesData.length > 0 && (
+        <section className="barber-analitika__panel barber-analitika__panel--request-statuses">
+          <h3 className="barber-analitika__panel-title">
+            Статусы заявок
+          </h3>
+          <div className="barber-analitika__request-statuses-list">
+            {bookingsStatusesData.map((item) => (
+              <div
+                key={item.status}
+                className="barber-analitika__request-status-badge-item"
+              >
+                <span className="barber-analitika__request-status-label">
+                  {item.label}
+                </span>
+                <span className="barber-analitika__request-status-badge-count">
+                  {fmtInt(item.count)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Топ 5 услуг по заявкам */}
+      {topServicesByBookings && topServicesByBookings.length > 0 && (
+        <section className="barber-analitika__panel barber-analitika__panel--top-services">
+          <h3 className="barber-analitika__panel-title">Топ 5 услуг по заявкам</h3>
+          <div className="barber-analitika__top-services-list">
+            {topServicesByBookings.map((service, idx) => (
+              <div key={service.id || idx} className="barber-analitika__top-service-item">
+                <div className="barber-analitika__top-service-left">
+                  <div className="barber-analitika__top-service-rank">
+                    {idx + 1}
+                  </div>
+                  <div className="barber-analitika__top-service-info">
+                    <div className="barber-analitika__top-service-name">
+                      {service.name}
+                    </div>
+                    <div className="barber-analitika__top-service-details">
+                      {fmtInt(service.count)} заявок
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Линейный график */}
       <section className="barber-analitika__panel barber-analitika__panel--line">

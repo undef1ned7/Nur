@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { FaSearch, FaFilter } from "react-icons/fa";
 import {
   RequestCard,
@@ -6,11 +6,11 @@ import {
   FiltersModal,
   Pager,
 } from "./components";
+import Loading from "../../../common/Loading/Loading";
 import "./Requests.scss";
 import api from "../../../../api";
 
 const BOOKINGS_EP = "/barbershop/bookings/";
-const EMPLOYEES_EP = "/users/employees/";
 
 /* ===== Status tabs config ===== */
 const STATUS_TABS = [
@@ -21,32 +21,10 @@ const STATUS_TABS = [
   { value: "spam", label: "Спам" },
 ];
 
-const PAGE_SIZE = 10;
-
-/* ===== helpers ===== */
-const asArray = (d) =>
-  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
-
-const fetchPaged = async (url, params = {}) => {
-  const acc = [];
-  let next = url;
-  const seen = new Set();
-  while (next && !seen.has(next)) {
-    seen.add(next);
-    const { data } = await api.get(next, { params: next === url ? params : {} });
-    acc.push(...asArray(data));
-    next = data?.next;
-  }
-  return acc;
-};
-
 const Requests = () => {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [employees, setEmployees] = useState([]);
-
-  /* Filters */
+  // Server-side список: состояние query
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusTab, setStatusTab] = useState("all");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortBy, setSortBy] = useState("newest");
@@ -55,50 +33,222 @@ const Requests = () => {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
 
+  // Server-side список: состояние данных
+  const [requests, setRequests] = useState([]);
+  const [requestsCount, setRequestsCount] = useState(0);
+  const [requestsNext, setRequestsNext] = useState(null);
+  const [requestsPrevious, setRequestsPrevious] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Refs для отмены запросов и защиты от race conditions
+  const abortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const debounceTimerRef = useRef(null);
+
   /* Modals */
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
-  /* ===== Fetch bookings from backend ===== */
-  const fetchBookings = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchPaged(BOOKINGS_EP, { page_size: 100 });
-      setRequests(data);
-    } catch (err) {
-      console.error("Error fetching bookings:", err);
-    } finally {
-      setLoading(false);
+  // Маппинг сортировки UI -> API
+  const getOrderingForAPI = (sortKey) => {
+    switch (sortKey) {
+      case "oldest":
+        return "created_at";
+      case "price_asc":
+        return "total_price";
+      case "price_desc":
+        return "-total_price";
+      case "newest":
+      default:
+        return "-created_at";
     }
-  }, []);
+  };
 
-  /* ===== Fetch employees for master filter ===== */
-  const fetchEmployees = useCallback(async () => {
-    try {
-      const data = await fetchPaged(EMPLOYEES_EP);
-      setEmployees(data);
-    } catch (err) {
-      console.error("Error fetching employees:", err);
-    }
-  }, []);
-
-  /* ===== Initial load ===== */
+  // Debounce для search (400ms)
   useEffect(() => {
-    fetchBookings();
-    fetchEmployees();
-  }, [fetchBookings, fetchEmployees]);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
 
-  /* Master options for filter */
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [search]);
+
+  // Сброс page при изменении search или ordering или фильтров
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, sortBy, statusTab, statusFilter, masterFilter, dateFrom, dateTo]);
+
+  // Основной эффект для загрузки bookings (server-side)
+  useEffect(() => {
+    // Отменяем предыдущий запрос
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Создаем новый AbortController
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Увеличиваем requestId для защиты от race conditions
+    const currentRequestId = ++requestIdRef.current;
+
+    // Формируем query params
+    const params = {};
+    if (debouncedSearch.trim()) {
+      params.search = debouncedSearch.trim();
+    }
+    const ordering = getOrderingForAPI(sortBy);
+    if (ordering) {
+      params.ordering = ordering;
+    }
+    if (page > 1) {
+      params.page = page;
+    }
+
+    // Статус из таба или фильтра (приоритет у фильтра)
+    const status = statusFilter || (statusTab !== "all" ? statusTab : null);
+    if (status) {
+      params.status = status;
+    }
+
+    // Фильтр по мастеру
+    if (masterFilter) {
+      params.master = masterFilter;
+    }
+
+    // Фильтры по дате
+    if (dateFrom) {
+      params.date_from = dateFrom;
+    }
+    if (dateTo) {
+      params.date_to = dateTo;
+    }
+
+    // Выполняем запрос
+    setLoading(true);
+    setError("");
+
+    api.get(BOOKINGS_EP, {
+      params,
+      signal: abortController.signal,
+    })
+      .then((response) => {
+        // Проверяем, что это актуальный запрос
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
+        // Проверяем, что запрос не был отменен
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        const data = response.data;
+
+        // Обрабатываем ответ (может быть {results, count, next, previous} или просто массив)
+        let results = [];
+        let count = 0;
+        let next = null;
+        let previous = null;
+
+        if (Array.isArray(data)) {
+          results = data;
+          count = data.length;
+        } else {
+          results = data.results || [];
+          count = data.count || results.length;
+          next = data.next || null;
+          previous = data.previous || null;
+        }
+
+        setRequests(results);
+        setRequestsCount(count);
+        setRequestsNext(next);
+        setRequestsPrevious(previous);
+        setLoading(false);
+      })
+      .catch((err) => {
+        // Игнорируем ошибки отмененных запросов
+        if (err.name === "AbortError" || err.name === "CanceledError") {
+          return;
+        }
+
+        // Проверяем, что это актуальный запрос
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
+        const errorMessage =
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Не удалось загрузить заявки.";
+
+        setError(errorMessage);
+        setLoading(false);
+      });
+
+    // Cleanup: отменяем запрос при размонтировании или изменении зависимостей
+    return () => {
+      // Отменяем только если это текущий запрос
+      if (abortControllerRef.current === abortController) {
+        abortController.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, [debouncedSearch, sortBy, page, statusTab, statusFilter, masterFilter, dateFrom, dateTo]);
+
+  // Cleanup при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      // Отменяем все активные запросы при размонтировании
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Вычисляем totalPages на основе count
+  const totalPages = useMemo(() => {
+    if (requestsCount === 0) return 1;
+    const pageSize = requests.length || 1;
+    if (pageSize === 0) return 1;
+    if (requestsNext) {
+      return Math.ceil(requestsCount / pageSize);
+    }
+    return page;
+  }, [requestsCount, requests.length, requestsNext, page]);
+
+  /* Master options for filter - получаем из текущих заявок */
   const masterOptions = useMemo(() => {
     const opts = [{ value: "", label: "Все мастера" }];
-    employees.forEach((e) => {
-      const first = e.first_name ?? "";
-      const last = e.last_name ?? "";
-      const name = [first, last].filter(Boolean).join(" ").trim() || e.email || "—";
-      opts.push({ value: e.id, label: name });
+    const uniqueMasters = new Map();
+    
+    requests.forEach((r) => {
+      if (r.master && !uniqueMasters.has(r.master.id)) {
+        const first = r.master.first_name ?? "";
+        const last = r.master.last_name ?? "";
+        const name = [first, last].filter(Boolean).join(" ").trim() || r.master.email || "—";
+        uniqueMasters.set(r.master.id, { value: r.master.id, label: name });
+      }
     });
-    return opts;
-  }, [employees]);
+    
+    return [...opts, ...Array.from(uniqueMasters.values())];
+  }, [requests]);
 
   /* Handle status change via API */
   const handleStatusChange = useCallback(async (requestId, newStatus) => {
@@ -109,78 +259,36 @@ const Requests = () => {
     
     try {
       await api.patch(`${BOOKINGS_EP}${requestId}/status/`, { status: newStatus });
+      // Обновляем список после успешного изменения статуса
+      // Триггерим перезагрузку через изменение page
+      if (page === 1) {
+        setPage(2);
+        setTimeout(() => setPage(1), 0);
+      } else {
+        setPage(1);
+      }
     } catch (err) {
       console.error("Error updating status:", err);
-      // Revert on error
-      fetchBookings();
-    }
-  }, [fetchBookings]);
-
-  /* Filter & sort */
-  const filtered = useMemo(() => {
-    let result = [...requests];
-
-    if (statusTab !== "all") {
-      result = result.filter((r) => r.status === statusTab);
-    }
-
-    if (statusFilter) {
-      result = result.filter((r) => r.status === statusFilter);
-    }
-
-    if (masterFilter) {
-      result = result.filter((r) => String(r.master_id) === masterFilter);
-    }
-
-    if (dateFrom) {
-      result = result.filter((r) => r.date >= dateFrom);
-    }
-    if (dateTo) {
-      result = result.filter((r) => r.date <= dateTo);
-    }
-
-    const q = search.trim().toLowerCase();
-    if (q) {
-      result = result.filter(
-        (r) =>
-          (r.client_name || "").toLowerCase().includes(q) ||
-          (r.client_phone || "").toLowerCase().includes(q) ||
-          (r.master_name || "").toLowerCase().includes(q)
-      );
-    }
-
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case "oldest":
-          return new Date(a.created_at) - new Date(b.created_at);
-        case "price_desc":
-          return (b.total_price || 0) - (a.total_price || 0);
-        case "price_asc":
-          return (a.total_price || 0) - (b.total_price || 0);
-        default:
-          return new Date(b.created_at) - new Date(a.created_at);
+      // Revert on error - перезагружаем данные
+      if (page === 1) {
+        setPage(2);
+        setTimeout(() => setPage(1), 0);
+      } else {
+        setPage(1);
       }
-    });
+    }
+  }, [page]);
 
-    return result;
-  }, [requests, statusTab, statusFilter, masterFilter, dateFrom, dateTo, search, sortBy]);
-
-  /* Counts by status */
+  /* Counts by status - вычисляем из текущих данных (или можно запрашивать отдельно) */
   const counts = useMemo(() => {
-    const c = { all: requests.length, new: 0, confirmed: 0, no_show: 0, spam: 0 };
+    // Для точных counts нужно делать отдельный запрос или получать их с бекенда
+    // Пока используем только текущую страницу для приблизительного подсчета
+    const c = { all: requestsCount, new: 0, confirmed: 0, no_show: 0, spam: 0 };
     requests.forEach((r) => {
       if (c[r.status] !== undefined) c[r.status]++;
     });
     return c;
-  }, [requests]);
-
-  /* Pagination */
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [statusTab, statusFilter, masterFilter, dateFrom, dateTo, search, sortBy]);
+  }, [requests, requestsCount]);
 
   /* Active filters count */
   const activeFiltersCount = [
@@ -211,7 +319,7 @@ const Requests = () => {
 
   const counterText = loading
     ? "Загрузка…"
-    : `${filtered.length} заявок`;
+    : `${requestsCount} заявок`;
 
   const hasFilters = search || activeFiltersCount > 0 || statusTab !== "all";
 
@@ -274,22 +382,16 @@ const Requests = () => {
         </div>
       </div>
 
-      {loading && (
-        <div className="barberrequests__skeletonList">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="barberrequests__skeletonCard" />
-          ))}
-        </div>
-      )}
+      {error && <div className="barberrequests__alert">{error}</div>}
 
-      {!loading && filtered.length === 0 && (
+      {loading ? (
+        <Loading message="Загрузка заявок..." />
+      ) : requests.length === 0 ? (
         <div className="barberrequests__empty">Заявок не найдено</div>
-      )}
-
-      {!loading && filtered.length > 0 && (
+      ) : (
         <>
           <div className="barberrequests__list">
-            {paginated.map((r) => (
+            {requests.map((r) => (
               <RequestCard
                 key={r.id}
                 request={r}
@@ -299,7 +401,14 @@ const Requests = () => {
             ))}
           </div>
 
-          <Pager page={page} totalPages={totalPages} onChange={setPage} />
+          <Pager
+            count={requestsCount}
+            page={page}
+            totalPages={totalPages}
+            next={requestsNext}
+            previous={requestsPrevious}
+            onChange={setPage}
+          />
         </>
       )}
 

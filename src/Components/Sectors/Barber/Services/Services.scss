@@ -113,7 +113,7 @@
     height: 44px;
     border-radius: 12px;
     border: 1px solid rgba(247, 215, 79, 0.3);
-    padding: 0 16px 0 40px;
+    padding: 0 14px 0 40px;
     font-size: 14px;
     font-weight: 400;
     background: linear-gradient(135deg, #fffef5 0%, #fefcf0 100%);
@@ -673,6 +673,13 @@
     padding: 0;
   }
 
+  &__pageInfo {
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
   &__pageBtn {
     border-radius: 8px;
     border: none;
@@ -933,11 +940,12 @@
   @media (max-width: 900px) {
     &__actions {
       flex-wrap: wrap;
+      gap: 10px;
     }
 
     &__searchWrap {
-      width: 100%;
-      flex: none;
+      flex: 1;
+      min-width: 200px;
     }
 
     &__filter {
@@ -967,27 +975,50 @@
     }
 
     &__actions {
-      gap: 10px;
+      gap: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
     }
 
-    &__filter {
-      width: 100%;
-      flex: none;
+    &__searchWrap {
+      flex: 1 1 0;
+      min-width: 0;
+      max-width: calc(100% - 48px);
+      order: 1;
+    }
+
+    &__btn--icon {
+      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
+      flex-grow: 0;
+      order: 2;
+    }
+
+    &__filtersWrap {
+      order: 3;
+      flex: 1 1 auto;
+      min-width: 0;
+      flex-basis: calc(100% - 48px);
     }
 
     &__filtersBtn {
       height: 40px;
       padding: 0 12px;
       font-size: 13px;
+      width: 100%;
     }
 
     &__viewToggle {
-      order: 10;
+      order: 4;
+      flex-shrink: 0;
+      flex-grow: 0;
     }
 
-    &__btn--icon {
-      width: 40px;
-      height: 40px;
+    &__filter {
+      width: 100%;
+      flex: none;
     }
 
     &__card {
@@ -1066,10 +1097,19 @@
       font-size: 12px;
     }
 
+    &__actions {
+      gap: 6px;
+    }
+
+    &__searchWrap {
+      max-width: calc(100% - 44px);
+    }
+
     &__searchInput {
-      height: 40px;
+      height: 38px;
       font-size: 13px;
       padding-left: 36px;
+      padding-right: 12px;
     }
 
     &__searchIcon {
@@ -1080,6 +1120,21 @@
     &__btn--icon {
       width: 38px;
       height: 38px;
+    }
+
+    &__filtersWrap {
+      flex: 1 1 auto;
+      min-width: 0;
+      flex-basis: calc(100% - 44px);
+    }
+
+    &__filtersBtn {
+      height: 38px;
+    }
+
+    &__viewBtn {
+      width: 34px;
+      height: 34px;
     }
 
     &__card {
@@ -1115,13 +1170,18 @@
     }
 
     &__actions {
-      gap: 8px;
+      gap: 6px;
+    }
+
+    &__searchWrap {
+      max-width: calc(100% - 42px);
     }
 
     &__searchInput {
-      height: 38px;
+      height: 36px;
       font-size: 12px;
       padding-left: 32px;
+      padding-right: 10px;
       border-radius: 10px;
     }
 
@@ -1130,8 +1190,14 @@
       font-size: 12px;
     }
 
+    &__filtersWrap {
+      flex: 1 1 auto;
+      min-width: 0;
+      flex-basis: calc(100% - 42px);
+    }
+
     &__filtersBtn {
-      height: 38px;
+      height: 36px;
       padding: 0 10px;
       gap: 6px;
 
@@ -1147,11 +1213,12 @@
 
     &__viewToggle {
       border-radius: 8px;
+      padding: 2px;
     }
 
     &__viewBtn {
-      width: 34px;
-      height: 34px;
+      width: 32px;
+      height: 32px;
     }
 
     &__list {

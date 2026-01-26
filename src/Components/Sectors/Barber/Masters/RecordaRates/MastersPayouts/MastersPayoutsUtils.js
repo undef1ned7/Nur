@@ -39,15 +39,13 @@ export const loadBarbershopData = async () => {
     fetchPaged("/barbershop/services/"),
   ]);
 
-  const normEmp = emps
-    .map((e) => {
-      const first = e.first_name ?? "";
-      const last = e.last_name ?? "";
-      const disp =
-        [last, first].filter(Boolean).join(" ").trim() || e.email || "—";
-      return { id: e.id, name: disp };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const normEmp = emps.map((e) => {
+    const first = e.first_name ?? "";
+    const last = e.last_name ?? "";
+    const disp =
+      [last, first].filter(Boolean).join(" ").trim() || e.email || "—";
+    return { id: e.id, name: disp };
+  });
 
   const normSvc = svcs.map((s) => ({
     id: s.id,

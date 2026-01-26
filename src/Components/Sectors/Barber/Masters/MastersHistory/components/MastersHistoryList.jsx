@@ -1,16 +1,12 @@
 // MastersHistoryList.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaTimes, FaUser, FaCut, FaCalendarAlt, FaClock, FaMoneyBillWave, FaPercent, FaTag } from "react-icons/fa";
+import api from "../../../../../../api";
+import Loading from "../../../../../common/Loading/Loading";
 import {
   dateISO,
   timeISO,
   fmtMoney,
-  barberNameOf,
-  serviceNamesFromRecord,
-  clientNameOf,
-  priceOfAppointment,
-  basePriceOfAppointment,
-  discountPercentOfAppointment,
   statusLabel,
 } from "../MastersHistoryUtils";
 
@@ -26,45 +22,63 @@ const statusKeyFromAppointment = (a) => {
 
 const MastersHistoryList = ({
   records,
-  employees,
-  services,
-  clients,
   loading,
   viewMode,
 }) => {
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [appointmentDetails, setAppointmentDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
 
   const openModal = (record) => setSelectedRecord(record);
-  const closeModal = () => setSelectedRecord(null);
+  const closeModal = () => {
+    setSelectedRecord(null);
+    setAppointmentDetails(null);
+    setDetailsError("");
+  };
+
+  // Загружаем полную информацию о записи при открытии модального окна
+  useEffect(() => {
+    if (!selectedRecord?.id) {
+      return;
+    }
+
+    const fetchDetails = async () => {
+      try {
+        setDetailsLoading(true);
+        setDetailsError("");
+        const response = await api.get(`/barbershop/appointments/${selectedRecord.id}/`);
+        setAppointmentDetails(response.data);
+      } catch (error) {
+        setDetailsError("Не удалось загрузить детали записи");
+      } finally {
+        setDetailsLoading(false);
+      }
+    };
+
+    fetchDetails();
+  }, [selectedRecord]);
 
   if (loading) {
-    return (
-      <div className="barbermastershistory__skeletonList" aria-hidden="true">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="barbermastershistory__skeletonCard" />
-        ))}
-      </div>
-    );
+    return <Loading message="Загрузка истории..." />;
   }
 
   if (records.length === 0) {
     return <div className="barbermastershistory__empty">Записей нет</div>;
   }
 
-  // Подготовка данных для записи
+  // Подготовка данных для записи из нового формата API
   const getRecordData = (a) => {
-    const date = dateISO(a.start_at);
-    const time = timeISO(a.start_at);
-    const client = clientNameOf(a, clients);
-    const service = serviceNamesFromRecord(a, services);
-    const barber = barberNameOf(a, employees);
-    const totalPrice = priceOfAppointment(a, services);
-    const basePrice = basePriceOfAppointment(a, services);
-    const discountPct = discountPercentOfAppointment(a, basePrice, totalPrice);
+    // Новый формат: { id, date, employee, client, total, status }
+    const date = dateISO(a.date);
+    const time = timeISO(a.date);
+    const client = a.client || "—";
+    const barber = a.employee || "—";
+    const totalPrice = a.total ? parseFloat(a.total) : null;
     const statusKey = statusKeyFromAppointment(a);
     const statusText = a.status_display || statusLabel(a.status);
 
-    return { date, time, client, service, barber, totalPrice, basePrice, discountPct, statusKey, statusText };
+    return { date, time, client, barber, totalPrice, statusKey, statusText };
   };
 
   // Модальное окно с полной информацией
@@ -72,6 +86,29 @@ const MastersHistoryList = ({
     if (!selectedRecord) return null;
 
     const data = getRecordData(selectedRecord);
+
+    // Используем детальные данные, если они загружены
+    const details = appointmentDetails;
+    
+    // Получаем услуги
+    const serviceNames = details?.services_names || [];
+    
+    // Получаем цены
+    const num = (v) => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const servicesPublic = Array.isArray(details?.services_public) ? details.services_public : [];
+    const servicesPriceSum = servicesPublic.reduce((sum, s) => sum + (num(s?.price) || 0), 0);
+    
+    const basePriceRaw = num(details?.price);
+    const discountPct = num(details?.discount) || 0;
+    const basePrice = basePriceRaw !== null ? basePriceRaw : servicesPriceSum || num(selectedRecord.total);
+    const totalPrice = basePrice !== null && discountPct > 0
+      ? Math.round(basePrice * (1 - discountPct / 100))
+      : basePrice;
 
     return (
       <>
@@ -89,6 +126,14 @@ const MastersHistoryList = ({
           </div>
 
           <div className="barbermastershistory__modalBody">
+            {detailsLoading && (
+              <div className="barbermastershistory__modalLoading">Загрузка деталей...</div>
+            )}
+            
+            {detailsError && (
+              <div className="barbermastershistory__modalError">{detailsError}</div>
+            )}
+
             <div className="barbermastershistory__modalStatus">
               <span className={`barbermastershistory__badge barbermastershistory__badge--${data.statusKey}`}>
                 {data.statusText}
@@ -137,42 +182,62 @@ const MastersHistoryList = ({
               </div>
             </div>
 
-            <div className="barbermastershistory__modalSection">
-              <div className="barbermastershistory__modalItem barbermastershistory__modalItem--full">
-                <div className="barbermastershistory__modalIcon">
-                  <FaCut />
-                </div>
-                <div className="barbermastershistory__modalInfo">
-                  <span className="barbermastershistory__modalLabel">Услуги</span>
-                  <span className="barbermastershistory__modalValue">{data.service}</span>
+            {/* Услуги */}
+            {serviceNames.length > 0 && (
+              <div className="barbermastershistory__modalSection">
+                <div className="barbermastershistory__modalItem barbermastershistory__modalItem--full">
+                  <div className="barbermastershistory__modalIcon">
+                    <FaCut />
+                  </div>
+                  <div className="barbermastershistory__modalInfo">
+                    <span className="barbermastershistory__modalLabel">Услуги</span>
+                    <span className="barbermastershistory__modalValue">{serviceNames.join(", ")}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="barbermastershistory__modalPricing">
-              <div className="barbermastershistory__modalPriceRow">
-                <span className="barbermastershistory__modalPriceLabel">
-                  <FaTag /> Цена
-                </span>
-                <span className="barbermastershistory__modalPriceValue">{fmtMoney(data.basePrice)}</span>
-              </div>
+            {/* Цены */}
+            {!detailsLoading && details && (
+              <div className="barbermastershistory__modalPricing">
+                {basePrice !== null && (
+                  <div className="barbermastershistory__modalPriceRow">
+                    <span className="barbermastershistory__modalPriceLabel">
+                      <FaTag /> Цена
+                    </span>
+                    <span className="barbermastershistory__modalPriceValue">{fmtMoney(basePrice)}</span>
+                  </div>
+                )}
 
-              {data.discountPct > 0 && (
-                <div className="barbermastershistory__modalPriceRow barbermastershistory__modalPriceRow--discount">
+                {discountPct > 0 && (
+                  <div className="barbermastershistory__modalPriceRow barbermastershistory__modalPriceRow--discount">
+                    <span className="barbermastershistory__modalPriceLabel">
+                      <FaPercent /> Скидка
+                    </span>
+                    <span className="barbermastershistory__modalPriceValue">-{discountPct}%</span>
+                  </div>
+                )}
+
+                <div className="barbermastershistory__modalPriceRow barbermastershistory__modalPriceRow--total">
                   <span className="barbermastershistory__modalPriceLabel">
-                    <FaPercent /> Скидка
+                    <FaMoneyBillWave /> Итого
                   </span>
-                  <span className="barbermastershistory__modalPriceValue">-{data.discountPct}%</span>
+                  <span className="barbermastershistory__modalPriceValue">{fmtMoney(totalPrice)}</span>
                 </div>
-              )}
-
-              <div className="barbermastershistory__modalPriceRow barbermastershistory__modalPriceRow--total">
-                <span className="barbermastershistory__modalPriceLabel">
-                  <FaMoneyBillWave /> Итого
-                </span>
-                <span className="barbermastershistory__modalPriceValue">{fmtMoney(data.totalPrice)}</span>
               </div>
-            </div>
+            )}
+
+            {/* Если детали еще не загружены, показываем только итого из списка */}
+            {!detailsLoading && !details && (
+              <div className="barbermastershistory__modalPricing">
+                <div className="barbermastershistory__modalPriceRow barbermastershistory__modalPriceRow--total">
+                  <span className="barbermastershistory__modalPriceLabel">
+                    <FaMoneyBillWave /> Итого
+                  </span>
+                  <span className="barbermastershistory__modalPriceValue">{fmtMoney(data.totalPrice)}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </>
@@ -199,7 +264,7 @@ const MastersHistoryList = ({
 
                 return (
                   <tr
-                    key={a.id ?? `${a.start_at}-${data.client}`}
+                    key={a.id}
                     className="barbermastershistory__tableRow"
                     onClick={() => openModal(a)}
                   >
@@ -232,7 +297,7 @@ const MastersHistoryList = ({
 
           return (
             <article
-              key={a.id ?? `${a.start_at}-${data.client}-${data.service}`}
+              key={a.id}
               className={`barbermastershistory__card barbermastershistory__card--${data.statusKey}`}
               onClick={() => openModal(a)}
             >

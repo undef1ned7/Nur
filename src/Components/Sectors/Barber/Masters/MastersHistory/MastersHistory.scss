@@ -308,6 +308,11 @@
     border-radius: 10px;
     padding: 3px;
     overflow: hidden;
+
+    // Скрываем на мобильных устройствах (автоматический режим)
+    @media (max-width: 768px) {
+      display: none;
+    }
   }
 
   &__viewBtn {
@@ -387,104 +392,195 @@
 
   /* ===== List (cards) ===== */
   &__list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
     overflow-y: auto;
     padding-right: 4px;
+
+    // На планшетах - 2 колонки
+    @media (max-width: 1024px) and (min-width: 769px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    // На телефонах - 1 колонка
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
   }
 
   /* ===== Card ===== */
   &__card {
     border-radius: 16px;
     border: 1px solid rgba(0, 0, 0, 0.04);
-    border-left-width: 4px;
+    border-left-width: 5px;
     border-left-color: rgba(0, 0, 0, 0.06);
-    padding: 16px 20px;
+    padding: 18px 20px;
     background: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
-    transition: all 0.15s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(250, 204, 21, 0.3), transparent);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
 
     &:hover {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
-      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 8px 32px rgba(0, 0, 0, 0.06);
+      transform: translateY(-2px);
+      border-left-width: 6px;
+
+      &::before {
+        opacity: 1;
+      }
+    }
+
+    &:active {
+      transform: translateY(0);
     }
 
     &--booked {
       border-left-color: #3b82f6;
+      
+      &:hover::before {
+        background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent);
+      }
     }
 
     &--confirmed {
       border-left-color: #8b5cf6;
+      
+      &:hover::before {
+        background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+      }
     }
 
     &--completed {
       border-left-color: #22c55e;
+      
+      &:hover::before {
+        background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.3), transparent);
+      }
     }
 
     &--canceled {
       border-left-color: #ef4444;
+      
+      &:hover::before {
+        background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.3), transparent);
+      }
     }
 
     &--no-show {
       border-left-color: #f59e0b;
+      
+      &:hover::before {
+        background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
+      }
+    }
+
+    // Улучшенная адаптивность для мобильных
+    @media (max-width: 640px) {
+      padding: 16px 18px;
+      border-left-width: 4px;
+
+      &:hover {
+        border-left-width: 5px;
+      }
     }
   }
 
   &__cardHead {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
+    align-items: flex-start;
+    margin-bottom: 14px;
     gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
   }
 
   &__cardTitle {
     margin: 0;
-    font-size: 14px;
-    font-weight: 450;
+    font-size: 15px;
+    font-weight: 500;
     color: var(--text);
+    letter-spacing: -0.01em;
+    
+    @media (max-width: 640px) {
+      font-size: 14px;
+    }
   }
 
   /* ===== Badge ===== */
   &__badge {
     font-size: 11px;
-    font-weight: 450;
-    padding: 5px 12px;
-    border-radius: 8px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 10px;
     white-space: nowrap;
     background: #f5f5f5;
     color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
 
     &--booked {
       background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
       color: #1d4ed8;
+      border-color: rgba(29, 78, 216, 0.2);
+      box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
     }
 
     &--confirmed {
       background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
       color: #6d28d9;
+      border-color: rgba(109, 40, 217, 0.2);
+      box-shadow: 0 2px 4px rgba(139, 92, 246, 0.1);
     }
 
     &--completed {
       background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
       color: #15803d;
+      border-color: rgba(21, 128, 61, 0.2);
+      box-shadow: 0 2px 4px rgba(34, 197, 94, 0.1);
     }
 
     &--canceled {
       background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
       color: #dc2626;
+      border-color: rgba(220, 38, 38, 0.2);
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.1);
     }
 
     &--no-show {
       background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
       color: #b45309;
+      border-color: rgba(180, 83, 9, 0.2);
+      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
     }
 
     &--other {
       background: #f5f5f5;
       color: #6b7280;
+      border-color: rgba(107, 114, 128, 0.2);
+    }
+    
+    @media (max-width: 640px) {
+      font-size: 10px;
+      padding: 5px 12px;
     }
   }
 
@@ -492,26 +588,38 @@
   &__body {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
     font-size: 13px;
     color: #6b7280;
   }
 
   &__row {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     align-items: baseline;
+    padding: 4px 0;
   }
 
   &__label {
     color: #9ca3af;
     font-weight: 400;
     flex-shrink: 0;
+    min-width: 90px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    
+    @media (max-width: 640px) {
+      min-width: 80px;
+      font-size: 11px;
+    }
   }
 
   &__value {
     color: var(--text);
-    font-weight: 450;
+    font-weight: 500;
+    flex: 1;
+    word-break: break-word;
   }
 
   &__summary {
@@ -539,24 +647,44 @@
 
   /* ===== Card Total ===== */
   &__cardTotal {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 2px solid rgba(0, 0, 0, 0.06);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.03) 0%, rgba(22, 163, 74, 0.03) 100%);
+    margin-left: -20px;
+    margin-right: -20px;
+    margin-bottom: -18px;
+    padding: 14px 20px;
+    border-radius: 0 0 16px 16px;
+    
+    @media (max-width: 640px) {
+      margin-left: -18px;
+      margin-right: -18px;
+      margin-bottom: -16px;
+      padding: 12px 18px;
+    }
   }
 
   &__cardTotalLabel {
     font-size: 12px;
-    font-weight: 450;
-    color: #9ca3af;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   &__cardTotalValue {
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 18px;
+    font-weight: 600;
     color: #16a34a;
+    letter-spacing: -0.02em;
+    
+    @media (max-width: 640px) {
+      font-size: 16px;
+    }
   }
 
   /* ===== Table ===== */
@@ -745,6 +873,26 @@
     padding: 22px;
     overflow-y: auto;
     max-height: calc(90vh - 80px);
+  }
+
+  &__modalLoading {
+    text-align: center;
+    padding: 12px;
+    font-size: 13px;
+    color: #9ca3af;
+    background: linear-gradient(135deg, rgba(250, 204, 21, 0.08) 0%, rgba(234, 179, 8, 0.08) 100%);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
+  &__modalError {
+    text-align: center;
+    padding: 12px;
+    font-size: 13px;
+    color: #dc2626;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.08) 100%);
+    border-radius: 10px;
+    margin-bottom: 16px;
   }
 
   &__modalStatus {
@@ -964,17 +1112,21 @@
     }
 
     &__searchWrap {
-      flex: 1 1 calc(100% - 130px);
+      flex: 1 1 100%;
       max-width: none;
       min-width: 0;
+      order: 1;
+    }
+
+    &__filter {
+      flex: 1 1 calc(50% - 5px);
+      min-width: 0;
+      order: 2;
     }
 
     &__filtersWrap {
-      flex: 0 0 auto;
-    }
-
-    &__viewToggle {
-      flex-shrink: 0;
+      flex: 1 1 calc(50% - 5px);
+      order: 3;
     }
   }
 
@@ -982,26 +1134,14 @@
     padding: 16px 12px;
     gap: 14px;
 
-    &__card {
-      padding: 14px 16px;
-    }
-
-    &__cardTitle {
+    &__searchInput {
+      height: 40px;
       font-size: 13px;
-    }
-
-    &__body {
-      font-size: 12px;
     }
 
     &__summary {
       flex-direction: column;
       gap: 4px;
-    }
-
-    &__searchInput {
-      height: 40px;
-      font-size: 13px;
     }
 
     &__modal {
@@ -1032,8 +1172,8 @@
   }
 
   @media (max-width: 480px) {
-    padding: 10px;
-    gap: 10px;
+    padding: 12px 10px;
+    gap: 12px;
 
     &__topRow {
       flex-wrap: wrap;
@@ -1042,11 +1182,12 @@
 
     &__counter {
       font-size: 13px;
+      flex: 1;
     }
 
     &__resetBtn {
       font-size: 12px;
-      padding: 5px 10px;
+      padding: 6px 12px;
     }
 
     &__searchWrap {
@@ -1054,38 +1195,39 @@
       order: 1;
     }
 
-    &__filtersWrap {
+    &__filter {
+      flex: 1 1 100%;
       order: 2;
+      width: 100%;
+      max-width: none;
     }
 
-    &__viewToggle {
+    &__filtersWrap {
+      flex: 1 1 100%;
       order: 3;
+      
+      button {
+        width: 100%;
+        justify-content: center;
+      }
     }
 
     &__searchInput {
-      height: 38px;
-      font-size: 12px;
-      padding-left: 36px;
+      height: 42px;
+      font-size: 13px;
+      padding-left: 38px;
     }
 
     &__searchIcon {
-      left: 12px;
-      font-size: 12px;
-    }
-
-    &__viewBtn {
-      width: 36px;
-      height: 36px;
+      left: 13px;
+      font-size: 13px;
     }
 
     &__filtersBtn {
-      height: 38px;
-      padding: 0 10px;
-      gap: 6px;
-      
-      span:not(.barbermastershistory__filtersBadge) {
-        display: none;
-      }
+      height: 42px;
+      padding: 0 16px;
+      gap: 8px;
+      font-size: 13px;
     }
   }
 
