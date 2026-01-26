@@ -13,12 +13,14 @@ const ExportModal = ({ open, onClose, onExport }) => {
   const [mode, setMode] = useState("weeks"); // day | weeks
   const [date, setDate] = useState(todayStr());
   const [weeks, setWeeks] = useState("1");
+  const [format, setFormat] = useState("pdf"); // txt | pdf
 
   useEffect(() => {
     if (!open) return;
     setMode("weeks");
     setDate(todayStr());
     setWeeks("1");
+    setFormat("pdf");
   }, [open]);
 
   if (!open) return null;
@@ -28,9 +30,14 @@ const ExportModal = ({ open, onClose, onExport }) => {
     { value: "weeks", label: "Неск. недель" },
   ];
 
+  const formatOptions = [
+    { value: "pdf", label: "PDF" },
+    { value: "txt", label: "TXT" },
+  ];
+
   return (
     <div className="barberrecordarates__overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="barberrecordarates__modal" onClick={(e) => e.stopPropagation()}>
+      <div className="barberrecordarates__modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "700px", width: "100%" }}>
         <div className="barberrecordarates__modalHead">
           <h4 className="barberrecordarates__modalTitle">Скачать отчёт</h4>
           <button type="button" className="barberrecordarates__iconBtn" aria-label="Закрыть" onClick={onClose}>
@@ -38,8 +45,8 @@ const ExportModal = ({ open, onClose, onExport }) => {
           </button>
         </div>
 
-        <div className="barberrecordarates__exportBody">
-          <div className="barberrecordarates__exportGrid">
+        <div className="barberrecordarates__exportBody" style={{ padding: "16px 20px", minHeight: "120px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: mode === "weeks" ? "repeat(4, 1fr)" : "repeat(3, 1fr)", gap: "12px" }}>
             <div className="barberrecordarates__exportField">
               <span className="barberrecordarates__filterLabel">Отчёт</span>
               <RRSelect value={mode} onChange={(v) => setMode(String(v))} options={modeOptions} placeholder="Выберите" />
@@ -55,7 +62,7 @@ const ExportModal = ({ open, onClose, onExport }) => {
               />
             </div>
 
-            {mode === "weeks" ? (
+            {mode === "weeks" && (
               <div className="barberrecordarates__exportField">
                 <span className="barberrecordarates__filterLabel">Недель</span>
                 <input
@@ -68,19 +75,22 @@ const ExportModal = ({ open, onClose, onExport }) => {
                   placeholder="1"
                 />
               </div>
-            ) : (
-              <div className="barberrecordarates__exportField" />
             )}
+
+            <div className="barberrecordarates__exportField">
+              <span className="barberrecordarates__filterLabel">Формат</span>
+              <RRSelect value={format} onChange={(v) => setFormat(String(v))} options={formatOptions} placeholder="Выберите" />
+            </div>
           </div>
         </div>
 
-        <div className="barberrecordarates__modalFoot">
+        <div className="barberrecordarates__modalFoot" style={{ padding: "12px 20px" }}>
           <button type="button" className="barberrecordarates__btn barberrecordarates__btn--secondary" onClick={onClose}>
             Отмена
           </button>
 
-          <button type="button" className="barberrecordarates__btn barberrecordarates__btn--primary" onClick={() => onExport?.({ mode, date, weeks })}>
-            Скачать TXT
+          <button type="button" className="barberrecordarates__btn barberrecordarates__btn--primary" onClick={() => onExport?.({ mode, date, weeks, format })}>
+            Скачать {format.toUpperCase()}
           </button>
         </div>
       </div>
