@@ -184,6 +184,8 @@ const Sell = () => {
       params.delete("page");
     }
     setSearchParams(params, { replace: true });
+    // Плавно прокручиваем страницу вверх при смене страницы
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // поиск по истории (дебаунс)
@@ -202,6 +204,11 @@ const Sell = () => {
     dispatch(historySellProduct({ search: "", page: currentPage }));
     dispatch(historySellObjects({ search: "", page: currentPage }));
   }, [dispatch, showSellMainStart, currentPage]);
+
+  // Плавно прокручиваем страницу вверх при изменении страницы
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   useEffect(() => {
     if (showSellModal) dispatch(startSale({ discount_total: 0 }));

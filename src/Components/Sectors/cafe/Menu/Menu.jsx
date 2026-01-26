@@ -1,5 +1,6 @@
 // src/Components/Sectors/cafe/Menu/Menu.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FaListUl, FaThLarge } from "react-icons/fa";
 import api from "../../../../api";
 import "./Menu.scss";
@@ -14,6 +15,8 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 
 // Утилиты
 const getListFromResponse = (res) => res?.data?.results || res?.data || [];
+
+const PAGE_SIZE = 50;
 
 const toNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -37,6 +40,8 @@ const normalizeDecimalValue = (value) => {
 const Menu = () => {
   const confirm = useConfirm()
   const alert = useAlert()
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   // Основное состояние
   const [activeTab, setActiveTab] = useState("items");
   const [viewMode, setViewMode] = useState("cards");
@@ -46,6 +51,15 @@ const Menu = () => {
   const [kitchens, setKitchens] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
   const [items, setItems] = useState([]);
+  
+  // Данные пагинации
+  const [itemsCount, setItemsCount] = useState(0);
+  const [itemsNext, setItemsNext] = useState(null);
+  const [itemsPrevious, setItemsPrevious] = useState(null);
+  
+  // Refs для отслеживания изменений данных
+  const isInitialMountRef = useRef(true);
+  const prevItemsRef = useRef([]);
 
   // Состояние загрузки
   const [loadingItems, setLoadingItems] = useState(true);
@@ -56,6 +70,21 @@ const Menu = () => {
   const debouncedItemSearch = useDebouncedValue(queryItems, 400);
   const [queryCats, setQueryCats] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("");
+  
+  // Получаем текущую страницу из URL
+  const currentPage = useMemo(
+    () => parseInt(searchParams.get("page") || "1", 10),
+    [searchParams]
+  );
+  
+  // Расчет общего количества страниц
+  const totalPages = useMemo(
+    () => (itemsCount && PAGE_SIZE ? Math.ceil(itemsCount / PAGE_SIZE) : 1),
+    [itemsCount]
+  );
+  
+  const hasNextPage = !!itemsNext;
+  const hasPrevPage = !!itemsPrevious;
 
   // Модал для блюд
   const [modalOpen, setModalOpen] = useState(false);
@@ -125,9 +154,17 @@ const Menu = () => {
 
   const fetchMenuItems = useCallback(async (params = {}) => {
     const res = await api.get("/cafe/menu-items/", {
-      params
+      params: {
+        page: params.page || 1,
+        search: params.search || "",
+        category: params.category || null,
+      }
     });
-    setItems(getListFromResponse(res));
+    const data = res?.data || {};
+    setItems(data?.results || (Array.isArray(data) ? data : []));
+    setItemsCount(data?.count || data?.length || 0);
+    setItemsNext(data?.next || null);
+    setItemsPrevious(data?.previous || null);
   }, []);
 
   const fetchMenuItemDetail = useCallback(async (id) => {
@@ -174,12 +211,49 @@ const Menu = () => {
     })();
   }, []);
 
-  // Загрузка блюд при монтировании
+  // Синхронизация URL с состоянием страницы
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    } else {
+      params.delete("page");
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [currentPage, searchParams, setSearchParams]);
+
+  // Обработчик смены страницы
+  const handlePageChange = useCallback((newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    const params = new URLSearchParams(searchParams);
+    if (newPage > 1) {
+      params.set("page", newPage.toString());
+    } else {
+      params.delete("page");
+    }
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams, totalPages]);
+
+  // Сброс на первую страницу при изменении поиска или фильтра
+  useEffect(() => {
+    if (currentPage > 1) {
+      const params = new URLSearchParams(searchParams);
+      params.delete("page");
+      setSearchParams(params, { replace: true });
+    }
+  }, [debouncedItemSearch, selectedCategoryFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Загрузка блюд при монтировании и изменении параметров
   useEffect(() => {
     (async () => {
       try {
         setLoadingItems(true);
         await fetchMenuItems({
+          page: currentPage,
           search: debouncedItemSearch,
           category: selectedCategoryFilter || null
         });
@@ -187,7 +261,42 @@ const Menu = () => {
         setLoadingItems(false);
       }
     })();
-  }, [debouncedItemSearch, selectedCategoryFilter]);
+  }, [fetchMenuItems, currentPage, debouncedItemSearch, selectedCategoryFilter]);
+
+  // Плавно прокручиваем страницу вверх при изменении данных блюд
+  useEffect(() => {
+    if (loadingItems) return;
+    // Пропускаем первый рендер
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      prevItemsRef.current = items || [];
+      return;
+    }
+
+    // Проверяем, что блюда изменились (новый запрос)
+    const prevItems = prevItemsRef.current;
+    const currentItems = items || [];
+
+    // Сравниваем первые блюда - если они разные, значит новый запрос
+    const isNewData =
+      prevItems.length > 0 &&
+      currentItems.length > 0 &&
+      prevItems[0]?.id !== currentItems[0]?.id;
+
+    if (isNewData) {
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        rootElement.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      } else {
+        // Fallback на window, если root не найден
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+    prevItemsRef.current = currentItems;
+  }, [items, loadingItems]);
 
   // Очистка URL при размонтировании
   useEffect(() => {
@@ -559,6 +668,12 @@ const Menu = () => {
           formatMoney={formatMoney}
           toNumber={toNumber}
           viewMode={viewMode}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsCount={itemsCount}
+          hasNextPage={hasNextPage}
+          hasPrevPage={hasPrevPage}
+          onPageChange={handlePageChange}
         />
       )}
 
