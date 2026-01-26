@@ -1092,7 +1092,7 @@ const ROLE_ITEM_URL = (id) => `/users/roles/custom/${id}/`;  // PUT / DELETE
 const SYSTEM_ROLES = ["owner", "admin"];
 
 /* ===== Константы ===== */
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 
 /* ===== utils ===== */
 const asArray = (data) =>

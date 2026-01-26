@@ -1,6 +1,7 @@
 import { Plus, Search, Trash } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 // import "./Sklad.scss";
 
 import api from "../../../api";
@@ -70,11 +71,31 @@ const STATUSES = [
 
 export const DEAL_STATUS_RU = ["Продажа", "Долги", "Предоплата"];
 
+const PAGE_SIZE = 50;
+
 const Sell = () => {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
-  const { history, start, historyObjects } = useSale();
+  const { 
+    history, 
+    start, 
+    historyObjects,
+    historyCount,
+    historyNext,
+    historyPrevious,
+    historyObjectsCount,
+    historyObjectsNext,
+    historyObjectsPrevious,
+    loading
+  } = useSale();
+  
+  // Получаем текущую страницу из URL
+  const currentPage = useMemo(
+    () => parseInt(searchParams.get("page") || "1", 10),
+    [searchParams]
+  );
 
   const [showDetailSell, setShowDetailSell] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
@@ -123,19 +144,64 @@ const Sell = () => {
   const filterSell = history.filter((item) => item.status !== "canceled");
 
   const filterField = isBuildingCompany ? historyObjects : filterSell;
+  
+  // Данные пагинации в зависимости от типа компании
+  const count = isBuildingCompany ? historyObjectsCount : historyCount;
+  const next = isBuildingCompany ? historyObjectsNext : historyNext;
+  const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
+  
+  // Расчет общего количества страниц
+  const totalPages = useMemo(
+    () => (count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1),
+    [count]
+  );
+  
+  const hasNextPage = !!next;
+  const hasPrevPage = !!previous;
+
+  // Синхронизация URL с состоянием страницы
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    } else {
+      params.delete("page");
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [currentPage, searchParams, setSearchParams]);
+
+  // Обработчик смены страницы
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    const params = new URLSearchParams(searchParams);
+    if (newPage > 1) {
+      params.set("page", newPage.toString());
+    } else {
+      params.delete("page");
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   // поиск по истории (дебаунс)
   const debouncedSearch = useDebounce((v) => {
-    dispatch(historySellProduct({ search: v }));
-    dispatch(historySellObjects({ search: v }));
+    dispatch(historySellProduct({ search: v, page: 1 }));
+    dispatch(historySellObjects({ search: v, page: 1 }));
+    // Сбрасываем на первую страницу при поиске
+    const params = new URLSearchParams(searchParams);
+    params.delete("page");
+    setSearchParams(params, { replace: true });
   }, 600);
   const onChange = (e) => debouncedSearch(e.target.value);
 
   useEffect(() => {
     if (showSellMainStart) return;
-    dispatch(historySellProduct({ search: "" }));
-    dispatch(historySellObjects({ search: "" }));
-  }, [dispatch, showSellMainStart]);
+    dispatch(historySellProduct({ search: "", page: currentPage }));
+    dispatch(historySellObjects({ search: "", page: currentPage }));
+  }, [dispatch, showSellMainStart, currentPage]);
 
   useEffect(() => {
     if (showSellModal) dispatch(startSale({ discount_total: 0 }));
@@ -237,8 +303,8 @@ const Sell = () => {
       if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
       clearSelection();
       alert("Выбранные записи удалены");
-      dispatch(historySellProduct({ search: "" }));
-      dispatch(historySellObjects({ search: "" }));
+      dispatch(historySellProduct({ search: "", page: currentPage }));
+      dispatch(historySellObjects({ search: "", page: currentPage }));
     } catch (e) {
       alert("Не удалось удалить: " + e.message);
     } finally {
@@ -270,8 +336,12 @@ const Sell = () => {
       if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
       clearSelection();
       alert("История удалена");
-      dispatch(historySellProduct({ search: "" }));
-      dispatch(historySellObjects({ search: "" }));
+      // После удаления всех записей возвращаемся на первую страницу
+      const params = new URLSearchParams(searchParams);
+      params.delete("page");
+      setSearchParams(params, { replace: true });
+      dispatch(historySellProduct({ search: "", page: 1 }));
+      dispatch(historySellObjects({ search: "", page: 1 }));
     } catch (e) {
       alert("Не удалось очистить историю: " + e.message);
     } finally {
@@ -411,7 +481,7 @@ const Sell = () => {
                           onChange={() => toggleRow(item.id)}
                         />
                       </td>
-                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="№">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
                       <td data-label="Клиент">{item.client_name || "-"}</td>
                       <td data-label="Товар">
                         {/* {item.products
@@ -445,6 +515,32 @@ const Sell = () => {
               </tbody>
             </table>
           </div>
+          
+          {/* Пагинация */}
+          {totalPages > 1 && (
+            <div className="sell__pagination">
+              <button
+                type="button"
+                className="sell__pagination-btn"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1 || loading || !hasPrevPage}
+              >
+                Назад
+              </button>
+              <span className="sell__pagination-info">
+                Страница {currentPage} из {totalPages}
+                {count ? ` (${count} записей)` : ""}
+              </span>
+              <button
+                type="button"
+                className="sell__pagination-btn"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={loading || !hasNextPage || (totalPages && currentPage >= totalPages)}
+              >
+                Вперед
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -463,7 +559,10 @@ const Sell = () => {
         <RefundPurchase
           item={itemId}
           onClose={() => setShowRefundModal(false)}
-          onChanged={() => dispatch(historySellProduct())}
+          onChanged={() => {
+            dispatch(historySellProduct({ search: "", page: currentPage }));
+            dispatch(historySellObjects({ search: "", page: currentPage }));
+          }}
         />
       )}
       {showBuilding && (

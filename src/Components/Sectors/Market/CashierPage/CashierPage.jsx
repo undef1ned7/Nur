@@ -657,7 +657,7 @@ const CashierPage = () => {
   // Расчет пагинации
   // Используем фиксированный размер страницы
   // Если есть next или previous, значит есть еще страницы
-  const PAGE_SIZE = 100; // Размер страницы для API
+  const PAGE_SIZE = 50; // Размер страницы для API
   const hasNextPage = !!next;
   const hasPrevPage = !!previous;
 

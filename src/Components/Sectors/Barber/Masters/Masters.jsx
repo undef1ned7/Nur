@@ -25,7 +25,7 @@ const ROLE_ITEM_URL = (id) => `/users/roles/custom/${id}/`;
 
 /* ===================== Helpers ===================== */
 const SYSTEM_ROLES = ["owner", "admin"];
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 50;
 
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];

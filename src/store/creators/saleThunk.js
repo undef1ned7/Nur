@@ -164,12 +164,15 @@ export const doSearch = createAsyncThunk(
 
 export const historySellProduct = createAsyncThunk(
   "products/historySellProduct",
-  async (search, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
       const { data } = await api.get(`/main/pos/sales/`, {
-        params: search,
+        params: {
+          page: params.page || 1,
+          search: params.search || "",
+        },
       });
-      return data.results;
+      return data; // Возвращаем полный объект с пагинацией
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
@@ -211,12 +214,15 @@ export const updateSellProduct = createAsyncThunk(
 
 export const historySellObjects = createAsyncThunk(
   "products/historySellObjects",
-  async (search, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
       const { data } = await api.get(`/main/object-sales/`, {
-        params: search,
+        params: {
+          page: params.page || 1,
+          search: params.search || "",
+        },
       });
-      return data.results;
+      return data; // Возвращаем полный объект с пагинацией
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }

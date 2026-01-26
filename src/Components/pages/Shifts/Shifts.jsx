@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -6,7 +6,6 @@ import {
   Wallet,
   CheckCircle,
   XCircle,
-  User,
   DollarSign,
   ShoppingCart,
   Lock,
@@ -21,8 +20,10 @@ const Shifts = () => {
   const [activeTab, setActiveTab] = useState("open"); // "open" или "closed"
 
   useEffect(() => {
-    dispatch(fetchShiftsAsync());
-  }, [dispatch]);
+    // Загружаем смены с фильтром по статусу в зависимости от активного таба
+    const params = activeTab === "open" ? { status: "open" } : { status: "closed" };
+    dispatch(fetchShiftsAsync(params));
+  }, [dispatch, activeTab]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -43,15 +44,8 @@ const Shifts = () => {
     navigate(`/crm/shifts/${shiftId}`);
   };
 
-  // Разделяем смены на открытые и закрытые
-  const { openShifts, closedShifts } = useMemo(() => {
-    const open = shifts.filter((shift) => shift.status === "open");
-    const closed = shifts.filter((shift) => shift.status === "closed");
-    return { openShifts: open, closedShifts: closed };
-  }, [shifts]);
-
-  // Получаем смены для активного таба
-  const displayedShifts = activeTab === "open" ? openShifts : closedShifts;
+  // Смены уже отфильтрованы на сервере, используем их напрямую
+  const displayedShifts = shifts;
 
   if (loading) {
     return (
@@ -77,8 +71,8 @@ const Shifts = () => {
         >
           <CheckCircle size={18} />
           <span>Открытые</span>
-          {openShifts.length > 0 && (
-            <span className="shifts-page__tab-badge">{openShifts.length}</span>
+          {activeTab === "open" && displayedShifts.length > 0 && (
+            <span className="shifts-page__tab-badge">{displayedShifts.length}</span>
           )}
         </button>
         <button
@@ -89,9 +83,9 @@ const Shifts = () => {
         >
           <XCircle size={18} />
           <span>Закрытые</span>
-          {closedShifts.length > 0 && (
+          {activeTab === "closed" && displayedShifts.length > 0 && (
             <span className="shifts-page__tab-badge">
-              {closedShifts.length}
+              {displayedShifts.length}
             </span>
           )}
         </button>

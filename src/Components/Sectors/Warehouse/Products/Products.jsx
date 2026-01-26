@@ -12,7 +12,7 @@ import "./Products.scss";
  * - БЭМ: .sklad-products*
  */
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 
 const WarehouseProducts = () => {
   /* ---------- Справочники (демо) ---------- */
