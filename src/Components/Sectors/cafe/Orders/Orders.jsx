@@ -191,7 +191,7 @@ const Orders = () => {
   const [openSelectId, setOpenSelectId] = useState(null);
 
   /* ===== API ===== */
-  const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/", { params: { status: 'free' } })));
+  const fetchTables = async () => setTables(listFrom(await api.get("/cafe/tables/")));
 
   const fetchEmployees = async () => {
     const arr = listFrom(await api.get("/users/employees/")) || [];
