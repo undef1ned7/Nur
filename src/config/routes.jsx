@@ -180,24 +180,6 @@ const createProtectedRoute = (path, Component, props) => (
 
 
 /**
- * Создает защищенный Layout
- */
-const createProtectedLayoute = (path, children) => (
-  <Route
-    key={path}
-    path={path}
-    element={
-      <ProtectedRoute>
-        {children}
-      </ProtectedRoute>
-    }
-  />
-);
-
-
-
-
-/**
  * Конфигурация публичных роутов
  */
 export const publicRoutes = [
@@ -337,8 +319,9 @@ export const crmRoutes = (profile) => [
     {
       [
         createProtectedRoute("*", CafeOrders, { index: true }),
-        createProtectedRoute("history", CafeOrderHistory, { index: true })
-      ]}
+        createProtectedRoute("history", CafeOrderHistory)
+      ]
+    }
   </Route>,
   createProtectedRoute("cafe/payroll", CafePayroll),
   createProtectedRoute("cafe/purchasing", CafePurchasing),
