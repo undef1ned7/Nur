@@ -23,7 +23,7 @@ export const RRSelect = ({ value, onChange, options, placeholder }) => {
   };
 
   return (
-    <div className="rr-select" ref={ref}>
+    <div className="rr-select" ref={ref} style={{ position: "relative", zIndex: open ? 1000 : 1 }}>
       <button
         type="button"
         className={`rr-select__control ${
@@ -42,7 +42,7 @@ export const RRSelect = ({ value, onChange, options, placeholder }) => {
       </button>
 
       {open && (
-        <div className="rr-select__dropdown">
+        <div className="rr-select__dropdown" style={{ position: "absolute", zIndex: 1001 }}>
           <ul className="rr-select__list">
             {options.map((opt) => (
               <li

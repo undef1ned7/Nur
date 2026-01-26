@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./RecordaRates.scss";
 import api from "../../../../../api";
+import { pdf } from "@react-pdf/renderer";
 
 import {
   RecordaRatesHeader,
@@ -13,6 +14,7 @@ import {
 import DaysModal from "./RecordaRatesDaysModal";
 import ProductSaleModal from "./RecordaRatesProductSaleModal";
 import ExportModal from "./RecordaRatesExportModal";
+import PayoutsPdfDocument from "./components/PayoutsPdfDocument";
 
 import {
   PAGE_SIZE,
@@ -391,7 +393,7 @@ const RecordaRates = ({
   const openExportModal = () => setExportModal({ open: true });
   const closeExportModal = () => setExportModal({ open: false });
 
-  const handleExport = async ({ mode, date, weeks }) => {
+  const handleExport = async ({ mode, date, weeks, format = "pdf" }) => {
     const clampInt = (v, min, max, def) => {
       const n = Number(v);
       if (!Number.isFinite(n)) return def;
@@ -624,18 +626,47 @@ const RecordaRates = ({
         `${cellR(money(totalsStat.product), W.product)}`
     );
 
-    const text = lines.join("\n");
-    const fname = `report_${startIso}_to_${endIso}.txt`;
+    if (format === "pdf") {
+      // PDF Export
+      const pdfData = {
+        startDate: startIso,
+        endDate: endIso,
+        monthKey,
+        rows: rowsOut,
+        totals: totalsStat,
+      };
 
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fname;
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(url);
-    a.remove();
+      const fname = `report_${startIso}_to_${endIso}.pdf`;
+
+      try {
+        const blob = await pdf(<PayoutsPdfDocument data={pdfData} />).toBlob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        a.remove();
+      } catch (error) {
+        console.error("PDF generation error:", error);
+        alert("Ошибка при создании PDF");
+      }
+    } else {
+      // TXT Export (original code)
+      const text = lines.join("\n");
+      const fname = `report_${startIso}_to_${endIso}.txt`;
+
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+    }
 
     closeExportModal?.();
   };

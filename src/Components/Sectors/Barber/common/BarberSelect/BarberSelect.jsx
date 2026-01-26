@@ -14,7 +14,7 @@ const BarberSelect = ({
   options,
   placeholder = "Выберите...",
   disabled = false,
-  hideClear = false,
+  hideClear = true,
   hideSearch: hideSearchProp,
   className = "",
 }) => {
