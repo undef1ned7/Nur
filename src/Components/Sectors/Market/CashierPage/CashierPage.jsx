@@ -26,6 +26,7 @@ import {
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
+import api from "../../../../api";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useSale } from "../../../../store/slices/saleSlice";
@@ -60,6 +61,7 @@ const CashierPage = () => {
   const { shifts } = useShifts();
   const { list: cashBoxes } = useCash();
   const { currentUser, userId } = useUser();
+  const [openShiftState, setOpenShiftState] = useState(null); // Локальное состояние для открытой смены
   console.log('SALEID', currentSale);
 
   // Функция для форматирования количества (убирает лишние нули)
@@ -108,11 +110,63 @@ const CashierPage = () => {
     return String(num).replace(/\.?0+$/, "");
   };
 
+  // Функция для поиска открытой смены на всех страницах
+  const findOpenShift = useCallback(async () => {
+    try {
+      // Пробуем загрузить с фильтром по статусу (если API поддерживает)
+      try {
+        const response = await api.get("/construction/shifts/", {
+          params: { status: "open" },
+        });
+        const openShiftFromApi = response.data?.results?.[0];
+        if (openShiftFromApi && openShiftFromApi.status === "open") {
+          setOpenShiftState(openShiftFromApi);
+          return openShiftFromApi;
+        }
+      } catch (e) {
+        // Если фильтр не поддерживается, продолжаем поиск по страницам
+        console.log("Filter by status not supported, searching all pages");
+      }
+
+      // Если не нашли, ищем по всем страницам
+      let page = 1;
+      let hasNext = true;
+
+      while (hasNext) {
+        const response = await api.get("/construction/shifts/", {
+          params: { page },
+        });
+        const data = response.data;
+        const results = data?.results || [];
+
+        const openShift = results.find((s) => s.status === "open");
+        if (openShift) {
+          setOpenShiftState(openShift);
+          return openShift;
+        }
+
+        hasNext = !!data?.next;
+        page++;
+        
+        // Защита от бесконечного цикла (максимум 10 страниц)
+        if (page > 10) break;
+      }
+
+      setOpenShiftState(null);
+      return null;
+    } catch (error) {
+      console.error("Ошибка при поиске открытой смены:", error);
+      setOpenShiftState(null);
+      return null;
+    }
+  }, []);
+
   // Получаем текущую открытую смену (мемоизируем, чтобы избежать лишних пересчетов)
-  const openShift = React.useMemo(
-    () => shifts.find((s) => s.status === "open"),
-    [shifts]
-  );
+  // Используем локальное состояние, если оно есть, иначе ищем в загруженных сменах
+  const openShift = React.useMemo(() => {
+    if (openShiftState) return openShiftState;
+    return shifts.find((s) => s.status === "open");
+  }, [shifts, openShiftState]);
   const openShiftId = openShift?.id;
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -481,6 +535,29 @@ const CashierPage = () => {
     dispatch(fetchShiftsAsync());
     dispatch(getCashBoxes());
   }, [dispatch]);
+
+  // Поиск открытой смены при загрузке и обновлении списка смен
+  useEffect(() => {
+    // Проверяем, есть ли открытая смена в загруженных сменах
+    const foundInLoaded = shifts.find((s) => s.status === "open");
+    
+    if (foundInLoaded) {
+      // Если нашли в загруженных, обновляем состояние
+      setOpenShiftState(foundInLoaded);
+    } else if (!openShiftState) {
+      // Если в загруженных нет и локального состояния тоже нет, ищем на всех страницах
+      findOpenShift();
+    } else {
+      // Если есть локальное состояние, проверяем его актуальность
+      // Проверяем, не была ли смена закрыта (если она есть в загруженных, но статус изменился)
+      const shiftInLoaded = shifts.find((s) => s.id === openShiftState.id);
+      if (shiftInLoaded && shiftInLoaded.status !== "open") {
+        // Смена была закрыта, сбрасываем состояние
+        setOpenShiftState(null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shifts]);
 
   // Закрываем экран открытия смены, если смена открыта или пользователь на странице смены
   useEffect(() => {
@@ -1120,7 +1197,10 @@ const CashierPage = () => {
         onBack={() => {
           setShowOpenShiftPage(false);
           // Обновляем список смен после возврата
-          dispatch(fetchShiftsAsync());
+          dispatch(fetchShiftsAsync()).then(() => {
+            // После обновления списка ищем открытую смену
+            findOpenShift();
+          });
         }}
       />
     );
@@ -1131,6 +1211,8 @@ const CashierPage = () => {
       <CloseShiftPage
         onBack={() => {
           setShowCloseShiftPage(false);
+          // Сбрасываем состояние открытой смены
+          setOpenShiftState(null);
           // Обновляем список смен после возврата
           dispatch(fetchShiftsAsync());
           // Обновляем продажу после закрытия смены
