@@ -13,6 +13,7 @@ import {
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -50,6 +51,7 @@ const CafeOrderHistory = () => {
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
+  const { tables: socketTables, orders: socketOrders } = useCafeWebSocketManager()
 
   const [waiterOptions, setWaiterOptions] = useState([
     { value: null, label: 'Все сотрудники' }
@@ -172,7 +174,7 @@ const CafeOrderHistory = () => {
         setLoading(false);
       }
     })();
-  }, [debouncedOrderSearchQuery, statusFilter, waiterFilter])
+  }, [debouncedOrderSearchQuery, statusFilter, waiterFilter, socketOrders?.orders])
 
   useEffect(() => {
     const handler = () => fetchOrders();

@@ -26,6 +26,7 @@ import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import { useCafeWebSocket, useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -146,6 +147,7 @@ const statusFilterOptions =
    Orders
    ========================================================= */
 const Orders = () => {
+
   const [tables, setTables] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -155,6 +157,7 @@ const Orders = () => {
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
+  const { tables: socketTables, orders: socketOrders } = useCafeWebSocketManager()
 
   const [kitchens, setKitchens] = useState([]);
 
@@ -166,9 +169,16 @@ const Orders = () => {
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
   const [statusFilter, setStatusFilter] = useState("");
 
-  const userData = useMemo(() => safeUserData(), []);
-  const userRole = userData?.role || "";
-  const userId = localStorage.getItem("userId");
+  const { userRole, userData, userId } = useMemo(() => {
+    const userData = safeUserData();
+    const userRole = userData?.role || "";
+    const userId = localStorage.getItem("userId");
+    return {
+      userData,
+      userRole,
+      userId,
+    }
+  }, [])
 
   const [printingId, setPrintingId] = useState(null);
 
@@ -267,17 +277,23 @@ const Orders = () => {
     } catch (e) {
       console.error("Print init error:", e);
     }
-
     (async () => {
       try {
-        await Promise.all([fetchTables(), fetchEmployees(), fetchMenu(), fetchKitchens(), fetchCashboxes()]);
+        await Promise.all([fetchEmployees(), fetchMenu(), fetchKitchens(), fetchCashboxes()]);
       } catch (e) {
         console.error("Ошибка загрузки:", e);
-      } finally {
-        setLoading(false);
       }
     })();
   }, [fetchOrders]);
+  useEffect(() => {
+    (async () => {
+      try {
+        await fetchTables();
+      } catch (e) {
+        console.error("Ошибка загрузки:", e);
+      }
+    })();
+  }, [socketOrders?.orders])
 
   useEffect(() => {
     setLoading(true);
@@ -294,7 +310,7 @@ const Orders = () => {
         setLoading(false);
       }
     })();
-  }, [debouncedOrderSearchQuery, waiterFilter])
+  }, [debouncedOrderSearchQuery, waiterFilter, socketTables?.tables])
 
   useEffect(() => {
     const handler = () => fetchOrders();
@@ -856,7 +872,11 @@ const Orders = () => {
       setPayOrder(null);
 
       // 6) Синхронизация с сервером
-      await fetchOrders();
+      await fetchOrders({
+        search: debouncedOrderSearchQuery,
+        status: 'open',
+        waiter: waiterFilter
+      });
 
       // успех — снимаем guard
       localStorage.removeItem(guardKey);
