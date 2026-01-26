@@ -332,13 +332,13 @@ const Documents = () => {
           />
         </div>
         <div className="documents__header-actions">
-          <button
+          {/* <button
             className="documents__create-btn"
             onClick={() => navigate("/crm/market/documents/create")}
           >
             <Plus size={18} />
             Создать
-          </button>
+          </button> */}
           <button
             className="documents__filter-btn"
             onClick={() => setShowReconciliationModal(true)}
