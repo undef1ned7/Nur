@@ -54,6 +54,9 @@ const BarberAnalitika = () => {
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
   const [monthIdx, setMonthIdx] = useState(now.getMonth());
+  const [clientsTab, setClientsTab] = useState("bookings"); // "bookings" или "sales"
+  const [mastersServicesTab, setMastersServicesTab] = useState("masters"); // "masters" или "services"
+  const [businessTab, setBusinessTab] = useState("products"); // "products", "cashboxes", "suppliers"
 
   const {
     loading,
@@ -570,179 +573,266 @@ const BarberAnalitika = () => {
         </div>
       </section>
 
-      {/* Топ мастеров / Топ клиентов */}
+      {/* Топ мастеров / Топ услуг и Топ клиентов */}
       <section className="barber-analitika__grid barber-analitika__grid--tops">
         <div className="barber-analitika__panel barber-analitika__panel--list">
-          <h3 className="barber-analitika__panel-title">Топ мастеров</h3>
-          <ul className="barber-analitika__top-list">
-            {rankBarbers.slice(0, 5).map((r) => (
-              <li key={r.id} className="barber-analitika__top-item">
-                <div className="barber-analitika__top-item-left">
-                  <div className="barber-analitika__top-icon barber-analitika__top-icon--barber">
-                    <FiScissors size={18} />
-                  </div>
-                  <div className="barber-analitika__top-item-text">
-                    <div className="barber-analitika__top-item-name">
-                      {r.name}
+          <div className="barber-analitika__tabs">
+            <button
+              className={`barber-analitika__tab ${mastersServicesTab === "masters" ? "barber-analitika__tab--active" : ""}`}
+              onClick={() => setMastersServicesTab("masters")}
+              type="button"
+            >
+              Мастера
+            </button>
+            <button
+              className={`barber-analitika__tab ${mastersServicesTab === "services" ? "barber-analitika__tab--active" : ""}`}
+              onClick={() => setMastersServicesTab("services")}
+              type="button"
+            >
+              Услуги
+            </button>
+          </div>
+
+          {mastersServicesTab === "masters" ? (
+            <>
+              <h3 className="barber-analitika__panel-title">Топ мастеров</h3>
+              <ul className="barber-analitika__top-list">
+                {rankBarbers.slice(0, 5).map((r) => (
+                  <li key={r.id} className="barber-analitika__top-item">
+                    <div className="barber-analitika__top-item-left">
+                      <div className="barber-analitika__top-icon barber-analitika__top-icon--barber">
+                        <FiScissors size={18} />
+                      </div>
+                      <div className="barber-analitika__top-item-text">
+                        <div className="barber-analitika__top-item-name">
+                          {r.name}
+                        </div>
+                        <div className="barber-analitika__top-item-sub">
+                          {fmtInt(r.count)} записей
+                        </div>
+                      </div>
                     </div>
-                    <div className="barber-analitika__top-item-sub">
-                      {fmtInt(r.count)} записей
+                    <div className="barber-analitika__top-item-sum">
+                      {fmtMoney(r.sum)}
                     </div>
-                  </div>
-                </div>
-                <div className="barber-analitika__top-item-sum">
-                  {fmtMoney(r.sum)}
-                </div>
-              </li>
-            ))}
-            {!rankBarbers.length && (
-              <li className="barber-analitika__top-empty">Нет данных.</li>
-            )}
-          </ul>
+                  </li>
+                ))}
+                {!rankBarbers.length && (
+                  <li className="barber-analitika__top-empty">Нет данных.</li>
+                )}
+              </ul>
+            </>
+          ) : (
+            <>
+              <h3 className="barber-analitika__panel-title">Топ услуг</h3>
+              <ul className="barber-analitika__top-list">
+                {rankServices.slice(0, 5).map((r) => (
+                  <li key={r.id} className="barber-analitika__top-item">
+                    <div className="barber-analitika__top-item-left">
+                      <div className="barber-analitika__top-icon barber-analitika__top-icon--service">
+                        <FiScissors size={18} />
+                      </div>
+                      <div className="barber-analitika__top-item-text">
+                        <div className="barber-analitika__top-item-name">
+                          {r.name}
+                        </div>
+                        <div className="barber-analitika__top-item-sub">
+                          {fmtInt(r.count)} раз
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                {!rankServices.length && (
+                  <li className="barber-analitika__top-empty">Нет данных.</li>
+                )}
+              </ul>
+            </>
+          )}
         </div>
 
         <div className="barber-analitika__panel barber-analitika__panel--list">
-          <h3 className="barber-analitika__panel-title">Топ клиентов</h3>
-          <ul className="barber-analitika__top-list">
-            {rankClientsVisits.slice(0, 5).map((r) => (
-              <li key={r.id} className="barber-analitika__top-item">
-                <div className="barber-analitika__top-item-left">
-                  <div className="barber-analitika__top-icon barber-analitika__top-icon--client">
-                    <FiUsers size={18} />
-                  </div>
-                  <div className="barber-analitika__top-item-text">
-                    <div className="barber-analitika__top-item-name">
-                      {r.name}
+          <div className="barber-analitika__tabs">
+            <button
+              className={`barber-analitika__tab ${clientsTab === "bookings" ? "barber-analitika__tab--active" : ""}`}
+              onClick={() => setClientsTab("bookings")}
+              type="button"
+            >
+              Запись
+            </button>
+            <button
+              className={`barber-analitika__tab ${clientsTab === "sales" ? "barber-analitika__tab--active" : ""}`}
+              onClick={() => setClientsTab("sales")}
+              type="button"
+            >
+              Продажа
+            </button>
+          </div>
+
+          {clientsTab === "bookings" ? (
+            <>
+              <h3 className="barber-analitika__panel-title">Топ клиентов</h3>
+              <ul className="barber-analitika__top-list">
+                {rankClientsVisits.slice(0, 5).map((r) => (
+                  <li key={r.id} className="barber-analitika__top-item">
+                    <div className="barber-analitika__top-item-left">
+                      <div className="barber-analitika__top-icon barber-analitika__top-icon--client">
+                        <FiUsers size={18} />
+                      </div>
+                      <div className="barber-analitika__top-item-text">
+                        <div className="barber-analitika__top-item-name">
+                          {r.name}
+                        </div>
+                        <div className="barber-analitika__top-item-sub">
+                          {fmtInt(r.count)} визитов
+                        </div>
+                      </div>
                     </div>
-                    <div className="barber-analitika__top-item-sub">
-                      {fmtInt(r.count)} визитов
+                    <div className="barber-analitika__top-item-sum">
+                      {fmtMoney(r.sum)}
                     </div>
-                  </div>
-                </div>
-                <div className="barber-analitika__top-item-sum">
-                  {fmtMoney(r.sum)}
-                </div>
-              </li>
-            ))}
-            {!rankClientsVisits.length && (
-              <li className="barber-analitika__top-empty">Нет данных.</li>
-            )}
-          </ul>
+                  </li>
+                ))}
+                {!rankClientsVisits.length && (
+                  <li className="barber-analitika__top-empty">Нет данных.</li>
+                )}
+              </ul>
+            </>
+          ) : (
+            <>
+              <h3 className="barber-analitika__panel-title">Клиенты (продажи)</h3>
+              <ul className="barber-analitika__top-list">
+                {clientsSalesRows.slice(0, 5).map((r, idx) => (
+                  <li key={idx} className="barber-analitika__top-item">
+                    <div className="barber-analitika__top-item-left">
+                      <div className="barber-analitika__top-icon barber-analitika__top-icon--client">
+                        <FiShoppingCart size={18} />
+                      </div>
+                      <div className="barber-analitika__top-item-text">
+                        <div className="barber-analitika__top-item-name">
+                          {r.name}
+                        </div>
+                        <div className="barber-analitika__top-item-sub">
+                          {fmtInt(r.orders)} заказов
+                        </div>
+                      </div>
+                    </div>
+                    <div className="barber-analitika__top-item-sum">
+                      {fmtMoney(r.revenue)}
+                    </div>
+                  </li>
+                ))}
+                {!clientsSalesRows.length && (
+                  <li className="barber-analitika__top-empty">Нет данных.</li>
+                )}
+              </ul>
+            </>
+          )}
         </div>
       </section>
 
-      {/* Карточки: услуги, товары, клиенты, кассы, поставщики */}
-      <section className="barber-analitika__grid barber-analitika__grid--cards">
-        <BarberAnalitikaCard
-          icon={<FiScissors size={16} />}
-          title="Топ услуг (месяц)"
-          columns={[
-            {
-              key: "name",
-              title: "Услуга",
-              className: "barber-analitika-table__ellipsis",
-            },
-            { key: "count", title: "Кол-во" },
-            {
-              key: "sum",
-              title: "Выручка",
-              className: "barber-analitika-table__money",
-              render: (r) => `${fmt(r.sum)} c`,
-            },
-          ]}
-          rows={rankServices}
-          onOpenModal={openModal}
-        />
+      {/* Карточка: бизнес операции (товары/кассы/поставщики) */}
+      <section className="barber-analitika__grid barber-analitika__grid--single">
+        <div className="barber-analitika__panel barber-analitika__panel--business">
+          <div className="barber-analitika__tabs">
+            <button
+              className={`barber-analitika__tab ${businessTab === "products" ? "barber-analitika__tab--active" : ""}`}
+              onClick={() => setBusinessTab("products")}
+              type="button"
+            >
+              Товары
+            </button>
+            <button
+              className={`barber-analitika__tab ${businessTab === "cashboxes" ? "barber-analitika__tab--active" : ""}`}
+              onClick={() => setBusinessTab("cashboxes")}
+              type="button"
+            >
+              Кассы
+            </button>
+            <button
+              className={`barber-analitika__tab ${businessTab === "suppliers" ? "barber-analitika__tab--active" : ""}`}
+              onClick={() => setBusinessTab("suppliers")}
+              type="button"
+            >
+              Поставщики
+            </button>
+          </div>
 
-        <BarberAnalitikaCard
-          icon={<FiPackage size={16} />}
-          title="Товары (продажи)"
-          columns={[
-            {
-              key: "name",
-              title: "Товар",
-              className: "barber-analitika-table__ellipsis",
-            },
-            { key: "qty", title: "Кол-во" },
-            {
-              key: "revenue",
-              title: "Выручка",
-              className: "barber-analitika-table__money",
-              render: (r) => `${fmt(r.revenue)} c`,
-            },
-          ]}
-          rows={loadingProducts ? [] : productsRowsAgg}
-          onOpenModal={openModal}
-        />
+          {businessTab === "products" && (
+            <BarberAnalitikaCard
+              icon={<FiPackage size={16} />}
+              title="Товары (продажи)"
+              columns={[
+                {
+                  key: "name",
+                  title: "Товар",
+                  className: "barber-analitika-table__ellipsis",
+                },
+                { key: "qty", title: "Кол-во" },
+                {
+                  key: "revenue",
+                  title: "Выручка",
+                  className: "barber-analitika-table__money",
+                  render: (r) => `${fmt(r.revenue)} c`,
+                },
+              ]}
+              rows={loadingProducts ? [] : productsRowsAgg}
+              onOpenModal={openModal}
+            />
+          )}
 
-        <BarberAnalitikaCard
-          icon={<FiUsers size={16} />}
-          title="Клиенты (продажи)"
-          columns={[
-            {
-              key: "name",
-              title: "Клиент",
-              className: "barber-analitika-table__ellipsis",
-            },
-            { key: "orders", title: "Заказы" },
-            {
-              key: "revenue",
-              title: "Выручка",
-              className: "barber-analitika-table__money",
-              render: (r) => `${fmt(r.revenue)} c`,
-            },
-          ]}
-          rows={clientsSalesRows}
-          onOpenModal={openModal}
-        />
+          {businessTab === "cashboxes" && (
+            <BarberAnalitikaCard
+              icon={<FiCreditCard size={16} />}
+              title="Кассы (месяц)"
+              columns={[
+                {
+                  key: "name",
+                  title: "Касса",
+                  className: "barber-analitika-table__ellipsis",
+                },
+                { key: "ops", title: "Операций" },
+                {
+                  key: "income",
+                  title: "Приход",
+                  className: "barber-analitika-table__money",
+                  render: (r) => `${fmt(r.income)} c`,
+                },
+                {
+                  key: "expense",
+                  title: "Расход",
+                  className: "barber-analitika-table__money",
+                  render: (r) => `${fmt(r.expense)} c`,
+                },
+              ]}
+              rows={loadingCash ? [] : cashRows}
+              onOpenModal={openModal}
+            />
+          )}
 
-        <BarberAnalitikaCard
-          icon={<FiCreditCard size={16} />}
-          title="Кассы (месяц)"
-          columns={[
-            {
-              key: "name",
-              title: "Касса",
-              className: "barber-analitika-table__ellipsis",
-            },
-            { key: "ops", title: "Операций" },
-            {
-              key: "income",
-              title: "Приход",
-              className: "barber-analitika-table__money",
-              render: (r) => `${fmt(r.income)} c`,
-            },
-            {
-              key: "expense",
-              title: "Расход",
-              className: "barber-analitika-table__money",
-              render: (r) => `${fmt(r.expense)} c`,
-            },
-          ]}
-          rows={loadingCash ? [] : cashRows}
-          onOpenModal={openModal}
-        />
-
-        <BarberAnalitikaCard
-          icon={<FiTruck size={16} />}
-          title="Поставщики (месяц)"
-          columns={[
-            {
-              key: "name",
-              title: "Поставщик",
-              className: "barber-analitika-table__ellipsis",
-            },
-            { key: "items", title: "Позиций" },
-            {
-              key: "amount",
-              title: "Сумма",
-              className: "barber-analitika-table__money",
-              render: (r) => `${fmt(r.amount)} c`,
-            },
-          ]}
-          rows={suppliersRows}
-          onOpenModal={openModal}
-        />
+          {businessTab === "suppliers" && (
+            <BarberAnalitikaCard
+              icon={<FiTruck size={16} />}
+              title="Поставщики (месяц)"
+              columns={[
+                {
+                  key: "name",
+                  title: "Поставщик",
+                  className: "barber-analitika-table__ellipsis",
+                },
+                { key: "items", title: "Позиций" },
+                {
+                  key: "amount",
+                  title: "Сумма",
+                  className: "barber-analitika-table__money",
+                  render: (r) => `${fmt(r.amount)} c`,
+                },
+              ]}
+              rows={suppliersRows}
+              onOpenModal={openModal}
+            />
+          )}
+        </div>
       </section>
 
       {modal.open && (
