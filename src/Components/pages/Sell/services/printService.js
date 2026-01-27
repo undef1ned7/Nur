@@ -366,6 +366,48 @@ async function ensureUsbReadyAuto() {
   return usbState.dev ? usbState : null;
 }
 
+/**
+ * Интерактивная проверка и подключение принтера.
+ * Сначала пытается авто-подключиться к уже разрешённому устройству.
+ * Если не найдено – показывает диалог выбора USB-устройства.
+ * Возвращает true, если после этого принтер доступен.
+ */
+export async function ensurePrinterConnectedInteractively() {
+  if (!("usb" in navigator)) return false;
+
+  // 1. Пытаемся автоматически подключиться к уже разрешённому устройству
+  try {
+    const state = await ensureUsbReadyAuto();
+    if (state && usbState.dev) {
+      return true;
+    }
+  } catch {
+    // игнорируем и пробуем интерактивное подключение ниже
+  }
+
+  // 2. Если авто-подключение не сработало – запрашиваем устройство у пользователя
+  try {
+    const dev = await requestUsbDevice();
+    if (!dev) return false;
+
+    // сохраняем VID/PID для будущих авто-подключений
+    saveVidPidToLS(dev);
+
+    // открываем устройство и захватываем интерфейс
+    const info = await openUsbDevice(dev);
+
+    // сохраняем в глобальном состоянии
+    usbState.dev = dev;
+
+    // если удалось получить outEP — считаем, что принтер подключен
+    return !!info?.outEP;
+  } catch (e) {
+    // Пользователь мог нажать Cancel или произошла другая ошибка
+    console.warn("Не удалось подключить USB-принтер интерактивно:", e);
+    return false;
+  }
+}
+
 export function attachUsbListenersOnce() {
   if (!("usb" in navigator)) return;
   if (attachUsbListenersOnce._did) return;
@@ -393,11 +435,24 @@ export function attachUsbListenersOnce() {
 }
 
 export async function checkPrinterConnection() {
-  if (!("usb" in navigator)) return false;
+  if (!("usb" in navigator)) {
+    console.warn("WebUSB не поддерживается в этом браузере");
+    return false;
+  }
   try {
     const state = await ensureUsbReadyAuto();
-    return state !== null && usbState.dev !== null;
-  } catch {
+    const connected = state !== null && usbState.dev !== null;
+    console.log("[PrintService] checkPrinterConnection ->", {
+      hasState: !!state,
+      hasDevice: !!usbState.dev,
+      connected,
+    });
+    return connected;
+  } catch (err) {
+    console.error(
+      "[PrintService] Ошибка при проверке подключения принтера:",
+      err
+    );
     return false;
   }
 }

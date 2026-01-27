@@ -249,23 +249,19 @@ const Orders = () => {
   const handleMenuPageChange = useCallback(async (newPage, searchQuery = "") => {
     if (newPage < 1) return;
     
-    const hasSearch = searchQuery.trim().length > 0;
-    const isPaginatedObject = menuItems?.results && menuItems?.count;
-    
-    // Если есть поиск или нет объекта с пагинацией - используем клиентскую пагинацию
-    if (hasSearch || !isPaginatedObject) {
-      setMenuCurrentPage(newPage);
-      return;
-    }
-    
-    // Серверная пагинация - загружаем данные с сервера
+    // Всегда загружаем данные с сервера (с поиском или без)
     setMenuLoading(true);
     try {
-      const res = await api.get("/cafe/menu-items/", {
-        params: {
-          page: newPage,
-        }
-      });
+      const params = {
+        page: newPage,
+      };
+      
+      // Добавляем параметр поиска, если он есть
+      if (searchQuery && searchQuery.trim().length > 0) {
+        params.search = searchQuery.trim();
+      }
+      
+      const res = await api.get("/cafe/menu-items/", { params });
       const data = res?.data || {};
       
       // Сохраняем полный объект пагинации (с count, next, previous, results)
@@ -288,7 +284,7 @@ const Orders = () => {
     } finally {
       setMenuLoading(false);
     }
-  }, [menuItems]);
+  }, []);
 
   const fetchCashboxes = async () => {
     try {
@@ -1412,6 +1408,8 @@ const Orders = () => {
               onClose={() => {
                 setMenuOpen(false);
                 setMenuCurrentPage(1);
+                // Загружаем первую страницу без поиска при закрытии
+                handleMenuPageChange(1, "");
               }}
               menuItems={menuItems}
               menuImageUrl={menuImageUrl}
