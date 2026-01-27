@@ -230,21 +230,21 @@
   }
 
   &__list {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
     gap: 16px;
+    flex-wrap: wrap;
   }
 
   &__receipt {
     background: #ffffff;
     border-radius: 12px;
+    flex: 1 0 280px;
     padding: 18px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     border: 1px solid #e5e7eb;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-width: 0;
   }
 
   &__receiptHeader {
@@ -364,6 +364,7 @@
 
   &__row {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
@@ -402,8 +403,10 @@
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+    width: 100%;
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: space-between;
+    
   }
 
   &__rowPrice {
