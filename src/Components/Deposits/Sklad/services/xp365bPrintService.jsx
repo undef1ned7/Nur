@@ -23,9 +23,16 @@ const chunkBytes = (u8, size = 4096) => {
   return out;
 };
 
+const sendRawBytes = async (u8) => {
+  for (const part of chunkBytes(u8)) {
+    await usbState.dev.transferOut(usbState.outEP, part);
+    await sleep(5);
+  }
+};
+
 /* ====================== TEXT WRAP ====================== */
 
-function wrap(text = "", width = 20) {
+function wrap(text = "", width = 20, maxLines = 3) {
   const words = String(text).split(/\s+/);
   const out = [];
   let line = "";
@@ -39,7 +46,7 @@ function wrap(text = "", width = 20) {
     }
   }
   if (line) out.push(line);
-  return out.slice(0, 2);
+  return out.slice(0, maxLines);
 }
 
 /* ====================== CP866 ====================== */
@@ -103,12 +110,13 @@ async function openUsbDevice(dev) {
 /* ====================== INIT (CYRILLIC + GAP) ====================== */
 
 async function initPrinter() {
-  const cmds = [
-    "CODEPAGE 866",
-    "SET GAP ON",
-    "SET BLINE OFF",
-    "\r\n",
-  ].join("\r\n");
+  // На некоторых XPrinter кириллица зависит и от ESC-выбора кодовой страницы,
+  // поэтому фиксируем это явно.
+  await sendRawBytes(new Uint8Array([0x1b, 0x74, 0x11])); // ESC t 17 (часто CP866)
+
+  const cmds = ["CODEPAGE 866", "SET GAP ON", "SET BLINE OFF", "\r\n"].join(
+    "\r\n"
+  );
 
   await sendTspl(cmds);
 }
@@ -152,28 +160,57 @@ export async function calibrateXprinter() {
 /* ====================== LABEL ====================== */
 
 function buildLabel({ title, barcode }) {
-  const lines = wrap(title || "ТОВАР");
-  const code = barcode || "123456789012";
+  // Фиксируем формат под вашу ленту: 25×15 мм, GAP 7 мм
+  const widthMm = 25;
+  const heightMm = 15;
+
+  const lines = wrap(title || "ТОВАР", 18, 3).map((s) =>
+    String(s).replace(/"/g, "")
+  );
+  const code = String(barcode || "123456789012").replace(/"/g, "");
+
+  const lineCount = lines.filter(Boolean).length;
+
+  const hasLongWord = String(title || "")
+    .trim()
+    .split(/\s+/)
+    .some((w) => w.length >= 12);
+
+  // Компактный макет: уменьшаем отступы, но оставляем шрифт,
+  // который у вас печатает кириллицу (обычно это "3").
+  const x = 6;
+  const titleY1 = 1;
+  // line-height для названия (расстояние между строками):
+  // для шрифта "3" делаем больше, иначе 2-я строка может "наезжать" на 1-ю
+  const titleLineHeight = lineCount >= 2 ? 20 : 13;
+  const titleY2 = titleY1 + titleLineHeight;
+  const titleY3 = titleY1 + titleLineHeight * 2;
+  const font = "3";
+
+  // Больше расстояние от названия до штрих‑кода
+  const extraBarcodeGap = hasLongWord ? 14 : 0;
+  const baseBarcodeY = lineCount >= 3 ? 66 : lineCount === 2 ? 56 : 44;
+  const barcodeY = baseBarcodeY + extraBarcodeGap;
+  const barcodeHeight = 24;
 
   return [
-    "SIZE 25 mm,15 mm",
+    `SIZE ${widthMm} mm,${heightMm} mm`,
     "GAP 7 mm,0 mm",
-
     "SPEED 4",
     "DENSITY 8",
-
     "DIRECTION 1",
     "REFERENCE 0,0",
     "OFFSET 0",
-
     "CLS",
     "CODEPAGE 866",
-
-    `TEXT 8,8,"3",0,1,1,"${lines[0] || ""}"`,
-    lines[1] ? `TEXT 8,32,"3",0,1,1,"${lines[1]}"` : "",
-
-    `BARCODE 8,${lines[1] ? 58 : 40},"128",32,1,0,2,2,"${code}"`,
-
+    `TEXT ${x},${titleY1},"${font}",0,1,1,"${lines[0] || ""}"`,
+    lines[1]
+      ? `TEXT ${x},${titleY2},"${font}",0,1,1,"${lines[1]}"`
+      : "",
+    lines[2]
+      ? `TEXT ${x},${titleY3},"${font}",0,1,1,"${lines[2]}"`
+      : "",
+    `BARCODE ${x},${barcodeY},"128",${barcodeHeight},1,0,1,1,"${code}"`,
     "PRINT 1",
     "\r\n",
   ]
@@ -204,6 +241,47 @@ if (typeof window !== "undefined") {
   window.printLabel = printLabel;
   window.testPrint = testPrint;
   window.calibrateXprinter = calibrateXprinter;
+}
+
+/* ====================== Backward-compatible API ====================== */
+
+let usbListenersAttached = false;
+
+/**
+ * Attach WebUSB connect/disconnect listeners once.
+ * This is used by `BarcodePrintTab.jsx`.
+ */
+export function attachXp365bUsbListenersOnce() {
+  if (usbListenersAttached) return;
+  usbListenersAttached = true;
+
+  if (typeof navigator === "undefined" || !navigator.usb?.addEventListener) return;
+
+  navigator.usb.addEventListener("disconnect", (event) => {
+    if (usbState.dev && event?.device === usbState.dev) {
+      usbState.dev = null;
+      usbState.outEP = null;
+    }
+  });
+}
+
+export async function checkXp365bConnection() {
+  return !!(usbState.dev && usbState.outEP != null);
+}
+
+/**
+ * Alias for explicit connect button in UI.
+ */
+export const connectXp365bManually = connectXprinter;
+
+/**
+ * Main API used by `BarcodePrintTab.jsx`.
+ */
+export async function printXp365bBarcodeLabel({
+  title,
+  barcode,
+}) {
+  await printLabel({ title, barcode });
 }
 
 
