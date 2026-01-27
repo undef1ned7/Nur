@@ -1478,7 +1478,7 @@ const CashierPage = () => {
             </div>
           )}
         </div>
-        <Button className="md:hidden!" onClick={() => setMobileProductsList(true)} color="info">Добавить товар</Button>
+        <Button className="min-[769px]:hidden!" onClick={() => setMobileProductsList(true)} color="info">Добавить товар</Button>
         <div className="cashier-page__cart">
           <div className="cashier-page__cart-header">
             <h2 className="cashier-page__cart-title">Корзина</h2>
