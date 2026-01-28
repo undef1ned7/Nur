@@ -1413,6 +1413,7 @@ const Orders = () => {
                 setMenuOpen(false);
                 setMenuCurrentPage(1);
               }}
+              cartItems={form.items}
               menuItems={menuItems}
               menuImageUrl={menuImageUrl}
               onPick={(m) => addOrIncMenuItem(m)}
