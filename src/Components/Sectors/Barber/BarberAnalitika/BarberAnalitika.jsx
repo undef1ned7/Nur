@@ -1,5 +1,7 @@
 // BarberAnalitika.jsx
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../../../api";
 import {
   FiRefreshCcw,
   FiUsers,
@@ -51,6 +53,7 @@ ChartJS.register(
 );
 
 const BarberAnalitika = () => {
+  const navigate = useNavigate();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
   const [monthIdx, setMonthIdx] = useState(now.getMonth());
@@ -94,6 +97,32 @@ const BarberAnalitika = () => {
   const openModal = (payload) => setModal({ open: true, ...payload });
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
+  // Обработчик клика на карточки приход/расход
+  const handleCardClick = async (tabType) => {
+    try {
+      const { data } = await api.get("/construction/cashboxes/");
+      const boxes = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      
+      if (boxes.length === 0) {
+        alert("Нет доступных касс");
+        return;
+      }
+
+      const firstBox = boxes[0];
+      const firstBoxId = firstBox?.id || firstBox?.uuid || "";
+      
+      if (!firstBoxId) {
+        alert("Не удалось определить ID кассы");
+        return;
+      }
+
+      navigate(`/crm/kassa/${firstBoxId}?tab=${tabType}`);
+    } catch (error) {
+      console.error("Ошибка при загрузке касс:", error);
+      alert("Не удалось загрузить список касс");
+    }
+  };
+
   const years = useMemo(() => [2025, 2026, 2027], []);
 
   /* ===== опции для комбобоксов ===== */
@@ -128,6 +157,7 @@ const BarberAnalitika = () => {
       value: fmtMoney(unifiedIncome),
       icon: <FiTrendingUp size={20} />,
       iconMod: "yellow",
+      onClick: () => handleCardClick("income"),
     },
     {
       key: "expense",
@@ -135,6 +165,7 @@ const BarberAnalitika = () => {
       value: fmtMoney(unifiedExpense),
       icon: <FiTrendingDown size={20} />,
       iconMod: "red",
+      onClick: () => handleCardClick("expense"),
     },
     {
       key: "profit",
@@ -405,7 +436,12 @@ const BarberAnalitika = () => {
       {/* KPI карточки */}
       <section className="barber-analitika__kpis">
         {kpiCards.map((card) => (
-          <div key={card.key} className="barber-analitika__kpi">
+          <div
+            key={card.key}
+            className={`barber-analitika__kpi ${card.onClick ? "barber-analitika__kpi--clickable" : ""}`}
+            onClick={card.onClick}
+            style={card.onClick ? { cursor: "pointer" } : {}}
+          >
             <div
               className={`barber-analitika__kpi-icon barber-analitika__kpi-icon--${card.iconMod}`}
             >

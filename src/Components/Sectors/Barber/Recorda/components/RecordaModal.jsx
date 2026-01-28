@@ -45,6 +45,8 @@ const RecordaModal = ({
   // форма - НОВЫЙ ПОРЯДОК: Сотрудник → Услуги → Дата/Время → Клиент
   const [selBarber, setSelBarber] = useState("");
   const [selServices, setSelServices] = useState([]);
+  console.log('48', selServices);
+  
   const [startDate, setStartDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
