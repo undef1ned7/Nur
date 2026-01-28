@@ -216,7 +216,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
                 type="button"
                 className="cafeCookKitchenModal__iconBtn"
                 onClick={refresh}
-                disabled={loading || saving}
+                // disabled={loading || saving}
                 title="Обновить список"
               >
                 <FaSyncAlt />

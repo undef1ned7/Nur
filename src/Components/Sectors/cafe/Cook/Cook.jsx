@@ -14,6 +14,7 @@ import { useCafeOrdersWebSocket } from "../../../../hooks/useCafeWebSocket";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
 import Pagination from "../../Market/Warehouse/components/Pagination";
+import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -654,16 +655,6 @@ const Cook = () => {
 
       try {
         suppressNextRefreshRef.current = true;
-
-        const needMap = await buildNeedForTask(task);
-
-        const dec = await applyWarehouseDecreaseSafe(needMap);
-        if (!dec.ok) {
-          suppressNextRefreshRef.current = false;
-          showNotice("error", dec.message || "Нельзя отметить «Готово»: не хватает ингредиентов.");
-          return;
-        }
-
         try {
           await dispatch(readyKitchenTaskAsync(taskId)).unwrap();
           showNotice("ok", "Отмечено как готово.");
@@ -682,7 +673,7 @@ const Cook = () => {
         showNotice("error", toUserMessage(err));
       }
     },
-    [dispatch, showNotice, buildNeedForTask, applyWarehouseDecreaseSafe, applyWarehouseIncreaseSafe]
+    [dispatch, showNotice, applyWarehouseDecreaseSafe, applyWarehouseIncreaseSafe]
   );
 
   const statusOptions = useMemo(
@@ -695,6 +686,10 @@ const Cook = () => {
     },
     [activeTab]
   );
+
+  const removeAfterReadyTask =  useCallback((id) => {
+    dispatch(removeAfterReady(id))
+  }, []);
   useEffect(() => {
     setQuery('');
     setStatusFilter(null);
@@ -747,7 +742,7 @@ const Cook = () => {
           !error &&
           tasks.map((g) => (
             <CookReceiptCard
-              key={g.key}
+              key={g.id}
               group={g}
               activeTab={activeTab}
               collapsed={collapsed[g.key] !== false}
@@ -759,6 +754,7 @@ const Cook = () => {
               isUpdating={(id) => isUpdating(id)}
               onClaimOne={handleClaimOne}
               onReadyOne={handleReadyOne}
+              onRemoveAfterReady={removeAfterReadyTask}
             />
           ))}
       </div>
