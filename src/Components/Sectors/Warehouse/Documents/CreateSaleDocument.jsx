@@ -870,7 +870,7 @@ const CreateSaleDocument = () => {
                           {formatPrice(product.price)} сом
                         </span>
                         <span className="create-sale-document__product-qty">
-                          {product.qty_on_hand || 0} {product.unit || "шт"}
+                          {product.quantity || 0} {product.unit || "шт"}
                         </span>
                       </div>
                     </div>

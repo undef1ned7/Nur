@@ -81,12 +81,20 @@ const RecordaServicesPicker = ({
       String(it.search || it.label || "").toLowerCase().includes(text)
     );
   }, [items, qTrim, already, isSingle]);
+  // console.log('312', filtered);
+  
 
   // закрытие по клику вне и по Esc
   useEffect(() => {
     const onDoc = (e) => {
       if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target)) setOpen(false);
+      // Игнорируем клики внутри карточек услуг и кнопок удаления
+      if (e.target?.closest?.(".barberrecorda__svcCard")) return;
+      if (e.target?.closest?.(".barberrecorda__svcCardDel")) return;
+      // Закрываем дропдаун только если клик был вне компонента
+      if (!wrapRef.current.contains(e.target)) {
+        setOpen(false);
+      }
     };
     const onEsc = (e) => {
       if (e.key === "Escape") setOpen(false);
@@ -128,13 +136,26 @@ const RecordaServicesPicker = ({
     resetCreateSignals();
   };
 
-  const handleRemoveMulti = (e, sid) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = safeSelected.filter((x) => String(x) !== String(sid));
-    onChange?.(next);
-    setOpen(false);
-    resetCreateSignals();
+  const handleRemoveMulti = (e, serviceId) => {
+    // Останавливаем всплытие события
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    // Получаем текущий список выбранных услуг
+    const currentIds = Array.isArray(selectedIds) 
+      ? [...selectedIds].map(String) 
+      : [];
+    
+    // Удаляем услугу из списка
+    const serviceIdStr = String(serviceId);
+    const next = currentIds.filter((id) => String(id) !== serviceIdStr);
+    
+    // Обновляем состояние через onChange
+    if (onChange) {
+      onChange(next);
+    }
   };
 
   /* ===========================
@@ -217,6 +238,7 @@ const RecordaServicesPicker = ({
     <div className="barberrecorda__svcField" ref={wrapRef}>
       <div className={`barberrecorda__svcSearchWrap ${open ? "is-open" : ""}`}>
         <div className="barberrecorda__svcSearch" onClick={() => setOpen(true)}>
+          
           <FaSearch className="barberrecorda__svcSearchIcon" />
           <input
             ref={inputRef}
@@ -271,6 +293,7 @@ const RecordaServicesPicker = ({
               <div className="barberrecorda__svcSummaryCol">
                 <span className="barberrecorda__svcSummaryValue">{summary.count}</span>
                 <span className="barberrecorda__svcSummaryLabel">услуг</span>
+                
               </div>
               <div className="barberrecorda__svcSummaryCol">
                 <span className="barberrecorda__svcSummaryValue">{summary.totalMinutes}</span>
@@ -305,7 +328,11 @@ const RecordaServicesPicker = ({
                     type="button"
                     className="barberrecorda__svcCardDel"
                     aria-label="Убрать услугу"
-                    onClick={(e) => handleRemoveMulti(e, id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRemoveMulti(e, id);
+                    }}
                   >
                     <FaTimes />
                   </button>

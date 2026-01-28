@@ -18,6 +18,7 @@ import AlertModal from "../../../common/AlertModal/AlertModal";
 import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
+  ensurePrinterConnectedInteractively,
 } from "../../../pages/Sell/services/printService";
 import api from "../../../../api";
 import "./PaymentPage.scss";
@@ -251,8 +252,14 @@ const PaymentPage = ({
         paymentMethodApi = "debt"; // Отправляем как долг
       }
 
-      // Проверяем подключение принтера ДО выполнения checkout
-      const isPrinterConnected = await checkPrinterConnection();
+      // Проверяем (и при необходимости запрашиваем) подключение принтера ДО выполнения checkout.
+      // Здесь всегда вызываем интерактивное подключение, чтобы при отсутствии принтера
+      // браузер показал стандартное окно выбора USB‑устройства.
+      console.log("[PaymentPage] Проверка принтера перед оплатой (интерактивно)...");
+      const isPrinterConnected = await ensurePrinterConnectedInteractively();
+      console.log("[PaymentPage] Результат проверки принтера перед оплатой:", {
+        isPrinterConnected,
+      });
 
       // Выполняем checkout
       // Передаем bool: true только если принтер подключен
@@ -443,8 +450,18 @@ const PaymentPage = ({
       return;
     }
 
-    // Сначала проверяем, подключен ли принтер
-    const isPrinterConnected = await checkPrinterConnection();
+    // Сначала проверяем, подключен ли принтер (с интерактивным запросом при необходимости).
+    // Если принтер не найден, будет показано окно выбора USB‑устройства.
+    console.log(
+      "[PaymentPage] Проверка принтера перед ручной печатью чека (интерактивно)..."
+    );
+    const isPrinterConnected = await ensurePrinterConnectedInteractively();
+    console.log(
+      "[PaymentPage] Результат проверки принтера перед ручной печатью:",
+      {
+        isPrinterConnected,
+      }
+    );
 
     if (!isPrinterConnected) {
       showAlert(

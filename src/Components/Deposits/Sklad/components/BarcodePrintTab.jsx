@@ -18,6 +18,7 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [labelSize, setLabelSize] = useState("30x20"); // размер этикетки по умолчанию
   const barcodeCanvasRef = useRef(null);
 
   // слушатели USB — один раз
@@ -95,6 +96,15 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
   const handlePrintFromPreview = async () => {
     if (!previewProduct || !previewProduct.barcode) return;
 
+    // Мапа доступных размеров этикеток (мм)
+    const sizeMap = {
+      "30x20": { widthMm: 30, heightMm: 20 },
+      "58x40": { widthMm: 58, heightMm: 40 },
+      "58x30": { widthMm: 58, heightMm: 30 },
+    };
+
+    const { widthMm, heightMm } = sizeMap[labelSize] || sizeMap["30x20"];
+
     setIsPrinting(true);
     setPrintingIds((prev) => new Set(prev).add(previewProduct.id));
 
@@ -102,8 +112,8 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
       await printXp365bBarcodeLabel({
         barcode: previewProduct.barcode,
         title: previewProduct.name || "Товар",
-        widthMm: 58,
-        heightMm: 40,
+        widthMm,
+        heightMm,
       });
 
       const connected = await checkXp365bConnection();
@@ -212,6 +222,20 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
         </div>
 
         <div className="barcode-print-tab__printer-controls">
+          <div className="barcode-print-tab__size-select-wrapper">
+            <label className="barcode-print-tab__size-label">
+              Размер этикетки:
+              <select
+                className="barcode-print-tab__size-select"
+                value={labelSize}
+                onChange={(e) => setLabelSize(e.target.value)}
+              >
+                <option value="30x20">30×20 мм</option>
+                <option value="58x40">58×40 мм</option>
+                <option value="58x30">58×30 мм</option>
+              </select>
+            </label>
+          </div>
           <div className="barcode-print-tab__printer-status">
             <span
               className={`barcode-print-tab__status-indicator ${

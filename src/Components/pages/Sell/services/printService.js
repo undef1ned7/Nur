@@ -44,12 +44,29 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 };
 
 /* ---------- Кодовые страницы и энкодеры ---------- */
-// 66 — PC866, 73 — CP1251 (часто встречается у Xprinter)
+// Поддерживаемые кодовые страницы для кириллицы:
+// 73 — CP1251 (часто встречается у Xprinter) - по умолчанию
+// 66 — PC866
+// 59 — PC866(Russian) - альтернативный вариант для русской кириллицы
+// 18 — PC852 (Latin2, также поддерживает CP866)
+// 22 — CP1251 (альтернативный код)
+// Если включен fallback (setEscposFallback(true)), система автоматически пробует
+// все варианты по порядку, если текущая кодировка не подходит
 const CODEPAGE = Number(localStorage.getItem("escpos_cp") ?? 73);
 export function setEscposCodepage(n) {
   localStorage.setItem("escpos_cp", String(n));
 }
-const CP866_CODES = new Set([66, 18]);
+// Включить/выключить автоматический fallback между кодовыми страницами
+export function setEscposFallback(enabled) {
+  localStorage.setItem("escpos_fallback", enabled ? "true" : "false");
+}
+// Получить текущее состояние fallback
+export function getEscposFallback() {
+  return localStorage.getItem("escpos_fallback") === "true";
+}
+// Список кодовых страниц для fallback (пробуются по порядку, если первая не подходит)
+const FALLBACK_CODEPAGES = [73, 66, 59, 18, 22]; // CP1251, PC866, PC866(Russian), PC852, CP1251(альт)
+const CP866_CODES = new Set([66, 18, 59]); // Добавлен код 59 для PC866(Russian)
 const CP1251_CODES = new Set([73, 22]);
 
 function encodeCP1251(s = "") {
@@ -181,7 +198,9 @@ function lr(left, right, width = 32) {
 function buildReceiptFromJSON(payload, opts = {}) {
   const width = opts.width || CHARS_PER_LINE;
   const divider = "-".repeat(width);
-  const enc = getEncoder(CODEPAGE);
+  // Используем переданную кодовую страницу или текущую из настроек
+  const codepage = opts.codepage ?? CODEPAGE;
+  const enc = getEncoder(codepage);
 
   const company = payload.company ?? "";
   const docNo = payload.doc_no ?? "";
@@ -204,7 +223,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40)); // init
   chunks.push(ESC(0x1b, 0x52, 0x07)); // International: Russia
-  chunks.push(ESC(0x1b, 0x74, CODEPAGE)); // кодовая страница
+  chunks.push(ESC(0x1b, 0x74, codepage)); // кодовая страница
 
   chunks.push(ESC(0x1b, 0x61, 0x01)); // center
   if (company) chunks.push(enc(company + "\n"));
@@ -366,6 +385,48 @@ async function ensureUsbReadyAuto() {
   return usbState.dev ? usbState : null;
 }
 
+/**
+ * Интерактивная проверка и подключение принтера.
+ * Сначала пытается авто-подключиться к уже разрешённому устройству.
+ * Если не найдено – показывает диалог выбора USB-устройства.
+ * Возвращает true, если после этого принтер доступен.
+ */
+export async function ensurePrinterConnectedInteractively() {
+  if (!("usb" in navigator)) return false;
+
+  // 1. Пытаемся автоматически подключиться к уже разрешённому устройству
+  try {
+    const state = await ensureUsbReadyAuto();
+    if (state && usbState.dev) {
+      return true;
+    }
+  } catch {
+    // игнорируем и пробуем интерактивное подключение ниже
+  }
+
+  // 2. Если авто-подключение не сработало – запрашиваем устройство у пользователя
+  try {
+    const dev = await requestUsbDevice();
+    if (!dev) return false;
+
+    // сохраняем VID/PID для будущих авто-подключений
+    saveVidPidToLS(dev);
+
+    // открываем устройство и захватываем интерфейс
+    const info = await openUsbDevice(dev);
+
+    // сохраняем в глобальном состоянии
+    usbState.dev = dev;
+
+    // если удалось получить outEP — считаем, что принтер подключен
+    return !!info?.outEP;
+  } catch (e) {
+    // Пользователь мог нажать Cancel или произошла другая ошибка
+    console.warn("Не удалось подключить USB-принтер интерактивно:", e);
+    return false;
+  }
+}
+
 export function attachUsbListenersOnce() {
   if (!("usb" in navigator)) return;
   if (attachUsbListenersOnce._did) return;
@@ -393,11 +454,24 @@ export function attachUsbListenersOnce() {
 }
 
 export async function checkPrinterConnection() {
-  if (!("usb" in navigator)) return false;
+  if (!("usb" in navigator)) {
+    console.warn("WebUSB не поддерживается в этом браузере");
+    return false;
+  }
   try {
     const state = await ensureUsbReadyAuto();
-    return state !== null && usbState.dev !== null;
-  } catch {
+    const connected = state !== null && usbState.dev !== null;
+    console.log("[PrintService] checkPrinterConnection ->", {
+      hasState: !!state,
+      hasDevice: !!usbState.dev,
+      connected,
+    });
+    return connected;
+  } catch (err) {
+    console.error(
+      "[PrintService] Ошибка при проверке подключения принтера:",
+      err
+    );
     return false;
   }
 }
@@ -423,7 +497,7 @@ async function printReceiptFromPdfUSB(pdfBlob) {
   }
 }
 
-async function printReceiptJSONViaUSB(payload) {
+async function printReceiptJSONViaUSB(payload, options = {}) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
   await ensureUsbReadyAuto();
   let dev = usbState.dev;
@@ -433,12 +507,52 @@ async function printReceiptJSONViaUSB(payload) {
   }
   const { outEP } = await openUsbDevice(dev);
 
-  const parts = buildReceiptFromJSON(payload, { width: CHARS_PER_LINE });
-  for (const data of parts) {
-    for (const chunk of chunkBytes(data)) {
-      await dev.transferOut(outEP, chunk);
+  // Проверяем, включен ли fallback механизм
+  const useFallback = options.useFallback ?? 
+    (localStorage.getItem("escpos_fallback") === "true");
+  
+  // Определяем список кодовых страниц для попытки
+  const codepagesToTry = options.codepage 
+    ? [options.codepage] 
+    : useFallback 
+      ? FALLBACK_CODEPAGES 
+      : [CODEPAGE];
+
+  let lastError = null;
+  
+  // Пробуем каждую кодовую страницу из списка
+  for (const codepage of codepagesToTry) {
+    try {
+      const parts = buildReceiptFromJSON(payload, { 
+        width: CHARS_PER_LINE,
+        codepage: codepage 
+      });
+      
+      for (const data of parts) {
+        for (const chunk of chunkBytes(data)) {
+          await dev.transferOut(outEP, chunk);
+        }
+      }
+      
+      // Если печать прошла успешно, сохраняем эту кодовую страницу
+      if (codepage !== CODEPAGE && codepagesToTry.length > 1) {
+        localStorage.setItem("escpos_cp", String(codepage));
+        console.log(`[PrintService] Успешно использована кодовая страница: ${codepage}`);
+      }
+      
+      return; // Успешно напечатано
+    } catch (error) {
+      lastError = error;
+      console.warn(`[PrintService] Ошибка с кодовой страницей ${codepage}:`, error);
+      // Продолжаем пробовать следующую кодовую страницу
+      if (codepagesToTry.length > 1) {
+        continue;
+      }
     }
   }
+  
+  // Если все попытки не удались, выбрасываем последнюю ошибку
+  throw lastError || new Error("Не удалось напечатать с любой из доступных кодовых страниц");
 }
 
 /* ---------- Главная функция обработки ответа для печати ---------- */

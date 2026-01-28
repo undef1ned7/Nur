@@ -229,11 +229,44 @@ export const RightMenuPanel = ({
 }) => {
   const [q, setQ] = useState("");
   const isCart = useCallback((id) => cartItems.find(el => el.menu_item == id), [cartItems])
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchTimeoutRef = useRef(null);
+
   useEffect(() => {
     if (!open) {
       setQ("");
+      setSearchQuery("");
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
     }
   }, [open]);
+
+  // Debounce для поиска - отправляем запрос на бэкенд через 500ms после остановки ввода
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    const timeoutId = setTimeout(() => {
+      const trimmedQuery = q.trim();
+      if (trimmedQuery !== searchQuery) {
+        setSearchQuery(trimmedQuery);
+        // Сбрасываем на первую страницу при новом поиске
+        if (onPageChange) {
+          onPageChange(1, trimmedQuery);
+        }
+      }
+    }, 500);
+
+    searchTimeoutRef.current = timeoutId;
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [q, searchQuery, onPageChange]);
 
   // Извлекаем массив блюд из объекта пагинации или используем как массив
   const itemsArray = useMemo(() => {
@@ -249,64 +282,29 @@ export const RightMenuPanel = ({
     return [];
   }, [menuItems]);
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return itemsArray;
-    return itemsArray.filter((m) => String(m?.title || "").toLowerCase().includes(s));
-  }, [itemsArray, q]);
-
-  // Сброс на первую страницу при изменении поиска
-  useEffect(() => {
-    if (onPageChange && currentPage > 1) {
-      onPageChange(1, q);
-    }
-  }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Пагинация отфильтрованных элементов
-  // Если есть поиск - используем длину отфильтрованного массива
-  // Если нет поиска и есть объект с пагинацией - используем count из объекта
+  // Пагинация - всегда используем данные с сервера
   const totalPages = useMemo(() => {
-    const hasSearch = q.trim().length > 0;
-
-    if (hasSearch) {
-      // При поиске используем клиентскую пагинацию на основе отфильтрованных данных
-      return Math.ceil((filtered.length || 0) / PAGE_SIZE);
-    }
-
-    // Если нет поиска и есть объект с пагинацией, используем count
+    // Если есть объект с пагинацией, используем count
     if (menuItems?.count && typeof menuItems.count === 'number') {
       return Math.ceil(menuItems.count / PAGE_SIZE);
     }
 
     // Иначе используем длину массива
     return Math.ceil((itemsArray.length || 0) / PAGE_SIZE);
-  }, [filtered.length, itemsArray.length, menuItems?.count, q]);
+  }, [itemsArray.length, menuItems?.count]);
 
-  const paginatedItems = useMemo(() => {
-    const hasSearch = q.trim().length > 0;
-    const isPaginatedObject = menuItems?.results && menuItems?.count;
-
-    // Если нет поиска и есть серверная пагинация - показываем все загруженные элементы
-    // (сервер уже вернул нужную страницу)
-    if (!hasSearch && isPaginatedObject) {
-      return itemsArray;
-    }
-
-    // Если есть поиск или нет серверной пагинации - применяем клиентскую пагинацию
-    const start = (currentPage - 1) * PAGE_SIZE;
-    const end = start + PAGE_SIZE;
-    return filtered.slice(start, end);
-  }, [filtered, itemsArray, currentPage, q, menuItems]);
+  // Показываем все загруженные элементы (сервер уже вернул нужную страницу)
+  const paginatedItems = itemsArray;
 
   const hasNextPage = currentPage < totalPages;
   const hasPrevPage = currentPage > 1;
 
   const handlePageChange = useCallback((newPage) => {
     if (newPage < 1 || newPage > totalPages) return;
-
-    // Вызываем переданную функцию пагинации
+    
+    // Вызываем переданную функцию пагинации с текущим поисковым запросом
     if (onPageChange) {
-      onPageChange(newPage, q);
+      onPageChange(newPage, searchQuery);
     }
 
     // Прокрутка вверх списка
@@ -314,7 +312,7 @@ export const RightMenuPanel = ({
     if (listEl) {
       listEl.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [totalPages, q, onPageChange]);
+  }, [totalPages, searchQuery, onPageChange]);
 
   if (!open) return null;
 
