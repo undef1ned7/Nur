@@ -46,27 +46,20 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 /* ---------- Кодовые страницы и энкодеры ---------- */
 // Поддерживаемые кодовые страницы для кириллицы:
 // 73 — CP1251 (часто встречается у Xprinter) - по умолчанию
-// 66 — PC866
+// 66 — PC866 (часто встречается у Xprinter по self-test)
+// 17 — PC866 (часто стандартный номер таблицы в ESC/POS)
 // 59 — PC866(Russian) - альтернативный вариант для русской кириллицы
-// 18 — PC852 (Latin2, также поддерживает CP866)
+// 18 — PC852 (Latin2, также поддерживает PC866)
 // 22 — CP1251 (альтернативный код)
-// Если включен fallback (setEscposFallback(true)), система автоматически пробует
-// все варианты по порядку, если текущая кодировка не подходит
-const CODEPAGE = Number(localStorage.getItem("escpos_cp") ?? 73);
+// ====== ЖЁСТКАЯ НАСТРОЙКА ДЛЯ XP-N160II: PC866 ======
+// Важно: у части Xprinter (в т.ч. XP-N160II) PC866 на ESC/POS бывает как 17 или 66.
+// Если будет "корябяза", поменяйте 17 <-> 66.
+const FORCED_CODEPAGE = 17; // PC866
+// printRussianRawUsb("Тест: Привет, мир! Ёё №");
 export function setEscposCodepage(n) {
   localStorage.setItem("escpos_cp", String(n));
 }
-// Включить/выключить автоматический fallback между кодовыми страницами
-export function setEscposFallback(enabled) {
-  localStorage.setItem("escpos_fallback", enabled ? "true" : "false");
-}
-// Получить текущее состояние fallback
-export function getEscposFallback() {
-  return localStorage.getItem("escpos_fallback") === "true";
-}
-// Список кодовых страниц для fallback (пробуются по порядку, если первая не подходит)
-const FALLBACK_CODEPAGES = [73, 66, 59, 18, 22]; // CP1251, PC866, PC866(Russian), PC852, CP1251(альт)
-const CP866_CODES = new Set([66, 18, 59]); // Добавлен код 59 для PC866(Russian)
+const PC866_CODES = new Set([66, 17, 18, 59]); // 17 — частый ESC/POS номер PC866, 59 — PC866(Russian)
 const CP1251_CODES = new Set([73, 22]);
 
 function encodeCP1251(s = "") {
@@ -83,13 +76,15 @@ function encodeCP1251(s = "") {
   }
   return new Uint8Array(out);
 }
-function encodeCP866(s = "") {
+function encodePC866(s = "") {
   const out = [];
   for (const ch of s) {
     const c = ch.codePointAt(0);
     if (c <= 0x7f) out.push(c);
     else if (c >= 0x0410 && c <= 0x042f) out.push(0x80 + (c - 0x0410));
-    else if (c >= 0x0430 && c <= 0x044f) out.push(0xa0 + (c - 0x0430));
+    // PC866: строчные а..п идут 0xA0..0xAF, а р..я идут 0xE0..0xEF
+    else if (c >= 0x0430 && c <= 0x043f) out.push(0xa0 + (c - 0x0430));
+    else if (c >= 0x0440 && c <= 0x044f) out.push(0xe0 + (c - 0x0440));
     else if (c === 0x0401) out.push(0xf0);
     else if (c === 0x0451) out.push(0xf1);
     else if (c === 0x2116) out.push(0xfc);
@@ -98,8 +93,8 @@ function encodeCP866(s = "") {
   return new Uint8Array(out);
 }
 const getEncoder = (n) =>
-  CP866_CODES.has(n)
-    ? encodeCP866
+  PC866_CODES.has(n)
+    ? encodePC866
     : CP1251_CODES.has(n)
     ? encodeCP1251
     : encodeCP1251;
@@ -198,9 +193,9 @@ function lr(left, right, width = 32) {
 function buildReceiptFromJSON(payload, opts = {}) {
   const width = opts.width || CHARS_PER_LINE;
   const divider = "-".repeat(width);
-  // Используем переданную кодовую страницу или текущую из настроек
-  const codepage = opts.codepage ?? CODEPAGE;
-  const enc = getEncoder(codepage);
+  // Жёстко используем PC866 (и для ESC t n, и для энкодинга текста)
+  const codepage = FORCED_CODEPAGE;
+  const enc = encodePC866;
 
   const company = payload.company ?? "";
   const docNo = payload.doc_no ?? "";
@@ -304,6 +299,9 @@ function saveVidPidToLS(dev) {
   try {
     localStorage.setItem("escpos_vid", dev.vendorId.toString(16));
     localStorage.setItem("escpos_pid", dev.productId.toString(16));
+    if (dev.productName) localStorage.setItem("escpos_product", dev.productName);
+    if (dev.manufacturerName)
+      localStorage.setItem("escpos_manufacturer", dev.manufacturerName);
   } catch {}
 }
 async function tryUsbAutoConnect() {
@@ -507,52 +505,53 @@ async function printReceiptJSONViaUSB(payload, options = {}) {
   }
   const { outEP } = await openUsbDevice(dev);
 
-  // Проверяем, включен ли fallback механизм
-  const useFallback = options.useFallback ?? 
-    (localStorage.getItem("escpos_fallback") === "true");
-  
-  // Определяем список кодовых страниц для попытки
-  const codepagesToTry = options.codepage 
-    ? [options.codepage] 
-    : useFallback 
-      ? FALLBACK_CODEPAGES 
-      : [CODEPAGE];
-
-  let lastError = null;
-  
-  // Пробуем каждую кодовую страницу из списка
-  for (const codepage of codepagesToTry) {
-    try {
-      const parts = buildReceiptFromJSON(payload, { 
-        width: CHARS_PER_LINE,
-        codepage: codepage 
-      });
-      
-      for (const data of parts) {
-        for (const chunk of chunkBytes(data)) {
-          await dev.transferOut(outEP, chunk);
-        }
-      }
-      
-      // Если печать прошла успешно, сохраняем эту кодовую страницу
-      if (codepage !== CODEPAGE && codepagesToTry.length > 1) {
-        localStorage.setItem("escpos_cp", String(codepage));
-        console.log(`[PrintService] Успешно использована кодовая страница: ${codepage}`);
-      }
-      
-      return; // Успешно напечатано
-    } catch (error) {
-      lastError = error;
-      console.warn(`[PrintService] Ошибка с кодовой страницей ${codepage}:`, error);
-      // Продолжаем пробовать следующую кодовую страницу
-      if (codepagesToTry.length > 1) {
-        continue;
-      }
+  // Жёстко печатаем в PC866 (без fallback/автоподбора)
+  const parts = buildReceiptFromJSON(payload, {
+    width: CHARS_PER_LINE,
+    codepage: FORCED_CODEPAGE,
+  });
+  for (const data of parts) {
+    for (const chunk of chunkBytes(data)) {
+      await dev.transferOut(outEP, chunk);
     }
   }
-  
-  // Если все попытки не удались, выбрасываем последнюю ошибку
-  throw lastError || new Error("Не удалось напечатать с любой из доступных кодовых страниц");
+}
+
+/* ---------- Минимальная печать PC866 (XP-N160II) ---------- */
+export async function printRussianRawUsb(text = "Привет, мир!") {
+  if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
+  await ensureUsbReadyAuto();
+  let dev = usbState.dev;
+  if (!dev) {
+    dev = await requestUsbDevice();
+    saveVidPidToLS(dev);
+  }
+  const { outEP } = await openUsbDevice(dev);
+
+  // ESC/POS: init, Russia, codepage PC866, text, newline, cut
+  const init = ESC(0x1b, 0x40);
+  const intl = ESC(0x1b, 0x52, 0x07);
+  const cp = ESC(0x1b, 0x74, FORCED_CODEPAGE); // PC866
+  const body = encodePC866(String(text) + "\n");
+  const cut = ESC(0x1d, 0x56, 0x00);
+
+  const data = new Uint8Array(
+    init.length + intl.length + cp.length + body.length + cut.length
+  );
+  let o = 0;
+  data.set(init, o);
+  o += init.length;
+  data.set(intl, o);
+  o += intl.length;
+  data.set(cp, o);
+  o += cp.length;
+  data.set(body, o);
+  o += body.length;
+  data.set(cut, o);
+
+  for (const chunk of chunkBytes(data)) {
+    await dev.transferOut(outEP, chunk);
+  }
 }
 
 /* ---------- Главная функция обработки ответа для печати ---------- */
