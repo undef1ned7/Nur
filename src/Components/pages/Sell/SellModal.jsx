@@ -186,8 +186,10 @@ function encodeCP866(s = "") {
       out.push(c);
     } else if (c >= 0x0410 && c <= 0x042f) {
       out.push(0x80 + (c - 0x0410)); // А..Я
-    } else if (c >= 0x0430 && c <= 0x044f) {
-      out.push(0xa0 + (c - 0x0430)); // а..я
+    } else if (c >= 0x0430 && c <= 0x043f) {
+      out.push(0xa0 + (c - 0x0430)); // а..п
+    } else if (c >= 0x0440 && c <= 0x044f) {
+      out.push(0xe0 + (c - 0x0440)); // р..я
     } else if (c === 0x0401) {
       out.push(0xf0); // Ё
     } else if (c === 0x0451) {
