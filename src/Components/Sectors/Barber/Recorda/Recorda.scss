@@ -1257,9 +1257,11 @@ $col-header-h: 56px;
 .barberrecorda__svcSearch,
 .barberrecorda__comboPopup,
 .barberrecorda__svcDropdown,
+.barberrecorda__svcCardDel,
 .barberrecorda__btn {
   pointer-events: auto; // возвращаем клики только нужным элементам
 }
+
   /* ===== услуги ===== */
   &__svcField {
     display: flex;
