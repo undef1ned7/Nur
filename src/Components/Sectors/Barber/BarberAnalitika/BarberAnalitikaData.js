@@ -449,7 +449,13 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     return amt >= 0 ? "income" : "expense";
   };
 
-  /* ===== кассы (без “Выплаты мастерам YYYY-MM”) ===== */
+  const isApprovedCashflow = (cf) => {
+    if (cf?.status === true) return true;
+    const v = String(cf?.status ?? "").trim().toLowerCase();
+    return v === "true" || v === "approved";
+  };
+
+  /* ===== кассы (только approved; без “Выплаты мастерам YYYY-MM”) ===== */
   const [cashRows, setCashRows] = useState([]);
   const [cashflowsPeriod, setCashflowsPeriod] = useState([]);
   const [loadingCash, setLoadingCash] = useState(false);
@@ -474,10 +480,10 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
           return t >= startTs && t <= endTs;
         });
 
-        // выкидываем запись “Выплаты мастерам YYYY-MM”
-        const periodFlows = periodFlowsRaw.filter(
-          (cf) => !isMasterPayoutFlow(cf),
-        );
+        // выкидываем запись “Выплаты мастерам YYYY-MM” + оставляем только approved
+        const periodFlows = periodFlowsRaw
+          .filter((cf) => !isMasterPayoutFlow(cf))
+          .filter(isApprovedCashflow);
 
         if (!cancelled) setCashflowsPeriod(periodFlows);
 
