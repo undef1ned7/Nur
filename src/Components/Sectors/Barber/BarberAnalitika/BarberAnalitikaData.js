@@ -16,6 +16,7 @@ import {
   asArray,
   clean,
   keyOf,
+  padDate,
   pad2,
   monthRange,
   tsOf,
@@ -455,6 +456,39 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     return v === "true" || v === "approved";
   };
 
+  const cashflowTitle = (cf) => {
+    return clean(
+      cf?.name || cf?.title || cf?.description || cf?.note || cf?.comment,
+      "Операция кассы",
+    );
+  };
+
+  const cashflowDate = (cf) =>
+    padDate(
+      cf?.created_at ||
+        cf?.created ||
+        cf?.date ||
+        cf?.timestamp ||
+        cf?.createdAt,
+    );
+
+  const appointmentTitle = (a) => {
+    const svcNames = servicesOfAppointment(a)
+      .map((s) => s?.name)
+      .filter(Boolean);
+    const serviceName = svcNames.length
+      ? svcNames.join(", ")
+      : clean(a?.service_name, "Услуга");
+    const clientLabel = a?.client ? clientNameBarber(a.client) : "";
+    const masterLabel = a?.barber ? empName(a.barber) : "";
+    return [serviceName, clientLabel && `Клиент: ${clientLabel}`, masterLabel && `Мастер: ${masterLabel}`]
+      .filter(Boolean)
+      .join(" • ");
+  };
+
+  const appointmentDate = (a) =>
+    padDate(a?.start_at || a?.date || a?.created_at || a?.updated_at);
+
   /* ===== кассы (только approved; без “Выплаты мастерам YYYY-MM”) ===== */
   const [cashRows, setCashRows] = useState([]);
   const [cashflowsPeriod, setCashflowsPeriod] = useState([]);
@@ -546,6 +580,63 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     const expense = cashRows.reduce((a, r) => a + toNum(r.expense), 0);
     return { income, expense, net: income - expense };
   }, [cashRows]);
+
+  /* ===== детали по приходу/расходу ===== */
+  const incomeDetailsRows = useMemo(() => {
+    const appointmentRows = filteredApps
+      .filter((a) => a.status === "completed")
+      .map((a) => ({
+        source: "Запись",
+        title: appointmentTitle(a),
+        amount: priceOf(a),
+        date: appointmentDate(a),
+        _ts: tsOf(a),
+      }));
+
+    const cashflowRows = (cashflowsPeriod || [])
+      .filter((cf) => dirOf(cf) === "income")
+      .map((cf) => ({
+        source: "Касса",
+        title: cashflowTitle(cf),
+        amount: Math.abs(toNum(cf.amount ?? cf.value ?? cf.sum ?? 0)),
+        date: cashflowDate(cf),
+        _ts: tsOf(cf),
+      }));
+
+    return [...appointmentRows, ...cashflowRows]
+      .sort((a, b) => (b._ts || 0) - (a._ts || 0))
+      .map(({ _ts, ...rest }) => rest);
+  }, [filteredApps, cashflowsPeriod, services, employees, clientsBarber]);
+
+  const expenseDetailsRows = useMemo(() => {
+    const cashflowRows = (cashflowsPeriod || [])
+      .filter((cf) => dirOf(cf) === "expense")
+      .map((cf) => ({
+        source: "Касса",
+        title: cashflowTitle(cf),
+        amount: Math.abs(toNum(cf.amount ?? cf.value ?? cf.sum ?? 0)),
+        date: cashflowDate(cf),
+        _ts: tsOf(cf),
+      }));
+
+    const fundValue = toNum(saleFund);
+    const fundRows =
+      fundValue > 0
+        ? [
+            {
+              source: "Выплаты мастерам",
+              title: `Период ${periodLabel}`,
+              amount: fundValue,
+              date: periodLabel,
+              _ts: endTs,
+            },
+          ]
+        : [];
+
+    return [...cashflowRows, ...fundRows]
+      .sort((a, b) => (b._ts || 0) - (a._ts || 0))
+      .map(({ _ts, ...rest }) => rest);
+  }, [cashflowsPeriod, saleFund, periodLabel, endTs]);
 
   /* ===== продажи товаров ===== */
   const periodSales = useMemo(() => {
@@ -797,5 +888,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     dayLineChart,
     bookingsStatusesData,
     topServicesByBookings,
+    incomeDetailsRows,
+    expenseDetailsRows,
   };
 };

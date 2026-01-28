@@ -121,6 +121,15 @@
       transform: translateY(-1px);
     }
 
+    &--clickable {
+      cursor: pointer;
+
+      &:focus-visible {
+        outline: 2px solid rgba(234, 179, 8, 0.55);
+        outline-offset: 2px;
+      }
+    }
+
     &-icon {
       grid-area: icon;
       width: 40px;
@@ -1388,6 +1397,10 @@
     white-space: nowrap;
     font-weight: 500;
     color: #16a34a;
+  }
+
+  &__money--expense {
+    color: #dc2626;
   }
 
   &__empty {

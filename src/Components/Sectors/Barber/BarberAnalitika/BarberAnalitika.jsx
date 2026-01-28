@@ -85,6 +85,8 @@ const BarberAnalitika = () => {
     dayLineChart,
     bookingsStatusesData,
     topServicesByBookings,
+    incomeDetailsRows,
+    expenseDetailsRows,
   } = useBarberAnalitikaData({ year, monthIdx });
 
   const [modal, setModal] = useState({
@@ -123,6 +125,55 @@ const BarberAnalitika = () => {
       ? { name: weekDayNames[busiestDayIdx], count: weekChart[busiestDayIdx] }
       : null;
 
+  const periodTitle = `${months[monthIdx]} ${year}`;
+
+  const incomeDetailsColumns = [
+    { key: "source", title: "Источник" },
+    {
+      key: "title",
+      title: "Описание",
+      className: "barber-analitika-table__ellipsis",
+    },
+    {
+      key: "amount",
+      title: "Сумма",
+      className: "barber-analitika-table__money",
+      render: (r) => fmtMoney(r.amount),
+    },
+    { key: "date", title: "Дата" },
+  ];
+
+  const expenseDetailsColumns = [
+    { key: "source", title: "Источник" },
+    {
+      key: "title",
+      title: "Описание",
+      className: "barber-analitika-table__ellipsis",
+    },
+    {
+      key: "amount",
+      title: "Сумма",
+      className:
+        "barber-analitika-table__money barber-analitika-table__money--expense",
+      render: (r) => fmtMoney(r.amount),
+    },
+    { key: "date", title: "Дата" },
+  ];
+
+  const openIncomeDetails = () =>
+    openModal({
+      title: `Приход (месяц) • ${periodTitle}`,
+      columns: incomeDetailsColumns,
+      rows: incomeDetailsRows,
+    });
+
+  const openExpenseDetails = () =>
+    openModal({
+      title: `Расход (месяц) • ${periodTitle}`,
+      columns: expenseDetailsColumns,
+      rows: expenseDetailsRows,
+    });
+
   /* ===== KPI карточки ===== */
   const kpiCards = [
     {
@@ -131,6 +182,7 @@ const BarberAnalitika = () => {
       value: fmtMoney(unifiedIncome),
       icon: <FiTrendingUp size={20} />,
       iconMod: "yellow",
+      onClick: openIncomeDetails,
     },
     {
       key: "expense",
@@ -138,6 +190,7 @@ const BarberAnalitika = () => {
       value: fmtMoney(unifiedExpense),
       icon: <FiTrendingDown size={20} />,
       iconMod: "red",
+      onClick: openExpenseDetails,
     },
     {
       key: "profit",
@@ -408,7 +461,24 @@ const BarberAnalitika = () => {
       {/* KPI карточки */}
       <section className="barber-analitika__kpis">
         {kpiCards.map((card) => (
-          <div key={card.key} className="barber-analitika__kpi">
+          <div
+            key={card.key}
+            className={`barber-analitika__kpi ${
+              card.onClick ? "barber-analitika__kpi--clickable" : ""
+            }`}
+            onClick={card.onClick}
+            onKeyDown={(e) => {
+              if (!card.onClick) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                card.onClick();
+              }
+            }}
+            role={card.onClick ? "button" : undefined}
+            tabIndex={card.onClick ? 0 : undefined}
+            aria-label={card.onClick ? `${card.title}: подробнее` : undefined}
+            title={card.onClick ? "Подробнее" : undefined}
+          >
             <div
               className={`barber-analitika__kpi-icon barber-analitika__kpi-icon--${card.iconMod}`}
             >
