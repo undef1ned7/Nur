@@ -272,7 +272,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 70;
+    z-index: 100;
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
     animation: ck-overlay-in .18s ease-out both;

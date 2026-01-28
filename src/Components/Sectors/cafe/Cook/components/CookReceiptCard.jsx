@@ -12,10 +12,9 @@ const CookReceiptCard = ({
   isUpdating,
   onClaimOne,
   onReadyOne,
+  onRemoveAfterReady
 }) => {
   const headerDate = formatReceiptDate(group.created_at);
-
-  const items = useMemo(() => group.items || [], [group.items]);
   const status = String(group?.status || "");
   const isPending = status === "pending";
   const isInProgress = status === "in_progress";
@@ -80,10 +79,10 @@ const CookReceiptCard = ({
               {isReady && (
                 <button
                   className="cafeCook__btn cafeCook__btn--ready cafeCook__btn--compact"
-                  disabled
+                  onClick={(e) => {e.stopPropagation(); onRemoveAfterReady(group.id)}}
                   type="button"
                 >
-                  Готов
+                  Убрать
                 </button>
               )}
             </>

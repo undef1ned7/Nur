@@ -31,6 +31,9 @@ const cafeOrdersSlice = createSlice({
         delete state.updatingStatus[taskId];
       }
     },
+    removeAfterReady: (state, { payload }) => {
+      state.tasks = state.tasks.filter(el => el.id != payload)
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -90,5 +93,5 @@ const cafeOrdersSlice = createSlice({
   },
 });
 
-export const { clearCafeOrders, setUpdatingStatus } = cafeOrdersSlice.actions;
+export const { clearCafeOrders, setUpdatingStatus, removeAfterReady } = cafeOrdersSlice.actions;
 export default cafeOrdersSlice.reducer;

@@ -109,7 +109,7 @@ const AlertModal = ({
             </h3>
           ) : null}
           <p
-            style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#111827" }}
+            style={{ whiteSpace: 'pre-wrap',margin: 0, fontSize: 16, fontWeight: 600, color: "#111827" }}
           >
             {message}
           </p>
