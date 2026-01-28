@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaPlus, FaPrint, FaSyncAlt, FaTimes } from "react-icons/fa";
+import { FaCheck, FaPlus, FaPrint, FaSyncAlt, FaTimes } from "react-icons/fa";
 import api from "../../../../../api";
 import {
   listAuthorizedPrinters,
@@ -27,7 +27,7 @@ const readKitchenPrinterMap = () => {
 const writeKitchenPrinterMap = (obj) => {
   try {
     localStorage.setItem("kitchen_printer_map", JSON.stringify(obj || {}));
-  } catch {}
+  } catch { }
 };
 
 const KitchenCreateModal = ({ open, onClose, onCreated }) => {
@@ -151,6 +151,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
   };
 
   if (!open) return null;
+  console.log(activeKey, selectedKey);
 
   return (
     <div
@@ -233,13 +234,14 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
               </button>
 
               <button
+                key={selectedKey}
                 type="button"
-                className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost"
+                className={`cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost ${(saving || selectedKey) ? 'active' : ''}`}
                 onClick={onSetActive}
                 disabled={loading || saving || !selectedKey}
                 title="Сделать выбранный принтер активным"
               >
-                Активный
+                <FaCheck />
               </button>
             </div>
           </div>

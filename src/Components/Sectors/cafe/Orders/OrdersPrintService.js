@@ -44,7 +44,7 @@ function readJson(key, fallback) {
 function writeJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+  } catch { }
 }
 
 export function getSavedPrinters() {
@@ -73,7 +73,7 @@ export function getActivePrinterKey() {
 export function setActivePrinterKey(printerKey) {
   try {
     localStorage.setItem(LS_ACTIVE, String(printerKey || ""));
-  } catch {}
+  } catch { }
 }
 
 function upsertSavedPrinter(dev) {
@@ -95,7 +95,7 @@ function upsertSavedPrinter(dev) {
   try {
     localStorage.setItem("escpos_vid", vidHex);
     localStorage.setItem("escpos_pid", pidHex);
-  } catch {}
+  } catch { }
 }
 
 export async function listAuthorizedPrinters() {
@@ -126,7 +126,7 @@ export async function choosePrinterByDialog() {
   if (usbState.dev && usbState.dev !== dev) {
     try {
       await usbState.dev.close();
-    } catch {}
+    } catch { }
   }
   usbState.dev = dev;
 
@@ -146,7 +146,7 @@ export async function setActivePrinterByKey(printerKey) {
   if (usbState.dev) {
     try {
       await usbState.dev.close();
-    } catch {}
+    } catch { }
     usbState.dev = null;
   }
 }
@@ -183,8 +183,8 @@ const getEncoder = (n) =>
   CP866_CODES.has(n)
     ? encodeCP866
     : CP1251_CODES.has(n)
-    ? encodeCP1251
-    : encodeCP1251;
+      ? encodeCP1251
+      : encodeCP1251;
 
 const money = (n) => Number(n || 0).toFixed(2);
 
@@ -213,10 +213,10 @@ async function openUsbDevice(dev) {
   }
 
   if (dev.configuration == null) {
-    await dev.selectConfiguration(1).catch(() => {});
+    await dev.selectConfiguration(1).catch(() => { });
     if (dev.configuration == null && dev.configurations?.length) {
       const cfgNum = dev.configurations[0]?.configurationValue ?? 1;
-      await dev.selectConfiguration(cfgNum).catch(() => {});
+      await dev.selectConfiguration(cfgNum).catch(() => { });
     }
   }
 
@@ -242,7 +242,7 @@ async function openUsbDevice(dev) {
       } catch {
         try {
           await dev.releaseInterface(intf.interfaceNumber);
-        } catch {}
+        } catch { }
         continue;
       }
 
@@ -307,7 +307,7 @@ export function attachUsbListenersOnce() {
       if (keyOf(e.device.vendorId, e.device.productId, e.device.serialNumber) !== activeKey) return;
       await openUsbDevice(e.device);
       usbState.dev = e.device;
-    } catch {}
+    } catch { }
   });
 
   navigator.usb.addEventListener("disconnect", (e) => {
@@ -356,6 +356,11 @@ function buildPrettyReceiptFromJSON(payload) {
   if (dt) chunks.push(enc(`Дата: ${dt}\n`));
   if (cashier) chunks.push(enc(`Кассир: ${cashier}\n`));
   chunks.push(enc("\n"));
+
+  if ('menu_title' in payload) {
+    const name = String(payload.menu_title ?? "").trim() || "Позиция";
+    chunks.push(enc(name + "\n"));
+  }
 
   for (const it of items) {
     const name = String(it.name ?? "").trim() || "Позиция";
@@ -408,7 +413,7 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
   try {
     const key = keyOf(dev.vendorId, dev.productId, dev.serialNumber);
     localStorage.setItem(LS_ACTIVE, key);
-  } catch {}
+  } catch { }
 
   usbState.dev = dev;
 

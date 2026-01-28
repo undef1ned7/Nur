@@ -158,8 +158,8 @@ const Orders = () => {
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
-  const { orders: socketOrders } = useCafeWebSocketManager()
-
+  const { orders: socketOrders, } = useCafeWebSocketManager()
+  
   const [kitchens, setKitchens] = useState([]);
 
   const [cashboxes, setCashboxes] = useState([]);
@@ -169,7 +169,7 @@ const Orders = () => {
   const [query, setQuery] = useState("");
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
   const [statusFilter, setStatusFilter] = useState("");
-  
+
   // Состояние пагинации меню
   const [menuCurrentPage, setMenuCurrentPage] = useState(1);
   const [menuLoading, setMenuLoading] = useState(false);
@@ -225,7 +225,7 @@ const Orders = () => {
         params: page > 1 ? { page } : {}
       });
       const data = res?.data || {};
-      
+
       // Сохраняем полный объект пагинации или массив
       const itemsData = data?.results ? data : (Array.isArray(data) ? data : []);
       setMenuItems(data?.results ? data : itemsData);
@@ -244,31 +244,31 @@ const Orders = () => {
       setMenuLoading(false);
     }
   };
-  
+
   // Обработчик смены страницы меню
   const handleMenuPageChange = useCallback(async (newPage, searchQuery = "") => {
     if (newPage < 1) return;
-    
+
     // Всегда загружаем данные с сервера (с поиском или без)
     setMenuLoading(true);
     try {
       const params = {
         page: newPage,
       };
-      
+
       // Добавляем параметр поиска, если он есть
       if (searchQuery && searchQuery.trim().length > 0) {
         params.search = searchQuery.trim();
       }
-      
+
       const res = await api.get("/cafe/menu-items/", { params });
       const data = res?.data || {};
-      
+
       // Сохраняем полный объект пагинации (с count, next, previous, results)
       // или массив, если это не объект пагинации
       const itemsData = data?.results ? data : (Array.isArray(data) ? data : []);
       setMenuItems(itemsData);
-      
+
       // Обновляем кэш
       const arr = Array.isArray(itemsData) ? itemsData : (data?.results || []);
       for (const m of arr) {
@@ -277,7 +277,7 @@ const Orders = () => {
           kitchen: m.kitchen ?? null,
         });
       }
-      
+
       setMenuCurrentPage(newPage);
     } catch (err) {
       console.error("Ошибка загрузки меню:", err);
@@ -521,7 +521,6 @@ const Orders = () => {
     async (order) => {
       if (!order?.id) return;
       if (printingId) return;
-
       setPrintingId(order.id);
       try {
         await checkPrinterConnection().catch(() => false);
