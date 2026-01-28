@@ -1411,6 +1411,7 @@ const Orders = () => {
                 // Загружаем первую страницу без поиска при закрытии
                 handleMenuPageChange(1, "");
               }}
+              cartItems={form.items}
               menuItems={menuItems}
               menuImageUrl={menuImageUrl}
               onPick={(m) => addOrIncMenuItem(m)}
