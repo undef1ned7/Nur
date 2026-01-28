@@ -552,7 +552,7 @@ export default function EmployeeTable() {
     department,
     deleteError,
   } = useSelector((state) => state.employee);
-  const { company: profile } = useUser();
+  const { company, profile, tariff, sector } = useUser();
   // console.log("====================================");
   // console.log(employees);
   // console.log("====================================");
@@ -844,6 +844,10 @@ export default function EmployeeTable() {
                           onSaveAccesses={(newAccessesPayload) =>
                             handleSaveEmployeeAccesses(e.id, newAccessesPayload)
                           }
+                          company={company}
+                          tariff={tariff}
+                          sectorName={sector || company?.sector?.name}
+                          profile={profile}
                         />
                       ) : (
                         <span>

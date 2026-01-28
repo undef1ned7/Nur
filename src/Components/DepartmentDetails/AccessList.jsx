@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { FaCheckCircle, FaRegCircle, FaSearch, FaTimes } from "react-icons/fa";
 import { MENU_CONFIG } from "../Sidebar/config/menuConfig";
 import { HIDE_RULES } from "../Sidebar/config/hideRules";
+import { getAdditionalServicesForMenu, ADDITIONAL_SERVICES_CONFIG } from "../Sidebar/config/additionalServicesConfig";
 
 // Базовые permissions (общие для всех секторов)
 const BASIC_ACCESS_TYPES = [
@@ -227,6 +228,16 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
 // Для обратной совместимости
 export const ALL_ACCESS_TYPES = BASIC_ACCESS_TYPES;
 
+// Маппинг для доп. услуг
+const additionalServicesMapping = {
+  can_view_whatsapp: { value: "WhatsApp", label: "WhatsApp", backendKey: "can_view_whatsapp" },
+  can_view_instagram: { value: "Instagram", label: "Instagram", backendKey: "can_view_instagram" },
+  can_view_telegram: { value: "Telegram", label: "Telegram", backendKey: "can_view_telegram" },
+  can_view_documents: { value: "Документы", label: "Документы", backendKey: "can_view_documents" },
+  can_view_market_label: { value: "Печать штрих-кодов", label: "Печать штрих-кодов", backendKey: "can_view_market_label" },
+  can_view_market_scales: { value: "Интеграция с весами", label: "Интеграция с весами", backendKey: "can_view_market_scales" },
+};
+
 // const LOCAL_STORAGE_KEY = "userSelectedAccesses";
 
 const AccessList = ({
@@ -244,6 +255,15 @@ const AccessList = ({
 
   // Получаем доступы, которые реально показываются в сайдбаре
   const sidebarAccessTypes = useMemo(() => {
+    // Определяем функции проверки прав до использования
+    const companyAllows = (perm) => {
+      if (!company) return undefined;
+      if (Object.prototype.hasOwnProperty.call(company, perm)) {
+        return company[perm] === true;
+      }
+      return undefined;
+    };
+
     // Вычисляем скрытые элементы на основе правил (как в useMenuItems)
     const hiddenByRules = (() => {
       const result = { labels: new Set(), toIncludes: [] };
@@ -324,13 +344,27 @@ const AccessList = ({
     const allMenuPermissions = new Set();
     [...basicItems, ...sectorItems].forEach((item) => {
       if (item.permission) {
-        allMenuPermissions.add(item.permission);
+        // "Филиалы" должны добавляться только если у компании есть активная доп. услуга
+        if (item.permission === "can_view_branch") {
+          if (companyAllows("can_view_branch") === true) {
+            allMenuPermissions.add(item.permission);
+          }
+        } else {
+          allMenuPermissions.add(item.permission);
+        }
       }
       // Обрабатываем children для дополнительных услуг
       if (item.children && Array.isArray(item.children)) {
         item.children.forEach((child) => {
           if (child.permission) {
-            allMenuPermissions.add(child.permission);
+            // "Филиалы" должны добавляться только если у компании есть активная доп. услуга
+            if (child.permission === "can_view_branch") {
+              if (companyAllows("can_view_branch") === true) {
+                allMenuPermissions.add(child.permission);
+              }
+            } else {
+              allMenuPermissions.add(child.permission);
+            }
           }
         });
       }
@@ -349,12 +383,94 @@ const AccessList = ({
       }
     }
 
+    // Добавляем активные доп. услуги компании и профиля владельца
+    const profileAllows = (perm) => {
+      if (!profile) return undefined;
+      if (Object.prototype.hasOwnProperty.call(profile, perm)) {
+        return profile[perm] === true;
+      }
+      return undefined;
+    };
+
+    if (company || profile) {
+      // Проверяем базовые доп. услуги из MENU_CONFIG.additional
+      MENU_CONFIG.additional.forEach((service) => {
+        if (!service.permission) return;
+
+        // Для WhatsApp, Instagram, Telegram, Документы проверяем ТОЛЬКО права компании
+        if (
+          service.permission === "can_view_whatsapp" ||
+          service.permission === "can_view_instagram" ||
+          service.permission === "can_view_telegram" ||
+          service.permission === "can_view_documents"
+        ) {
+          if (companyAllows(service.permission) === true) {
+            allMenuPermissions.add(service.permission);
+          }
+        }
+        // Для "Печать штрих-кодов" и "Интеграция с весами" проверяем ТОЛЬКО права профиля владельца
+        else if (
+          service.permission === "can_view_market_label" ||
+          service.permission === "can_view_market_scales"
+        ) {
+          // Проверяем права в профиле владельца
+          if (profileAllows(service.permission) === true) {
+            allMenuPermissions.add(service.permission);
+          }
+        }
+        // Для остальных проверяем права компании или профиля
+        else {
+          if (companyAllows(service.permission) === true || profileAllows(service.permission) === true) {
+            allMenuPermissions.add(service.permission);
+          }
+        }
+      });
+
+      // Проверяем динамические доп. услуги из additionalServicesConfig
+      const hasPermission = (perm) => {
+        // Проверяем и в компании, и в профиле
+        return companyAllows(perm) === true || profileAllows(perm) === true;
+      };
+
+      const isAllowed = (comp, perm) => {
+        // Проверяем и в компании, и в профиле
+        return companyAllows(perm) === true || profileAllows(perm) === true;
+      };
+
+      const dynamicServices = getAdditionalServicesForMenu({
+        hasPermission,
+        isAllowed,
+        company,
+        tariff,
+        sector: company?.sector?.name || sectorName,
+      });
+
+      dynamicServices.forEach((service) => {
+        if (service.permission) {
+          // "Филиалы" должны добавляться только если у компании есть активная доп. услуга
+          if (service.permission === "can_view_branch") {
+            if (companyAllows("can_view_branch") === true) {
+              allMenuPermissions.add(service.permission);
+            }
+          } else {
+            allMenuPermissions.add(service.permission);
+          }
+        }
+      });
+    }
+
     // Маппим permissions обратно в доступы из BASIC_ACCESS_TYPES и SECTOR_ACCESS_TYPES
     const result = [];
 
     // Базовые доступы
     BASIC_ACCESS_TYPES.forEach((accessType) => {
-      if (allMenuPermissions.has(accessType.backendKey)) {
+      // "Филиалы" должны отображаться только если у компании есть активная доп. услуга
+      if (accessType.backendKey === "can_view_branch") {
+        // Проверяем, есть ли активная доп. услуга у компании
+        if (companyAllows("can_view_branch") === true && allMenuPermissions.has(accessType.backendKey)) {
+          result.push(accessType);
+        }
+      } else if (allMenuPermissions.has(accessType.backendKey)) {
         result.push(accessType);
       }
     });
@@ -367,8 +483,38 @@ const AccessList = ({
       }
     });
 
+    // Добавляем доп. услуги, которые активны у компании или профиля, но еще не добавлены
+    allMenuPermissions.forEach((permission) => {
+      // Проверяем, что это доп. услуга и её еще нет в результате
+      if (additionalServicesMapping[permission]) {
+        const exists = result.some((r) => r.backendKey === permission);
+        if (!exists) {
+          result.push(additionalServicesMapping[permission]);
+        }
+      } else {
+        // Проверяем динамические доп. услуги из конфигурации
+        // Если permission есть в allMenuPermissions, но нет в маппинге,
+        // это может быть динамическая услуга (например, "Склад", "Филиалы")
+        let dynamicService = MENU_CONFIG.additional.find(
+          (s) => s.permission === permission
+        );
+        if (!dynamicService) {
+          dynamicService = ADDITIONAL_SERVICES_CONFIG.find(
+            (s) => s.permission === permission
+          );
+        }
+        if (dynamicService && !result.some((r) => r.backendKey === permission)) {
+          result.push({
+            value: dynamicService.label,
+            label: dynamicService.label,
+            backendKey: dynamicService.permission,
+          });
+        }
+      }
+    });
+
     return result;
-  }, [sectorName, tariff, company]);
+  }, [sectorName, tariff, company, profile]);
 
   const [selectedAccess, setSelectedAccess] = useState(() => {
     // Используем доступы из сайдбара
@@ -411,7 +557,7 @@ const AccessList = ({
   // Используем доступы из сайдбара
   const availableAccessTypes = sidebarAccessTypes;
 
-  // Разделяем на базовые и секторные
+  // Разделяем на базовые, секторные и доп. услуги
   const basicAccessTypes = useMemo(() => {
     return availableAccessTypes.filter((type) =>
       BASIC_ACCESS_TYPES.some((basic) => basic.backendKey === type.backendKey)
@@ -423,8 +569,31 @@ const AccessList = ({
       (type) =>
         !BASIC_ACCESS_TYPES.some(
           (basic) => basic.backendKey === type.backendKey
-        )
+        ) &&
+        !additionalServicesMapping[type.backendKey]
     );
+  }, [availableAccessTypes]);
+
+  // Доп. услуги (отдельная категория)
+  const additionalServicesTypes = useMemo(() => {
+    return availableAccessTypes.filter((type) => {
+      // Проверяем, есть ли это в маппинге базовых доп. услуг
+      if (additionalServicesMapping[type.backendKey]) {
+        return true;
+      }
+      // Проверяем, есть ли это в MENU_CONFIG.additional
+      const inMenuConfig = MENU_CONFIG.additional.some(
+        (s) => s.permission === type.backendKey
+      );
+      if (inMenuConfig) {
+        return true;
+      }
+      // Проверяем, есть ли это в динамических услугах
+      const inDynamicServices = ADDITIONAL_SERVICES_CONFIG.some(
+        (s) => s.permission === type.backendKey
+      );
+      return inDynamicServices;
+    });
   }, [availableAccessTypes]);
 
   // Фильтрация по поисковому запросу
@@ -443,6 +612,14 @@ const AccessList = ({
       type.label.toLowerCase().includes(query)
     );
   }, [sectorAccessTypes, searchQuery]);
+
+  const filteredAdditional = useMemo(() => {
+    if (!searchQuery.trim()) return additionalServicesTypes;
+    const query = searchQuery.toLowerCase();
+    return additionalServicesTypes.filter((type) =>
+      type.label.toLowerCase().includes(query)
+    );
+  }, [additionalServicesTypes, searchQuery]);
 
   const handleSave = () => {
     const payloadForBackend = {};
@@ -720,6 +897,124 @@ const AccessList = ({
                       : "white",
                     border: `1px solid ${
                       selectedAccess[accessType.backendKey] ? "#2196f3" : "#ddd"
+                    }`,
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "#f5f5f5";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!selectedAccess[accessType.backendKey]) {
+                      e.currentTarget.style.background = "white";
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!selectedAccess[accessType.backendKey]}
+                    onChange={() => toggleAccess(accessType.backendKey)}
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      color: "#333",
+                      userSelect: "none",
+                    }}
+                  >
+                    {accessType.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Дополнительные услуги */}
+        {filteredAdditional.length > 0 && (
+          <div style={{ marginBottom: "24px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+                paddingBottom: "8px",
+                borderBottom: "2px solid #e0e0e0",
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: "#333",
+                }}
+              >
+                Дополнительные услуги
+              </h4>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => handleSelectAll(filteredAdditional, true)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Выбрать все
+                </button>
+                <button
+                  onClick={() => handleSelectAll(filteredAdditional, false)}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Снять все
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "8px",
+                maxHeight: "300px",
+                overflowY: "auto",
+                padding: "8px",
+                background: "#fff3e0",
+                borderRadius: "6px",
+              }}
+            >
+              {filteredAdditional.map((accessType) => (
+                <label
+                  key={accessType.backendKey}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    borderRadius: "4px",
+                    background: selectedAccess[accessType.backendKey]
+                      ? "#ffe0b2"
+                      : "white",
+                    border: `1px solid ${
+                      selectedAccess[accessType.backendKey] ? "#ff9800" : "#ddd"
                     }`,
                     transition: "all 0.2s",
                   }}
