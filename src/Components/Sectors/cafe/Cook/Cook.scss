@@ -661,7 +661,7 @@
   align-items: center;
   justify-content: center;
   padding: 18px;
-  z-index: 9999;
+  z-index: 100;
 
   &__panel {
     width: min(720px, 100%);

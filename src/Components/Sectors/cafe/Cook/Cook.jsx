@@ -15,7 +15,6 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
-import { checkPrinterConnection, printOrderReceiptJSONViaUSBWithDialog } from "../Orders/OrdersPrintService";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 

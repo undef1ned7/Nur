@@ -1404,7 +1404,9 @@ const Settings = () => {
       setFormData({ current_password: "", new_password: "", new_password2: "" });
     } catch (err) {
       console.error("Failed to update password:", err);
-      showAlert("error", "Ошибка при изменении пароля");
+      const errorsText = Object.values(err).join('\n')
+      console.log(errorsText);
+      showAlert("error", `Ошибка при изменении пароля\n${errorsText}`);
     } finally {
       setSaving(false);
     }
@@ -1521,7 +1523,7 @@ const Settings = () => {
 
   /* ===== Онлайн: ссылки ===== */
   const sectorName = useMemo(() => String(company?.sector?.name || "").toLowerCase().trim(), [company?.sector?.name]);
-  
+
   const isBarberSector = useMemo(() => {
     return sectorName === "барбершоп" || sectorName === "салон красоты" || sectorName.includes("барбер") || sectorName.includes("парикмахер");
   }, [sectorName]);
@@ -1532,19 +1534,19 @@ const Settings = () => {
 
   const onlineMenuUrl = useMemo(() => {
     if (!company?.slug) return "";
-    
+
     // Определяем тип сектора
-    const isMarket = sectorName === "магазин" || 
-                     sectorName === "цветочный магазин" || 
-                     sectorName.includes("магазин");
-    
+    const isMarket = sectorName === "магазин" ||
+      sectorName === "цветочный магазин" ||
+      sectorName.includes("магазин");
+
     // Генерируем URL в зависимости от типа сектора
     if (isMarket) {
       return `${safeOrigin()}/catalog/${company.slug}`;
     } else if (isCafeSector) {
       return `${safeOrigin()}/cafe/${company.slug}/menu`;
     }
-    
+
     // По умолчанию для кафе
     return `${safeOrigin()}/cafe/${company.slug}/menu`;
   }, [company?.slug, sectorName, isCafeSector]);
@@ -1762,19 +1764,18 @@ const Settings = () => {
                 <div className="settings__password-strength">
                   <div className="settings__strength-bar">
                     <div
-                      className={`settings__strength-fill ${
-                        formData.new_password.length > 8 ? "strong" : formData.new_password.length > 5 ? "medium" : "weak"
-                      }`}
+                      className={`settings__strength-fill ${formData.new_password.length > 8 ? "strong" : formData.new_password.length > 5 ? "medium" : "weak"
+                        }`}
                     />
                   </div>
                   <span className="settings__strength-text">
                     {formData.new_password.length === 0
                       ? "Введите пароль"
                       : formData.new_password.length < 6
-                      ? "Слабый"
-                      : formData.new_password.length < 9
-                      ? "Средний"
-                      : "Сильный"}
+                        ? "Слабый"
+                        : formData.new_password.length < 9
+                          ? "Средний"
+                          : "Сильный"}
                   </span>
                 </div>
               </div>
@@ -1909,131 +1910,131 @@ const Settings = () => {
           </form>
         );
 
-case "Онлайн":
-  return (
-    <div className="settings__tab-content">
-      <div className="settings__section">
-        <h2 className="settings__section-title">
-          <span className="settings__emoji">🌐</span> Онлайн
-        </h2>
+      case "Онлайн":
+        return (
+          <div className="settings__tab-content">
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <span className="settings__emoji">🌐</span> Онлайн
+              </h2>
 
-        <div className="settings__onlineGrid">
-          {/* Онлайн-запись для барбершопа */}
-          {isBarberSector && (
-            <div className="settings__onlineCard">
-              <div className="settings__onlineHead">
-                <div className="settings__onlineTitle">📅 Онлайн-запись</div>
-                <div className="settings__onlineHint">Клиенты могут записаться онлайн по этой ссылке</div>
-              </div>
+              <div className="settings__onlineGrid">
+                {/* Онлайн-запись для барбершопа */}
+                {isBarberSector && (
+                  <div className="settings__onlineCard">
+                    <div className="settings__onlineHead">
+                      <div className="settings__onlineTitle">📅 Онлайн-запись</div>
+                      <div className="settings__onlineHint">Клиенты могут записаться онлайн по этой ссылке</div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">Slug</div>
-                <div className="settings__onlineValue">{company?.slug || "—"}</div>
-              </div>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Slug</div>
+                      <div className="settings__onlineValue">{company?.slug || "—"}</div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">URL</div>
-                <div className="settings__onlineLinkBox">
-                  <input className="settings__onlineInput" value={onlineBookingUrl || ""} readOnly />
-                  <div className="settings__onlineBtns">
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--secondary"
-                      onClick={() => copyText(onlineBookingUrl)}
-                      disabled={!onlineBookingUrl}
-                    >
-                      Копировать
-                    </button>
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--primary"
-                      onClick={() => openUrl(onlineBookingUrl)}
-                      disabled={!onlineBookingUrl}
-                    >
-                      Открыть
-                    </button>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">URL</div>
+                      <div className="settings__onlineLinkBox">
+                        <input className="settings__onlineInput" value={onlineBookingUrl || ""} readOnly />
+                        <div className="settings__onlineBtns">
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--secondary"
+                            onClick={() => copyText(onlineBookingUrl)}
+                            disabled={!onlineBookingUrl}
+                          >
+                            Копировать
+                          </button>
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--primary"
+                            onClick={() => openUrl(onlineBookingUrl)}
+                            disabled={!onlineBookingUrl}
+                          >
+                            Открыть
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!onlineBookingUrl && (
+                      <div className="settings__warnBox">
+                        Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
+                )}
 
-              {!onlineBookingUrl && (
-                <div className="settings__warnBox">
-                  Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
-                </div>
-              )}
-            </div>
-          )}
+                {/* Онлайн-меню/каталог для кафе и магазинов */}
+                {(isCafeSector || isMarketSector) && (
+                  <div className="settings__onlineCard">
+                    <div className="settings__onlineHead">
+                      <div className="settings__onlineTitle">{isCafeSector ? "🍽️ Онлайн-меню" : "🛒 Онлайн-каталог"}</div>
+                      <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
+                    </div>
 
-          {/* Онлайн-меню/каталог для кафе и магазинов */}
-          {(isCafeSector || isMarketSector) && (
-            <div className="settings__onlineCard">
-              <div className="settings__onlineHead">
-                <div className="settings__onlineTitle">{isCafeSector ? "🍽️ Онлайн-меню" : "🛒 Онлайн-каталог"}</div>
-                <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
-              </div>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Slug</div>
+                      <div className="settings__onlineValue">{company?.slug || "—"}</div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">Slug</div>
-                <div className="settings__onlineValue">{company?.slug || "—"}</div>
-              </div>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">URL</div>
+                      <div className="settings__onlineLinkBox">
+                        <input className="settings__onlineInput" value={onlineMenuUrl || ""} readOnly />
+                        <div className="settings__onlineBtns">
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--secondary"
+                            onClick={() => copyText(onlineMenuUrl)}
+                            disabled={!onlineMenuUrl}
+                          >
+                            Копировать
+                          </button>
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--primary"
+                            onClick={() => openUrl(onlineMenuUrl)}
+                            disabled={!onlineMenuUrl}
+                          >
+                            Открыть
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">URL</div>
-                <div className="settings__onlineLinkBox">
-                  <input className="settings__onlineInput" value={onlineMenuUrl || ""} readOnly />
-                  <div className="settings__onlineBtns">
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--secondary"
-                      onClick={() => copyText(onlineMenuUrl)}
-                      disabled={!onlineMenuUrl}
-                    >
-                      Копировать
-                    </button>
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--primary"
-                      onClick={() => openUrl(onlineMenuUrl)}
-                      disabled={!onlineMenuUrl}
-                    >
-                      Открыть
-                    </button>
+                    {!onlineMenuUrl && (
+                      <div className="settings__warnBox">
+                        Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
+                )}
 
-              {!onlineMenuUrl && (
-                <div className="settings__warnBox">
-                  Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
-                </div>
-              )}
+                {/* Fallback если не определён тип сектора */}
+                {!isBarberSector && !isCafeSector && !isMarketSector && (
+                  <div className="settings__onlineCard">
+                    <div className="settings__onlineHead">
+                      <div className="settings__onlineTitle">Ссылка на онлайн</div>
+                      <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
+                    </div>
+
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Slug</div>
+                      <div className="settings__onlineValue">{company?.slug || "—"}</div>
+                    </div>
+
+                    {!company?.slug && (
+                      <div className="settings__warnBox">
+                        Нет slug у компании — без него ссылку собрать нельзя.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-
-          {/* Fallback если не определён тип сектора */}
-          {!isBarberSector && !isCafeSector && !isMarketSector && (
-            <div className="settings__onlineCard">
-              <div className="settings__onlineHead">
-                <div className="settings__onlineTitle">Ссылка на онлайн</div>
-                <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
-              </div>
-
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">Slug</div>
-                <div className="settings__onlineValue">{company?.slug || "—"}</div>
-              </div>
-
-              {!company?.slug && (
-                <div className="settings__warnBox">
-                  Нет slug у компании — без него ссылку собрать нельзя.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+          </div>
+        );
 
 
       default:
