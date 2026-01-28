@@ -66,16 +66,22 @@
 
   &__tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 32px;
     border-bottom: 2px solid #e0e0e0;
+    @include ifmobile {
+      justify-content: center;
+    }
   }
 
   &__tab {
     display: flex;
+    flex: 1;
     align-items: center;
     gap: 8px;
     padding: 12px 24px;
+    justify-content: center;
     background: none;
     border: none;
     border-bottom: 3px solid transparent;

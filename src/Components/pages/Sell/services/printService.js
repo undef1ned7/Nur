@@ -44,12 +44,22 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 };
 
 /* ---------- Кодовые страницы и энкодеры ---------- */
-// 66 — PC866, 73 — CP1251 (часто встречается у Xprinter)
-const CODEPAGE = Number(localStorage.getItem("escpos_cp") ?? 73);
+// Поддерживаемые кодовые страницы для кириллицы:
+// 73 — CP1251 (часто встречается у Xprinter) - по умолчанию
+// 66 — PC866 (часто встречается у Xprinter по self-test)
+// 17 — PC866 (часто стандартный номер таблицы в ESC/POS)
+// 59 — PC866(Russian) - альтернативный вариант для русской кириллицы
+// 18 — PC852 (Latin2, также поддерживает PC866)
+// 22 — CP1251 (альтернативный код)
+// ====== ЖЁСТКАЯ НАСТРОЙКА ДЛЯ XP-N160II: PC866 ======
+// Важно: у части Xprinter (в т.ч. XP-N160II) PC866 на ESC/POS бывает как 17 или 66.
+// Если будет "корябяза", поменяйте 17 <-> 66.
+const FORCED_CODEPAGE = 17; // PC866
+// printRussianRawUsb("Тест: Привет, мир! Ёё №");
 export function setEscposCodepage(n) {
   localStorage.setItem("escpos_cp", String(n));
 }
-const CP866_CODES = new Set([66, 18]);
+const PC866_CODES = new Set([66, 17, 18, 59]); // 17 — частый ESC/POS номер PC866, 59 — PC866(Russian)
 const CP1251_CODES = new Set([73, 22]);
 
 function encodeCP1251(s = "") {
@@ -66,13 +76,15 @@ function encodeCP1251(s = "") {
   }
   return new Uint8Array(out);
 }
-function encodeCP866(s = "") {
+function encodePC866(s = "") {
   const out = [];
   for (const ch of s) {
     const c = ch.codePointAt(0);
     if (c <= 0x7f) out.push(c);
     else if (c >= 0x0410 && c <= 0x042f) out.push(0x80 + (c - 0x0410));
-    else if (c >= 0x0430 && c <= 0x044f) out.push(0xa0 + (c - 0x0430));
+    // PC866: строчные а..п идут 0xA0..0xAF, а р..я идут 0xE0..0xEF
+    else if (c >= 0x0430 && c <= 0x043f) out.push(0xa0 + (c - 0x0430));
+    else if (c >= 0x0440 && c <= 0x044f) out.push(0xe0 + (c - 0x0440));
     else if (c === 0x0401) out.push(0xf0);
     else if (c === 0x0451) out.push(0xf1);
     else if (c === 0x2116) out.push(0xfc);
@@ -81,8 +93,8 @@ function encodeCP866(s = "") {
   return new Uint8Array(out);
 }
 const getEncoder = (n) =>
-  CP866_CODES.has(n)
-    ? encodeCP866
+  PC866_CODES.has(n)
+    ? encodePC866
     : CP1251_CODES.has(n)
     ? encodeCP1251
     : encodeCP1251;
@@ -181,7 +193,9 @@ function lr(left, right, width = 32) {
 function buildReceiptFromJSON(payload, opts = {}) {
   const width = opts.width || CHARS_PER_LINE;
   const divider = "-".repeat(width);
-  const enc = getEncoder(CODEPAGE);
+  // Жёстко используем PC866 (и для ESC t n, и для энкодинга текста)
+  const codepage = FORCED_CODEPAGE;
+  const enc = encodePC866;
 
   const company = payload.company ?? "";
   const docNo = payload.doc_no ?? "";
@@ -204,7 +218,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
   const chunks = [];
   chunks.push(ESC(0x1b, 0x40)); // init
   chunks.push(ESC(0x1b, 0x52, 0x07)); // International: Russia
-  chunks.push(ESC(0x1b, 0x74, CODEPAGE)); // кодовая страница
+  chunks.push(ESC(0x1b, 0x74, codepage)); // кодовая страница
 
   chunks.push(ESC(0x1b, 0x61, 0x01)); // center
   if (company) chunks.push(enc(company + "\n"));
@@ -285,6 +299,9 @@ function saveVidPidToLS(dev) {
   try {
     localStorage.setItem("escpos_vid", dev.vendorId.toString(16));
     localStorage.setItem("escpos_pid", dev.productId.toString(16));
+    if (dev.productName) localStorage.setItem("escpos_product", dev.productName);
+    if (dev.manufacturerName)
+      localStorage.setItem("escpos_manufacturer", dev.manufacturerName);
   } catch {}
 }
 async function tryUsbAutoConnect() {
@@ -366,6 +383,48 @@ async function ensureUsbReadyAuto() {
   return usbState.dev ? usbState : null;
 }
 
+/**
+ * Интерактивная проверка и подключение принтера.
+ * Сначала пытается авто-подключиться к уже разрешённому устройству.
+ * Если не найдено – показывает диалог выбора USB-устройства.
+ * Возвращает true, если после этого принтер доступен.
+ */
+export async function ensurePrinterConnectedInteractively() {
+  if (!("usb" in navigator)) return false;
+
+  // 1. Пытаемся автоматически подключиться к уже разрешённому устройству
+  try {
+    const state = await ensureUsbReadyAuto();
+    if (state && usbState.dev) {
+      return true;
+    }
+  } catch {
+    // игнорируем и пробуем интерактивное подключение ниже
+  }
+
+  // 2. Если авто-подключение не сработало – запрашиваем устройство у пользователя
+  try {
+    const dev = await requestUsbDevice();
+    if (!dev) return false;
+
+    // сохраняем VID/PID для будущих авто-подключений
+    saveVidPidToLS(dev);
+
+    // открываем устройство и захватываем интерфейс
+    const info = await openUsbDevice(dev);
+
+    // сохраняем в глобальном состоянии
+    usbState.dev = dev;
+
+    // если удалось получить outEP — считаем, что принтер подключен
+    return !!info?.outEP;
+  } catch (e) {
+    // Пользователь мог нажать Cancel или произошла другая ошибка
+    console.warn("Не удалось подключить USB-принтер интерактивно:", e);
+    return false;
+  }
+}
+
 export function attachUsbListenersOnce() {
   if (!("usb" in navigator)) return;
   if (attachUsbListenersOnce._did) return;
@@ -393,11 +452,24 @@ export function attachUsbListenersOnce() {
 }
 
 export async function checkPrinterConnection() {
-  if (!("usb" in navigator)) return false;
+  if (!("usb" in navigator)) {
+    console.warn("WebUSB не поддерживается в этом браузере");
+    return false;
+  }
   try {
     const state = await ensureUsbReadyAuto();
-    return state !== null && usbState.dev !== null;
-  } catch {
+    const connected = state !== null && usbState.dev !== null;
+    console.log("[PrintService] checkPrinterConnection ->", {
+      hasState: !!state,
+      hasDevice: !!usbState.dev,
+      connected,
+    });
+    return connected;
+  } catch (err) {
+    console.error(
+      "[PrintService] Ошибка при проверке подключения принтера:",
+      err
+    );
     return false;
   }
 }
@@ -423,7 +495,7 @@ async function printReceiptFromPdfUSB(pdfBlob) {
   }
 }
 
-async function printReceiptJSONViaUSB(payload) {
+async function printReceiptJSONViaUSB(payload, options = {}) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
   await ensureUsbReadyAuto();
   let dev = usbState.dev;
@@ -433,11 +505,52 @@ async function printReceiptJSONViaUSB(payload) {
   }
   const { outEP } = await openUsbDevice(dev);
 
-  const parts = buildReceiptFromJSON(payload, { width: CHARS_PER_LINE });
+  // Жёстко печатаем в PC866 (без fallback/автоподбора)
+  const parts = buildReceiptFromJSON(payload, {
+    width: CHARS_PER_LINE,
+    codepage: FORCED_CODEPAGE,
+  });
   for (const data of parts) {
     for (const chunk of chunkBytes(data)) {
       await dev.transferOut(outEP, chunk);
     }
+  }
+}
+
+/* ---------- Минимальная печать PC866 (XP-N160II) ---------- */
+export async function printRussianRawUsb(text = "Привет, мир!") {
+  if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
+  await ensureUsbReadyAuto();
+  let dev = usbState.dev;
+  if (!dev) {
+    dev = await requestUsbDevice();
+    saveVidPidToLS(dev);
+  }
+  const { outEP } = await openUsbDevice(dev);
+
+  // ESC/POS: init, Russia, codepage PC866, text, newline, cut
+  const init = ESC(0x1b, 0x40);
+  const intl = ESC(0x1b, 0x52, 0x07);
+  const cp = ESC(0x1b, 0x74, FORCED_CODEPAGE); // PC866
+  const body = encodePC866(String(text) + "\n");
+  const cut = ESC(0x1d, 0x56, 0x00);
+
+  const data = new Uint8Array(
+    init.length + intl.length + cp.length + body.length + cut.length
+  );
+  let o = 0;
+  data.set(init, o);
+  o += init.length;
+  data.set(intl, o);
+  o += intl.length;
+  data.set(cp, o);
+  o += cp.length;
+  data.set(body, o);
+  o += body.length;
+  data.set(cut, o);
+
+  for (const chunk of chunkBytes(data)) {
+    await dev.transferOut(outEP, chunk);
   }
 }
 

@@ -21,6 +21,7 @@ import {
   monthRange,
   tsOf,
   fetchAllConstructionCashflows,
+  formatDateForAPI,
 } from "./BarberAnalitikaUtils";
 
 const SALE_PAYOUTS_EP = "/barbershop/sale-payouts/";
@@ -35,6 +36,17 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     [year, monthIdx],
   );
 
+  // Форматируем даты для API
+  const dateFrom = useMemo(() => {
+    const start = new Date(year, monthIdx, 1);
+    return formatDateForAPI(start);
+  }, [year, monthIdx]);
+
+  const dateTo = useMemo(() => {
+    const end = new Date(year, monthIdx + 1, 0); // последний день месяца
+    return formatDateForAPI(end);
+  }, [year, monthIdx]);
+
   const periodLabel = useMemo(
     () => `${year}-${pad2(monthIdx + 1)}`,
     [year, monthIdx],
@@ -47,6 +59,37 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     dispatch(fetchProductsAsync({}));
   }, [dispatch]);
 
+  /* ===== загрузка данных из новой API аналитики ===== */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingAnalytics(true);
+      try {
+        const { data } = await api.get("/barbershop/analytics/", {
+          params: {
+            date_from: dateFrom,
+            date_to: dateTo,
+          },
+        });
+        if (!cancelled) {
+          setAnalyticsData(data);
+        }
+      } catch (e) {
+        console.error("Ошибка загрузки аналитики:", e);
+        if (!cancelled) {
+          setAnalyticsData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingAnalytics(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFrom, dateTo]);
+
   /* ===== загрузка данных барбершопа ===== */
   const [appointments, setAppointments] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -56,6 +99,10 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   const [clientsMarket, setClientsMarket] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+
+  /* ===== данные из новой API аналитики ===== */
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   const fetchPaged = async (url) => {
     const acc = [];
@@ -259,7 +306,8 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     [appointments, startTs, endTs],
   );
 
-  const totalApps = filteredApps.length;
+  // Используем данные из новой API аналитики, если они доступны
+  const totalApps = analyticsData?.totals?.appointments_total ?? filteredApps.length;
   const totalServices = services.length;
   const totalClientsBarber = clientsBarber.length;
   const totalClientsMarket = useMemo(
@@ -279,10 +327,11 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     return map;
   }, [filteredApps]);
 
-  const completedCount = totalsByStatus.get("completed")?.count || 0;
-  const completedSum = totalsByStatus.get("completed")?.sum || 0;
-  const canceledCount = totalsByStatus.get("canceled")?.count || 0;
-  const noShowCount = totalsByStatus.get("no_show")?.count || 0;
+  // Используем данные из API, если доступны, иначе вычисляем из filteredApps
+  const completedCount = analyticsData?.totals?.appointments_completed ?? (totalsByStatus.get("completed")?.count || 0);
+  const completedSum = analyticsData?.totals?.revenue ? toNum(analyticsData.totals.revenue) : (totalsByStatus.get("completed")?.sum || 0);
+  const canceledCount = analyticsData?.totals?.appointments_canceled ?? (totalsByStatus.get("canceled")?.count || 0);
+  const noShowCount = analyticsData?.totals?.appointments_no_show ?? (totalsByStatus.get("no_show")?.count || 0);
 
   /* ===== фильтр bookings по периоду ===== */
   const filteredBookings = useMemo(() => {
@@ -377,6 +426,17 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   );
 
   const rankBarbers = useMemo(() => {
+    // Используем данные из новой API, если доступны
+    if (analyticsData?.masters && Array.isArray(analyticsData.masters)) {
+      return analyticsData.masters.map((m) => ({
+        id: m.master_id,
+        name: m.master_name || "—",
+        count: m.count || 0,
+        sum: toNum(m.revenue || 0),
+      })).sort((x, y) => y.sum - x.sum || y.count - x.count);
+    }
+    
+    // Fallback на старую логику
     const m = new Map();
     filteredApps.forEach((a) => {
       const key = String(a.barber);
@@ -392,9 +452,20 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
       m.set(key, rec);
     });
     return [...m.values()].sort((x, y) => y.sum - x.sum || y.count - x.count);
-  }, [filteredApps, employees, COUNTABLE_FOR_RANK]);
+  }, [analyticsData, filteredApps, employees, COUNTABLE_FOR_RANK]);
 
   const rankServices = useMemo(() => {
+    // Используем данные из новой API, если доступны
+    if (analyticsData?.services && Array.isArray(analyticsData.services)) {
+      return analyticsData.services.map((s) => ({
+        id: s.service_id,
+        name: s.name || "—",
+        count: s.count || 0,
+        sum: toNum(s.revenue || 0),
+      })).sort((x, y) => y.sum - x.sum || y.count - x.count);
+    }
+    
+    // Fallback на старую логику
     const m = new Map();
 
     filteredApps.forEach((a) => {
@@ -418,7 +489,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
     });
 
     return [...m.values()].sort((x, y) => y.sum - x.sum || y.count - x.count);
-  }, [filteredApps, services, COUNTABLE_FOR_RANK]);
+  }, [analyticsData, filteredApps, services, COUNTABLE_FOR_RANK]);
 
   const rankClientsVisits = useMemo(() => {
     const m = new Map();
@@ -858,7 +929,7 @@ export const useBarberAnalitikaData = ({ year, monthIdx }) => {
   const unifiedExpense = saleFund + cashTotals.expense;
 
   return {
-    loading,
+    loading: loading || loadingAnalytics,
     errorMsg,
     totalApps,
     totalServices,

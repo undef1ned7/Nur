@@ -6,6 +6,7 @@ import {
   useParams,
   Link,
   useLocation,
+  useSearchParams,
 } from "react-router-dom";
 import api from "../../../api";
 import Reports from "./Reports/Reports";
@@ -608,11 +609,38 @@ const CashboxReports = () => (
 /* ──────────────────────────────── Детали кассы */
 const CashboxDetail = () => {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [box, setBox] = useState(null);
   const [ops, setOps] = useState([]);
-  const [tab, setTab] = useState("all");
+  const tabFromUrl = searchParams.get("tab");
+  const [tab, setTab] = useState(tabFromUrl || "all");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
+  // Синхронизация tab с URL параметром
+  useEffect(() => {
+    const urlTab = searchParams.get("tab");
+    if (urlTab && ["income", "expense", "all"].includes(urlTab)) {
+      if (urlTab !== tab) {
+        setTab(urlTab);
+      }
+    } else if (!urlTab && tab !== "all") {
+      // Если параметр удален из URL, сбрасываем на "all"
+      setTab("all");
+    }
+  }, [searchParams, tab]);
+
+  // Обновление URL при изменении tab
+  const handleTabChange = (newTab) => {
+    setTab(newTab);
+    const params = new URLSearchParams(searchParams);
+    if (newTab === "all") {
+      params.delete("tab");
+    } else {
+      params.set("tab", newTab);
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   const fromAny = (res) => {
     const d = res?.data ?? res ?? [];
@@ -732,7 +760,7 @@ const CashboxDetail = () => {
           className={`kassa__chip ${
             tab === "expense" ? "kassa__chip--active" : ""
           }`}
-          onClick={() => setTab("expense")}
+          onClick={() => handleTabChange("expense")}
         >
           Расход
         </button>
@@ -740,7 +768,7 @@ const CashboxDetail = () => {
           className={`kassa__chip ${
             tab === "income" ? "kassa__chip--active" : ""
           }`}
-          onClick={() => setTab("income")}
+          onClick={() => handleTabChange("income")}
         >
           Приход
         </button>
@@ -748,7 +776,7 @@ const CashboxDetail = () => {
           className={`kassa__chip ${
             tab === "all" ? "kassa__chip--active" : ""
           }`}
-          onClick={() => setTab("all")}
+          onClick={() => handleTabChange("all")}
         >
           Все
         </button>
