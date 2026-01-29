@@ -161,6 +161,8 @@ import OnlineBooking from "../Components/Sectors/Barber/OnlineBooking/OnlineBook
 import CafeOrdersLayout from "../Components/Sectors/cafe/Orders";
 import Orders from "../Components/Sectors/cafe/Orders/Orders";
 import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistory";
+import SellLayout from "../Components/pages/Sell/SellLayout";
+import SellMainStart from "../Components/pages/Sell/SellMainStart";
 
 
 /**
@@ -242,7 +244,14 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
   createProtectedRoute("barcodes", BarcodePrintPage),
   createProtectedRoute("scales", ScalesPage),
-  createProtectedRoute("sell", Sell),
+  <Route path="sell" key={'sell'} element={<SellLayout />}>
+    {
+      [
+        createProtectedRoute("", Sell, {index: true}),
+        createProtectedRoute("start", SellMainStart)
+      ]
+    }
+  </Route>,
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),
   createProtectedRoute("sklad-accounting", WarehouseAccounting),

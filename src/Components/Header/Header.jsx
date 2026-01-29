@@ -24,6 +24,7 @@ const pageTitles = {
   // --- добавлено ---
   // Базовые
   "/crm/sell": "Продажа",
+  "/crm/sell/start": "Продажа",
   "/crm/kassa": "Касса",
   "/crm/clients": "Клиенты",
   "/crm/departments": "Отделы",

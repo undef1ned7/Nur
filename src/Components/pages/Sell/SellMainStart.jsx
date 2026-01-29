@@ -69,7 +69,15 @@ const SellMainStart = ({ show, setShow }) => {
   const { start, foundProduct } = useSale();
   const { list: products } = useProducts();
   const { list: clients = [] } = useClient();
-
+  const filteredProducts = useMemo(() => {
+    const cartItemsMap = new Map(start?.items?.map(el => [el.product, parseFloat(el.quantity)]))
+    const data = products.filter(el => {
+      const qty = parseFloat(el.quantity);
+      const cartQty = cartItemsMap.get(el.id) || 0;
+      return !!(qty - cartQty)
+    })
+    return data.filter(el => !!el.quantity)
+  }, [products, start])
   // Флаг для отслеживания недавнего сканирования (чтобы не открывать модалку при Enter от сканера)
   const lastScanTimeRef = useRef(0);
   console.log('START', start);
@@ -212,8 +220,6 @@ const SellMainStart = ({ show, setShow }) => {
   };
 
   const debouncedDiscount1 = useDebounce((v) => {
-    console.log('ASDKJNASKDKASDK', v);
-
     dispatch(startSale({ discount_total: v }));
   }, 600);
   const onDiscountChange = (e) => debouncedDiscount1(e.target.value);
@@ -1109,10 +1115,6 @@ const SellMainStart = ({ show, setShow }) => {
     <section className="sell start">
       <div className="sell__header">
         <div className="sell__header-left">
-          <Button color="warning" variant="contained" className="mr-auto flex gap-4" onClick={() => setShow(false)}>
-            <ArrowBackIcon />
-            <p>Назад</p>
-          </Button>
           <ProductSearch
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
@@ -1120,7 +1122,7 @@ const SellMainStart = ({ show, setShow }) => {
             setShowDropdown={setShowDropdown}
             foundProduct={foundProduct}
             start={start}
-            products={products}
+            products={filteredProducts}
             setAlert={setAlert}
             dispatch={dispatch}
           />
@@ -1169,116 +1171,6 @@ const SellMainStart = ({ show, setShow }) => {
       <div className="block gap-4 xl:flex justify-between ">
         <div className="w-full xl:w-[66%] start__body-column">
           <div className="start__body-column">
-            {/* <div className="sell__body-header">
-              <h2 className="start__body-title">
-                {selectedItem?.product_name}
-              </h2>
-
-              <div className="start__actions">
-                <div className="start__actions-left">
-                  <input
-                    type="text"
-                    className="start__actions-input"
-                    value={
-                      selectedItem?.unit_price * selectedItem?.quantity || ""
-                    }
-                    readOnly
-                  />
-
-                  <div className="start__actions-row">
-                    <button
-                      className="start__actions-btn"
-                      onClick={incQty}
-                      disabled={!selectedItem}
-                      title="Увеличить количество"
-                    >
-                      <Plus />
-                    </button>
-
-                    <input
-                      style={{ width: 100 }}
-                      type="text"
-                      min={0}
-                      className="start__actions-input"
-                      value={qty}
-                      placeholder="Кол-во"
-                      onChange={(e) => {
-                        const newQty = e.target.value;
-                        setQty(newQty);
-                        if (selectedItem && newQty !== "" && start?.id) {
-                          debouncedQtyUpdate(newQty, selectedItem, start.id);
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (selectedItem && start?.id) {
-                          const inputValue = e.target.value;
-                          let qtyNum;
-
-                          if (inputValue === "" || inputValue === "0") {
-                            qtyNum = selectedItem.quantity || 0;
-                          } else {
-                            qtyNum = Math.max(0, toNum(inputValue));
-                          }
-
-                          const productId =
-                            selectedItem.product || selectedItem.id;
-                          const available = getAvailableQtyForProduct(
-                            productId,
-                            products
-                          );
-                          if (available && qtyNum > available) {
-                            qtyNum = available;
-                            setAlert({
-                              open: true,
-                              type: "error",
-                              message:
-                                "Нельзя установить количество больше остатка",
-                            });
-                          }
-
-                          setQty(String(qtyNum));
-
-                          dispatch(
-                            updateManualFilling({
-                              id: start.id,
-                              productId: selectedItem.id,
-                              quantity: qtyNum,
-                            })
-                          )
-                            .unwrap()
-                            .then(() => onRefresh());
-                        }
-                      }}
-                      disabled={!selectedItem}
-                    />
-
-                    <button
-                      className="start__actions-btn"
-                      onClick={decQty}
-                      disabled={!selectedItem}
-                      title="Уменьшить количество"
-                    >
-                      <Minus />
-                    </button>
-                  </div>
-
-                  <input
-                    type="text"
-                    className="start__actions-input"
-                    placeholder="Скидка на позицию"
-                    onChange={onProductDiscountChange}
-                    disabled={!selectedItem}
-                  />
-                </div>
-
-                <input
-                  type="text"
-                  className="start__actions-input"
-                  placeholder="Общ скидка"
-                  onChange={onDiscountChange}
-                />
-              </div>
-            </div> */}
             <CartTable
               items={currentItems}
               selectedId={selectedId}
@@ -1301,7 +1193,7 @@ const SellMainStart = ({ show, setShow }) => {
               Доп. услуги
             </button>
 
-            {products?.map((product) => (
+            {filteredProducts?.map((product) => (
               <button
                 key={product.id || product.name}
                 className={cx(
@@ -1309,23 +1201,6 @@ const SellMainStart = ({ show, setShow }) => {
                   selectedItem?.product_name == product.name && "active"
                 )}
                 onClick={async () => {
-                  const available = getAvailableQtyForProduct(
-                    product,
-                    products
-                  );
-                  const pid = product.id || product.product;
-                  const inCart = getCartQtyForProduct(pid, start?.items);
-                  if (available <= 0 || inCart >= available) {
-                    setAlert({
-                      open: true,
-                      type: "error",
-                      message:
-                        available > 0
-                          ? `Нельзя добавить больше, чем есть на складе (доступно: ${available})`
-                          : "Товара нет в наличии",
-                    });
-                    return;
-                  }
                   await dispatch(
                     manualFilling({
                       id: start.id,
