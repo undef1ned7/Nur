@@ -1829,7 +1829,7 @@ const Cart = ({
       {isMobile && (
         <div
           className={`mobile-order-section ${isOrderSectionOpen ? "open" : ""
-            } ${isClosing ? "closing" : ""} z-50!`}
+            } ${isClosing ? "closing" : ""} z-100!`}
           onTouchStart={handleOrderTouchStart}
           onTouchMove={handleOrderTouchMove}
           onTouchEnd={handleOrderTouchEnd}

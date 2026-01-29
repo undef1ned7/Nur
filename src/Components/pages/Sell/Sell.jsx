@@ -136,30 +136,37 @@ const Sell = () => {
     });
   const clearSelection = () => setSelectedIds(new Set());
 
-  const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
-  const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
-  const isBuildingCompany = sectorName === "строительная компания";
-  const isStartPlan = planName === "старт";
-
-  const filterSell = history.filter((item) => item.status !== "canceled");
-
-  const filterField = isBuildingCompany ? historyObjects : filterSell;
-
-  // Данные пагинации в зависимости от типа компании
-  const count = isBuildingCompany ? historyObjectsCount : historyCount;
-  const next = isBuildingCompany ? historyObjectsNext : historyNext;
-  const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
-
-  // Расчет общего количества страниц
-  const totalPages = useMemo(
-    () => (count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1),
-    [count]
-  );
-
-  const hasNextPage = !!next;
-  const hasPrevPage = !!previous;
-
+  const {
+    isBuildingCompany,
+    filterField,
+    count,
+    totalPages,
+    hasNextPage,
+    hasPrevPage
+  } = useMemo(() => {
+    const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
+    const isBuildingCompany = sectorName === "строительная компания";
+    const filterSell = history.filter((item) => item.status !== "canceled");
+    const filterField = isBuildingCompany ? historyObjects : filterSell;
+    const count = isBuildingCompany ? historyObjectsCount : historyCount;
+    const next = isBuildingCompany ? historyObjectsNext : historyNext;
+    const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
+    const totalPages = count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1
+    return {
+      sectorName,
+      isBuildingCompany,
+      filterSell,
+      filterField,
+      count,
+      next,
+      previous,
+      totalPages,
+      hasNextPage: !!next,
+      hasPrevPage: !!previous
+    }
+  }, [company, historyObjectsCount, historyObjectsNext, historyObjectsPrevious, historyPrevious, historyCount, historyNext])
   // Синхронизация URL с состоянием страницы
+
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     if (currentPage > 1) {

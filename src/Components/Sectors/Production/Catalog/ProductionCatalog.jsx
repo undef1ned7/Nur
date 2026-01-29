@@ -1621,8 +1621,16 @@ const ProductionCatalog = () => {
         <div className={`products-container ${viewMode}`}>
           {productsList.length === 0 ? (
             <div className="empty-state">
-              <p>Товары не найдены</p>
-              <button onClick={clearAllFilters}>Показать все товары</button>
+              <p>
+                {
+                  debouncedSearchQuery ? 'Товары не найдены' : 'Список товаров пуст'
+                }
+              </p>
+              {
+                debouncedSearchQuery && (
+                  <button onClick={clearAllFilters}>Показать все товары</button>
+                )
+              }
             </div>
           ) : (
             <div className={`products-grid ${viewMode}`}>

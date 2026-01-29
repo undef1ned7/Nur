@@ -464,6 +464,18 @@
     border-radius: 8px;
     margin-top: 5px;
     margin-bottom: 30px;
+
+    &_clients {
+      display: flex;
+      gap: 10px;
+      flex: 1 0 300px;
+    }
+    &_search {
+      display: flex;
+      gap: 10px;
+      flex: 1 0 300px;
+    }
+
     &-necessarily {
       font-family: Montserrat;
       font-weight: 300;
@@ -480,6 +492,7 @@
       padding: 5px;
       cursor: pointer;
       background-color: #fff;
+      color: green;
     }
     &-input {
       border: 1px solid #00000033;
@@ -513,6 +526,7 @@
       display: flex;
       align-items: center;
       column-gap: 10px;
+      width: 100%;
       span {
         display: flex;
         align-items: center;
@@ -973,7 +987,8 @@
 }
 
 // Мобильные устройства (до 768px)
-@media screen and (max-width: 1200px) { // менял Султан) с 768
+@media screen and (max-width: 1200px) {
+  // менял Султан) с 768
   // Общие стили
   .col-8,
   .col-4 {
@@ -983,8 +998,6 @@
 
   // Заголовок страницы продаж
   .sell__header {
-    flex-direction: column;
-    align-items: stretch;
     gap: 10px;
     padding: 10px;
     margin-bottom: 20px;
@@ -992,7 +1005,6 @@
 
   .sell__header-left {
     width: 100%;
-    flex-direction: column;
     gap: 10px;
 
     > * {
@@ -1201,7 +1213,7 @@
   }
 
   // Модальные окна
-  
+
   .start__debt,
   .start__custom-service {
     width: 100%;

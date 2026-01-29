@@ -3,7 +3,6 @@ import { Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useDebounce } from "../../../hooks/useDebounce";
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   doSearch,
   manualFilling,
@@ -55,7 +54,6 @@ import {
 } from "./components/PaymentModals";
 import DiscountModal from "./components/DiscountModal";
 import CustomServiceModal from "./components/CustomServiceModal";
-import { Button } from "@mui/material";
 
 const cx = (...args) => args.filter(Boolean).join(" ");
 
@@ -63,7 +61,8 @@ const cx = (...args) => args.filter(Boolean).join(" ");
    Компонент SellMainStart
    ============================================================ */
 
-const SellMainStart = ({ show, setShow }) => {
+const SellMainStart = () => {
+  const dispatch = useDispatch();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
   const { start, foundProduct } = useSale();
@@ -154,7 +153,11 @@ const SellMainStart = ({ show, setShow }) => {
       company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
   });
 
-  const dispatch = useDispatch();
+  useEffect(() => {
+    if (!start?.id) {
+      dispatch(startSale({}))
+    }
+  }, [start])
   const run = (thunk) => dispatch(thunk).unwrap();
 
   const [selectClient, setSelectClient] = useState("");
@@ -167,19 +170,19 @@ const SellMainStart = ({ show, setShow }) => {
     () => (start?.items || []).find((i) => i.id === selectedId) || null,
     [start?.items, selectedId]
   );
-
-  const filterClient = useMemo(
-    () =>
-      (Array.isArray(clients) ? clients : []).filter(
-        (c) => c.type === "client"
-      ),
-    [clients]
-  );
-  const pickClient = useMemo(
-    () => filterClient.find((x) => String(x.id) === String(clientId)),
-    [filterClient, clientId]
-  );
-
+  const {
+    pickClient,
+    filterClient } = useMemo(
+      () => {
+        const filterClient = Array.isArray(clients) ? clients : [].filter((c) => c.type === "client");
+        const pickClient = filterClient.find((x) => String(x.id) === String(clientId))
+        return {
+          filterClient,
+          pickClient
+        }
+      },
+      [clients, clientId]
+    );
   const [state, setState] = useState({
     phone: "",
     dueDate: "",
@@ -200,20 +203,6 @@ const SellMainStart = ({ show, setShow }) => {
     else setQty("");
   }, [selectedItem]);
 
-  const debouncedDiscount = useDebounce((v) => {
-    if (!start || !selectedItem) return;
-    dispatch(
-      manualFilling({
-        id: start.id,
-        productId: selectedItem.id,
-        discount_total: v,
-        quantity: 2,
-      })
-    );
-  }, 600);
-
-  const onProductDiscountChange = (e) => debouncedDiscount(e.target.value);
-
   const onChange2 = (e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
@@ -224,43 +213,58 @@ const SellMainStart = ({ show, setShow }) => {
   }, 600);
   const onDiscountChange = (e) => debouncedDiscount1(e.target.value);
 
-  const debouncedQtyUpdate = useDebounce(
-    async (newQty, currentSelectedItem, currentStartId) => {
-      if (!currentSelectedItem || !currentStartId) return;
-      let qtyNum = Math.max(0, toNum(newQty));
-      const productId = currentSelectedItem.product || currentSelectedItem.id;
-      const available = getAvailableQtyForProduct(productId, products);
-      if (available && qtyNum > available) {
-        qtyNum = available;
-        setAlert({
-          open: true,
-          type: "error",
-          message: "Введено больше доступного количества. Значение ограничено",
-        });
-        setQty(String(qtyNum));
-      }
+  // const debouncedQtyUpdate = useDebounce(
+  //   async (newQty, currentSelectedItem, currentStartId) => {
+  //     if (!currentSelectedItem || !currentStartId) return;
+  //     let qtyNum = Math.max(0, toNum(newQty));
+  //     const productId = currentSelectedItem.product || currentSelectedItem.id;
+  //     const available = getAvailableQtyForProduct(productId, products);
+  //     if (available && qtyNum > available) {
+  //       qtyNum = available;
+  //       setAlert({
+  //         open: true,
+  //         type: "error",
+  //         message: "Введено больше доступного количества. Значение ограничено",
+  //       });
+  //       setQty(String(qtyNum));
+  //     }
 
-      try {
-        await dispatch(
-          updateManualFilling({
-            id: currentStartId,
-            productId: currentSelectedItem.id,
-            quantity: qtyNum,
-          })
-        ).unwrap();
-        onRefresh();
-      } catch (error) {
-        console.error("Ошибка при обновлении количества:", error);
-      }
-    },
-    600
-  );
+  //     try {
+  //       await dispatch(
+  //         updateManualFilling({
+  //           id: currentStartId,
+  //           productId: currentSelectedItem.id,
+  //           quantity: qtyNum,
+  //         })
+  //       ).unwrap();
+  //       onRefresh();
+  //     } catch (error) {
+  //       console.error("Ошибка при обновлении количества:", error);
+  //     }
+  //   },
+  //   600
+  // );
 
-  const currentItems = useMemo(() => start?.items || [], [start]);
-  const currentSubtotal = start?.subtotal;
-  const currentDiscount = start?.order_discount_total;
-  const currentTotal = start?.total;
-  const isEmpty = useMemo(() => !!start?.items?.length, [start?.items])
+
+  const {
+    currentItems,
+    currentSubtotal,
+    currentDiscount,
+    currentTotal,
+    isEmpty } = useMemo(() => {
+      const currentItems = start?.items || [];
+      const currentSubtotal = start?.subtotal;
+      const currentDiscount = start?.order_discount_total;
+      const currentTotal = start?.total;
+      const isEmpty = !!start?.items?.length;
+      return {
+        currentItems,
+        currentSubtotal,
+        currentDiscount,
+        currentTotal,
+        isEmpty,
+      }
+    }, [start]);
 
   const onRefresh = useCallback(() => {
     dispatch(startSale({ discount_total: currentDiscount }));
@@ -471,20 +475,20 @@ const SellMainStart = ({ show, setShow }) => {
     onRefresh();
   };
 
-  const decQty = async () => {
-    if (!selectedItem) return;
-    const next = Math.max(0, (toNum(qty) || 0) - 1);
-    setQty(String(next));
+  // const decQty = async () => {
+  //   if (!selectedItem) return;
+  //   const next = Math.max(0, (toNum(qty) || 0) - 1);
+  //   setQty(String(next));
 
-    await dispatch(
-      updateManualFilling({
-        id: start.id,
-        productId: selectedItem.id,
-        quantity: next,
-      })
-    ).unwrap();
-    onRefresh();
-  };
+  //   await dispatch(
+  //     updateManualFilling({
+  //       id: start?.id,
+  //       productId: selectedItem.id,
+  //       quantity: next,
+  //     })
+  //   ).unwrap();
+  //   onRefresh();
+  // };
 
   // Функции для работы с товарами в таблице
   const handleIncreaseQty = async (item) => {
@@ -620,7 +624,7 @@ const SellMainStart = ({ show, setShow }) => {
     try {
       await dispatch(
         updateManualFilling({
-          id: start.id,
+          id: start?.id,
           productId: item.id,
           quantity: qtyNum,
         })
@@ -676,7 +680,7 @@ const SellMainStart = ({ show, setShow }) => {
       }
       await dispatch(
         addCustomItem({
-          id: start.id,
+          id: start?.id,
           name: customService.name.trim(),
           price: customService.price.trim(),
           quantity: Number(customService.quantity) || 1,
@@ -1115,7 +1119,7 @@ const SellMainStart = ({ show, setShow }) => {
     <section className="sell start">
       <div className="sell__header">
         <div className="sell__header-left">
-          <ProductSearch
+          <div className="sell__header_search">  <ProductSearch
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             showDropdown={showDropdown}
@@ -1125,47 +1129,47 @@ const SellMainStart = ({ show, setShow }) => {
             products={filteredProducts}
             setAlert={setAlert}
             dispatch={dispatch}
-          />
+          /></div>
 
-          <select
-            onChange={(e) => {
-              setClientId(e.target.value);
-              setSelectClient(e.target.value);
-            }}
-            value={clientId}
-            className="sell__header-input"
-          >
-            <option value="">Выберите клиента</option>
-            {filterClient.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.full_name}
-              </option>
-            ))}
-          </select>
+          <div className="sell__header_clients">
+            <select
+              onChange={(e) => {
+                setClientId(e.target.value);
+                setSelectClient(e.target.value);
+              }}
+              value={clientId}
+              className="sell__header-input"
+            >
+              <option value="">Выберите клиента</option>
+              {filterClient.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.full_name}
+                </option>
+              ))}
+            </select>
 
-          <button
-            className="sell__header-plus"
-            onClick={() => setShowNewClientModal(true)}
-          >
-            <span>
-              {/* плюс */}
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M19 11H13V5C13 4.73478 12.8946 4.48043 12.7071 4.29289C12.5196 4.10536 12.2652 4 12 4C11.7348 4 11.4804 4.10536 11.2929 4.29289C11.1054 4.48043 11 4.73478 11 5V11H5C4.73478 11 4.4804 11.1054 4.29289 11.2929C4.10536 11.4804 4 11.7348 4 12C4 12.2652 4.10536 12.5196 4.29289 12.7071C4.4804 12.8946 4.73478 13 5 13H11V19C11 19.2652 11.1054 19.5196 11.2929 19.7071C11.4804 19.8946 11.7348 20 12 20C12.2652 20 12.5196 19.8946 12.7071 19.7071C12.8946 19.5196 13 19.2652 13 19V13H19C19.2652 13 19.5196 12.8946 19.7071 12.7071C19.8946 12.5196 20 12.2652 20 12C20 11.7348 19.8946 11.4804 19.7071 11.2929C19.5196 11.1054 19.2652 11 19 11Z"
-                  fill="#CCCCCC"
-                />
-              </svg>
-            </span>
-          </button>
+            <button
+              className="sell__header-plus"
+              onClick={() => setShowNewClientModal(true)}
+            >
+              <span>
+                {/* плюс */}
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 11H13V5C13 4.73478 12.8946 4.48043 12.7071 4.29289C12.5196 4.10536 12.2652 4 12 4C11.7348 4 11.4804 4.10536 11.2929 4.29289C11.1054 4.48043 11 4.73478 11 5V11H5C4.73478 11 4.4804 11.1054 4.29289 11.2929C4.10536 11.4804 4 11.7348 4 12C4 12.2652 4.10536 12.5196 4.29289 12.7071C4.4804 12.8946 4.73478 13 5 13H11V19C11 19.2652 11.1054 19.5196 11.2929 19.7071C11.4804 19.8946 11.7348 20 12 20C12.2652 20 12.5196 19.8946 12.7071 19.7071C12.8946 19.5196 13 19.2652 13 19V13H19C19.2652 13 19.5196 12.8946 19.7071 12.7071C19.8946 12.5196 20 12.2652 20 12C20 11.7348 19.8946 11.4804 19.7071 11.2929C19.5196 11.1054 19.2652 11 19 11Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
+            </button>
+          </div>
         </div>
-
-        <div className="sell__header-left"></div>
       </div>
 
       <div className="block gap-4 xl:flex justify-between ">
@@ -1201,13 +1205,13 @@ const SellMainStart = ({ show, setShow }) => {
                   selectedItem?.product_name == product.name && "active"
                 )}
                 onClick={async () => {
+
                   await dispatch(
                     manualFilling({
-                      id: start.id,
-                      productId: product.id,
+                      id: start?.id,
+                      productId: product?.id,
                     })
                   ).unwrap();
-                  dispatch(startSale());
                 }}
                 title="Добавить 1 шт"
               >
