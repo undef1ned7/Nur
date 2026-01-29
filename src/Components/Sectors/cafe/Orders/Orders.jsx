@@ -158,8 +158,17 @@ const Orders = () => {
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
-  const { orders: socketOrders, } = useCafeWebSocketManager()
-  
+  const kitchenPrintRef = useRef(null);
+
+  const { orders: socketOrders } = useCafeWebSocketManager({
+    onOrdersMessage: (msg) => {
+      if (msg?.type === "order_created") {
+        const orderId = msg?.data?.order?.id ?? msg?.data?.order_id;
+        if (orderId) kitchenPrintRef.current?.(orderId);
+      }
+    },
+  });
+
   const [kitchens, setKitchens] = useState([]);
 
   const [cashboxes, setCashboxes] = useState([]);
@@ -629,6 +638,13 @@ const Orders = () => {
     [buildKitchenTicketPayload, getKitchenPrinterKey, getMenuKitchenId, kitchensMap]
   );
 
+  useEffect(() => {
+    kitchenPrintRef.current = autoPrintKitchenTickets;
+    return () => {
+      kitchenPrintRef.current = null;
+    };
+  }, [autoPrintKitchenTickets]);
+
   /* ===== модалка create/edit ===== */
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -838,7 +854,7 @@ const Orders = () => {
 
         setOrders((prev) => [...prev, res.data]);
 
-        await autoPrintKitchenTickets(res?.data?.id);
+        // Кухонный чек печатается по WebSocket (order_created)
       } else {
         const payload = normalizeOrderPayload(form);
         await postWithWaiterFallback(`/cafe/orders/${editingId}/`, payload, "patch");
