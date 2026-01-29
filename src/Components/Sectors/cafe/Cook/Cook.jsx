@@ -14,6 +14,7 @@ import { useCafeOrdersWebSocket } from "../../../../hooks/useCafeWebSocket";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
 import Pagination from "../../Market/Warehouse/components/Pagination";
+import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -216,6 +217,13 @@ const currentFilterOptions = [
   { value: "pending", label: "Ожидает" },
   { value: "in_progress", label: "В работе" },
 ];
+
+const stLabels = {
+  pending: "ожидает",
+  in_progress: "в работе",
+  ready: "готов",
+  cancelled: "отменён",
+};
 
 const Cook = () => {
   const dispatch = useDispatch();
@@ -485,157 +493,57 @@ const Cook = () => {
     [updateWarehouseItem]
   );
 
-  const groups = useMemo(() => {
-    const base = activeTab === "current"
-      ? (Array.isArray(tasks) ? tasks : [])
-      : (Array.isArray(historyOrders) ? historyOrders : []);
-    const map = new Map();
+  // const groups = useMemo(() => {
+  //   const uniqueList = new Set(tasks.map(el => el.order + '/' + el.menu_item));
+  //   const result = [];
+  //   uniqueList.forEach(el => {
+  //     const [order, menu_item] = el.split('/');
+  //     const orderObj = {};
+  //     const filteredItems = tasks.filter(el => el.order == order && menu_item == el.menu_item);
+  //     const template = filteredItems[0]
+  //     if (!template) return;
+  //     result.push({
+  //       ...template,
+  //       quantity: filteredItems.length
+  //     })
+  //   })
+  //   return result
+  // }, [tasks]);
 
-    for (const t of base) {
-      const mid = extractMenuIdFromTask(t);
-      const midKey = String(mid || "");
+  // useEffect(() => {
+  //   if (!groups?.length) return;
+  //   setCollapsed((prev) => {
+  //     const next = { ...prev };
+  //     for (const g of groups) if (next[g.key] === undefined) next[g.key] = true;
+  //     return next;
+  //   });
+  // }, [groups]);
 
-      const localTitle = extractMenuTitleFromTask(t);
-      const cachedTitle = midKey ? String(titleCacheRef.current.get(midKey) || "").trim() : "";
-
-      const title = localTitle || cachedTitle;
-
-      // гарантируем, что CookReceiptCard/модалка увидит menu_item_title
-      const tNorm = title ? { ...t, menu_item_title: title } : t;
-
-      const orderId = pickOrderId(tNorm);
-      const minute = toMinuteKey(tNorm?.created_at);
-
-      const fallbackKey = `tbl:${String(tNorm?.table_number ?? "")}|w:${String(tNorm?.waiter_label ?? "")}|g:${String(
-        tNorm?.guest ?? ""
-      )}|c:${minute}`;
-
-      const key = orderId ? `order:${orderId}` : fallbackKey;
-
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          orderId,
-          table_number: tNorm?.table_number ?? "—",
-          guest: tNorm?.guest ?? "",
-          waiter_label: tNorm?.waiter_label ?? "",
-          created_at: tNorm?.created_at ?? "",
-          order_status: tNorm?.order_status || "", // Статус заказа для фильтрации
-          items: [],
-        });
-      }
-
-      const g = map.get(key);
-      g.items.push(tNorm);
-
-      // Сохраняем статус заказа в группе
-      if (tNorm?.order_status && !g.order_status) {
-        g.order_status = tNorm.order_status;
-      }
-
-      const cur = new Date(g.created_at || 0).getTime();
-      const next = new Date(tNorm?.created_at || 0).getTime();
-      if (next > cur) g.created_at = tNorm?.created_at ?? g.created_at;
-
-      if (!g.waiter_label && tNorm?.waiter_label) g.waiter_label = tNorm.waiter_label;
-      if (!g.guest && tNorm?.guest) g.guest = tNorm.guest;
-      if (!g.table_number && tNorm?.table_number) g.table_number = tNorm.table_number;
-    }
-
-    let arr = Array.from(map.values()).map((g) => {
-      const items = (g.items || []).slice().sort((a, b) => {
-        const ai = Number(a?.unit_index) || 0;
-        const bi = Number(b?.unit_index) || 0;
-        if (ai !== bi) return ai - bi;
-        return String(a?.menu_item_title ?? "").localeCompare(String(b?.menu_item_title ?? ""));
-      });
-
-      // Для истории используем статус заказа, для текущих задач - статус из computeGroupStatus
-      const finalStatus = activeTab === "history" && g.order_status
-        ? g.order_status
-        : computeGroupStatus(items);
-
-      return { ...g, items, status: finalStatus };
-    });
-
-    const stLabels = {
-      pending: "ожидает",
-      in_progress: "в работе",
-      ready: "готов",
-      cancelled: "отменён",
-      canceled: "отменён",
-      open: "открыт",
-      closed: "закрыт",
-    };
-
-    if (statusFilter !== "all") {
-      if (activeTab === "history") {
-        // В истории фильтруем по статусу заказа (order_status)
-        const sf = statusFilter === "cancelled" ? "cancelled" : statusFilter;
-        arr = arr.filter((g) => {
-          const orderStatus = String(g.order_status || "").toLowerCase();
-          if (!orderStatus) return true;
-          // "ready" в фильтре означает "closed" в истории
-          if (sf === "ready") return orderStatus === "closed";
-          if (sf === "cancelled" || sf === "canceled") return orderStatus === "cancelled" || orderStatus === "canceled";
-          if (sf === "open") return orderStatus === "open";
-          return orderStatus === sf;
-        });
-      }
-    }
-
-    const q = query.trim().toLowerCase();
-    if (q) {
-      arr = arr.filter((g) => {
-        const tNum = String(g.table_number ?? "").toLowerCase();
-        const guest = String(g.guest ?? "").toLowerCase();
-        const waiter = String(g.waiter_label ?? "").toLowerCase();
-        const st = String(g.status ?? "").toLowerCase();
-
-        if (tNum.includes(q)) return true;
-        if (guest.includes(q)) return true;
-        if (waiter.includes(q)) return true;
-        if (st.includes(q) || stLabels[st]?.includes(q)) return true;
-
-        return (g.items || []).some((it) => {
-          const title = String(it?.menu_item_title ?? "").toLowerCase();
-          const unit = String(it?.unit_index ?? "").toLowerCase();
-          const price = String(it?.price ?? "").toLowerCase();
-          const ist = String(it?.status ?? "").toLowerCase();
-          return (
-            title.includes(q) ||
-            unit.includes(q) ||
-            price.includes(q) ||
-            ist.includes(q) ||
-            stLabels[ist]?.includes(q)
-          );
-        });
-      });
-    }
-
-    return arr.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-    // titlesTick нужен, чтобы после догрузки названий groups пересчитался
-  }, [tasks, historyOrders, activeTab, titlesTick]);
-
-  useEffect(() => {
-    if (!groups.length) return;
-    setCollapsed((prev) => {
-      const next = { ...prev };
-      for (const g of groups) if (next[g.key] === undefined) next[g.key] = true;
-      return next;
-    });
-  }, [groups]);
-
-  const toggleGroup = useCallback((key) => {
-    setCollapsed((p) => ({ ...p, [key]: !p[key] }));
-  }, []);
-
+  // const toggleGroup = useCallback((key) => {
+  //   setCollapsed((p) => ({ ...p, [key]: !p[key] }));
+  // }, []);
+  const buildPrintPayload = useCallback(
+    (order) => {
+      const t = order.table_number;
+      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+      return {
+        company: localStorage.getItem("company_name") || "КУХНЯ",
+        doc_no: `СТОЛ ${t ?? "—"}`,
+        created_at: dt,
+        menu_title: order.menu_item_title
+      };
+    },
+    []
+  );
   const handleClaimOne = useCallback(
     async (taskId, e) => {
       if (e?.preventDefault) e.preventDefault();
       try {
         suppressNextRefreshRef.current = true;
-        await dispatch(claimKitchenTaskAsync(taskId)).unwrap();
+        const response = await dispatch(claimKitchenTaskAsync(taskId)).unwrap();
+        // await checkPrinterConnection().catch(() => false);
+        // const payload = buildPrintPayload(response);
+        // await printOrderReceiptJSONViaUSBWithDialog(payload);
       } catch (err) {
         suppressNextRefreshRef.current = false;
         console.error("Claim error:", err);
@@ -654,16 +562,6 @@ const Cook = () => {
 
       try {
         suppressNextRefreshRef.current = true;
-
-        const needMap = await buildNeedForTask(task);
-
-        const dec = await applyWarehouseDecreaseSafe(needMap);
-        if (!dec.ok) {
-          suppressNextRefreshRef.current = false;
-          showNotice("error", dec.message || "Нельзя отметить «Готово»: не хватает ингредиентов.");
-          return;
-        }
-
         try {
           await dispatch(readyKitchenTaskAsync(taskId)).unwrap();
           showNotice("ok", "Отмечено как готово.");
@@ -682,7 +580,7 @@ const Cook = () => {
         showNotice("error", toUserMessage(err));
       }
     },
-    [dispatch, showNotice, buildNeedForTask, applyWarehouseDecreaseSafe, applyWarehouseIncreaseSafe]
+    [dispatch, showNotice, applyWarehouseDecreaseSafe, applyWarehouseIncreaseSafe]
   );
 
   const statusOptions = useMemo(
@@ -695,6 +593,10 @@ const Cook = () => {
     },
     [activeTab]
   );
+
+  const removeAfterReadyTask = useCallback((id) => {
+    dispatch(removeAfterReady(id))
+  }, []);
   useEffect(() => {
     setQuery('');
     setStatusFilter(null);
@@ -733,7 +635,7 @@ const Cook = () => {
 
         {error && <div className="cafeCook__alert">Ошибка: {error?.message || error?.detail || String(error)}</div>}
 
-        {!loading && !historyLoading && !error && groups.length === 0 && (
+        {!loading && !historyLoading && !error && tasks?.length === 0 && (
           <div className="cafeCook__alert cafeCook__alert--neutral">
             {query.trim()
               ? `Ничего не найдено по запросу «${query}»`
@@ -747,7 +649,7 @@ const Cook = () => {
           !error &&
           tasks.map((g) => (
             <CookReceiptCard
-              key={g.key}
+              key={g.id}
               group={g}
               activeTab={activeTab}
               collapsed={collapsed[g.key] !== false}
@@ -759,6 +661,7 @@ const Cook = () => {
               isUpdating={(id) => isUpdating(id)}
               onClaimOne={handleClaimOne}
               onReadyOne={handleReadyOne}
+              onRemoveAfterReady={removeAfterReadyTask}
             />
           ))}
       </div>

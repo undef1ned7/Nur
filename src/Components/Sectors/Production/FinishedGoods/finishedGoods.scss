@@ -1189,7 +1189,7 @@
   padding: 12px 16px;
   border: 2px solid var(--fg-border-soft);
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 16px;
   background: var(--fg-bg);
   color: var(--fg-text);
   transition: all 0.2s ease;
@@ -1197,7 +1197,6 @@
 
   @media (max-width: 480px) {
     padding: 10px 14px;
-    font-size: 14px;
     border-radius: 8px;
   }
 
