@@ -54,7 +54,10 @@ import {
 } from "./components/PaymentModals";
 import DiscountModal from "./components/DiscountModal";
 import CustomServiceModal from "./components/CustomServiceModal";
-
+import './sell.scss'
+import { FaCar, FaCartArrowDown, FaMinus, FaPlus } from "react-icons/fa";
+import UniversalModal from "../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
+import { debounce } from "@mui/material";
 const cx = (...args) => args.filter(Boolean).join(" ");
 
 /* ============================================================
@@ -65,17 +68,24 @@ const SellMainStart = () => {
   const dispatch = useDispatch();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
-  const { start, foundProduct } = useSale();
+  const { start, foundProduct, loading: saleLoading } = useSale();
   const { list: products } = useProducts();
   const { list: clients = [] } = useClient();
   const filteredProducts = useMemo(() => {
-    const cartItemsMap = new Map(start?.items?.map(el => [el.product, parseFloat(el.quantity)]))
-    const data = products.filter(el => {
+    const cartItemsMap = new Map(start?.items?.map(el => [el.product, { qty: parseFloat(el.quantity), item: el }]))
+    return products.map(el => {
       const qty = parseFloat(el.quantity);
-      const cartQty = cartItemsMap.get(el.id) || 0;
-      return !!(qty - cartQty)
-    })
-    return data.filter(el => !!el.quantity)
+      const cartItem = cartItemsMap.get(el.id)
+      const cartQty = cartItem?.qty || 0;
+      const primaryImg = el.images.find(el => el.is_primary)
+      return {
+        ...el,
+        quantity: qty - cartQty,
+        isCart: !!cartQty,
+        cartItem: cartItem?.item,
+        img: primaryImg?.image_url ?? el.images[0]?.image_url ?? '/images/placeholder.avif'
+      }
+    }).filter(el => !!el.quantity)
   }, [products, start])
   // Флаг для отслеживания недавнего сканирования (чтобы не открывать модалку при Enter от сканера)
   const lastScanTimeRef = useRef(0);
@@ -1115,6 +1125,8 @@ const SellMainStart = () => {
     }
   };
 
+  const [showCart, setShowCart] = useState(false)
+
   return (
     <section className="sell start">
       <div className="sell__header">
@@ -1168,27 +1180,44 @@ const SellMainStart = () => {
                 </svg>
               </span>
             </button>
+            <button
+              className="sell__header-plus"
+              disabled={!start?.items?.length}
+              onClick={() => setShowCart(prev => !prev)}
+            >
+              <span>
+                <FaCartArrowDown color={start?.items?.length ? 'green' : 'orange'} />
+              </span>
+            </button>
           </div>
         </div>
       </div>
+      {
+        showCart && (
+          <UniversalModal
+            show={showCart}
+            title={'Корзина'}
+            onClose={() => setShowCart(false)}>
+            <div className="start__body-column--cart">
+              <CartTable
+                items={currentItems}
+                selectedId={selectedId}
+                onRowClick={handleRowClick}
+                itemQuantities={itemQuantities}
+                onQtyChange={handleItemQtyChange}
+                onQtyBlur={handleItemQtyBlur}
+                onIncreaseQty={handleIncreaseQty}
+                onDecreaseQty={handleDecreaseQty}
+                onRemoveItem={handleRemoveItem}
+              />
 
-      <div className="block gap-4 xl:flex justify-between ">
-        <div className="w-full xl:w-[66%] start__body-column">
-          <div className="start__body-column">
-            <CartTable
-              items={currentItems}
-              selectedId={selectedId}
-              onRowClick={handleRowClick}
-              itemQuantities={itemQuantities}
-              onQtyChange={handleItemQtyChange}
-              onQtyBlur={handleItemQtyBlur}
-              onIncreaseQty={handleIncreaseQty}
-              onDecreaseQty={handleDecreaseQty}
-              onRemoveItem={handleRemoveItem}
-            />
-          </div>
+            </div>
+          </UniversalModal>)
+      }
+      <div className="start__sell_body">
+        <div className="start__products">
+          <div className="start_product_item">
 
-          <div className="start__products">
             <button
               className="start__products-add orange"
               onClick={() => setShowCustomServiceModal(true)}
@@ -1196,32 +1225,98 @@ const SellMainStart = () => {
             >
               Доп. услуги
             </button>
-
-            {filteredProducts?.map((product) => (
-              <button
-                key={product.id || product.name}
-                className={cx(
-                  "start__products-add",
-                  selectedItem?.product_name == product.name && "active"
-                )}
-                onClick={async () => {
-
-                  await dispatch(
-                    manualFilling({
-                      id: start?.id,
-                      productId: product?.id,
-                    })
-                  ).unwrap();
-                }}
-                title="Добавить 1 шт"
-              >
-                {product.name}
-              </button>
-            ))}
           </div>
+
+          {filteredProducts?.map((product) => (
+            <div className="start_product_item">
+              <div className="start_product_item--image">
+                <img src={product.img} alt="" />
+              </div>
+              <div className="start_product_item--content">
+                <p className="start_product_item--title">
+                  <span className="start_product_item--title-name">Нзв.: <strong>{product.name}</strong></span>
+                  <span className="start_product_item--title-qty">
+                    <strong>{product.quantity}</strong> шт
+                  </span>
+                </p>
+                <div className="start_product_item--control">
+                  <button
+                    key={product.id || product.name}
+                    className={cx(
+                      "start__products-add",
+                      selectedItem?.product_name == product.name && "active"
+                    )}
+                    disabled={saleLoading}
+                    onClick={() => {
+                      if (product.isCart) {
+                        return handleRemoveItem(product)
+                      }
+                      dispatch(
+                        manualFilling({
+                          id: start?.id,
+                          productId: product?.id,
+                        })
+                      ).unwrap();
+                    }}
+                    title="Добавить 1 шт"
+                  >
+                    {product.isCart ? 'Убрать' : 'Добавить'}
+                  </button>
+                  {
+                    product.isCart && (
+                      <div className="start_product_item--control_action">
+                        <button
+                          className={cx(
+                            "start__products-add",
+                            selectedItem?.product_name == product.name && "active"
+                          )}
+                          disabled={saleLoading}
+                          onClick={() => {
+                            handleDecreaseQty(product.cartItem)
+                          }}
+                          title="Добавить 1 шт"
+                        >
+                          <FaMinus />
+                        </button>
+                        <input
+                          min={0}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleItemQtyChange(product.cartItem, e.target.value)
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                            handleItemQtyBlur(product.cartItem);
+                          }}
+                          value={itemQuantities[product.cartItem?.id] ?? product.cartItem.quantity ?? ''}
+                          type="number" />
+                        <button
+                          className={cx(
+                            "start__products-add",
+                            selectedItem?.product_name == product.name && "active"
+                          )}
+                          disabled={saleLoading}
+                          onClick={() => {
+                            handleIncreaseQty(product.cartItem)
+                          }}
+                          title="Добавить 1 шт"
+                        >
+                          <FaPlus />
+                        </button>
+                      </div>
+
+                    )
+                  }
+                </div>
+              </div>
+
+
+            </div>
+
+          ))}
         </div>
 
-        <div className="w-full! xl:w-[33%]!">
+        <div className="start__cart__body">
           <div className="start__total">
             <div className="start__total-top">
               <div className="start__total-row">

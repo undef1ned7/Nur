@@ -42,6 +42,13 @@
 .receipt__discount {
   margin-bottom: 15px;
 }
+.start__body-column--cart {
+  width: 100%;
+
+  @include ifmobile {
+    width: 300px;
+  }
+}
 
 .sell__empty {
   display: flex;
@@ -72,6 +79,7 @@
 }
 
 .start {
+  height: 90dvh;
   &__discount {
     .sell__header-input {
       width: 100%;
@@ -193,6 +201,12 @@
   &__body {
     display: flex;
     flex-wrap: wrap;
+
+    &-column {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
     &-title {
       margin-bottom: 13px;
       font-family: Montserrat;
@@ -203,11 +217,7 @@
       line-height: 100%;
       letter-spacing: 0%;
     }
-    &-column {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
+
     &-table {
       margin-top: 10px;
       border-collapse: collapse;
@@ -231,18 +241,52 @@
   //   justify-content: start;
   //   // align-items: self-start;
   // }
+
+  &__sell_body {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  &__cart__body {
+    position: sticky;
+    top: 100px;
+    display: flex;
+    flex: 1 0 300px;
+    height: fit-content;
+
+    @include iflaptop {
+      order: 1;
+      position: static;
+    }
+    @include ifmobile {
+      order: 1;
+      position: static;
+    }
+    .start__total {
+      width: 100%;
+      height: fit-content;
+    }
+  }
   &__products {
     margin-top: 15px;
+    height: 100%;
     display: flex;
     align-items: center;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
+    flex-wrap: wrap;
+    overflow: auto;
     gap: 10px;
     padding-bottom: 5px;
-    width: 700px;
     max-width: 100%;
-    box-sizing: border-box;
+    flex: 1 0 300px;
+    @include iflaptop {
+      order: 2;
+    }
+
+    @include ifmobile {
+      order: 2;
+    }
+
     // Скрытие скроллбара для WebKit браузеров
     &::-webkit-scrollbar {
       height: 6px;
@@ -258,6 +302,7 @@
         background: #555;
       }
     }
+
     // Для Firefox
     scrollbar-width: thin;
     scrollbar-color: #888 #f1f1f1;
@@ -267,16 +312,95 @@
       background-color: #f7d617;
       border: none;
       cursor: pointer;
-      flex-shrink: 0;
-      white-space: nowrap;
       font-size: 14px;
-      min-width: fit-content;
+      flex: 1 0 50px;
+      justify-content: center;
+      display: flex;
       &.active {
         outline: 2px solid #3b82f6;
       }
       &.orange {
         background-color: #f57912;
         color: #fff;
+      }
+    }
+    .start_product_item {
+      border: 1px solid rgba(128, 128, 128, 0.532);
+      border-radius: 15px;
+      padding: 10px;
+      flex: 1 0 280px;
+      display: flex;
+      gap: 10px;
+
+      &--image {
+        width: 60px;
+        height: 60px;
+        border: 1px solid rgb(121, 117, 117);
+        overflow: hidden;
+        border-radius: 5px;
+        img {
+          object-fit: cover;
+        }
+      }
+
+      &--content {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+      }
+      &--title {
+        width: 100%;
+        font-size: 17px;
+        padding-left: 10px;
+        display: flex;
+        justify-content: space-between;
+        white-space: collapse;
+        flex: 1;
+        &-name {
+          display: flex;
+          color: gray;
+          gap: 5px;
+          strong {
+            color: black;
+            width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            @include ifmobile {
+              max-width: 150px;
+            }
+            @include iftablet {
+              max-width: 150px;
+            }
+          }
+        }
+        &-qty {
+          display: flex;
+          color: gray;
+          gap: 5px;
+          font-weight: 400;
+        }
+      }
+
+      &--control {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+
+        &_action {
+          display: flex;
+          gap: 5px;
+          flex: 1 0 200px;
+          &>button  {
+            flex: 0 0 40px;
+          }
+
+          & > input {
+            border: 2px solid #f7d617;
+            border-radius: 5px;
+            width: 100%;
+          }
+        }
       }
     }
   }
@@ -706,12 +830,6 @@
   }
   .start__actions-input {
     width: 100% !important;
-  }
-  .start__products {
-    gap: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
   }
   .start__products-add {
     flex-shrink: 0;
