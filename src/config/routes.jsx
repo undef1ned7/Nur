@@ -152,6 +152,12 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
 
+// Autosalon
+import { AutosalonProvider } from "../Components/Sectors/Autosalon/context/AutosalonContext";
+import AutosalonTable from "../Components/Sectors/Autosalon/Table/Table";
+import AutosalonClients from "../Components/Sectors/Autosalon/Clients/Clients";
+import AutosalonAnalytics from "../Components/Sectors/Autosalon/Analytics/Analytics";
+
 
 
 // Public pages
@@ -162,6 +168,23 @@ import CafeOrdersLayout from "../Components/Sectors/cafe/Orders";
 import Orders from "../Components/Sectors/cafe/Orders/Orders";
 import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistory";
 
+
+// Autosalon: обёртка с провайдером контекста
+const AutosalonTableRoute = () => (
+  <AutosalonProvider>
+    <AutosalonTable />
+  </AutosalonProvider>
+);
+const AutosalonClientsRoute = () => (
+  <AutosalonProvider>
+    <AutosalonClients />
+  </AutosalonProvider>
+);
+const AutosalonAnalyticsRoute = () => (
+  <AutosalonProvider>
+    <AutosalonAnalytics />
+  </AutosalonProvider>
+);
 
 /**
  * Создает защищенный роут
@@ -381,6 +404,11 @@ export const crmRoutes = (profile) => [
 
   // Pilorama routes
   createProtectedRoute("pilorama/warehouse", PiloramaWarehouse),
+
+  // Autosalon routes
+  createProtectedRoute("autosalon", AutosalonTableRoute),
+  createProtectedRoute("autosalon/clients", AutosalonClientsRoute),
+  createProtectedRoute("autosalon/analytics", AutosalonAnalyticsRoute),
 
   // Other routes
   createProtectedRoute("instagram", Instagram),

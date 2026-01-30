@@ -1,9 +1,10 @@
+@use "../../../../App.scss";
+
 .logistics-page {
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  // background: #f5f7fb;
   min-height: 100%;
 
   &__header {
@@ -23,12 +24,12 @@
     color: #6b7280;
   }
 
-  /* Аналитика */
   &__analytics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
   }
+
   .logistics-page__analytics-card--all {
     background: #ffffff;
     border-top: 3px solid #000000;
@@ -82,7 +83,6 @@
     color: #4b5563;
   }
 
-  /* Кнопки / экшены */
   &__actions {
     display: flex;
     justify-content: flex-end;
@@ -131,24 +131,6 @@
     }
   }
 
-  &__icon-btn {
-    width: 30px;
-    height: 30px;
-    border-radius: 999px;
-    border: none;
-    background: #fee2e2;
-    color: #b91c1c;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-
-    &:hover {
-      background: #fecaca;
-    }
-  }
-
   &__link-btn {
     margin-top: 6px;
     padding: 0;
@@ -160,7 +142,6 @@
     text-decoration: underline;
   }
 
-  /* Форма */
   &__form {
     background: #ffffff;
     border-radius: 16px;
@@ -241,28 +222,19 @@
     }
   }
 
-  /* Товары */
-  &__items-block {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  &__items-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  &__section-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #111827;
-  }
-
   &__table-container {
     width: 100%;
+  }
+
+  /* ✅ ВОТ ТУТ: скролл работает, но полоса НЕ видна */
+  &__table-scroll {
+    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: none; /* Firefox */
+
+    &::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
   }
 
   &__table {
@@ -284,10 +256,6 @@
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-    }
-
-    tbody tr {
-      transition: background-color 0.15s ease;
     }
 
     tbody tr:last-child td {
@@ -318,7 +286,6 @@
     margin-top: 4px;
   }
 
-  /* Модальное окно формы */
   &__modal-overlay {
     position: fixed;
     inset: 0;
@@ -338,7 +305,6 @@
     background: transparent;
   }
 
-  /* Список заказов */
   &__orders {
     margin-top: 16px;
   }
@@ -416,7 +382,6 @@
     display: flex;
     gap: 6px;
     justify-content: flex-start;
-    // flex-wrap: wrap;
   }
 
   /* Просмотр заказа */
@@ -620,14 +585,6 @@
     justify-content: center;
   }
 
-  .logistics-page__table-wrapper {
-    overflow-x: auto;
-  }
-
-  .logistics-page__orders-table {
-    min-width: 620px;
-  }
-
   .logistics-page__modal {
     max-width: 100%;
     max-height: 100vh;
@@ -653,5 +610,56 @@
   .logistics-page__order-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+.logistics-page {
+  &__modal--expense {
+    max-width: 520px;
+    padding: 12px;
+  }
+
+  &__expense {
+    gap: 14px;
+  }
+
+  &__expense-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  &__expense-close {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    font-size: 16px;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  &__input--error {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25) !important;
+    background: #fff !important;
+  }
+
+  &__field-hint {
+    font-size: 12px;
+    color: #6b7280;
+
+    &--error {
+      color: #ef4444;
+    }
   }
 }
