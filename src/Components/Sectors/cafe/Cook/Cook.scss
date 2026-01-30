@@ -143,6 +143,16 @@
         background: var(--primary-dark);
       }
     }
+
+    &--ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+      &:hover:not(:disabled) {
+        background: rgba(15, 23, 42, 0.05);
+        color: var(--text);
+      }
+    }
   }
 
   &__tabs {
@@ -233,6 +243,131 @@
     display: flex;
     gap: 16px;
     flex-wrap: wrap;
+  }
+
+  &__kitchens {
+    width: 100%;
+  }
+
+  &__kitchensList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__kitchenItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: #fff;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    transition: border-color 0.15s;
+    &:hover {
+      border-color: var(--primary-dark);
+    }
+  }
+
+  &__kitchenName {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__kitchenActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__kitchenBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: rgba(15, 23, 42, 0.06);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &--edit:hover:not(:disabled) {
+      color: #1e40af;
+      background: rgba(30, 64, 175, 0.1);
+    }
+
+    &--delete:hover:not(:disabled) {
+      color: #b91c1c;
+      background: rgba(185, 28, 28, 0.1);
+    }
+  }
+
+  &__editKitchenOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+
+  &__editKitchenModal {
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  &__editKitchenTitle {
+    margin: 0 0 16px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  &__editKitchenInput {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary-dark);
+    }
+  }
+
+  &__editKitchenFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
   }
 
   &__receipt {

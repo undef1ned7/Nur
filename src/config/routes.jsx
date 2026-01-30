@@ -153,8 +153,6 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
 
-
-
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
 import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
@@ -164,7 +162,6 @@ import Orders from "../Components/Sectors/cafe/Orders/Orders";
 import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistory";
 import SellLayout from "../Components/pages/Sell/SellLayout";
 import SellMainStart from "../Components/pages/Sell/SellMainStart";
-
 
 /**
  * Создает защищенный роут
@@ -182,7 +179,6 @@ const createProtectedRoute = (path, Component, props) => (
   />
 );
 
-
 /**
  * Конфигурация публичных роутов
  */
@@ -190,8 +186,6 @@ export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
   <Route key="/" path="/" element={<Landing />} />,
   <Route key="/register" path="/register" element={<Register />} />,
-
-
 
   // Public routes
   <Route
@@ -209,8 +203,6 @@ export const publicRoutes = [
     path="/barber/:company_slug/booking"
     element={<OnlineBooking />}
   />,
-
-
 
   <Route
     key="/submit-application"
@@ -245,13 +237,11 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
   createProtectedRoute("barcodes", BarcodePrintPage),
   createProtectedRoute("scales", ScalesPage),
-  <Route path="sell" key={'sell'} element={<SellLayout />}>
-    {
-      [
-        createProtectedRoute("", Sell, {index: true}),
-        createProtectedRoute("start", SellMainStart)
-      ]
-    }
+  <Route path="sell" key={"sell"} element={<SellLayout />}>
+    {[
+      createProtectedRoute("", Sell, { index: true }),
+      createProtectedRoute("start", SellMainStart),
+    ]}
   </Route>,
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),
@@ -271,9 +261,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-      createProtectedRoute("kassa/*", Kassa),
-      createProtectedRoute("kassa/:id", KassaDet),
-    ]
+        createProtectedRoute("kassa/*", Kassa),
+        createProtectedRoute("kassa/:id", KassaDet),
+      ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
@@ -326,13 +316,11 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("cafe/inventory", CafeInventory),
   createProtectedRoute("cafe/menu", CafeMenu),
 
-  <Route path="cafe/orders" key={'cafe/orders'} element={<CafeOrdersLayout />}>
-    {
-      [
-        createProtectedRoute("*", CafeOrders, { index: true }),
-        createProtectedRoute("history", CafeOrderHistory)
-      ]
-    }
+  <Route path="cafe/orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
+    {[
+      createProtectedRoute("*", CafeOrders, { index: true }),
+      createProtectedRoute("history", CafeOrderHistory),
+    ]}
   </Route>,
   createProtectedRoute("cafe/payroll", CafePayroll),
   createProtectedRoute("cafe/purchasing", CafePurchasing),
@@ -390,7 +378,6 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
   createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
   createProtectedRoute("warehouse/counterparties", Counterparties),
-
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),
