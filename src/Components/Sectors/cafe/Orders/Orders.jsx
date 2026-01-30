@@ -818,9 +818,9 @@ const Orders = () => {
       ...prev,
       items: prev.items.map((i) =>
         String(i.menu_item) === String(id)
-          ? { ...i, quantity: Math.max(1, (Number(i.quantity) || 1) - 1) }
+          ? { ...i, quantity: Math.max(0, (Number(i.quantity) || 1) - 1) }
           : i
-      ),
+      ).filter(el => el.quantity),
     }));
   };
 
@@ -965,6 +965,7 @@ const Orders = () => {
       setOrders((prev) => (prev || []).filter((o) => String(o.id) !== String(payOrder.id)));
 
       // 5) Закрываем модалку
+      printOrder(payOrder)
       setPayOpen(false);
       setPayOrder(null);
 
@@ -1346,7 +1347,7 @@ const Orders = () => {
                                   type="button"
                                   className="cafeOrders__qtyBtn"
                                   onClick={() => decItem(it.menu_item)}
-                                  disabled={saving || qty <= 1}
+                                  disabled={saving || qty <= 0}
                                   aria-label="Уменьшить"
                                 >
                                   <FaMinus />
