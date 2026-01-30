@@ -89,6 +89,18 @@ const ProductionRequest = () => {
     };
   }, [isCartSectionOpen]);
 
+  const filteredProduts = useMemo(() => {
+    const cartItemQtyMap = new Map(cartItems?.items?.map(el => [el.product, el.quantity_requested]) ?? [])
+    const data = products.map(el => {
+      const productQty = el.quantity;
+      const itemQty = parseFloat(cartItemQtyMap.get(el.id) ?? '0')
+      return {
+        ...el,
+        quantity: productQty - itemQty
+      }
+    }).filter(el => !!el.quantity)
+    return data
+  }, [cartItems, products])
   // Debounce для поиска
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -366,7 +378,7 @@ const ProductionRequest = () => {
 
       {!loading && !error && (
         <ProductsGrid
-          products={products || []}
+          products={filteredProduts || []}
           viewMode={viewMode}
           onViewProduct={handleViewProduct}
           onDragStart={handleDragStart}
