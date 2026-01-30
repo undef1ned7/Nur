@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { FaPencilAlt, FaTrash } from "react-icons/fa";
+import { FaCheck, FaPencilAlt, FaPrint, FaSyncAlt, FaTrash } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import api from "../../../../api";
 import { useConfirm } from "../../../../hooks/useDialog";
@@ -25,6 +25,7 @@ import NotificationCadeSound from "../../../common/Notification/NotificationCade
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
+import { getActivePrinterKey, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -142,7 +143,7 @@ const tryFetchTaskDetail = async (taskId) => {
     try {
       const r = await api.get(url);
       if (r?.data) return r.data;
-    } catch {}
+    } catch { }
   }
   return null;
 };
@@ -272,9 +273,17 @@ const Cook = () => {
   const [editKitchenTitle, setEditKitchenTitle] = useState("");
   const [kitchenSaving, setKitchenSaving] = useState(false);
 
-  const confirm = useConfirm();
-  const {socketOrders: {orders}} = useOutletContext()
+
+    ////PRINT
+  const [activeKey, setActiveKey] = useState(getActivePrinterKey());
+  const [selectedKey, setSelectedKey] = useState(getActivePrinterKey());
+  const [authorized, setAuthorized] = useState([]);
+  const [saved, setSaved] = useState([]);
+  const [saving, setSaving] = useState(false);
   
+  const confirm = useConfirm();
+  const { socketOrders: { orders } } = useOutletContext()
+
   const menuCacheRef = useRef(new Map()); // menuId -> full menu item
   const titleCacheRef = useRef(new Map()); // menuId -> title (быстрый доступ)
   const noticeTimerRef = useRef(null);
@@ -353,9 +362,9 @@ const Cook = () => {
     if (editingKitchen) {
       setEditKitchenTitle(
         editingKitchen.name ??
-          editingKitchen.title ??
-          editingKitchen.title_name ??
-          ""
+        editingKitchen.title ??
+        editingKitchen.title_name ??
+        ""
       );
     } else {
       setEditKitchenTitle("");
@@ -369,6 +378,7 @@ const Cook = () => {
     try {
       await api.patch(`/cafe/kitchens/${id}/`, {
         title: editKitchenTitle.trim(),
+        printer: activeKey
       });
       setEditingKitchen(null);
       refetchKitchens();
@@ -379,7 +389,7 @@ const Cook = () => {
     } finally {
       setKitchenSaving(false);
     }
-  }, [editingKitchen, editKitchenTitle, refetchKitchens, showNotice]);
+  }, [editingKitchen, editKitchenTitle, refetchKitchens, showNotice, activeKey]);
 
   const handleDeleteKitchen = useCallback(
     (k) => {
@@ -567,7 +577,7 @@ const Cook = () => {
         remainder: numStr(nextRem),
       });
       return;
-    } catch {}
+    } catch { }
     await api.put(`/cafe/warehouse/${item.id}/`, {
       title: item.title,
       unit: item.unit,
@@ -620,7 +630,7 @@ const Cook = () => {
             const { item, prev } = applied[i];
             await updateWarehouseItem(item, prev);
           }
-        } catch {}
+        } catch { }
         throw e;
       }
     },
@@ -642,7 +652,7 @@ const Cook = () => {
         const next = cur + qty;
         try {
           await updateWarehouseItem(s, next);
-        } catch {}
+        } catch { }
       }
     },
     [updateWarehouseItem]
@@ -727,7 +737,7 @@ const Cook = () => {
         } catch (eReady) {
           try {
             await applyWarehouseIncreaseSafe(needMap);
-          } catch {}
+          } catch { }
           suppressNextRefreshRef.current = false;
           console.error("Ready error:", eReady);
           showNotice("error", toUserMessage(eReady));
@@ -756,10 +766,68 @@ const Cook = () => {
     }
   }, [activeTab]);
 
+  const safeName = (p) => p?.name || "USB Printer";
+  const shortKey = (k) => String(k || "").split(":").slice(0, 2).join(":");
+
   useEffect(() => {
     setQuery("");
     setStatusFilter(null);
   }, [activeTab]);
+
+  ////PRINT
+  const merged = useMemo(() => {
+    const map = new Map();
+    for (const p of saved) map.set(p.key, p);
+    for (const p of authorized) if (!map.has(p.key)) map.set(p.key, p);
+    return Array.from(map.values());
+  }, [saved, authorized]);
+  const [loadingPrint, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setSaved(getSavedPrinters());
+      const list = await listAuthorizedPrinters();
+      setAuthorized(Array.isArray(list) ? list : []);
+      const a = getActivePrinterKey();
+      setActiveKey(a);
+      setSelectedKey((prev) => prev || a);
+    } catch (e) {
+      console.error("KitchenCreateModal refresh error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    refresh();
+  }, [open, refresh]);
+
+  const onPickByDialog = async () => {
+    setLoading(true);
+    try {
+      await choosePrinterByDialog();
+      await refresh();
+    } catch (e) {
+      console.error("KitchenCreateModal choose printer error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSetActive = async () => {
+    if (!selectedKey) return;
+    setLoading(true);
+    try {
+      await setActivePrinterByKey(selectedKey);
+      const a = getActivePrinterKey();
+      setActiveKey(a);
+    } catch (e) {
+      console.error("KitchenCreateModal set active error:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <section className="cafeCook">
       <CookHeader
@@ -794,8 +862,8 @@ const Cook = () => {
           activeTab === "kitchens"
             ? kitchensLoading
             : loading
-            ? "true"
-            : "false"
+              ? "true"
+              : "false"
         }
       >
         {activeTab === "kitchens" ? (
@@ -868,8 +936,8 @@ const Cook = () => {
                 {query.trim()
                   ? `Ничего не найдено по запросу «${query}»`
                   : activeTab === "current"
-                  ? "Нет текущих задач"
-                  : "История пуста"}
+                    ? "Нет текущих задач"
+                    : "История пуста"}
               </div>
             )}
 
@@ -913,7 +981,7 @@ const Cook = () => {
         onCreated={() => {
           try {
             window.dispatchEvent(new CustomEvent("orders:refresh"));
-          } catch {}
+          } catch { }
         }}
       />
 
@@ -937,6 +1005,46 @@ const Cook = () => {
               disabled={kitchenSaving}
               autoFocus
             />
+            <div className="cafeCookKitchenModal__field mb-4">
+              <div className="cafeCookKitchenModal__label">Чековый аппарат</div>
+
+              <div className="cafeCookKitchenModal__printerRow">
+                <select
+                  className="cafeCookKitchenModal__select"
+                  value={selectedKey || ""}
+                  onChange={(e) => setSelectedKey(e.target.value)}
+                  disabled={loadingPrint || saving}
+                  title="Выберите принтер"
+                >
+                  <option value="">— Выберите принтер —</option>
+                  {merged.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {safeName(p)} ({shortKey(p.key)}){p.key === activeKey ? " • активный" : ""}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  className="cafeCookKitchenModal__iconBtn"
+                  onClick={refresh}
+                  // disabled={loading || saving}
+                  title="Обновить список"
+                >
+                  <FaSyncAlt />
+                </button>
+
+                <button
+                  type="button"
+                  className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
+                  onClick={onPickByDialog}
+                  disabled={loading || saving}
+                  title="Открыть диалог WebUSB и выбрать принтер"
+                >
+                  <FaPrint /> Выбрать
+                </button>
+              </div>
+            </div>
             <div className="cafeCook__editKitchenFooter">
               <button
                 type="button"
