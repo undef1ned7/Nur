@@ -78,9 +78,9 @@ const Sell = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
-  const { 
-    history, 
-    start, 
+  const {
+    history,
+    start,
     historyObjects,
     historyCount,
     historyNext,
@@ -90,7 +90,7 @@ const Sell = () => {
     historyObjectsPrevious,
     loading
   } = useSale();
-  
+
   // Получаем текущую страницу из URL
   const currentPage = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
@@ -136,30 +136,37 @@ const Sell = () => {
     });
   const clearSelection = () => setSelectedIds(new Set());
 
-  const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
-  const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
-  const isBuildingCompany = sectorName === "строительная компания";
-  const isStartPlan = planName === "старт";
-
-  const filterSell = history.filter((item) => item.status !== "canceled");
-
-  const filterField = isBuildingCompany ? historyObjects : filterSell;
-  
-  // Данные пагинации в зависимости от типа компании
-  const count = isBuildingCompany ? historyObjectsCount : historyCount;
-  const next = isBuildingCompany ? historyObjectsNext : historyNext;
-  const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
-  
-  // Расчет общего количества страниц
-  const totalPages = useMemo(
-    () => (count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1),
-    [count]
-  );
-  
-  const hasNextPage = !!next;
-  const hasPrevPage = !!previous;
-
+  const {
+    isBuildingCompany,
+    filterField,
+    count,
+    totalPages,
+    hasNextPage,
+    hasPrevPage
+  } = useMemo(() => {
+    const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
+    const isBuildingCompany = sectorName === "строительная компания";
+    const filterSell = history.filter((item) => item.status !== "canceled");
+    const filterField = isBuildingCompany ? historyObjects : filterSell;
+    const count = isBuildingCompany ? historyObjectsCount : historyCount;
+    const next = isBuildingCompany ? historyObjectsNext : historyNext;
+    const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
+    const totalPages = count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1
+    return {
+      sectorName,
+      isBuildingCompany,
+      filterSell,
+      filterField,
+      count,
+      next,
+      previous,
+      totalPages,
+      hasNextPage: !!next,
+      hasPrevPage: !!previous
+    }
+  }, [company, historyObjectsCount, historyObjectsNext, historyObjectsPrevious, historyPrevious, historyCount, historyNext])
   // Синхронизация URL с состоянием страницы
+
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     if (currentPage > 1) {
@@ -393,164 +400,145 @@ const Sell = () => {
 
   return (
     <div>
-      {showSellMainStart ? (
-        <SellMainStart
-          show={showSellMainStart}
-          setShow={setShowSellMainStart}
-        />
-      ) : (
-        <>
-          <div className="sell__header">
-            <div className="sell__header-left">
-              <div className="sell__header-input">
-                <input className="w-full" onChange={onChange} type="text" placeholder="Поиск" />
-                <span>
-                  <Search size={15} color="#91929E" />
-                </span>
-              </div>
-            </div>
-            <div className="sell__header-left">
-              {selectedIds.size > 0 ? (
-                <SelectionActions pageItems={filterField} />
-              ) : (
-                <>
-                  {isBuildingCompany ? (
-                    <button
-                      className="sklad__add"
-                      onClick={() => setShowBuilding(true)}
-                    >
-                      <Plus size={16} style={{ marginRight: 4 }} /> Продать
-                      квартиру
-                    </button>
-                  ) : (
-                    <>
-                      {sectorName !== "магазин" && (
-                        <button
-                          className="sell__header-btn"
-                          onClick={() => {
-                            dispatch(startSale({ discount_total: 0 }));
-                            setShowSellMainStart(true);
-                          }}
-                        >
-                          Продать
-                        </button>
-                      )}
-                      <button
-                        className="sell__header-btn"
-                        onClick={() => setShowAddCashboxModal(true)}
-                      >
-                        Прочие расходы
-                      </button>
-                    </>
-                  )}
-                </>
-              )}
+      <>
+        <div className="sell__header">
+          <div className="sell__header-left">
+            <div className="sell__header-input">
+              <input className="w-full" onChange={onChange} type="text" placeholder="Поиск" />
+              <span>
+                <Search size={15} color="#91929E" />
+              </span>
             </div>
           </div>
-          <div className="sell__wrappper">
-            <table className="sell__table">
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={
-                        filterField.length > 0 &&
-                        filterField.every((i) => selectedIds.has(i.id))
-                      }
-                      onChange={() => toggleSelectAllOnPage(filterField)}
-                    />
-                  </th>
-                  <th>№</th>
-                  <th>Клиент</th>
-                  <th>Товар</th>
-                  <th>Метод оплаты</th>
-                  <th>Цена</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((item, idx) => {
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => {
-                        setSellId(item.id);
-                        setShowDetailSell(true);
-                      }}
+          <div className="sell__header-left">
+            {selectedIds.size > 0 ? (
+              <SelectionActions pageItems={filterField} />
+            ) : (
+              <>
+                {isBuildingCompany ? (
+                  <button
+                    className="sklad__add"
+                    onClick={() => setShowBuilding(true)}
+                  >
+                    <Plus size={16} style={{ marginRight: 4 }} /> Продать
+                    квартиру
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="sell__header-btn"
+                      onClick={() => setShowAddCashboxModal(true)}
                     >
-                      <td onClick={(e) => e.stopPropagation()} data-label="">
-                        <input
-                          type="checkbox"
-                          checked={isSelected(item.id)}
-                          onChange={() => toggleRow(item.id)}
-                        />
-                      </td>
-                      <td data-label="№">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
-                      <td data-label="Клиент">{item.client_name || "-"}</td>
-                      <td data-label="Товар">
-                        {/* {item.products
+                      Прочие расходы
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        <div className="sell__wrappper">
+          <table className="sell__table">
+            <thead>
+              <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={
+                      filterField.length > 0 &&
+                      filterField.every((i) => selectedIds.has(i.id))
+                    }
+                    onChange={() => toggleSelectAllOnPage(filterField)}
+                  />
+                </th>
+                <th>№</th>
+                <th>Клиент</th>
+                <th>Товар</th>
+                <th>Метод оплаты</th>
+                <th>Цена</th>
+                <th>Статус</th>
+                <th>Дата</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((item, idx) => {
+                return (
+                  <tr
+                    key={item.id}
+                    onClick={() => {
+                      setSellId(item.id);
+                      setShowDetailSell(true);
+                    }}
+                  >
+                    <td onClick={(e) => e.stopPropagation()} data-label="">
+                      <input
+                        type="checkbox"
+                        checked={isSelected(item.id)}
+                        onChange={() => toggleRow(item.id)}
+                      />
+                    </td>
+                    <td data-label="№">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
+                    <td data-label="Клиент">{item.client_name || "-"}</td>
+                    <td data-label="Товар">
+                      {/* {item.products
                           .map((product) => product.name)
                           .join(", ")} */}
-                        {item.first_item_name || "-"}
-                      </td>
-                      <td data-label="Метод оплаты">
-                        {translatePaymentMethod(item.payment_method)}
-                      </td>
-                      <td data-label="Цена">{item.total}</td>
-                      <td data-label="Статус">
-                        {kindTranslate[item.status] || item.status}
-                      </td>
-                      <td data-label="Дата">
-                        {new Date(item.created_at).toLocaleDateString()}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()} data-label="">
-                        {company.sector.name === "Магазин" && (
-                          <button
-                            className="sell__table-refund"
-                            onClick={() => handleOpen(item)}
-                          >
-                            Возврат
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Пагинация */}
-          {totalPages > 1 && (
-            <div className="sell__pagination">
-              <button
-                type="button"
-                className="sell__pagination-btn"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1 || loading || !hasPrevPage}
-              >
-                Назад
-              </button>
-              <span className="sell__pagination-info">
-                Страница {currentPage} из {totalPages}
-                {count ? ` (${count} записей)` : ""}
-              </span>
-              <button
-                type="button"
-                className="sell__pagination-btn"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={loading || !hasNextPage || (totalPages && currentPage >= totalPages)}
-              >
-                Вперед
-              </button>
-            </div>
-          )}
-        </>
-      )}
+                      {item.first_item_name || "-"}
+                    </td>
+                    <td data-label="Метод оплаты">
+                      {translatePaymentMethod(item.payment_method)}
+                    </td>
+                    <td data-label="Цена">{item.total}</td>
+                    <td data-label="Статус">
+                      {kindTranslate[item.status] || item.status}
+                    </td>
+                    <td data-label="Дата">
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()} data-label="">
+                      {company.sector.name === "Магазин" && (
+                        <button
+                          className="sell__table-refund"
+                          onClick={() => handleOpen(item)}
+                        >
+                          Возврат
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
+        {/* Пагинация */}
+        {totalPages > 1 && (
+          <div className="sell__pagination">
+            <button
+              type="button"
+              className="sell__pagination-btn"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading || !hasPrevPage}
+            >
+              Назад
+            </button>
+            <span className="sell__pagination-info">
+              Страница {currentPage} из {totalPages}
+              {count ? ` (${count} записей)` : ""}
+            </span>
+            <button
+              type="button"
+              className="sell__pagination-btn"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={loading || !hasNextPage || (totalPages && currentPage >= totalPages)}
+            >
+              Вперед
+            </button>
+          </div>
+        )}
+      </>
       {showAddCashboxModal && (
         <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />
       )}

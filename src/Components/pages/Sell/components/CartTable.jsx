@@ -1,5 +1,5 @@
 import { Minus, Plus, X } from "lucide-react";
-
+import '../sell.scss'
 const cx = (...args) => args.filter(Boolean).join(" ");
 
 const CartTable = ({

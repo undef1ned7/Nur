@@ -3,7 +3,6 @@ import { Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useDebounce } from "../../../hooks/useDebounce";
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   doSearch,
   manualFilling,
@@ -55,21 +54,39 @@ import {
 } from "./components/PaymentModals";
 import DiscountModal from "./components/DiscountModal";
 import CustomServiceModal from "./components/CustomServiceModal";
-import { Button } from "@mui/material";
-
+import './sell.scss'
+import { FaCar, FaCartArrowDown, FaMinus, FaPlus } from "react-icons/fa";
+import UniversalModal from "../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
+import { debounce } from "@mui/material";
 const cx = (...args) => args.filter(Boolean).join(" ");
 
 /* ============================================================
    Компонент SellMainStart
    ============================================================ */
 
-const SellMainStart = ({ show, setShow }) => {
+const SellMainStart = () => {
+  const dispatch = useDispatch();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
-  const { start, foundProduct } = useSale();
+  const { start, foundProduct, loading: saleLoading } = useSale();
   const { list: products } = useProducts();
   const { list: clients = [] } = useClient();
-
+  const filteredProducts = useMemo(() => {
+    const cartItemsMap = new Map(start?.items?.map(el => [el.product, { qty: parseFloat(el.quantity), item: el }]))
+    return products.map(el => {
+      const qty = parseFloat(el.quantity);
+      const cartItem = cartItemsMap.get(el.id)
+      const cartQty = cartItem?.qty || 0;
+      const primaryImg = el.images.find(el => el.is_primary)
+      return {
+        ...el,
+        quantity: qty - cartQty,
+        isCart: !!cartQty,
+        cartItem: cartItem?.item,
+        img: primaryImg?.image_url ?? el.images[0]?.image_url ?? '/images/placeholder.avif'
+      }
+    }).filter(el => !!el.quantity)
+  }, [products, start])
   // Флаг для отслеживания недавнего сканирования (чтобы не открывать модалку при Enter от сканера)
   const lastScanTimeRef = useRef(0);
   console.log('START', start);
@@ -146,7 +163,11 @@ const SellMainStart = ({ show, setShow }) => {
       company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
   });
 
-  const dispatch = useDispatch();
+  useEffect(() => {
+    if (!start?.id) {
+      dispatch(startSale({}))
+    }
+  }, [start])
   const run = (thunk) => dispatch(thunk).unwrap();
 
   const [selectClient, setSelectClient] = useState("");
@@ -159,19 +180,19 @@ const SellMainStart = ({ show, setShow }) => {
     () => (start?.items || []).find((i) => i.id === selectedId) || null,
     [start?.items, selectedId]
   );
-
-  const filterClient = useMemo(
-    () =>
-      (Array.isArray(clients) ? clients : []).filter(
-        (c) => c.type === "client"
-      ),
-    [clients]
-  );
-  const pickClient = useMemo(
-    () => filterClient.find((x) => String(x.id) === String(clientId)),
-    [filterClient, clientId]
-  );
-
+  const {
+    pickClient,
+    filterClient } = useMemo(
+      () => {
+        const filterClient = Array.isArray(clients) ? clients : [].filter((c) => c.type === "client");
+        const pickClient = filterClient.find((x) => String(x.id) === String(clientId))
+        return {
+          filterClient,
+          pickClient
+        }
+      },
+      [clients, clientId]
+    );
   const [state, setState] = useState({
     phone: "",
     dueDate: "",
@@ -192,69 +213,68 @@ const SellMainStart = ({ show, setShow }) => {
     else setQty("");
   }, [selectedItem]);
 
-  const debouncedDiscount = useDebounce((v) => {
-    if (!start || !selectedItem) return;
-    dispatch(
-      manualFilling({
-        id: start.id,
-        productId: selectedItem.id,
-        discount_total: v,
-        quantity: 2,
-      })
-    );
-  }, 600);
-
-  const onProductDiscountChange = (e) => debouncedDiscount(e.target.value);
-
   const onChange2 = (e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
   };
 
   const debouncedDiscount1 = useDebounce((v) => {
-    console.log('ASDKJNASKDKASDK', v);
-
     dispatch(startSale({ discount_total: v }));
   }, 600);
   const onDiscountChange = (e) => debouncedDiscount1(e.target.value);
 
-  const debouncedQtyUpdate = useDebounce(
-    async (newQty, currentSelectedItem, currentStartId) => {
-      if (!currentSelectedItem || !currentStartId) return;
-      let qtyNum = Math.max(0, toNum(newQty));
-      const productId = currentSelectedItem.product || currentSelectedItem.id;
-      const available = getAvailableQtyForProduct(productId, products);
-      if (available && qtyNum > available) {
-        qtyNum = available;
-        setAlert({
-          open: true,
-          type: "error",
-          message: "Введено больше доступного количества. Значение ограничено",
-        });
-        setQty(String(qtyNum));
-      }
+  // const debouncedQtyUpdate = useDebounce(
+  //   async (newQty, currentSelectedItem, currentStartId) => {
+  //     if (!currentSelectedItem || !currentStartId) return;
+  //     let qtyNum = Math.max(0, toNum(newQty));
+  //     const productId = currentSelectedItem.product || currentSelectedItem.id;
+  //     const available = getAvailableQtyForProduct(productId, products);
+  //     if (available && qtyNum > available) {
+  //       qtyNum = available;
+  //       setAlert({
+  //         open: true,
+  //         type: "error",
+  //         message: "Введено больше доступного количества. Значение ограничено",
+  //       });
+  //       setQty(String(qtyNum));
+  //     }
 
-      try {
-        await dispatch(
-          updateManualFilling({
-            id: currentStartId,
-            productId: currentSelectedItem.id,
-            quantity: qtyNum,
-          })
-        ).unwrap();
-        onRefresh();
-      } catch (error) {
-        console.error("Ошибка при обновлении количества:", error);
-      }
-    },
-    600
-  );
+  //     try {
+  //       await dispatch(
+  //         updateManualFilling({
+  //           id: currentStartId,
+  //           productId: currentSelectedItem.id,
+  //           quantity: qtyNum,
+  //         })
+  //       ).unwrap();
+  //       onRefresh();
+  //     } catch (error) {
+  //       console.error("Ошибка при обновлении количества:", error);
+  //     }
+  //   },
+  //   600
+  // );
 
-  const currentItems = useMemo(() => start?.items || [], [start]);
-  const currentSubtotal = start?.subtotal;
-  const currentDiscount = start?.order_discount_total;
-  const currentTotal = start?.total;
-  const isEmpty = useMemo(() => !!start?.items?.length, [start?.items])
+
+  const {
+    currentItems,
+    currentSubtotal,
+    currentDiscount,
+    currentTotal,
+    isEmpty } = useMemo(() => {
+      const currentItems = start?.items || [];
+      const currentSubtotal = start?.subtotal;
+      const currentDiscount = start?.order_discount_total;
+      const currentTotal = start?.total;
+      const isEmpty = !!start?.items?.length;
+      return {
+        currentItems,
+        currentSubtotal,
+        currentDiscount,
+        currentTotal,
+        isEmpty,
+      }
+    }, [start]);
 
   const onRefresh = useCallback(() => {
     dispatch(startSale({ discount_total: currentDiscount }));
@@ -465,20 +485,20 @@ const SellMainStart = ({ show, setShow }) => {
     onRefresh();
   };
 
-  const decQty = async () => {
-    if (!selectedItem) return;
-    const next = Math.max(0, (toNum(qty) || 0) - 1);
-    setQty(String(next));
+  // const decQty = async () => {
+  //   if (!selectedItem) return;
+  //   const next = Math.max(0, (toNum(qty) || 0) - 1);
+  //   setQty(String(next));
 
-    await dispatch(
-      updateManualFilling({
-        id: start.id,
-        productId: selectedItem.id,
-        quantity: next,
-      })
-    ).unwrap();
-    onRefresh();
-  };
+  //   await dispatch(
+  //     updateManualFilling({
+  //       id: start?.id,
+  //       productId: selectedItem.id,
+  //       quantity: next,
+  //     })
+  //   ).unwrap();
+  //   onRefresh();
+  // };
 
   // Функции для работы с товарами в таблице
   const handleIncreaseQty = async (item) => {
@@ -614,7 +634,7 @@ const SellMainStart = ({ show, setShow }) => {
     try {
       await dispatch(
         updateManualFilling({
-          id: start.id,
+          id: start?.id,
           productId: item.id,
           quantity: qtyNum,
         })
@@ -670,7 +690,7 @@ const SellMainStart = ({ show, setShow }) => {
       }
       await dispatch(
         addCustomItem({
-          id: start.id,
+          id: start?.id,
           name: customService.name.trim(),
           price: customService.price.trim(),
           quantity: Number(customService.quantity) || 1,
@@ -1105,194 +1125,99 @@ const SellMainStart = ({ show, setShow }) => {
     }
   };
 
+  const [showCart, setShowCart] = useState(false)
+
   return (
     <section className="sell start">
       <div className="sell__header">
         <div className="sell__header-left">
-          <Button color="warning" variant="contained" className="mr-auto flex gap-4" onClick={() => setShow(false)}>
-            <ArrowBackIcon />
-            <p>Назад</p>
-          </Button>
-          <ProductSearch
+          <div className="sell__header_search">  <ProductSearch
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             showDropdown={showDropdown}
             setShowDropdown={setShowDropdown}
             foundProduct={foundProduct}
             start={start}
-            products={products}
+            products={filteredProducts}
             setAlert={setAlert}
             dispatch={dispatch}
-          />
+          /></div>
 
-          <select
-            onChange={(e) => {
-              setClientId(e.target.value);
-              setSelectClient(e.target.value);
-            }}
-            value={clientId}
-            className="sell__header-input"
-          >
-            <option value="">Выберите клиента</option>
-            {filterClient.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.full_name}
-              </option>
-            ))}
-          </select>
+          <div className="sell__header_clients">
+            <select
+              onChange={(e) => {
+                setClientId(e.target.value);
+                setSelectClient(e.target.value);
+              }}
+              value={clientId}
+              className="sell__header-input"
+            >
+              <option value="">Выберите клиента</option>
+              {filterClient.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.full_name}
+                </option>
+              ))}
+            </select>
 
-          <button
-            className="sell__header-plus"
-            onClick={() => setShowNewClientModal(true)}
-          >
-            <span>
-              {/* плюс */}
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M19 11H13V5C13 4.73478 12.8946 4.48043 12.7071 4.29289C12.5196 4.10536 12.2652 4 12 4C11.7348 4 11.4804 4.10536 11.2929 4.29289C11.1054 4.48043 11 4.73478 11 5V11H5C4.73478 11 4.4804 11.1054 4.29289 11.2929C4.10536 11.4804 4 11.7348 4 12C4 12.2652 4.10536 12.5196 4.29289 12.7071C4.4804 12.8946 4.73478 13 5 13H11V19C11 19.2652 11.1054 19.5196 11.2929 19.7071C11.4804 19.8946 11.7348 20 12 20C12.2652 20 12.5196 19.8946 12.7071 19.7071C12.8946 19.5196 13 19.2652 13 19V13H19C19.2652 13 19.5196 12.8946 19.7071 12.7071C19.8946 12.5196 20 12.2652 20 12C20 11.7348 19.8946 11.4804 19.7071 11.2929C19.5196 11.1054 19.2652 11 19 11Z"
-                  fill="#CCCCCC"
-                />
-              </svg>
-            </span>
-          </button>
-        </div>
-
-        <div className="sell__header-left"></div>
-      </div>
-
-      <div className="block gap-4 xl:flex justify-between ">
-        <div className="w-full xl:w-[66%] start__body-column">
-          <div className="start__body-column">
-            {/* <div className="sell__body-header">
-              <h2 className="start__body-title">
-                {selectedItem?.product_name}
-              </h2>
-
-              <div className="start__actions">
-                <div className="start__actions-left">
-                  <input
-                    type="text"
-                    className="start__actions-input"
-                    value={
-                      selectedItem?.unit_price * selectedItem?.quantity || ""
-                    }
-                    readOnly
+            <button
+              className="sell__header-plus"
+              onClick={() => setShowNewClientModal(true)}
+            >
+              <span>
+                {/* плюс */}
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 11H13V5C13 4.73478 12.8946 4.48043 12.7071 4.29289C12.5196 4.10536 12.2652 4 12 4C11.7348 4 11.4804 4.10536 11.2929 4.29289C11.1054 4.48043 11 4.73478 11 5V11H5C4.73478 11 4.4804 11.1054 4.29289 11.2929C4.10536 11.4804 4 11.7348 4 12C4 12.2652 4.10536 12.5196 4.29289 12.7071C4.4804 12.8946 4.73478 13 5 13H11V19C11 19.2652 11.1054 19.5196 11.2929 19.7071C11.4804 19.8946 11.7348 20 12 20C12.2652 20 12.5196 19.8946 12.7071 19.7071C12.8946 19.5196 13 19.2652 13 19V13H19C19.2652 13 19.5196 12.8946 19.7071 12.7071C19.8946 12.5196 20 12.2652 20 12C20 11.7348 19.8946 11.4804 19.7071 11.2929C19.5196 11.1054 19.2652 11 19 11Z"
+                    fill="currentColor"
                   />
-
-                  <div className="start__actions-row">
-                    <button
-                      className="start__actions-btn"
-                      onClick={incQty}
-                      disabled={!selectedItem}
-                      title="Увеличить количество"
-                    >
-                      <Plus />
-                    </button>
-
-                    <input
-                      style={{ width: 100 }}
-                      type="text"
-                      min={0}
-                      className="start__actions-input"
-                      value={qty}
-                      placeholder="Кол-во"
-                      onChange={(e) => {
-                        const newQty = e.target.value;
-                        setQty(newQty);
-                        if (selectedItem && newQty !== "" && start?.id) {
-                          debouncedQtyUpdate(newQty, selectedItem, start.id);
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (selectedItem && start?.id) {
-                          const inputValue = e.target.value;
-                          let qtyNum;
-
-                          if (inputValue === "" || inputValue === "0") {
-                            qtyNum = selectedItem.quantity || 0;
-                          } else {
-                            qtyNum = Math.max(0, toNum(inputValue));
-                          }
-
-                          const productId =
-                            selectedItem.product || selectedItem.id;
-                          const available = getAvailableQtyForProduct(
-                            productId,
-                            products
-                          );
-                          if (available && qtyNum > available) {
-                            qtyNum = available;
-                            setAlert({
-                              open: true,
-                              type: "error",
-                              message:
-                                "Нельзя установить количество больше остатка",
-                            });
-                          }
-
-                          setQty(String(qtyNum));
-
-                          dispatch(
-                            updateManualFilling({
-                              id: start.id,
-                              productId: selectedItem.id,
-                              quantity: qtyNum,
-                            })
-                          )
-                            .unwrap()
-                            .then(() => onRefresh());
-                        }
-                      }}
-                      disabled={!selectedItem}
-                    />
-
-                    <button
-                      className="start__actions-btn"
-                      onClick={decQty}
-                      disabled={!selectedItem}
-                      title="Уменьшить количество"
-                    >
-                      <Minus />
-                    </button>
-                  </div>
-
-                  <input
-                    type="text"
-                    className="start__actions-input"
-                    placeholder="Скидка на позицию"
-                    onChange={onProductDiscountChange}
-                    disabled={!selectedItem}
-                  />
-                </div>
-
-                <input
-                  type="text"
-                  className="start__actions-input"
-                  placeholder="Общ скидка"
-                  onChange={onDiscountChange}
-                />
-              </div>
-            </div> */}
-            <CartTable
-              items={currentItems}
-              selectedId={selectedId}
-              onRowClick={handleRowClick}
-              itemQuantities={itemQuantities}
-              onQtyChange={handleItemQtyChange}
-              onQtyBlur={handleItemQtyBlur}
-              onIncreaseQty={handleIncreaseQty}
-              onDecreaseQty={handleDecreaseQty}
-              onRemoveItem={handleRemoveItem}
-            />
+                </svg>
+              </span>
+            </button>
+            <button
+              className="sell__header-plus"
+              disabled={!start?.items?.length}
+              onClick={() => setShowCart(prev => !prev)}
+            >
+              <span>
+                <FaCartArrowDown color={start?.items?.length ? 'green' : 'orange'} />
+              </span>
+            </button>
           </div>
+        </div>
+      </div>
+      {
+        showCart && (
+          <UniversalModal
+            show={showCart}
+            title={'Корзина'}
+            onClose={() => setShowCart(false)}>
+            <div className="start__body-column--cart">
+              <CartTable
+                items={currentItems}
+                selectedId={selectedId}
+                onRowClick={handleRowClick}
+                itemQuantities={itemQuantities}
+                onQtyChange={handleItemQtyChange}
+                onQtyBlur={handleItemQtyBlur}
+                onIncreaseQty={handleIncreaseQty}
+                onDecreaseQty={handleDecreaseQty}
+                onRemoveItem={handleRemoveItem}
+              />
 
-          <div className="start__products">
+            </div>
+          </UniversalModal>)
+      }
+      <div className="start__sell_body">
+        <div className="start__products">
+          <div className="start_product_item">
+
             <button
               className="start__products-add orange"
               onClick={() => setShowCustomServiceModal(true)}
@@ -1300,49 +1225,98 @@ const SellMainStart = ({ show, setShow }) => {
             >
               Доп. услуги
             </button>
-
-            {products?.map((product) => (
-              <button
-                key={product.id || product.name}
-                className={cx(
-                  "start__products-add",
-                  selectedItem?.product_name == product.name && "active"
-                )}
-                onClick={async () => {
-                  const available = getAvailableQtyForProduct(
-                    product,
-                    products
-                  );
-                  const pid = product.id || product.product;
-                  const inCart = getCartQtyForProduct(pid, start?.items);
-                  if (available <= 0 || inCart >= available) {
-                    setAlert({
-                      open: true,
-                      type: "error",
-                      message:
-                        available > 0
-                          ? `Нельзя добавить больше, чем есть на складе (доступно: ${available})`
-                          : "Товара нет в наличии",
-                    });
-                    return;
-                  }
-                  await dispatch(
-                    manualFilling({
-                      id: start.id,
-                      productId: product.id,
-                    })
-                  ).unwrap();
-                  dispatch(startSale());
-                }}
-                title="Добавить 1 шт"
-              >
-                {product.name}
-              </button>
-            ))}
           </div>
+
+          {filteredProducts?.map((product) => (
+            <div className="start_product_item">
+              <div className="start_product_item--image">
+                <img src={product.img} alt="" />
+              </div>
+              <div className="start_product_item--content">
+                <p className="start_product_item--title">
+                  <span className="start_product_item--title-name">Нзв.: <strong>{product.name}</strong></span>
+                  <span className="start_product_item--title-qty">
+                    <strong>{product.quantity}</strong> шт
+                  </span>
+                </p>
+                <div className="start_product_item--control">
+                  <button
+                    key={product.id || product.name}
+                    className={cx(
+                      "start__products-add",
+                      selectedItem?.product_name == product.name && "active"
+                    )}
+                    disabled={saleLoading}
+                    onClick={() => {
+                      if (product.isCart) {
+                        return handleRemoveItem(product)
+                      }
+                      dispatch(
+                        manualFilling({
+                          id: start?.id,
+                          productId: product?.id,
+                        })
+                      ).unwrap();
+                    }}
+                    title="Добавить 1 шт"
+                  >
+                    {product.isCart ? 'Убрать' : 'Добавить'}
+                  </button>
+                  {
+                    product.isCart && (
+                      <div className="start_product_item--control_action">
+                        <button
+                          className={cx(
+                            "start__products-add",
+                            selectedItem?.product_name == product.name && "active"
+                          )}
+                          disabled={saleLoading}
+                          onClick={() => {
+                            handleDecreaseQty(product.cartItem)
+                          }}
+                          title="Добавить 1 шт"
+                        >
+                          <FaMinus />
+                        </button>
+                        <input
+                          min={0}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleItemQtyChange(product.cartItem, e.target.value)
+                          }}
+                          onBlur={(e) => {
+                            e.stopPropagation();
+                            handleItemQtyBlur(product.cartItem);
+                          }}
+                          value={itemQuantities[product.cartItem?.id] ?? product.cartItem.quantity ?? ''}
+                          type="number" />
+                        <button
+                          className={cx(
+                            "start__products-add",
+                            selectedItem?.product_name == product.name && "active"
+                          )}
+                          disabled={saleLoading}
+                          onClick={() => {
+                            handleIncreaseQty(product.cartItem)
+                          }}
+                          title="Добавить 1 шт"
+                        >
+                          <FaPlus />
+                        </button>
+                      </div>
+
+                    )
+                  }
+                </div>
+              </div>
+
+
+            </div>
+
+          ))}
         </div>
 
-        <div className="w-full! xl:w-[33%]!">
+        <div className="start__cart__body">
           <div className="start__total">
             <div className="start__total-top">
               <div className="start__total-row">

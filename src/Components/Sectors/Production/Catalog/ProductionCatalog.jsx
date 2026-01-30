@@ -53,6 +53,8 @@ import { display, margin } from "@mui/system";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useAlert } from "../../../../hooks/useDialog";
+import useResize from "../../../../hooks/useResize";
+import { useAgentCart } from "../../../../store/slices/agentCartSlice";
 
 // Моковые данные для демонстрации
 const mockProducts = [
@@ -836,14 +838,14 @@ const ProductDetailModal = ({
               >
                 {onAddToCartWithoutCart ? (
                   <>
-                    <button
+                    {/* <button
                       className="request-without-cart-btn-modal"
                       onClick={handleAddToCartWithoutCartClick}
                       disabled={!available || quantity <= 0}
                     >
                       <Send size={18} />
                       Без корзины ({quantity} шт.)
-                    </button>
+                    </button> */}
                     <button
                       className="request-with-cart-btn-modal"
                       onClick={handleAddToCartClick}
@@ -893,12 +895,19 @@ const ProductionCatalog = () => {
   // console.log(1, products);
 
   const cartItemsCount = useSelector(selectCartItemsCount);
-
+  const agentCart = useAgentCart()
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
-  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState("cards"); // 'grid' or 'list'
+  const { isMobile } = useResize(({ isMobile }) => {
+    if (isMobile) {
+      setViewMode('cards')
+    }
+  })
+  console.log('AGENT CART', agentCart);
+
   const [showFilters, setShowFilters] = useState(false);
   // const [showCart, setShowCart] = useState(false);
   const [isCartSectionOpen, setIsCartSectionOpen] = useState(false);
@@ -912,36 +921,29 @@ const ProductionCatalog = () => {
   const [agentProductsMap, setAgentProductsMap] = useState(new Map());
   const [isMobileView, setIsMobileView] = useState(false);
 
-  // Получаем массив продуктов из results
-  const rawProductsList = Array.isArray(products?.results)
-    ? products.results
-    : Array.isArray(products)
-      ? products
-      : [];
-
-  // Сортируем товары: сначала те, что в наличии
   const productsList = useMemo(() => {
-    return [...rawProductsList].sort((a, b) => {
-      // Проверяем наличие товара в агентских продуктах
-      const aHasInAgent = agentProductsMap.has(a.id);
-      const bHasInAgent = agentProductsMap.has(b.id);
+    const data = Array.isArray(products?.results)
+      ? products.results
+      : Array.isArray(products)
+        ? products
+        : []
+    return data.map(product => {
+      const hasInAgentProducts = agentProductsMap.has(product.id);
+      const agentQty = hasInAgentProducts
+        ? agentProductsMap.get(product.id) ?? 0
+        : 0;
 
-      // Получаем количество
-      const aQty = aHasInAgent ? agentProductsMap.get(a.id) ?? 0 : 0;
-      const bQty = bHasInAgent ? agentProductsMap.get(b.id) ?? 0 : 0;
+      const cartQty = agentCart?.items?.find(cartP => cartP.product === product.id)?.quantity || 0;
 
-      // Товар в наличии, если есть в агентских продуктах и количество > 0
-      const aInStock = aHasInAgent && aQty > 0;
-      const bInStock = bHasInAgent && bQty > 0;
-
-      // Сначала товары в наличии (true идет первым)
-      if (aInStock && !bInStock) return -1;
-      if (!aInStock && bInStock) return 1;
-
-      // Если оба в наличии или оба не в наличии, сохраняем исходный порядок
-      return 0;
-    });
-  }, [rawProductsList, agentProductsMap]);
+      const enrichedProduct = {
+        ...product,
+        quantity: agentQty - cartQty,
+        isAvailableInAgent: hasInAgentProducts,
+      };
+      return enrichedProduct
+    })
+      .filter(el => !!el.quantity)
+  }, [agentProductsMap, products, agentCart]);
 
   // Функция для получения товаров из корзины и обновления счетчика
   const refreshCartItems = useCallback(async () => {
@@ -1531,20 +1533,25 @@ const ProductionCatalog = () => {
             </button>
           )}
 
-          <div className="view-mode-toggle">
-            <button
-              className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
-              onClick={() => setViewMode("grid")}
-            >
-              <Grid size={20} />
-            </button>
-            <button
-              className={`view-btn ${viewMode === "list" ? "active" : ""}`}
-              onClick={() => setViewMode("list")}
-            >
-              <List size={20} />
-            </button>
-          </div>
+          {
+            !isMobile && (
+              <div className="view-mode-toggle">
+                <button
+                  className={`view-btn ${viewMode === "cards" ? "active" : ""}`}
+                  onClick={() => setViewMode("cards")}
+                >
+                  <Grid size={20} />
+                </button>
+                <button
+                  className={`view-btn ${viewMode === "list" ? "active" : ""}`}
+                  onClick={() => setViewMode("list")}
+                >
+                  <List size={20} />
+                </button>
+              </div>
+            )
+          }
+
         </div>
       </div>
 
@@ -1614,38 +1621,33 @@ const ProductionCatalog = () => {
         <div className={`products-container ${viewMode}`}>
           {productsList.length === 0 ? (
             <div className="empty-state">
-              <p>Товары не найдены</p>
-              <button onClick={clearAllFilters}>Показать все товары</button>
+              <p>
+                {
+                  debouncedSearchQuery ? 'Товары не найдены' : 'Список товаров пуст'
+                }
+              </p>
+              {
+                debouncedSearchQuery && (
+                  <button onClick={clearAllFilters}>Показать все товары</button>
+                )
+              }
             </div>
           ) : (
             <div className={`products-grid ${viewMode}`}>
-              {productsList.map((product) => {
-                // Проверяем, есть ли товар в мапе агентских продуктов
-                const hasInAgentProducts = agentProductsMap.has(product.id);
-                // Получаем количество из мапы агентских продуктов
-                // Если товара нет в мапе, количество = 0 и он недоступен
-                const agentQty = hasInAgentProducts
-                  ? agentProductsMap.get(product.id) ?? 0
-                  : 0;
-                // Обогащаем продукт количеством из агентских продуктов
-                const enrichedProduct = {
-                  ...product,
-                  quantity: agentQty,
-                  isAvailableInAgent: hasInAgentProducts, // Флаг наличия в агентских продуктах
-                };
+              {productsList.map((enrichedProduct) => {
                 return (
                   <div
-                    key={product.id}
+                    key={enrichedProduct.id}
                     className="grid-item"
                     onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, product.id)}
+                    onDrop={(e) => handleDrop(e, enrichedProduct.id)}
                   >
                     <ProductCard
                       product={enrichedProduct}
                       onView={handleViewProduct}
-                      onDragStart={(e) => handleDragStart(e, product.id)}
+                      onDragStart={(e) => handleDragStart(e, enrichedProduct.id)}
                       onDragEnd={handleDragEnd}
-                      isDragging={draggedItem === product.id}
+                      isDragging={draggedItem === enrichedProduct.id}
                       onAddToCart={handleAddToCart}
                       onAddToCartWithoutCart={handleAddToCartWithoutCart}
                     />
