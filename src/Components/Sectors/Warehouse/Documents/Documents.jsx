@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { pdf } from "@react-pdf/renderer";
 import {
   getReceiptJson,
@@ -35,9 +35,23 @@ import InvoicePreviewModal from "./components/InvoicePreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
 
+// Маппинг URL-параметра (path) в значение doc_type для API
+const DOC_TYPE_FROM_PARAM = {
+  all: "",
+  sale: "SALE",
+  purchase: "PURCHASE",
+  sale_return: "SALE_RETURN",
+  purchase_return: "PURCHASE_RETURN",
+  inventory: "INVENTORY",
+  receipt: "RECEIPT",
+  write_off: "WRITE_OFF",
+  transfer: "TRANSFER",
+};
+
 const Documents = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { docType: docTypeParam } = useParams();
   const { company } = useUser();
   const {
     documents,
@@ -50,8 +64,11 @@ const Documents = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
 
+  // Тип документа из URL (sidebar): all, sale, purchase, ...
+  const docType =
+    DOC_TYPE_FROM_PARAM[docTypeParam] ?? DOC_TYPE_FROM_PARAM.all;
+
   const [activeTab, setActiveTab] = useState("receipts");
-  const [docType, setDocType] = useState(""); // Пустая строка = все типы
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
@@ -61,19 +78,6 @@ const Documents = () => {
   const [editReceiptId, setEditReceiptId] = useState(null);
   const [editReceiptData, setEditReceiptData] = useState(null);
   const debounceTimerRef = useRef(null);
-
-  // Опции типов документов
-  const docTypeOptions = [
-    { value: "", label: "Все типы" },
-    { value: "SALE", label: "Продажа" },
-    { value: "PURCHASE", label: "Покупка" },
-    { value: "SALE_RETURN", label: "Возврат продажи" },
-    { value: "PURCHASE_RETURN", label: "Возврат покупки" },
-    { value: "INVENTORY", label: "Инвентаризация" },
-    { value: "RECEIPT", label: "Приход" },
-    { value: "WRITE_OFF", label: "Списание" },
-    { value: "TRANSFER", label: "Перемещение" },
-  ];
 
   // Debounce для поиска
   useEffect(() => {
@@ -496,28 +500,13 @@ const Documents = () => {
           />
         </div>
         <div className="documents__header-actions">
-          <select
-            className="documents__doc-type-select"
-            value={docType}
-            onChange={(e) => setDocType(e.target.value)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: "4px",
-              border: "1px solid #ddd",
-              fontSize: "14px",
-              marginRight: "10px",
-              cursor: "pointer",
-            }}
-          >
-            {docTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
           <button
             className="documents__create-btn"
-            onClick={() => navigate("/crm/warehouse/documents/create")}
+            onClick={() =>
+              navigate("/crm/warehouse/documents/create", {
+                state: { docType: docType || "SALE" },
+              })
+            }
           >
             <Plus size={18} />
             Создать

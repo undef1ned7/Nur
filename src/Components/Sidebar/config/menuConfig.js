@@ -489,10 +489,20 @@ export const MENU_CONFIG = {
       },
       {
         label: "Документы",
-        to: "/crm/warehouse/documents",
+        to: "/crm/warehouse/documents/all",
         icon: menuIcons.documentScanner,
         permission: "can_view_document",
         implemented: true,
+        children: [
+          { label: "Продажа", to: "/crm/warehouse/documents/sale" },
+          { label: "Покупка", to: "/crm/warehouse/documents/purchase" },
+          { label: "Возврат продажи", to: "/crm/warehouse/documents/sale_return" },
+          { label: "Возврат покупки", to: "/crm/warehouse/documents/purchase_return" },
+          { label: "Инвентаризация", to: "/crm/warehouse/documents/inventory" },
+          { label: "Приход", to: "/crm/warehouse/documents/receipt" },
+          { label: "Списание", to: "/crm/warehouse/documents/write_off" },
+          { label: "Перемещение", to: "/crm/warehouse/documents/transfer" },
+        ],
       },
       {
         label: "Склады",

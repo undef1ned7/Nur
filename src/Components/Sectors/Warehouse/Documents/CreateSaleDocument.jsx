@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -26,13 +26,34 @@ import { useUser } from "../../../../store/slices/userSlice";
 import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 
+const VALID_DOC_TYPES = [
+  "SALE",
+  "PURCHASE",
+  "SALE_RETURN",
+  "PURCHASE_RETURN",
+  "INVENTORY",
+  "RECEIPT",
+  "WRITE_OFF",
+  "TRANSFER",
+];
+
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { company, profile: userProfile } = useUser();
   const { list: cashBoxes } = useCash();
   const { list: counterparties } = useCounterparty();
-  const alert = useAlert()
+  const alert = useAlert();
+  const urlDocType = searchParams.get("doc_type");
+  const initialDocType =
+    urlDocType && VALID_DOC_TYPES.includes(urlDocType)
+      ? urlDocType
+      : location.state?.docType && VALID_DOC_TYPES.includes(location.state.docType)
+        ? location.state.docType
+        : "SALE";
+
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
   const [products, setProducts] = useState([]);
@@ -45,7 +66,7 @@ const CreateSaleDocument = () => {
   const [warehouse, setWarehouse] = useState("");
   const [warehouseTo, setWarehouseTo] = useState("");
   const [clientId, setClientId] = useState("");
-  const [docType, setDocType] = useState("SALE");
+  const [docType, setDocType] = useState(initialDocType);
   const [activeTab, setActiveTab] = useState("products");
   const [documentSearch, setDocumentSearch] = useState("");
   const [isDocumentPosted, setIsDocumentPosted] = useState(false);
@@ -79,6 +100,14 @@ const CreateSaleDocument = () => {
   const displayDate = formatDisplayDate(
     documentDateValue ? new Date(documentDateValue).toISOString() : null
   );
+
+  // Синхронизируем тип документа в URL, чтобы в сайдбаре подсвечивался текущий тип
+  useEffect(() => {
+    const current = searchParams.get("doc_type");
+    if (current !== docType) {
+      setSearchParams({ doc_type: docType }, { replace: true });
+    }
+  }, [docType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounce для поиска товаров
   useEffect(() => {
@@ -161,12 +190,7 @@ const CreateSaleDocument = () => {
       return;
     }
     
-    // Если warehouses пуст, пробуем выбрать из cashBoxes
-    if (cashBoxes && cashBoxes.length > 0) {
-      const firstCashBox = cashBoxes[0];
-      setWarehouse(firstCashBox.id || firstCashBox.uuid || "");
-    }
-  }, [warehouses, cashBoxes, warehouse]);
+  }, [warehouses, warehouse]);
 
   // Синхронизация выбранных товаров с товарами в корзине
   useEffect(() => {
@@ -986,23 +1010,6 @@ const CreateSaleDocument = () => {
 
             <div className="create-sale-document__fields">
               <div className="create-sale-document__field">
-                <label>Тип документа *</label>
-                <select
-                  value={docType}
-                  onChange={(e) => setDocType(e.target.value)}
-                  required
-                >
-                  <option value="SALE">Продажа</option>
-                  <option value="PURCHASE">Покупка</option>
-                  <option value="SALE_RETURN">Возврат продажи</option>
-                  <option value="PURCHASE_RETURN">Возврат покупки</option>
-                  <option value="INVENTORY">Инвентаризация</option>
-                  <option value="RECEIPT">Приход</option>
-                  <option value="WRITE_OFF">Списание</option>
-                  <option value="TRANSFER">Перемещение</option>
-                </select>
-              </div>
-              <div className="create-sale-document__field">
                 <label>Склад {isWarehouseToRequired ? "отправитель" : ""} *</label>
                 <select
                   value={warehouse}
@@ -1015,14 +1022,6 @@ const CreateSaleDocument = () => {
                     .map((wh) => (
                       <option key={wh.id} value={wh.id}>
                         {wh.name || wh.title || wh.id}
-                      </option>
-                    ))}
-                  {/* Также показываем склады из cashBoxes для обратной совместимости */}
-                  {cashBoxes
-                    ?.filter((box) => !isWarehouseToRequired || box.id !== warehouseTo)
-                    ?.map((box) => (
-                      <option key={box.id} value={box.id}>
-                        {box.name || box.title || box.id}
                       </option>
                     ))}
                 </select>
@@ -1041,14 +1040,6 @@ const CreateSaleDocument = () => {
                       .map((wh) => (
                         <option key={wh.id} value={wh.id}>
                           {wh.name || wh.title || wh.id}
-                        </option>
-                      ))}
-                    {/* Также показываем склады из cashBoxes для обратной совместимости */}
-                    {cashBoxes
-                      ?.filter((box) => box.id !== warehouse)
-                      ?.map((box) => (
-                        <option key={box.id} value={box.id}>
-                          {box.name || box.title || box.id}
                         </option>
                       ))}
                   </select>

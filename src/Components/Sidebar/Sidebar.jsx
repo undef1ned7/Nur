@@ -21,6 +21,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   const location = useLocation();
   const menuRef = useRef(null); // 👈 ref теперь на меню
 
+  // Раскрывать подменю «Документы» на странице документов, закрывать при уходе
+  useEffect(() => {
+    if (location.pathname.includes("warehouse/documents")) {
+      setOpenDropdown((prev) => (prev === "Документы" ? prev : "Документы"));
+    } else {
+      setOpenDropdown(null);
+    }
+  }, [location.pathname]);
 
   const currentTariff = tariff || company?.subscription_plan?.name || "Старт";
   const currentSector = sector || company?.sector?.name;

@@ -1,4 +1,4 @@
-import { Route } from "react-router-dom";
+import { Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
 
 // Public routes
@@ -139,6 +139,7 @@ import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
 import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategory/BrandCategoryPage";
+import WarehouseDocumentsLayout from "../Components/Sectors/Warehouse/Documents/DocumentsLayout";
 import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
 import CreateWarehouseDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
 // Production
@@ -361,8 +362,19 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/warehouses", Warehouses),
   createProtectedRoute("warehouse/analytics", WarehouseAnalytics),
   createProtectedRoute("warehouse/clients", WarehouseClients),
-  createProtectedRoute("warehouse/documents", WarehouseDocuments),
-  createProtectedRoute("warehouse/documents/create", CreateWarehouseDocument),
+  <Route
+    path="warehouse/documents"
+    key="warehouse/documents"
+    element={
+      <ProtectedRoute>
+        <WarehouseDocumentsLayout />
+      </ProtectedRoute>
+    }
+  >
+    <Route index element={<Navigate to="all" replace />} />
+    <Route path="create" element={<CreateWarehouseDocument />} />
+    <Route path=":docType" element={<WarehouseDocuments />} />
+  </Route>,
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
   createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),
