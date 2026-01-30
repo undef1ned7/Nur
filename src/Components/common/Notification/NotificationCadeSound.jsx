@@ -153,7 +153,7 @@ export default function NotificationCadeSound({ deps, notification, clearNotific
             )} */}
 
             {
-                currentNotification.length &&
+                !!currentNotification.length &&
                 (
                     <div className='fixed top-4 gap-2 right-4 z-40 flex flex-col'>
                         {

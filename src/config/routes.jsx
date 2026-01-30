@@ -162,6 +162,7 @@ import Orders from "../Components/Sectors/cafe/Orders/Orders";
 import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistory";
 import SellLayout from "../Components/pages/Sell/SellLayout";
 import SellMainStart from "../Components/pages/Sell/SellMainStart";
+import CafeLayout from "../Components/Sectors/cafe/CafeLayout";
 
 /**
  * Создает защищенный роут
@@ -261,9 +262,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-        createProtectedRoute("kassa/*", Kassa),
-        createProtectedRoute("kassa/:id", KassaDet),
-      ]
+      createProtectedRoute("kassa/*", Kassa),
+      createProtectedRoute("kassa/:id", KassaDet),
+    ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
@@ -310,26 +311,31 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("market/analytics", MarketAnalytics),
 
   // Cafe routes
-  createProtectedRoute("cafe/analytics", CafeAnalytics),
-  createProtectedRoute("cafe/documents", CafeDocuments),
-  createProtectedRoute("cafe/cook", Cook),
-  createProtectedRoute("cafe/inventory", CafeInventory),
-  createProtectedRoute("cafe/menu", CafeMenu),
-
-  <Route path="cafe/orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
-    {[
-      createProtectedRoute("*", CafeOrders, { index: true }),
-      createProtectedRoute("history", CafeOrderHistory),
-    ]}
+  <Route element={<CafeLayout />} path="cafe">
+    {
+      [
+        createProtectedRoute("analytics", CafeAnalytics),
+        createProtectedRoute("documents", CafeDocuments),
+        createProtectedRoute("cook", Cook),
+        createProtectedRoute("inventory", CafeInventory),
+        createProtectedRoute("menu", CafeMenu),
+        <Route path="orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
+          {[
+            createProtectedRoute("*", CafeOrders, { index: true }),
+            createProtectedRoute("history", CafeOrderHistory),
+          ]}
+        </Route>,
+        createProtectedRoute("payroll", CafePayroll),
+        createProtectedRoute("purchasing", CafePurchasing),
+        createProtectedRoute("reports", CafeReports),
+        createProtectedRoute("reservations", CafeReservations),
+        createProtectedRoute("stock", CafeStock),
+        createProtectedRoute("kassa/*", CafeKassa),
+        createProtectedRoute("clients", CafeClients),
+        createProtectedRoute("tables", CafeTables),
+      ]
+    }
   </Route>,
-  createProtectedRoute("cafe/payroll", CafePayroll),
-  createProtectedRoute("cafe/purchasing", CafePurchasing),
-  createProtectedRoute("cafe/reports", CafeReports),
-  createProtectedRoute("cafe/reservations", CafeReservations),
-  createProtectedRoute("cafe/stock", CafeStock),
-  createProtectedRoute("cafe/kassa/*", CafeKassa),
-  createProtectedRoute("cafe/clients", CafeClients),
-  createProtectedRoute("cafe/tables", CafeTables),
 
   // Building routes
   createProtectedRoute("building/work", BuildingWork),

@@ -1,9 +1,10 @@
 import { Button } from '@mui/material'
 import React, { useMemo } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useOutletContext } from 'react-router-dom'
 
 export default function CafeOrdersLayout() {
     const location = useLocation()
+    const socket = useOutletContext()
     const { text, path } = useMemo(() => {
         let isHistoryLocatin = location.pathname.split('/').map(el => el.trim()).filter(Boolean).at(-1) === 'history';
         let text = !isHistoryLocatin ? 'История заказов' : 'Назад'
@@ -39,7 +40,7 @@ export default function CafeOrdersLayout() {
                     </Button>
                 </NavLink>
             </div>
-            <Outlet />
+            <Outlet context={socket} />
         </>
     )
 }

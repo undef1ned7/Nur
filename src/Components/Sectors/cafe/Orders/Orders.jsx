@@ -30,6 +30,7 @@ import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import { useUser } from "../../../../store/slices/userSlice";
 import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
 import Pagination from "../../Market/Counterparties/components/Pagination";
+import { useOutletContext } from "react-router-dom";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -166,8 +167,7 @@ const Orders = () => {
     limit: 100,
     totalCount: 0
   })
-  const { orders: socketOrders, } = useCafeWebSocketManager()
-  const [notificationOrder, setNotificationOrder] = useState(null)
+  const { socketOrders } = useOutletContext()
   const [kitchens, setKitchens] = useState([]);
 
   const [cashboxes, setCashboxes] = useState([]);
@@ -378,25 +378,25 @@ const Orders = () => {
   // Синхронизация данных из сокетов с локальным состоянием
   useEffect(() => {
     if (!socketOrders?.orders || !Array.isArray(socketOrders.orders)) return;
-    
+
     // Фильтруем только открытые заказы (как в fetchOrders)
     const socketOpenOrders = socketOrders.orders.filter(order => {
       const status = String(order.status || '').toLowerCase();
       return status === 'open' && !order.is_paid;
     });
-    
+
     // Обновляем локальное состояние только если есть изменения
     setOrders(prev => {
       // Проверяем, нужно ли обновлять
       const prevIds = new Set(prev.map(o => String(o.id)));
       const socketIds = new Set(socketOpenOrders.map(o => String(o.id)));
-      
+
       // Если списки идентичны, не обновляем
-      if (prevIds.size === socketIds.size && 
-          [...prevIds].every(id => socketIds.has(id))) {
+      if (prevIds.size === socketIds.size &&
+        [...prevIds].every(id => socketIds.has(id))) {
         return prev;
       }
-      
+
       return socketOpenOrders;
     });
   }, [socketOrders?.orders])
@@ -569,13 +569,13 @@ const Orders = () => {
 
   /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА ===== */
   const buildKitchenTicketPayload = useCallback(
-    ({ order, kitchenId, kitchenLabel, items }) => {
+    ({ order, kitchenId, kitchenLabel, items }, label = 'КАССАА') => {
       const t = tablesMap.get(order?.table);
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
 
       return {
-        company: localStorage.getItem("company_name") || "КАССА",
+        company: localStorage.getItem("company_name") || label,
         doc_no: `${kitchenLabel || "КУХНЯ"} • СТОЛ ${t?.number ?? "—"}`,
         created_at: dt,
         cashier_name: cashier,
@@ -588,7 +588,7 @@ const Orders = () => {
         items: (items || []).map((it) => ({
           name: String(it.menu_item_title || it.title || "Позиция"),
           qty: Math.max(1, Number(it.quantity) || 1),
-          price: linePrice(it),
+          // price: linePrice(it),
         })),
       };
     },
@@ -648,8 +648,7 @@ const Orders = () => {
             kitchenId,
             kitchenLabel,
             items: kitItems,
-            company: 'КУХНЯ'
-          });
+          }, 'КУХНЯ');
 
           await setActivePrinterByKey(printerKey);
           await printOrderReceiptJSONViaUSB(payload);
@@ -852,17 +851,7 @@ const Orders = () => {
     }
   };
 
-  const [notificationDeps, setNotificationDeps] = useState(null);
-  useEffect(() => {
-    console.log('AKSDLKASDKJASLKDJLASJDASKLDJ');
-    const { lastMessage } = socketOrders;
-    if (!lastMessage) return;
-    const { type, data } = lastMessage;
-    if (type === "kitchen_task_ready" && data?.task?.waiter === userData?.id) {
-      setNotificationDeps(data?.task?.created_at)
-      setNotificationOrder(`${data?.task?.menu_item_title} \nдля стола: №: ${data?.task.table_number} готово`);
-    }
-  }, [socketOrders])
+
 
   const saveForm = async (e) => {
     e.preventDefault();
@@ -1029,7 +1018,6 @@ const Orders = () => {
           <h2 className="cafeOrders__title">Заказы</h2>
           <div className="cafeOrders__subtitle">После оплаты заказ исчезает здесь и появляется в кассе как приход.</div>
         </div>
-        <NotificationCadeSound clearNotification={() => setNotificationOrder(null)} notification={notificationOrder} deps={notificationDeps} />
         <div className="cafeOrders__actions">
           <div className="cafeOrders__search">
             <FaSearch className="cafeOrders__searchIcon" />

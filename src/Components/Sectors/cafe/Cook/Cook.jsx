@@ -24,6 +24,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
+import { useOutletContext } from "react-router-dom";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -272,11 +273,11 @@ const Cook = () => {
   const [kitchenSaving, setKitchenSaving] = useState(false);
 
   const confirm = useConfirm();
-
+  const {socketOrders: {orders}} = useOutletContext()
+  
   const menuCacheRef = useRef(new Map()); // menuId -> full menu item
   const titleCacheRef = useRef(new Map()); // menuId -> title (быстрый доступ)
   const noticeTimerRef = useRef(null);
-  const { orders } = useCafeOrdersWebSocket();
   // чтобы перерендерить, когда догрузили title
   const [titlesTick, setTitlesTick] = useState(0);
   // глушим возможный внешний orders:refresh сразу после смены статуса
@@ -761,7 +762,6 @@ const Cook = () => {
   }, [activeTab]);
   return (
     <section className="cafeCook">
-      <NotificationCadeSound deps={orders} />
       <CookHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}

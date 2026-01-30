@@ -15,6 +15,7 @@ import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import Pagination from "../../Market/Warehouse/components/Pagination";
+import { useOutletContext } from "react-router-dom";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -52,8 +53,7 @@ const CafeOrderHistory = () => {
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
-  const { tables: socketTables, orders: socketOrders } = useCafeWebSocketManager()
-
+  const { socketOrders } = useOutletContext()
   const [waiterOptions, setWaiterOptions] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
@@ -186,8 +186,6 @@ const CafeOrderHistory = () => {
       }
     })();
   }, [debouncedOrderSearchQuery, statusFilter, waiterFilter, socketOrders?.orders, ordersPagination?.currentPage])
-  console.log(orders, 'ORDERS');
-
   useEffect(() => {
     const handler = () => fetchOrders();
     window.addEventListener("orders:refresh", handler);
