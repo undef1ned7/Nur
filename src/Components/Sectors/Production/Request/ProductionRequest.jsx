@@ -55,6 +55,7 @@ const ProductionRequest = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
   // Блокировка прокрутки фона при открытии корзины (только на десктопе)
   useEffect(() => {
     // Проверяем, десктоп ли это
@@ -90,7 +91,7 @@ const ProductionRequest = () => {
   }, [isCartSectionOpen]);
 
   const filteredProduts = useMemo(() => {
-    const cartItemQtyMap = new Map(cartItems?.items?.map(el => [el.product, el.quantity_requested]) ?? [])
+    const cartItemQtyMap = new Map(cartItems?.map(el => [el.product, el.quantity_requested]) ?? [])
     const data = products.map(el => {
       const productQty = el.quantity;
       const itemQty = parseFloat(cartItemQtyMap.get(el.id) ?? '0')
@@ -101,6 +102,10 @@ const ProductionRequest = () => {
     }).filter(el => !!el.quantity)
     return data
   }, [cartItems, products])
+  const detailProduct = useMemo(() => {
+    const findedEl = filteredProduts.find(el => el?.id == selectedProduct?.id)
+    return findedEl;
+  }, [filteredProduts, selectedProduct])
   // Debounce для поиска
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -176,7 +181,7 @@ const ProductionRequest = () => {
         const { updateAgentCartItemById } = await import(
           "../../../../api/agentCarts"
         );
-        const newQuantity = (existingItem.quantity_requested || 0) + quantity;
+        const newQuantity = (+existingItem.quantity_requested || 0) + quantity;
         await updateAgentCartItemById(existingItem.id, {
           quantity_requested: newQuantity,
         });
@@ -190,7 +195,7 @@ const ProductionRequest = () => {
       }
 
       // Обновляем данные корзины
-      await refreshCart();
+      await refreshCart(cartId);
 
       // Показываем уведомление об успешном добавлении
       setAlertType("success");
@@ -392,7 +397,7 @@ const ProductionRequest = () => {
       )}
 
       <ProductDetailModal
-        product={selectedProduct}
+        product={detailProduct}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onRequestWithCart={handleRequestWithCart}

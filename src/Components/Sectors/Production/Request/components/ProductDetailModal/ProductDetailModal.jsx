@@ -44,6 +44,12 @@ const ProductDetailModal = ({
     }
   };
 
+  useEffect(() => {
+    if (!product?.quantity) {
+      onClose();
+    }
+  },[product])
+
   const handleRequestWithoutCart = () => {
     if (available && quantity > 0 && onRequestWithoutCart) {
       onRequestWithoutCart(product, quantity);
