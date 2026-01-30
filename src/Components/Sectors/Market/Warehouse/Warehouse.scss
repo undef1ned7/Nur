@@ -93,6 +93,11 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+.warehouse-view-buttons {
+  @media (max-width: 768px) {
+    flex-wrap: wrap;
+  }
+}
 
 .warehouse-search {
   position: relative;
@@ -147,6 +152,11 @@
     &:hover {
       background: #f9fafb;
       border-color: var(--primary);
+    }
+    @media (max-width: 768px) {
+      width: 100%;
+      display: flex;
+      justify-content: center;
     }
   }
 }

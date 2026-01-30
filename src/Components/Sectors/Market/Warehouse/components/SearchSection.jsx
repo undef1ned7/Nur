@@ -33,14 +33,15 @@ const SearchSection = ({
           Всего: {count ?? 0} • Найдено: {foundCount}
         </span>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
           <button
             type="button"
             onClick={() => onViewModeChange(VIEW_MODES.TABLE)}
             className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
-              ${viewMode === VIEW_MODES.TABLE
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              ${
+                viewMode === VIEW_MODES.TABLE
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
               }`}
           >
             <Table2 size={16} />
@@ -51,9 +52,10 @@ const SearchSection = ({
             type="button"
             onClick={() => onViewModeChange(VIEW_MODES.CARDS)}
             className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
-              ${viewMode === VIEW_MODES.CARDS
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              ${
+                viewMode === VIEW_MODES.CARDS
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
               }`}
           >
             <LayoutGrid size={16} />
@@ -62,7 +64,7 @@ const SearchSection = ({
 
           {onOpenFilters && (
             <button
-              className="warehouse-search__filter-btn"
+              className="warehouse-search__filter-btn md:block flex justify-center w-full"
               onClick={onOpenFilters}
             >
               <Filter size={16} />
@@ -76,4 +78,3 @@ const SearchSection = ({
 };
 
 export default React.memo(SearchSection);
-

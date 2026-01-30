@@ -1,6 +1,15 @@
-import React, { act, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  act,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { FaPencilAlt, FaTrash } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import api from "../../../../api";
+import { useConfirm } from "../../../../hooks/useDialog";
 import {
   fetchKitchenTasksAsync,
   claimKitchenTaskAsync,
@@ -53,7 +62,8 @@ const toMinuteKey = (iso) => {
   return `${y}-${m}-${day} ${hh}:${mm}`;
 };
 
-const pickOrderId = (t) => t?.order ?? t?.order_id ?? t?.orderId ?? t?.order_pk ?? null;
+const pickOrderId = (t) =>
+  t?.order ?? t?.order_id ?? t?.orderId ?? t?.order_pk ?? null;
 
 const computeGroupStatus = (items) => {
   const s = (items || []).map((x) => String(x?.status || ""));
@@ -108,7 +118,12 @@ const extractMenuTitleFromTask = (t) =>
   ).trim();
 
 const extractPortionsFromTask = (t) =>
-  Math.max(1, Number(firstDefined(t?.quantity, t?.qty, t?.count, t?.portions, t?.amount, 1)) || 1);
+  Math.max(
+    1,
+    Number(
+      firstDefined(t?.quantity, t?.qty, t?.count, t?.portions, t?.amount, 1)
+    ) || 1
+  );
 
 const tryFetchTaskDetail = async (taskId) => {
   const id = String(taskId || "");
@@ -126,7 +141,7 @@ const tryFetchTaskDetail = async (taskId) => {
     try {
       const r = await api.get(url);
       if (r?.data) return r.data;
-    } catch { }
+    } catch {}
   }
   return null;
 };
@@ -155,7 +170,12 @@ const coerceArray = (v) => {
 
 const extractRecipeRows = (menuFull) => {
   if (!menuFull) return [];
-  const candidates = [menuFull.ingredients, menuFull.recipe, menuFull.recipe_items, menuFull.components];
+  const candidates = [
+    menuFull.ingredients,
+    menuFull.recipe,
+    menuFull.recipe_items,
+    menuFull.components,
+  ];
   for (const c of candidates) {
     const arr = coerceArray(c);
     if (arr.length) return arr;
@@ -175,10 +195,13 @@ const extractRecipeProductId = (row) =>
     row?.item_id
   );
 
-const extractRecipeAmount = (row) => firstDefined(row?.amount, row?.qty, row?.quantity, row?.count, 0);
+const extractRecipeAmount = (row) =>
+  firstDefined(row?.amount, row?.qty, row?.quantity, row?.count, 0);
 
 const toUserMessage = (err) => {
-  const raw = String(err?.message || err?.detail || err?.error || err || "").trim();
+  const raw = String(
+    err?.message || err?.detail || err?.error || err || ""
+  ).trim();
   const lower = raw.toLowerCase();
 
   if (
@@ -190,7 +213,10 @@ const toUserMessage = (err) => {
     return "Нельзя отметить «Готово»: у блюда не настроены ингредиенты. Обратитесь к администратору.";
   }
 
-  if (lower.includes("недостаточно на складе") || lower.includes("нет на складе")) {
+  if (
+    lower.includes("недостаточно на складе") ||
+    lower.includes("нет на складе")
+  ) {
     return "Нельзя отметить «Готово»: на складе не хватает ингредиентов. Проверьте остатки.";
   }
 
@@ -204,7 +230,6 @@ const toUserMessage = (err) => {
 
   return "Не удалось выполнить действие. Попробуйте ещё раз.";
 };
-
 
 const historyFilterOptions = [
   { value: null, label: "Все статусы" },
@@ -227,7 +252,9 @@ const stLabels = {
 
 const Cook = () => {
   const dispatch = useDispatch();
-  const { tasks, loading, error, updatingStatus } = useSelector((state) => state.cafeOrders);
+  const { tasks, loading, error, updatingStatus } = useSelector(
+    (state) => state.cafeOrders
+  );
   const [activeTab, setActiveTab] = useState("current");
   const [query, setQuery] = useState("");
   const debouncedTaskSearchQuery = useDebouncedValue(query, 400);
@@ -238,11 +265,18 @@ const Cook = () => {
   const [kitchenModalOpen, setKitchenModalOpen] = useState(false);
   const [historyOrders, setHistoryOrders] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [kitchensList, setKitchensList] = useState([]);
+  const [kitchensLoading, setKitchensLoading] = useState(false);
+  const [editingKitchen, setEditingKitchen] = useState(null);
+  const [editKitchenTitle, setEditKitchenTitle] = useState("");
+  const [kitchenSaving, setKitchenSaving] = useState(false);
+
+  const confirm = useConfirm();
 
   const menuCacheRef = useRef(new Map()); // menuId -> full menu item
   const titleCacheRef = useRef(new Map()); // menuId -> title (быстрый доступ)
   const noticeTimerRef = useRef(null);
-  const { orders } = useCafeOrdersWebSocket()
+  const { orders } = useCafeOrdersWebSocket();
   // чтобы перерендерить, когда догрузили title
   const [titlesTick, setTitlesTick] = useState(0);
   // глушим возможный внешний orders:refresh сразу после смены статуса
@@ -258,25 +292,31 @@ const Cook = () => {
     const params = {
       search: debouncedTaskSearchQuery,
       status: statusFilter,
-      ordering: '-created_at'
-    }
+      ordering: "-created_at",
+    };
     if (!statusFilter) {
-      if (activeTab === 'history') {
-        params['status'] = historyFilterOptions.map(el => el.value).filter(Boolean).toString()
+      if (activeTab === "history") {
+        params["status"] = historyFilterOptions
+          .map((el) => el.value)
+          .filter(Boolean)
+          .toString();
       } else {
-        params['status'] = currentFilterOptions.map(el => el.value).filter(Boolean).toString()
+        params["status"] = currentFilterOptions
+          .map((el) => el.value)
+          .filter(Boolean)
+          .toString();
       }
     }
 
-    if (!debouncedTaskSearchQuery) delete params['search'];
+    if (!debouncedTaskSearchQuery) delete params["search"];
     dispatch(fetchKitchenTasksAsync(params));
-  }, [debouncedTaskSearchQuery, statusFilter, activeTab])
+  }, [debouncedTaskSearchQuery, statusFilter, activeTab]);
 
   const refetch = useCallback(async () => {
     // История: закрытые заказы + готовые задачи (даже если заказ ещё открыт)
     setHistoryLoading(true);
     try {
-      await refetchTask()
+      await refetchTask();
     } catch (err) {
       setHistoryOrders([]);
     } finally {
@@ -287,6 +327,82 @@ const Cook = () => {
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  const refetchKitchens = useCallback(() => {
+    if (activeTab !== "kitchens") return;
+    setKitchensLoading(true);
+    api
+      .get("/cafe/kitchens/")
+      .then((res) => setKitchensList(listFrom(res)))
+      .catch(() => setKitchensList([]))
+      .finally(() => setKitchensLoading(false));
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "kitchens") return;
+    setKitchensLoading(true);
+    api
+      .get("/cafe/kitchens/")
+      .then((res) => setKitchensList(listFrom(res)))
+      .catch(() => setKitchensList([]))
+      .finally(() => setKitchensLoading(false));
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (editingKitchen) {
+      setEditKitchenTitle(
+        editingKitchen.name ??
+          editingKitchen.title ??
+          editingKitchen.title_name ??
+          ""
+      );
+    } else {
+      setEditKitchenTitle("");
+    }
+  }, [editingKitchen]);
+
+  const handleSaveEditKitchen = useCallback(async () => {
+    const id = editingKitchen?.id ?? editingKitchen?.uuid;
+    if (!id || !editKitchenTitle.trim()) return;
+    setKitchenSaving(true);
+    try {
+      await api.patch(`/cafe/kitchens/${id}/`, {
+        title: editKitchenTitle.trim(),
+      });
+      setEditingKitchen(null);
+      refetchKitchens();
+      showNotice("ok", "Кухня сохранена");
+    } catch (e) {
+      console.error("Kitchen update error:", e);
+      showNotice("error", e?.response?.data?.detail || "Не удалось сохранить");
+    } finally {
+      setKitchenSaving(false);
+    }
+  }, [editingKitchen, editKitchenTitle, refetchKitchens, showNotice]);
+
+  const handleDeleteKitchen = useCallback(
+    (k) => {
+      const id = k?.id ?? k?.uuid;
+      if (!id) return;
+      const name = k?.name ?? k?.title ?? k?.title_name ?? "кухня";
+      confirm(`Удалить кухню «${name}»?`, async (result) => {
+        if (!result) return;
+        setKitchenSaving(true);
+        try {
+          await api.delete(`/cafe/kitchens/${id}/`);
+          setEditingKitchen(null);
+          refetchKitchens();
+          showNotice("ok", "Кухня удалена");
+        } catch (e) {
+          console.error("Kitchen delete error:", e);
+          showNotice("error", e?.response?.data?.detail || "Не удалось удалить");
+        } finally {
+          setKitchenSaving(false);
+        }
+      });
+    },
+    [confirm, refetchKitchens, showNotice]
+  );
 
   useEffect(() => {
     const handler = () => {
@@ -300,7 +416,10 @@ const Cook = () => {
     return () => window.removeEventListener("orders:refresh", handler);
   }, [refetch]);
 
-  const isUpdating = useCallback((taskId) => updatingStatus?.[taskId] === true, [updatingStatus]);
+  const isUpdating = useCallback(
+    (taskId) => updatingStatus?.[taskId] === true,
+    [updatingStatus]
+  );
 
   const getMenuWithIngredients = useCallback(async (menuId) => {
     const key = String(menuId || "");
@@ -313,7 +432,14 @@ const Cook = () => {
 
     if (full) {
       menuCacheRef.current.set(key, full);
-      const title = String(firstDefined(full?.title, full?.name, full?.menu_item_title, full?.menuItemTitle) || "").trim();
+      const title = String(
+        firstDefined(
+          full?.title,
+          full?.name,
+          full?.menu_item_title,
+          full?.menuItemTitle
+        ) || ""
+      ).trim();
       if (title) titleCacheRef.current.set(key, title);
     }
 
@@ -349,7 +475,14 @@ const Cook = () => {
         if (cancelled) return;
         try {
           const full = await getMenuWithIngredients(id);
-          const title = String(firstDefined(full?.title, full?.name, full?.menu_item_title, full?.menuItemTitle) || "").trim();
+          const title = String(
+            firstDefined(
+              full?.title,
+              full?.name,
+              full?.menu_item_title,
+              full?.menuItemTitle
+            ) || ""
+          ).trim();
           if (title) {
             titleCacheRef.current.set(String(id), title);
             if (!cancelled) setTitlesTick((x) => x + 1);
@@ -375,21 +508,33 @@ const Cook = () => {
         if (detail) menuId = extractMenuIdFromTask(detail);
       }
 
-      if (!menuId) throw new Error("У блюда не найден ID для списания со склада.");
+      if (!menuId)
+        throw new Error("У блюда не найден ID для списания со склада.");
 
       let full = null;
       try {
         full = await getMenuWithIngredients(menuId);
       } catch (e) {
         const status = e?.response?.status;
-        if (status === 404) throw new Error("Блюдо не найдено в меню. Обратитесь к администратору.");
-        throw new Error("Не удалось получить данные блюда. Попробуйте ещё раз.");
+        if (status === 404)
+          throw new Error(
+            "Блюдо не найдено в меню. Обратитесь к администратору."
+          );
+        throw new Error(
+          "Не удалось получить данные блюда. Попробуйте ещё раз."
+        );
       }
 
-      if (!full) throw new Error("Не удалось получить данные блюда. Попробуйте ещё раз.");
+      if (!full)
+        throw new Error(
+          "Не удалось получить данные блюда. Попробуйте ещё раз."
+        );
 
       const recipeRows = extractRecipeRows(full);
-      if (!recipeRows.length) throw new Error("У блюда не настроены ингредиенты. Обратитесь к администратору.");
+      if (!recipeRows.length)
+        throw new Error(
+          "У блюда не настроены ингредиенты. Обратитесь к администратору."
+        );
 
       const portions = extractPortionsFromTask(task);
       const need = new Map();
@@ -405,7 +550,10 @@ const Cook = () => {
         need.set(k, (need.get(k) || 0) + add);
       }
 
-      if (!need.size) throw new Error("У блюда не настроены ингредиенты. Обратитесь к администратору.");
+      if (!need.size)
+        throw new Error(
+          "У блюда не настроены ингредиенты. Обратитесь к администратору."
+        );
       return need;
     },
     [getMenuWithIngredients]
@@ -414,9 +562,11 @@ const Cook = () => {
   const updateWarehouseItem = useCallback(async (item, nextRem) => {
     if (!item?.id) throw new Error("Позиция склада без ID.");
     try {
-      await api.patch(`/cafe/warehouse/${item.id}/`, { remainder: numStr(nextRem) });
+      await api.patch(`/cafe/warehouse/${item.id}/`, {
+        remainder: numStr(nextRem),
+      });
       return;
-    } catch { }
+    } catch {}
     await api.put(`/cafe/warehouse/${item.id}/`, {
       title: item.title,
       unit: item.unit,
@@ -445,7 +595,11 @@ const Cook = () => {
       }
 
       if (lacks.length) {
-        return { ok: false, message: "Нельзя отметить «Готово»: на складе не хватает ингредиентов." };
+        return {
+          ok: false,
+          message:
+            "Нельзя отметить «Готово»: на складе не хватает ингредиентов.",
+        };
       }
 
       const applied = [];
@@ -465,7 +619,7 @@ const Cook = () => {
             const { item, prev } = applied[i];
             await updateWarehouseItem(item, prev);
           }
-        } catch { }
+        } catch {}
         throw e;
       }
     },
@@ -487,7 +641,7 @@ const Cook = () => {
         const next = cur + qty;
         try {
           await updateWarehouseItem(s, next);
-        } catch { }
+        } catch {}
       }
     },
     [updateWarehouseItem]
@@ -522,19 +676,18 @@ const Cook = () => {
   // const toggleGroup = useCallback((key) => {
   //   setCollapsed((p) => ({ ...p, [key]: !p[key] }));
   // }, []);
-  const buildPrintPayload = useCallback(
-    (order) => {
-      const t = order.table_number;
-      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
-      return {
-        company: localStorage.getItem("company_name") || "КУХНЯ",
-        doc_no: `СТОЛ ${t ?? "—"}`,
-        created_at: dt,
-        menu_title: order.menu_item_title
-      };
-    },
-    []
-  );
+  const buildPrintPayload = useCallback((order) => {
+    const t = order.table_number;
+    const dt = formatReceiptDate(
+      order?.created_at || order?.date || order?.created
+    );
+    return {
+      company: localStorage.getItem("company_name") || "КУХНЯ",
+      doc_no: `СТОЛ ${t ?? "—"}`,
+      created_at: dt,
+      menu_title: order.menu_item_title,
+    };
+  }, []);
   const handleClaimOne = useCallback(
     async (taskId, e) => {
       if (e?.preventDefault) e.preventDefault();
@@ -553,6 +706,10 @@ const Cook = () => {
     [dispatch, showNotice]
   );
 
+  const removeAfterReadyTask = useCallback((id) => {
+    dispatch(removeAfterReady(id));
+  }, [dispatch]);
+
   const handleReadyOne = useCallback(
     async (task, e) => {
       if (e?.preventDefault) e.preventDefault();
@@ -564,11 +721,12 @@ const Cook = () => {
         suppressNextRefreshRef.current = true;
         try {
           await dispatch(readyKitchenTaskAsync(taskId)).unwrap();
+          removeAfterReadyTask(taskId);
           showNotice("ok", "Отмечено как готово.");
         } catch (eReady) {
           try {
             await applyWarehouseIncreaseSafe(needMap);
-          } catch { }
+          } catch {}
           suppressNextRefreshRef.current = false;
           console.error("Ready error:", eReady);
           showNotice("error", toUserMessage(eReady));
@@ -580,27 +738,27 @@ const Cook = () => {
         showNotice("error", toUserMessage(err));
       }
     },
-    [dispatch, showNotice, applyWarehouseDecreaseSafe, applyWarehouseIncreaseSafe]
+    [
+      dispatch,
+      showNotice,
+      removeAfterReadyTask,
+      applyWarehouseDecreaseSafe,
+      applyWarehouseIncreaseSafe,
+    ]
   );
 
-  const statusOptions = useMemo(
-    () => {
-      if (activeTab === "history") {
-        return historyFilterOptions;
-      } else {
-        return currentFilterOptions;
-      }
-    },
-    [activeTab]
-  );
+  const statusOptions = useMemo(() => {
+    if (activeTab === "history") {
+      return historyFilterOptions;
+    } else {
+      return currentFilterOptions;
+    }
+  }, [activeTab]);
 
-  const removeAfterReadyTask = useCallback((id) => {
-    dispatch(removeAfterReady(id))
-  }, []);
   useEffect(() => {
-    setQuery('');
+    setQuery("");
     setStatusFilter(null);
-  }, [activeTab])
+  }, [activeTab]);
   return (
     <section className="cafeCook">
       <NotificationCadeSound deps={orders} />
@@ -630,40 +788,112 @@ const Cook = () => {
         </div>
       ) : null}
 
-      <div className="cafeCook__list" aria-busy={loading ? "true" : "false"}>
-        {loading && <div className="cafeCook__alert cafeCook__alert--neutral">Загрузка…</div>}
+      <div
+        className="cafeCook__list"
+        aria-busy={
+          activeTab === "kitchens"
+            ? kitchensLoading
+            : loading
+            ? "true"
+            : "false"
+        }
+      >
+        {activeTab === "kitchens" ? (
+          <>
+            {kitchensLoading && (
+              <div className="cafeCook__alert cafeCook__alert--neutral">
+                Загрузка…
+              </div>
+            )}
+            {!kitchensLoading && kitchensList.length === 0 && (
+              <div className="cafeCook__alert cafeCook__alert--neutral">
+                Нет кухонь
+              </div>
+            )}
+            {!kitchensLoading && kitchensList.length > 0 && (
+              <div className="cafeCook__kitchens">
+                <ul className="cafeCook__kitchensList">
+                  {kitchensList.map((k) => (
+                    <li
+                      key={k.id ?? k.uuid ?? k.name}
+                      className="cafeCook__kitchenItem"
+                    >
+                      <span className="cafeCook__kitchenName">
+                        {k.name ?? k.title ?? k.title_name ?? "—"}
+                      </span>
+                      <div className="cafeCook__kitchenActions">
+                        <button
+                          type="button"
+                          className="cafeCook__kitchenBtn cafeCook__kitchenBtn--edit"
+                          onClick={() => setEditingKitchen(k)}
+                          disabled={kitchenSaving}
+                          title="Редактировать"
+                          aria-label="Редактировать"
+                        >
+                          <FaPencilAlt />
+                        </button>
+                        <button
+                          type="button"
+                          className="cafeCook__kitchenBtn cafeCook__kitchenBtn--delete"
+                          onClick={() => handleDeleteKitchen(k)}
+                          disabled={kitchenSaving}
+                          title="Удалить"
+                          aria-label="Удалить"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {loading && (
+              <div className="cafeCook__alert cafeCook__alert--neutral">
+                Загрузка…
+              </div>
+            )}
 
-        {error && <div className="cafeCook__alert">Ошибка: {error?.message || error?.detail || String(error)}</div>}
+            {error && (
+              <div className="cafeCook__alert">
+                Ошибка: {error?.message || error?.detail || String(error)}
+              </div>
+            )}
 
-        {!loading && !historyLoading && !error && tasks?.length === 0 && (
-          <div className="cafeCook__alert cafeCook__alert--neutral">
-            {query.trim()
-              ? `Ничего не найдено по запросу «${query}»`
-              : activeTab === "current"
-                ? "Нет текущих задач"
-                : "История пуста"}
-          </div>
+            {!loading && !historyLoading && !error && tasks?.length === 0 && (
+              <div className="cafeCook__alert cafeCook__alert--neutral">
+                {query.trim()
+                  ? `Ничего не найдено по запросу «${query}»`
+                  : activeTab === "current"
+                  ? "Нет текущих задач"
+                  : "История пуста"}
+              </div>
+            )}
+
+            {!loading &&
+              !error &&
+              tasks.map((g) => (
+                <CookReceiptCard
+                  key={g.id}
+                  group={g}
+                  activeTab={activeTab}
+                  collapsed={collapsed[g.key] !== false}
+                  onToggle={() => toggleGroup(g.key)}
+                  formatReceiptDate={formatReceiptDate}
+                  getStatusLabel={getStatusLabel}
+                  extractPortionsFromTask={extractPortionsFromTask}
+                  toNum={toNum}
+                  isUpdating={(id) => isUpdating(id)}
+                  onClaimOne={handleClaimOne}
+                  onReadyOne={handleReadyOne}
+                  onRemoveAfterReady={removeAfterReadyTask}
+                />
+              ))}
+          </>
         )}
-
-        {!loading &&
-          !error &&
-          tasks.map((g) => (
-            <CookReceiptCard
-              key={g.id}
-              group={g}
-              activeTab={activeTab}
-              collapsed={collapsed[g.key] !== false}
-              onToggle={() => toggleGroup(g.key)}
-              formatReceiptDate={formatReceiptDate}
-              getStatusLabel={getStatusLabel}
-              extractPortionsFromTask={extractPortionsFromTask}
-              toNum={toNum}
-              isUpdating={(id) => isUpdating(id)}
-              onClaimOne={handleClaimOne}
-              onReadyOne={handleReadyOne}
-              onRemoveAfterReady={removeAfterReadyTask}
-            />
-          ))}
       </div>
       {/* <Pagination
         currentPage={currentPage}
@@ -683,9 +913,52 @@ const Cook = () => {
         onCreated={() => {
           try {
             window.dispatchEvent(new CustomEvent("orders:refresh"));
-          } catch { }
+          } catch {}
         }}
       />
+
+      {editingKitchen && (
+        <div
+          className="cafeCook__editKitchenOverlay"
+          onClick={() => !kitchenSaving && setEditingKitchen(null)}
+          role="presentation"
+        >
+          <div
+            className="cafeCook__editKitchenModal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="cafeCook__editKitchenTitle">Редактировать кухню</h3>
+            <input
+              type="text"
+              className="cafeCook__editKitchenInput"
+              value={editKitchenTitle}
+              onChange={(e) => setEditKitchenTitle(e.target.value)}
+              placeholder="Название кухни"
+              disabled={kitchenSaving}
+              autoFocus
+            />
+            <div className="cafeCook__editKitchenFooter">
+              <button
+                type="button"
+                className="cafeCook__btn cafeCook__btn--ghost"
+                onClick={() => !kitchenSaving && setEditingKitchen(null)}
+                disabled={kitchenSaving}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="cafeCook__btn cafeCook__btn--primary"
+                onClick={handleSaveEditKitchen}
+                style={{ padding: "10px 20px" }}
+                disabled={kitchenSaving || !editKitchenTitle.trim()}
+              >
+                {kitchenSaving ? "Сохранение…" : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

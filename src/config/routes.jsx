@@ -1,4 +1,4 @@
-import { Route } from "react-router-dom";
+import { Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
 
 // Public routes
@@ -139,6 +139,7 @@ import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
 import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategory/BrandCategoryPage";
+import WarehouseDocumentsLayout from "../Components/Sectors/Warehouse/Documents/DocumentsLayout";
 import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
 import CreateWarehouseDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
 // Production
@@ -152,8 +153,6 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
 
-
-
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
 import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
@@ -163,7 +162,6 @@ import Orders from "../Components/Sectors/cafe/Orders/Orders";
 import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistory";
 import SellLayout from "../Components/pages/Sell/SellLayout";
 import SellMainStart from "../Components/pages/Sell/SellMainStart";
-
 
 /**
  * Создает защищенный роут
@@ -181,7 +179,6 @@ const createProtectedRoute = (path, Component, props) => (
   />
 );
 
-
 /**
  * Конфигурация публичных роутов
  */
@@ -189,8 +186,6 @@ export const publicRoutes = [
   <Route key="/login" path="/login" element={<Login />} />,
   <Route key="/" path="/" element={<Landing />} />,
   <Route key="/register" path="/register" element={<Register />} />,
-
-
 
   // Public routes
   <Route
@@ -208,8 +203,6 @@ export const publicRoutes = [
     path="/barber/:company_slug/booking"
     element={<OnlineBooking />}
   />,
-
-
 
   <Route
     key="/submit-application"
@@ -244,13 +237,11 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
   createProtectedRoute("barcodes", BarcodePrintPage),
   createProtectedRoute("scales", ScalesPage),
-  <Route path="sell" key={'sell'} element={<SellLayout />}>
-    {
-      [
-        createProtectedRoute("", Sell, {index: true}),
-        createProtectedRoute("start", SellMainStart)
-      ]
-    }
+  <Route path="sell" key={"sell"} element={<SellLayout />}>
+    {[
+      createProtectedRoute("", Sell, { index: true }),
+      createProtectedRoute("start", SellMainStart),
+    ]}
   </Route>,
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),
@@ -270,9 +261,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-      createProtectedRoute("kassa/*", Kassa),
-      createProtectedRoute("kassa/:id", KassaDet),
-    ]
+        createProtectedRoute("kassa/*", Kassa),
+        createProtectedRoute("kassa/:id", KassaDet),
+      ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
@@ -325,13 +316,11 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("cafe/inventory", CafeInventory),
   createProtectedRoute("cafe/menu", CafeMenu),
 
-  <Route path="cafe/orders" key={'cafe/orders'} element={<CafeOrdersLayout />}>
-    {
-      [
-        createProtectedRoute("*", CafeOrders, { index: true }),
-        createProtectedRoute("history", CafeOrderHistory)
-      ]
-    }
+  <Route path="cafe/orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
+    {[
+      createProtectedRoute("*", CafeOrders, { index: true }),
+      createProtectedRoute("history", CafeOrderHistory),
+    ]}
   </Route>,
   createProtectedRoute("cafe/payroll", CafePayroll),
   createProtectedRoute("cafe/purchasing", CafePurchasing),
@@ -361,8 +350,19 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/warehouses", Warehouses),
   createProtectedRoute("warehouse/analytics", WarehouseAnalytics),
   createProtectedRoute("warehouse/clients", WarehouseClients),
-  createProtectedRoute("warehouse/documents", WarehouseDocuments),
-  createProtectedRoute("warehouse/documents/create", CreateWarehouseDocument),
+  <Route
+    path="warehouse/documents"
+    key="warehouse/documents"
+    element={
+      <ProtectedRoute>
+        <WarehouseDocumentsLayout />
+      </ProtectedRoute>
+    }
+  >
+    <Route index element={<Navigate to="all" replace />} />
+    <Route path="create" element={<CreateWarehouseDocument />} />
+    <Route path=":docType" element={<WarehouseDocuments />} />
+  </Route>,
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
   createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),
@@ -378,7 +378,6 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
   createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
   createProtectedRoute("warehouse/counterparties", Counterparties),
-
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),
