@@ -85,11 +85,16 @@ const SellMainStart = () => {
         cartItem: cartItem?.item,
         img: primaryImg?.image_url ?? el.images[0]?.image_url ?? '/images/placeholder.avif'
       }
-    }).filter(el => !!el.quantity)
+    })
+      .sort((a, b) => {
+        if (a.cartItem) return -1;
+        if (b.cartItem) return 1;
+        return 0;
+      })
+      .filter(el => !!el.quantity)
   }, [products, start])
   // Флаг для отслеживания недавнего сканирования (чтобы не открывать модалку при Enter от сканера)
   const lastScanTimeRef = useRef(0);
-  console.log('START', start);
 
   // Автодобавление товара по сканеру штрих-кода
   const { error: barcodeScanError } = useBarcodeToCart(start?.id, {
@@ -1131,17 +1136,18 @@ const SellMainStart = () => {
     <section className="sell start">
       <div className="sell__header">
         <div className="sell__header-left">
-          <div className="sell__header_search">  <ProductSearch
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            showDropdown={showDropdown}
-            setShowDropdown={setShowDropdown}
-            foundProduct={foundProduct}
-            start={start}
-            products={filteredProducts}
-            setAlert={setAlert}
-            dispatch={dispatch}
-          /></div>
+          <div className="sell__header_search">
+            <ProductSearch
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              showDropdown={showDropdown}
+              setShowDropdown={setShowDropdown}
+              foundProduct={foundProduct}
+              start={start}
+              products={filteredProducts}
+              setAlert={setAlert}
+              dispatch={dispatch}
+            /></div>
 
           <div className="sell__header_clients">
             <select
@@ -1235,7 +1241,7 @@ const SellMainStart = () => {
               <div className="start_product_item--content">
                 <p className="start_product_item--title">
                   <span className="start_product_item--title-name">Нзв.: <strong>{product.name}</strong></span>
-                  <span className="start_product_item--title-qty">
+                  <span className="start_product_item--title-qty">Кол.
                     <strong>{product.quantity}</strong> шт
                   </span>
                 </p>

@@ -1,5 +1,5 @@
 // src/.../Tables.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { FaChair, FaTimes, FaPlus, FaFilter } from "react-icons/fa";
 import api from "../../../../api";
 import TablesHall from "./components/TablesHall";
@@ -7,6 +7,7 @@ import TablesZones from "./components/TablesZones";
 import TablesFiltersModal from "./components/TablesFiltersModal";
 import "./Tables.scss";
 import { useCafeTablesWebSocket } from "../../../../hooks/useCafeWebSocket";
+import { useOutletContext } from "react-router-dom";
 
 const listFrom = (r) => r?.data?.results || r?.data || [];
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
@@ -34,8 +35,7 @@ const Tables = () => {
   const [zones, setZones] = useState([]);
   const [tables, setTables] = useState([]);
   const [ordersActive, setOrdersActive] = useState([]);
-  const socket = useCafeTablesWebSocket()
-
+  const { socketTables: socket } = useOutletContext()
   // confirm modal (no window.confirm)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState(false);

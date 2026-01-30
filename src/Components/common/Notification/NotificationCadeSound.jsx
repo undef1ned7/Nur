@@ -1,13 +1,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-export default function NotificationCadeSound({ deps }) {
+export default function NotificationCadeSound({ deps, notification, clearNotification }) {
     const audioRef = useRef(null);
     const isFirstEffect = useRef(true);
     const [audioUnlocked, setAudioUnlocked] = useState(false);
     const [showUnlockButton, setShowUnlockButton] = useState(false);
     const [playError, setPlayError] = useState(null);
-
-    // Функция для разблокировки аудио
     const unlockAudio = useCallback(async () => {
         if (!audioRef.current || audioUnlocked) return;
 
@@ -24,10 +22,7 @@ export default function NotificationCadeSound({ deps }) {
             setAudioUnlocked(true);
             setShowUnlockButton(false);
             setPlayError(null);
-
-            console.log('✅ Аудио успешно разблокировано');
         } catch (error) {
-            console.error('❌ Не удалось разблокировать аудио:', error);
             setPlayError(error.message);
         }
     }, [audioUnlocked]);
@@ -69,25 +64,41 @@ export default function NotificationCadeSound({ deps }) {
                     await audioRef.current.play();
                     setPlayError(null);
                 } catch (error) {
-                    console.error('❌ Ошибка воспроизведения:', error);
                     setPlayError(error.message);
-
-                    // Если ошибка автовоспроизведения, показываем кнопку
                     if (error.name === 'NotAllowedError') {
                         setAudioUnlocked(false);
                         setShowUnlockButton(true);
                     }
                 }
             } else {
-                // Показываем кнопку разблокировки если аудио заблокировано
                 setShowUnlockButton(true);
-                console.log('🔇 Аудио заблокировано');
             }
         };
 
         playNotification();
+
     }, [deps, audioUnlocked]);
 
+    const [currentNotification, setCurrentNotification] = useState([]);
+    useEffect(() => {
+        if (!notification) return;
+
+        const newNotification = {
+            id: Date.now().toString(),
+            text: notification,
+        }
+
+        setCurrentNotification(prev => {
+            return [newNotification, ...prev]
+        })
+
+        setTimeout(() => {
+            setCurrentNotification(prev => {
+                if (prev.length === 0) return prev;
+                return prev.slice(0, -1);
+            })
+        }, 4000)
+    }, [notification])
     return (
         <>
             {showUnlockButton && !audioUnlocked && (
@@ -135,12 +146,29 @@ export default function NotificationCadeSound({ deps }) {
                 </div>
             )}
 
-            {process.env.NODE_ENV === 'development' && (
+            {/* {process.env.NODE_ENV === 'development' && (
                 <div className={`fixed top-4 right-4 z-40 px-3 py-2 rounded-lg text-xs font-medium ${audioUnlocked ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                     {audioUnlocked ? '🔊 Звук включен' : '🔇 Звук выключен'}
                 </div>
-            )}
+            )} */}
 
+            {
+                !!currentNotification.length &&
+                (
+                    <div className='fixed top-4 gap-2 right-4 z-40 flex flex-col'>
+                        {
+                            currentNotification.map(({ text }) => (
+                                <div className={`px-3 py-2 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800`}>
+                                    {
+                                        text
+                                    }
+                                </div>
+                            ))
+                        }
+
+                    </div>
+                )
+            }
             <audio
                 ref={audioRef}
                 src="/sounds/notification.mp3"

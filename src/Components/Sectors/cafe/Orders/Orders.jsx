@@ -1,5 +1,5 @@
 // src/.../Orders.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaSearch,
   FaPlus,
@@ -28,6 +28,9 @@ import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import { useUser } from "../../../../store/slices/userSlice";
+import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
+import Pagination from "../../Market/Counterparties/components/Pagination";
+import { useOutletContext } from "react-router-dom";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -158,8 +161,13 @@ const Orders = () => {
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
-  const { orders: socketOrders, } = useCafeWebSocketManager()
-  
+  const [ordersPagination, setOrderPagination] = useState({
+    totalPages: 0,
+    currentPage: 1,
+    limit: 100,
+    totalCount: 0
+  })
+  const { socketOrders } = useOutletContext()
   const [kitchens, setKitchens] = useState([]);
 
   const [cashboxes, setCashboxes] = useState([]);
@@ -168,7 +176,6 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [query, setQuery] = useState("");
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
-  const [statusFilter, setStatusFilter] = useState("");
 
   // Состояние пагинации меню
   const [menuCurrentPage, setMenuCurrentPage] = useState(1);
@@ -185,9 +192,6 @@ const Orders = () => {
     }
   }, [profile])
   const [printingId, setPrintingId] = useState(null);
-
-  const [showAll, setShowAll] = useState(false);
-  const ORDERS_COLLAPSE_LIMIT = 6;
 
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const CARD_ITEMS_LIMIT = 4;
@@ -332,12 +336,19 @@ const Orders = () => {
     if (isStaff) {
       params['waiter'] = userId
     }
-    const base = listFrom(await api.get("/cafe/orders/", {
+    const response = await api.get("/cafe/orders/", {
       params
-    })) || [];
+    })
+    const base = listFrom(response) || [];
     const full = await hydrateOrdersDetails(base);
+    const { data } = response;
+    setOrderPagination(prev => ({
+      ...prev,
+      totalPages: Math.ceil(data.count / prev.limit),
+      totalCount: data.count
+    }))
     setOrders(full);
-  }, [debouncedOrderSearchQuery, waiterFilter, socketOrders?.orders, isStaff]);
+  }, [debouncedOrderSearchQuery, waiterFilter, socketOrders?.orders, isStaff, ordersPagination.currentPage]);
 
   useEffect(() => {
     try {
@@ -367,25 +378,25 @@ const Orders = () => {
   // Синхронизация данных из сокетов с локальным состоянием
   useEffect(() => {
     if (!socketOrders?.orders || !Array.isArray(socketOrders.orders)) return;
-    
+
     // Фильтруем только открытые заказы (как в fetchOrders)
     const socketOpenOrders = socketOrders.orders.filter(order => {
       const status = String(order.status || '').toLowerCase();
       return status === 'open' && !order.is_paid;
     });
-    
+
     // Обновляем локальное состояние только если есть изменения
     setOrders(prev => {
       // Проверяем, нужно ли обновлять
       const prevIds = new Set(prev.map(o => String(o.id)));
       const socketIds = new Set(socketOpenOrders.map(o => String(o.id)));
-      
+
       // Если списки идентичны, не обновляем
-      if (prevIds.size === socketIds.size && 
-          [...prevIds].every(id => socketIds.has(id))) {
+      if (prevIds.size === socketIds.size &&
+        [...prevIds].every(id => socketIds.has(id))) {
         return prev;
       }
-      
+
       return socketOpenOrders;
     });
   }, [socketOrders?.orders])
@@ -414,7 +425,7 @@ const Orders = () => {
   const waiters = useMemo(
     () =>
       employees
-        .filter(el => !(el.role === 'owner' || el.role === 'admin'))
+        .filter(el => !(el?.role === 'owner' || el?.role === 'admin'))
         .map((u) => ({ id: u.id, name: fullName(u) })),
     [employees]
   );
@@ -468,14 +479,9 @@ const Orders = () => {
   }, [orders, userRole, userId]);
 
   const visibleOrders = useMemo(() => {
-    if (showAll) return roleFiltered;
-    if (roleFiltered.length > ORDERS_COLLAPSE_LIMIT) return roleFiltered.slice(0, ORDERS_COLLAPSE_LIMIT);
     return roleFiltered;
-  }, [roleFiltered, showAll]);
+  }, [roleFiltered]);
 
-  useEffect(() => {
-    if (roleFiltered.length <= ORDERS_COLLAPSE_LIMIT && showAll) setShowAll(false);
-  }, [roleFiltered.length]);
 
   const linePrice = (it) => {
     if (it?.menu_item_price != null) return toNum(it.menu_item_price);
@@ -563,13 +569,13 @@ const Orders = () => {
 
   /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА ===== */
   const buildKitchenTicketPayload = useCallback(
-    ({ order, kitchenId, kitchenLabel, items }) => {
+    ({ order, kitchenId, kitchenLabel, items }, label = 'КАССАА') => {
       const t = tablesMap.get(order?.table);
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
 
       return {
-        company: localStorage.getItem("company_name") || "КАССА",
+        company: localStorage.getItem("company_name") || label,
         doc_no: `${kitchenLabel || "КУХНЯ"} • СТОЛ ${t?.number ?? "—"}`,
         created_at: dt,
         cashier_name: cashier,
@@ -582,7 +588,7 @@ const Orders = () => {
         items: (items || []).map((it) => ({
           name: String(it.menu_item_title || it.title || "Позиция"),
           qty: Math.max(1, Number(it.quantity) || 1),
-          price: linePrice(it),
+          // price: linePrice(it),
         })),
       };
     },
@@ -642,7 +648,7 @@ const Orders = () => {
             kitchenId,
             kitchenLabel,
             items: kitItems,
-          });
+          }, 'КУХНЯ');
 
           await setActivePrinterByKey(printerKey);
           await printOrderReceiptJSONViaUSB(payload);
@@ -845,6 +851,8 @@ const Orders = () => {
     }
   };
 
+
+
   const saveForm = async (e) => {
     e.preventDefault();
     if (!form.table || !form.items.length) return;
@@ -1002,8 +1010,6 @@ const Orders = () => {
     }));
   }, [clients]);
 
-  console.log('FORM', form);
-
 
   return (
     <section className="cafeOrders">
@@ -1012,7 +1018,6 @@ const Orders = () => {
           <h2 className="cafeOrders__title">Заказы</h2>
           <div className="cafeOrders__subtitle">После оплаты заказ исчезает здесь и появляется в кассе как приход.</div>
         </div>
-
         <div className="cafeOrders__actions">
           <div className="cafeOrders__search">
             <FaSearch className="cafeOrders__searchIcon" />
@@ -1045,22 +1050,9 @@ const Orders = () => {
         </div>
       </div>
 
-      {!loading && roleFiltered.length > ORDERS_COLLAPSE_LIMIT && (
-        <div className="cafeOrders__collapseRow">
-          <button
-            type="button"
-            className="cafeOrders__btn cafeOrders__btn--secondary"
-            onClick={() => setShowAll((v) => !v)}
-          >
-            {showAll ? "Свернуть" : `Показать все (${roleFiltered.length})`}
-          </button>
-        </div>
-      )}
-
       <div className="cafeOrders__list">
         {loading && <div className="cafeOrders__alert">Загрузка…</div>}
-
-        {!loading &&
+        {
           visibleOrders.map((o) => {
             const t = tablesMap.get(o.table);
             const totals = calcTotals(o);
@@ -1148,6 +1140,20 @@ const Orders = () => {
         {!loading && !roleFiltered.length && (
           <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
         )}
+        <Pagination
+          currentPage={ordersPagination.currentPage}
+          totalPages={ordersPagination.totalPages}
+          count={ordersPagination.totalCount}
+          hasNextPage={ordersPagination.currentPage < ordersPagination.totalPages}
+          hasPrevPage={ordersPagination.currentPage > 1}
+          loading={loading}
+          onPageChange={(page) => {
+            setOrderPagination(prev => ({
+              ...prev,
+              currentPage: page
+            }))
+          }}
+        />
       </div>
 
       {/* Modal create/edit */}

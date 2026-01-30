@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useUser } from '../store/slices/userSlice';
 import api from '../api';
+import logger from '../utils/logger';
 
 /**
  * Универсальный хук для подключения к WebSocket кафе
@@ -63,22 +64,22 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
         }
 
         if (wsRef.current?.readyState === WebSocket.OPEN && connectionUrlRef.current === url) {
-            console.log(`✅ WebSocket ${endpoint} уже подключен, пропускаем переподключение`);
+            logger(console.log, (`✅ WebSocket ${endpoint} уже подключен, пропускаем переподключение`));
             return true;
         }
 
         if (wsRef.current?.readyState === WebSocket.CONNECTING && connectionUrlRef.current === url) {
-            console.log(`⏳ WebSocket ${endpoint} уже подключается, ожидаем...`);
+            logger(console.log, (`⏳ WebSocket ${endpoint} уже подключается, ожидаем...`));
             return true;
         }
 
         // Закрываем существующее соединение только если URL изменился
         if (wsRef.current && connectionUrlRef.current !== url) {
-            console.log(`🔄 URL изменился, закрываем старое соединение`);
+            logger(console.log, (`🔄 URL изменился, закрываем старое соединение`));
             try {
                 wsRef.current.close(1000, 'URL changed');
             } catch (e) {
-                console.log('Ошибка при закрытии старого соединения:', e);
+                logger(console.log, ('Ошибка при закрытии старого соединения:', e));
             }
         }
 
@@ -93,12 +94,12 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
         clearTimeout(reconnectTimeoutRef.current);
 
         try {
-            console.log(`🔌 Подключение к WebSocket: ${endpoint}`);
+            logger(console.log, (`🔌 Подключение к WebSocket: ${endpoint}`));
             const ws = new WebSocket(url);
             wsRef.current = ws;
 
             ws.onopen = () => {
-                console.log(`✅ WebSocket ${endpoint} подключен`);
+                logger(console.log, (`✅ WebSocket ${endpoint} подключен`));
                 setIsConnected(true);
                 setError(null);
                 reconnectAttemptsRef.current = 0;
@@ -112,22 +113,22 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
                     // Вызываем пользовательский обработчик
                     onMessage(data);
                 } catch (error) {
-                    console.error('❌ Ошибка обработки сообщения:', error);
+                    logger(console.error, ('❌ Ошибка обработки сообщения:', error));
                 }
             };
 
             ws.onerror = (errorEvent) => {
-                console.error(`❌ WebSocket ${endpoint} ошибка:`, errorEvent);
+                logger(console.error, (`❌ WebSocket ${endpoint} ошибка:`, errorEvent));
                 setError('Ошибка соединения WebSocket');
                 onError(errorEvent);
             };
 
             ws.onclose = (event) => {
-                console.log(`🔌 WebSocket ${endpoint} закрыт:`, {
+                logger(console.log, (`🔌 WebSocket ${endpoint} закрыт:`, {
                     code: event.code,
                     reason: event.reason,
                     wasClean: event.wasClean
-                });
+                }));
 
                 setIsConnected(false);
                 wsRef.current = null;
@@ -141,19 +142,19 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
 
                 if (shouldReconnect) {
                     reconnectAttemptsRef.current += 1;
-                    console.log(`🔄 Попытка переподключения ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`);
+                    logger(console.log, (`🔄 Попытка переподключения ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}`));
 
                     reconnectTimeoutRef.current = setTimeout(() => {
                         connect();
                     }, RECONNECT_DELAY);
                 } else if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
-                    console.error(`❌ Превышено максимальное количество попыток переподключения для ${endpoint}`);
+                    logger(console.error, (`❌ Превышено максимальное количество попыток переподключения для ${endpoint}`));
                 }
             };
 
             return true;
         } catch (error) {
-            console.error('❌ Ошибка создания WebSocket:', error);
+            logger(console.error, ('❌ Ошибка создания WebSocket:', error));
             setError(error.message);
             return false;
         }
@@ -171,14 +172,14 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
             try {
                 wsRef.current.close(code, reason);
             } catch (e) {
-                console.log('Ошибка при закрытии соединения:', e);
+                logger(console.log, ('Ошибка при закрытии соединения:', e));
             }
             wsRef.current = null;
         }
 
         connectionUrlRef.current = null;
         setIsConnected(false);
-        console.log(`🔌 WebSocket ${endpoint} отключен`);
+        logger(console.log, (`🔌 WebSocket ${endpoint} отключен`));
     }, [endpoint]);
 
     // Отправка сообщения
@@ -187,14 +188,14 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
             try {
                 const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
                 wsRef.current.send(messageStr);
-                console.log(`📤 Отправлено ${endpoint}:`, message);
+                logger(console.log, (`📤 Отправлено ${endpoint}:`, message));
                 return true;
             } catch (error) {
-                console.error('❌ Ошибка отправки:', error);
+                logger(console.error, ('❌ Ошибка отправки:', error));
                 return false;
             }
         }
-        console.warn(`⚠️ WebSocket ${endpoint} не подключен`);
+        logger(console.warn, (`⚠️ WebSocket ${endpoint} не подключен`));
         return false;
     }, [endpoint]);
 
@@ -230,7 +231,7 @@ export const useCafeWebSocket = (endpoint, options = {}) => {
 
         // Переподключаемся только если URL изменился
         if (newUrl && connectionUrlRef.current !== newUrl) {
-            console.log(`🔄 URL изменился, переподключение ${endpoint}...`);
+            logger(console.log, (`🔄 URL изменился, переподключение ${endpoint}...`));
             disconnect(1000, 'Parameters changed');
             setTimeout(() => connect(), 500);
         }
@@ -289,7 +290,7 @@ export const useCafeOrdersWebSocket = (options = {}) => {
                 }
                 processedOrdersRef.current.add(`created-${newOrder.id}`);
 
-                console.log('🆕 Новый заказ:', newOrder.id);
+                logger(console.log, ('🆕 Новый заказ:', newOrder.id));
 
                 setNewOrders(prev => {
                     if (prev.some(order => order.id === newOrder.id)) return prev;
@@ -321,15 +322,14 @@ export const useCafeOrdersWebSocket = (options = {}) => {
                     return;
                 }
                 processedOrdersRef.current.add(updateKey);
-
-                console.log('📝 Заказ обновлен:', updatedOrder.id);
+                logger(console.log, ('📝 Заказ обновлен:', updatedOrder.id));
 
                 // Проверяем, оплачен ли заказ
-                const isPaid = updatedOrder.status === 'paid' || 
-                              updatedOrder.is_paid === true ||
-                              ['paid', 'оплачен', 'оплачено', 'оплачён'].includes(
-                                  String(updatedOrder.status || '').toLowerCase()
-                              );
+                const isPaid = updatedOrder.status === 'paid' ||
+                    updatedOrder.is_paid === true ||
+                    ['paid', 'оплачен', 'оплачено', 'оплачён'].includes(
+                        String(updatedOrder.status || '').toLowerCase()
+                    );
 
                 setUpdatedOrders(prev => {
                     const exists = prev.find(order => order.id === updatedOrder.id);
@@ -359,11 +359,11 @@ export const useCafeOrdersWebSocket = (options = {}) => {
             }
 
             case 'table_status_changed':
-                console.log('🔄 Статус стола изменен:', message.data);
+                logger(console.log, ('🔄 Статус стола изменен:', message.data));
                 break;
 
             default:
-                console.log('📨 Другое сообщение:', message.type);
+                logger(console.log, ('📨 Другое сообщение:', message.type));
         }
     }, []);
 
@@ -396,7 +396,7 @@ export const useCafeOrdersWebSocket = (options = {}) => {
             const { data } = await api.get(`/cafe/orders/`);
             setOrders(data.results || data);
         } catch (error) {
-            console.error('❌ Ошибка загрузки заказов:', error);
+            logger(console.error, ('❌ Ошибка загрузки заказов:', error));
         }
     }, []);
 
@@ -428,7 +428,7 @@ export const useCafeTablesWebSocket = (options = {}) => {
                 const tableId = tableData.table_id || tableData.table?.id;
 
                 if (!tableId) {
-                    console.warn('❌ Нет ID стола в сообщении');
+                    logger(console.warn, ('❌ Нет ID стола в сообщении'));
                     return;
                 }
 
@@ -439,7 +439,7 @@ export const useCafeTablesWebSocket = (options = {}) => {
                 }
                 processedStatusRef.current.add(statusKey);
 
-                console.log('🔄 Статус стола изменен:', tableId);
+                logger(console.log, ('🔄 Статус стола изменен:', tableId));
 
                 // Обновляем статус стола
                 setTables(prev => {
@@ -484,7 +484,7 @@ export const useCafeTablesWebSocket = (options = {}) => {
             }
 
             default:
-                console.log('📨 Другое сообщение:', message.type);
+                logger(console.log, ('📨 Другое сообщение:', message.type));
         }
     }, []);
 
@@ -502,7 +502,7 @@ export const useCafeTablesWebSocket = (options = {}) => {
             setTables(data.results || data);
             return data;
         } catch (error) {
-            console.error('❌ Ошибка загрузки столов:', error);
+            logger(console.error, ('❌ Ошибка загрузки столов:', error));
         }
     }, []);
 
@@ -559,13 +559,13 @@ export const useCafeWebSocketManager = (options = {}) => {
     });
 
     const connectAll = useCallback(() => {
-        console.log('🔌 Подключение всех WebSocket...');
+        logger(console.log, ('🔌 Подключение всех WebSocket...'));
         ordersWs.connect();
         tablesWs.connect();
     }, [ordersWs.connect, tablesWs.connect]); // ✅ Стабильные зависимости
 
     const disconnectAll = useCallback(() => {
-        console.log('🔌 Отключение всех WebSocket...');
+        logger(console.log, ('🔌 Отключение всех WebSocket...'));
         ordersWs.disconnect();
         tablesWs.disconnect();
     }, [ordersWs.disconnect, tablesWs.disconnect]); // ✅ Стабильные зависимости
@@ -582,7 +582,7 @@ export const useCafeWebSocketManager = (options = {}) => {
     );
 
     const fetchAllData = useCallback(async () => {
-        console.log('📥 Загрузка начальных данных...');
+        logger(console.log, ('📥 Загрузка начальных данных...'));
         const [ordersData, tablesData] = await Promise.all([
             ordersWs.fetchOrdersStatus(),
             tablesWs.fetchTables()

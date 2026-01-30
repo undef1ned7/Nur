@@ -14,6 +14,8 @@ import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCom
 import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
+import Pagination from "../../Market/Warehouse/components/Pagination";
+import { useOutletContext } from "react-router-dom";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -51,8 +53,7 @@ const CafeOrderHistory = () => {
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
   const [loading, setLoading] = useState(true);
-  const { tables: socketTables, orders: socketOrders } = useCafeWebSocketManager()
-
+  const { socketOrders } = useOutletContext()
   const [waiterOptions, setWaiterOptions] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
@@ -63,15 +64,17 @@ const CafeOrderHistory = () => {
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
   const [statusFilter, setStatusFilter] = useState("");
   const [waiterFilter, setWaiterFilter] = useState(null);
-
+  const [ordersPagination, setOrderPagination] = useState({
+    totalPages: 0,
+    currentPage: 1,
+    limit: 100,
+    totalCount: 0
+  })
 
   const userData = useMemo(() => safeUserData(), []);
   const userRole = userData?.role || "";
   const userId = localStorage.getItem("userId");
 
-
-  const [showAll, setShowAll] = useState(false);
-  const ORDERS_COLLAPSE_LIMIT = 6;
 
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const CARD_ITEMS_LIMIT = 4;
@@ -129,10 +132,17 @@ const CafeOrderHistory = () => {
   };
 
   const fetchOrders = useCallback(async (params = {}) => {
-    const base = listFrom(await api.get("/cafe/orders/", {
+    const response = await api.get("/cafe/orders/", {
       params
-    })) || [];
+    })
+    const base = listFrom(response) || [];
     const full = await hydrateOrdersDetails(base);
+    const { data } = response;
+    setOrderPagination(prev => ({
+      ...prev,
+      totalPages: Math.ceil(data.count / prev.limit),
+      totalCount: data.count
+    }))
     setOrders(full);
   }, []);
 
@@ -161,7 +171,8 @@ const CafeOrderHistory = () => {
         const params = {
           search: debouncedOrderSearchQuery,
           status__in: ['closed', 'cancelled'].toString(),
-          waiter: waiterFilter
+          waiter: waiterFilter,
+          page: ordersPagination.currentPage
         };
         if (statusFilter) {
           params['status'] = statusFilter;
@@ -174,8 +185,7 @@ const CafeOrderHistory = () => {
         setLoading(false);
       }
     })();
-  }, [debouncedOrderSearchQuery, statusFilter, waiterFilter, socketOrders?.orders])
-
+  }, [debouncedOrderSearchQuery, statusFilter, waiterFilter, socketOrders?.orders, ordersPagination?.currentPage])
   useEffect(() => {
     const handler = () => fetchOrders();
     window.addEventListener("orders:refresh", handler);
@@ -205,15 +215,8 @@ const CafeOrderHistory = () => {
   }, [orders, userRole, userId]);
 
   const visibleOrders = useMemo(() => {
-    if (showAll) return roleFiltered;
-    if (roleFiltered.length > ORDERS_COLLAPSE_LIMIT) return roleFiltered.slice(0, ORDERS_COLLAPSE_LIMIT);
     return roleFiltered;
-  }, [roleFiltered, showAll]);
-
-  useEffect(() => {
-    if (roleFiltered.length <= ORDERS_COLLAPSE_LIMIT && showAll) setShowAll(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roleFiltered.length]);
+  }, [roleFiltered]);
 
   const linePrice = (it) => {
     if (it?.menu_item_price != null) return toNum(it.menu_item_price);
@@ -290,18 +293,6 @@ const CafeOrderHistory = () => {
         </div>
       </div>
 
-      {!loading && roleFiltered.length > ORDERS_COLLAPSE_LIMIT && (
-        <div className="cafeOrders__collapseRow">
-          <button
-            type="button"
-            className="cafeOrders__btn cafeOrders__btn--secondary"
-            onClick={() => setShowAll((v) => !v)}
-          >
-            {showAll ? "Свернуть" : `Показать все (${roleFiltered.length})`}
-          </button>
-        </div>
-      )}
-
       <div className="cafeOrders__list">
         {loading && <div className="cafeOrders__alert">Загрузка…</div>}
 
@@ -363,9 +354,24 @@ const CafeOrderHistory = () => {
             );
           })}
 
+
         {!loading && !roleFiltered.length && (
           <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
         )}
+        <Pagination
+          currentPage={ordersPagination.currentPage}
+          totalPages={ordersPagination.totalPages}
+          count={ordersPagination.totalCount}
+          hasNextPage={ordersPagination.currentPage < ordersPagination.totalPages}
+          hasPrevPage={ordersPagination.currentPage > 1}
+          loading={loading}
+          onPageChange={(page) => {
+            setOrderPagination(prev => ({
+              ...prev,
+              currentPage: page
+            }))
+          }}
+        />
       </div>
     </section>
   );

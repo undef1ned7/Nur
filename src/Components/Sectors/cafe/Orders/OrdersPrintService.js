@@ -23,7 +23,7 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 };
 
 const LS_PRINTERS = "escpos_printers";
-const LS_ACTIVE = "escpos_printer_active";
+export const LS_ACTIVE = "escpos_printer_active";
 
 const toHex4 = (n) => Number(n || 0).toString(16).padStart(4, "0");
 const safeSerial = (s) => {
@@ -409,14 +409,12 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
 
   const filters = [{ classCode: 0x07 }, { classCode: 0xff }];
   const dev = await navigator.usb.requestDevice({ filters });
-
   try {
     const key = keyOf(dev.vendorId, dev.productId, dev.serialNumber);
     localStorage.setItem(LS_ACTIVE, key);
   } catch { }
 
   usbState.dev = dev;
-
   const { outEP } = await openUsbDevice(dev);
 
   const parts = buildPrettyReceiptFromJSON(payload);
@@ -425,4 +423,5 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
       await dev.transferOut(outEP, chunk);
     }
   }
+  return activedDev
 }
