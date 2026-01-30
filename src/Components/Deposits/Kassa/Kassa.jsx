@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Routes,
-  Route,
   useNavigate,
   useParams,
   Link,
   useLocation,
   useSearchParams,
 } from "react-router-dom";
+import { Search, Plus, Table2, LayoutGrid } from "lucide-react";
 import api from "../../../api";
 import Reports from "./Reports/Reports";
 import "./kassa.scss";
@@ -44,55 +43,42 @@ const isUnpaidStatus = (s) => {
 };
 
 /* ───────────────────────────────────────────────── */
-const CafeKassa = () => (
-  <Routes>
-    <Route index element={<CashboxList />} />
-    <Route path="pay" element={<CashboxPayment />} />
-    <Route path="reports" element={<CashboxReports />} />
-    {/* <Route path="reports" element={<CashboxReports />} /> */}
-    <Route path=":id" element={<CashboxDetail />} />
-  </Routes>
-);
-
-/* Верхние вкладки */
-const HeaderTabs = () => {
+/* Рендер по pathname, чтобы контент гарантированно показывался (вложенные Routes могут не матчить в RR v6) */
+const CafeKassa = () => {
   const { pathname } = useLocation();
-  const strip = (p) => p.replace(/\/+$/, "");
-  const p = strip(pathname);
-  const b = strip(BASE);
+  const normalized = pathname.replace(/\/+$/, "") || BASE;
+  const baseNorm = BASE.replace(/\/+$/, "");
 
-  const isList = p === b;
-  const isReports = p === `${b}/reports`;
-  const isPay = p === `${b}/pay`;
-
-  return (
-    <div className="kassa__header">
-      <div className="kassa__tabs">
-        <Link
-          className={`kassa__tab ${isList ? "kassa__tab--active" : ""}`}
-          to={BASE}
-        >
-          Кассы
-        </Link>
-        <Link
-          className={`kassa__tab ${isPay ? "kassa__tab--active" : ""}`}
-          to={`${BASE}/pay`}
-        >
-          Оплата
-        </Link>
-        <Link
-          className={`kassa__tab ${isReports ? "kassa__tab--active" : ""}`}
-          to={`${BASE}/reports`}
-        >
-          Отчёты
-        </Link>
-        {/* <button></button> */}
-      </div>
-    </div>
-  );
+  if (normalized !== baseNorm) {
+    const afterBase = normalized.slice(baseNorm.length + 1);
+    const idSegment = afterBase.split("/")[0];
+    if (idSegment) return <CashboxDetail id={idSegment} />;
+  }
+  return <CashboxList />;
 };
 
+/* Шапка страницы кассы */
+const HeaderTabs = ({ rightAction }) => (
+  <div className="kassa-header">
+    <div className="kassa-header__left">
+      <div className="kassa-header__icon-box">💰</div>
+      <div className="kassa-header__title-section">
+        <h1 className="kassa-header__title">Касса</h1>
+      </div>
+    </div>
+    <div className="kassa-header__right">{rightAction}</div>
+  </div>
+);
+
 /* ──────────────────────────────── Список касс */
+const VIEW_STORAGE_KEY = "kassa-view-mode";
+const getInitialViewMode = () => {
+  if (typeof window === "undefined") return "table";
+  const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+  if (saved === "table" || saved === "cards") return saved;
+  return "table";
+};
+
 const CashboxList = () => {
   const { company } = useUser();
   const [rows, setRows] = useState([]);
@@ -102,7 +88,12 @@ const CashboxList = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [checked, setChecked] = useState(false);
+  const [viewMode, setViewMode] = useState(getInitialViewMode);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   const load = async () => {
     try {
@@ -152,104 +143,177 @@ const CashboxList = () => {
   };
 
   return (
-    <div className="kassa">
-      {/* <HeaderTabs /> */}
+    <div className="kassa-page">
+      <HeaderTabs
+        rightAction={
+          <button
+            className="kassa-header__create-btn"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={16} />
+            {company?.subscription_plan?.name === "Старт"
+              ? "Создать кассу"
+              : "Создать кассу для прочих расходов"}
+          </button>
+        }
+      />
 
-      <div className="kassa__toolbar">
-        <div className="kassa__toolbarGroup">
-          <span className="kassa__total">Всего: {filtered.length}</span>
+      <div className="kassa-search-section">
+        <div className="kassa-search">
+          <Search className="kassa-search__icon" size={18} />
+          <input
+            type="text"
+            className="kassa-search__input"
+            placeholder="Поиск по названию или отделу…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
-
-        <div className="kassa__controls">
-          <div className="kassa__searchWrap">
-            <input
-              className="kassa__input"
-              type="text"
-              placeholder="Поиск…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
+        <div className="kassa-search__meta">
+          <span className="kassa-search__info">Всего: {filtered.length}</span>
+          <div className="kassa-search__view-toggle">
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`kassa-view-btn ${
+                viewMode === "table" ? "kassa-view-btn--active" : ""
+              }`}
+              title="Таблица"
+            >
+              <Table2 size={16} />
+              Таблица
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`kassa-view-btn ${
+                viewMode === "cards" ? "kassa-view-btn--active" : ""
+              }`}
+              title="Карточки"
+            >
+              <LayoutGrid size={16} />
+              Карточки
+            </button>
           </div>
-          {/* {console.log(filtered)} */}
-          {(filtered?.length ?? 0) === 0 && (
-            <>
-              {company?.subscription_plan?.name === "Старт" ? (
-                <button
-                  className="kassa__btn kassa__btn--primary"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  Создать кассу
-                </button>
-              ) : (
-                <button
-                  className="kassa__btn kassa__btn--primary"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  Создать кассу для прочьих расходов
-                </button>
-              )}
-            </>
-          )}
         </div>
       </div>
 
       {err && <div className="kassa__alert kassa__alert--error">{err}</div>}
 
-      <div className="kassa__tableWrap">
-        <table className="kassa__table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Название Отдела</th>
-              <th>Приход</th>
-              <th>Расход</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      <div className="kassa-table-container">
+        {viewMode === "table" && (
+          <div className="kassa-table-scroll">
+            <table className="kassa-table">
+            <thead>
               <tr>
-                <td colSpan={5}>Загрузка…</td>
+                <th>#</th>
+                <th>Название отдела</th>
+                <th>Приход</th>
+                <th>Расход</th>
+                <th>Действия</th>
               </tr>
-            ) : filtered.length ? (
-              filtered.map((r, i) => (
-                <tr
-                  key={r.id}
-                  className="kassa__rowClickable"
-                  onClick={() => navigate(`${BASE}/${r.id}`)}
-                >
-                  <td>{i + 1}</td>
-                  <td>
-                    <b>{r.department_name || r.name || "—"}</b>
-                  </td>
-                  <td>{money(r.analytics?.income_total || 0)}</td>
-                  <td>{money(r.analytics?.expense_total || 0)}</td>
-                  <td>
-                    <button
-                      className="kassa__btn kassa__btn--secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`${BASE}/${r.id}`);
-                      }}
-                    >
-                      Открыть
-                    </button>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="kassa-table__loading">
+                    Загрузка…
                   </td>
                 </tr>
-              ))
+              ) : filtered.length ? (
+                filtered.map((r, i) => (
+                  <tr
+                    key={r.id}
+                    className="kassa__rowClickable"
+                    onClick={() => navigate(`${BASE}/${r.id}`)}
+                  >
+                    <td>{i + 1}</td>
+                    <td>
+                      <b>{r.department_name || r.name || "—"}</b>
+                    </td>
+                    <td>{money(r.analytics?.income_total || 0)}</td>
+                    <td>{money(r.analytics?.expense_total || 0)}</td>
+                    <td>
+                      <button
+                        className="kassa__btn kassa__btn--secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`${BASE}/${r.id}`);
+                        }}
+                      >
+                        Открыть
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="kassa-table__empty">
+                    Нет данных
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          </div>
+        )}
+
+        {viewMode === "cards" && (
+          <div className="kassa-cards-wrapper">
+            {loading ? (
+              <div className="kassa-cards-loading">Загрузка…</div>
+            ) : filtered.length === 0 ? (
+              <div className="kassa-cards-empty">Нет данных</div>
             ) : (
-              <tr>
-                <td colSpan={5} className="kassa__center">
-                  Нет данных
-                </td>
-              </tr>
+              <div className="kassa-cards">
+                {filtered.map((r, i) => (
+                  <div
+                    key={r.id}
+                    className="kassa-card"
+                    onClick={() => navigate(`${BASE}/${r.id}`)}
+                  >
+                    <div className="kassa-card__header">
+                      <span className="kassa-card__num">{i + 1}</span>
+                      <h3 className="kassa-card__title">
+                        {r.department_name || r.name || "—"}
+                      </h3>
+                    </div>
+                    <div className="kassa-card__fields">
+                      <div className="kassa-card__field">
+                        <span className="kassa-card__label">Приход</span>
+                        <span className="kassa-card__value kassa-card__value--income">
+                          {money(r.analytics?.income_total || 0)}
+                        </span>
+                      </div>
+                      <div className="kassa-card__field">
+                        <span className="kassa-card__label">Расход</span>
+                        <span className="kassa-card__value kassa-card__value--expense">
+                          {money(r.analytics?.expense_total || 0)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="kassa-card__actions">
+                      <button
+                        type="button"
+                        className="kassa__btn kassa__btn--secondary kassa-card__btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`${BASE}/${r.id}`);
+                        }}
+                      >
+                        Открыть
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          </tbody>
-        </table>
+          </div>
+        )}
       </div>
 
       {createOpen && (
-        <div className="kassa-modal">
+        <div className="kassa-modal" style={{ display: "block" }}>
           <div
             className="kassa-modal__overlay"
             onClick={() => setCreateOpen(false)}
@@ -531,25 +595,47 @@ const CashboxPayment = () => {
   };
 
   return (
-    <div className="kassa">
+    <div className="kassa-page">
       <HeaderTabs />
 
-      <div className="kassa__toolbar">
-        <div className="kassa__toolbarGroup">
-          <span className="kassa__total">К оплате столов: {groups.length}</span>
-        </div>
-
-        <div className="kassa__controls">
-          {!boxId && boxes.length === 0 && (
-            <span className="kassa__alert" style={{ color: "#d32f2f" }}>
-              Создайте кассу в разделе «Кассы», чтобы принимать оплату.
-            </span>
-          )}
+      <div className="kassa-header">
+        <div className="kassa-header__left">
+          <div className="kassa-header__icon-box">💳</div>
+          <div className="kassa-header__title-section">
+            <h2 className="kassa-header__title">Оплата</h2>
+            <p className="kassa-header__subtitle">
+              Столы к оплате: {groups.length}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="kassa__tableWrap">
-        <table className="kassa__table">
+      <div className="kassa-search-section">
+        <span className="kassa-search__info">
+          {!boxId && boxes.length === 0 && (
+            <span className="kassa__alert" style={{ color: "var(--danger)" }}>
+              Создайте кассу в разделе «Кассы», чтобы принимать оплату.
+            </span>
+          )}
+        </span>
+        {boxId && boxes.length > 0 && (
+          <select
+            className="kassa-search__input"
+            style={{ maxWidth: 280, paddingLeft: 12 }}
+            value={boxId}
+            onChange={(e) => setBoxId(e.target.value)}
+          >
+            {boxes.map((b) => (
+              <option key={b.id || b.uuid} value={b.id || b.uuid}>
+                {b.department_name || b.name || b.id}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div className="kassa-table-container">
+        <table className="kassa-table">
           <thead>
             <tr>
               <th>Стол</th>
@@ -562,7 +648,9 @@ const CashboxPayment = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5}>Загрузка…</td>
+                <td colSpan={5} className="kassa-table__loading">
+                  Загрузка…
+                </td>
               </tr>
             ) : groups.length ? (
               groups.map((g) => (
@@ -586,7 +674,7 @@ const CashboxPayment = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="kassa__center">
+                <td colSpan={5} className="kassa-table__empty">
                   Нет столов, ожидающих оплаты
                 </td>
               </tr>
@@ -600,15 +688,16 @@ const CashboxPayment = () => {
 
 /* ──────────────────────────────── Обёртка с отчётом */
 const CashboxReports = () => (
-  <div className="kassa">
+  <div className="kassa-page">
     <HeaderTabs />
     <Reports />
   </div>
 );
 
 /* ──────────────────────────────── Детали кассы */
-const CashboxDetail = () => {
-  const { id } = useParams();
+const CashboxDetail = ({ id: idProp }) => {
+  const { id: idFromParams } = useParams();
+  const id = idProp ?? idFromParams;
   const [searchParams, setSearchParams] = useSearchParams();
   const [box, setBox] = useState(null);
   const [ops, setOps] = useState([]);
@@ -737,64 +826,72 @@ const CashboxDetail = () => {
   }, [ops, tab]);
 
   return (
-    <div className="kassa">
-      <div className="kassa__header">
-        <div className="kassa__tabs">
-          <Link className="kassa__tab" to={BASE}>
+    <div className="kassa-page">
+      <div className="kassa-header">
+        <div className="kassa-header__left">
+          <div className="kassa-header__icon-box">📦</div>
+          <div className="kassa-header__title-section">
+            <h2 className="kassa-header__title">
+              {box?.department_name || box?.name || "Касса"}
+            </h2>
+            <p className="kassa-header__subtitle">Операции по кассе</p>
+          </div>
+        </div>
+        <nav className="kassa-header__nav-tabs">
+          <Link className="kassa-header__nav-tab" to={BASE}>
             ← Назад
           </Link>
-          <span className="kassa__tab kassa__tab--active">
-            {box?.department_name || box?.name || "Касса"}
-          </span>
-          <Link className="kassa__tab" to={`${BASE}/pay`}>
+          <Link className="kassa-header__nav-tab" to={`${BASE}/pay`}>
             Оплата
           </Link>
-          <Link className="kassa__tab" to={`${BASE}/reports`}>
+          <Link className="kassa-header__nav-tab" to={`${BASE}/reports`}>
             Отчёты
           </Link>
-        </div>
+        </nav>
       </div>
 
-      <div className="kassa__switch">
+      <div className="kassa-search-section">
+        <div className="kassa-chip-group">
+          <button
+            className={`kassa-chip ${
+              tab === "expense" ? "kassa-chip--active" : ""
+            }`}
+            onClick={() => handleTabChange("expense")}
+          >
+            Расход
+          </button>
+          <button
+            className={`kassa-chip ${
+              tab === "income" ? "kassa-chip--active" : ""
+            }`}
+            onClick={() => handleTabChange("income")}
+          >
+            Приход
+          </button>
+          <button
+            className={`kassa-chip ${
+              tab === "all" ? "kassa-chip--active" : ""
+            }`}
+            onClick={() => handleTabChange("all")}
+          >
+            Все
+          </button>
+        </div>
         <button
-          className={`kassa__chip ${
-            tab === "expense" ? "kassa__chip--active" : ""
-          }`}
-          onClick={() => handleTabChange("expense")}
-        >
-          Расход
-        </button>
-        <button
-          className={`kassa__chip ${
-            tab === "income" ? "kassa__chip--active" : ""
-          }`}
-          onClick={() => handleTabChange("income")}
-        >
-          Приход
-        </button>
-        <button
-          className={`kassa__chip ${
-            tab === "all" ? "kassa__chip--active" : ""
-          }`}
-          onClick={() => handleTabChange("all")}
-        >
-          Все
-        </button>
-        <div className="kassa__grow" />
-        <button
-          className="kassa__btn kassa__btn--primary"
+          className="kassa-header__create-btn"
           onClick={() =>
             alert(
               "Добавление операции делается через API. Здесь доступен только просмотр."
             )
           }
         >
+          <Plus size={16} />
           Добавить операцию
         </button>
       </div>
 
-      <div className="kassa__tableWrap">
-        <table className="kassa__table">
+      <div className="kassa-table-container">
+        <table className="kassa-table">
           <thead>
             <tr>
               <th>Тип</th>
@@ -806,7 +903,9 @@ const CashboxDetail = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4}>Загрузка…</td>
+                <td colSpan={4} className="kassa-table__loading">
+                  Загрузка…
+                </td>
               </tr>
             ) : err ? (
               <tr>
@@ -825,7 +924,9 @@ const CashboxDetail = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={4}>Нет операций</td>
+                <td colSpan={4} className="kassa-table__empty">
+                  Нет операций
+                </td>
               </tr>
             )}
           </tbody>

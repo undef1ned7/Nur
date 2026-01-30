@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
+
 :root {
   --primary: #f7d74f;
   --primary-dark: #d4b800;
@@ -7,6 +9,439 @@
   --surface: #fff;
   --radius: 12px;
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  --danger: #ef4444;
+}
+
+/* ================== WAREHOUSE-LIKE PAGE LAYOUT ================== */
+.kassa-page {
+  font-family: "Montserrat", sans-serif;
+  padding: 24px;
+  min-height: 100vh;
+  @media screen and (max-width: 768px) {
+    padding: 0;
+  }
+}
+
+.kassa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  &__left {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__icon-box {
+    width: 48px;
+    height: 48px;
+    background: var(--primary);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+
+  &__title-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+
+  &__subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  &__create-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: var(--primary);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: var(--primary-dark);
+    }
+  }
+
+  &__nav-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &__nav-tab {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    text-decoration: none;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f9fafb;
+      border-color: var(--primary);
+    }
+
+    &--active {
+      background: var(--primary);
+      border-color: var(--primary-dark);
+    }
+  }
+}
+
+.kassa-search-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.kassa-search__meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.kassa-search__view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kassa-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: var(--primary);
+  }
+
+  &--active {
+    background: var(--primary);
+    border-color: var(--primary-dark);
+    color: #000;
+  }
+}
+
+.kassa-search {
+  position: relative;
+  flex: 1;
+  min-width: 280px;
+
+  &__icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  &__input {
+    width: 100%;
+    padding: 10px 12px 10px 40px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    background: white;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  &__info {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  &__filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f9fafb;
+      border-color: var(--primary);
+    }
+  }
+}
+
+.kassa-table-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kassa-table-container {
+  background: white;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  min-height: 280px;
+  @media screen and (max-width: 768px) {
+    border-radius: 0;
+    border: none;
+  }
+}
+
+/* Карточки касс */
+.kassa-cards-wrapper {
+  padding: 20px;
+  min-height: 240px;
+  @media screen and (max-width: 768px) {
+    padding: 0;
+  }
+}
+
+.kassa-cards-loading,
+.kassa-cards-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.kassa-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.kassa-card {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow);
+  }
+}
+
+.kassa-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.kassa-card__num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #000;
+
+  &--income {
+    width: auto;
+    min-width: 28px;
+    padding: 4px 10px;
+    background: #d1fae5;
+    color: #059669;
+    font-size: 12px;
+  }
+
+  &--expense {
+    width: auto;
+    min-width: 28px;
+    padding: 4px 10px;
+    background: #fee2e2;
+    color: var(--danger);
+    font-size: 12px;
+  }
+}
+
+.kassa-card__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.kassa-card__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.kassa-card__field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.kassa-card__label {
+  color: var(--muted);
+}
+
+.kassa-card__value {
+  font-weight: 600;
+  color: var(--text);
+
+  &--income {
+    color: #059669;
+  }
+
+  &--expense {
+    color: var(--danger);
+  }
+}
+
+.kassa-card__actions {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.kassa-card__btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.kassa-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+
+  thead {
+    background: #f9fafb;
+  }
+
+  th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  td {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  &__loading,
+  &__empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+  }
+}
+
+.kassa-chip-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.kassa-chip {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: var(--primary);
+  }
+
+  &--active {
+    background: var(--text);
+    color: #fff;
+    border-color: var(--text);
+  }
 }
 
 /* ================== WRAPPER ================== */
@@ -173,6 +608,242 @@
 .kassa__rowClickable {
   cursor: pointer;
 }
+
+.kassa__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: #fff;
+  transition: all 0.2s;
+}
+.kassa__btn:hover {
+  background: #f9fafb;
+}
+.kassa__btn--primary {
+  background: var(--primary);
+  border-color: var(--primary-dark);
+  color: #000;
+}
+.kassa__btn--primary:hover {
+  background: var(--primary-dark);
+}
+.kassa__btn--secondary {
+  background: #fff;
+  color: var(--text);
+}
+
+.kassa-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  padding: 20px;
+}
+
+.kassa-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+}
+
+.kassa-modal__card {
+  position: relative;
+  background: #fff;
+  border-radius: var(--radius);
+  width: min(480px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+  // @media screen and (max-width: 576px) {
+  //   top: 0;
+  // }
+}
+.kassa-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.kassa-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+.kassa-modal__close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  line-height: 1;
+}
+.kassa-modal__section {
+  padding: 16px 20px;
+}
+.kassa-modal__label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  // margin-bottom: 8px;
+}
+.kassa-modal__input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.kassa-modal__footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Модалка фильтров потоков (KassaWorkerDet) */
+.kassa-filter-modal {
+  display: flex;
+  flex-direction: column;
+}
+
+.kassa-filter-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.kassa-filter-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.kassa-filter-modal__body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.kassa-filter-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kassa-filter-modal__label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.kassa-filter-modal__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.kassa-filter-modal__search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.kassa-filter-modal__search-input {
+  width: 100%;
+  padding: 12px 14px 12px 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text);
+  background: #fff;
+  transition: border-color 0.2s;
+
+  &::placeholder {
+    color: var(--muted);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+}
+
+.kassa-filter-modal__select-native {
+  width: 100%;
+  padding: 12px 14px;
+  padding-right: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  &:hover {
+    border-color: var(--primary);
+  }
+}
+
+.kassa-filter-modal__footer {
+  padding: 16px 24px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.kassa-filter-modal__reset {
+  width: 100%;
+  padding: 14px 20px;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #e5e7eb;
+  }
+}
+
+.kassa__alert {
+  font-size: 14px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  &--error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: var(--danger);
+  }
+}
+
 .vitrina__reset {
   padding: 5px 0;
 }

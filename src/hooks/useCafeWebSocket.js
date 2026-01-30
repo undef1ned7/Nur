@@ -324,6 +324,13 @@ export const useCafeOrdersWebSocket = (options = {}) => {
 
                 console.log('📝 Заказ обновлен:', updatedOrder.id);
 
+                // Проверяем, оплачен ли заказ
+                const isPaid = updatedOrder.status === 'paid' || 
+                              updatedOrder.is_paid === true ||
+                              ['paid', 'оплачен', 'оплачено', 'оплачён'].includes(
+                                  String(updatedOrder.status || '').toLowerCase()
+                              );
+
                 setUpdatedOrders(prev => {
                     const exists = prev.find(order => order.id === updatedOrder.id);
                     if (exists) {
@@ -334,11 +341,20 @@ export const useCafeOrdersWebSocket = (options = {}) => {
                     return [...prev, updatedOrder];
                 });
 
-                setOrders(prev => prev.map(order =>
-                    order.id === updatedOrder.id
-                        ? { ...order, ...updatedOrder }
-                        : order
-                ));
+                // Если заказ оплачен, удаляем его из списка, иначе обновляем
+                setOrders(prev => {
+                    if (isPaid) {
+                        // Удаляем оплаченный заказ из списка
+                        return prev.filter(order => String(order.id) !== String(updatedOrder.id));
+                    } else {
+                        // Обновляем заказ
+                        return prev.map(order =>
+                            order.id === updatedOrder.id
+                                ? { ...order, ...updatedOrder }
+                                : order
+                        );
+                    }
+                });
                 break;
             }
 

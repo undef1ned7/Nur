@@ -1032,6 +1032,20 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                         <div
                           key={materialId}
                           className="select-materials__item"
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            // Не переключать при клике по полю количества
+                            if (e.target.closest?.(".MuiTextField-root")) return;
+                            toggleRecipeItem(materialId);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              if (e.target.closest?.(".MuiTextField-root")) return;
+                              toggleRecipeItem(materialId);
+                            }
+                          }}
                           style={{
                             display: "grid",
                             gridTemplateColumns: "auto 1fr 160px",
@@ -1041,6 +1055,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                             backgroundColor: isInsufficient
                               ? "#ffebee"
                               : "transparent",
+                            cursor: "pointer",
                           }}
                         >
                           <Checkbox
@@ -1049,16 +1064,15 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                             }
                             checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
                             checked={checked}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleRecipeItem(materialId);
-                            }}
                             onClick={(e) => {
-                              e.stopPropagation();
+                              e.preventDefault();
+                              // Даём клику всплыть до строки — переключение через onClick строки
+                              // (на десктопе клик часто попадает по иконке, а не по input)
                             }}
                             sx={{
                               color: "#000",
                               "&.Mui-checked": { color: "#f9cf00" },
+                              pointerEvents: "auto",
                             }}
                           />
                           <div
@@ -1100,7 +1114,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                               )}
                             </small>
                           </div>
-                          <TextField
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <TextField
                             size="small"
                             placeholder="Кол-во"
                             type="number"
@@ -1121,6 +1136,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                                 : ""
                             }
                           />
+                          </div>
                         </div>
                       );
                     } catch (error) {

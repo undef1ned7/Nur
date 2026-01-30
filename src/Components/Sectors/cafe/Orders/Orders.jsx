@@ -364,6 +364,32 @@ const Orders = () => {
     })();
   }, [socketOrders?.orders])
 
+  // Синхронизация данных из сокетов с локальным состоянием
+  useEffect(() => {
+    if (!socketOrders?.orders || !Array.isArray(socketOrders.orders)) return;
+    
+    // Фильтруем только открытые заказы (как в fetchOrders)
+    const socketOpenOrders = socketOrders.orders.filter(order => {
+      const status = String(order.status || '').toLowerCase();
+      return status === 'open' && !order.is_paid;
+    });
+    
+    // Обновляем локальное состояние только если есть изменения
+    setOrders(prev => {
+      // Проверяем, нужно ли обновлять
+      const prevIds = new Set(prev.map(o => String(o.id)));
+      const socketIds = new Set(socketOpenOrders.map(o => String(o.id)));
+      
+      // Если списки идентичны, не обновляем
+      if (prevIds.size === socketIds.size && 
+          [...prevIds].every(id => socketIds.has(id))) {
+        return prev;
+      }
+      
+      return socketOpenOrders;
+    });
+  }, [socketOrders?.orders])
+
   useEffect(() => {
     setLoading(true);
     (async () => {
@@ -934,8 +960,8 @@ const Orders = () => {
       setPayOpen(false);
       setPayOrder(null);
 
-      // 6) Синхронизация с сервером
-      await fetchOrders();
+      // 6) Сокеты автоматически обновят список заказов через событие order_updated
+      // Не нужно вызывать fetchOrders() - это вызывает ненужную перезагрузку
 
       // успех — снимаем guard
       localStorage.removeItem(guardKey);

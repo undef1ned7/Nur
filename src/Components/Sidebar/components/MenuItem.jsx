@@ -1,4 +1,16 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
+// Маппинг path (из URL сайдбара) в doc_type для подсветки при создании документа
+const DOC_TYPE_PATH_TO_API = {
+  sale: "SALE",
+  purchase: "PURCHASE",
+  sale_return: "SALE_RETURN",
+  purchase_return: "PURCHASE_RETURN",
+  inventory: "INVENTORY",
+  receipt: "RECEIPT",
+  write_off: "WRITE_OFF",
+  transfer: "TRANSFER",
+};
 
 /**
  * Компонент для рендеринга пункта меню
@@ -10,7 +22,14 @@ const MenuItem = ({
   toggleSidebar,
 }) => {
   const { label, to, icon, children } = item;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const IconComponent = typeof icon === "function" ? icon() : icon;
+  const isDocumentsSection =
+    to?.includes("warehouse/documents") && children?.length > 0;
+  const createPageDocType = searchParams.get("doc_type");
+  const isOnCreatePage = location.pathname.includes("warehouse/documents/create");
 
   // Проверяем настройку автоматического закрытия сайдбара
   const shouldCloseOnClick = () => {
@@ -32,6 +51,7 @@ const MenuItem = ({
       if (!isDropdownOpen) {
         e.preventDefault();
         onToggleDropdown();
+        navigate(to);
       } else {
         if (shouldCloseOnClick()) {
           toggleSidebar();
@@ -63,13 +83,22 @@ const MenuItem = ({
           {children.map((child) => {
             const ChildIcon =
               typeof child.icon === "function" ? child.icon() : child.icon;
+            const childPathSegment = child.to?.split("/").filter(Boolean).pop();
+            const childDocType = DOC_TYPE_PATH_TO_API[childPathSegment];
+            const isActiveOnCreatePage =
+              isDocumentsSection &&
+              isOnCreatePage &&
+              childDocType &&
+              createPageDocType === childDocType;
             return (
               <li key={child.label}>
                 <NavLink
                   to={child.to}
                   className={({ isActive }) =>
                     `sidebar__submenu-item ${
-                      isActive ? "sidebar__submenu-item--active" : ""
+                      isActive || isActiveOnCreatePage
+                        ? "sidebar__submenu-item--active"
+                        : ""
                     }`
                   }
                   onClick={() => {
