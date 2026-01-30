@@ -355,6 +355,7 @@
         display: flex;
         justify-content: space-between;
         white-space: collapse;
+        flex-wrap: wrap;
         flex: 1;
         &-name {
           display: flex;
@@ -379,6 +380,9 @@
           color: gray;
           gap: 5px;
           font-weight: 400;
+          strong {
+            color: black;
+          }
         }
       }
 

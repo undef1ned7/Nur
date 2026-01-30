@@ -1,5 +1,5 @@
 // src/.../Orders.jsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaSearch,
   FaPlus,
@@ -28,6 +28,8 @@ import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import { useUser } from "../../../../store/slices/userSlice";
+import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
+import Pagination from "../../Market/Counterparties/components/Pagination";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -158,8 +160,14 @@ const Orders = () => {
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
+  const [ordersPagination, setOrderPagination] = useState({
+    totalPages: 0,
+    currentPage: 1,
+    limit: 100,
+    totalCount: 0
+  })
   const { orders: socketOrders, } = useCafeWebSocketManager()
-  
+  const [notificationOrder, setNotificationOrder] = useState(null)
   const [kitchens, setKitchens] = useState([]);
 
   const [cashboxes, setCashboxes] = useState([]);
@@ -168,7 +176,6 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [query, setQuery] = useState("");
   const debouncedOrderSearchQuery = useDebouncedValue(query, 400);
-  const [statusFilter, setStatusFilter] = useState("");
 
   // Состояние пагинации меню
   const [menuCurrentPage, setMenuCurrentPage] = useState(1);
@@ -185,9 +192,6 @@ const Orders = () => {
     }
   }, [profile])
   const [printingId, setPrintingId] = useState(null);
-
-  const [showAll, setShowAll] = useState(false);
-  const ORDERS_COLLAPSE_LIMIT = 6;
 
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const CARD_ITEMS_LIMIT = 4;
@@ -332,12 +336,19 @@ const Orders = () => {
     if (isStaff) {
       params['waiter'] = userId
     }
-    const base = listFrom(await api.get("/cafe/orders/", {
+    const response = await api.get("/cafe/orders/", {
       params
-    })) || [];
+    })
+    const base = listFrom(response) || [];
     const full = await hydrateOrdersDetails(base);
+    const { data } = response;
+    setOrderPagination(prev => ({
+      ...prev,
+      totalPages: Math.ceil(data.count / prev.limit),
+      totalCount: data.count
+    }))
     setOrders(full);
-  }, [debouncedOrderSearchQuery, waiterFilter, socketOrders?.orders, isStaff]);
+  }, [debouncedOrderSearchQuery, waiterFilter, socketOrders?.orders, isStaff, ordersPagination.currentPage]);
 
   useEffect(() => {
     try {
@@ -388,7 +399,7 @@ const Orders = () => {
   const waiters = useMemo(
     () =>
       employees
-        .filter(el => !(el.role === 'owner' || el.role === 'admin'))
+        .filter(el => !(el?.role === 'owner' || el?.role === 'admin'))
         .map((u) => ({ id: u.id, name: fullName(u) })),
     [employees]
   );
@@ -442,14 +453,9 @@ const Orders = () => {
   }, [orders, userRole, userId]);
 
   const visibleOrders = useMemo(() => {
-    if (showAll) return roleFiltered;
-    if (roleFiltered.length > ORDERS_COLLAPSE_LIMIT) return roleFiltered.slice(0, ORDERS_COLLAPSE_LIMIT);
     return roleFiltered;
-  }, [roleFiltered, showAll]);
+  }, [roleFiltered]);
 
-  useEffect(() => {
-    if (roleFiltered.length <= ORDERS_COLLAPSE_LIMIT && showAll) setShowAll(false);
-  }, [roleFiltered.length]);
 
   const linePrice = (it) => {
     if (it?.menu_item_price != null) return toNum(it.menu_item_price);
@@ -616,6 +622,7 @@ const Orders = () => {
             kitchenId,
             kitchenLabel,
             items: kitItems,
+            company: 'КУХНЯ'
           });
 
           await setActivePrinterByKey(printerKey);
@@ -819,6 +826,18 @@ const Orders = () => {
     }
   };
 
+  const [notificationDeps, setNotificationDeps] = useState(null);
+  useEffect(() => {
+    console.log('AKSDLKASDKJASLKDJLASJDASKLDJ');
+    const { lastMessage } = socketOrders;
+    if (!lastMessage) return;
+    const { type, data } = lastMessage;
+    if (type === "kitchen_task_ready" && data?.task?.waiter === userData?.id) {
+      setNotificationDeps(data?.task?.created_at)
+      setNotificationOrder(`${data?.task?.menu_item_title} \nдля стола: №: ${data?.task.table_number} готово`);
+    }
+  }, [socketOrders])
+
   const saveForm = async (e) => {
     e.preventDefault();
     if (!form.table || !form.items.length) return;
@@ -976,8 +995,6 @@ const Orders = () => {
     }));
   }, [clients]);
 
-  console.log('FORM', form);
-
 
   return (
     <section className="cafeOrders">
@@ -986,7 +1003,7 @@ const Orders = () => {
           <h2 className="cafeOrders__title">Заказы</h2>
           <div className="cafeOrders__subtitle">После оплаты заказ исчезает здесь и появляется в кассе как приход.</div>
         </div>
-
+        <NotificationCadeSound clearNotification={() => setNotificationOrder(null)} notification={notificationOrder} deps={notificationDeps} />
         <div className="cafeOrders__actions">
           <div className="cafeOrders__search">
             <FaSearch className="cafeOrders__searchIcon" />
@@ -1019,22 +1036,9 @@ const Orders = () => {
         </div>
       </div>
 
-      {!loading && roleFiltered.length > ORDERS_COLLAPSE_LIMIT && (
-        <div className="cafeOrders__collapseRow">
-          <button
-            type="button"
-            className="cafeOrders__btn cafeOrders__btn--secondary"
-            onClick={() => setShowAll((v) => !v)}
-          >
-            {showAll ? "Свернуть" : `Показать все (${roleFiltered.length})`}
-          </button>
-        </div>
-      )}
-
       <div className="cafeOrders__list">
         {loading && <div className="cafeOrders__alert">Загрузка…</div>}
-
-        {!loading &&
+        {
           visibleOrders.map((o) => {
             const t = tablesMap.get(o.table);
             const totals = calcTotals(o);
@@ -1122,6 +1126,20 @@ const Orders = () => {
         {!loading && !roleFiltered.length && (
           <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
         )}
+        <Pagination
+          currentPage={ordersPagination.currentPage}
+          totalPages={ordersPagination.totalPages}
+          count={ordersPagination.totalCount}
+          hasNextPage={ordersPagination.currentPage < ordersPagination.totalPages}
+          hasPrevPage={ordersPagination.currentPage > 1}
+          loading={loading}
+          onPageChange={(page) => {
+            setOrderPagination(prev => ({
+              ...prev,
+              currentPage: page
+            }))
+          }}
+        />
       </div>
 
       {/* Modal create/edit */}
