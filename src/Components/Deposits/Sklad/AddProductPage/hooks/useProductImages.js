@@ -32,7 +32,8 @@ export const useProductImages = () => {
    */
   const removeImage = (index) => {
     const image = images[index];
-    if (image?.preview) {
+    // revokeObjectURL только для blob-URL (свои файлы); для HTTP-URL (из API) не вызывать — иначе исключение и setImages не выполнится
+    if (image?.preview && String(image.preview).startsWith("blob:")) {
       URL.revokeObjectURL(image.preview);
     }
     const newImages = images.filter((_, i) => i !== index);

@@ -674,6 +674,48 @@ export const deleteCounterparty = async (id) => {
   }
 };
 
+/**
+ * Получить долги контрагента
+ * @param {string} id - UUID контрагента
+ * @returns {{ results: Array, total_debt: number }}
+ */
+export const getCounterpartyDebts = async (id) => {
+  try {
+    const response = await api.get(`warehouse/crud/counterparties/${id}/debts/`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      return { results: [], total_debt: 0 };
+    }
+    if (error.response) {
+      console.error("Get Counterparty Debts Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Получить историю оплат контрагента
+ * @param {string} id - UUID контрагента
+ * @returns {{ results: Array }}
+ */
+export const getCounterpartyPayments = async (id) => {
+  try {
+    const response = await api.get(`warehouse/crud/counterparties/${id}/payments/`);
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      return { results: [] };
+    }
+    if (error.response) {
+      console.error("Get Counterparty Payments Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 export default {
   // Документы
   listDocuments,
@@ -716,6 +758,8 @@ export default {
   createCounterparty,
   updateCounterparty,
   deleteCounterparty,
+  getCounterpartyDebts,
+  getCounterpartyPayments,
 };
 
 

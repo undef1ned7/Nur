@@ -84,6 +84,23 @@ const StockItemModal = ({
                 placeholder="Введите минимум"
               />
             </div>
+
+            <div className="cafeStock__field">
+              <label className="cafeStock__label">Цена за ед.</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="cafeStock__input"
+                value={form.unit_price}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    unit_price: sanitizeDecimalInput(e.target.value),
+                  }))
+                }
+                placeholder="Цена за единицу"
+              />
+            </div>
           </div>
 
           <div className="cafeStock__formActions">
@@ -108,6 +125,8 @@ const StockMoveModal = ({
   moveItem,
   moveQty,
   setMoveQty,
+  moveUnitPrice,
+  setMoveUnitPrice,
   onClose,
   onSubmit,
   sanitizeDecimalInput,
@@ -136,6 +155,17 @@ const StockMoveModal = ({
                 onChange={(e) => setMoveQty(sanitizeDecimalInput(e.target.value))}
                 required
                 placeholder="Введите количество"
+              />
+            </div>
+            <div className="cafeStock__field cafeStock__field--full">
+              <label className="cafeStock__label">Цена за ед.</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="cafeStock__input"
+                value={moveUnitPrice}
+                onChange={(e) => setMoveUnitPrice(sanitizeDecimalInput(e.target.value))}
+                placeholder="Цена за единицу"
               />
             </div>
           </div>

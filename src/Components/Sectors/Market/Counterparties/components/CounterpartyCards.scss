@@ -1,3 +1,20 @@
 // Стили для CounterpartyCards компонента
 // Основные стили находятся в Counterparties.scss
 
+.warehouse-card__open-btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+}
+

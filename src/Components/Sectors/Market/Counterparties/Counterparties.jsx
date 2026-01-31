@@ -104,11 +104,9 @@ const Counterparties = () => {
   // Обработчики событий
   const handleCounterpartyClick = useCallback(
     (counterparty) => {
-      // navigate(`/crm/market/counterparties/${counterparty.id}`);
-      // Пока просто показываем alert, можно добавить страницу деталей позже
-      console.log("Counterparty clicked:", counterparty);
+      navigate(`/crm/warehouse/counterparties/${counterparty.id}`);
     },
-    []
+    [navigate]
   );
 
   const handlePageChange = useCallback(
@@ -137,7 +135,7 @@ const Counterparties = () => {
       console.error("Ошибка при удалении контрагентов:", e);
       alert(
         "Не удалось удалить контрагентов: " +
-        (e?.message || e?.detail || "Неизвестная ошибка")
+          (e?.message || e?.detail || "Неизвестная ошибка")
       );
     } finally {
       setBulkDeleting(false);
@@ -230,15 +228,11 @@ const Counterparties = () => {
 
       {showCreateModal && (
         <ReactPortal wrapperId="create_counter_modal">
-          <CreateCounterpartyModal
-            onClose={() => setShowCreateModal(false)}
-          />
+          <CreateCounterpartyModal onClose={() => setShowCreateModal(false)} />
         </ReactPortal>
-
       )}
     </div>
   );
 };
 
 export default Counterparties;
-

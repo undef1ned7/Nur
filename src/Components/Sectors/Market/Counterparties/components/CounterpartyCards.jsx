@@ -29,10 +29,7 @@ const CounterpartyCard = React.memo(
     const typeLabel = typeLabels[type] || type;
 
     return (
-      <div
-        className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-        onClick={() => onCounterpartyClick(counterparty)}
-      >
+      <div className="warehouse-table__row warehouse-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
         <div className="flex items-start gap-3">
           <div className="pt-1" onClick={(e) => onRowSelect(counterparty.id, e)}>
             <input
@@ -96,6 +93,19 @@ const CounterpartyCard = React.memo(
               </div>
             </div>
           )}
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            className="warehouse-card__open-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCounterpartyClick(counterparty);
+            }}
+          >
+            Открыть
+          </button>
         </div>
       </div>
     );
