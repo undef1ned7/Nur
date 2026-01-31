@@ -12,7 +12,10 @@ import {
 } from "../../../store/slices/productSlice";
 import { addCashFlows } from "../../../store/slices/cashSlice";
 import { useUser } from "../../../store/slices/userSlice";
-import { fetchClientsAsync } from "../../../store/creators/clientCreators";
+import {
+  fetchClientsAsync,
+  createClientAsync,
+} from "../../../store/creators/clientCreators";
 import { useClient } from "../../../store/slices/ClientSlice";
 import { createDeal } from "../../../store/creators/saleThunk";
 import api from "../../../api";
@@ -24,10 +27,25 @@ async function createDebt(payload) {
   return res.data;
 }
 
+const initialSupplierFormState = {
+  full_name: "",
+  phone: "",
+  email: "",
+  date: new Date().toISOString().split("T")[0],
+  type: "suppliers",
+  llc: "",
+  inn: "",
+  okpo: "",
+  score: "",
+  bik: "",
+  address: "",
+};
+
 const AddProductBarcode = ({
   onClose: onAddModalClose,
   onShowSuccessAlert,
   onShowErrorAlert,
+  onShowSupplierCreated,
   selectCashBox,
 }) => {
   const {
@@ -59,6 +77,11 @@ const AddProductBarcode = ({
   const [debtMonths, setDebtMonths] = useState("");
   const [clientId, setClientId] = useState("");
   const [showDebtForm, setShowDebtForm] = useState(false);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const showSupplierFormRef = useRef(showSupplierForm);
+  showSupplierFormRef.current = showSupplierForm;
+  const [supplierFormState, setSupplierFormState] = useState(initialSupplierFormState);
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
   const [debtState, setDebtState] = useState({
     phone: "",
     dueDate: "",
@@ -183,8 +206,49 @@ const AddProductBarcode = ({
     setDebtState((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleSupplierFormChange = (e) => {
+    const { name, value } = e.target;
+    setSupplierFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const onSubmitSupplier = async (e) => {
+    e.preventDefault();
+    if (!supplierFormState.full_name?.trim()) {
+      if (onShowErrorAlert) onShowErrorAlert("Введите ФИО поставщика");
+      return;
+    }
+    setCreatingSupplier(true);
+    try {
+      const client = await dispatch(createClientAsync(supplierFormState)).unwrap();
+      await dispatch(fetchClientsAsync());
+      setShowSupplierForm(false);
+      if (client?.id) {
+        setClientId(String(client.id));
+      }
+      setSupplierFormState(initialSupplierFormState);
+      if (onShowSupplierCreated) {
+        onShowSupplierCreated("Поставщик успешно создан!");
+      }
+    } catch (err) {
+      const msg = err?.message || err?.detail || JSON.stringify(err);
+      if (onShowErrorAlert) onShowErrorAlert(`Ошибка при создании поставщика: ${msg}`);
+    } finally {
+      setCreatingSupplier(false);
+    }
+  };
+
+  // Не обрабатывать скан, если пользователь вводит текст в поле (форма поставщика, долга или любое input/textarea/select)
   useScanDetection({
     onComplete: (scanned) => {
+      const active = document.activeElement;
+      const isInputFocused =
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.tagName === "SELECT");
+      if (isInputFocused || showSupplierFormRef.current) {
+        return;
+      }
       if (scanned.length >= 3) {
         setBarcodeScan(scanned);
       }
@@ -687,22 +751,104 @@ const AddProductBarcode = ({
                     <p className="add-product-barcode__error-message">
                       Выберите поставщика!
                     </p>
-                    <div className="add-product-barcode__form-group">
+                    <div className="add-product-barcode__form-group add-product-barcode__supplier-row">
                       <label>Поставщик *</label>
-                      <select
-                        onChange={(e) => {
-                          setClientId(e.target.value);
-                        }}
-                        value={clientId}
-                      >
-                        <option value="">Выберите поставщика</option>
-                        {filterClient.map((client) => (
-                          <option key={client.id} value={client.id}>
-                            {client.full_name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="add-product-barcode__supplier-select-wrap">
+                        <select
+                          onChange={(e) => setClientId(e.target.value)}
+                          value={clientId}
+                          className="add-product-barcode__select"
+                        >
+                          <option value="">Выберите поставщика</option>
+                          {filterClient.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.full_name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="add-product-barcode__create-supplier-btn"
+                          onClick={() => setShowSupplierForm(!showSupplierForm)}
+                        >
+                          + Создать поставщика
+                        </button>
+                      </div>
                     </div>
+                    {showSupplierForm && (
+                      <form
+                        className="add-product-barcode__supplier-form"
+                        onSubmit={onSubmitSupplier}
+                      >
+                        <input
+                          type="text"
+                          name="full_name"
+                          placeholder="ФИО *"
+                          value={supplierFormState.full_name}
+                          onChange={handleSupplierFormChange}
+                          className="add-product-barcode__input"
+                        />
+                        <input
+                          type="text"
+                          name="phone"
+                          placeholder="Телефон"
+                          value={supplierFormState.phone}
+                          onChange={handleSupplierFormChange}
+                          className="add-product-barcode__input"
+                        />
+                        <input
+                          type="email"
+                          name="email"
+                          placeholder="Почта"
+                          value={supplierFormState.email}
+                          onChange={handleSupplierFormChange}
+                          className="add-product-barcode__input"
+                        />
+                        <input
+                          type="text"
+                          name="llc"
+                          placeholder="ОсОО"
+                          value={supplierFormState.llc}
+                          onChange={handleSupplierFormChange}
+                          className="add-product-barcode__input"
+                        />
+                        <input
+                          type="text"
+                          name="inn"
+                          placeholder="ИНН"
+                          value={supplierFormState.inn}
+                          onChange={handleSupplierFormChange}
+                          className="add-product-barcode__input"
+                        />
+                        <input
+                          type="text"
+                          name="address"
+                          placeholder="Адрес"
+                          value={supplierFormState.address}
+                          onChange={handleSupplierFormChange}
+                          className="add-product-barcode__input"
+                        />
+                        <div className="add-product-barcode__supplier-form-actions">
+                          <button
+                            type="button"
+                            className="add-product-barcode__btn add-product-barcode__btn--secondary"
+                            onClick={() => {
+                              setShowSupplierForm(false);
+                              setSupplierFormState(initialSupplierFormState);
+                            }}
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            type="submit"
+                            className="add-product-barcode__btn add-product-barcode__btn--primary"
+                            disabled={creatingSupplier}
+                          >
+                            {creatingSupplier ? "Создание..." : "Создать"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </>
                 )}
                 {company?.subscription_plan?.name === "Старт" && clientId && (

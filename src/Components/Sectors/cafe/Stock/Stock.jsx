@@ -31,6 +31,8 @@ const Stock = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [cashboxes, setCashboxes] = useState([]);
+  const [cashboxId, setCashboxId] = useState("");
 
   // модалка товара
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,12 +42,14 @@ const Stock = () => {
     unit: "",
     remainder: "",
     minimum: "",
+    unit_price: "",
   });
 
   // модалка движения (приход)
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveItem, setMoveItem] = useState(null);
   const [moveQty, setMoveQty] = useState("");
+  const [moveUnitPrice, setMoveUnitPrice] = useState("");
 
   // модалка подтверждения удаления
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -63,6 +67,22 @@ const Stock = () => {
       }
     };
     fetchAll();
+  }, []);
+
+  useEffect(() => {
+    const fetchCashboxes = async () => {
+      try {
+        const r = await api.get("/construction/cashboxes/");
+        const arr = listFrom(r) || [];
+        const list = Array.isArray(arr) ? arr : [];
+        setCashboxes(list);
+        const firstKey = String(list?.[0]?.id || list?.[0]?.uuid || "");
+        if (firstKey) setCashboxId(firstKey);
+      } catch {
+        setCashboxes([]);
+      }
+    };
+    fetchCashboxes();
   }, []);
 
   const filtered = useMemo(() => {
@@ -84,6 +104,7 @@ const Stock = () => {
       unit: "",
       remainder: "",
       minimum: "",
+      unit_price: "",
     });
     setModalOpen(true);
   };
@@ -95,6 +116,7 @@ const Stock = () => {
       unit: row.unit || "",
       remainder: String(row.remainder ?? ""),
       minimum: String(row.minimum ?? ""),
+      unit_price: String(row.unit_price ?? ""),
     });
     setModalOpen(true);
   };
@@ -107,6 +129,7 @@ const Stock = () => {
 
     const remainderNum = toNum(form.remainder);
     const minimumNum = toNum(form.minimum);
+    const unitPriceNum = toNum(form.unit_price);
 
     if (!title || !unit) return;
 
@@ -115,6 +138,7 @@ const Stock = () => {
       unit,
       remainder: numStr(Math.max(0, remainderNum)),
       minimum: numStr(Math.max(0, minimumNum)),
+      unit_price: numStr(Math.max(0, unitPriceNum)),
     };
 
     try {
@@ -123,6 +147,17 @@ const Stock = () => {
         const res = await api.post("/cafe/warehouse/", payload);
         setItems((prev) => [...prev, res.data]);
         setModalOpen(false);
+        // Запись в кассу (расход — закупка нового товара): количество × цена
+        const boxId = cashboxId || String(cashboxes?.[0]?.id ?? cashboxes?.[0]?.uuid ?? "");
+        if (boxId) {
+          const amount = remainderNum * unitPriceNum;
+          api.post("/construction/cashflows/", {
+            cashbox: boxId,
+            type: "expense",
+            name: `Новый товар на склад: ${title}`,
+            amount,
+          }).catch(() => {});
+        }
       } else {
         // Редактирование товара
         const res = await api.put(`/cafe/warehouse/${editingId}/`, payload);
@@ -154,6 +189,7 @@ const Stock = () => {
   const openMove = (item) => {
     setMoveItem(item);
     setMoveQty("");
+    setMoveUnitPrice(String(item.unit_price ?? ""));
     setMoveOpen(true);
   };
 
@@ -169,17 +205,32 @@ const Stock = () => {
     const current = toNum(moveItem.remainder);
     const nextQty = current + qtyNum;
 
+    const unitPriceNum = toNum(moveUnitPrice);
     const payload = {
       title: moveItem.title,
       unit: moveItem.unit,
       remainder: numStr(nextQty),
       minimum: numStr(toNum(moveItem.minimum)),
+      unit_price: numStr(unitPriceNum >= 0 ? unitPriceNum : toNum(moveItem.unit_price)),
     };
 
     try {
       const res = await api.put(`/cafe/warehouse/${moveItem.id}/`, payload);
       setItems((prev) => prev.map((s) => (s.id === moveItem.id ? res.data : s)));
       setMoveOpen(false);
+      // Запись в кассу (расход — приход товара на склад): количество × цена
+      const boxId = cashboxId || String(cashboxes?.[0]?.id ?? cashboxes?.[0]?.uuid ?? "");
+      if (boxId) {
+        const price = unitPriceNum > 0 ? unitPriceNum : toNum(moveItem.unit_price);
+        const amount = qtyNum * price;
+        const moveName = `Приход на склад: ${moveItem.title}, ${numStr(qtyNum)} ${moveItem.unit}`;
+        api.post("/construction/cashflows/", {
+          cashbox: boxId,
+          type: "expense",
+          name: moveName,
+          amount,
+        }).catch(() => {});
+      }
     } catch (err) {
       // Ошибка применения движения
     }
@@ -291,6 +342,8 @@ const Stock = () => {
           moveItem={moveItem}
           moveQty={moveQty}
           setMoveQty={setMoveQty}
+          moveUnitPrice={moveUnitPrice}
+          setMoveUnitPrice={setMoveUnitPrice}
           onClose={() => setMoveOpen(false)}
           onSubmit={applyMove}
           sanitizeDecimalInput={sanitizeDecimalInput}

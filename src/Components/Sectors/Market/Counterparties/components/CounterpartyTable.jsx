@@ -29,10 +29,7 @@ const CounterpartyRow = React.memo(
     const typeLabel = typeLabels[type] || type;
 
     return (
-      <tr
-        className="warehouse-table__row"
-        onClick={() => onCounterpartyClick(counterparty)}
-      >
+      <tr className="warehouse-table__row">
         <td onClick={(e) => onRowSelect(counterparty.id, e)}>
           <input
             type="checkbox"
@@ -52,6 +49,18 @@ const CounterpartyRow = React.memo(
         {/* <td>{phone}</td>
         <td>{email}</td>
         <td>{inn}</td> */}
+        <td>
+          <button
+            type="button"
+            className="warehouse-table__open-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCounterpartyClick(counterparty);
+            }}
+          >
+            Открыть
+          </button>
+        </td>
       </tr>
     );
   },
@@ -94,7 +103,7 @@ const CounterpartyTable = ({
         <table className="warehouse-table w-full min-w-[1100px]">
           <tbody>
             <tr>
-              <td colSpan={7} className="warehouse-table__loading">
+              <td colSpan={5} className="warehouse-table__loading">
                 Загрузка...
               </td>
             </tr>
@@ -110,7 +119,7 @@ const CounterpartyTable = ({
         <table className="warehouse-table w-full min-w-[1100px]">
           <tbody>
             <tr>
-              <td colSpan={7} className="warehouse-table__empty">
+              <td colSpan={5} className="warehouse-table__empty">
                 Контрагенты не найдены
               </td>
             </tr>
@@ -141,6 +150,7 @@ const CounterpartyTable = ({
             <th>№</th>
             <th>Название</th>
             <th>Тип</th>
+            <th></th>
             {/* <th>Телефон</th>
             <th>Email</th>
             <th>ИНН</th> */}
@@ -181,7 +191,10 @@ const areEqual = (prevProps, nextProps) => {
     return true;
   }
 
-  if (prevProps.counterparties.length > 0 && nextProps.counterparties.length > 0) {
+  if (
+    prevProps.counterparties.length > 0 &&
+    nextProps.counterparties.length > 0
+  ) {
     if (prevProps.counterparties[0]?.id !== nextProps.counterparties[0]?.id) {
       return false;
     }
@@ -191,4 +204,3 @@ const areEqual = (prevProps, nextProps) => {
 };
 
 export default React.memo(CounterpartyTable, areEqual);
-

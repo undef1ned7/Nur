@@ -292,21 +292,15 @@ const KassaDet = () => {
 
   // --- ЛОГИКА ФИЛЬТРАЦИИ ---
   // flowsList !== null — данные пришли с бэка по поиску/типу; иначе — из cashboxDetails
-  const baseFlows =
-    flowsList !== null
-      ? flowsList
-      : (cashboxDetails?.cashflows || []).filter(
-          (flow) =>
-            (activeFlowType === "all" || flow.type === activeFlowType) &&
-            (flow.status === "true" ||
-              flow.status === "approved" ||
-              flow.status === true)
-        );
-  const filteredCashflows = baseFlows.filter(
+  // Всегда фильтруем по типу таба (все / приход / расход) и по статусу
+  const rawFlows =
+    flowsList !== null ? flowsList : cashboxDetails?.cashflows || [];
+  const filteredCashflows = rawFlows.filter(
     (flow) =>
-      flow.status === "true" ||
-      flow.status === "approved" ||
-      flow.status === true
+      (activeFlowType === "all" || flow.type === activeFlowType) &&
+      (flow.status === "true" ||
+        flow.status === "approved" ||
+        flow.status === true)
   );
 
   const handleResetFilters = () => {

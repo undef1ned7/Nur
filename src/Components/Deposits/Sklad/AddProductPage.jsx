@@ -223,6 +223,9 @@ const AddProductPage = () => {
   // Ошибки для обязательных полей
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Id изображений при загрузке товара (для удаления с сервера при редактировании)
+  const [initialProductImageIds, setInitialProductImageIds] = useState([]);
+
   // Состояния для долга
   const [debt, setDebt] = useState("");
   const [amount, setAmount] = useState("");
@@ -262,15 +265,21 @@ const AddProductPage = () => {
           setItemType(detectedItemType);
 
           // Заполняем основные данные
+          // Форматируем цену до 3 знаков после запятой при загрузке для редактирования
+          const formatPrice3Decimals = (v) => {
+            if (v === null || v === undefined || v === "") return "";
+            const n = Number(String(v).replace(",", "."));
+            return Number.isFinite(n) ? (Math.round(n * 1000) / 1000).toString() : String(v);
+          };
           setNewItemData({
             name: product.name || "",
             barcode: product.barcode || "",
             brand_name: product.brand_name || "",
             category_name: product.category_name || "",
-            price: product.price || "",
+            price: formatPrice3Decimals(product.price),
             quantity: product.quantity || "",
             client: product.client || "",
-            purchase_price: product.purchase_price || "",
+            purchase_price: formatPrice3Decimals(product.purchase_price),
             plu: product.plu || "",
             scale_type: product.scale_type || "",
           });
@@ -289,7 +298,7 @@ const AddProductPage = () => {
             weight: product.characteristics?.factual_weight_kg || "0",
             description: product.characteristics?.description || "",
             country: product.country || "",
-            purchasePrice: product.purchase_price || "",
+            purchasePrice: formatPrice3Decimals(product.purchase_price) || "",
             markup: product.markup_percent || "0",
             discount: product.discount_percent || "0",
             supplier: product.client || "",
@@ -314,6 +323,9 @@ const AddProductPage = () => {
               id: img.id,
             }));
             setImages(loadedImages);
+            setInitialProductImageIds(product.images.map((img) => img.id).filter(Boolean));
+          } else {
+            setInitialProductImageIds([]);
           }
 
           // Для комплекта загружаем состав из packages
@@ -354,16 +366,22 @@ const AddProductPage = () => {
       }
       setItemType(detectedItemType);
 
+      // Форматируем цену до 3 знаков при дублировании
+      const formatPrice3DecimalsDup = (v) => {
+        if (v === null || v === undefined || v === "") return "";
+        const n = Number(String(v).replace(",", "."));
+        return Number.isFinite(n) ? (Math.round(n * 1000) / 1000).toString() : String(v);
+      };
       // Заполняем основные данные (очищаем ID, штрих-код и количество для нового товара)
       setNewItemData({
         name: product.name || "",
         barcode: "", // Очищаем штрих-код для нового товара
         brand_name: product.brand_name || "",
         category_name: product.category_name || "",
-        price: product.price || "",
+        price: formatPrice3DecimalsDup(product.price),
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",
-        purchase_price: product.purchase_price || "",
+        purchase_price: formatPrice3DecimalsDup(product.purchase_price),
         plu: product.plu || "",
         scale_type: product.scale_type || "",
       });
@@ -397,7 +415,7 @@ const AddProductPage = () => {
         })),
       });
 
-      // Загружаем изображения (копируем ссылки, но не файлы)
+      // Загружаем изображения (копируем ссылки, но не файлы); для нового товара не храним id для удаления
       if (product.images && product.images.length > 0) {
         const loadedImages = product.images.map((img) => ({
           file: null, // Файл не копируем, только URL для предпросмотра
@@ -408,6 +426,7 @@ const AddProductPage = () => {
         }));
         setImages(loadedImages);
       }
+      setInitialProductImageIds([]);
 
       // Очищаем state после использования, чтобы при возврате назад не дублировалось снова
       if (location.state) {
@@ -441,11 +460,24 @@ const AddProductPage = () => {
     setState((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Ограничение цены: максимум 3 знака после запятой
+  const sanitizePriceTo3Decimals = (val) => {
+    const s = String(val ?? "").replace(",", ".");
+    const cleaned = s.replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length <= 1) return cleaned;
+    return parts[0] + "." + parts.slice(1).join("").slice(0, 3);
+  };
+
   const handleChange = (e) => {
     const { name, value, type } = e.target;
+    let finalValue = type === "number" ? (value === "" ? "" : parseInt(value)) : value;
+    if (name === "price" || name === "purchase_price") {
+      finalValue = sanitizePriceTo3Decimals(value);
+    }
     setNewItemData((prevData) => ({
       ...prevData,
-      [name]: type === "number" ? (value === "" ? "" : parseInt(value)) : value,
+      [name]: finalValue,
       scale_type:
         name === "scale_type"
           ? value
@@ -559,20 +591,34 @@ const AddProductPage = () => {
         const targetProductId = isEditMode
           ? productId
           : product?.id || product?.data?.id;
-        if (targetProductId && images.length > 0) {
+        if (targetProductId) {
+          // В режиме редактирования: удаляем с сервера изображения, которые пользователь убрал из списка
+          if (isEditMode && initialProductImageIds.length > 0) {
+            const currentIds = images.filter((im) => im.id).map((im) => im.id);
+            const removedIds = initialProductImageIds.filter((id) => !currentIds.includes(id));
+            if (removedIds.length > 0) {
+              await Promise.allSettled(
+                removedIds.map((imageId) =>
+                  api.delete(`/main/products/${targetProductId}/images/${imageId}/`)
+                )
+              );
+            }
+          }
           // Загружаем только новые изображения (с файлами)
-          const newImages = images.filter((im) => im.file);
-          if (newImages.length > 0) {
-            const uploads = newImages.map(async (im) => {
-              const fd = new FormData();
-              fd.append("image", im.file);
-              if (im.alt) fd.append("alt", im.alt || name);
-              fd.append("is_primary", String(Boolean(im.is_primary)));
-              return api.post(`/main/products/${targetProductId}/images/`, fd, {
-                headers: { "Content-Type": "multipart/form-data" },
+          if (images.length > 0) {
+            const newImages = images.filter((im) => im.file);
+            if (newImages.length > 0) {
+              const uploads = newImages.map(async (im) => {
+                const fd = new FormData();
+                fd.append("image", im.file);
+                if (im.alt) fd.append("alt", im.alt || name);
+                fd.append("is_primary", String(Boolean(im.is_primary)));
+                return api.post(`/main/products/${targetProductId}/images/`, fd, {
+                  headers: { "Content-Type": "multipart/form-data" },
+                });
               });
-            });
-            if (uploads.length) await Promise.allSettled(uploads);
+              if (uploads.length) await Promise.allSettled(uploads);
+            }
           }
         }
       } catch (e) {
@@ -619,9 +665,12 @@ const AddProductPage = () => {
       // Добавление денежного потока при создании товара
       // Создаем запрос на кассу только если не долг и не режим редактирования
       if (!isEditMode && debt !== "Долги") {
-        // Используем цену продажи для amount
+        // Сумма в кассу: количество × цена за единицу (для Предоплаты — переданная сумма)
         const sellingPrice = price || newItemData.price || "0";
-        const amountForCash = debt === "Предоплата" ? amount : sellingPrice;
+        const amountForCash =
+          debt === "Предоплата"
+            ? Number(amount || "0")
+            : qty * Number(sellingPrice);
         // Используем selectCashBox если cashData.cashbox пустой
         const cashboxId = cashData.cashbox || selectCashBox;
 
@@ -960,6 +1009,9 @@ const AddProductPage = () => {
                 }}
                 onShowErrorAlert={(errorMsg) => {
                   showAlert(errorMsg, "error", "Ошибка");
+                }}
+                onShowSupplierCreated={(message) => {
+                  showAlert(message, "success", "Успех");
                 }}
                 selectCashBox={selectCashBox}
               />
@@ -1528,7 +1580,8 @@ const AddProductPage = () => {
                       <input
                         type="text"
                         name="purchase_price"
-                        placeholder="0.00"
+                        placeholder="0.000"
+                        inputMode="decimal"
                         className="add-product-page__input"
                         value={newItemData.purchase_price}
                         onChange={handleChange}
@@ -1551,7 +1604,8 @@ const AddProductPage = () => {
                       <input
                         type="text"
                         name="price"
-                        placeholder="0.00"
+                        placeholder="0.000"
+                        inputMode="decimal"
                         className="add-product-page__input"
                         value={newItemData.price}
                         onChange={handleChange}
@@ -1813,12 +1867,16 @@ const MarketProductForm = ({
     isPriceManuallyChanged,
   ]);
 
-  // Сброс флага ручного изменения при изменении цены закупки или наценки
-  useEffect(() => {
-    if (itemType === "product") {
-      setIsPriceManuallyChanged(false);
-    }
-  }, [newItemData.purchase_price, marketData.markup, itemType]);
+  // Сброс флага только при явном редактировании полей (не при программном обновлении наценки из handlePriceChange)
+  const handlePurchasePriceChange = (e) => {
+    if (itemType === "product") setIsPriceManuallyChanged(false);
+    handleChange(e);
+  };
+  const handleMarkupFieldChange = (e) => {
+    setIsMarkupManuallyChanged(true);
+    if (itemType === "product") setIsPriceManuallyChanged(false);
+    handleMarketDataChange("markup", e.target.value);
+  };
 
   // Обработчик изменения цены продажи вручную
   const handlePriceChange = (e) => {
@@ -2323,7 +2381,9 @@ const MarketProductForm = ({
                     name="purchase_price"
                     className="market-product-form__input"
                     value={newItemData.purchase_price}
-                    onChange={handleChange}
+                    onChange={handlePurchasePriceChange}
+                    placeholder="0.000"
+                    inputMode="decimal"
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
@@ -2340,10 +2400,7 @@ const MarketProductForm = ({
                     type="text"
                     className="market-product-form__input"
                     value={marketData.markup}
-                    onChange={(e) => {
-                      setIsMarkupManuallyChanged(true);
-                      handleMarketDataChange("markup", e.target.value);
-                    }}
+                    onChange={handleMarkupFieldChange}
                   />
                   <span className="market-product-form__currency">%</span>
                 </div>
@@ -2359,7 +2416,8 @@ const MarketProductForm = ({
                     className="market-product-form__input"
                     value={newItemData.price}
                     onChange={handlePriceChange}
-                    placeholder="Рассчитывается автоматически"
+                    placeholder="0.000 или рассчитывается автоматически"
+                    inputMode="decimal"
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
@@ -2697,6 +2755,8 @@ const MarketProductForm = ({
                     className="market-product-form__input"
                     value={newItemData.price}
                     onChange={handleChange}
+                    placeholder="0.000"
+                    inputMode="decimal"
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
@@ -2815,6 +2875,8 @@ const MarketProductForm = ({
                     className="market-product-form__input"
                     value={newItemData.price}
                     onChange={handleChange}
+                    placeholder="0.000"
+                    inputMode="decimal"
                   />
                   <span className="market-product-form__currency">COM</span>
                   <div className="market-product-form__recalculate-wrapper">
