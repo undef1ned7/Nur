@@ -14,6 +14,8 @@ const SearchSection = ({
   onOpenFilters,
   count,
   foundCount,
+  showViewModeToggle = true,
+  searchPlaceholder = "Поиск по названию товара...",
 }) => {
   return (
     <div className="warehouse-search-section">
@@ -22,7 +24,7 @@ const SearchSection = ({
         <input
           type="text"
           className="warehouse-search__input"
-          placeholder="Поиск по названию товара..."
+          placeholder={searchPlaceholder}
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
         />
@@ -34,33 +36,37 @@ const SearchSection = ({
         </span>
 
         <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
-          <button
-            type="button"
-            onClick={() => onViewModeChange(VIEW_MODES.TABLE)}
-            className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
-              ${
-                viewMode === VIEW_MODES.TABLE
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-          >
-            <Table2 size={16} />
-            Таблица
-          </button>
+          {showViewModeToggle && (
+            <>
+              <button
+                type="button"
+                onClick={() => onViewModeChange(VIEW_MODES.TABLE)}
+                className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
+                  ${
+                    viewMode === VIEW_MODES.TABLE
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  }`}
+              >
+                <Table2 size={16} />
+                Таблица
+              </button>
 
-          <button
-            type="button"
-            onClick={() => onViewModeChange(VIEW_MODES.CARDS)}
-            className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
-              ${
-                viewMode === VIEW_MODES.CARDS
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-          >
-            <LayoutGrid size={16} />
-            Карточки
-          </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange(VIEW_MODES.CARDS)}
+                className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
+                  ${
+                    viewMode === VIEW_MODES.CARDS
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                  }`}
+              >
+                <LayoutGrid size={16} />
+                Карточки
+              </button>
+            </>
+          )}
 
           {onOpenFilters && (
             <button
