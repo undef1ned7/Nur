@@ -883,28 +883,43 @@
   padding: 10px;
   overflow: auto; /* скролл видимый */
   flex: 1;
+  flex-wrap: wrap;
+  display: flex;
 }
 
 .cafeOrdersRpanel__item {
   width: 100%;
-  display: grid;
-  grid-template-columns: 44px 1fr 40px;
+  display: flex;
   gap: 10px;
+  justify-content: space-between;
   align-items: center;
   padding: 10px;
   border-radius: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #fff;
+  background: #ffffff7e;
+  overflow: hidden;
   cursor: pointer;
   text-align: left;
+  flex: 1 0 150px;
   margin-bottom: 8px;
+  position: relative;
 
   &:hover {
-    background: #fafafa;
     border-color: rgba(15, 23, 42, 0.14);
   }
 }
+.cafeOrdersRpanel__image {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 
+}
 .cafeOrdersRpanel__thumb {
   width: 44px;
   height: 44px;
@@ -933,11 +948,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @include ifmobile {
+    font-size: 14px;
+  }
 }
 
 .cafeOrdersRpanel__price {
   font-size: 13px;
-  color: var(--muted);
+  // color: var(--muted);
+  color: black;
   font-weight: 500;
 }
 

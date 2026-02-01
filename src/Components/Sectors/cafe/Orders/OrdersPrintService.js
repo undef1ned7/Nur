@@ -431,8 +431,6 @@ export async function printViaWiFiSimple(payload, ip, port = 9100) {
   try {
     const parts = buildPrettyReceiptFromJSON(payload);
     const combinedData = combineDataParts(parts);
-    console.log('COMBINED DATA', combinedData);
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 100); // Таймаут 100мс
     fetch(`http://${ip}:${port}`, {
@@ -455,7 +453,6 @@ export async function printViaWiFiSimple(payload, ip, port = 9100) {
         }
         return true;
       });
-    console.log(`Чек отправлен на ${ip}:${port}`);
     return true;
 
   } catch (error) {
