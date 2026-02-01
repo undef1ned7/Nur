@@ -502,6 +502,8 @@ export const MENU_CONFIG = {
           { label: "Приход", to: "/crm/warehouse/documents/receipt" },
           { label: "Списание", to: "/crm/warehouse/documents/write_off" },
           { label: "Перемещение", to: "/crm/warehouse/documents/transfer" },
+          { label: "Приход (деньги)", to: "/crm/warehouse/documents/money/receipt" },
+          { label: "Расход (деньги)", to: "/crm/warehouse/documents/money/expense" },
         ],
       },
       {

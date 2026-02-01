@@ -98,7 +98,10 @@ export const updateDocument = async (id, documentData) => {
  */
 export const patchDocument = async (id, documentData) => {
   try {
-    const response = await api.patch(`warehouse/documents/${id}/`, documentData);
+    const response = await api.patch(
+      `warehouse/documents/${id}/`,
+      documentData
+    );
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -138,7 +141,10 @@ export const postDocument = async (id, options = {}) => {
     if (options.allow_negative !== undefined) {
       body.allow_negative = options.allow_negative;
     }
-    const response = await api.post(`warehouse/documents/${id}/post/`, Object.keys(body).length > 0 ? body : undefined);
+    const response = await api.post(
+      `warehouse/documents/${id}/post/`,
+      Object.keys(body).length > 0 ? body : undefined
+    );
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -261,7 +267,10 @@ export const listSaleReturnDocuments = async (params = {}) => {
  */
 export const createSaleReturnDocument = async (payload) => {
   try {
-    const response = await api.post("warehouse/documents/sale-return/", payload);
+    const response = await api.post(
+      "warehouse/documents/sale-return/",
+      payload
+    );
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -520,7 +529,10 @@ export const createProduct = async (productData) => {
  */
 export const updateProduct = async (id, productData) => {
   try {
-    const response = await api.put(`warehouse/crud/products/${id}/`, productData);
+    const response = await api.put(
+      `warehouse/crud/products/${id}/`,
+      productData
+    );
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -594,7 +606,9 @@ export const getWarehouseById = async (id) => {
  */
 export const listCounterparties = async (params = {}) => {
   try {
-    const response = await api.get("warehouse/crud/counterparties/", { params });
+    const response = await api.get("warehouse/crud/counterparties/", {
+      params,
+    });
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -628,7 +642,10 @@ export const getCounterpartyById = async (id) => {
  */
 export const createCounterparty = async (counterpartyData) => {
   try {
-    const response = await api.post("warehouse/crud/counterparties/", counterpartyData);
+    const response = await api.post(
+      "warehouse/crud/counterparties/",
+      counterpartyData
+    );
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -646,7 +663,10 @@ export const createCounterparty = async (counterpartyData) => {
  */
 export const updateCounterparty = async (id, counterpartyData) => {
   try {
-    const response = await api.put(`warehouse/crud/counterparties/${id}/`, counterpartyData);
+    const response = await api.put(
+      `warehouse/crud/counterparties/${id}/`,
+      counterpartyData
+    );
     return response.data;
   } catch (error) {
     if (error.response) {
@@ -681,7 +701,9 @@ export const deleteCounterparty = async (id) => {
  */
 export const getCounterpartyDebts = async (id) => {
   try {
-    const response = await api.get(`warehouse/crud/counterparties/${id}/debts/`);
+    const response = await api.get(
+      `warehouse/crud/counterparties/${id}/debts/`
+    );
     return response.data;
   } catch (error) {
     if (error.response?.status === 404) {
@@ -702,7 +724,9 @@ export const getCounterpartyDebts = async (id) => {
  */
 export const getCounterpartyPayments = async (id) => {
   try {
-    const response = await api.get(`warehouse/crud/counterparties/${id}/payments/`);
+    const response = await api.get(
+      `warehouse/crud/counterparties/${id}/payments/`
+    );
     return response.data;
   } catch (error) {
     if (error.response?.status === 404) {
@@ -710,6 +734,238 @@ export const getCounterpartyPayments = async (id) => {
     }
     if (error.response) {
       console.error("Get Counterparty Payments Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== ДЕНЕЖНЫЕ ДОКУМЕНТЫ (ПРИХОД/РАСХОД) ====================
+
+/**
+ * 5.1 Категории платежей
+ * GET/POST /api/warehouse/money/categories/
+ * GET/PATCH/PUT/DELETE /api/warehouse/money/categories/{id}/
+ */
+export const listMoneyCategories = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/money/categories/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Money Categories Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const getMoneyCategoryById = async (id) => {
+  try {
+    const response = await api.get(`warehouse/money/categories/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Money Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const createMoneyCategory = async (payload) => {
+  try {
+    const response = await api.post("warehouse/money/categories/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Money Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const updateMoneyCategory = async (id, payload) => {
+  try {
+    const response = await api.put(
+      `warehouse/money/categories/${id}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Money Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const patchMoneyCategory = async (id, payload) => {
+  try {
+    const response = await api.patch(
+      `warehouse/money/categories/${id}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Patch Money Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const deleteMoneyCategory = async (id) => {
+  try {
+    const response = await api.delete(`warehouse/money/categories/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Money Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 5.2 Денежные документы (приход MONEY_RECEIPT / расход MONEY_EXPENSE)
+ * Статусы: DRAFT | POSTED
+ */
+export const listMoneyDocuments = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/money/documents/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Money Documents Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const getMoneyDocumentById = async (id) => {
+  try {
+    const response = await api.get(`warehouse/money/documents/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const createMoneyDocument = async (payload) => {
+  try {
+    const response = await api.post("warehouse/money/documents/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const updateMoneyDocument = async (id, payload) => {
+  try {
+    const response = await api.put(`warehouse/money/documents/${id}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const patchMoneyDocument = async (id, payload) => {
+  try {
+    const response = await api.patch(
+      `warehouse/money/documents/${id}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Patch Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const deleteMoneyDocument = async (id) => {
+  try {
+    const response = await api.delete(`warehouse/money/documents/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const postMoneyDocument = async (id) => {
+  try {
+    const response = await api.post(`warehouse/money/documents/${id}/post/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Post Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const unpostMoneyDocument = async (id) => {
+  try {
+    const response = await api.post(`warehouse/money/documents/${id}/unpost/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Unpost Money Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 5.3 Денежные операции по контрагенту
+ * GET /api/warehouse/money/counterparties/{counterparty_id}/operations/
+ * Фильтры: doc_type, status, warehouse, payment_category. Поиск: search (по number, comment)
+ */
+export const getCounterpartyMoneyOperations = async (
+  counterpartyId,
+  params = {}
+) => {
+  try {
+    const response = await api.get(
+      `warehouse/money/counterparties/${counterpartyId}/operations/`,
+      { params }
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response?.status === 404) {
+      return { results: [] };
+    }
+    if (error.response) {
+      console.error(
+        "Get Counterparty Money Operations Error:",
+        error.response.data
+      );
       return Promise.reject(error.response.data);
     }
     return Promise.reject(error);
@@ -760,6 +1016,20 @@ export default {
   deleteCounterparty,
   getCounterpartyDebts,
   getCounterpartyPayments,
+  // Денежные документы (приход/расход)
+  listMoneyCategories,
+  getMoneyCategoryById,
+  createMoneyCategory,
+  updateMoneyCategory,
+  patchMoneyCategory,
+  deleteMoneyCategory,
+  listMoneyDocuments,
+  getMoneyDocumentById,
+  createMoneyDocument,
+  updateMoneyDocument,
+  patchMoneyDocument,
+  deleteMoneyDocument,
+  postMoneyDocument,
+  unpostMoneyDocument,
+  getCounterpartyMoneyOperations,
 };
-
-
