@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { FaCheck, FaPencilAlt, FaPrint, FaSyncAlt, FaTrash } from "react-icons/fa";
+import { FaCheck, FaPencilAlt, FaPrint, FaSyncAlt, FaTrash, FaUsb, FaWifi } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import api from "../../../../api";
 import { useConfirm } from "../../../../hooks/useDialog";
@@ -24,7 +24,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
-import { getActivePrinterKey, listAuthorizedPrinters, setActivePrinterByKey } from "../Orders/OrdersPrintService";
+import { getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -273,13 +273,15 @@ const Cook = () => {
   const [kitchenSaving, setKitchenSaving] = useState(false);
 
 
-    ////PRINT
+  ////PRINT
   const [activeKey, setActiveKey] = useState(getActivePrinterKey());
   const [selectedKey, setSelectedKey] = useState(getActivePrinterKey());
   const [authorized, setAuthorized] = useState([]);
   const [saved, setSaved] = useState([]);
   const [saving, setSaving] = useState(false);
-  
+  const [printerDevice, setPrinterDevice] = useState('usb');
+  const [ipPrinter, setIpPrinter] = useState('')
+
   const confirm = useConfirm();
   const { socketOrders: { orders } } = useOutletContext()
 
@@ -365,6 +367,18 @@ const Cook = () => {
         editingKitchen.title_name ??
         ""
       );
+      const printerSeparatorIndex = editingKitchen?.printer?.indexOf('/')
+      if (printerSeparatorIndex > -1) {
+        const printerKey = editingKitchen?.printer.slice(0, printerSeparatorIndex)
+        const printerData = editingKitchen?.printer.slice(printerSeparatorIndex + 1)
+        if (printerKey === 'usb') {
+          setSelectedKey(printerData)
+          setPrinterDevice('usb')
+        } else if (printerKey === 'ip') {
+          setIpPrinter(printerData)
+          setPrinterDevice('ip')
+        }
+      }
     } else {
       setEditKitchenTitle("");
     }
@@ -374,11 +388,16 @@ const Cook = () => {
     const id = editingKitchen?.id ?? editingKitchen?.uuid;
     if (!id || !editKitchenTitle.trim()) return;
     setKitchenSaving(true);
+    const data = {
+      title: editKitchenTitle.trim(),
+    }
+    if (printerDevice === 'usb' && selectedKey) {
+      data['printer'] = `usb/${selectedKey}`
+    } else {
+      data['printer'] = `ip/${ipPrinter}`
+    }
     try {
-      await api.patch(`/cafe/kitchens/${id}/`, {
-        title: editKitchenTitle.trim(),
-        printer: activeKey
-      });
+      await api.patch(`/cafe/kitchens/${id}/`, data);
       setEditingKitchen(null);
       refetchKitchens();
       showNotice("ok", "Кухня сохранена");
@@ -388,7 +407,7 @@ const Cook = () => {
     } finally {
       setKitchenSaving(false);
     }
-  }, [editingKitchen, editKitchenTitle, refetchKitchens, showNotice, activeKey]);
+  }, [editingKitchen, editKitchenTitle, refetchKitchens, showNotice, printerDevice, selectedKey, ipPrinter]);
 
   const handleDeleteKitchen = useCallback(
     (k) => {
@@ -1004,45 +1023,79 @@ const Cook = () => {
               disabled={kitchenSaving}
               autoFocus
             />
+
             <div className="cafeCookKitchenModal__field mb-4">
               <div className="cafeCookKitchenModal__label">Чековый аппарат</div>
-
-              <div className="cafeCookKitchenModal__printerRow">
-                <select
-                  className="cafeCookKitchenModal__select"
-                  value={selectedKey || ""}
-                  onChange={(e) => setSelectedKey(e.target.value)}
-                  disabled={loadingPrint || saving}
-                  title="Выберите принтер"
-                >
-                  <option value="">— Выберите принтер —</option>
-                  {merged.map((p) => (
-                    <option key={p.key} value={p.key}>
-                      {safeName(p)} ({shortKey(p.key)}){p.key === activeKey ? " • активный" : ""}
-                    </option>
-                  ))}
-                </select>
-
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  className="cafeCookKitchenModal__iconBtn"
-                  onClick={refresh}
-                  // disabled={loading || saving}
+                  className={`cafeCookKitchenModal__iconBtn ${printerDevice == 'usb' ? 'bg-green-300!' : ''}`}
+                  onClick={() => setPrinterDevice('usb')}
                   title="Обновить список"
                 >
-                  <FaSyncAlt />
+                  <FaUsb />
                 </button>
-
                 <button
                   type="button"
-                  className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
-                  onClick={onPickByDialog}
-                  disabled={loading || saving}
-                  title="Открыть диалог WebUSB и выбрать принтер"
+                  className={`cafeCookKitchenModal__iconBtn ${printerDevice !== 'usb' ? 'bg-green-300!' : ''}`}
+                  onClick={() => setPrinterDevice('wifi')}
+                  title="Обновить список"
                 >
-                  <FaPrint /> Выбрать
+                  <FaWifi />
                 </button>
               </div>
+              {
+                printerDevice == 'usb' ? (
+                  <div className="cafeCookKitchenModal__printerRow">
+                    <select
+                      className="cafeCookKitchenModal__select"
+                      value={selectedKey || ""}
+                      onChange={(e) => setSelectedKey(e.target.value)}
+                      disabled={loading || saving}
+                      title="Выберите принтер"
+                    >
+                      <option value="">— Выберите принтер —</option>
+                      {merged.map((p) => (
+                        <option key={p.key} value={p.key}>
+                          {safeName(p)} ({shortKey(p.key)}){p.key === activeKey ? " • активный" : ""}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      className="cafeCookKitchenModal__iconBtn"
+                      onClick={refresh}
+                      // disabled={loading || saving}
+                      title="Обновить список"
+                    >
+                      <FaSyncAlt />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
+                      onClick={onPickByDialog}
+                      disabled={loading || saving}
+                      title="Открыть диалог WebUSB и выбрать принтер"
+                    >
+                      <FaPrint /> Выбрать
+                    </button>
+                  </div>
+                ) : (
+                  <div className="cafeCookKitchenModal__printerRow w-full!">
+                    <input
+                      className="cafeCookKitchenModal__input w-full!"
+                      placeholder="IP Адрес принтера"
+                      value={ipPrinter}
+                      onChange={(e) => setIpPrinter(e.target.value)}
+                      disabled={saving}
+                      autoComplete="off"
+                    />
+                  </div>
+                )
+              }
+
             </div>
             <div className="cafeCook__editKitchenFooter">
               <button

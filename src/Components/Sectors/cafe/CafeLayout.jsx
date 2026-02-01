@@ -16,9 +16,7 @@ export default function CafeLayout() {
         if (type === "kitchen_task_ready" && data?.task?.waiter === profile?.id) {
             setNotificationDeps(data?.task?.created_at)
             setNotificationOrder(`${data?.task?.menu_item_title} \nдля стола: №: ${data?.task.table_number} готово`);
-        } else if (type === '') {
-
-        }
+        } 
     }, [orders])
     return (
         <>

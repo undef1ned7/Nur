@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaCheck, FaPlus, FaPrint, FaSyncAlt, FaTimes } from "react-icons/fa";
+import { FaCheck, FaPlus, FaPrint, FaSyncAlt, FaTimes, FaUsb, FaWifi } from "react-icons/fa";
 import api from "../../../../../api";
 import {
   listAuthorizedPrinters,
@@ -33,6 +33,8 @@ const writeKitchenPrinterMap = (obj) => {
 const KitchenCreateModal = ({ open, onClose, onCreated }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [printerDevice, setPrinterDevice] = useState('usb');
+  const [ipPrinter, setIpPrinter] = useState('')
 
   const [title, setTitle] = useState("");
   const [authorized, setAuthorized] = useState([]);
@@ -116,19 +118,21 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       const nextNumber = await computeNextKitchenNumber();
 
       let created = null;
-
+      const data = {
+        title: t,
+        number: nextNumber,
+      }
+      if (printerDevice === 'usb' && selectedKey) {
+        data['printer'] = `usb/${selectedKey}`
+      } else if (printerDevice === 'wifi' && ipPrinter) {
+        data['printer'] = `ip/${ipPrinter}`
+      }
       try {
-        const r = await api.post("/cafe/kitchens/", {
-          title: t,
-          printer_key: selectedKey,
-        });
+        const r = await api.post("/cafe/kitchens/", data);
         created = r?.data || null;
       } catch (e1) {
         try {
-          const r2 = await api.post("/cafe/kitchens/", {
-            title: t,
-            number: nextNumber,
-          });
+          const r2 = await api.post("/cafe/kitchens/", data);
           created = r2?.data || null;
 
           if (created?.id) {
@@ -149,10 +153,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       setSaving(false);
     }
   };
-
   if (!open) return null;
-  console.log(activeKey, selectedKey);
-
   return (
     <div
       className="cafeCookKitchenModal"
@@ -196,54 +197,89 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
           <div className="cafeCookKitchenModal__field">
             <div className="cafeCookKitchenModal__label">Чековый аппарат</div>
-
-            <div className="cafeCookKitchenModal__printerRow">
-              <select
-                className="cafeCookKitchenModal__select"
-                value={selectedKey || ""}
-                onChange={(e) => setSelectedKey(e.target.value)}
-                disabled={loading || saving}
-                title="Выберите принтер"
-              >
-                <option value="">— Выберите принтер —</option>
-                {merged.map((p) => (
-                  <option key={p.key} value={p.key}>
-                    {safeName(p)} ({shortKey(p.key)}){p.key === activeKey ? " • активный" : ""}
-                  </option>
-                ))}
-              </select>
-
+            <div className="flex gap-2">
               <button
                 type="button"
-                className="cafeCookKitchenModal__iconBtn"
-                onClick={refresh}
+                className={`cafeCookKitchenModal__iconBtn ${printerDevice == 'usb' ? 'bg-green-300!' : ''}`}
+                onClick={() => setPrinterDevice('usb')}
                 // disabled={loading || saving}
                 title="Обновить список"
               >
-                <FaSyncAlt />
+                <FaUsb />
               </button>
-
               <button
                 type="button"
-                className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
-                onClick={onPickByDialog}
-                disabled={loading || saving}
-                title="Открыть диалог WebUSB и выбрать принтер"
+                className={`cafeCookKitchenModal__iconBtn ${printerDevice !== 'usb' ? 'bg-green-300!' : ''}`}
+                onClick={() => setPrinterDevice('wifi')}
+                // disabled={loading || saving}
+                title="Обновить список"
               >
-                <FaPrint /> Выбрать
-              </button>
-
-              <button
-                key={selectedKey}
-                type="button"
-                className={`cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost ${(saving || selectedKey) ? 'active' : ''}`}
-                onClick={onSetActive}
-                disabled={loading || saving || !selectedKey}
-                title="Сделать выбранный принтер активным"
-              >
-                <FaCheck />
+                <FaWifi />
               </button>
             </div>
+            {
+              printerDevice == 'usb' ? (
+                <div className="cafeCookKitchenModal__printerRow">
+                  <select
+                    className="cafeCookKitchenModal__select"
+                    value={selectedKey || ""}
+                    onChange={(e) => setSelectedKey(e.target.value)}
+                    disabled={loading || saving}
+                    title="Выберите принтер"
+                  >
+                    <option value="">— Выберите принтер —</option>
+                    {merged.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {safeName(p)} ({shortKey(p.key)}){p.key === activeKey ? " • активный" : ""}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    className="cafeCookKitchenModal__iconBtn"
+                    onClick={refresh}
+                    // disabled={loading || saving}
+                    title="Обновить список"
+                  >
+                    <FaSyncAlt />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
+                    onClick={onPickByDialog}
+                    disabled={loading || saving}
+                    title="Открыть диалог WebUSB и выбрать принтер"
+                  >
+                    <FaPrint /> Выбрать
+                  </button>
+
+                  <button
+                    key={selectedKey}
+                    type="button"
+                    className={`cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost ${(saving || selectedKey) ? 'active' : ''}`}
+                    onClick={onSetActive}
+                    disabled={loading || saving || !selectedKey}
+                    title="Сделать выбранный принтер активным"
+                  >
+                    <FaCheck />
+                  </button>
+                </div>
+              ) : (
+                <div className="cafeCookKitchenModal__printerRow w-full!">
+                  <input
+                    className="cafeCookKitchenModal__input w-full!"
+                    placeholder="IP Адрес принтера"
+                    value={ipPrinter}
+                    onChange={(e) => setIpPrinter(e.target.value)}
+                    disabled={saving}
+                    autoComplete="off"
+                  />
+                </div>
+              )
+            }
+
           </div>
         </div>
 

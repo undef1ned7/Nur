@@ -161,6 +161,8 @@ const Orders = () => {
   const [waiterOptionsFilter, setWaiterOptionsFilter] = useState([
     { value: null, label: 'Все сотрудники' }
   ])
+
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState(null);
   const [ordersPagination, setOrderPagination] = useState({
     totalPages: 0,
     currentPage: 1,
@@ -224,12 +226,17 @@ const Orders = () => {
 
   const fetchMenu = async (page = 1) => {
     setMenuLoading(true);
+    const params = {
+      category: selectedCategoryFilter
+    }
+    if (page > 1) {
+      params['page'] = page
+    }
     try {
       const res = await api.get("/cafe/menu-items/", {
-        params: page > 1 ? { page } : {}
+        params
       });
       const data = res?.data || {};
-
       // Сохраняем полный объект пагинации или массив
       const itemsData = data?.results ? data : (Array.isArray(data) ? data : []);
       setMenuItems(data?.results ? data : itemsData);
@@ -349,7 +356,9 @@ const Orders = () => {
     }))
     setOrders(full);
   }, [debouncedOrderSearchQuery, waiterFilter, socketOrders?.orders, isStaff, ordersPagination.currentPage]);
-
+  useEffect(() => {
+    fetchMenu(1)
+  }, [selectedCategoryFilter])
   useEffect(() => {
     try {
       attachUsbListenersOnce();
@@ -358,7 +367,7 @@ const Orders = () => {
     }
     (async () => {
       try {
-        await Promise.all([fetchEmployees(), fetchMenu(1), fetchKitchens(), fetchCashboxes()]);
+        await Promise.all([fetchEmployees(), fetchKitchens(), fetchCashboxes()]);
       } catch (e) {
         console.error("Ошибка загрузки:", e);
       }
@@ -638,12 +647,14 @@ const Orders = () => {
         for (const [kitchenId, kitItems] of groups.entries()) {
           const k = kitchensMap.get(String(kitchenId));
           const kitchenLabel = k?.label || k?.title || k?.name || "Кухня";
+          console.log('ASDASDASD',kitchenId, kitItems);
+          
           const printerKey = getKitchenPrinterKey(kitchenId);
 
-          if (!printerKey) {
-            console.error("Kitchen print skipped: no printer_key for kitchen", kitchenId);
-            continue;
-          }
+          // if (!printerKey) {
+          //   console.error("Kitchen print skipped: no printer_key for kitchen", kitchenId);
+          //   continue;
+          // }
 
           const payload = buildKitchenTicketPayload({
             order: detail,
@@ -652,8 +663,8 @@ const Orders = () => {
             items: kitItems,
           }, 'КУХНЯ');
 
-          await setActivePrinterByKey(printerKey);
-        await printViaWiFiSimple(payload, "192.168.1.200")
+          // await setActivePrinterByKey(printerKey);
+          await printViaWiFiSimple(payload, "192.168.1.200")
           // await printOrderReceiptJSONViaUSB(payload);
         }
       } catch (e) {
@@ -874,7 +885,8 @@ const Orders = () => {
         }
 
         setOrders((prev) => [...prev, res.data]);
-
+        console.log('OREDERS', res);
+        
         await autoPrintKitchenTickets(res?.data?.id);
       } else {
         const payload = normalizeOrderPayload(form);
@@ -1440,6 +1452,8 @@ const Orders = () => {
 
             <RightMenuPanel
               open={menuOpen}
+              selectedCategoryFilter={selectedCategoryFilter}
+              setSelectedCategoryFilter={setSelectedCategoryFilter}
               onClose={() => {
                 setMenuOpen(false);
                 setMenuCurrentPage(1);
