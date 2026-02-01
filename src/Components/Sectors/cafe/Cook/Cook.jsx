@@ -21,11 +21,10 @@ import KitchenCreateModal from "./components/KitchenCreateModal";
 import "./Cook.scss";
 import { useCafeOrdersWebSocket } from "../../../../hooks/useCafeWebSocket";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
-import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
-import { getActivePrinterKey, setActivePrinterByKey } from "../Orders/OrdersPrintService";
+import { getActivePrinterKey, listAuthorizedPrinters, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 

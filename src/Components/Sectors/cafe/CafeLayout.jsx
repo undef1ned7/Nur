@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useCafeWebSocketManager } from '../../../hooks/useCafeWebSocket'
-import NotificationCadeSound from '../../common/Notification/NotificationCadeSound'
+import NotificationCafeSound from '../../common/Notification/NotificationCafeSound'
 import { useUser } from '../../../store/slices/userSlice'
 
 export default function CafeLayout() {
@@ -22,7 +22,7 @@ export default function CafeLayout() {
     }, [orders])
     return (
         <>
-            <NotificationCadeSound notification={notificationOrder} deps={orders} />
+            <NotificationCafeSound notification={notificationOrder} deps={orders} />
             <Outlet context={{
                 socketOrders: orders,
                 socketTables: tables
