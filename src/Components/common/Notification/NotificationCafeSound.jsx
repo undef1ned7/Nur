@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-export default function NotificationCadeSound({ deps, notification, clearNotification }) {
+export default function NotificationCafeSound({ deps, notification, clearNotification }) {
     const audioRef = useRef(null);
     const isFirstEffect = useRef(true);
     const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -145,13 +145,6 @@ export default function NotificationCadeSound({ deps, notification, clearNotific
                     </div>
                 </div>
             )}
-
-            {/* {process.env.NODE_ENV === 'development' && (
-                <div className={`fixed top-4 right-4 z-40 px-3 py-2 rounded-lg text-xs font-medium ${audioUnlocked ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                    {audioUnlocked ? '🔊 Звук включен' : '🔇 Звук выключен'}
-                </div>
-            )} */}
-
             {
                 !!currentNotification.length &&
                 (
@@ -175,6 +168,12 @@ export default function NotificationCadeSound({ deps, notification, clearNotific
                 preload="auto"
                 className="hidden"
             />
+            {/* <audio
+                ref={waiterSoundRef}
+                src="/sounds/waiter_notification.mp3"
+                preload="auto"
+                className="hidden"
+            /> */}
 
             <style jsx>{`
                 @keyframes slide-up {
