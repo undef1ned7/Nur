@@ -384,6 +384,7 @@ function buildPrettyReceiptFromJSON(payload) {
   return chunks;
 }
 
+
 export async function printOrderReceiptJSONViaUSB(payload) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
 
@@ -424,4 +425,54 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
     }
   }
   return activedDev
+}
+
+export async function printViaWiFiSimple(payload, ip, port = 9100) {
+  try {
+    const parts = buildPrettyReceiptFromJSON(payload);
+    const combinedData = combineDataParts(parts);
+    console.log('COMBINED DATA', combinedData);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 100); // Таймаут 100мс
+    fetch(`http://${ip}:${port}`, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: combinedData,
+      signal: controller.signal
+    })
+      .then(() => {
+        clearTimeout(timeoutId);
+        return true;
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          console.log('Запрос прерван по таймауту (но данные отправлены)');
+        } else {
+          console.log('Ошибка сети (но данные могли отправиться):', error.message);
+        }
+        return true;
+      });
+    console.log(`Чек отправлен на ${ip}:${port}`);
+    return true;
+
+  } catch (error) {
+    console.warn(`Не удалось отправить на ${ip}:${port}`, error);
+    throw error;
+  }
+}
+
+function combineDataParts(parts) {
+  const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const part of parts) {
+    combined.set(part, offset);
+    offset += part.length;
+  }
+
+  return combined;
 }

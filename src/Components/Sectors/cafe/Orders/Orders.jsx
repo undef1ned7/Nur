@@ -20,6 +20,7 @@ import {
   printOrderReceiptJSONViaUSBWithDialog,
   printOrderReceiptJSONViaUSB,
   setActivePrinterByKey,
+  printViaWiFiSimple,
 } from "./OrdersPrintService";
 
 import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
@@ -28,7 +29,6 @@ import { SimpleStamp } from "../../../UI/SimpleStamp";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import { useUser } from "../../../../store/slices/userSlice";
-import NotificationCadeSound from "../../../common/Notification/NotificationCadeSound";
 import Pagination from "../../Market/Counterparties/components/Pagination";
 import { useOutletContext } from "react-router-dom";
 
@@ -183,7 +183,7 @@ const Orders = () => {
 
   const { isStaff, userRole, userData, userId } = useMemo(() => {
     const userRole = profile?.role || "";
-    const isStaff = !(profile?.role === 'owner' || profile.role === 'admin');
+    const isStaff = !(profile?.role === 'owner' || profile?.role === 'admin');
     return {
       userData: profile,
       userRole,
@@ -555,9 +555,11 @@ const Orders = () => {
       if (printingId) return;
       setPrintingId(order.id);
       try {
+
         await checkPrinterConnection().catch(() => false);
         const payload = buildPrintPayload(order);
-        await printOrderReceiptJSONViaUSBWithDialog(payload);
+        await printViaWiFiSimple(payload, "192.168.1.200")
+        // await printOrderReceiptJSONViaUSBWithDialog(payload);
       } catch (e) {
         // Ошибка печати чека
       } finally {
@@ -651,7 +653,8 @@ const Orders = () => {
           }, 'КУХНЯ');
 
           await setActivePrinterByKey(printerKey);
-          await printOrderReceiptJSONViaUSB(payload);
+        await printViaWiFiSimple(payload, "192.168.1.200")
+          // await printOrderReceiptJSONViaUSB(payload);
         }
       } catch (e) {
         console.error("Auto kitchen print error:", e);
