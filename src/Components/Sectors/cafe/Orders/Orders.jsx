@@ -21,6 +21,7 @@ import {
   printOrderReceiptJSONViaUSB,
   setActivePrinterByKey,
   printViaWiFiSimple,
+  parsePrinterBinding,
 } from "./OrdersPrintService";
 
 import { RightMenuPanel, SearchSelect } from "./components/OrdersParts";
@@ -194,6 +195,8 @@ const Orders = () => {
     }
   }, [profile])
   const [printingId, setPrintingId] = useState(null);
+
+  // Cash/receipt printer binding is configured in Settings (Настройки → Печать).
 
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const CARD_ITEMS_LIMIT = 4;
@@ -567,10 +570,21 @@ const Orders = () => {
 
         await checkPrinterConnection().catch(() => false);
         const payload = buildPrintPayload(order);
-        await printViaWiFiSimple(payload, "192.168.1.200")
-        // await printOrderReceiptJSONViaUSBWithDialog(payload);
+
+        // Receipt printer (cashier)
+        const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
+        if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
+        const parsed = parsePrinterBinding(receiptBinding);
+        if (parsed.kind === "ip") {
+          await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+        } else if (parsed.kind === "usb") {
+          await setActivePrinterByKey(parsed.usbKey);
+          await printOrderReceiptJSONViaUSB(payload);
+        } else {
+          throw new Error("Некорректная настройка принтера кассы");
+        }
       } catch (e) {
-        // Ошибка печати чека
+        console.error("Receipt print error:", e);
       } finally {
         setPrintingId(null);
       }
@@ -633,7 +647,8 @@ const Orders = () => {
 
         const groups = new Map();
         for (const it of items) {
-          const menuId = it?.menu_item || it?.menu_item_id || it?.menuItem || it?.id;
+          const menuId = it?.menu_item || it?.menu_item_id || it?.menuItem;
+          if (!menuId) continue;
           const kitchenId = getMenuKitchenId(menuId);
           if (!kitchenId) continue;
 
@@ -663,9 +678,15 @@ const Orders = () => {
             items: kitItems,
           }, 'КУХНЯ');
 
-          // await setActivePrinterByKey(printerKey);
-          await printViaWiFiSimple(payload, "192.168.1.200")
-          // await printOrderReceiptJSONViaUSB(payload);
+          const parsed = parsePrinterBinding(printerKey);
+          if (parsed.kind === "ip") {
+            await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+          } else if (parsed.kind === "usb") {
+            await setActivePrinterByKey(parsed.usbKey);
+            await printOrderReceiptJSONViaUSB(payload);
+          } else {
+            console.warn("Kitchen print skipped: invalid printer binding for kitchen", kitchenId, printerKey);
+          }
         }
       } catch (e) {
         console.error("Auto kitchen print error:", e);
