@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-export default function NotificationCafeSound({ deps, notification, clearNotification }) {
+export default function NotificationCafeSound({ notificationKey, notification, clearNotification }) {
     const audioRef = useRef(null);
     const isFirstEffect = useRef(true);
     const [audioUnlocked, setAudioUnlocked] = useState(false);
     const [showUnlockButton, setShowUnlockButton] = useState(false);
     const [playError, setPlayError] = useState(null);
+    const lastPlayedKeyRef = useRef(null);
+    const lastToastKeyRef = useRef(null);
     const unlockAudio = useCallback(async () => {
         if (!audioRef.current || audioUnlocked) return;
 
@@ -57,6 +59,10 @@ export default function NotificationCafeSound({ deps, notification, clearNotific
             return;
         }
 
+        // Дедуп: одно и то же событие не проигрываем повторно
+        if (notificationKey && lastPlayedKeyRef.current === notificationKey) return;
+        if (notificationKey) lastPlayedKeyRef.current = notificationKey;
+
         const playNotification = async () => {
             if (audioUnlocked) {
                 try {
@@ -77,11 +83,15 @@ export default function NotificationCafeSound({ deps, notification, clearNotific
 
         playNotification();
 
-    }, [deps, audioUnlocked]);
+    }, [notificationKey, audioUnlocked]);
 
     const [currentNotification, setCurrentNotification] = useState([]);
     useEffect(() => {
         if (!notification) return;
+
+        // Дедуп: если ключ тот же — не добавляем второй тост
+        if (notificationKey && lastToastKeyRef.current === notificationKey) return;
+        if (notificationKey) lastToastKeyRef.current = notificationKey;
 
         const newNotification = {
             id: Date.now().toString(),
@@ -98,7 +108,7 @@ export default function NotificationCafeSound({ deps, notification, clearNotific
                 return prev.slice(0, -1);
             })
         }, 4000)
-    }, [notification])
+    }, [notification, notificationKey])
     return (
         <>
             {showUnlockButton && !audioUnlocked && (

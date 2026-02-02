@@ -24,7 +24,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
-import { getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, setActivePrinterByKey } from "../Orders/OrdersPrintService";
+import { formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -376,7 +376,7 @@ const Cook = () => {
           setPrinterDevice('usb')
         } else if (printerKey === 'ip') {
           setIpPrinter(printerData)
-          setPrinterDevice('ip')
+          setPrinterDevice('wifi')
         }
       }
     } else {
@@ -392,9 +392,9 @@ const Cook = () => {
       title: editKitchenTitle.trim(),
     }
     if (printerDevice === 'usb' && selectedKey) {
-      data['printer'] = `usb/${selectedKey}`
-    } else {
-      data['printer'] = `ip/${ipPrinter}`
+      data['printer'] = formatPrinterBinding({ kind: "usb", usbKey: selectedKey })
+    } else if (printerDevice === 'wifi' && ipPrinter.trim()) {
+      data['printer'] = formatPrinterBinding({ kind: "ip", ipPort: ipPrinter })
     }
     try {
       await api.patch(`/cafe/kitchens/${id}/`, data);

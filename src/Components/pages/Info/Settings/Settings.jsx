@@ -1222,6 +1222,8 @@ import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
 import { IconButton } from "@mui/material";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import CafeReceiptPrinterSettings from "./CafeReceiptPrinterSettings";
+import CafeKitchenPrintersSettings from "./CafeKitchenPrintersSettings";
 
 /* helpers */
 const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
@@ -2033,6 +2035,25 @@ const Settings = () => {
                 )}
               </div>
             </div>
+          </div>
+        );
+
+      case "Печать":
+        return (
+          <div className="settings__tab-content">
+            {isCafeSector ? (
+              <>
+                <CafeReceiptPrinterSettings showAlert={showAlert} />
+                <CafeKitchenPrintersSettings showAlert={showAlert} />
+              </>
+            ) : (
+              <div className="settings__section">
+                <h2 className="settings__section-title">
+                  <span className="settings__emoji">🖨️</span> Печать
+                </h2>
+                <p className="settings__mutedText">Эти настройки доступны только для сектора кафе.</p>
+              </div>
+            )}
           </div>
         );
 
