@@ -7,6 +7,7 @@ import {
   getSavedPrinters,
   getActivePrinterKey,
   setActivePrinterByKey,
+  formatPrinterBinding,
 } from "../../Orders/OrdersPrintService";
 import "./KitchenCreateModal.scss";
 
@@ -69,6 +70,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
   useEffect(() => {
     if (!open) return;
     setTitle("");
+    setIpPrinter("");
     refresh();
   }, [open, refresh]);
 
@@ -111,7 +113,9 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
   const createKitchen = async () => {
     const t = title.trim();
-    if (!t || !selectedKey) return;
+    if (!t) return;
+    if (printerDevice === "usb" && !selectedKey) return;
+    if (printerDevice === "wifi" && !ipPrinter.trim()) return;
 
     setSaving(true);
     try {
@@ -123,9 +127,9 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
         number: nextNumber,
       }
       if (printerDevice === 'usb' && selectedKey) {
-        data['printer'] = `usb/${selectedKey}`
+        data['printer'] = formatPrinterBinding({ kind: "usb", usbKey: selectedKey })
       } else if (printerDevice === 'wifi' && ipPrinter) {
-        data['printer'] = `ip/${ipPrinter}`
+        data['printer'] = formatPrinterBinding({ kind: "ip", ipPort: ipPrinter })
       }
       try {
         const r = await api.post("/cafe/kitchens/", data);
@@ -137,12 +141,19 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
           if (created?.id) {
             const map = readKitchenPrinterMap();
-            map[String(created.id)] = selectedKey;
+            if (data?.printer) map[String(created.id)] = data.printer;
             writeKitchenPrinterMap(map);
           }
         } catch (e2) {
           throw e2;
         }
+      }
+
+      // local fallback mapping (used when backend does not return/store printer field)
+      if (created?.id && data?.printer) {
+        const map = readKitchenPrinterMap();
+        map[String(created.id)] = data.printer;
+        writeKitchenPrinterMap(map);
       }
 
       onCreated?.(created);
@@ -270,7 +281,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
                 <div className="cafeCookKitchenModal__printerRow w-full!">
                   <input
                     className="cafeCookKitchenModal__input w-full!"
-                    placeholder="IP Адрес принтера"
+                    placeholder="IP:порт (например 192.168.1.200:9100)"
                     value={ipPrinter}
                     onChange={(e) => setIpPrinter(e.target.value)}
                     disabled={saving}
@@ -297,7 +308,11 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
             type="button"
             className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
             onClick={createKitchen}
-            disabled={saving || !title.trim() || !selectedKey}
+            disabled={
+              saving ||
+              !title.trim() ||
+              (printerDevice === "usb" ? !selectedKey : !ipPrinter.trim())
+            }
           >
             <FaPlus /> {saving ? "Создаём…" : "Создать"}
           </button>

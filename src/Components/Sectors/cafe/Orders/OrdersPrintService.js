@@ -22,6 +22,17 @@ const chunkBytes = (u8, size = 12 * 1024) => {
   return out;
 };
 
+function u8ToBase64(u8) {
+  // chunked to avoid call stack limits
+  const CHUNK = 0x8000;
+  let binary = "";
+  for (let i = 0; i < u8.length; i += CHUNK) {
+    const slice = u8.subarray(i, i + CHUNK);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
 const LS_PRINTERS = "escpos_printers";
 export const LS_ACTIVE = "escpos_printer_active";
 
@@ -427,10 +438,101 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
   return activedDev
 }
 
+export function parsePrinterBinding(raw) {
+  const v0 = String(raw || "").trim();
+  if (!v0) return { kind: "", raw: "" };
+
+  // normalize: allow plain "192.168.1.200:9100" or "http://192.168.1.200:9100/"
+  let v = v0.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+
+  if (v.startsWith("usb/")) {
+    const usbKey = v.slice(4).trim();
+    return usbKey ? { kind: "usb", usbKey } : { kind: "", raw: v0 };
+  }
+
+  if (v.startsWith("ip/")) v = v.slice(3).trim();
+
+  // host[:port]
+  const m = v.match(/^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/);
+  if (!m) return { kind: "unknown", raw: v0 };
+
+  const ip = m[1];
+  const portNum = m[2] ? Number(m[2]) : 9100;
+  const port =
+    Number.isFinite(portNum) && portNum > 0 && portNum <= 65535 ? portNum : 9100;
+
+  return { kind: "ip", ip, port };
+}
+
+export function formatPrinterBinding(input) {
+  const kind = input?.kind;
+  if (kind === "usb") {
+    const usbKey = String(input?.usbKey || "").trim();
+    return usbKey ? `usb/${usbKey}` : "";
+  }
+  if (kind === "ip") {
+    // accept ipPort string or ip+port
+    const ipPort = String(input?.ipPort || "").trim();
+    if (ipPort) {
+      const parsed = parsePrinterBinding(`ip/${ipPort}`);
+      if (parsed.kind !== "ip") return "";
+      return parsed.port === 9100 ? `ip/${parsed.ip}` : `ip/${parsed.ip}:${parsed.port}`;
+    }
+
+    const ip = String(input?.ip || "").trim();
+    const portNum = Number(input?.port ?? 9100);
+    const port =
+      Number.isFinite(portNum) && portNum > 0 && portNum <= 65535 ? portNum : 9100;
+    if (!ip) return "";
+    return port === 9100 ? `ip/${ip}` : `ip/${ip}:${port}`;
+  }
+  return "";
+}
+
 export async function printViaWiFiSimple(payload, ip, port = 9100) {
   try {
     const parts = buildPrettyReceiptFromJSON(payload);
     const combinedData = combineDataParts(parts);
+
+    // Preferred: local RAW-TCP bridge (prints without HTTP headers)
+    // Run: `npm run printer-bridge`
+    // Optional override:
+    // localStorage.setItem("cafe_printer_bridge_url", "http://127.0.0.1:5179/print")
+    const bridgeUrl =
+      localStorage.getItem("cafe_printer_bridge_url") || "http://127.0.0.1:5179/print";
+
+    try {
+      const r = await fetch(bridgeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ip,
+          port,
+          data: u8ToBase64(combinedData),
+          timeoutMs: 2000,
+        }),
+      });
+      if (r.ok) return true;
+    } catch {
+      // ignore and fallback to legacy HTTP below
+    }
+
+    // Legacy fallback (direct HTTP to printer) is blocked on HTTPS sites (Mixed Content + Local Address Space).
+    // Keep it only for local/dev http origins, or if explicitly forced.
+    const isHttps = typeof window !== "undefined" && window.location?.protocol === "https:";
+    const forceLegacy = (() => {
+      try {
+        return localStorage.getItem("cafe_allow_legacy_http_print") === "true";
+      } catch {
+        return false;
+      }
+    })();
+    if (isHttps && !forceLegacy) {
+      throw new Error(
+        "Printer-bridge недоступен. На HTTPS нельзя печатать напрямую на IP:9100 — запустите printer-bridge на ПК с принтером."
+      );
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 100); // Таймаут 100мс
     fetch(`http://${ip}:${port}`, {
