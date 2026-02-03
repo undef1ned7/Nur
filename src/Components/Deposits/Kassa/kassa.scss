@@ -109,7 +109,8 @@
     color: var(--text);
     text-decoration: none;
     transition: all 0.2s;
-
+    flex: 1 0 100px;
+    
     &:hover {
       background: #f9fafb;
       border-color: var(--primary);

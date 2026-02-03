@@ -16,9 +16,11 @@ import "./Vitrina.scss";
 import { useUser } from "../../../store/slices/userSlice";
 import PendingModal from "../Kassa/PendingModal/PendingModal";
 import Pending from "../../pages/Pending/Pending";
+import useResize from "../../../hooks/useResize";
 
 const KassaDet = () => {
   const { id } = useParams();
+
   const cashboxId = id;
   const { company } = useUser();
   const navigate = useNavigate();
@@ -58,6 +60,11 @@ const KassaDet = () => {
     return "table";
   };
   const [viewMode, setViewMode] = useState(getInitialViewMode);
+  const { isMobile } = useResize(({ isMobile }) => {
+    setViewMode(prev => isMobile ? "cards" : prev);
+  });
+
+
   useEffect(() => {
     localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
   }, [viewMode]);
@@ -525,29 +532,26 @@ const KassaDet = () => {
           </Link>
           <button
             type="button"
-            className={`kassa-header__nav-tab ${
-              activeFlowType === "all" ? "kassa-header__nav-tab--active" : ""
-            }`}
+            className={`kassa-header__nav-tab ${activeFlowType === "all" ? "kassa-header__nav-tab--active" : ""
+              }`}
             onClick={() => setActiveFlowType("all")}
           >
             Все
           </button>
           <button
             type="button"
-            className={`kassa-header__nav-tab ${
-              activeFlowType === "expense"
-                ? "kassa-header__nav-tab--active"
-                : ""
-            }`}
+            className={`kassa-header__nav-tab ${activeFlowType === "expense"
+              ? "kassa-header__nav-tab--active"
+              : ""
+              }`}
             onClick={() => setActiveFlowType("expense")}
           >
             Расход
           </button>
           <button
             type="button"
-            className={`kassa-header__nav-tab ${
-              activeFlowType === "income" ? "kassa-header__nav-tab--active" : ""
-            }`}
+            className={`kassa-header__nav-tab ${activeFlowType === "income" ? "kassa-header__nav-tab--active" : ""
+              }`}
             onClick={() => setActiveFlowType("income")}
           >
             Приход
@@ -555,11 +559,10 @@ const KassaDet = () => {
           {company?.subscription_plan?.name !== "Старт" && (
             <button
               type="button"
-              className={`kassa-header__nav-tab ${
-                activeFlowType === "pending"
-                  ? "kassa-header__nav-tab--active"
-                  : ""
-              }`}
+              className={`kassa-header__nav-tab ${activeFlowType === "pending"
+                ? "kassa-header__nav-tab--active"
+                : ""
+                }`}
               onClick={() => setActiveFlowType("pending")}
             >
               Запросы
@@ -567,11 +570,10 @@ const KassaDet = () => {
           )}
           <button
             type="button"
-            className={`kassa-header__nav-tab ${
-              activeFlowType === "reports"
-                ? "kassa-header__nav-tab--active"
-                : ""
-            }`}
+            className={`kassa-header__nav-tab ${activeFlowType === "reports"
+              ? "kassa-header__nav-tab--active"
+              : ""
+              }`}
             onClick={() => setActiveFlowType("reports")}
           >
             Отчеты
@@ -594,17 +596,15 @@ const KassaDet = () => {
         <div className="cashbox-reports">
           <div className="cashbox-reports__tabs">
             <button
-              className={`cashbox-reports__tab ${
-                reportType === "monthly" ? "cashbox-reports__tab--active" : ""
-              }`}
+              className={`cashbox-reports__tab ${reportType === "monthly" ? "cashbox-reports__tab--active" : ""
+                }`}
               onClick={() => setReportType("monthly")}
             >
               Ежемесячный отчет
             </button>
             <button
-              className={`cashbox-reports__tab ${
-                reportType === "daily" ? "cashbox-reports__tab--active" : ""
-              }`}
+              className={`cashbox-reports__tab ${reportType === "daily" ? "cashbox-reports__tab--active" : ""
+                }`}
               onClick={() => setReportType("daily")}
             >
               Дневной отчет
@@ -663,11 +663,10 @@ const KassaDet = () => {
                 <div className="cashbox-reports__summary-item">
                   <span className="cashbox-reports__summary-label">Итого:</span>
                   <span
-                    className={`cashbox-reports__summary-value ${
-                      reportData.net >= 0
-                        ? "cashbox-reports__summary-value--income"
-                        : "cashbox-reports__summary-value--expense"
-                    }`}
+                    className={`cashbox-reports__summary-value ${reportData.net >= 0
+                      ? "cashbox-reports__summary-value--income"
+                      : "cashbox-reports__summary-value--expense"
+                      }`}
                   >
                     {reportData.net.toFixed(2)} сом
                   </span>
@@ -795,30 +794,33 @@ const KassaDet = () => {
               />
             </div>
             <div className="kassa-search__meta">
-              <div className="kassa-search__view-toggle">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("table")}
-                  className={`kassa-view-btn ${
-                    viewMode === "table" ? "kassa-view-btn--active" : ""
-                  }`}
-                  title="Таблица"
-                >
-                  <Table2 size={16} />
-                  Таблица
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("cards")}
-                  className={`kassa-view-btn ${
-                    viewMode === "cards" ? "kassa-view-btn--active" : ""
-                  }`}
-                  title="Карточки"
-                >
-                  <LayoutGrid size={16} />
-                  Карточки
-                </button>
-              </div>
+              {
+                !isMobile && (
+                  <div className="kassa-search__view-toggle">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("table")}
+                      className={`kassa-view-btn ${viewMode === "table" ? "kassa-view-btn--active" : ""
+                        }`}
+                      title="Таблица"
+                    >
+                      <Table2 size={16} />
+                      Таблица
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("cards")}
+                      className={`kassa-view-btn ${viewMode === "cards" ? "kassa-view-btn--active" : ""
+                        }`}
+                      title="Карточки"
+                    >
+                      <LayoutGrid size={16} />
+                      Карточки
+                    </button>
+                  </div>
+                )
+              }
+
               <button
                 className="kassa-search__filter-btn"
                 onClick={() => setShowFilter(true)}
@@ -840,8 +842,8 @@ const KassaDet = () => {
                 {activeFlowType === "income"
                   ? " (Приходы)."
                   : activeFlowType === "expense"
-                  ? " (Расходы)."
-                  : "."}
+                    ? " (Расходы)."
+                    : "."}
               </div>
             ) : viewMode === "table" ? (
               <table className="kassa-table">
@@ -871,11 +873,10 @@ const KassaDet = () => {
                     <div key={flow.id} className="kassa-card">
                       <div className="kassa-card__header">
                         <span
-                          className={`kassa-card__num ${
-                            flow.type === "income"
-                              ? "kassa-card__num--income"
-                              : "kassa-card__num--expense"
-                          }`}
+                          className={`kassa-card__num ${flow.type === "income"
+                            ? "kassa-card__num--income"
+                            : "kassa-card__num--expense"
+                            }`}
                         >
                           {flow.type === "income" ? "Приход" : "Расход"}
                         </span>
@@ -887,11 +888,10 @@ const KassaDet = () => {
                         <div className="kassa-card__field">
                           <span className="kassa-card__label">Сумма</span>
                           <span
-                            className={`kassa-card__value ${
-                              flow.type === "income"
-                                ? "kassa-card__value--income"
-                                : "kassa-card__value--expense"
-                            }`}
+                            className={`kassa-card__value ${flow.type === "income"
+                              ? "kassa-card__value--income"
+                              : "kassa-card__value--expense"
+                              }`}
                           >
                             {flow.amount} с
                           </span>
@@ -901,8 +901,8 @@ const KassaDet = () => {
                           <span className="kassa-card__value">
                             {flow.created_at
                               ? new Date(flow.created_at).toLocaleDateString(
-                                  "ru-RU"
-                                )
+                                "ru-RU"
+                              )
                               : "—"}
                           </span>
                         </div>

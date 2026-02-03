@@ -13,6 +13,7 @@ import {
   createDeal,
   getProductCheckout, // будем получать PDF/JSON для печати
   deleteProductInCart,
+  deleteSale,
 } from "../../../store/creators/saleThunk";
 import {
   createClientAsync,
@@ -57,7 +58,7 @@ import CustomServiceModal from "./components/CustomServiceModal";
 import './sell.scss'
 import { FaCar, FaCartArrowDown, FaMinus, FaPlus } from "react-icons/fa";
 import UniversalModal from "../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
-import { debounce } from "@mui/material";
+import { m } from "framer-motion";
 const cx = (...args) => args.filter(Boolean).join(" ");
 
 /* ============================================================
@@ -883,6 +884,16 @@ const SellMainStart = () => {
         }
 
         await dispatch(createDeal(dealPayload)).unwrap();
+        // await run(deleteSale(start?.id));
+        // await run(
+        //   addCashFlows({
+        //     ...cashData,
+        //     name: cashData.name === "" ? "Продажа" : cashData.name,
+        //     amount: amountForCash,
+        //     source_cashbox_flow_id: result?.sale_id,
+        //     type: finalPaymentType === "cash" ? "income" : "income",
+        //   })
+        // );
       }
 
       if (finalPaymentType === "cash") {
@@ -962,8 +973,6 @@ const SellMainStart = () => {
         type: "success",
         message: "Операция успешно выполнена!",
       });
-      console.log('JKASHDKJAHSKDHASJDHKSA', 123123);
-
       setPaymentMethod(null);
       setCashReceived("");
       setCashPaymentConfirmed(false);
@@ -1068,6 +1077,27 @@ const SellMainStart = () => {
           };
 
           await dispatch(createDeal(dealPayload)).unwrap();
+          const checkoutParams = {
+            id: start?.id,
+            bool: true,
+            clientId: clientId,
+            payment_method: "debt",
+            amount: 0,
+            cash_received: 0,
+          };
+          const result = await run(productCheckout(checkoutParams));
+          const printingResult = await run(getProductCheckout(result?.sale_id));
+          await run(
+            addCashFlows({
+              ...cashData,
+              name: cashData.name === "" ? "Продажа" : cashData.name,
+              amount: amountForCash,
+              source_cashbox_flow_id: result?.sale_id,
+              type: finalPaymentType === "cash" ? "income" : "income",
+            })
+          );
+          await handleCheckoutResponseForPrinting(printingResult);
+
         }
       } else if (debt === "Предоплата") {
         if (!amount || Number(amount) <= 0) {
@@ -1100,8 +1130,27 @@ const SellMainStart = () => {
             debtMonths: Number(debtMonths || 0),
             first_due_date: state.dueDate,
           };
-
+          const checkoutParams = {
+            id: start?.id,
+            bool: true,
+            clientId: clientId,
+            payment_method: "debt",
+            amount: 0,
+            cash_received: Number(amount),
+          };
           await dispatch(createDeal(dealPayload)).unwrap();
+          const result = await run(productCheckout(checkoutParams));
+          const printingResult = await run(getProductCheckout(result?.sale_id));
+          await run(
+            addCashFlows({
+              ...cashData,
+              name: cashData.name === "" ? "Продажа" : cashData.name,
+              amount: amountForCash,
+              source_cashbox_flow_id: result?.sale_id,
+              type: finalPaymentType === "cash" ? "income" : "income",
+            })
+          );
+          await handleCheckoutResponseForPrinting(printingResult);
         }
       }
 

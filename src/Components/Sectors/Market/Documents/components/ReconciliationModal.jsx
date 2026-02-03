@@ -124,6 +124,7 @@ export default function ReconciliationModal({ open, onClose }) {
             end: filters.end,
             currency: filters.currency,
             clientName,
+            companyName: data?.company?.name,
           }}
         />
       ).toBlob();
