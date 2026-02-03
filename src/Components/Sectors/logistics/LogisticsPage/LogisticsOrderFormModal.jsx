@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { createClientAsync } from "../../../../store/creators/clientCreators";
+import {
+  createClientAsync,
+  fetchClientsAsync,
+} from "../../../../store/creators/clientCreators";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const LogisticsOrderFormModal = ({
   visible,
@@ -18,15 +22,37 @@ const LogisticsOrderFormModal = ({
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientSaving, setNewClientSaving] = useState(false);
+  const [newClientErrors, setNewClientErrors] = useState({
+    full_name: "",
+    phone: "",
+    email: "",
+    common: "",
+  });
 
   const handleAddClient = async () => {
-    if (!newClientName.trim()) return;
+    const fullName = newClientName.trim();
+    const phone = newClientPhone.trim();
+    const email = newClientEmail.trim();
+
+    if (!fullName) {
+      setNewClientErrors((prev) => ({
+        ...prev,
+        full_name: "Введите имя клиента",
+        common: "",
+      }));
+      return;
+    }
+
     try {
-      const action = await dispatch(
+      setNewClientSaving(true);
+      setNewClientErrors({ full_name: "", phone: "", email: "", common: "" });
+
+      const client = await dispatch(
         createClientAsync({
-          full_name: newClientName.trim(),
-          phone: newClientPhone.trim(),
-          email: newClientEmail.trim(),
+          full_name: fullName,
+          phone,
+          email,
           date: new Date().toISOString().split("T")[0],
           type: "client",
           llc: "",
@@ -36,18 +62,55 @@ const LogisticsOrderFormModal = ({
           bik: "",
           address: "",
         })
-      );
-      if (createClientAsync.fulfilled.match(action)) {
-        const client = action.payload;
-        // сразу подставим созданного клиента в форму
-        setForm((f) => ({ ...f, clientId: client.id }));
-        setNewClientName("");
-        setNewClientPhone("");
-        setNewClientEmail("");
-        setShowNewClient(false);
-      }
+      ).unwrap();
+
+      // Сразу подставим созданного клиента в форму
+      setForm((f) => ({ ...f, clientId: client.id }));
+
+      // Обновим список клиентов, чтобы он появился в селекте
+      dispatch(fetchClientsAsync());
+
+      setNewClientName("");
+      setNewClientPhone("");
+      setNewClientEmail("");
+      setShowNewClient(false);
     } catch (err) {
-      console.error(err);
+      console.error("Ошибка при создании клиента в логистике:", err);
+
+      const data =
+        err?.data ??
+        err?.response?.data ??
+        err?.payload?.data ??
+        err?.payload ??
+        err;
+
+      const toMsg = (v) => {
+        if (Array.isArray(v)) return v.filter(Boolean).map(String).join("\n");
+        if (typeof v === "string") return v.trim();
+        return "";
+      };
+
+      const fieldErrors = {
+        full_name: toMsg(data?.full_name),
+        phone: toMsg(data?.phone),
+        email: toMsg(data?.email),
+        common: toMsg(data?.non_field_errors) || "",
+      };
+
+      const common =
+        fieldErrors.common ||
+        validateResErrors(err, "Не удалось создать клиента");
+
+      setNewClientErrors({
+        ...fieldErrors,
+        common:
+          fieldErrors.full_name || fieldErrors.phone || fieldErrors.email
+            ? ""
+            : common,
+      });
+    }
+    finally {
+      setNewClientSaving(false);
     }
   };
 
@@ -105,29 +168,77 @@ const LogisticsOrderFormModal = ({
               <div className="logistics-page__field logistics-page__field--full">
                 <div className="logistics-page__new-client">
                   <input
-                    className="logistics-page__input"
+                    className={`logistics-page__input${newClientErrors.full_name ? " logistics-page__input--error" : ""
+                      }`}
                     placeholder="Имя клиента *"
                     value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
+                    onChange={(e) => {
+                      setNewClientName(e.target.value);
+                      if (newClientErrors.full_name) {
+                        setNewClientErrors((prev) => ({ ...prev, full_name: "" }));
+                      }
+                    }}
                   />
                   <input
-                    className="logistics-page__input"
+                    className={`logistics-page__input${newClientErrors.phone ? " logistics-page__input--error" : ""
+                      }`}
                     placeholder="Телефон"
                     value={newClientPhone}
-                    onChange={(e) => setNewClientPhone(e.target.value)}
+                    onChange={(e) => {
+                      setNewClientPhone(e.target.value);
+                      if (newClientErrors.phone) {
+                        setNewClientErrors((prev) => ({ ...prev, phone: "" }));
+                      }
+                    }}
                   />
                   <input
-                    className="logistics-page__input"
+                    className={`logistics-page__input${newClientErrors.email ? " logistics-page__input--error" : ""
+                      }`}
                     placeholder="E-mail"
                     value={newClientEmail}
-                    onChange={(e) => setNewClientEmail(e.target.value)}
+                    onChange={(e) => {
+                      setNewClientEmail(e.target.value);
+                      if (newClientErrors.email) {
+                        setNewClientErrors((prev) => ({ ...prev, email: "" }));
+                      }
+                    }}
                   />
+
+                  {(newClientErrors.full_name ||
+                    newClientErrors.phone ||
+                    newClientErrors.email ||
+                    newClientErrors.common) && (
+                    <div className="logistics-page__new-client-errors">
+                      {newClientErrors.full_name && (
+                        <div className="logistics-page__field-hint logistics-page__field-hint--error">
+                          {newClientErrors.full_name}
+                        </div>
+                      )}
+                      {newClientErrors.phone && (
+                        <div className="logistics-page__field-hint logistics-page__field-hint--error">
+                          {newClientErrors.phone}
+                        </div>
+                      )}
+                      {newClientErrors.email && (
+                        <div className="logistics-page__field-hint logistics-page__field-hint--error">
+                          {newClientErrors.email}
+                        </div>
+                      )}
+                      {newClientErrors.common && (
+                        <div className="logistics-page__field-hint logistics-page__field-hint--error">
+                          {newClientErrors.common}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     className="logistics-page__btn logistics-page__btn--secondary"
                     onClick={handleAddClient}
+                    disabled={newClientSaving}
                   >
-                    Сохранить клиента
+                    {newClientSaving ? "Сохранение..." : "Сохранить клиента"}
                   </button>
                 </div>
               </div>

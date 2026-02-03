@@ -20,6 +20,7 @@ import { useUser } from "../../../../store/slices/userSlice";
 import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
 import "../../Market/Warehouse/Warehouse.scss";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
+import useResize from "../../../../hooks/useResize";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -370,6 +371,13 @@ const RawMaterialsWarehouse = () => {
   };
   const [viewMode, setViewMode] = useState(getInitialViewMode);
   const debounceTimerRef = useRef(null);
+  const { isMobile } = useResize(({ isMobile }) => {
+    if (isMobile) {
+      setViewMode('cards')
+    } else {
+      setViewMode(getInitialViewMode())
+    }
+  });
 
   // Debounce для поиска
   useEffect(() => {
@@ -524,22 +532,27 @@ const RawMaterialsWarehouse = () => {
 
           {/* Date filters */}
           <div className="flex items-center gap-2 flex-wrap">
-            <label className="text-sm text-slate-600">От:</label>
-            <input
-              type="date"
-              className="warehouse-search__input"
-              style={{ width: "auto", minWidth: "140px" }}
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-            <label className="text-sm text-slate-600">До:</label>
-            <input
-              type="date"
-              className="warehouse-search__input"
-              style={{ width: "auto", minWidth: "140px" }}
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
+            <div className="flex-1 flex gap-2 justify-between items-center">
+              <label className="text-sm text-slate-600">От:</label>
+              <input
+                type="date"
+                className="warehouse-search__input flex-1"
+                style={{ width: "auto", minWidth: "140px" }}
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 items-center gap-2 flex justify-between">
+              <label className="text-sm  text-slate-600">До:</label>
+              <input
+                type="date"
+                className="warehouse-search__input flex-1"
+                style={{ width: "auto", minWidth: "140px" }}
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
+
             {(dateFrom || dateTo || search || categoryId) && (
               <button
                 type="button"
@@ -552,7 +565,7 @@ const RawMaterialsWarehouse = () => {
           </div>
 
           {/* View toggle */}
-          <div className="ml-auto flex items-center gap-2">
+          {!isMobile && (<div className="ml-auto flex items-center gap-2">
             <button
               type="button"
               onClick={() => setViewMode("table")}
@@ -576,7 +589,7 @@ const RawMaterialsWarehouse = () => {
               <LayoutGrid size={16} />
               Карточки
             </button>
-          </div>
+          </div>)}
         </div>
       </div>
 

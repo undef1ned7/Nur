@@ -276,7 +276,7 @@ const PendingModal = ({ onClose, onChanged }) => {
               </thead>
               <tbody>
                 {filteredTransfers.map((transfer, idx) => (
-                  <tr key={transfer.id}>
+                  <tr key={transfer.id + idx}>
                     <td data-label="№">{idx + 1}</td>
                     <td data-label="Товар">{transfer.product_name || "—"}</td>
                     {profile?.role === "owner" && (

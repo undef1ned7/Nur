@@ -20,6 +20,7 @@ import { useLogistics } from "../../../../store/slices/logisticsSlice";
 import LogisticsOrderFormModal from "./LogisticsOrderFormModal";
 import LogisticsOrderViewModal from "./LogisticsOrderViewModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import useResize from "../../../../hooks/useResize";
 
 const statusOptions = [
   { value: "decorated", label: "Оформлен" },
@@ -88,11 +89,11 @@ const normalizeStatus = (raw) => {
 const getServiceValue = (order) => {
   return safeNum(
     order?.price_service ??
-      order?.service_price ??
-      order?.servicePrice ??
-      order?.service ??
-      order?.service_cost ??
-      0
+    order?.service_price ??
+    order?.servicePrice ??
+    order?.service ??
+    order?.service_cost ??
+    0
   );
 };
 
@@ -174,9 +175,8 @@ const ExpenseModal = ({ open, onClose, onSubmit, loading }) => {
             <div className="logistics-page__field logistics-page__field--full">
               <label className="logistics-page__label">Сумма ($)</label>
               <input
-                className={`logistics-page__input${
-                  touched && !isValid ? " logistics-page__input--error" : ""
-                }`}
+                className={`logistics-page__input${touched && !isValid ? " logistics-page__input--error" : ""
+                  }`}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Например: 150"
@@ -223,14 +223,19 @@ const LogisticsPage = () => {
   const { company } = useUser();
   const { list: logistics, loading } = useLogistics();
   const { list: cashBoxes } = useCash(); // оставил как есть, не трогаю остальной код
-
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [viewOrder, setViewOrder] = useState(null);
   const [filterStatus, setFilterStatus] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
-
+  const { isMobile } = useResize(({ isMobile }) => {
+    if (isMobile) {
+      setViewMode('cards')
+    } else {
+      setViewMode(getInitialViewMode())
+    }
+  });
   // ✅ расход теперь с сервера (SUM /logistics/expenses/)
   const [sentToCashAmount, setSentToCashAmount] = useState(0);
 
@@ -557,9 +562,8 @@ const LogisticsPage = () => {
         {statusSummary.map((s) => (
           <div
             key={s.key}
-            className={`logistics-page__analytics-card logistics-page__analytics-card--${s.color}${
-              normalizeStatus(filterStatus) === s.key ? " logistics-page__analytics-card--active" : ""
-            }`}
+            className={`logistics-page__analytics-card logistics-page__analytics-card--${s.color}${normalizeStatus(filterStatus) === s.key ? " logistics-page__analytics-card--active" : ""
+              }`}
             onClick={() => setFilterStatus((prev) => (normalizeStatus(prev) === s.key ? null : s.key))}
           >
             <div className="logistics-page__analytics-label">{s.label}</div>
@@ -595,7 +599,7 @@ const LogisticsPage = () => {
         <div className="logistics-page__orders-header">
           <h2 className="logistics-page__orders-title">Заказы по логистике</h2>
 
-          <div className="logistics-page__view-toggle">
+          {!isMobile && (<div className="logistics-page__view-toggle">
             <button
               type="button"
               onClick={() => setViewMode("table")}
@@ -612,7 +616,7 @@ const LogisticsPage = () => {
               <LayoutGrid size={16} />
               Карточки
             </button>
-          </div>
+          </div>)}
         </div>
 
         <div className="logistics-page__table-container w-full">
@@ -719,13 +723,12 @@ const LogisticsPage = () => {
                         <div className="mb-3 flex items-center justify-between">
                           <div className="text-xs font-semibold text-slate-500">#{index + 1}</div>
                           <div
-                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              statusColor === "blue"
-                                ? "bg-blue-100 text-blue-700"
-                                : statusColor === "orange"
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusColor === "blue"
+                              ? "bg-blue-100 text-blue-700"
+                              : statusColor === "orange"
                                 ? "bg-orange-100 text-orange-700"
                                 : "bg-green-100 text-green-700"
-                            }`}
+                              }`}
                           >
                             {statusLabel}
                           </div>
