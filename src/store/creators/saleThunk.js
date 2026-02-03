@@ -29,8 +29,18 @@ const hasPositiveNumber = (v) => Number.isFinite(Number(v)) && Number(v) > 0;
 // ===== POS продажи (товары) =====
 export const startSale = createAsyncThunk(
   "sale/start",
-  async ({ discount_total = 0, shift = null }, { rejectWithValue }) => {
+  async (args = {}, { rejectWithValue }) => {
     try {
+      // Нормализуем аргументы:
+      // - startSale() -> {}
+      // - startSale(10) / startSale("10") -> { discount_total: 10 }
+      // - startSale({ discount_total, shift }) -> как есть
+      const normalized =
+        typeof args === "number" || typeof args === "string"
+          ? { discount_total: Number(args) || 0 }
+          : args || {};
+
+      const { discount_total = 0, shift = null } = normalized;
       const payload = {
         order_discount_total: discount_total,
       };
@@ -43,6 +53,15 @@ export const startSale = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
+  },
+  {
+    // Защита от многократных параллельных вызовов startSale (частая причина пачки запросов при монтировании страницы)
+    condition: (args, { getState }) => {
+      const state = getState?.();
+      // если уже идет startSale — пропускаем повторный dispatch
+      if (state?.sale?.startSaleLoading) return false;
+      return true;
+    },
   }
 );
 

@@ -216,7 +216,7 @@ const LogisticsOrderFormModal = ({
                     maximumFractionDigits: 2,
                   });
                 })()}{" "}
-                сом
+                $
               </p>
             </div>
 
