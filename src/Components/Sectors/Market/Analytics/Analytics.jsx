@@ -545,6 +545,7 @@ const Analytics = () => {
       cash: "Наличные",
       transfer: "Безналичные",
       card: "Карта",
+      debt: "Долг",
       deferred: "Отсрочка",
     };
 

@@ -180,7 +180,9 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
             <span className="header__notification-count">{unreadCount}</span>
           )}
         </div>
-        <div className="header__profile">
+        <div onClick={() => {
+            navigate("/crm/set")
+        }} disabeld={!userProfile} className={`header__profile ${userProfile ? "cursor-pointer" : ""}`}>
           <div className="header__avatar">
             {usernameToDisplay
               ? usernameToDisplay.charAt(0).toUpperCase()

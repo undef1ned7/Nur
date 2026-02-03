@@ -60,6 +60,7 @@ import { FaCar, FaCartArrowDown, FaMinus, FaPlus } from "react-icons/fa";
 import UniversalModal from "../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
 import { m } from "framer-motion";
 import { useConfirm } from "../../../hooks/useDialog";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 const cx = (...args) => args.filter(Boolean).join(" ");
 
 /* ============================================================
@@ -1071,6 +1072,8 @@ const SellMainStart = () => {
           const totalForDeal = start?.total;
           const dealPayload = {
             clientId: clientId,
+            name: pickClient?.full_name,
+            phone: pickClient.phone,
             title: `Долг ${pickClient?.full_name}`,
             statusRu: debt,
             amount: totalForDeal,
@@ -1115,6 +1118,8 @@ const SellMainStart = () => {
           const totalForDeal = start?.total;
           const dealPayload = {
             clientId: clientId,
+            name: pickClient?.full_name,
+            phone: pickClient.phone,
             title: `Предоплата ${pickClient?.full_name}`,
             statusRu: debt,
             amount: totalForDeal,
@@ -1153,14 +1158,11 @@ const SellMainStart = () => {
       });
     } catch (error) {
       console.error("Ошибка при сохранении долга:", error);
+
       setAlert({
         open: true,
         type: "error",
-        message:
-          error?.data?.prepayment ||
-          error?.message ||
-          error?.data?.detail ||
-          "Ошибка при сохранении долга",
+        message: validateResErrors(error, "Ошибка при сохранении долга"),
       });
     }
   };
@@ -1257,7 +1259,7 @@ const SellMainStart = () => {
       }
       <div className="start__sell_body">
         <div className="start__products">
-          <div className="start_product_item">
+          <div className="start_product_item start_product_item--service" key="custom-services">
 
             <button
               className="start__products-add orange"
@@ -1269,9 +1271,12 @@ const SellMainStart = () => {
           </div>
 
           {filteredProducts?.map((product) => (
-            <div className="start_product_item">
+            <div
+              className="start_product_item start_product_item--product"
+              key={product.id || product.name}
+            >
               <div className="start_product_item--image">
-                <img src={product.img} alt="" />
+                <img src={product.img} alt={product.name || "Товар"} />
               </div>
               <div className="start_product_item--content">
                 <p className="start_product_item--title">

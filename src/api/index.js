@@ -43,7 +43,7 @@ api.interceptors.response.use(
     const accessToken = localStorage.getItem("accessToken");
     const refreshToken = localStorage.getItem("refreshToken");
 
-    if (err.response?.status === 401 && !originalRequest._retry) {
+    if (err.response?.status === 401 && !originalRequest._retry && accessToken) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
