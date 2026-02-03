@@ -399,6 +399,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   &__unit {
@@ -450,6 +451,7 @@
   &__footer {
     display: flex;
     gap: 12px;
+    flex-wrap: wrap;
     padding: 20px 24px;
     border-top: 1px solid var(--border);
     justify-content: flex-end;
@@ -462,6 +464,7 @@
     border: none;
     border-radius: 8px;
     font-size: 14px;
+    flex: 1;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -478,6 +481,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 14px;
+    flex: 1;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -497,6 +501,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    flex: 1;
 
     &:hover {
       background: #fef9e7;

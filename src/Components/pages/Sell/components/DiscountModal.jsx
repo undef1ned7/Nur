@@ -23,11 +23,16 @@ const DiscountModal = ({
           <label>Сумма скидки</label>
           <input
             className="sell__header-input"
-            type="text"
+            type="number"
             min="0"
             step="0.01"
+            onFocus={(e) => {
+              if (e.target.value <= 0) {
+                setDiscountValue("");
+              }
+            }}
             value={discountValue}
-            onChange={(e) => setDiscountValue(e.target.value)}
+            onChange={(e) => setDiscountValue(e.target.value.replace(/\D/g, ""))}
             placeholder="Введите сумму скидки"
             autoFocus
           />

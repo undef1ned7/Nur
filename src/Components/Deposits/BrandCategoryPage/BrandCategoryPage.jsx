@@ -4,7 +4,7 @@
 // Требует redux‑thunk'и: fetchBrandsAsync, createBrandAsync, updateBrandAsync, deleteBrandAsync
 // и fetchCategoriesAsync, createCategoryAsync, updateCategoryAsync, deleteCategoryAsync, уже описанные ранее.
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Search, MoreVertical, Plus, X } from "lucide-react";
 import {
@@ -18,6 +18,8 @@ import {
   deleteCategoryAsync,
 } from "../../../store/creators/productCreators"; // поправьте путь при необходимости
 import "./Employ.scss"; // ⚠️ тот же файл стилей
+import { useAlert, useConfirm } from "../../../hooks/useDialog";
+import { useDebouncedValue } from "../../../hooks/useDebounce";
 
 /* ------------------------------------------------------------------ */
 // Универсальный модал (создание / редактирование)
@@ -33,7 +35,7 @@ const TextModal = ({
   return (
     <div className="edit-modal brand">
       <div className="edit-modal__overlay" onClick={onClose} />
-      <div className="edit-modal__content">
+      <div className="edit-modal__content brand-category-page__edit-modal-content">
         <div className="edit-modal__header">
           <h3>{title}</h3>
           <X size={18} className="edit-modal__close-icon" onClick={onClose} />
@@ -145,24 +147,45 @@ export default function BrandCategoryPage() {
     deleting,
   } = useSelector((s) => s.product); // предположительно brands & categories лежат в productSlice
 
+  const confirm = useConfirm();
+  const alert = useAlert();
   /* local state */
   const [modalCfg, setModalCfg] = useState(null); // { type: 'brand'|'category', mode: 'add'|'edit', item?: obj }
   const [searchBrand, setSearchBrand] = useState("");
   const [searchCat, setSearchCat] = useState("");
+  const debouncedSearchBrand = useDebouncedValue(searchBrand, 500);
+  const debouncedSearchCat = useDebouncedValue(searchCat, 500);
 
+  const refreshBrands = useCallback(() => {
+    const params = {
+      search: debouncedSearchBrand,
+    };
+    dispatch(fetchBrandsAsync(params));
+  }, [dispatch, debouncedSearchBrand]);
+  const refreshCategories = useCallback(() => {
+    const params = {
+      search: debouncedSearchCat,
+    };
+    dispatch(fetchCategoriesAsync(params));
+  }, [dispatch, debouncedSearchCat]);
   /* fetch */
+
   useEffect(() => {
-    dispatch(fetchBrandsAsync());
-    dispatch(fetchCategoriesAsync());
-  }, [dispatch, creating, updating, deleting]);
+    if (!modalCfg) {
+      refreshCategories();
+    }
+    if (modalCfg?.type === "brand") {
+      refreshBrands();
+    }
+  }, [debouncedSearchBrand, modalCfg]);
+  useEffect(() => {
+    if (modalCfg?.type === "category") {
+      refreshCategories();
+    }
+  }, [debouncedSearchCat, modalCfg]);
 
   /* helpers */
-  const filteredBrands = brands.filter((b) =>
-    b.name.toLowerCase().includes(searchBrand.toLowerCase())
-  );
-  const filteredCats = categories.filter((c) =>
-    c.name.toLowerCase().includes(searchCat.toLowerCase())
-  );
+
 
   // modal submit
   const handleSubmit = async (name) => {
@@ -170,18 +193,25 @@ export default function BrandCategoryPage() {
     if (!name.trim()) return alert("Введите название");
     try {
       if (type === "brand") {
-        if (mode === "add") await dispatch(createBrandAsync({ name })).unwrap();
+        if (mode === "add") {
+          await dispatch(createBrandAsync({ name })).unwrap();
+          refreshBrands();
+        }
         else
           await dispatch(
             updateBrandAsync({ brandId: item.id, updatedData: { name } })
           ).unwrap();
+        refreshBrands();
       } else {
-        if (mode === "add")
+        if (mode === "add") {
           await dispatch(createCategoryAsync({ name })).unwrap();
+          refreshCategories();
+        }
         else
           await dispatch(
             updateCategoryAsync({ categoryId: item.id, updatedData: { name } })
           ).unwrap();
+        refreshCategories();
       }
       setModalCfg(null);
     } catch (e) {
@@ -191,14 +221,23 @@ export default function BrandCategoryPage() {
   };
   const handleDelete = async () => {
     const { type, item } = modalCfg;
-    if (!window.confirm("Удалить?")) return;
-    try {
-      if (type === "brand") await dispatch(deleteBrandAsync(item.id)).unwrap();
-      else await dispatch(deleteCategoryAsync(item.id)).unwrap();
-      setModalCfg(null);
-    } catch (e) {
-      alert("Ошибка удаления");
-    }
+    confirm("Удалить?", async (result) => {
+      if (!result) return;
+      try {
+        if (type === "brand") {
+          await dispatch(deleteBrandAsync(item.id)).unwrap();
+          refreshBrands();
+        } else {
+          await dispatch(deleteCategoryAsync(item.id)).unwrap();
+          refreshCategories();
+        }
+        setModalCfg(null);
+      } catch (e) {
+        alert("Ошибка удаления");
+        console.error(e);
+      }
+
+    });
   };
   const [activeTab, setActiveTab] = useState(1);
 
@@ -208,7 +247,7 @@ export default function BrandCategoryPage() {
       content: (
         <Section
           title="Бренды"
-          items={filteredBrands}
+          items={brands}
           loading={loadingBrands}
           error={errorBrands}
           search={searchBrand}
@@ -223,7 +262,7 @@ export default function BrandCategoryPage() {
       content: (
         <Section
           title="Категории"
-          items={filteredCats}
+          items={categories}
           loading={loadingCategories}
           error={errorCategories}
           search={searchCat}

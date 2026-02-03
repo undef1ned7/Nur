@@ -92,8 +92,17 @@ function fmtDate(dt) {
 
 function pick(obj, keys, fallback = "") {
   for (const k of keys) {
-    const v = obj?.[k];
-    if (v !== undefined && v !== null && v !== "") return v;
+    if (keys.includes('.')) {
+      const [key, subkey] = k.split('.');
+      const v = obj?.[key];
+      if (v !== undefined && v !== null && v !== "") return v?.[subkey];
+    } else {
+      const v = obj?.[k];
+      if (typeof v === 'object') {
+        continue;
+      }
+      if (v !== undefined && v !== null && v !== "") return v;
+    }
   }
   return fallback;
 }
@@ -155,11 +164,10 @@ export default function ReconciliationPdfDocument({ data, meta }) {
   registerPdfFonts();
   const lines = extractLines(data);
 
-  const companyName = safe(
-    pick(data, ["company_name", "company", "seller", "our_company_name"], meta?.companyName)
+  const companyName = meta?.companyName || safe(
+    pick(data, ["company_name", "company.name", "seller.name", "our_company_name"], meta?.companyName)
   );
-  const clientName = safe(pick(data, ["client_name", "client", "buyer", "counterparty"], meta?.clientName));
-
+  const clientName = meta?.clientName || safe(pick(data, ["client_name", "client.name", "buyer.name", "counterparty"], meta?.clientName));
   const start = pick(data, ["start", "date_from", "period_start"], meta?.start);
   const end = pick(data, ["end", "date_to", "period_end"], meta?.end);
   const currency = safe(pick(data, ["currency"], meta?.currency || "KGS"));

@@ -13,6 +13,7 @@ import {
   createDeal,
   getProductCheckout, // будем получать PDF/JSON для печати
   deleteProductInCart,
+  deleteSale,
 } from "../../../store/creators/saleThunk";
 import {
   createClientAsync,
@@ -57,7 +58,8 @@ import CustomServiceModal from "./components/CustomServiceModal";
 import './sell.scss'
 import { FaCar, FaCartArrowDown, FaMinus, FaPlus } from "react-icons/fa";
 import UniversalModal from "../../Sectors/Production/ProductionAgents/UniversalModal/UniversalModal";
-import { debounce } from "@mui/material";
+import { m } from "framer-motion";
+import { useConfirm } from "../../../hooks/useDialog";
 const cx = (...args) => args.filter(Boolean).join(" ");
 
 /* ============================================================
@@ -65,6 +67,7 @@ const cx = (...args) => args.filter(Boolean).join(" ");
    ============================================================ */
 
 const SellMainStart = () => {
+  const confirm = useConfirm();
   const dispatch = useDispatch();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
@@ -883,6 +886,16 @@ const SellMainStart = () => {
         }
 
         await dispatch(createDeal(dealPayload)).unwrap();
+        // await run(deleteSale(start?.id));
+        // await run(
+        //   addCashFlows({
+        //     ...cashData,
+        //     name: cashData.name === "" ? "Продажа" : cashData.name,
+        //     amount: amountForCash,
+        //     source_cashbox_flow_id: result?.sale_id,
+        //     type: finalPaymentType === "cash" ? "income" : "income",
+        //   })
+        // );
       }
 
       if (finalPaymentType === "cash") {
@@ -962,8 +975,6 @@ const SellMainStart = () => {
         type: "success",
         message: "Операция успешно выполнена!",
       });
-      console.log('JKASHDKJAHSKDHASJDHKSA', 123123);
-
       setPaymentMethod(null);
       setCashReceived("");
       setCashPaymentConfirmed(false);
@@ -1035,7 +1046,7 @@ const SellMainStart = () => {
       }
 
       if (!validateDebtTerm()) return;
-
+      let printingResult = null;
       if (debt === "Долги") {
         if (company?.subscription_plan?.name === "Старт") {
           if (!state.phone) {
@@ -1068,6 +1079,17 @@ const SellMainStart = () => {
           };
 
           await dispatch(createDeal(dealPayload)).unwrap();
+          const checkoutParams = {
+            id: start?.id,
+            bool: true,
+            clientId: clientId,
+            payment_method: "debt",
+            amount: 0,
+            cash_received: 0,
+          };
+          const result = await run(productCheckout(checkoutParams));
+          printingResult = await run(getProductCheckout(result?.sale_id));
+
         }
       } else if (debt === "Предоплата") {
         if (!amount || Number(amount) <= 0) {
@@ -1100,22 +1122,35 @@ const SellMainStart = () => {
             debtMonths: Number(debtMonths || 0),
             first_due_date: state.dueDate,
           };
-
+          const checkoutParams = {
+            id: start?.id,
+            bool: true,
+            clientId: clientId,
+            payment_method: "debt",
+            amount: 0,
+            cash_received: Number(amount),
+          };
           await dispatch(createDeal(dealPayload)).unwrap();
+          const result = await run(productCheckout(checkoutParams));
+          printingResult = await run(getProductCheckout(result?.sale_id));
+
         }
       }
-
-      setAlert({
-        open: true,
-        type: "success",
-        message:
-          debt === "Долги"
-            ? "Долг успешно создан!"
-            : "Предоплата успешно сохранена!",
+      confirm(`Напечатать чек?`, async (ok) => {
+        if (ok && printingResult) {
+          await handleCheckoutResponseForPrinting(printingResult);
+        }
+        setAlert({
+          open: true,
+          type: "success",
+          message:
+            debt === "Долги"
+              ? "Долг успешно создан!"
+              : "Предоплата успешно сохранена!",
+        });
+        setShowDebtModal(false);
+        onRefresh()
       });
-
-      setShowDebtModal(false);
-      onRefresh()
     } catch (error) {
       console.error("Ошибка при сохранении долга:", error);
       setAlert({
