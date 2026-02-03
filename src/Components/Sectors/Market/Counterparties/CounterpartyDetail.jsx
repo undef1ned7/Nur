@@ -17,7 +17,9 @@ const fmtDate = (v) => {
 };
 
 /**
- * Страница детального просмотра контрагента: долги, общий долг, история оплат.
+ * Страница контрагента: только денежные операции по контрагенту (API 5.3).
+ * GET /api/warehouse/money/counterparties/{counterparty_id}/operations/
+ * Фильтры: doc_type, status, warehouse, payment_category. Поиск: search (по number, comment).
  */
 const CounterpartyDetail = () => {
   const { id } = useParams();
@@ -26,12 +28,18 @@ const CounterpartyDetail = () => {
   const current = useSelector((state) => state.counterparty.current);
   const loadingCurrent = useSelector((state) => state.counterparty.loadingCurrent);
 
-  const [debts, setDebts] = useState({ results: [], total_debt: 0 });
-  const [payments, setPayments] = useState({ results: [] });
-  const [loadingDebts, setLoadingDebts] = useState(true);
-  const [loadingPayments, setLoadingPayments] = useState(true);
-  const [errorDebts, setErrorDebts] = useState("");
-  const [errorPayments, setErrorPayments] = useState("");
+  const [operations, setOperations] = useState({ results: [] });
+  const [loadingOperations, setLoadingOperations] = useState(true);
+  const [errorOperations, setErrorOperations] = useState("");
+  const [warehouses, setWarehouses] = useState([]);
+  const [paymentCategories, setPaymentCategories] = useState([]);
+
+  const [docTypeFilter, setDocTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [warehouseFilter, setWarehouseFilter] = useState("");
+  const [paymentCategoryFilter, setPaymentCategoryFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchDebounced, setSearchDebounced] = useState("");
 
   const name = current?.name ?? "—";
 
@@ -41,57 +49,59 @@ const CounterpartyDetail = () => {
     return () => dispatch(clearCurrentCounterparty());
   }, [dispatch, id]);
 
-  const loadDebts = useCallback(async () => {
-    if (!id) return;
-    setLoadingDebts(true);
-    setErrorDebts("");
-    try {
-      const data = await warehouseAPI.getCounterpartyDebts(id);
-      setDebts({
-        results: data?.results ?? [],
-        total_debt: data?.total_debt ?? 0,
-      });
-    } catch (e) {
-      setErrorDebts("Не удалось загрузить долги");
-      setDebts({ results: [], total_debt: 0 });
-    } finally {
-      setLoadingDebts(false);
-    }
-  }, [id]);
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(searchTerm.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   useEffect(() => {
-    loadDebts();
-  }, [loadDebts]);
+    const loadOptions = async () => {
+      try {
+        const [whData, catData] = await Promise.all([
+          warehouseAPI.listWarehouses(),
+          warehouseAPI.listMoneyCategories(),
+        ]);
+        setWarehouses(whData?.results ?? (Array.isArray(whData) ? whData : []));
+        setPaymentCategories(catData?.results ?? (Array.isArray(catData) ? catData : []));
+      } catch {
+        setWarehouses([]);
+        setPaymentCategories([]);
+      }
+    };
+    loadOptions();
+  }, []);
 
-  const loadPayments = useCallback(async () => {
+  const loadOperations = useCallback(async () => {
     if (!id) return;
-    setLoadingPayments(true);
-    setErrorPayments("");
+    setLoadingOperations(true);
+    setErrorOperations("");
     try {
-      const data = await warehouseAPI.getCounterpartyPayments(id);
-      setPayments({ results: data?.results ?? [] });
+      const params = {};
+      if (docTypeFilter) params.doc_type = docTypeFilter;
+      if (statusFilter) params.status = statusFilter;
+      if (warehouseFilter) params.warehouse = warehouseFilter;
+      if (paymentCategoryFilter) params.payment_category = paymentCategoryFilter;
+      if (searchDebounced) params.search = searchDebounced;
+      const data = await warehouseAPI.getCounterpartyMoneyOperations(id, params);
+      const list = data?.results ?? (Array.isArray(data) ? data : []);
+      setOperations({ results: list });
     } catch (e) {
-      setErrorPayments("Не удалось загрузить историю оплат");
-      setPayments({ results: [] });
+      setErrorOperations("Не удалось загрузить приход/расход");
+      setOperations({ results: [] });
     } finally {
-      setLoadingPayments(false);
+      setLoadingOperations(false);
     }
-  }, [id]);
+  }, [id, docTypeFilter, statusFilter, warehouseFilter, paymentCategoryFilter, searchDebounced]);
 
   useEffect(() => {
-    loadPayments();
-  }, [loadPayments]);
+    loadOperations();
+  }, [loadOperations]);
 
-  const debtRows = debts.results || [];
-  const totalDebt =
-    debts.total_debt ?? debtRows.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-  const paymentRows = payments.results || [];
+  const operationRows = operations.results || [];
 
-  const [activeTab, setActiveTab] = useState("debts");
-  const TABS = [
-    { key: "debts", label: "Долги контрагента" },
-    { key: "payments", label: "История оплат" },
-  ];
+  const docTypeLabel = (docType) =>
+    docType === "MONEY_RECEIPT" ? "Приход" : docType === "MONEY_EXPENSE" ? "Расход" : docType ?? "—";
+  const statusLabel = (s) => (s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—");
 
   const goBack = () => navigate("/crm/warehouse/counterparties");
 
@@ -125,95 +135,107 @@ const CounterpartyDetail = () => {
           <div className="counterparty-detail-page__loading">Загрузка данных контрагента...</div>
         ) : (
           <>
-            <section className="counterparty-detail-page__section counterparty-detail-page__section--total">
-              <h2 className="counterparty-detail-page__section-title">Общий долг</h2>
-              <div className="counterparty-detail-page__total-debt">
-                {loadingDebts ? "—" : fmtMoney(totalDebt)}
-              </div>
-            </section>
-
-            <div className="counterparty-detail-page__tabs">
-              <div className="counterparty-detail-page__tab-list" role="tablist">
-                {TABS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === key}
-                    className={`counterparty-detail-page__tab ${activeTab === key ? "counterparty-detail-page__tab--active" : ""}`}
-                    onClick={() => setActiveTab(key)}
-                  >
-                    {label}
-                  </button>
+            <div className="counterparty-detail-page__operations-toolbar">
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Поиск по номеру, комментарию..."
+                className="counterparty-detail-page__search-input"
+                aria-label="Поиск по номеру и комментарию"
+              />
+              <select
+                value={docTypeFilter}
+                onChange={(e) => setDocTypeFilter(e.target.value)}
+                className="counterparty-detail-page__filter-select"
+                aria-label="Тип документа"
+              >
+                <option value="">Все типы</option>
+                <option value="MONEY_RECEIPT">Приход</option>
+                <option value="MONEY_EXPENSE">Расход</option>
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="counterparty-detail-page__filter-select"
+                aria-label="Статус"
+              >
+                <option value="">Все статусы</option>
+                <option value="DRAFT">Черновик</option>
+                <option value="POSTED">Проведён</option>
+              </select>
+              <select
+                value={warehouseFilter}
+                onChange={(e) => setWarehouseFilter(e.target.value)}
+                className="counterparty-detail-page__filter-select"
+                aria-label="Склад"
+              >
+                <option value="">Все склады</option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name ?? w.title ?? w.id}
+                  </option>
                 ))}
-              </div>
-              <div className="counterparty-detail-page__tab-panel">
-                {activeTab === "debts" && (
-                  <>
-                    {loadingDebts ? (
-                      <div className="counterparty-detail-page__loading">Загрузка...</div>
-                    ) : errorDebts ? (
-                      <div className="counterparty-detail-page__error">{errorDebts}</div>
-                    ) : debtRows.length === 0 ? (
-                      <div className="counterparty-detail-page__empty">Нет данных о долгах</div>
-                    ) : (
-                      <div className="counterparty-detail-page__table-wrap">
-                        <table className="counterparty-detail-page__table">
-                          <thead>
-                            <tr>
-                              <th>Документ / Описание</th>
-                              <th>Сумма</th>
-                              <th>Дата</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {debtRows.map((row) => (
-                              <tr key={row.id || row.document_id || Math.random()}>
-                                <td>{row.document_number ?? row.description ?? row.title ?? "—"}</td>
-                                <td>{fmtMoney(row.amount)}</td>
-                                <td>{fmtDate(row.date ?? row.created_at)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </>
-                )}
-                {activeTab === "payments" && (
-                  <>
-                    {loadingPayments ? (
-                      <div className="counterparty-detail-page__loading">Загрузка...</div>
-                    ) : errorPayments ? (
-                      <div className="counterparty-detail-page__error">{errorPayments}</div>
-                    ) : paymentRows.length === 0 ? (
-                      <div className="counterparty-detail-page__empty">Нет данных об оплатах</div>
-                    ) : (
-                      <div className="counterparty-detail-page__table-wrap">
-                        <table className="counterparty-detail-page__table">
-                          <thead>
-                            <tr>
-                              <th>Дата</th>
-                              <th>Сумма</th>
-                              <th>Комментарий</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {paymentRows.map((row) => (
-                              <tr key={row.id || Math.random()}>
-                                <td>{fmtDate(row.date ?? row.created_at ?? row.paid_at)}</td>
-                                <td>{fmtMoney(row.amount)}</td>
-                                <td>{row.comment ?? row.description ?? "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+              </select>
+              <select
+                value={paymentCategoryFilter}
+                onChange={(e) => setPaymentCategoryFilter(e.target.value)}
+                className="counterparty-detail-page__filter-select"
+                aria-label="Категория платежа"
+              >
+                <option value="">Все категории</option>
+                {paymentCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title ?? c.name ?? c.id}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="counterparty-detail-page__refresh-btn"
+                onClick={loadOperations}
+                disabled={loadingOperations}
+              >
+                {loadingOperations ? "Загрузка…" : "Обновить"}
+              </button>
             </div>
+
+            {loadingOperations ? (
+              <div className="counterparty-detail-page__loading">Загрузка...</div>
+            ) : errorOperations ? (
+              <div className="counterparty-detail-page__error">{errorOperations}</div>
+            ) : operationRows.length === 0 ? (
+              <div className="counterparty-detail-page__empty">Нет приходов и расходов</div>
+            ) : (
+              <div className="counterparty-detail-page__table-wrap">
+                <table className="counterparty-detail-page__table">
+                  <thead>
+                    <tr>
+                      <th>Тип</th>
+                      <th>Номер</th>
+                      <th>Дата</th>
+                      <th>Сумма</th>
+                      <th>Категория</th>
+                      <th>Статус</th>
+                      <th>Комментарий</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operationRows.map((row) => (
+                      <tr key={row.id || Math.random()}>
+                        <td>{docTypeLabel(row.doc_type)}</td>
+                        <td>{row.number ?? "—"}</td>
+                        <td>{fmtDate(row.date ?? row.created_at)}</td>
+                        <td>{fmtMoney(row.amount)}</td>
+                        <td>{row.payment_category_title ?? "—"}</td>
+                        <td>{statusLabel(row.status)}</td>
+                        <td>{row.comment ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
       </div>

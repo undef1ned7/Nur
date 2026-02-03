@@ -143,6 +143,7 @@ import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategor
 import WarehouseDocumentsLayout from "../Components/Sectors/Warehouse/Documents/DocumentsLayout";
 import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
 import CreateWarehouseDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
+import MoneyDocumentsPage from "../Components/Sectors/Warehouse/Money/MoneyDocumentsPage";
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
 import ProductionAgents from "../Components/Sectors/Production/ProductionAgents/ProductionAgents";
@@ -263,9 +264,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-      createProtectedRoute("kassa/*", Kassa),
-      createProtectedRoute("kassa/:id", KassaDet),
-    ]
+        createProtectedRoute("kassa/*", Kassa),
+        createProtectedRoute("kassa/:id", KassaDet),
+      ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
@@ -313,29 +314,27 @@ export const crmRoutes = (profile) => [
 
   // Cafe routes
   <Route element={<CafeLayout />} path="cafe">
-    {
-      [
-        createProtectedRoute("analytics", CafeAnalytics),
-        createProtectedRoute("documents", CafeDocuments),
-        createProtectedRoute("cook", Cook),
-        createProtectedRoute("inventory", CafeInventory),
-        createProtectedRoute("menu", CafeMenu),
-        <Route path="orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
-          {[
-            createProtectedRoute("*", CafeOrders, { index: true }),
-            createProtectedRoute("history", CafeOrderHistory),
-          ]}
-        </Route>,
-        createProtectedRoute("payroll", CafePayroll),
-        createProtectedRoute("purchasing", CafePurchasing),
-        createProtectedRoute("reports", CafeReports),
-        createProtectedRoute("reservations", CafeReservations),
-        createProtectedRoute("stock", CafeStock),
-        createProtectedRoute("kassa/*", CafeKassa),
-        createProtectedRoute("clients", CafeClients),
-        createProtectedRoute("tables", CafeTables),
-      ]
-    }
+    {[
+      createProtectedRoute("analytics", CafeAnalytics),
+      createProtectedRoute("documents", CafeDocuments),
+      createProtectedRoute("cook", Cook),
+      createProtectedRoute("inventory", CafeInventory),
+      createProtectedRoute("menu", CafeMenu),
+      <Route path="orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
+        {[
+          createProtectedRoute("*", CafeOrders, { index: true }),
+          createProtectedRoute("history", CafeOrderHistory),
+        ]}
+      </Route>,
+      createProtectedRoute("payroll", CafePayroll),
+      createProtectedRoute("purchasing", CafePurchasing),
+      createProtectedRoute("reports", CafeReports),
+      createProtectedRoute("reservations", CafeReservations),
+      createProtectedRoute("stock", CafeStock),
+      createProtectedRoute("kassa/*", CafeKassa),
+      createProtectedRoute("clients", CafeClients),
+      createProtectedRoute("tables", CafeTables),
+    ]}
   </Route>,
 
   // Building routes
@@ -366,9 +365,26 @@ export const crmRoutes = (profile) => [
       </ProtectedRoute>
     }
   >
-    <Route index element={<Navigate to="all" replace />} />
-    <Route path="create" element={<CreateWarehouseDocument />} />
-    <Route path=":docType" element={<WarehouseDocuments />} />
+    <Route
+      key="warehouse/documents-index"
+      index
+      element={<Navigate to="all" replace />}
+    />
+    <Route
+      key="warehouse/documents-create"
+      path="create"
+      element={<CreateWarehouseDocument />}
+    />
+    <Route
+      key="warehouse/documents-type"
+      path=":docType"
+      element={<WarehouseDocuments />}
+    />
+    <Route
+      key="warehouse/documents-money"
+      path="money/:docType"
+      element={<MoneyDocumentsPage />}
+    />
   </Route>,
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
@@ -384,6 +400,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/write_offs", WarehouseWriteOffs),
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
   createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
+  createProtectedRoute("warehouse/payment_categories", WarehouseBrandCategory),
   createProtectedRoute("warehouse/counterparties", Counterparties),
   createProtectedRoute("warehouse/counterparties/:id", CounterpartyDetail),
 

@@ -165,4 +165,55 @@
     background: #fef2f2;
     border-radius: 8px;
   }
+
+  &__operations-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  &__search-input {
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    background: white;
+    color: var(--text, #111827);
+    min-width: 200px;
+    flex: 1;
+    max-width: 280px;
+  }
+
+  &__filter-select {
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    background: white;
+    color: var(--text, #111827);
+    min-width: 140px;
+  }
+
+  &__refresh-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text, #111827);
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover:not(:disabled) {
+      background: #e5e7eb;
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+  }
 }

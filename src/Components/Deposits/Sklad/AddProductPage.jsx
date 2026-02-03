@@ -269,7 +269,9 @@ const AddProductPage = () => {
           const formatPrice3Decimals = (v) => {
             if (v === null || v === undefined || v === "") return "";
             const n = Number(String(v).replace(",", "."));
-            return Number.isFinite(n) ? (Math.round(n * 1000) / 1000).toString() : String(v);
+            return Number.isFinite(n)
+              ? (Math.round(n * 1000) / 1000).toString()
+              : String(v);
           };
           setNewItemData({
             name: product.name || "",
@@ -323,7 +325,9 @@ const AddProductPage = () => {
               id: img.id,
             }));
             setImages(loadedImages);
-            setInitialProductImageIds(product.images.map((img) => img.id).filter(Boolean));
+            setInitialProductImageIds(
+              product.images.map((img) => img.id).filter(Boolean)
+            );
           } else {
             setInitialProductImageIds([]);
           }
@@ -370,7 +374,9 @@ const AddProductPage = () => {
       const formatPrice3DecimalsDup = (v) => {
         if (v === null || v === undefined || v === "") return "";
         const n = Number(String(v).replace(",", "."));
-        return Number.isFinite(n) ? (Math.round(n * 1000) / 1000).toString() : String(v);
+        return Number.isFinite(n)
+          ? (Math.round(n * 1000) / 1000).toString()
+          : String(v);
       };
       // Заполняем основные данные (очищаем ID, штрих-код и количество для нового товара)
       setNewItemData({
@@ -471,7 +477,8 @@ const AddProductPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
-    let finalValue = type === "number" ? (value === "" ? "" : parseInt(value)) : value;
+    let finalValue =
+      type === "number" ? (value === "" ? "" : parseInt(value)) : value;
     if (name === "price" || name === "purchase_price") {
       finalValue = sanitizePriceTo3Decimals(value);
     }
@@ -595,11 +602,15 @@ const AddProductPage = () => {
           // В режиме редактирования: удаляем с сервера изображения, которые пользователь убрал из списка
           if (isEditMode && initialProductImageIds.length > 0) {
             const currentIds = images.filter((im) => im.id).map((im) => im.id);
-            const removedIds = initialProductImageIds.filter((id) => !currentIds.includes(id));
+            const removedIds = initialProductImageIds.filter(
+              (id) => !currentIds.includes(id)
+            );
             if (removedIds.length > 0) {
               await Promise.allSettled(
                 removedIds.map((imageId) =>
-                  api.delete(`/main/products/${targetProductId}/images/${imageId}/`)
+                  api.delete(
+                    `/main/products/${targetProductId}/images/${imageId}/`
+                  )
                 )
               );
             }
@@ -613,9 +624,13 @@ const AddProductPage = () => {
                 fd.append("image", im.file);
                 if (im.alt) fd.append("alt", im.alt || name);
                 fd.append("is_primary", String(Boolean(im.is_primary)));
-                return api.post(`/main/products/${targetProductId}/images/`, fd, {
-                  headers: { "Content-Type": "multipart/form-data" },
-                });
+                return api.post(
+                  `/main/products/${targetProductId}/images/`,
+                  fd,
+                  {
+                    headers: { "Content-Type": "multipart/form-data" },
+                  }
+                );
               });
               if (uploads.length) await Promise.allSettled(uploads);
             }
