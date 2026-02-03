@@ -43,12 +43,16 @@ export async function createDebt({
   amount,
   debtMonths = 0,
   firstDueDate = null,
+  phone = '',
+  name = "",
   note = "",
 }) {
   const payload = {
     client: clientId,
     kind: "debt",
     title,
+    name,
+    phone,
     note: note || "",
     amount, // "30.00" или число — как у тебя принято
     debt_months: Number(debtMonths ?? 0), // <-- всегда отправляем, минимум 0
@@ -70,7 +74,19 @@ const STATUSES = [
 ];
 
 export const DEAL_STATUS_RU = ["Продажа", "Долги", "Предоплата"];
+const kindTranslate = {
+  new: "Новый",
+  paid: "Оплаченный",
+  canceled: "возвращенный",
+  debt: "Долг",
+};
 
+const paymentMethodTranslate = {
+  cash: "Наличные",
+  card: "Карта",
+  transfer: "Перевод",
+  debt: "Долг",
+};
 const PAGE_SIZE = 50;
 
 const Sell = () => {
@@ -259,17 +275,7 @@ const Sell = () => {
     setShowRefundModal(true);
   };
 
-  const kindTranslate = {
-    new: "Новый",
-    paid: "Оплаченный",
-    canceled: "возвращенный",
-  };
 
-  const paymentMethodTranslate = {
-    cash: "Наличные",
-    card: "Карта",
-    transfer: "Перевод",
-  };
 
   const translatePaymentMethod = (method) => {
     if (!method) return "-";

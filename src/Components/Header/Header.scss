@@ -107,6 +107,9 @@
     align-items: center;
     gap: 10px;
 
+    &.cursor-pointer {
+      cursor: pointer;
+    }
     @media (max-width: 768px) {
       display: none;
     }
