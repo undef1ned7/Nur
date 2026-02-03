@@ -501,8 +501,9 @@ export async function printViaWiFiSimple(payload, ip, port = 9100) {
     const bridgeUrl =
       localStorage.getItem("cafe_printer_bridge_url") || "http://127.0.0.1:5179/print";
 
+    let r;
     try {
-      const r = await fetch(bridgeUrl, {
+      r = await fetch(bridgeUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -512,50 +513,17 @@ export async function printViaWiFiSimple(payload, ip, port = 9100) {
           timeoutMs: 2000,
         }),
       });
-      if (r.ok) return true;
-    } catch {
-      // ignore and fallback to legacy HTTP below
-    }
-
-    // Legacy fallback (direct HTTP to printer) is blocked on HTTPS sites (Mixed Content + Local Address Space).
-    // Keep it only for local/dev http origins, or if explicitly forced.
-    const isHttps = typeof window !== "undefined" && window.location?.protocol === "https:";
-    const forceLegacy = (() => {
-      try {
-        return localStorage.getItem("cafe_allow_legacy_http_print") === "true";
-      } catch {
-        return false;
-      }
-    })();
-    if (isHttps && !forceLegacy) {
+    } catch (bridgeErr) {
       throw new Error(
-        "Printer-bridge недоступен. На HTTPS нельзя печатать напрямую на IP:9100 — запустите printer-bridge на ПК с принтером."
+        `Printer-bridge недоступен. Запустите на ПК с принтером: npm run printer-bridge. Печать по Wi‑Fi только через bridge — иначе на чек печатаются HTTP-заголовки. ${String(bridgeErr?.message || bridgeErr)}`
       );
     }
+    if (r.ok) return true;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 100); // Таймаут 100мс
-    fetch(`http://${ip}:${port}`, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: combinedData,
-      signal: controller.signal
-    })
-      .then(() => {
-        clearTimeout(timeoutId);
-        return true;
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-          console.log('Запрос прерван по таймауту (но данные отправлены)');
-        } else {
-          console.log('Ошибка сети (но данные могли отправиться):', error.message);
-        }
-        return true;
-      });
-    return true;
+    const errText = await r.text().catch(() => "");
+    throw new Error(
+      `Printer-bridge ответил ${r.status}. ${errText ? errText.slice(0, 100) : ""}`
+    );
 
   } catch (error) {
     console.warn(`Не удалось отправить на ${ip}:${port}`, error);

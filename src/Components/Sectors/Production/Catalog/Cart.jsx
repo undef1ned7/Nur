@@ -868,10 +868,16 @@ const Cart = ({
 
   // Alerts delegated to parent
 
-  // Загружаем клиентов при монтировании
+  // Корзина может быть:
+  // - десктоп-модалкой (isOpen === true)
+  // - мобильной нижней секцией (isMobile && isOrderSectionOpen)
+  const isCartActive = isOpen || (isMobile && isOrderSectionOpen);
+
+  // Загружаем клиентов только когда корзина реально открыта/активна
   useEffect(() => {
+    if (!isCartActive) return;
     dispatch(fetchClientsAsync());
-  }, [dispatch]);
+  }, [dispatch, isCartActive]);
 
   // Проверяем, мобильное ли это устройство
   useEffect(() => {
@@ -891,81 +897,44 @@ const Cart = ({
     onMobileViewChange?.(isMobile);
   }, [isMobile, onMobileViewChange]);
 
-  // Load items for provided or discovered draft cart; do not create here
+  // Load items for provided or discovered draft cart.
+  // ВАЖНО: не создаём корзину на монтировании компонента (Cart рендерится всегда),
+  // чтобы не плодить лишние запросы `/main/agents/me/cart/start/` при открытии страницы.
   useEffect(() => {
     (async () => {
       try {
-        let cid = agentCartIdProp;
-        if (!cid) {
-          // Используем startAgentCart для получения/создания корзины
-          const cart = await dispatch(
-            startAgentCart({ agent: null, order_discount_total: "0.00" })
-          ).unwrap();
-          if (cart?.id) {
-            cid = cart.id;
-            setAgentCart(cart);
-            localStorage.setItem("agentCartId", cid);
-          }
-        }
-        setAgentCartId(cid || null);
-        if (cid) {
-          setLoadingAgentItems(true);
-          try {
-            // Используем getAgentCart для получения активной корзины
-            const cart = await dispatch(
-              getAgentCart({ agent: null, order_discount_total: "0.00" })
-            ).unwrap();
-            if (cart?.id) {
-              setAgentCart(cart);
-              setAgentItems(Array.isArray(cart.items) ? cart.items : []);
-              // Обновляем ID корзины если он изменился
-              if (cart.id !== cid) {
-                setAgentCartId(cart.id);
-                localStorage.setItem("agentCartId", cart.id);
-              }
-            } else {
-              // Если корзина не найдена, создаем новую
-              const newCart = await dispatch(
-                startAgentCart({ agent: null, order_discount_total: "0.00" })
-              ).unwrap();
-              if (newCart?.id) {
-                setAgentCartId(newCart.id);
-                setAgentCart(newCart);
-                setAgentItems(
-                  Array.isArray(newCart.items) ? newCart.items : []
-                );
-                localStorage.setItem("agentCartId", newCart.id);
-              }
-            }
-          } catch (e) {
-            // Если корзина не найдена, создаем новую
-            try {
-              const newCart = await dispatch(
-                startAgentCart({ agent: null, order_discount_total: "0.00" })
-              ).unwrap();
-              if (newCart?.id) {
-                setAgentCartId(newCart.id);
-                setAgentCart(newCart);
-                setAgentItems(
-                  Array.isArray(newCart.items) ? newCart.items : []
-                );
-                localStorage.setItem("agentCartId", newCart.id);
-              }
-            } catch (err) {
-              console.error("Error creating cart:", err);
-            }
-          } finally {
-            setLoadingAgentItems(false);
+        if (!isCartActive) return;
+
+        // cart id может прийти пропсом от родителя или лежать в localStorage
+        const storedId = localStorage.getItem("agentCartId");
+        const cid = agentCartIdProp || storedId || null;
+        setAgentCartId(cid);
+
+        setLoadingAgentItems(true);
+        // Используем getAgentCart (legacy /cart/start/) как единственный источник истины
+        const cart = await dispatch(
+          getAgentCart({ agent: null, order_discount_total: "0.00" })
+        ).unwrap();
+
+        if (cart?.id) {
+          setAgentCart(cart);
+          setAgentItems(Array.isArray(cart.items) ? cart.items : []);
+          // Обновляем ID корзины если он изменился
+          if (cart.id !== cid) {
+            setAgentCartId(cart.id);
+            localStorage.setItem("agentCartId", cart.id);
           }
         } else {
-          setAgentItems([]);
           setAgentCart(null);
+          setAgentItems([]);
         }
       } catch (e) {
         console.error("Error loading cart:", e);
+      } finally {
+        setLoadingAgentItems(false);
       }
     })();
-  }, [dispatch, agentCartIdProp]);
+  }, [dispatch, agentCartIdProp, isCartActive]);
 
   const handleUpdateQuantity = async (itemId, newQuantity) => {
     console.log("Cart: handleUpdateQuantity called", {
@@ -1081,6 +1050,7 @@ const Cart = ({
 
   // Обновляем корзину при изменении agentCartId
   useEffect(() => {
+    if (!isCartActive) return;
     if (agentCartId && agentCartIdProp === agentCartId) {
       (async () => {
         try {
@@ -1094,29 +1064,27 @@ const Cart = ({
         }
       })();
     }
-  }, [agentCartId, agentCartIdProp, dispatch]);
+  }, [agentCartId, agentCartIdProp, dispatch, isCartActive]);
 
   // Функция для обновления корзины
   const refreshCart = useCallback(async () => {
     try {
       setLoadingAgentItems(true);
-      // Проверяем актуальный ID корзины из localStorage
-      const storedCartId = localStorage.getItem("agentCartId");
-      const cartIdToUse = storedCartId || agentCartId || agentCartIdProp;
-
-      if (cartIdToUse) {
-        const cart = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" })
-        ).unwrap();
-        if (cart?.id) {
-          setAgentCart(cart);
-          setAgentItems(Array.isArray(cart.items) ? cart.items : []);
-          // Обновляем ID корзины если он изменился
-          if (cart.id !== agentCartId) {
-            setAgentCartId(cart.id);
-            localStorage.setItem("agentCartId", cart.id);
-          }
+      // legacy endpoint /cart/start/ сам создаёт/возвращает активную корзину,
+      // поэтому НЕ требуем наличия cartId заранее.
+      const cart = await dispatch(
+        getAgentCart({ agent: null, order_discount_total: "0.00" })
+      ).unwrap();
+      if (cart?.id) {
+        setAgentCart(cart);
+        setAgentItems(Array.isArray(cart.items) ? cart.items : []);
+        if (cart.id !== agentCartId) {
+          setAgentCartId(cart.id);
+          localStorage.setItem("agentCartId", cart.id);
         }
+      } else {
+        setAgentCart(null);
+        setAgentItems([]);
       }
     } catch (e) {
       console.error("Error refreshing cart:", e);
@@ -1155,11 +1123,12 @@ const Cart = ({
     }
   };
 
-  // Загружаем смены и кассы при монтировании
+  // Загружаем смены и кассы только когда корзина открыта
   useEffect(() => {
+    if (!isCartActive) return;
     dispatch(fetchShiftsAsync());
     dispatch(getCashBoxes());
-  }, [dispatch]);
+  }, [dispatch, isCartActive]);
 
   // Функция для проверки и открытия смены
   const ensureShiftIsOpen = async () => {

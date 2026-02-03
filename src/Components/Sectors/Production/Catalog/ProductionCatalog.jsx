@@ -1027,75 +1027,36 @@ const ProductionCatalog = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchQuery, filters]);
 
-  // Загружаем данные агентских продуктов для получения количества
-  useEffect(() => {
-    (async () => {
-      try {
-        const result = await dispatch(getMyAgentProductsAsync()).unwrap();
-        if (Array.isArray(result)) {
-          setAgentProducts(result);
-          // Создаем мапу product_id -> qty_on_hand
-          const map = new Map();
-          result.forEach((item) => {
-            if (item.product && item.qty_on_hand !== undefined) {
-              map.set(item.product, Number(item.qty_on_hand) || 0);
-            }
-          });
-          setAgentProductsMap(map);
-        }
-      } catch (error) {
-        console.error("Error loading agent products:", error);
-      }
-    })();
-  }, [dispatch]);
-
   // Загружаем смены и кассы при монтировании
   useEffect(() => {
     dispatch(fetchShiftsAsync());
     dispatch(getCashBoxes());
   }, [dispatch]);
 
-  // Ensure agent cart exists once per page load: if no id in localStorage, create
+  // Инициализация корзины агента (1 запрос на /cart/start/ вместо нескольких)
+  // ВАЖНО: `getAgentCart` и `startAgentCart` идут в один и тот же legacy endpoint
+  // `/main/agents/me/cart/start/`, поэтому на старте страницы достаточно вызвать `getAgentCart` один раз.
   useEffect(() => {
     (async () => {
       try {
-        const storedId = localStorage.getItem("agentCartId");
-        if (storedId) {
-          // Проверяем, существует ли корзина через getAgentCart
-          try {
-            const cart = await dispatch(
-              getAgentCart({ agent: null, order_discount_total: "0.00" })
-            ).unwrap();
-            if (cart?.id) {
-              setAgentCartId(cart.id);
-              // Обновляем счетчик товаров
-              await refreshCartItems();
-              return;
-            }
-          } catch (e) {
-            // Корзина не найдена, создадим новую
-            localStorage.removeItem("agentCartId");
-          }
-        }
-        // Создаем новую корзину
-        const created = await dispatch(
-          startAgentCart({
-            agent: null, // или можно передать ID агента, если доступен
-            order_discount_total: "0.00",
-          })
+        const cart = await dispatch(
+          getAgentCart({ agent: null, order_discount_total: "0.00" })
         ).unwrap();
-        const newId = created?.id || null;
-        if (newId) {
-          localStorage.setItem("agentCartId", newId);
-          setAgentCartId(newId);
-          setAgentCartItemsCount(0);
+
+        const id = cart?.id || null;
+        if (id) {
+          setAgentCartId(id);
+          localStorage.setItem("agentCartId", id);
+          setAgentCartItemsCount(
+            Array.isArray(cart?.items) ? cart.items.length : 0
+          );
         }
       } catch (e) {
         // ignore; will fallback to local cart until user retries
         console.error("Error initializing agent cart:", e);
       }
     })();
-  }, [dispatch, refreshCartItems]);
+  }, [dispatch]);
 
   // Блокировка прокрутки фона при открытии корзины (только на десктопе)
   useEffect(() => {

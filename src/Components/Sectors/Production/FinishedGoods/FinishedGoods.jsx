@@ -282,20 +282,22 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       );
     } else {
       // ДОБАВЛЕНИЕ: всегда разрешено
-      // При добавлении ставим количество как у товара, или "1" если количество товара не указано
-      const syncedQty = String(product.quantity || "1");
+      // ВАЖНО: quantity в recipeItems — это расход сырья НА 1 ЕДИНИЦУ товара (qty_per_unit),
+      // а общий расход считается как qty_per_unit × product.quantity.
+      // Поэтому по умолчанию ставим "1", а не product.quantity (иначе получится product.quantity²).
+      const perUnitQty = "1";
       const material = (Array.isArray(materials) ? materials : []).find(
         (m) => m && m.id != null && String(m.id) === key
       );
 
       // Добавляем сырье (всегда разрешено, даже если материал не найден в списке)
       // Сохраняем materialId как есть (может быть строкой или UUID), но при сравнении всегда используем строку
-      setRecipeItems((prev) => [...prev, { materialId, quantity: syncedQty }]);
+      setRecipeItems((prev) => [...prev, { materialId, quantity: perUnitQty }]);
 
       // Предупреждаем, если сырья может быть недостаточно (но НЕ блокируем добавление)
       if (material) {
         const availableQty = Number(material.quantity || 0);
-        const requestedQty = Number(syncedQty || 0);
+        const requestedQty = Number(perUnitQty || 0);
         const units = Number(product.quantity || 0);
         const totalNeeded = requestedQty * units;
 
@@ -362,13 +364,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     );
   }, []);
 
-  // НОВОЕ: авто-синхронизация количества сырья при изменении количества товара
-  useEffect(() => {
-    const syncedQty = String(product.quantity ?? "");
-    setRecipeItems((prev) =>
-      prev.map((it) => ({ ...it, quantity: syncedQty }))
-    );
-  }, [product.quantity]);
+  // ВАЖНО: recipeItems[].quantity — это qty_per_unit (расход на 1 ед. товара),
+  // поэтому НЕ синхронизируем его с количеством готового товара.
 
   // валидатор товара
   const validateProduct = useCallback(() => {
@@ -425,9 +422,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     if (!validateProduct()) return;
 
     // рецепт для списания: [{id, qty_per_unit}]
-    // ВАЖНО: сейчас quantity у сырья = общему количеству товара,
-    // если нужно списывать на весь объём, можно интерпретировать как "на 1 ед."
-    // и умножать на units (ниже уже есть логика units).
+    // ВАЖНО: recipeItems[].quantity — это qty_per_unit (расход сырья на 1 ед. товара),
+    // а общий расход считается как qty_per_unit × units.
     const recipe = recipeItems
       .map((it) => ({
         id: String(it.materialId),
@@ -3176,7 +3172,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                   return (
                     <div
                       key={item.id}
-                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
                       onClick={() => openEdit(item)}
                     >
                       <div className="flex items-start gap-3">

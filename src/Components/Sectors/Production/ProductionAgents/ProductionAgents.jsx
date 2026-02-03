@@ -556,6 +556,43 @@ const ProductionAgents = () => {
     return params;
   }, [debouncedSearch, dateFrom, dateTo]);
 
+  // Обновление списка передач (для агента — только свои)
+  const refreshTransfers = useCallback(() => {
+    dispatch(
+      fetchTransfersAsync(profile?.role === "owner" ? {} : { agent: profile?.id })
+    );
+  }, [dispatch, profile?.id, profile?.role]);
+
+  // Обновление списка товаров у агентов для owner (локальный state `agents`)
+  const loadAgentsProducts = useCallback(() => {
+    if (profile?.role !== "owner") return;
+    const params = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    api
+      .get("/main/owners/agents/products/", { params })
+      .then(({ data }) => {
+        setAgents(data);
+      })
+      .catch((e) => console.log(e));
+  }, [profile?.role, dateFrom, dateTo]);
+
+  // Обновление основного списка товаров на странице
+  const refreshProductsList = useCallback(() => {
+    if (profile?.role === "owner") {
+      loadAgentsProducts();
+    } else {
+      // Важно: сохраняем текущие фильтры/поиск/дату
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
+    }
+  }, [dispatch, profile?.role, agentProductsParams, loadAgentsProducts]);
+
+  // После "Принять" и "Вернуть" — обновляем и товары, и передачи
+  const refreshAfterAcceptOrReturn = useCallback(() => {
+    refreshTransfers();
+    refreshProductsList();
+  }, [refreshTransfers, refreshProductsList]);
+
   // View mode (table/cards)
   const STORAGE_KEY = "production_agents_view_mode";
   const getInitialViewMode = () => {
@@ -645,28 +682,15 @@ const ProductionAgents = () => {
 
   useEffect(() => {
     // dispatch(getProfile());
-    dispatch(
-      fetchTransfersAsync(
-        profile?.role === "owner" ? {} : { agent: profile?.id }
-      )
-    );
-  }, [dispatch, profile]);
+    refreshTransfers();
+  }, [refreshTransfers]);
   useEffect(() => {
     if (showSellModal) dispatch(startSale());
   }, [showSellModal, dispatch]);
 
   useEffect(() => {
-    if (profile?.role !== "owner") return;
-    const params = {};
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    api
-      .get("/main/owners/agents/products/", { params })
-      .then(({ data }) => {
-        setAgents(data);
-      })
-      .catch((e) => console.log(e));
-  }, [profile?.role, dateFrom, dateTo]);
+    loadAgentsProducts();
+  }, [loadAgentsProducts]);
 
   // Обработчик для кнопки "Продать товар"
   const handleStartSale = async () => {
@@ -1143,7 +1167,7 @@ const ProductionAgents = () => {
                         {viewProducts?.map((item, idx) => (
                           <div
                             key={item.id}
-                            className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                            className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
                           >
                             <div className="min-w-0 flex-1">
                               <div className="text-xs text-slate-500">
@@ -1391,11 +1415,7 @@ const ProductionAgents = () => {
         <PendingModal
           onClose={() => setShowPendingModal(false)}
           onChanged={() => {
-            if (profile?.role === "owner") {
-              dispatch(fetchTransfersAsync());
-            } else {
-              dispatch(fetchAgentProductsAsync());
-            }
+            refreshAfterAcceptOrReturn();
           }}
         />
       )}
@@ -1403,11 +1423,7 @@ const ProductionAgents = () => {
         <ReturnProductModal
           onClose={() => setShowReturnProductModal(false)}
           onChanged={() => {
-            if (profile?.role === "owner") {
-              dispatch(fetchTransfersAsync());
-            } else {
-              dispatch(fetchAgentProductsAsync());
-            }
+            refreshAfterAcceptOrReturn();
           }}
           item={itemId3}
         />

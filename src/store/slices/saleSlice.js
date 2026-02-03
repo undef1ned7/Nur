@@ -42,6 +42,8 @@ const initialState = {
   start: null, // POS-продажа (товары)
   startObject: null, // Object-продажа (строительные)
   loading: false,
+  // отдельный флаг именно для startSale (чтобы не плодить параллельные /start/ запросы)
+  startSaleLoading: false,
   cart: null,
   error: null,
   barcode: null,
@@ -93,14 +95,17 @@ const saleSlice = createSlice({
       // POS
       .addCase(startSale.pending, (state) => {
         state.loading = true;
+        state.startSaleLoading = true;
       })
       .addCase(startSale.fulfilled, (state, { payload }) => {
         state.start = payload;
         state.loading = false;
+        state.startSaleLoading = false;
       })
       .addCase(startSale.rejected, (state, action) => {
         state.error = ensureError(action);
         state.loading = false;
+        state.startSaleLoading = false;
       })
       .addCase(getSale.pending, (state) => {
         state.loading = true;

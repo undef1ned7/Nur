@@ -680,12 +680,13 @@ const AddProductPage = () => {
       // Добавление денежного потока при создании товара
       // Создаем запрос на кассу только если не долг и не режим редактирования
       if (!isEditMode && debt !== "Долги") {
-        // Сумма в кассу: количество × цена за единицу (для Предоплаты — переданная сумма)
-        const sellingPrice = price || newItemData.price || "0";
+        // Сумма в кассу: количество × закупочная цена за единицу (для Предоплаты — переданная сумма)
+        const purchaseUnitPrice =
+          purchase_price || newItemData.purchase_price || "0";
         const amountForCash =
           debt === "Предоплата"
             ? Number(amount || "0")
-            : qty * Number(sellingPrice);
+            : qty * Number(purchaseUnitPrice);
         // Используем selectCashBox если cashData.cashbox пустой
         const cashboxId = cashData.cashbox || selectCashBox;
 
