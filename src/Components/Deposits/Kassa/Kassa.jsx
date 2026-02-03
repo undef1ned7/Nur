@@ -11,6 +11,7 @@ import api from "../../../api";
 import Reports from "./Reports/Reports";
 import "./kassa.scss";
 import { useUser } from "../../../store/slices/userSlice";
+import useResize from "../../../hooks/useResize";
 
 /* Base path */
 const BASE = "/crm/kassa";
@@ -90,7 +91,13 @@ const CashboxList = () => {
   const [checked, setChecked] = useState(false);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
   const navigate = useNavigate();
-
+  const { isMobile } = useResize(({ isMobile }) => {
+    if (isMobile) {
+      setViewMode('cards')
+    } else {
+      setViewMode(getInitialViewMode())
+    }
+  });
   useEffect(() => {
     localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
   }, [viewMode]);
@@ -171,13 +178,12 @@ const CashboxList = () => {
         </div>
         <div className="kassa-search__meta">
           <span className="kassa-search__info">Всего: {filtered.length}</span>
-          <div className="kassa-search__view-toggle">
+          {!isMobile && (<div className="kassa-search__view-toggle">
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`kassa-view-btn ${
-                viewMode === "table" ? "kassa-view-btn--active" : ""
-              }`}
+              className={`kassa-view-btn ${viewMode === "table" ? "kassa-view-btn--active" : ""
+                }`}
               title="Таблица"
             >
               <Table2 size={16} />
@@ -186,15 +192,14 @@ const CashboxList = () => {
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`kassa-view-btn ${
-                viewMode === "cards" ? "kassa-view-btn--active" : ""
-              }`}
+              className={`kassa-view-btn ${viewMode === "cards" ? "kassa-view-btn--active" : ""
+                }`}
               title="Карточки"
             >
               <LayoutGrid size={16} />
               Карточки
             </button>
-          </div>
+          </div>)}
         </div>
       </div>
 
@@ -204,57 +209,57 @@ const CashboxList = () => {
         {viewMode === "table" && (
           <div className="kassa-table-scroll">
             <table className="kassa-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Название отдела</th>
-                <th>Приход</th>
-                <th>Расход</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+              <thead>
                 <tr>
-                  <td colSpan={5} className="kassa-table__loading">
-                    Загрузка…
-                  </td>
+                  <th>#</th>
+                  <th>Название отдела</th>
+                  <th>Приход</th>
+                  <th>Расход</th>
+                  <th>Действия</th>
                 </tr>
-              ) : filtered.length ? (
-                filtered.map((r, i) => (
-                  <tr
-                    key={r.id}
-                    className="kassa__rowClickable"
-                    onClick={() => navigate(`${BASE}/${r.id}`)}
-                  >
-                    <td>{i + 1}</td>
-                    <td>
-                      <b>{r.department_name || r.name || "—"}</b>
-                    </td>
-                    <td>{money(r.analytics?.income_total || 0)}</td>
-                    <td>{money(r.analytics?.expense_total || 0)}</td>
-                    <td>
-                      <button
-                        className="kassa__btn kassa__btn--secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`${BASE}/${r.id}`);
-                        }}
-                      >
-                        Открыть
-                      </button>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="kassa-table__loading">
+                      Загрузка…
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="kassa-table__empty">
-                    Нет данных
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ) : filtered.length ? (
+                  filtered.map((r, i) => (
+                    <tr
+                      key={r.id}
+                      className="kassa__rowClickable"
+                      onClick={() => navigate(`${BASE}/${r.id}`)}
+                    >
+                      <td>{i + 1}</td>
+                      <td>
+                        <b>{r.department_name || r.name || "—"}</b>
+                      </td>
+                      <td>{money(r.analytics?.income_total || 0)}</td>
+                      <td>{money(r.analytics?.expense_total || 0)}</td>
+                      <td>
+                        <button
+                          className="kassa__btn kassa__btn--secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`${BASE}/${r.id}`);
+                          }}
+                        >
+                          Открыть
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="kassa-table__empty">
+                      Нет данных
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -499,19 +504,19 @@ const CashboxPayment = () => {
     try {
       await api.post(`/cafe/orders/${id}/pay/`);
       return true;
-    } catch {}
+    } catch { }
     try {
       await api.patch(`/cafe/orders/${id}/`, { status: "paid" });
       return true;
-    } catch {}
+    } catch { }
     try {
       await api.patch(`/cafe/orders/${id}/`, { status: "оплачен" });
       return true;
-    } catch {}
+    } catch { }
     try {
       await api.put(`/cafe/orders/${id}/`, { status: "paid" });
       return true;
-    } catch {}
+    } catch { }
     return false;
   };
 
@@ -552,7 +557,7 @@ const CashboxPayment = () => {
         okIds.map(async (id) => {
           try {
             await api.delete(`/cafe/orders/${id}/`);
-          } catch {}
+          } catch { }
         })
       );
 
@@ -571,7 +576,7 @@ const CashboxPayment = () => {
               places: grp.table?.places,
               status: "free",
             });
-          } catch {}
+          } catch { }
         }
       }
 
@@ -582,7 +587,7 @@ const CashboxPayment = () => {
             detail: { tableId: grp.tableId, orderIds: okIds },
           })
         );
-      } catch {}
+      } catch { }
 
       // 7) Финальная синхронизация
       await loadAll();
@@ -746,12 +751,12 @@ const CashboxDetail = ({ id: idProp }) => {
       try {
         detail = (await api.get(`/construction/cashboxes/${id}/detail/owner/`))
           .data;
-      } catch {}
+      } catch { }
       if (!detail) {
         try {
           detail = (await api.get(`/construction/cashboxes/${id}/detail/`))
             .data;
-        } catch {}
+        } catch { }
       }
       if (!detail) {
         detail = (await api.get(`/construction/cashboxes/${id}/`)).data;
@@ -770,7 +775,7 @@ const CashboxDetail = ({ id: idProp }) => {
             params: { cashbox: id },
           });
           flows = fromAny(r1);
-        } catch {}
+        } catch { }
       }
       if (!flows.length && detail?.uuid) {
         try {
@@ -778,7 +783,7 @@ const CashboxDetail = ({ id: idProp }) => {
             params: { cashbox: detail.uuid },
           });
           flows = fromAny(r2);
-        } catch {}
+        } catch { }
       }
 
       const mapped = (flows || []).map((x, i) => {
@@ -853,25 +858,22 @@ const CashboxDetail = ({ id: idProp }) => {
       <div className="kassa-search-section">
         <div className="kassa-chip-group">
           <button
-            className={`kassa-chip ${
-              tab === "expense" ? "kassa-chip--active" : ""
-            }`}
+            className={`kassa-chip ${tab === "expense" ? "kassa-chip--active" : ""
+              }`}
             onClick={() => handleTabChange("expense")}
           >
             Расход
           </button>
           <button
-            className={`kassa-chip ${
-              tab === "income" ? "kassa-chip--active" : ""
-            }`}
+            className={`kassa-chip ${tab === "income" ? "kassa-chip--active" : ""
+              }`}
             onClick={() => handleTabChange("income")}
           >
             Приход
           </button>
           <button
-            className={`kassa-chip ${
-              tab === "all" ? "kassa-chip--active" : ""
-            }`}
+            className={`kassa-chip ${tab === "all" ? "kassa-chip--active" : ""
+              }`}
             onClick={() => handleTabChange("all")}
           >
             Все

@@ -77,8 +77,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   useEffect(() => {
     if (location.pathname.includes('crm') && location.pathname.split('/').map(el => el.trim()).filter(Boolean).length == 1 && menuItems.length && !isLoading) {
       navigate(menuItems.at(0).to);
-      console.log('asdasdasdasdasdas');
-      
     }
   }, [menuItems, isLoading])
   return (

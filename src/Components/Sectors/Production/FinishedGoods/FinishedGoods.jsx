@@ -1112,26 +1112,26 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                           </div>
                           <div onClick={(e) => e.stopPropagation()}>
                             <TextField
-                            size="small"
-                            placeholder="Кол-во"
-                            type="number"
-                            inputProps={{
-                              step: "0.0001",
-                              min: "0",
-                              max: units > 0 ? availableQty / units : undefined,
-                            }}
-                            disabled={!checked}
-                            value={qty}
-                            onChange={(e) =>
-                              changeRecipeQty(materialId, e.target.value)
-                            }
-                            error={isInsufficient}
-                            helperText={
-                              isInsufficient
-                                ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
-                                : ""
-                            }
-                          />
+                              size="small"
+                              placeholder="Кол-во"
+                              type="number"
+                              inputProps={{
+                                step: "0.0001",
+                                min: "0",
+                                max: units > 0 ? availableQty / units : undefined,
+                              }}
+                              disabled={!checked}
+                              value={qty}
+                              onChange={(e) =>
+                                changeRecipeQty(materialId, e.target.value)
+                              }
+                              error={isInsufficient}
+                              helperText={
+                                isInsufficient
+                                  ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
+                                  : ""
+                              }
+                            />
                           </div>
                         </div>
                       );
@@ -2694,8 +2694,7 @@ const FinishedGoods = ({ products, onChanged }) => {
   // состояние для редактирования
   const [showEdit, setShowEdit] = useState(false);
   const [showMarriageModal, setShowMarriageModal] = useState(false);
-  const [showTransferProductModal, setShowTransferProductModal] =
-    useState(false);
+  const [showTransferProductModal, setShowTransferProductModal] = useState(false);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
 
   const [showAcceptProductModal, setShowAcceptProductModal] = useState(false);
@@ -2731,17 +2730,15 @@ const FinishedGoods = ({ products, onChanged }) => {
     return isSmall ? "cards" : "table";
   }, []);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
-
-  // Сохраняем режим просмотра в localStorage
-
-  const { isMobile } = useResize((media) => {
-    const { isMobile } = media
+  const {isMobile} = useResize(({isMobile}) => {
     if (isMobile) {
       setViewMode('cards')
     } else {
       setViewMode(getInitialViewMode())
     }
-  })
+  });
+  // Сохраняем режим просмотра в localStorage
+
   useEffect(() => {
     if (isMobile) return;
     if (typeof window !== "undefined") {
