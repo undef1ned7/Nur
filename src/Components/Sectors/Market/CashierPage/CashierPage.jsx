@@ -29,7 +29,7 @@ import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 import api from "../../../../api";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../store/slices/productSlice";
-import { useSale } from "../../../../store/slices/saleSlice";
+import { resetPosSale, useSale } from "../../../../store/slices/saleSlice";
 import { useShifts } from "../../../../store/slices/shiftSlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import AlertModal from "../../../common/AlertModal/AlertModal";
@@ -45,6 +45,7 @@ import OpenShiftPage from "./OpenShiftPage";
 import PaymentPage from "./PaymentPage";
 import ShiftPage from "./ShiftPage";
 import { Button } from "@mui/material";
+import sleep from "../../../../../tools/sleep";
 
 const CashierPage = () => {
   const navigate = useNavigate();
@@ -62,7 +63,6 @@ const CashierPage = () => {
   const { list: cashBoxes } = useCash();
   const { currentUser, userId } = useUser();
   const [openShiftState, setOpenShiftState] = useState(null); // Локальное состояние для открытой смены
-  console.log('SALEID', currentSale);
 
   // Функция для форматирования количества (убирает лишние нули)
   const formatQuantity = (qty) => {
@@ -123,6 +123,10 @@ const CashierPage = () => {
           setOpenShiftState(openShiftFromApi);
           return openShiftFromApi;
         }
+        // Если фильтр поддерживается и открытой смены нет — прекращаем поиск.
+        // Иначе будет лишнее сканирование страниц (много повторных запросов).
+        setOpenShiftState(null);
+        return null;
       } catch (e) {
         // Если фильтр не поддерживается, продолжаем поиск по страницам
         console.log("Filter by status not supported, searching all pages");
@@ -147,7 +151,7 @@ const CashierPage = () => {
 
         hasNext = !!data?.next;
         page++;
-        
+
         // Защита от бесконечного цикла (максимум 10 страниц)
         if (page > 10) break;
       }
@@ -168,6 +172,9 @@ const CashierPage = () => {
     return shifts.find((s) => s.status === "open");
   }, [shifts, openShiftState]);
   const openShiftId = openShift?.id;
+  const openShiftStatus = openShift?.status;
+
+
 
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
@@ -313,6 +320,24 @@ const CashierPage = () => {
     onComplete: async (barcode) => {
       if (!barcode || barcode.length < 3) return;
       if (barcodeProcessingRef.current) return;
+
+      // ВАЖНО: во время под-экранов (закрытие/открытие смены, оплата и т.д.)
+      // не обрабатываем "сканирование", иначе быстрый ввод цифр (например сумма)
+      // может быть принят за штрих-код и показать "Нет открытой смены".
+      if (
+        showCloseShiftPage ||
+        showOpenShiftPage ||
+        showPaymentPage ||
+        showShiftPage ||
+        showMenuModal ||
+        showCustomerModal ||
+        showDebtModal ||
+        showReceiptsModal ||
+        showCustomServiceModal ||
+        showDiscountModal
+      ) {
+        return;
+      }
 
       // Валидация штрих-кода: проверяем, что он не содержит служебные символы
       // Сканер не должен отправлять Backspace, Delete и другие служебные клавиши
@@ -540,7 +565,7 @@ const CashierPage = () => {
   useEffect(() => {
     // Проверяем, есть ли открытая смена в загруженных сменах
     const foundInLoaded = shifts.find((s) => s.status === "open");
-    
+
     if (foundInLoaded) {
       // Если нашли в загруженных, обновляем состояние
       setOpenShiftState(foundInLoaded);
@@ -879,7 +904,7 @@ const CashierPage = () => {
     dispatch(
       startSale({ discount_total: 0, shift: openShiftId })
     );
-  },[openShiftId])
+  }, [openShiftId])
 
   const addToCart = async (product) => {
     // Проверяем наличие товара
@@ -1215,11 +1240,12 @@ const CashierPage = () => {
           setOpenShiftState(null);
           // Обновляем список смен после возврата
           dispatch(fetchShiftsAsync());
-          // Обновляем продажу после закрытия смены
-          refreshSale();
-          // Очищаем корзину и текущую продажу
+          // Очищаем корзину и текущую продажу (после закрытия смены она невалидна)
+          dispatch(resetPosSale());
           setCart([]);
+          cartOrderRef.current = [];
           setSelectedCustomer(null);
+          setDiscountValue("");
         }}
         shift={openShift}
       />

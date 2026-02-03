@@ -76,7 +76,18 @@ const ensureError = (action) =>
 const saleSlice = createSlice({
   name: "sale",
   initialState,
-  reducers: {},
+  reducers: {
+    resetPosSale: (state) => {
+      // Сбрасываем активную POS-продажу и связанные ошибки/данные,
+      // например при закрытии смены
+      state.start = null;
+      state.cart = null;
+      state.checkout = null;
+      state.error = null;
+      state.barcode = null;
+      state.barcodeError = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       // POS
@@ -443,5 +454,6 @@ const saleSlice = createSlice({
   },
 });
 
+export const { resetPosSale } = saleSlice.actions;
 export const useSale = () => useSelector((state) => state.sale);
 export default saleSlice.reducer;

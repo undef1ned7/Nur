@@ -130,10 +130,10 @@ const OpenShiftPage = ({ onBack }) => {
               Сумма наличных (сом) *
             </label>
             <input
-              type="text"
+              type="number"
               className="open-shift-page__input"
               value={openingCash}
-              onChange={(e) => setOpeningCash(e.target.value)}
+              onChange={(e) =>  setOpeningCash( e.target.value)}
               placeholder="0.00"
               step="0.01"
               min="0"

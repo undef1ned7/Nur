@@ -8,7 +8,7 @@ import {
   normalizeDealFromApi,
 } from "../clientDetails.helpers";
 import api from "../../../../../api";
-
+import { useConfirm } from "../../../../../hooks/useDialog";
 export default function DealFormModal({
   open,
   clientId,
@@ -18,6 +18,7 @@ export default function DealFormModal({
   onDeleted,
   onError,
 }) {
+  const confirm = useConfirm();
   const [dealName, setDealName] = useState("");
   const [dealBudget, setDealBudget] = useState("");
   const [dealStatus, setDealStatus] = useState("Продажа");
@@ -36,7 +37,7 @@ export default function DealFormModal({
       setDealStatus(kindToRu(editingDeal.kind));
       setDealDebtMonths(
         editingDeal.debt_months !== undefined &&
-        editingDeal.debt_months !== null
+          editingDeal.debt_months !== null
           ? String(editingDeal.debt_months)
           : ""
       );
@@ -82,8 +83,8 @@ export default function DealFormModal({
         ? { debt_months: parseInt(debt_months, 10) }
         : {}),
       ...(ruStatusToKind(statusRu) === "debt" &&
-      first_due_date &&
-      toYYYYMMDD(first_due_date)
+        first_due_date &&
+        toYYYYMMDD(first_due_date)
         ? { first_due_date: toYYYYMMDD(first_due_date) }
         : {}),
     };
@@ -109,8 +110,8 @@ export default function DealFormModal({
         ? { debt_months: parseInt(debt_months, 10) }
         : {}),
       ...(ruStatusToKind(statusRu) === "debt" &&
-      first_due_date &&
-      toYYYYMMDD(first_due_date)
+        first_due_date &&
+        toYYYYMMDD(first_due_date)
         ? { first_due_date: toYYYYMMDD(first_due_date) }
         : {}),
     };
@@ -165,16 +166,17 @@ export default function DealFormModal({
 
   const handleDelete = async () => {
     if (!editingDeal) return;
-    const ok = window.confirm("Удалить сделку?");
-    if (!ok) return;
-    try {
-      await deleteDealApi(editingDeal.id);
-      onDeleted?.(editingDeal.id);
-      onClose?.();
-    } catch (e) {
-      console.error(e);
-      onError?.(msgFromError(e, "Не удалось удалить сделку"));
-    }
+    confirm("Удалить сделку?", async (ok) => {
+      if (!ok) return;
+      try {
+        await deleteDealApi(editingDeal.id);
+        onDeleted?.(editingDeal.id);
+        onClose?.();
+      } catch (e) {
+        console.error(e);
+        onError?.(msgFromError(e, "Не удалось удалить сделку"));
+      }
+    });
   };
 
   const handleClose = () => {
@@ -233,6 +235,11 @@ export default function DealFormModal({
                 onChange={(e) => setDealBudget(e.target.value)}
                 onBlur={() => setDealBudget(toDecimalString(dealBudget))}
                 placeholder="0.00"
+                onFocus={() => {
+                  if (toDecimalString(dealBudget) === "0.00" || toDecimalString(dealBudget) === "0") {
+                    setDealBudget("");
+                  }
+                }}
               />
             </label>
 

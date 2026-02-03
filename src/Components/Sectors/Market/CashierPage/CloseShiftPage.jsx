@@ -9,6 +9,7 @@ import {
 import { useShifts } from "../../../../store/slices/shiftSlice";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import "./CloseShiftPage.scss";
+import sleep from "../../../../../tools/sleep";
 
 const CloseShiftPage = ({ onBack, shift: initialShift }) => {
   const dispatch = useDispatch();
@@ -52,12 +53,8 @@ const CloseShiftPage = ({ onBack, shift: initialShift }) => {
     }
   }, [dispatch, shift?.id]);
 
-  // Обновляем данные смены после успешного закрытия
-  useEffect(() => {
-    if (shift?.id && shift?.status === "closed") {
-      dispatch(fetchShiftByIdAsync(shift.id));
-    }
-  }, [dispatch, shift?.id, shift?.status]);
+  // Примечание: отдельный повторный fetch после закрытия не нужен,
+  // т.к. closeShiftAsync возвращает обновлённую смену и кладёт её в Redux.
 
   if (!shift) {
     return (
@@ -89,17 +86,13 @@ const CloseShiftPage = ({ onBack, shift: initialShift }) => {
       ).unwrap();
 
       // Обновляем список смен
-      await dispatch(fetchShiftsAsync());
       // Небольшая задержка, чтобы сервер успел обработать запрос
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      // Обновляем данные конкретной смены для получения актуальной expected_cash
-      await dispatch(fetchShiftByIdAsync(shift.id));
+      await sleep(300);
+      // await dispatch(fetchShiftByIdAsync(shift.id));
 
       showAlert("success", "Успех", "Смена успешно закрыта");
-      // Закрываем экран через небольшую задержку, чтобы пользователь увидел обновленные данные
-      setTimeout(() => {
-        onBack();
-      }, 1500);
+      await sleep(1500);
+      onBack();
     } catch (error) {
       console.error("Ошибка при закрытии смены:", error);
       showAlert(
@@ -160,7 +153,7 @@ const CloseShiftPage = ({ onBack, shift: initialShift }) => {
               Фактическая сумма на кассе (сом) *
             </label>
             <input
-              type="text"
+              type="number"
               className="close-shift-page__input"
               value={closingCash}
               onChange={(e) => setClosingCash(e.target.value)}

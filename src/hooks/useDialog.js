@@ -32,7 +32,7 @@ const useErrorModal = () => {
 const useConfirm = () => {
     const { openModal } = useModal();
 
-    const confirm = (message, callback) => {
+    const confirm =  (message, callback) => {
         openModal({
             message,
             onConfirm: (result) => callback(result),
