@@ -3,7 +3,10 @@ import { useEffect, useState, useMemo } from "react";
 import { FaCheckCircle, FaRegCircle, FaSearch, FaTimes } from "react-icons/fa";
 import { MENU_CONFIG } from "../Sidebar/config/menuConfig";
 import { HIDE_RULES } from "../Sidebar/config/hideRules";
-import { getAdditionalServicesForMenu, ADDITIONAL_SERVICES_CONFIG } from "../Sidebar/config/additionalServicesConfig";
+import {
+  getAdditionalServicesForMenu,
+  ADDITIONAL_SERVICES_CONFIG,
+} from "../Sidebar/config/additionalServicesConfig";
 
 // Базовые permissions (общие для всех секторов)
 const BASIC_ACCESS_TYPES = [
@@ -209,6 +212,7 @@ const SECTOR_ACCESS_TYPES = {
       backendKey: "can_view_analytics",
     },
     { value: "Документы", label: "Документы", backendKey: "can_view_document" },
+    { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
   ],
 };
 
@@ -230,12 +234,36 @@ export const ALL_ACCESS_TYPES = BASIC_ACCESS_TYPES;
 
 // Маппинг для доп. услуг
 const additionalServicesMapping = {
-  can_view_whatsapp: { value: "WhatsApp", label: "WhatsApp", backendKey: "can_view_whatsapp" },
-  can_view_instagram: { value: "Instagram", label: "Instagram", backendKey: "can_view_instagram" },
-  can_view_telegram: { value: "Telegram", label: "Telegram", backendKey: "can_view_telegram" },
-  can_view_documents: { value: "Документы", label: "Документы", backendKey: "can_view_documents" },
-  can_view_market_label: { value: "Печать штрих-кодов", label: "Печать штрих-кодов", backendKey: "can_view_market_label" },
-  can_view_market_scales: { value: "Интеграция с весами", label: "Интеграция с весами", backendKey: "can_view_market_scales" },
+  can_view_whatsapp: {
+    value: "WhatsApp",
+    label: "WhatsApp",
+    backendKey: "can_view_whatsapp",
+  },
+  can_view_instagram: {
+    value: "Instagram",
+    label: "Instagram",
+    backendKey: "can_view_instagram",
+  },
+  can_view_telegram: {
+    value: "Telegram",
+    label: "Telegram",
+    backendKey: "can_view_telegram",
+  },
+  can_view_documents: {
+    value: "Документы",
+    label: "Документы",
+    backendKey: "can_view_documents",
+  },
+  can_view_market_label: {
+    value: "Печать штрих-кодов",
+    label: "Печать штрих-кодов",
+    backendKey: "can_view_market_label",
+  },
+  can_view_market_scales: {
+    value: "Интеграция с весами",
+    label: "Интеграция с весами",
+    backendKey: "can_view_market_scales",
+  },
 };
 
 // const LOCAL_STORAGE_KEY = "userSelectedAccesses";
@@ -420,7 +448,10 @@ const AccessList = ({
         }
         // Для остальных проверяем права компании или профиля
         else {
-          if (companyAllows(service.permission) === true || profileAllows(service.permission) === true) {
+          if (
+            companyAllows(service.permission) === true ||
+            profileAllows(service.permission) === true
+          ) {
             allMenuPermissions.add(service.permission);
           }
         }
@@ -467,7 +498,10 @@ const AccessList = ({
       // "Филиалы" должны отображаться только если у компании есть активная доп. услуга
       if (accessType.backendKey === "can_view_branch") {
         // Проверяем, есть ли активная доп. услуга у компании
-        if (companyAllows("can_view_branch") === true && allMenuPermissions.has(accessType.backendKey)) {
+        if (
+          companyAllows("can_view_branch") === true &&
+          allMenuPermissions.has(accessType.backendKey)
+        ) {
           result.push(accessType);
         }
       } else if (allMenuPermissions.has(accessType.backendKey)) {
@@ -503,7 +537,10 @@ const AccessList = ({
             (s) => s.permission === permission
           );
         }
-        if (dynamicService && !result.some((r) => r.backendKey === permission)) {
+        if (
+          dynamicService &&
+          !result.some((r) => r.backendKey === permission)
+        ) {
           result.push({
             value: dynamicService.label,
             label: dynamicService.label,
@@ -569,8 +606,7 @@ const AccessList = ({
       (type) =>
         !BASIC_ACCESS_TYPES.some(
           (basic) => basic.backendKey === type.backendKey
-        ) &&
-        !additionalServicesMapping[type.backendKey]
+        ) && !additionalServicesMapping[type.backendKey]
     );
   }, [availableAccessTypes]);
 

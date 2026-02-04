@@ -941,14 +941,23 @@ const Masters = () => {
           { value: "Услуги", label: "Услуги", backendKey: "can_view_services" },
         ],
         Склад: [
-          { value: "Контрагенты", label: "Контрагенты", backendKey: "can_view_clients" },
+          {
+            value: "Контрагенты",
+            label: "Контрагенты",
+            backendKey: "can_view_clients",
+          },
           {
             value: "Аналитика",
             label: "Аналитика",
             backendKey: "can_view_analytics",
           },
           { value: "Товары", label: "Товары", backendKey: "can_view_products" },
-          { value: "Документы", label: "Документы", backendKey: "can_view_document" },
+          {
+            value: "Документы",
+            label: "Документы",
+            backendKey: "can_view_document",
+          },
+          { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
         ],
         Производство: [
           {
@@ -1296,6 +1305,24 @@ const Masters = () => {
                             navigate(`/crm/production/agents/${u.id}/analytics`)
                           }
                           title="Аналитика агента"
+                        >
+                          <span className="barbermasters__btnText">
+                            📊 Аналитика
+                          </span>
+                        </button>
+                      )}
+                    {company?.sector?.name === "Склад" &&
+                      (u.role === "agent" ||
+                        roleLabel?.toLowerCase().includes("агент")) && (
+                        <button
+                          className="barbermasters__btn barbermasters__btn--secondary"
+                          onClick={() =>
+                            navigate(
+                              `/crm/warehouse/analytics?agent_id=${u.id}`,
+                              { state: { agentName: fullName(u) } }
+                            )
+                          }
+                          title="Аналитика склада (агент)"
                         >
                           <span className="barbermasters__btnText">
                             📊 Аналитика

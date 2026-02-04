@@ -1,5 +1,6 @@
-import { Route, Navigate } from "react-router-dom";
+import { Route, Navigate, useSearchParams } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
+import { useUser } from "../store/slices/userSlice";
 
 // Public routes
 import Login from "../Components/Auth/Login/Login";
@@ -129,6 +130,7 @@ import ConsultingReports from "../Components/Sectors/Consulting/Kassa/Reports/Re
 
 // Warehouse
 import WarehouseAnalytics from "../Components/Sectors/Warehouse/Analytics/Analytics";
+import WarehouseAgentAnalytics from "../Components/Sectors/Warehouse/Analytics/AgentAnalytics";
 import WarehouseClients from "../Components/Sectors/Warehouse/Clients/Clients";
 import WarehouseDirectories from "../Components/Sectors/Warehouse/Directories/Directories";
 import WarehouseMovements from "../Components/Sectors/Warehouse/Movements/Movements";
@@ -144,6 +146,7 @@ import WarehouseDocumentsLayout from "../Components/Sectors/Warehouse/Documents/
 import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
 import CreateWarehouseDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
 import MoneyDocumentsPage from "../Components/Sectors/Warehouse/Money/MoneyDocumentsPage";
+import WarehouseAgents from "../Components/Sectors/Warehouse/Agents/Agents";
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
 import ProductionAgents from "../Components/Sectors/Production/ProductionAgents/ProductionAgents";
@@ -181,6 +184,18 @@ const createProtectedRoute = (path, Component, props) => (
     {...props}
   />
 );
+
+/** Аналитика склада: новая аналитика агента (AgentAnalytics) — для агента без agent_id или при agent_id в URL; иначе владелец/админ (WarehouseAnalytics) */
+const WarehouseAnalyticsRoute = () => {
+  const { profile } = useUser();
+  const [searchParams] = useSearchParams();
+  const agentId = searchParams.get("agent_id");
+  const isAgent =
+    profile?.role !== "owner" && profile?.role !== "admin";
+  if (isAgent && !agentId) return <WarehouseAgentAnalytics />;
+  if (agentId) return <WarehouseAgentAnalytics />;
+  return <WarehouseAnalytics />;
+};
 
 /**
  * Конфигурация публичных роутов
@@ -354,7 +369,7 @@ export const crmRoutes = (profile) => [
 
   // Warehouse routes
   createProtectedRoute("warehouse/warehouses", Warehouses),
-  createProtectedRoute("warehouse/analytics", WarehouseAnalytics),
+  createProtectedRoute("warehouse/analytics", WarehouseAnalyticsRoute),
   createProtectedRoute("warehouse/clients", WarehouseClients),
   <Route
     path="warehouse/documents"
@@ -386,6 +401,7 @@ export const crmRoutes = (profile) => [
       element={<MoneyDocumentsPage />}
     />
   </Route>,
+  createProtectedRoute("warehouse/agents", WarehouseAgents),
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
   createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),

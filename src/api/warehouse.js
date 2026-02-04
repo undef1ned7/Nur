@@ -596,6 +596,293 @@ export const getWarehouseById = async (id) => {
   }
 };
 
+// ==================== АГЕНТЫ: ЗАЯВКИ (CARTS) ====================
+
+/**
+ * 6.1 Заявки агента на товар
+ * GET /api/warehouse/agent-carts/
+ */
+export const listAgentCarts = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/agent-carts/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Agent Carts Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * POST /api/warehouse/agent-carts/
+ */
+export const createAgentCart = async (payload) => {
+  try {
+    const response = await api.post("warehouse/agent-carts/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * GET /api/warehouse/agent-carts/{id}/
+ */
+export const getAgentCartById = async (id) => {
+  try {
+    const response = await api.get(`warehouse/agent-carts/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * PUT /api/warehouse/agent-carts/{id}/
+ */
+export const updateAgentCart = async (id, payload) => {
+  try {
+    const response = await api.put(`warehouse/agent-carts/${id}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * PATCH /api/warehouse/agent-carts/{id}/
+ */
+export const patchAgentCart = async (id, payload) => {
+  try {
+    const response = await api.patch(`warehouse/agent-carts/${id}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Patch Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * DELETE /api/warehouse/agent-carts/{id}/
+ */
+export const deleteAgentCart = async (id) => {
+  try {
+    const response = await api.delete(`warehouse/agent-carts/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * POST /api/warehouse/agent-carts/{id}/submit/
+ */
+export const submitAgentCart = async (id) => {
+  try {
+    const response = await api.post(`warehouse/agent-carts/${id}/submit/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Submit Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * POST /api/warehouse/agent-carts/{id}/approve/
+ */
+export const approveAgentCart = async (id) => {
+  try {
+    const response = await api.post(`warehouse/agent-carts/${id}/approve/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Approve Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * POST /api/warehouse/agent-carts/{id}/reject/
+ */
+export const rejectAgentCart = async (id) => {
+  try {
+    const response = await api.post(`warehouse/agent-carts/${id}/reject/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Reject Agent Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== АГЕНТЫ: ПОЗИЦИИ ЗАЯВКИ (ITEMS) ====================
+
+/**
+ * 6.2 Позиции заявки
+ * GET /api/warehouse/agent-cart-items/?cart={uuid}
+ */
+export const listAgentCartItems = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/agent-cart-items/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Agent Cart Items Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * POST /api/warehouse/agent-cart-items/
+ */
+export const createAgentCartItem = async (payload) => {
+  try {
+    const response = await api.post("warehouse/agent-cart-items/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Agent Cart Item Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * GET /api/warehouse/agent-cart-items/{id}/
+ */
+export const getAgentCartItemById = async (id) => {
+  try {
+    const response = await api.get(`warehouse/agent-cart-items/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Agent Cart Item Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * PUT /api/warehouse/agent-cart-items/{id}/
+ */
+export const updateAgentCartItem = async (id, payload) => {
+  try {
+    const response = await api.put(`warehouse/agent-cart-items/${id}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Agent Cart Item Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * PATCH /api/warehouse/agent-cart-items/{id}/
+ */
+export const patchAgentCartItem = async (id, payload) => {
+  try {
+    const response = await api.patch(
+      `warehouse/agent-cart-items/${id}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Patch Agent Cart Item Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * DELETE /api/warehouse/agent-cart-items/{id}/
+ */
+export const deleteAgentCartItem = async (id) => {
+  try {
+    const response = await api.delete(`warehouse/agent-cart-items/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Agent Cart Item Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== АГЕНТЫ: ОСТАТКИ ====================
+
+/**
+ * 6.3 Остатки у агента (текущий пользователь)
+ * GET /api/warehouse/agents/me/products/
+ */
+export const listMyAgentProducts = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/agents/me/products/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List My Agent Products Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Остатки у всех агентов (для owner/admin)
+ * GET /api/warehouse/owner/agents/products/
+ */
+export const listOwnerAgentsProducts = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/owner/agents/products/", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Owner Agents Products Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== КОНТРАГЕНТЫ (CRUD) ====================
 
 /**
@@ -972,6 +1259,65 @@ export const getCounterpartyMoneyOperations = async (
   }
 };
 
+// ==================== АНАЛИТИКА СКЛАДА ====================
+
+/**
+ * 7.1 Аналитика владельца (общая)
+ * GET /api/warehouse/owner/analytics/
+ * @param {Object} params - period=day|week|month|custom, date, date_from, date_to
+ */
+export const getOwnerAnalytics = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/owner/analytics/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Owner Analytics Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 7.2 Аналитика агента (по себе)
+ * GET /api/warehouse/agents/me/analytics/
+ */
+export const getAgentMeAnalytics = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/agents/me/analytics/", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Agent Me Analytics Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 7.3 Аналитика по конкретному агенту
+ * GET /api/warehouse/owner/agents/{agent_id}/analytics/
+ */
+export const getOwnerAgentAnalytics = async (agentId, params = {}) => {
+  try {
+    const response = await api.get(
+      `warehouse/owner/agents/${agentId}/analytics/`,
+      { params }
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Owner Agent Analytics Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 export default {
   // Документы
   listDocuments,
@@ -1008,6 +1354,28 @@ export default {
   // Склады
   listWarehouses,
   getWarehouseById,
+  // Агенты: заявки и остатки
+  listAgentCarts,
+  createAgentCart,
+  getAgentCartById,
+  updateAgentCart,
+  patchAgentCart,
+  deleteAgentCart,
+  submitAgentCart,
+  approveAgentCart,
+  rejectAgentCart,
+  listAgentCartItems,
+  createAgentCartItem,
+  getAgentCartItemById,
+  updateAgentCartItem,
+  patchAgentCartItem,
+  deleteAgentCartItem,
+  listMyAgentProducts,
+  listOwnerAgentsProducts,
+  // Аналитика склада
+  getOwnerAnalytics,
+  getAgentMeAnalytics,
+  getOwnerAgentAnalytics,
   // Контрагенты
   listCounterparties,
   getCounterpartyById,
