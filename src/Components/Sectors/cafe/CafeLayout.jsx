@@ -10,6 +10,7 @@ export default function CafeLayout() {
     const { orders, tables } = useCafeWebSocketManager();
     const [notificationDeps, setNotificationDeps] = useState(null);
     const [notificationOrder, setNotificationOrder] = useState(null)
+    const [notificationOptions, setNotificationOptions] = useState(null);
     const { profile } = useUser();
     const location = useLocation();
     const notifiedTasksRef = useRef(new Set()); // taskKey -> notified once on this device
@@ -294,6 +295,7 @@ export default function CafeLayout() {
                 notifiedTasksRef.current.add(key);
                 setNotificationDeps(key);
                 setNotificationOrder(`${t?.menu_item_title} \nдля стола: №: ${t?.table_number} готово`);
+                setNotificationOptions({ variant: "waiter", sticky: true });
             }
         }
 
@@ -309,6 +311,7 @@ export default function CafeLayout() {
                     const key = `order_created-${oid}`;
                     setNotificationDeps(key);
                     setNotificationOrder(msg);
+                    setNotificationOptions({ variant: "default", sticky: false });
                 }
             }
 
@@ -338,7 +341,11 @@ export default function CafeLayout() {
 
     return (
         <>
-            <NotificationCafeSound notification={notificationOrder} notificationKey={notificationDeps} />
+            <NotificationCafeSound
+                notification={notificationOrder}
+                notificationKey={notificationDeps}
+                notificationOptions={notificationOptions}
+            />
             <Outlet context={{
                 socketOrders: orders,
                 socketTables: tables

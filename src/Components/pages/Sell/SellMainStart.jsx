@@ -681,7 +681,10 @@ const SellMainStart = () => {
         });
         return;
       }
-      if (!customService.price.trim() || Number(customService.price) <= 0) {
+      const priceNum = toNum(customService.price);
+      console.log(priceNum, customService.price);
+      
+      if (!customService.price.trim() || !Number.isFinite(priceNum) || priceNum <= 0) {
         setAlert({
           open: true,
           type: "error",
@@ -701,7 +704,7 @@ const SellMainStart = () => {
         addCustomItem({
           id: start?.id,
           name: customService.name.trim(),
-          price: customService.price.trim(),
+          price: priceNum,
           quantity: Number(customService.quantity) || 1,
         })
       ).unwrap();

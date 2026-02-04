@@ -19,9 +19,13 @@ const ruStatusToKind = (ru) => {
   return "sale";
 };
 
-const toDecimalString = (n) => {
-  const num = Number(n || 0);
-  return num.toFixed(2);
+const toDecimalString = (v) => {
+  const s = String(v ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/,/g, ".");
+  const num = Number(s);
+  return Number.isFinite(num) ? num.toFixed(2) : "0.00";
 };
 
 const hasPositiveNumber = (v) => Number.isFinite(Number(v)) && Number(v) > 0;

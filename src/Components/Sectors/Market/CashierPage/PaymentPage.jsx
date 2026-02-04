@@ -319,6 +319,7 @@ const PaymentPage = ({
                       startDebtError?.message ||
                       "Проверьте данные клиента.")
                 );
+                return;
               }
             }
 

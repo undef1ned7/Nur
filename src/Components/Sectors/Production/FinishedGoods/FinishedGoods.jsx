@@ -574,239 +574,207 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             <X size={20} />
           </button>
         </div>
-
-        {createError && (
-          <p className="finished-goods-add-modal__error-message">
-            Ошибка добавления: {createError.message || "ошибка"}
-          </p>
-        )}
-
-        {/* Основные поля */}
-        <div className="finished-goods-add-modal__section">
-          <label>Название *</label>
-          <input
-            name="name"
-            className="finished-goods-add-modal__input"
-            placeholder="Например, Буханка хлеба"
-            value={product.name}
-            onChange={onProductChange}
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Штрих код *</label>
-          <input
-            name="barcode"
-            className="finished-goods-add-modal__input"
-            placeholder="Штрих код"
-            value={product.barcode}
-            onChange={onProductChange}
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Бренд *</label>
-          <select
-            name="brand_name"
-            className="finished-goods-add-modal__input"
-            value={product.brand_name}
-            onChange={onProductChange}
-            required
-          >
-            <option value="">-- Выберите бренд --</option>
-            {categories &&
-              brands?.map((b) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Категория *</label>
-          <select
-            name="category_name"
-            className="finished-goods-add-modal__input"
-            value={product.category_name}
-            onChange={onProductChange}
-            required
-          >
-            <option value="">-- Выберите категорию --</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Поставщик + быстрое создание */}
-        <div className="finished-goods-add-modal__section">
-          <label>Поставщик {dealStatus ? "*" : ""}</label>
-          <select
-            name="client"
-            className="finished-goods-add-modal__input"
-            value={product.client}
-            onChange={onProductChange}
-            required={!!dealStatus}
-          >
-            <option value="">-- Выберите поставщика --</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            className="create-client"
-            onClick={() => setShowSupplierForm((v) => !v)}
-          >
-            {showSupplierForm ? "Отменить" : "Создать поставщика"}
-          </button>
-
-          {showSupplierForm && (
-            <form
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                rowGap: "10px",
-              }}
-              onSubmit={createSupplier}
-            >
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                placeholder="ФИО"
-                name="full_name"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="llc"
-                placeholder="ОсОО"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="inn"
-                placeholder="ИНН"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="okpo"
-                placeholder="ОКПО"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="score"
-                placeholder="Р/СЧЁТ"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="bik"
-                placeholder="БИК"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="address"
-                placeholder="Адрес"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="phone"
-                placeholder="Телефон"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="email"
-                name="email"
-                placeholder="Почта"
-              />
-              <div style={{ display: "flex", columnGap: "10px" }}>
-                <button
-                  className="create-client"
-                  type="button"
-                  onClick={() => setShowSupplierForm(false)}
-                >
-                  Отмена
-                </button>
-                <button className="create-client">Создать</button>
-              </div>
-            </form>
+        <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+          {createError && (
+            <p className="finished-goods-add-modal__error-message">
+              Ошибка добавления: {createError.message || "ошибка"}
+            </p>
           )}
-        </div>
 
-        {product.client && (
-          <>
-            <div className="finished-goods-add-modal__section">
-              <label>Тип оплаты *</label>
-              <select
-                name="category_name"
-                className="finished-goods-add-modal__input"
-                value={dealStatus}
-                onChange={(e) => setDealStatus(e.target.value)}
-                required
-              >
-                <option value="">-- Выберите тип оплаты --</option>
-                {DEAL_STATUS_RU?.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
+          {/* Основные поля */}
+          <div className="finished-goods-add-modal__section">
+            <label>Название *</label>
+            <input
+              name="name"
+              className="finished-goods-add-modal__input"
+              placeholder="Например, Буханка хлеба"
+              value={product.name}
+              onChange={onProductChange}
+              required
+            />
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label>Штрих код *</label>
+            <input
+              name="barcode"
+              className="finished-goods-add-modal__input"
+              placeholder="Штрих код"
+              value={product.barcode}
+              onChange={onProductChange}
+              required
+            />
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label>Бренд *</label>
+            <select
+              name="brand_name"
+              className="finished-goods-add-modal__input"
+              value={product.brand_name}
+              onChange={onProductChange}
+              required
+            >
+              <option value="">-- Выберите бренд --</option>
+              {categories &&
+                brands?.map((b) => (
+                  <option key={b.id} value={b.name}>
+                    {b.name}
                   </option>
                 ))}
-              </select>
-            </div>
+            </select>
+          </div>
 
-            {dealStatus === "Долги" && (
-              <div className="finished-goods-add-modal__section">
-                <label>Срок долга *</label>
+          <div className="finished-goods-add-modal__section">
+            <label>Категория *</label>
+            <select
+              name="category_name"
+              className="finished-goods-add-modal__input"
+              value={product.category_name}
+              onChange={onProductChange}
+              required
+            >
+              <option value="">-- Выберите категорию --</option>
+              {categories?.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Поставщик + быстрое создание */}
+          <div className="finished-goods-add-modal__section">
+            <label>Поставщик {dealStatus ? "*" : ""}</label>
+            <select
+              name="client"
+              className="finished-goods-add-modal__input"
+              value={product.client}
+              onChange={onProductChange}
+              required={!!dealStatus}
+            >
+              <option value="">-- Выберите поставщика --</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.full_name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              className="create-client"
+              onClick={() => setShowSupplierForm((v) => !v)}
+            >
+              {showSupplierForm ? "Отменить" : "Создать поставщика"}
+            </button>
+
+            {showSupplierForm && (
+              <form
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  rowGap: "10px",
+                }}
+                onSubmit={createSupplier}
+              >
                 <input
                   className="finished-goods-add-modal__input"
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={debtMonths}
-                  onChange={(e) => setDebtMonths(e.target.value)}
-                  onWheel={(e) => e.currentTarget.blur()}
-                  placeholder="Например, 6"
-                  required
+                  onChange={onSupplierChange}
+                  type="text"
+                  placeholder="ФИО"
+                  name="full_name"
                 />
-              </div>
-            )}
-
-            {dealStatus === "Предоплата" && (
-              <>
-                <div className="finished-goods-add-modal__section">
-                  <label>Предоплата *</label>
-                  <input
-                    className="finished-goods-add-modal__input"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={prepayment}
-                    onChange={(e) => setPrepayment(e.target.value)}
-                    onWheel={(e) => e.currentTarget.blur()}
-                    placeholder="Сумма предоплаты"
-                    required
-                  />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="llc"
+                  placeholder="ОсОО"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="inn"
+                  placeholder="ИНН"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="okpo"
+                  placeholder="ОКПО"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="score"
+                  placeholder="Р/СЧЁТ"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="bik"
+                  placeholder="БИК"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="address"
+                  placeholder="Адрес"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="phone"
+                  placeholder="Телефон"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="email"
+                  name="email"
+                  placeholder="Почта"
+                />
+                <div style={{ display: "flex", columnGap: "10px" }}>
+                  <button
+                    className="create-client"
+                    type="button"
+                    onClick={() => setShowSupplierForm(false)}
+                  >
+                    Отмена
+                  </button>
+                  <button className="create-client">Создать</button>
                 </div>
+              </form>
+            )}
+          </div>
+
+          {product.client && (
+            <>
+              <div className="finished-goods-add-modal__section">
+                <label>Тип оплаты *</label>
+                <select
+                  name="category_name"
+                  className="finished-goods-add-modal__input"
+                  value={dealStatus}
+                  onChange={(e) => setDealStatus(e.target.value)}
+                  required
+                >
+                  <option value="">-- Выберите тип оплаты --</option>
+                  {DEAL_STATUS_RU?.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {dealStatus === "Долги" && (
                 <div className="finished-goods-add-modal__section">
                   <label>Срок долга *</label>
                   <input
@@ -821,144 +789,513 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                     required
                   />
                 </div>
-              </>
-            )}
-          </>
-        )}
+              )}
 
-        {/* Цена и количество */}
-        <div className="finished-goods-add-modal__section">
-          <label>Розничная цена *</label>
-          <input
-            type="number"
-            name="price"
-            className="finished-goods-add-modal__input"
-            placeholder="120"
-            value={product.price}
-            onChange={onProductChange}
-            onWheel={(e) => e.currentTarget.blur()}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
+              {dealStatus === "Предоплата" && (
+                <>
+                  <div className="finished-goods-add-modal__section">
+                    <label>Предоплата *</label>
+                    <input
+                      className="finished-goods-add-modal__input"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={prepayment}
+                      onChange={(e) => setPrepayment(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="Сумма предоплаты"
+                      required
+                    />
+                  </div>
+                  <div className="finished-goods-add-modal__section">
+                    <label>Срок долга *</label>
+                    <input
+                      className="finished-goods-add-modal__input"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={debtMonths}
+                      onChange={(e) => setDebtMonths(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="Например, 6"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
-        {/* Фото (динамические) */}
-
-        <div className="finished-goods-add-modal__section">
-          <label>Закупочная цена *</label>
-          <input
-            type="number"
-            name="purchase_price"
-            className="finished-goods-add-modal__input"
-            placeholder="110"
-            value={product.purchase_price}
-            onChange={onProductChange}
-            onWheel={(e) => e.currentTarget.blur()}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Количество *</label>
-          <input
-            type="number"
-            name="quantity"
-            className="finished-goods-add-modal__input"
-            placeholder="100"
-            value={product.quantity}
-            onChange={onProductChange}
-            onWheel={(e) => e.currentTarget.blur()}
-            min="0"
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              cursor: "pointer",
-            }}
-          >
+          {/* Цена и количество */}
+          <div className="finished-goods-add-modal__section">
+            <label>Розничная цена *</label>
             <input
-              type="checkbox"
-              name="stock"
-              checked={product.stock}
+              type="number"
+              name="price"
+              className="finished-goods-add-modal__input"
+              placeholder="120"
+              value={product.price}
               onChange={onProductChange}
+              onWheel={(e) => e.currentTarget.blur()}
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          {/* Фото (динамические) */}
+
+          <div className="finished-goods-add-modal__section">
+            <label>Закупочная цена *</label>
+            <input
+              type="number"
+              name="purchase_price"
+              className="finished-goods-add-modal__input"
+              placeholder="110"
+              value={product.purchase_price}
+              onChange={onProductChange}
+              onWheel={(e) => e.currentTarget.blur()}
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label>Количество *</label>
+            <input
+              type="number"
+              name="quantity"
+              className="finished-goods-add-modal__input"
+              placeholder="100"
+              value={product.quantity}
+              onChange={onProductChange}
+              onWheel={(e) => e.currentTarget.blur()}
+              min="0"
+              required
+            />
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label
               style={{
-                width: "18px",
-                height: "18px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
                 cursor: "pointer",
               }}
-            />
-            <span>Акционный товар</span>
-          </label>
-        </div>
-        <div className="finished-goods-add-modal__section">
-          <label>Фото товара</label>
-          <button
-            type="button"
-            className="create-client"
-            onClick={addImageSlot}
-            style={{ marginBottom: 10 }}
-          >
-            + Добавить картинку
-          </button>
-          {images.length > 0 && (
+            >
+              <input
+                type="checkbox"
+                name="stock"
+                checked={product.stock}
+                onChange={onProductChange}
+                style={{
+                  width: "18px",
+                  height: "18px",
+                  cursor: "pointer",
+                }}
+              />
+              <span>Акционный товар</span>
+            </label>
+          </div>
+          <div className="finished-goods-add-modal__section">
+            <label>Фото товара</label>
+            <button
+              type="button"
+              className="create-client"
+              onClick={addImageSlot}
+              style={{ marginBottom: 10 }}
+            >
+              + Добавить картинку
+            </button>
+            {images.length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr",
+                  gap: 12,
+                }}
+              >
+                {images.map((im, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: "1px dashed #ccc",
+                      borderRadius: 8,
+                      padding: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: 6,
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{ opacity: 0.8 }}>Фото #{idx + 1}</span>
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: 10 }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="primary_image"
+                            checked={Boolean(im.is_primary)}
+                            onChange={() => handlePrimarySelect(idx)}
+                          />
+                          Главная
+                        </label>
+                        <button
+                          type="button"
+                          className="select-materials__remove"
+                          onClick={() => removeImageSlot(idx)}
+                          aria-label="Удалить изображение"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            border: "1px solid var(--border,#444)",
+                            background: "transparent",
+                            color: "inherit",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    {/* <input
+                    type="file"
+                    accept="image/*"
+                    className="finished-goods-add-modal__input"
+                    onChange={(e) =>
+                      handleImageChange(idx, e.target.files?.[0] || null)
+                    }
+                  /> */}
+                    <FileInput
+                      onChange={(e) =>
+                        handleImageChange(idx, e.target.files?.[0] || null)
+                      }
+                      accept={`image/*`}
+                      name="image"
+                      label="Image"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Состав (сырьё) */}
+          <div className="finished-goods-add-modal__section">
             <div
+              className="select-materials__head"
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
                 gap: 12,
               }}
             >
-              {images.map((im, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    border: "1px dashed #ccc",
-                    borderRadius: 8,
-                    padding: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 6,
-                      gap: 8,
-                    }}
-                  >
-                    <span style={{ opacity: 0.8 }}>Фото #{idx + 1}</span>
+              <label>Состав (сырьё)</label>
+              <button
+                type="button"
+                className="create-client"
+                onClick={() => setMaterialsOpen((prev) => !prev)}
+                disabled={materialsLoading}
+              >
+                {materialsOpen
+                  ? "Скрыть список"
+                  : materialsLoading
+                    ? "Загрузка…"
+                    : "+ Добавить сырьё"}
+              </button>
+            </div>
+
+            {materialsOpen && (
+              <div
+                className="select-materials__head-search"
+                style={{ marginTop: 8 }}
+              >
+                <input
+                  className="finished-goods-add-modal__input"
+                  name="materialQuery"
+                  placeholder="Поиск сырья"
+                  value={materialQuery}
+                  onChange={(e) => setMaterialQuery(e.target.value)}
+                />
+              </div>
+            )}
+
+            {materialsOpen && (
+              <div
+                className="select-materials__check active"
+                style={{
+                  marginTop: 8,
+                  position: "relative",
+                  maxHeight: 260,
+                  overflow: "auto",
+                  border: "1px solid var(--border,#333)",
+                  borderRadius: 8,
+                  padding: 8,
+                }}
+              >
+                {
+                  filteredMaterials
+                    ?.map((m) => {
+                      try {
+                        const materialId = m.id;
+                        const materialKey = String(materialId);
+                        const checked = recipeMap.has(materialKey);
+                        const qty = recipeMap.get(materialKey) ?? "";
+                        const availableQty = Number(m.quantity || 0);
+                        const requestedQty = Number(qty || 0);
+                        const units = Number(product.quantity || 0);
+                        const totalNeeded = requestedQty * units;
+                        const isInsufficient =
+                          checked && totalNeeded > availableQty;
+
+                        return (
+                          <div
+                            key={materialId}
+                            className="select-materials__item"
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              // Не переключать при клике по полю количества
+                              if (e.target.closest?.(".MuiTextField-root")) return;
+                              toggleRecipeItem(materialId);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                if (e.target.closest?.(".MuiTextField-root")) return;
+                                toggleRecipeItem(materialId);
+                              }
+                            }}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "auto 1fr 160px",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "6px 4px",
+                              backgroundColor: isInsufficient
+                                ? "#ffebee"
+                                : "transparent",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <Checkbox
+                              icon={
+                                <CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />
+                              }
+                              checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
+                              checked={checked}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                // Даём клику всплыть до строки — переключение через onClick строки
+                                // (на десктопе клик часто попадает по иконке, а не по input)
+                              }}
+                              sx={{
+                                color: "#000",
+                                "&.Mui-checked": { color: "#f9cf00" },
+                                pointerEvents: "auto",
+                              }}
+                            />
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 2,
+                              }}
+                            >
+                              <p
+                                title={m.name || m.title || `#${materialId}`}
+                                style={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  margin: 0,
+                                }}
+                              >
+                                {m.name || m.title || `#${materialId}`}
+                              </p>
+                              <small
+                                style={{
+                                  fontSize: "11px",
+                                  opacity: 0.7,
+                                  color: isInsufficient ? "#d32f2f" : "inherit",
+                                }}
+                              >
+                                Доступно: {availableQty}
+                                {checked && units > 0 && (
+                                  <span
+                                    style={{
+                                      color: isInsufficient ? "#d32f2f" : "#666",
+                                    }}
+                                  >
+                                    {" "}
+                                    | Нужно: {totalNeeded}
+                                    {isInsufficient && " ⚠️"}
+                                  </span>
+                                )}
+                              </small>
+                            </div>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <TextField
+                                size="small"
+                                placeholder="Кол-во"
+                                type="number"
+                                inputProps={{
+                                  step: "0.0001",
+                                  min: "0",
+                                  max: units > 0 ? availableQty / units : undefined,
+                                  onWheel: (e) => e.currentTarget.blur(),
+                                }}
+                                disabled={!checked}
+                                value={qty}
+                                onChange={(e) =>
+                                  changeRecipeQty(materialId, e.target.value)
+                                }
+                                error={isInsufficient}
+                                helperText={
+                                  isInsufficient
+                                    ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
+                                    : ""
+                                }
+                              />
+                            </div>
+                          </div>
+                        );
+                      } catch (error) {
+                        // Пропускаем проблемный материал, но не блокируем остальные
+                        return null;
+                      }
+                    })
+                }
+                {(!filteredMaterials || filteredMaterials.length === 0) &&
+                  !materialsLoading && (
+                    <div style={{ padding: 8, opacity: 0.7 }}>
+                      Ничего не найдено…
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {recipeItems.length > 0 && (
+              <div
+                className="select-materials__selected"
+                style={{ marginTop: 10 }}
+              >
+                {recipeItems.map((it) => {
+                  const mat = (Array.isArray(materials) ? materials : []).find(
+                    (m) => String(m.id) === String(it.materialId)
+                  );
+                  const availableQty = Number(mat?.quantity || 0);
+                  const requestedQty = Number(it.quantity || 0);
+                  const units = Number(product.quantity || 0);
+                  const totalNeeded = requestedQty * units;
+                  const isInsufficient = totalNeeded > availableQty;
+
+                  return (
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                      key={it.materialId}
+                      className="select-materials__selected-item"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 160px 40px",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "6px 0",
+                        borderBottom: "1px dashed var(--border,#444)",
+                        backgroundColor: isInsufficient
+                          ? "#ffebee"
+                          : "transparent",
+                      }}
                     >
-                      <label
+                      <div
                         style={{
                           display: "flex",
-                          alignItems: "center",
-                          gap: 6,
+                          flexDirection: "column",
+                          gap: 2,
                         }}
                       >
-                        <input
-                          type="radio"
-                          name="primary_image"
-                          checked={Boolean(im.is_primary)}
-                          onChange={() => handlePrimarySelect(idx)}
-                        />
-                        Главная
-                      </label>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <Checkbox
+                            checked
+                            onChange={() => removeRecipeItem(it.materialId)}
+                            sx={{
+                              color: "#000",
+                              "&.Mui-checked": { color: "#f9cf00" },
+                            }}
+                          />
+                          <p style={{ margin: 0 }}>
+                            {mat?.name ?? mat?.title ?? `ID ${it.materialId}`}
+                          </p>
+                        </div>
+                        <small
+                          style={{
+                            fontSize: "11px",
+                            opacity: 0.7,
+                            color: isInsufficient ? "#d32f2f" : "inherit",
+                            marginLeft: "40px",
+                          }}
+                        >
+                          Доступно: {availableQty}
+                          {units > 0 && (
+                            <span
+                              style={{
+                                color: isInsufficient ? "#d32f2f" : "#666",
+                              }}
+                            >
+                              {" "}
+                              | Нужно: {totalNeeded}
+                              {isInsufficient && " ⚠️ Недостаточно!"}
+                            </span>
+                          )}
+                        </small>
+                      </div>
+                      <TextField
+                        size="small"
+                        placeholder="Кол-во"
+                        type="number"
+                        inputProps={{
+                          step: "0.0001",
+                          min: "0",
+                          max: availableQty / (units || 1),
+                          onWheel: (e) => e.currentTarget.blur(),
+                        }}
+                        value={it.quantity}
+                        onChange={(e) =>
+                          changeRecipeQty(it.materialId, e.target.value)
+                        }
+                        error={isInsufficient}
+                        helperText={
+                          isInsufficient
+                            ? `Нужно ${totalNeeded}, есть ${availableQty}`
+                            : ""
+                        }
+                      />
                       <button
                         type="button"
                         className="select-materials__remove"
-                        onClick={() => removeImageSlot(idx)}
-                        aria-label="Удалить изображение"
+                        onClick={() => removeRecipeItem(it.materialId)}
+                        aria-label="Удалить"
                         style={{
                           width: 36,
                           height: 36,
@@ -972,366 +1309,31 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                         ×
                       </button>
                     </div>
-                  </div>
-                  {/* <input
-                    type="file"
-                    accept="image/*"
-                    className="finished-goods-add-modal__input"
-                    onChange={(e) =>
-                      handleImageChange(idx, e.target.files?.[0] || null)
-                    }
-                  /> */}
-                  <FileInput
-                    onChange={(e) =>
-                      handleImageChange(idx, e.target.files?.[0] || null)
-                    }
-                    accept={`image/*`}
-                    name="image"
-                    label="Image"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Состав (сырьё) */}
-        <div className="finished-goods-add-modal__section">
-          <div
-            className="select-materials__head"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <label>Состав (сырьё)</label>
-            <button
-              type="button"
-              className="create-client"
-              onClick={() => setMaterialsOpen((prev) => !prev)}
-              disabled={materialsLoading}
-            >
-              {materialsOpen
-                ? "Скрыть список"
-                : materialsLoading
-                  ? "Загрузка…"
-                  : "+ Добавить сырьё"}
-            </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {materialsOpen && (
-            <div
-              className="select-materials__head-search"
-              style={{ marginTop: 8 }}
+          {/* Кнопки */}
+          <div className="finished-goods-add-modal__footer">
+            <button
+              className="finished-goods-add-modal__cancel"
+              onClick={onClose}
+              disabled={creating}
             >
-              <input
-                className="finished-goods-add-modal__input"
-                name="materialQuery"
-                placeholder="Поиск сырья"
-                value={materialQuery}
-                onChange={(e) => setMaterialQuery(e.target.value)}
-              />
-            </div>
-          )}
-
-          {materialsOpen && (
-            <div
-              className="select-materials__check active"
-              style={{
-                marginTop: 8,
-                position: "relative",
-                maxHeight: 260,
-                overflow: "auto",
-                border: "1px solid var(--border,#333)",
-                borderRadius: 8,
-                padding: 8,
-              }}
+              Отмена
+            </button>
+            <button
+              className="finished-goods-add-modal__save"
+              onClick={handleSubmit}
+              disabled={creating || materialsLoading}
             >
-              {
-                filteredMaterials
-                  ?.map((m) => {
-                    try {
-                      const materialId = m.id;
-                      const materialKey = String(materialId);
-                      const checked = recipeMap.has(materialKey);
-                      const qty = recipeMap.get(materialKey) ?? "";
-                      const availableQty = Number(m.quantity || 0);
-                      const requestedQty = Number(qty || 0);
-                      const units = Number(product.quantity || 0);
-                      const totalNeeded = requestedQty * units;
-                      const isInsufficient =
-                        checked && totalNeeded > availableQty;
+              {creating ? "Добавление..." : "Добавить"}
+            </button>
+          </div>
+        </form>
 
-                      return (
-                        <div
-                          key={materialId}
-                          className="select-materials__item"
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            // Не переключать при клике по полю количества
-                            if (e.target.closest?.(".MuiTextField-root")) return;
-                            toggleRecipeItem(materialId);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              if (e.target.closest?.(".MuiTextField-root")) return;
-                              toggleRecipeItem(materialId);
-                            }
-                          }}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "auto 1fr 160px",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 4px",
-                            backgroundColor: isInsufficient
-                              ? "#ffebee"
-                              : "transparent",
-                            cursor: "pointer",
-                          }}
-                        >
-                          <Checkbox
-                            icon={
-                              <CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />
-                            }
-                            checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
-                            checked={checked}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              // Даём клику всплыть до строки — переключение через onClick строки
-                              // (на десктопе клик часто попадает по иконке, а не по input)
-                            }}
-                            sx={{
-                              color: "#000",
-                              "&.Mui-checked": { color: "#f9cf00" },
-                              pointerEvents: "auto",
-                            }}
-                          />
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 2,
-                            }}
-                          >
-                            <p
-                              title={m.name || m.title || `#${materialId}`}
-                              style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                margin: 0,
-                              }}
-                            >
-                              {m.name || m.title || `#${materialId}`}
-                            </p>
-                            <small
-                              style={{
-                                fontSize: "11px",
-                                opacity: 0.7,
-                                color: isInsufficient ? "#d32f2f" : "inherit",
-                              }}
-                            >
-                              Доступно: {availableQty}
-                              {checked && units > 0 && (
-                                <span
-                                  style={{
-                                    color: isInsufficient ? "#d32f2f" : "#666",
-                                  }}
-                                >
-                                  {" "}
-                                  | Нужно: {totalNeeded}
-                                  {isInsufficient && " ⚠️"}
-                                </span>
-                              )}
-                            </small>
-                          </div>
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <TextField
-                              size="small"
-                              placeholder="Кол-во"
-                              type="number"
-                              inputProps={{
-                                step: "0.0001",
-                                min: "0",
-                                max: units > 0 ? availableQty / units : undefined,
-                                onWheel: (e) => e.currentTarget.blur(),
-                              }}
-                              disabled={!checked}
-                              value={qty}
-                              onChange={(e) =>
-                                changeRecipeQty(materialId, e.target.value)
-                              }
-                              error={isInsufficient}
-                              helperText={
-                                isInsufficient
-                                  ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
-                                  : ""
-                              }
-                            />
-                          </div>
-                        </div>
-                      );
-                    } catch (error) {
-                      // Пропускаем проблемный материал, но не блокируем остальные
-                      return null;
-                    }
-                  })
-              }
-              {(!filteredMaterials || filteredMaterials.length === 0) &&
-                !materialsLoading && (
-                  <div style={{ padding: 8, opacity: 0.7 }}>
-                    Ничего не найдено…
-                  </div>
-                )}
-            </div>
-          )}
-
-          {recipeItems.length > 0 && (
-            <div
-              className="select-materials__selected"
-              style={{ marginTop: 10 }}
-            >
-              {recipeItems.map((it) => {
-                const mat = (Array.isArray(materials) ? materials : []).find(
-                  (m) => String(m.id) === String(it.materialId)
-                );
-                const availableQty = Number(mat?.quantity || 0);
-                const requestedQty = Number(it.quantity || 0);
-                const units = Number(product.quantity || 0);
-                const totalNeeded = requestedQty * units;
-                const isInsufficient = totalNeeded > availableQty;
-
-                return (
-                  <div
-                    key={it.materialId}
-                    className="select-materials__selected-item"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 160px 40px",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 0",
-                      borderBottom: "1px dashed var(--border,#444)",
-                      backgroundColor: isInsufficient
-                        ? "#ffebee"
-                        : "transparent",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 2,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <Checkbox
-                          checked
-                          onChange={() => removeRecipeItem(it.materialId)}
-                          sx={{
-                            color: "#000",
-                            "&.Mui-checked": { color: "#f9cf00" },
-                          }}
-                        />
-                        <p style={{ margin: 0 }}>
-                          {mat?.name ?? mat?.title ?? `ID ${it.materialId}`}
-                        </p>
-                      </div>
-                      <small
-                        style={{
-                          fontSize: "11px",
-                          opacity: 0.7,
-                          color: isInsufficient ? "#d32f2f" : "inherit",
-                          marginLeft: "40px",
-                        }}
-                      >
-                        Доступно: {availableQty}
-                        {units > 0 && (
-                          <span
-                            style={{
-                              color: isInsufficient ? "#d32f2f" : "#666",
-                            }}
-                          >
-                            {" "}
-                            | Нужно: {totalNeeded}
-                            {isInsufficient && " ⚠️ Недостаточно!"}
-                          </span>
-                        )}
-                      </small>
-                    </div>
-                    <TextField
-                      size="small"
-                      placeholder="Кол-во"
-                      type="number"
-                      inputProps={{
-                        step: "0.0001",
-                        min: "0",
-                        max: availableQty / (units || 1),
-                        onWheel: (e) => e.currentTarget.blur(),
-                      }}
-                      value={it.quantity}
-                      onChange={(e) =>
-                        changeRecipeQty(it.materialId, e.target.value)
-                      }
-                      error={isInsufficient}
-                      helperText={
-                        isInsufficient
-                          ? `Нужно ${totalNeeded}, есть ${availableQty}`
-                          : ""
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="select-materials__remove"
-                      onClick={() => removeRecipeItem(it.materialId)}
-                      aria-label="Удалить"
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        border: "1px solid var(--border,#444)",
-                        background: "transparent",
-                        color: "inherit",
-                        cursor: "pointer",
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Кнопки */}
-        <div className="finished-goods-add-modal__footer">
-          <button
-            className="finished-goods-add-modal__cancel"
-            onClick={onClose}
-            disabled={creating}
-          >
-            Отмена
-          </button>
-          <button
-            className="finished-goods-add-modal__save"
-            onClick={handleSubmit}
-            disabled={creating || materialsLoading}
-          >
-            {creating ? "Добавление..." : "Добавить"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -2772,7 +2774,7 @@ const FinishedGoods = ({ products, onChanged }) => {
     return isSmall ? "cards" : "table";
   }, []);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
-  const {isMobile} = useResize(({isMobile}) => {
+  const { isMobile } = useResize(({ isMobile }) => {
     if (isMobile) {
       setViewMode('cards')
     } else {
