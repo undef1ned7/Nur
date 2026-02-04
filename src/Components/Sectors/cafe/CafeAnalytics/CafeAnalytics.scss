@@ -469,8 +469,8 @@
 
   &__modalPanel {
     position: relative;
-    width: min(980px, calc(100vw - 24px));
-    max-height: calc(100vh - 24px);
+    width: min(980px, calc(100% - 24px));
+    max-height: calc(100dvh - 24px);
     background: #fff;
     border-radius: 18px;
     box-shadow: var(--shadow);

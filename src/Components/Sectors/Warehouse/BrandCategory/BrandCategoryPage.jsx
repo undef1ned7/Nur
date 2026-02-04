@@ -363,7 +363,7 @@ const BrandCategoryPage = () => {
   };
 
   return (
-    <div className="warehouse-page">
+    <div className="warehouse-page brand-category-page">
       <div className="warehouse-header">
         <div className="warehouse-header__left">
           <div className="warehouse-header__icon">

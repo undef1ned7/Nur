@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { FaSearch, FaShoppingCart, FaTimes, FaTrash, FaMinus, FaPlus, FaStar, FaTag, FaInfoCircle } from "react-icons/fa";
+import { FaSearch, FaShoppingCart, FaTimes, FaTrash, FaMinus, FaPlus, FaStar, FaTag, FaInfoCircle, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import api from "../../../../api";
 import "./Catalog.scss";
 
@@ -44,8 +44,11 @@ const getQuery = (search) => {
   return {
     q: sp.get("q") || "",
     category: sp.get("category") || "",
+    page: sp.get("page") || "1",
   };
 };
+
+const PAGE_SIZE = 100;
 
 const setQuery = (locationSearch, patch) => {
   const sp = new URLSearchParams(locationSearch);
@@ -508,7 +511,9 @@ const Catalog = () => {
     setLoading(true);
     setErr("");
 
-    const paramsQ = {};
+    const paramsQ = { page_size: PAGE_SIZE };
+    const pageNum = Math.max(1, parseInt(qState.page, 10) || 1);
+    paramsQ.page = pageNum;
     if (qState.category) paramsQ.category = qState.category;
     if (qState.q) paramsQ.search = qState.q;
 
@@ -540,10 +545,10 @@ const Catalog = () => {
     return () => {
       alive = false;
     };
-  }, [slug, qState.category, qState.q]);
+  }, [slug, qState.category, qState.q, qState.page]);
 
-  /* categories */
-  const categories = useMemo(() => {
+  /* categories: из текущих items (для пустого фильтра — полный список) */
+  const categoriesFromItems = useMemo(() => {
     const map = new Map();
     (items || []).forEach((p) => {
       if (!p?.category || !p?.category_title) return;
@@ -551,6 +556,27 @@ const Catalog = () => {
     });
     return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title));
   }, [items]);
+
+  /* храним полный список категорий, чтобы при выборе одной остальные не пропадали */
+  const [allCategories, setAllCategories] = useState([]);
+  useEffect(() => {
+    if (!qState.category && !qState.q && categoriesFromItems.length > 0) {
+      setAllCategories(categoriesFromItems);
+    }
+  }, [qState.category, qState.q, categoriesFromItems]);
+
+  const categories = allCategories.length > 0 ? allCategories : categoriesFromItems;
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const currentPage = Math.max(1, Math.min(parseInt(qState.page, 10) || 1, totalPages));
+
+  const goToPage = useCallback(
+    (pageNum) => {
+      const p = Math.max(1, Math.min(Number(pageNum), totalPages));
+      setQS({ page: p === 1 ? "" : String(p) });
+    },
+    [totalPages, setQS]
+  );
 
   const brandTitle = company?.name || (companyLoading ? "Загрузка..." : "TechStore");
 
@@ -705,11 +731,11 @@ const Catalog = () => {
             <input
               className="sfbar__searchInput"
               value={qState.q}
-              onChange={(e) => setQS({ q: e.target.value })}
+              onChange={(e) => setQS({ q: e.target.value, page: "" })}
               placeholder="Поиск товаров..."
             />
             {qState.q ? (
-              <button type="button" className="sfbar__clear" onClick={() => setQS({ q: "" })} aria-label="Clear">
+              <button type="button" className="sfbar__clear" onClick={() => setQS({ q: "", page: "" })} aria-label="Clear">
                 <FaTimes />
               </button>
             ) : null}
@@ -752,7 +778,7 @@ const Catalog = () => {
               <button
                 type="button"
                 className={`sfchip ${qState.category ? "" : "sfchip--active"}`}
-                onClick={() => setQS({ category: "" })}
+                onClick={() => setQS({ category: "", page: "" })}
               >
                 <FaStar /> Все
               </button>
@@ -762,7 +788,7 @@ const Catalog = () => {
                   key={c.id}
                   type="button"
                   className={`sfchip ${String(qState.category) === String(c.id) ? "sfchip--active" : ""}`}
-                  onClick={() => setQS({ category: c.id })}
+                  onClick={() => setQS({ category: c.id, page: "" })}
                   title={c.title}
                 >
                   {c.title}
@@ -830,6 +856,58 @@ const Catalog = () => {
               <ShowcaseCard key={p.id} item={p} onAdd={addToCart} onOpen={openProduct} />
             ))}
         </div>
+
+        {/* Pagination */}
+        {!loading && !err && totalPages > 1 && (
+          <nav className="sfpager" aria-label="Пагинация">
+            <button
+              type="button"
+              className="sfpager__btn sfpager__btn--prev"
+              onClick={() => goToPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+              aria-label="Предыдущая страница"
+            >
+              <FaChevronLeft /> Назад
+            </button>
+            <ul className="sfpager__list">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce((acc, p, i, arr) => {
+                  if (i > 0 && p - arr[i - 1] > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <li key={`ellipsis-${i}`} className="sfpager__ellipsis" aria-hidden="true">
+                      …
+                    </li>
+                  ) : (
+                    <li key={p}>
+                      <button
+                        type="button"
+                        className={`sfpager__btn sfpager__btn--num ${p === currentPage ? "sfpager__btn--active" : ""}`}
+                        onClick={() => goToPage(p)}
+                        aria-current={p === currentPage ? "page" : undefined}
+                        aria-label={`Страница ${p}`}
+                      >
+                        {p}
+                      </button>
+                    </li>
+                  )
+                )}
+            </ul>
+            <button
+              type="button"
+              className="sfpager__btn sfpager__btn--next"
+              onClick={() => goToPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+              aria-label="Следующая страница"
+            >
+              Вперёд <FaChevronRight />
+            </button>
+          </nav>
+        )}
       </div>
 
       <ShowcaseModal

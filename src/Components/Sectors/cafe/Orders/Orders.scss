@@ -582,9 +582,10 @@
     align-items: center; /* центр */
     justify-content: center;
     z-index: 100;
-    overflow: auto;
+    overflow: hidden; /* не скроллить фон на мобильных при скролле модалки/панели блюд */
     padding: 22px 12px;
-    overscroll-behavior: contain;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* если экран низкий — слегка вверх, чтобы не резало */
@@ -597,6 +598,11 @@
   &__shell {
     position: relative;
     width: min(760px, 96vw);
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   &__card {
@@ -808,7 +814,7 @@
   right: -380px;
   width: 360px;
   max-width: 92vw;
-  height: 100%;
+  height: 100%; /* на десктопе — по родителю; на мобильных ниже переопределено на dvh */
   border-radius: 16px;
   border: 1px solid rgba(15, 23, 42, 0.1);
   background: #fff;
@@ -885,6 +891,9 @@
   flex: 1;
   flex-wrap: wrap;
   display: flex;
+  overscroll-behavior: contain; /* на мобильных при скролле списка блюд не скроллить задний фон */
+  -webkit-overflow-scrolling: touch;
+  min-height: 0; /* чтобы flex-ребёнок мог скроллиться */
 }
 
 .cafeOrdersRpanel__item {
@@ -1049,7 +1058,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: min(760px, 96vw);
-    height: calc(100vh - 36px);
+    height: calc(100dvh - 36px);
     max-width: 96vw;
     border-radius: 18px;
     animation: rpanel-in-mobile 0.18s ease-out forwards;

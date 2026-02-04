@@ -64,7 +64,7 @@ function useBodyScrollLock(active) {
       left: document.body.style.left,
       right: document.body.style.right,
       width: document.body.style.width,
-      overflowY: document.body.style.overflowY,
+      overflow: document.body.style.overflow,
       paddingRight: document.body.style.paddingRight,
     };
 
@@ -75,7 +75,7 @@ function useBodyScrollLock(active) {
     document.body.style.left = "0";
     document.body.style.right = "0";
     document.body.style.width = "100%";
-    document.body.style.overflowY = "scroll";
+    document.body.style.overflow = "hidden";
     if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
 
     return () => {
@@ -86,7 +86,7 @@ function useBodyScrollLock(active) {
       document.body.style.left = original.left;
       document.body.style.right = original.right;
       document.body.style.width = original.width;
-      document.body.style.overflowY = original.overflowY;
+      document.body.style.overflow = original.overflow;
       document.body.style.paddingRight = original.paddingRight;
 
       window.scrollTo(0, y);

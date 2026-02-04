@@ -1397,18 +1397,20 @@
     -webkit-backdrop-filter: blur(2px);
     animation: modal-in 0.18s ease-out both;
     padding: 12px;
-    overflow: auto;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   &__card {
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
-    width: min(760px, calc(100vw - 24px));
-    max-height: min(90vh, 760px);
-    overflow: auto;
+    width: min(760px, calc(100% - 24px));
+    max-height: min(90dvh, 760px);
+    overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
     animation: modal-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) 0.04s both;
   }
@@ -1554,8 +1556,8 @@
 
   @media (max-width: 480px) {
     &__card {
-      width: calc(100vw - 16px);
-      max-height: 85vh;
+      width: calc(100% - 16px);
+      max-height: calc(100dvh - 16px);
       border-radius: 12px;
     }
 
@@ -1607,8 +1609,8 @@
 
   @media (max-width: 320px) {
     &__card {
-      width: 100vw;
-      max-height: 100vh;
+      width: 100%;
+      max-height: 100dvh;
       border-radius: 8px 8px 0 0;
     }
 
@@ -1693,7 +1695,7 @@
     border-radius: 16px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
     padding: 24px;
-    width: min(420px, calc(100vw - 24px));
+    width: min(420px, calc(100% - 24px));
     animation: confirm-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
@@ -1720,7 +1722,7 @@
 
   @media (max-width: 480px) {
     &__card {
-      width: calc(100vw - 16px);
+      width: calc(100% - 16px);
       padding: 16px;
       border-radius: 12px;
     }
@@ -1761,7 +1763,7 @@
 
   @media (max-width: 320px) {
     &__card {
-      width: 100vw;
+      width: 100%;
       padding: 12px;
       border-radius: 8px 8px 0 0;
     }

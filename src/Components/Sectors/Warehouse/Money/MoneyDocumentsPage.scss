@@ -4,6 +4,9 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  @media screen and (max-width: 576px) {
+    width: 100%;
+  }
 }
 
 .warehouse-page .warehouse-header__secondary-btn {

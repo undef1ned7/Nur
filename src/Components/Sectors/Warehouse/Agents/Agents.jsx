@@ -20,6 +20,7 @@ import {
   rejectAgentCart,
   submitAgentCart,
 } from "../../../../api/warehouse";
+import { VIEW_MODES } from "../../Market/Warehouse/constants";
 
 import "../../Market/Warehouse/Warehouse.scss";
 import "./Agents.scss";
@@ -496,7 +497,12 @@ const AgentCartModal = ({
   return (
     <div className="agent-cart-modal">
       <div className="agent-cart-modal__overlay" onClick={onClose} />
-      <div className="agent-cart-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="agent-cart-modal-title">
+      <div
+        className="agent-cart-modal__dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agent-cart-modal-title"
+      >
         {/* Header: заголовок, статус, ID, закрыть */}
         <header className="agent-cart-modal__header">
           <div className="agent-cart-modal__header-left">
@@ -521,9 +527,7 @@ const AgentCartModal = ({
           </button>
         </header>
 
-        {error && (
-          <div className="agent-cart-modal__error">{error}</div>
-        )}
+        {error && <div className="agent-cart-modal__error">{error}</div>}
 
         {loading ? (
           <div className="agent-cart-modal__body">
@@ -535,31 +539,59 @@ const AgentCartModal = ({
               {/* Блок данных заявки (6.1): все поля из API */}
               {cartId && cart && (
                 <section className="agent-cart-modal__section agent-cart-modal__info">
-                  <h3 className="agent-cart-modal__section-title">Данные заявки</h3>
+                  <h3 className="agent-cart-modal__section-title">
+                    Данные заявки
+                  </h3>
                   <div className="agent-cart-modal__info-grid">
                     <div className="agent-cart-modal__field">
-                      <span className="agent-cart-modal__field-label">Агент</span>
-                      <span className="agent-cart-modal__field-value">{agentLabel}</span>
+                      <span className="agent-cart-modal__field-label">
+                        Агент
+                      </span>
+                      <span className="agent-cart-modal__field-value">
+                        {agentLabel}
+                      </span>
                     </div>
                     <div className="agent-cart-modal__field">
-                      <span className="agent-cart-modal__field-label">Склад</span>
-                      <span className="agent-cart-modal__field-value">{warehouseLabel || shortId(cart.warehouse)}</span>
+                      <span className="agent-cart-modal__field-label">
+                        Склад
+                      </span>
+                      <span className="agent-cart-modal__field-value">
+                        {warehouseLabel || shortId(cart.warehouse)}
+                      </span>
                     </div>
                     <div className="agent-cart-modal__field">
-                      <span className="agent-cart-modal__field-label">Статус</span>
-                      <span className={`agents-badge ${statusClass(cart.status)}`}>{statusLabel(cart.status)}</span>
+                      <span className="agent-cart-modal__field-label">
+                        Статус
+                      </span>
+                      <span
+                        className={`agents-badge ${statusClass(cart.status)}`}
+                      >
+                        {statusLabel(cart.status)}
+                      </span>
                     </div>
                     <div className="agent-cart-modal__field agent-cart-modal__field--full">
-                      <span className="agent-cart-modal__field-label">Примечание</span>
-                      <span className="agent-cart-modal__field-value">{cart.note || "—"}</span>
+                      <span className="agent-cart-modal__field-label">
+                        Примечание
+                      </span>
+                      <span className="agent-cart-modal__field-value">
+                        {cart.note || "—"}
+                      </span>
                     </div>
                     <div className="agent-cart-modal__field">
-                      <span className="agent-cart-modal__field-label">Дата создания</span>
-                      <span className="agent-cart-modal__field-value">{fmtDateTime(cart.created_date)}</span>
+                      <span className="agent-cart-modal__field-label">
+                        Дата создания
+                      </span>
+                      <span className="agent-cart-modal__field-value">
+                        {fmtDateTime(cart.created_date)}
+                      </span>
                     </div>
                     <div className="agent-cart-modal__field">
-                      <span className="agent-cart-modal__field-label">Дата одобрения</span>
-                      <span className="agent-cart-modal__field-value">{fmtDateTime(cart.approved_at)}</span>
+                      <span className="agent-cart-modal__field-label">
+                        Дата одобрения
+                      </span>
+                      <span className="agent-cart-modal__field-value">
+                        {fmtDateTime(cart.approved_at)}
+                      </span>
                     </div>
                   </div>
                 </section>
@@ -577,7 +609,9 @@ const AgentCartModal = ({
                       className="agent-cart-modal__input"
                       value={form.warehouse}
                       disabled={busy || (cartId && !isDraft)}
-                      onChange={(e) => setForm((p) => ({ ...p, warehouse: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, warehouse: e.target.value }))
+                      }
                     >
                       <option value="">Выберите склад…</option>
                       {Object.values(warehousesById || {}).map((w) => (
@@ -594,7 +628,9 @@ const AgentCartModal = ({
                       rows={3}
                       value={form.note}
                       disabled={busy || (cartId && !isDraft)}
-                      onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, note: e.target.value }))
+                      }
                       placeholder="Комментарий к заявке…"
                     />
                   </label>
@@ -603,127 +639,166 @@ const AgentCartModal = ({
 
               {/* Позиции заявки показываем только после создания заявки (есть cartId) */}
               {cartId && (
-              <section className="agent-cart-modal__section agent-cart-modal__positions">
-                <h3 className="agent-cart-modal__section-title">Позиции заявки</h3>
-                <p className="agent-cart-modal__hint">
-                  Редактировать можно только в статусе «Черновик».
-                </p>
+                <section className="agent-cart-modal__section agent-cart-modal__positions">
+                  <h3 className="agent-cart-modal__section-title">
+                    Позиции заявки
+                  </h3>
+                  <p className="agent-cart-modal__hint">
+                    Редактировать можно только в статусе «Черновик».
+                  </p>
 
-                <div className={`agent-cart-modal__add-row ${canEditItems ? "" : "agent-cart-modal__add-row--disabled"}`}>
-                  <div className="agent-cart-modal__add-search">
-                    <ProductAutocomplete
-                      disabled={!canEditItems || busy}
-                      onPick={(p) => setNewItem((s) => ({ ...s, product: p }))}
-                    />
-                    {newItem.product && (
-                      <div className="agent-cart-modal__picked">
-                        <span className="agent-cart-modal__picked-name">{newItem.product?.name || "—"}</span>
-                        <button
-                          type="button"
-                          className="agent-cart-modal__picked-clear"
-                          onClick={() => setNewItem((s) => ({ ...s, product: null }))}
-                          disabled={busy || !canEditItems}
-                        >
-                          Сбросить
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="agent-cart-modal__add-qty">
-                    <label className="agent-cart-modal__label-inline">Кол-во (quantity_requested)</label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      className="agent-cart-modal__input agent-cart-modal__input--num"
-                      value={newItem.quantity_requested}
-                      disabled={busy || !canEditItems}
-                      onChange={(e) => setNewItem((s) => ({ ...s, quantity_requested: e.target.value }))}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className="agent-cart-modal__btn agent-cart-modal__btn--primary"
-                    disabled={busy || !canEditItems || !newItem.product?.id}
-                    onClick={() => addItem(newItem.product, newItem.quantity_requested)}
-                    title={!canEditItems ? "Доступно только в черновике" : "Добавить позицию"}
+                  <div
+                    className={`agent-cart-modal__add-row ${
+                      canEditItems ? "" : "agent-cart-modal__add-row--disabled"
+                    }`}
                   >
-                    <Plus size={18} />
-                    Добавить
-                  </button>
-                </div>
+                    <div className="agent-cart-modal__add-search">
+                      <ProductAutocomplete
+                        disabled={!canEditItems || busy}
+                        onPick={(p) =>
+                          setNewItem((s) => ({ ...s, product: p }))
+                        }
+                      />
+                      {newItem.product && (
+                        <div className="agent-cart-modal__picked">
+                          <span className="agent-cart-modal__picked-name">
+                            {newItem.product?.name || "—"}
+                          </span>
+                          <button
+                            type="button"
+                            className="agent-cart-modal__picked-clear"
+                            onClick={() =>
+                              setNewItem((s) => ({ ...s, product: null }))
+                            }
+                            disabled={busy || !canEditItems}
+                          >
+                            Сбросить
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="agent-cart-modal__add-qty">
+                      <label className="agent-cart-modal__label-inline">
+                        Кол-во (quantity_requested)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        className="agent-cart-modal__input agent-cart-modal__input--num"
+                        value={newItem.quantity_requested}
+                        disabled={busy || !canEditItems}
+                        onChange={(e) =>
+                          setNewItem((s) => ({
+                            ...s,
+                            quantity_requested: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="agent-cart-modal__btn agent-cart-modal__btn--primary"
+                      disabled={busy || !canEditItems || !newItem.product?.id}
+                      onClick={() =>
+                        addItem(newItem.product, newItem.quantity_requested)
+                      }
+                      title={
+                        !canEditItems
+                          ? "Доступно только в черновике"
+                          : "Добавить позицию"
+                      }
+                    >
+                      <Plus size={18} />
+                      Добавить
+                    </button>
+                  </div>
 
-                <div className="agent-cart-modal__table-wrap">
-                  <table className="agent-cart-modal__table">
-                    <thead>
-                      <tr>
-                        <th>№</th>
-                        <th>Товар</th>
-                        <th>Артикул</th>
-                        <th>Ед.</th>
-                        <th>Кол-во</th>
-                        <th>Дата создания</th>
-                        <th>Обновлено</th>
-                        <th>Действия</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.length === 0 ? (
+                  <div className="agent-cart-modal__table-wrap">
+                    <table className="agent-cart-modal__table">
+                      <thead>
                         <tr>
-                          <td colSpan={8} className="agent-cart-modal__empty">Нет позиций</td>
+                          <th>№</th>
+                          <th>Товар</th>
+                          <th>Артикул</th>
+                          <th>Ед.</th>
+                          <th>Кол-во</th>
+                          <th>Дата создания</th>
+                          <th>Обновлено</th>
+                          <th>Действия</th>
                         </tr>
-                      ) : (
-                        items.map((it, idx) => (
-                          <tr key={it.id}>
-                            <td>{idx + 1}</td>
-                            <td className="agent-cart-modal__cell-name">
-                              {productMetaByItemId?.[it.id]?.name || shortId(it.product)}
-                            </td>
-                            <td>{productMetaByItemId?.[it.id]?.article || "—"}</td>
-                            <td>{productMetaByItemId?.[it.id]?.unit || "—"}</td>
-                            <td>
-                              <input
-                                type="number"
-                                step="0.001"
-                                className="agent-cart-modal__input-inline"
-                                disabled={busy || !canEditItems}
-                                value={itemQtyDraft?.[it.id] ?? ""}
-                                onChange={(e) =>
-                                  setItemQtyDraft((p) => ({ ...p, [it.id]: e.target.value }))
-                                }
-                              />
-                            </td>
-                            <td className="agent-cart-modal__cell-date">{fmtDateTime(it.created_date)}</td>
-                            <td className="agent-cart-modal__cell-date">{fmtDateTime(it.updated_date)}</td>
-                            <td>
-                              <div className="agent-cart-modal__row-actions">
-                                <button
-                                  type="button"
-                                  className="agent-cart-modal__btn-icon"
-                                  disabled={busy || !canEditItems}
-                                  onClick={() => saveItemQty(it.id)}
-                                  title="Сохранить количество"
-                                >
-                                  <Check size={16} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="agent-cart-modal__btn-icon agent-cart-modal__btn-icon--danger"
-                                  disabled={busy || !canEditItems}
-                                  onClick={() => removeItem(it.id)}
-                                  title="Удалить позицию"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
+                      </thead>
+                      <tbody>
+                        {items.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="agent-cart-modal__empty">
+                              Нет позиций
                             </td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                        ) : (
+                          items.map((it, idx) => (
+                            <tr key={it.id}>
+                              <td>{idx + 1}</td>
+                              <td className="agent-cart-modal__cell-name">
+                                {productMetaByItemId?.[it.id]?.name ||
+                                  shortId(it.product)}
+                              </td>
+                              <td>
+                                {productMetaByItemId?.[it.id]?.article || "—"}
+                              </td>
+                              <td>
+                                {productMetaByItemId?.[it.id]?.unit || "—"}
+                              </td>
+                              <td>
+                                <input
+                                  type="number"
+                                  step="0.001"
+                                  className="agent-cart-modal__input-inline"
+                                  disabled={busy || !canEditItems}
+                                  value={itemQtyDraft?.[it.id] ?? ""}
+                                  onChange={(e) =>
+                                    setItemQtyDraft((p) => ({
+                                      ...p,
+                                      [it.id]: e.target.value,
+                                    }))
+                                  }
+                                />
+                              </td>
+                              <td className="agent-cart-modal__cell-date">
+                                {fmtDateTime(it.created_date)}
+                              </td>
+                              <td className="agent-cart-modal__cell-date">
+                                {fmtDateTime(it.updated_date)}
+                              </td>
+                              <td>
+                                <div className="agent-cart-modal__row-actions">
+                                  <button
+                                    type="button"
+                                    className="agent-cart-modal__btn-icon"
+                                    disabled={busy || !canEditItems}
+                                    onClick={() => saveItemQty(it.id)}
+                                    title="Сохранить количество"
+                                  >
+                                    <Check size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="agent-cart-modal__btn-icon agent-cart-modal__btn-icon--danger"
+                                    disabled={busy || !canEditItems}
+                                    onClick={() => removeItem(it.id)}
+                                    title="Удалить позицию"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
               )}
             </div>
 
@@ -738,7 +813,11 @@ const AgentCartModal = ({
                         className="agent-cart-modal__btn agent-cart-modal__btn--secondary"
                         disabled={busy || !isDraft}
                         onClick={saveCartHeader}
-                        title={!isDraft ? "Только в черновике" : "Сохранить склад и примечание"}
+                        title={
+                          !isDraft
+                            ? "Только в черновике"
+                            : "Сохранить склад и примечание"
+                        }
                       >
                         <Check size={18} />
                         Сохранить
@@ -818,6 +897,7 @@ const Agents = () => {
   // Владелец: carts | history | stocks. Агент: carts | stocks
   const [activeTab, setActiveTab] = useState("carts");
   const [historySubTab, setHistorySubTab] = useState("approved");
+  const [viewMode, setViewMode] = useState(VIEW_MODES.TABLE);
 
   const [warehouses, setWarehouses] = useState([]);
   const warehousesById = useMemo(
@@ -935,7 +1015,9 @@ const Agents = () => {
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((c) =>
-        String(c.note || "").toLowerCase().includes(q)
+        String(c.note || "")
+          .toLowerCase()
+          .includes(q)
       );
     }
     return list.sort((a, b) => {
@@ -987,17 +1069,18 @@ const Agents = () => {
               Создать заявку
             </button>
           )}
-          {isOwnerOrAdmin && (activeTab === "carts" || activeTab === "history") && (
-            <button
-              className="warehouse-header__create-btn"
-              onClick={loadCarts}
-              disabled={cartsLoading}
-              title="Обновить заявки"
-            >
-              <RefreshCw size={16} />
-              Обновить
-            </button>
-          )}
+          {isOwnerOrAdmin &&
+            (activeTab === "carts" || activeTab === "history") && (
+              <button
+                className="warehouse-header__create-btn"
+                onClick={loadCarts}
+                disabled={cartsLoading}
+                title="Обновить заявки"
+              >
+                <RefreshCw size={16} />
+                Обновить
+              </button>
+            )}
           {/* <button
             className="warehouse-header__create-btn"
             onClick={() => (activeTab === "carts" ? loadCarts() : loadStocks())}
@@ -1050,11 +1133,11 @@ const Agents = () => {
               />
             </div>
 
-            <div className="warehouse-search__info">
+            <div className="warehouse-search__info flex flex-wrap items-center gap-2">
               {activeTab !== "history" && (
                 <select
                   className="warehouse-search__input"
-                  style={{ width: 220 }}
+                  style={{ width: 220, maxWidth: "100%" }}
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
@@ -1065,11 +1148,44 @@ const Agents = () => {
                   <option value="rejected">Отклонено</option>
                 </select>
               )}
+
               <span style={{ marginLeft: 12 }}>
                 {activeTab === "history"
-                  ? `${historySubTab === "approved" ? "Одобренные" : "Отклонённые"}: ${historyCartsToShow.length}`
+                  ? `${
+                      historySubTab === "approved"
+                        ? "Одобренные"
+                        : "Отклонённые"
+                    }: ${historyCartsToShow.length}`
                   : `Всего: ${cartsToShow.length}`}
               </span>
+
+              <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
+                <button
+                  type="button"
+                  onClick={() => setViewMode(VIEW_MODES.TABLE)}
+                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
+                    ${
+                      viewMode === VIEW_MODES.TABLE
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                >
+                  Таблица
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setViewMode(VIEW_MODES.CARDS)}
+                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
+                    ${
+                      viewMode === VIEW_MODES.CARDS
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                >
+                  Карточки
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1077,19 +1193,27 @@ const Agents = () => {
             <div className="agents-history-tabs">
               <button
                 type="button"
-                className={`agents-history-tab ${historySubTab === "approved" ? "active" : ""}`}
+                className={`agents-history-tab ${
+                  historySubTab === "approved" ? "active" : ""
+                }`}
                 onClick={() => setHistorySubTab("approved")}
               >
                 Одобренные
-                <span className="agents-history-tab__count">{approvedCarts.length}</span>
+                <span className="agents-history-tab__count">
+                  {approvedCarts.length}
+                </span>
               </button>
               <button
                 type="button"
-                className={`agents-history-tab ${historySubTab === "rejected" ? "active" : ""}`}
+                className={`agents-history-tab ${
+                  historySubTab === "rejected" ? "active" : ""
+                }`}
                 onClick={() => setHistorySubTab("rejected")}
               >
                 Отклонённые
-                <span className="agents-history-tab__count">{rejectedCarts.length}</span>
+                <span className="agents-history-tab__count">
+                  {rejectedCarts.length}
+                </span>
               </button>
             </div>
           )}
@@ -1100,130 +1224,271 @@ const Agents = () => {
 
           {activeTab === "history" ? (
             <div className="warehouse-table-container w-full">
-              <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <table className="warehouse-table w-full min-w-[900px]">
-                  <thead>
-                    <tr>
-                      <th>№</th>
-                      {isOwnerOrAdmin && <th>Агент</th>}
-                      <th>Склад</th>
-                      <th>Примечание</th>
-                      <th>Обновлено</th>
-                      <th>Отправлено</th>
-                      <th>Одобрено</th>
-                      {isOwnerOrAdmin && <th>Действия</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cartsLoading ? (
+              {viewMode === VIEW_MODES.TABLE ? (
+                <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <table className="warehouse-table w-full min-w-[900px]">
+                    <thead>
                       <tr>
-                        <td colSpan={isOwnerOrAdmin ? 8 : 6} className="warehouse-table__loading">
-                          Загрузка…
-                        </td>
+                        <th>№</th>
+                        {isOwnerOrAdmin && <th>Агент</th>}
+                        <th>Склад</th>
+                        <th>Примечание</th>
+                        <th>Обновлено</th>
+                        <th>Отправлено</th>
+                        <th>Одобрено</th>
+                        {isOwnerOrAdmin && <th>Действия</th>}
                       </tr>
-                    ) : historyCartsToShow.length === 0 ? (
-                      <tr>
-                        <td colSpan={isOwnerOrAdmin ? 8 : 6} className="warehouse-table__empty">
-                          {historySubTab === "approved"
-                            ? "Нет одобренных заявок"
-                            : "Нет отклонённых заявок"}
-                        </td>
-                      </tr>
-                    ) : (
-                      historyCartsToShow.map((c, idx) => (
-                        <tr
-                          key={c.id}
-                          className="warehouse-table__row agents-clickable-row"
-                          onClick={() => openExisting(c.id)}
-                        >
-                          <td>{idx + 1}</td>
-                          {isOwnerOrAdmin && (
+                    </thead>
+                    <tbody>
+                      {cartsLoading ? (
+                        <tr>
+                          <td
+                            colSpan={isOwnerOrAdmin ? 8 : 6}
+                            className="warehouse-table__loading"
+                          >
+                            Загрузка…
+                          </td>
+                        </tr>
+                      ) : historyCartsToShow.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={isOwnerOrAdmin ? 8 : 6}
+                            className="warehouse-table__empty"
+                          >
+                            {historySubTab === "approved"
+                              ? "Нет одобренных заявок"
+                              : "Нет отклонённых заявок"}
+                          </td>
+                        </tr>
+                      ) : (
+                        historyCartsToShow.map((c, idx) => (
+                          <tr
+                            key={c.id}
+                            className="warehouse-table__row agents-clickable-row"
+                            onClick={() => openExisting(c.id)}
+                          >
+                            <td>{idx + 1}</td>
+                            {isOwnerOrAdmin && (
+                              <td>
+                                {c.agent_name ||
+                                  c.agent_display ||
+                                  shortId(c.agent)}
+                              </td>
+                            )}
                             <td>
-                              {c.agent_name || c.agent_display || shortId(c.agent)}
+                              {warehousesById?.[c.warehouse]?.name ||
+                                shortId(c.warehouse)}
                             </td>
-                          )}
-                          <td>
+                            <td className="agents-note">
+                              {c.note ? String(c.note) : "—"}
+                            </td>
+                            <td>{fmtDateTime(c.updated_date)}</td>
+                            <td>{fmtDateTime(c.submitted_at)}</td>
+                            <td>{fmtDateTime(c.approved_at)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="agents-cards-grid">
+                  {cartsLoading ? (
+                    <div className="agents-cards-empty">Загрузка…</div>
+                  ) : historyCartsToShow.length === 0 ? (
+                    <div className="agents-cards-empty">
+                      {historySubTab === "approved"
+                        ? "Нет одобренных заявок"
+                        : "Нет отклонённых заявок"}
+                    </div>
+                  ) : (
+                    historyCartsToShow.map((c, idx) => (
+                      <button
+                        type="button"
+                        key={c.id}
+                        className="agents-card"
+                        onClick={() => openExisting(c.id)}
+                      >
+                        <div className="agents-card__header">
+                          <div className="agents-card__title">
+                            Заявка #{idx + 1}
+                          </div>
+                          <div className="agents-card__meta">
+                            {fmtDateTime(c.updated_date)}
+                          </div>
+                        </div>
+                        {isOwnerOrAdmin && (
+                          <div className="agents-card__row">
+                            <span className="agents-card__label">Агент</span>
+                            <span className="agents-card__value">
+                              {c.agent_name ||
+                                c.agent_display ||
+                                shortId(c.agent)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="agents-card__row">
+                          <span className="agents-card__label">Склад</span>
+                          <span className="agents-card__value">
                             {warehousesById?.[c.warehouse]?.name ||
                               shortId(c.warehouse)}
-                          </td>
-                          <td className="agents-note">
+                          </span>
+                        </div>
+                        <div className="agents-card__row">
+                          <span className="agents-card__label">Примечание</span>
+                          <span className="agents-card__value agents-card__note">
                             {c.note ? String(c.note) : "—"}
-                          </td>
-                          <td>{fmtDateTime(c.updated_date)}</td>
-                          <td>{fmtDateTime(c.submitted_at)}</td>
-                          <td>{fmtDateTime(c.approved_at)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                          </span>
+                        </div>
+                        <div className="agents-card__footer">
+                          <span className="agents-card__label">Отправлено</span>
+                          <span className="agents-card__value">
+                            {fmtDateTime(c.submitted_at)}
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="warehouse-table-container w-full">
-              <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <table className="warehouse-table w-full min-w-[900px]">
-                  <thead>
-                    <tr>
-                      <th>№</th>
-                      {isOwnerOrAdmin && <th>Агент</th>}
-                      <th>Склад</th>
-                      <th>Статус</th>
-                      <th>Примечание</th>
-                      <th>Обновлено</th>
-                      <th>Отправлено</th>
-                      <th>Одобрено</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cartsLoading ? (
+              {viewMode === VIEW_MODES.TABLE ? (
+                <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <table className="warehouse-table w-full min-w-[900px]">
+                    <thead>
                       <tr>
-                        <td colSpan={isOwnerOrAdmin ? 8 : 7} className="warehouse-table__loading">
-                          Загрузка…
-                        </td>
+                        <th>№</th>
+                        {isOwnerOrAdmin && <th>Агент</th>}
+                        <th>Склад</th>
+                        <th>Статус</th>
+                        <th>Примечание</th>
+                        <th>Обновлено</th>
+                        <th>Отправлено</th>
+                        <th>Одобрено</th>
                       </tr>
-                    ) : cartsToShow.length === 0 ? (
-                      <tr>
-                        <td colSpan={isOwnerOrAdmin ? 8 : 7} className="warehouse-table__empty">
-                          Заявок нет
-                        </td>
-                      </tr>
-                    ) : (
-                      cartsToShow.map((c, idx) => (
-                        <tr
-                          key={c.id}
-                          className="warehouse-table__row agents-clickable-row"
-                          onClick={() => openExisting(c.id)}
-                        >
-                          <td>{idx + 1}</td>
-                          {isOwnerOrAdmin && (
-                            <td>
-                              {c.agent_name || c.agent_display || shortId(c.agent)}
-                            </td>
-                          )}
-                          <td>
+                    </thead>
+                    <tbody>
+                      {cartsLoading ? (
+                        <tr>
+                          <td
+                            colSpan={isOwnerOrAdmin ? 8 : 7}
+                            className="warehouse-table__loading"
+                          >
+                            Загрузка…
+                          </td>
+                        </tr>
+                      ) : cartsToShow.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={isOwnerOrAdmin ? 8 : 7}
+                            className="warehouse-table__empty"
+                          >
+                            Заявок нет
+                          </td>
+                        </tr>
+                      ) : (
+                        cartsToShow.map((c, idx) => {
+                          const rowIndex = idx + 1;
+                          return (
+                            <tr
+                              key={c.id}
+                              className="warehouse-table__row agents-clickable-row"
+                              onClick={() => openExisting(c.id)}
+                            >
+                              <td>{rowIndex}</td>
+                              {isOwnerOrAdmin && (
+                                <td>
+                                  {c.agent_name ||
+                                    c.agent_display ||
+                                    shortId(c.agent)}
+                                </td>
+                              )}
+                              <td>
+                                {warehousesById?.[c.warehouse]?.name ||
+                                  shortId(c.warehouse)}
+                              </td>
+                              <td>
+                                <span
+                                  className={`agents-badge ${statusClass(
+                                    c.status
+                                  )}`}
+                                >
+                                  {statusLabel(c.status)}
+                                </span>
+                              </td>
+                              <td className="agents-note">
+                                {c.note ? String(c.note) : "—"}
+                              </td>
+                              <td>{fmtDateTime(c.updated_date)}</td>
+                              <td>{fmtDateTime(c.submitted_at)}</td>
+                              <td>{fmtDateTime(c.approved_at)}</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="agents-cards-grid">
+                  {cartsLoading ? (
+                    <div className="agents-cards-empty">Загрузка…</div>
+                  ) : cartsToShow.length === 0 ? (
+                    <div className="agents-cards-empty">Заявок нет</div>
+                  ) : (
+                    cartsToShow.map((c, idx) => (
+                      <button
+                        type="button"
+                        key={c.id}
+                        className="agents-card"
+                        onClick={() => openExisting(c.id)}
+                      >
+                        <div className="agents-card__header">
+                          <div className="agents-card__title">
+                            Заявка #{idx + 1}
+                          </div>
+                          <span
+                            className={`agents-badge ${statusClass(c.status)}`}
+                          >
+                            {statusLabel(c.status)}
+                          </span>
+                        </div>
+                        {isOwnerOrAdmin && (
+                          <div className="agents-card__row">
+                            <span className="agents-card__label">Агент</span>
+                            <span className="agents-card__value">
+                              {c.agent_name ||
+                                c.agent_display ||
+                                shortId(c.agent)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="agents-card__row">
+                          <span className="agents-card__label">Склад</span>
+                          <span className="agents-card__value">
                             {warehousesById?.[c.warehouse]?.name ||
                               shortId(c.warehouse)}
-                          </td>
-                          <td>
-                            <span
-                              className={`agents-badge ${statusClass(c.status)}`}
-                            >
-                              {statusLabel(c.status)}
-                            </span>
-                          </td>
-                          <td className="agents-note">
+                          </span>
+                        </div>
+                        <div className="agents-card__row">
+                          <span className="agents-card__label">Примечание</span>
+                          <span className="agents-card__value agents-card__note">
                             {c.note ? String(c.note) : "—"}
-                          </td>
-                          <td>{fmtDateTime(c.updated_date)}</td>
-                          <td>{fmtDateTime(c.submitted_at)}</td>
-                          <td>{fmtDateTime(c.approved_at)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                          </span>
+                        </div>
+                        <div className="agents-card__footer">
+                          <span className="agents-card__label">Обновлено</span>
+                          <span className="agents-card__value">
+                            {fmtDateTime(c.updated_date)}
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           )}
         </>
@@ -1234,64 +1499,163 @@ const Agents = () => {
           {stocksError && (
             <div className="agents-error">{String(stocksError)}</div>
           )}
+
+          <div className="warehouse-search-section">
+            <div
+              className="warehouse-search__info flex flex-wrap items-center gap-2"
+              style={{ width: "100%" }}
+            >
+              <span>Всего: {normalizeList(stocks).length}</span>
+              <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
+                <button
+                  type="button"
+                  onClick={() => setViewMode(VIEW_MODES.TABLE)}
+                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
+                    ${
+                      viewMode === VIEW_MODES.TABLE
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                >
+                  Таблица
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode(VIEW_MODES.CARDS)}
+                  className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
+                    ${
+                      viewMode === VIEW_MODES.CARDS
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                    }`}
+                >
+                  Карточки
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="warehouse-table-container w-full">
-            <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <table className="warehouse-table w-full min-w-[900px]">
-                <thead>
-                  <tr>
-                    <th>№</th>
-                    {isOwnerOrAdmin && <th>Агент</th>}
-                    <th>Склад</th>
-                    <th>Товар</th>
-                    <th>Артикул</th>
-                    <th>Ед.</th>
-                    <th>Кол-во</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stocksLoading ? (
+            {viewMode === VIEW_MODES.TABLE ? (
+              <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <table className="warehouse-table w-full min-w-[900px]">
+                  <thead>
                     <tr>
-                      <td
-                        colSpan={isOwnerOrAdmin ? 7 : 6}
-                        className="warehouse-table__loading"
-                      >
-                        Загрузка…
-                      </td>
+                      <th>№</th>
+                      {isOwnerOrAdmin && <th>Агент</th>}
+                      <th>Склад</th>
+                      <th>Товар</th>
+                      <th>Артикул</th>
+                      <th>Ед.</th>
+                      <th>Кол-во</th>
                     </tr>
-                  ) : normalizeList(stocks).length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={isOwnerOrAdmin ? 7 : 6}
-                        className="warehouse-table__empty"
-                      >
-                        Остатков нет
-                      </td>
-                    </tr>
-                  ) : (
-                    normalizeList(stocks).map((r, idx) => (
-                      <tr key={r.id || idx} className="warehouse-table__row">
-                        <td>{idx + 1}</td>
-                        {isOwnerOrAdmin && (
-                          <td>
-                            {r.agent_name || r.agent_display || shortId(r.agent)}
-                          </td>
-                        )}
-                        <td>
+                  </thead>
+                  <tbody>
+                    {stocksLoading ? (
+                      <tr>
+                        <td
+                          colSpan={isOwnerOrAdmin ? 7 : 6}
+                          className="warehouse-table__loading"
+                        >
+                          Загрузка…
+                        </td>
+                      </tr>
+                    ) : normalizeList(stocks).length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={isOwnerOrAdmin ? 7 : 6}
+                          className="warehouse-table__empty"
+                        >
+                          Остатков нет
+                        </td>
+                      </tr>
+                    ) : (
+                      normalizeList(stocks).map((r, idx) => {
+                        const rowIndex = idx + 1;
+                        return (
+                          <tr
+                            key={r.id || idx}
+                            className="warehouse-table__row"
+                          >
+                            <td>{rowIndex}</td>
+                            {isOwnerOrAdmin && (
+                              <td>
+                                {r.agent_name ||
+                                  r.agent_display ||
+                                  shortId(r.agent)}
+                              </td>
+                            )}
+                            <td>
+                              {warehousesById?.[r.warehouse]?.name ||
+                                shortId(r.warehouse)}
+                            </td>
+                            <td className="warehouse-table__name">
+                              {r.product_name || shortId(r.product)}
+                            </td>
+                            <td>{r.product_article || "—"}</td>
+                            <td>{r.product_unit || "—"}</td>
+                            <td>{r.qty ?? "—"}</td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="agents-cards-grid">
+                {stocksLoading ? (
+                  <div className="agents-cards-empty">Загрузка…</div>
+                ) : normalizeList(stocks).length === 0 ? (
+                  <div className="agents-cards-empty">Остатков нет</div>
+                ) : (
+                  normalizeList(stocks).map((r, idx) => (
+                    <div key={r.id || idx} className="agents-card">
+                      <div className="agents-card__header">
+                        <div className="agents-card__title">
+                          Остаток #{idx + 1}
+                        </div>
+                      </div>
+                      {isOwnerOrAdmin && (
+                        <div className="agents-card__row">
+                          <span className="agents-card__label">Агент</span>
+                          <span className="agents-card__value">
+                            {r.agent_name ||
+                              r.agent_display ||
+                              shortId(r.agent)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="agents-card__row">
+                        <span className="agents-card__label">Склад</span>
+                        <span className="agents-card__value">
                           {warehousesById?.[r.warehouse]?.name ||
                             shortId(r.warehouse)}
-                        </td>
-                        <td className="warehouse-table__name">
+                        </span>
+                      </div>
+                      <div className="agents-card__row">
+                        <span className="agents-card__label">Товар</span>
+                        <span className="agents-card__value">
                           {r.product_name || shortId(r.product)}
-                        </td>
-                        <td>{r.product_article || "—"}</td>
-                        <td>{r.product_unit || "—"}</td>
-                        <td>{r.qty ?? "—"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        </span>
+                      </div>
+                      <div className="agents-card__row">
+                        <span className="agents-card__label">Артикул</span>
+                        <span className="agents-card__value">
+                          {r.product_article || "—"}
+                        </span>
+                      </div>
+                      <div className="agents-card__footer">
+                        <span className="agents-card__label">Кол-во</span>
+                        <span className="agents-card__value">
+                          {r.qty ?? "—"} {r.product_unit || ""}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

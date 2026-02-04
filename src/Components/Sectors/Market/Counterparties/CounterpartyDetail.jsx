@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LayoutGrid, List } from "lucide-react";
 import warehouseAPI from "../../../../api/warehouse";
 import { useDispatch, useSelector } from "react-redux";
 import { getWarehouseCounterpartyById } from "../../../../store/creators/warehouseThunk";
@@ -40,6 +40,7 @@ const CounterpartyDetail = () => {
   const [paymentCategoryFilter, setPaymentCategoryFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
+  const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
 
   const name = current?.name ?? "—";
 
@@ -99,6 +100,23 @@ const CounterpartyDetail = () => {
 
   const operationRows = operations.results || [];
 
+  // Сводка по операциям (results): Общий долг, Переводы, Продажи
+  const summary = useMemo(() => {
+    const list = operationRows;
+    let sumReceipt = 0;
+    let sumExpense = 0;
+    list.forEach((row) => {
+      const amount = Number(row.amount) || 0;
+      if (row.doc_type === "MONEY_RECEIPT") sumReceipt += amount;
+      else if (row.doc_type === "MONEY_EXPENSE") sumExpense += amount;
+    });
+    return {
+      totalDebt: sumReceipt - sumExpense,
+      transfers: sumReceipt + sumExpense,
+      sales: sumReceipt,
+    };
+  }, [operationRows]);
+
   const docTypeLabel = (docType) =>
     docType === "MONEY_RECEIPT" ? "Приход" : docType === "MONEY_EXPENSE" ? "Расход" : docType ?? "—";
   const statusLabel = (s) => (s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—");
@@ -135,6 +153,27 @@ const CounterpartyDetail = () => {
           <div className="counterparty-detail-page__loading">Загрузка данных контрагента...</div>
         ) : (
           <>
+            <div className="counterparty-detail-page__summary-cards">
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt">
+                <span className="counterparty-detail-page__summary-label">Общий долг</span>
+                <span className="counterparty-detail-page__summary-value">
+                  {summary.totalDebt.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COM
+                </span>
+              </div>
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">
+                <span className="counterparty-detail-page__summary-label">Переводы</span>
+                <span className="counterparty-detail-page__summary-value">
+                  {summary.transfers.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COM
+                </span>
+              </div>
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
+                <span className="counterparty-detail-page__summary-label">Продажи</span>
+                <span className="counterparty-detail-page__summary-value">
+                  {summary.sales.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COM
+                </span>
+              </div>
+            </div>
+
             <div className="counterparty-detail-page__operations-toolbar">
               <input
                 type="search"
@@ -144,6 +183,24 @@ const CounterpartyDetail = () => {
                 className="counterparty-detail-page__search-input"
                 aria-label="Поиск по номеру и комментарию"
               />
+              <div className="counterparty-detail-page__view-toggle">
+                <button
+                  type="button"
+                  className={`counterparty-detail-page__view-btn ${viewMode === "table" ? "counterparty-detail-page__view-btn--active" : ""}`}
+                  onClick={() => setViewMode("table")}
+                  title="Таблица"
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  type="button"
+                  className={`counterparty-detail-page__view-btn ${viewMode === "cards" ? "counterparty-detail-page__view-btn--active" : ""}`}
+                  onClick={() => setViewMode("cards")}
+                  title="Карточки"
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
               <select
                 value={docTypeFilter}
                 onChange={(e) => setDocTypeFilter(e.target.value)}
@@ -206,7 +263,7 @@ const CounterpartyDetail = () => {
               <div className="counterparty-detail-page__error">{errorOperations}</div>
             ) : operationRows.length === 0 ? (
               <div className="counterparty-detail-page__empty">Нет приходов и расходов</div>
-            ) : (
+            ) : viewMode === "table" ? (
               <div className="counterparty-detail-page__table-wrap">
                 <table className="counterparty-detail-page__table">
                   <thead>
@@ -234,6 +291,43 @@ const CounterpartyDetail = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            ) : (
+              <div className="counterparty-detail-page__cards">
+                {operationRows.map((row) => (
+                  <div key={row.id || Math.random()} className="counterparty-detail-page__card">
+                    <div className="counterparty-detail-page__card-header">
+                      <span className="counterparty-detail-page__card-number">{row.number ?? "—"}</span>
+                      <span className={`counterparty-detail-page__card-status counterparty-detail-page__card-status--${row.status === "POSTED" ? "posted" : "draft"}`}>
+                        {statusLabel(row.status)}
+                      </span>
+                    </div>
+                    <div className="counterparty-detail-page__card-body">
+                      <div className="counterparty-detail-page__card-row">
+                        <span className="counterparty-detail-page__card-label">Тип</span>
+                        <span className="counterparty-detail-page__card-value">{docTypeLabel(row.doc_type)}</span>
+                      </div>
+                      <div className="counterparty-detail-page__card-row">
+                        <span className="counterparty-detail-page__card-label">Дата</span>
+                        <span className="counterparty-detail-page__card-value">{fmtDate(row.date ?? row.created_at)}</span>
+                      </div>
+                      <div className="counterparty-detail-page__card-row">
+                        <span className="counterparty-detail-page__card-label">Сумма</span>
+                        <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--amount">{fmtMoney(row.amount)}</span>
+                      </div>
+                      <div className="counterparty-detail-page__card-row">
+                        <span className="counterparty-detail-page__card-label">Категория</span>
+                        <span className="counterparty-detail-page__card-value">{row.payment_category_title ?? "—"}</span>
+                      </div>
+                      {(row.comment ?? "").trim() ? (
+                        <div className="counterparty-detail-page__card-row">
+                          <span className="counterparty-detail-page__card-label">Комментарий</span>
+                          <span className="counterparty-detail-page__card-value">{row.comment}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </>

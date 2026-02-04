@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { X, Edit, Copy, Trash2, ArrowLeftRight, Calendar, Tag, Globe, Box, FileText } from "lucide-react";
 import "../../Market/Warehouse/Warehouse.scss";
-import api from "../../../../api";
+import warehouseAPI from "../../../../api/warehouse";
 import noImage from "../../Market/Warehouse/components/placeholder.png";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import WarehouseMoveProductModal from "./WarehouseMoveProductModal";
@@ -21,8 +21,8 @@ const WarehouseProductDetail = () => {
   const fetchProduct = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/warehouse/products/${id}/`);
-      setProduct(response.data);
+      const data = await warehouseAPI.getProductByUuid(id);
+      setProduct(data);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Ошибка при загрузке товара склада:", error);
@@ -74,7 +74,7 @@ const WarehouseProductDetail = () => {
 
   const confirmDelete = async () => {
     try {
-      await api.delete(`/warehouse/products/${id}/`);
+      await warehouseAPI.deleteProductByUuid(id);
       setShowDeleteConfirm(false);
       navigate(-1);
     } catch (error) {
@@ -111,6 +111,10 @@ const WarehouseProductDetail = () => {
     return `${date.getDate()} ${months[date.getMonth()]}`;
   };
 
+  const handleOpenMoveModal = () => {
+    setShowMoveModal(true);
+  };
+
   if (loading) return <div className="product-detail-loading">Загрузка...</div>;
   if (!product) return <div className="product-detail-error">Товар не найден</div>;
 
@@ -133,7 +137,7 @@ const WarehouseProductDetail = () => {
 
         <button
           className="product-detail__duplicate-btn"
-          onClick={() => setShowMoveModal(true)}
+          onClick={handleOpenMoveModal}
           type="button"
         >
           <ArrowLeftRight size={16} />
