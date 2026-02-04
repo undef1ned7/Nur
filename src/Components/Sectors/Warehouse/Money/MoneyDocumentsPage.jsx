@@ -649,6 +649,24 @@ const MoneyDocumentsPage = () => {
                 </div>
               )}
               <div className="money-documents-page__field">
+                <label htmlFor="money-doc-warehouse">Склад *</label>
+                <select
+                  id="money-doc-warehouse"
+                  value={form.warehouse}
+                  onChange={(e) =>
+                    handleFormChange("warehouse", e.target.value)
+                  }
+                  required
+                >
+                  <option value="">выберите</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name ?? w.title ?? w.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="money-documents-page__field">
                 <label htmlFor="money-doc-counterparty">Контрагент *</label>
                 <select
                   id="money-doc-counterparty"
