@@ -1,5 +1,5 @@
 import { Minus, Plus, X } from "lucide-react";
-import '../sell.scss'
+import "../sell.scss";
 const cx = (...args) => args.filter(Boolean).join(" ");
 
 const CartTable = ({
@@ -13,95 +13,134 @@ const CartTable = ({
   onDecreaseQty,
   onRemoveItem,
 }) => {
+  const formatMoney = (v) => {
+    const n = Number(String(v ?? "").trim().replace(/,/g, "."));
+    if (!Number.isFinite(n)) return String(v ?? "0");
+    return n.toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const toNum = (v) => {
+    const n = Number(String(v ?? "").trim().replace(/,/g, "."));
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const getThumb = (item) => {
+    return (
+      item?.primary_image_url ||
+      item?.image_url ||
+      item?.product_image_url ||
+      item?.product?.primary_image_url ||
+      item?.product?.image_url ||
+      "/images/placeholder.avif"
+    );
+  };
+
+  if (!Array.isArray(items) || items.length === 0) {
+    return <div className="cartEmpty">Корзина пуста</div>;
+  }
+
   return (
-    <div className="start__body-wrapper">
-      <div className="start__body-wrapper">
-        <table className="start__body-table">
-          <tbody>
-            {items.map((item, idx) => (
-              <tr
-                key={item.id}
-                className={cx(selectedId === item.id && "active")}
-                onClick={() => onRowClick(item)}
-                style={{ cursor: "pointer" }}
-                title="Выбрать позицию"
+    <div className="cartList">
+      {items.map((item, idx) => {
+        const title = item?.product_name ?? item?.display_name ?? item?.name ?? "—";
+        const unit = item?.unit ?? item?.unit_name ?? "шт";
+        const priceNum = toNum(item?.unit_price ?? item?.price ?? 0);
+        const qtyRaw = itemQuantities?.[item.id] ?? item?.quantity ?? "";
+        const qtyNum = toNum(qtyRaw);
+        const sum = priceNum * qtyNum;
+        const thumb = getThumb(item);
+
+        return (
+          <div
+            key={item.id}
+            className={cx("cartItem", selectedId === item.id && "active")}
+            role="button"
+            tabIndex={0}
+            onClick={() => onRowClick(item)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onRowClick(item);
+            }}
+            title="Выбрать позицию"
+          >
+            <div className="cartItem__media">
+              <img
+                src={thumb}
+                alt=""
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.src = "/images/placeholder.avif";
+                }}
+              />
+            </div>
+
+            <div className="cartItem__main">
+              <div className="cartItem__head">
+                <div className="cartItem__title">
+                  <span className="cartItem__index">#{idx + 1}</span>
+                  {title}
+                </div>
+                <button
+                  type="button"
+                  className="cartItem__remove"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveItem(item);
+                  }}
+                  aria-label="Удалить"
+                  title="Удалить"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="cartItem__meta">
+                <span className="cartItem__price">
+                  {formatMoney(priceNum)} сом / {unit}
+                </span>
+                <span className="cartItem__sum">
+                  {formatMoney(sum)} сом
+                </span>
+              </div>
+
+              <div
+                className="cartItem__controls"
+                onClick={(e) => e.stopPropagation()}
               >
-                <td>{idx + 1}.</td>
-                <td>{item.product_name ?? item.display_name}</td>
-                <td>{item.unit_price}</td>
-                <td>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <button
-                      className="start__table-btn start__table-btn--minus"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDecreaseQty(item);
-                      }}
-                      title="Уменьшить количество"
-                    >
-                      <Minus size={16} />
-                    </button>
-                    <input
-                      type="number"
-                      min="0"
-                      value={itemQuantities[item.id] ?? item.quantity ?? ""}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        onQtyChange(item, e.target.value);
-                      }}
-                      onBlur={(e) => {
-                        e.stopPropagation();
-                        onQtyBlur(item);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        width: "60px",
-                        textAlign: "center",
-                        border: "1px solid #ddd",
-                        borderRadius: "4px",
-                        padding: "4px 8px",
-                        fontSize: "14px",
-                      }}
-                      title="Редактировать количество"
-                    />
-                    <span style={{ fontSize: "14px", color: "#666" }}>шт</span>
-                    <button
-                      className="start__table-btn start__table-btn--plus"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onIncreaseQty(item);
-                      }}
-                      title="Увеличить количество"
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </td>
-                <td className="min-w-18">{(Number(item.unit_price) * Number(item.quantity)).toFixed(2)}</td>
-                <td>
+                <div className="cartQty">
                   <button
-                    className="start__table-btn start__table-btn--delete"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveItem(item);
-                    }}
-                    title="Удалить товар"
+                    type="button"
+                    className="cartQty__btn cartQty__btn--minus"
+                    onClick={() => onDecreaseQty(item)}
+                    title="Уменьшить"
                   >
-                    <X size={16} />
+                    <Minus size={16} />
                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  <input
+                    className="cartQty__input"
+                    type="number"
+                    min="0"
+                    value={qtyRaw}
+                    onChange={(e) => onQtyChange(item, e.target.value)}
+                    onBlur={() => onQtyBlur(item)}
+                    title="Количество"
+                  />
+                  <button
+                    type="button"
+                    className="cartQty__btn cartQty__btn--plus"
+                    onClick={() => onIncreaseQty(item)}
+                    title="Увеличить"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };

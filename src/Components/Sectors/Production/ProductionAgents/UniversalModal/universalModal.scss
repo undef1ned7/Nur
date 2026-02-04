@@ -21,10 +21,16 @@
     position: relative;
     // width: 400px;
     z-index: 1;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     &-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex: 0 0 auto;
       button {
         border: none;
         background-color: transparent;
@@ -39,6 +45,12 @@
         line-height: 100%;
         letter-spacing: 0%;
       }
+    }
+    &-body {
+      flex: 1 1 auto;
+      min-height: 0; // важно для scroll внутри flex
+      overflow: auto;
+      padding-top: 12px;
     }
   }
 }
