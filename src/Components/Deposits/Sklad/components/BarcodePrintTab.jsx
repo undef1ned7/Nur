@@ -17,7 +17,17 @@ import JsBarcode from "jsbarcode";
  * - Canvas был 400x80, а JsBarcode рисовал height=90 → обрезало. Теперь размер canvas подстраивается под выбранный размер этикетки.
  * - Превью стало ближе к реальным пропорциям 203 DPI (dots), без магии “на глаз”.
  */
-const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
+const BarcodePrintTab = ({
+  products,
+  loading,
+  searchTerm,
+  onSearchChange,
+  page = 1,
+  totalPages = 1,
+  count = 0,
+  pageSize = 100,
+  onPageChange,
+}) => {
   const [printingIds, setPrintingIds] = useState(() => new Set());
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -510,42 +520,75 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
             <div className="barcode-print-tab__empty-text">Товары не найдены</div>
           </div>
         ) : (
-          <div className="barcode-print-tab__grid">
-            {filteredProducts.map((product) => {
-              const isItemPrinting = printingIds.has(product.id);
+          <>
+            <div className="barcode-print-tab__grid">
+              {filteredProducts.map((product) => {
+                const isItemPrinting = printingIds.has(product.id);
 
-              return (
-                <div key={product.id} className="barcode-print-tab__card">
-                  <div className="barcode-print-tab__card-header">
-                    <div className="barcode-print-tab__barcode-label">Штрих-код:</div>
-                    <div className="barcode-print-tab__barcode-value">
-                      {product.barcode || "—"}
+                return (
+                  <div key={product.id} className="barcode-print-tab__card">
+                    <div className="barcode-print-tab__card-header">
+                      <div className="barcode-print-tab__barcode-label">Штрих-код:</div>
+                      <div className="barcode-print-tab__barcode-value">
+                        {product.barcode || "—"}
+                      </div>
+                    </div>
+
+                    <div className="barcode-print-tab__card-body">
+                      <button
+                        className="barcode-print-tab__print-btn"
+                        onClick={() => handleOpenPreview(product)}
+                        disabled={!product.barcode || isItemPrinting}
+                        title={
+                          !product.barcode
+                            ? "У товара отсутствует штрих-код"
+                            : isItemPrinting
+                            ? "Идёт печать..."
+                            : "Предпросмотр и печать штрих-кода"
+                        }
+                      >
+                        <span className="barcode-print-tab__print-icon">🖨️</span>
+                        {isItemPrinting ? "Печать..." : "Распечатать штрих-код"}
+                      </button>
+
+                      <div className="barcode-print-tab__product-name">{product.name}</div>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  <div className="barcode-print-tab__card-body">
-                    <button
-                      className="barcode-print-tab__print-btn"
-                      onClick={() => handleOpenPreview(product)}
-                      disabled={!product.barcode || isItemPrinting}
-                      title={
-                        !product.barcode
-                          ? "У товара отсутствует штрих-код"
-                          : isItemPrinting
-                          ? "Идёт печать..."
-                          : "Предпросмотр и печать штрих-кода"
-                      }
-                    >
-                      <span className="barcode-print-tab__print-icon">🖨️</span>
-                      {isItemPrinting ? "Печать..." : "Распечатать штрих-код"}
-                    </button>
-
-                    <div className="barcode-print-tab__product-name">{product.name}</div>
-                  </div>
+            {totalPages > 1 && onPageChange && (
+              <nav className="barcode-print-tab__pagination" aria-label="Пагинация">
+                <span className="barcode-print-tab__pagination-info">
+                  Страница {page} из {totalPages}
+                  {count > 0 && (
+                    <> · Всего: {count}</>
+                  )}
+                </span>
+                <div className="barcode-print-tab__pagination-buttons">
+                  <button
+                    type="button"
+                    className="barcode-print-tab__pagination-btn"
+                    onClick={() => onPageChange(page - 1)}
+                    disabled={page <= 1}
+                    aria-label="Предыдущая страница"
+                  >
+                    Назад
+                  </button>
+                  <button
+                    type="button"
+                    className="barcode-print-tab__pagination-btn"
+                    onClick={() => onPageChange(page + 1)}
+                    disabled={page >= totalPages}
+                    aria-label="Следующая страница"
+                  >
+                    Вперёд
+                  </button>
                 </div>
-              );
-            })}
-          </div>
+              </nav>
+            )}
+          </>
         )}
       </div>
 

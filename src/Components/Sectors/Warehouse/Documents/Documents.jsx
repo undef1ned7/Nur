@@ -34,6 +34,7 @@ import ReceiptEditModal from "./components/ReceiptEditModal";
 import InvoicePreviewModal from "./components/InvoicePreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -49,6 +50,8 @@ const DOC_TYPE_FROM_PARAM = {
 };
 
 const Documents = () => {
+  const alert = useAlert();
+  const confirm = useConfirm(); 
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { docType: docTypeParam } = useParams();
@@ -265,55 +268,48 @@ const Documents = () => {
   // Проведение документа
   const handlePost = async (item) => {
     if (!item?.id) return;
-    
-    if (!window.confirm(`Провести документ ${item.number}?`)) {
-      return;
-    }
-
-    try {
-      const result = await dispatch(
-        postWarehouseDocument({ id: item.id, allowNegative: false })
-      );
-      
-      if (postWarehouseDocument.fulfilled.match(result)) {
-        alert("Документ успешно проведен");
-        // Перезагружаем список документов
-        handleSaved();
-      } else {
-        const error = result.payload || result.error;
-        const errorMessage = error?.detail || error?.message || "Ошибка при проведении документа";
-        alert("Ошибка: " + errorMessage);
+    confirm(`Провести документ ${item.number}?`, async (ok) => {
+      if (!ok) return;
+      try {
+        const result = await dispatch(postWarehouseDocument({ id: item.id, allowNegative: false }));
+        if (postWarehouseDocument.fulfilled.match(result)) {
+          alert("Документ успешно проведен");
+          // Перезагружаем список документов
+          handleSaved();
+        } else {
+          const error = result.payload || result.error;
+          const errorMessage = error?.detail || error?.message || "Ошибка при проведении документа";
+          alert("Ошибка: " + errorMessage);
+        }
+      } catch (error) {
+        console.error("Ошибка при проведении документа:", error);
+        alert("Ошибка: " + (error?.message || "Не удалось провести документ"), true);
       }
-    } catch (error) {
-      console.error("Ошибка при проведении документа:", error);
-      alert("Ошибка: " + (error?.message || "Не удалось провести документ"));
-    }
+    });
   };
 
   // Отмена проведения документа
   const handleUnpost = async (item) => {
     if (!item?.id) return;
     
-    if (!window.confirm(`Отменить проведение документа ${item.number}?`)) {
-      return;
-    }
-
-    try {
-      const result = await dispatch(unpostWarehouseDocument(item.id));
-      
-      if (unpostWarehouseDocument.fulfilled.match(result)) {
-        alert("Проведение документа отменено");
-        // Перезагружаем список документов
-        handleSaved();
-      } else {
-        const error = result.payload || result.error;
-        const errorMessage = error?.detail || error?.message || "Ошибка при отмене проведения";
-        alert("Ошибка: " + errorMessage);
+    confirm(`Отменить проведение документа ${item.number}?`, async (ok) => {
+      if (!ok) return;
+      try {
+        const result = await dispatch(unpostWarehouseDocument(item.id));
+        if (unpostWarehouseDocument.fulfilled.match(result)) {
+          alert("Проведение документа отменено");
+          // Перезагружаем список документов
+          handleSaved();
+        } else {
+          const error = result.payload || result.error;
+          const errorMessage = error?.detail || error?.message || "Ошибка при отмене проведения";
+          alert("Ошибка: " + errorMessage);
+        }
+      } catch (error) {
+        console.error("Ошибка при отмене проведения документа:", error);
+        alert("Ошибка: " + (error?.message || "Не удалось отменить проведение документа"), true);
       }
-    } catch (error) {
-      console.error("Ошибка при отмене проведения документа:", error);
-      alert("Ошибка: " + (error?.message || "Не удалось отменить проведение документа"));
-    }
+    });
   };
 
   const handlePrint = async (item) => {
@@ -436,7 +432,8 @@ const Documents = () => {
 
         if (!isPrinterConnected) {
           alert(
-            "Принтер не подключен. Пожалуйста, подключите принтер перед печатью."
+            "Принтер не подключен. Пожалуйста, подключите принтер перед печатью.",
+            true
           );
           return;
         }
@@ -473,7 +470,7 @@ const Documents = () => {
     } catch (printError) {
       console.error("Ошибка при печати:", printError);
       alert(
-        "Ошибка при печати: " + (printError.message || "Неизвестная ошибка")
+        "Ошибка при печати: " + (printError.message || "Неизвестная ошибка", true)
       );
     }
   };

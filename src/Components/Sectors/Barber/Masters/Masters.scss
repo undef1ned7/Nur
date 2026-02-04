@@ -31,7 +31,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  max-height: 100dvh;
+  // max-height: 100dvh;
   overflow: auto;
 
   /* ====== Хедер ====== */
@@ -192,29 +192,27 @@
   &__list {
     display: grid;
     gap: 0;
-    max-height: clamp(340px, 64dvh, 720px);
-    overflow: auto;
+    // max-height: clamp(340px, 64dvh, 720px);
+    // overflow: auto;
     padding: 0 20px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
 
-    &::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
+    // &::-webkit-scrollbar {
+    //   width: 6px;
+    //   height: 6px;
+    // }
 
-    &::-webkit-scrollbar-track {
-      background: #f3f4f6;
-    }
+    // &::-webkit-scrollbar-track {
+    //   background: #f3f4f6;
+    // }
 
-    &::-webkit-scrollbar-thumb {
-      background: #d1d5db;
-      border-radius: 3px;
+    // &::-webkit-scrollbar-thumb {
+    //   background: #d1d5db;
+    //   border-radius: 3px;
 
-      &:hover {
-        background: #9ca3af;
-      }
-    }
+    //   &:hover {
+    //     background: #9ca3af;
+    //   }
+    // }
   }
 
   &__card {
@@ -907,12 +905,8 @@
 .barbermasters__list {
   display: grid;
   gap: 12px;
-  max-height: clamp(340px, 64dvh, 720px);
-  overflow: auto;
   padding-right: 8px;
   padding-top: 4px;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 .barbermasters__list::-webkit-scrollbar {
   width: 8px;
@@ -945,7 +939,7 @@
   background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 
   &::before {
     content: "";
@@ -1743,7 +1737,7 @@
     }
 
     &__list {
-      max-height: 60dvh;
+      // max-height: 60dvh;
       gap: 10px;
     }
 
@@ -1888,7 +1882,7 @@
     }
 
     &__list {
-      max-height: 55dvh;
+      // max-height: 55dvh;
       gap: 8px;
     }
 
@@ -2076,10 +2070,6 @@
     &__btn {
       height: 38px;
       padding: 0 12px;
-    }
-
-    &__list {
-      max-height: 50dvh;
     }
 
     &__card {
@@ -2549,10 +2539,6 @@
 /* Улучшения для горизонтальной ориентации на мобильных */
 @media (max-width: 900px) and (orientation: landscape) {
   .barbermasters {
-    &__list {
-      max-height: 50dvh;
-    }
-
     &__modal {
       max-height: 85dvh;
     }
@@ -2570,10 +2556,6 @@
 /* Улучшения для очень маленьких экранов в альбомной ориентации */
 @media (max-width: 600px) and (orientation: landscape) {
   .barbermasters {
-    &__list {
-      max-height: 45dvh;
-    }
-
     &__modal {
       max-height: 80dvh;
     }
@@ -2629,10 +2611,6 @@
 /* Улучшения для низких экранов */
 @media (max-height: 600px) {
   .barbermasters {
-    &__list {
-      max-height: 40dvh;
-    }
-
     &__modal {
       max-height: 85dvh;
     }
