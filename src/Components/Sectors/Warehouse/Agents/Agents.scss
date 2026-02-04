@@ -1,0 +1,663 @@
+.agents-page {
+  .agents-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0 16px;
+    flex-wrap: wrap;
+  }
+
+  .agents-tab {
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    color: #0f172a;
+    font-weight: 600;
+    transition: 0.15s ease;
+  }
+
+  .agents-tab.active {
+    background: #f7d74f;
+    color: #000;
+    border-color: #e6c547;
+  }
+
+  .agents-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .badge--draft {
+    background: #f1f5f9;
+    color: #334155;
+    border-color: #e2e8f0;
+  }
+  .badge--submitted {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+  }
+  .badge--approved {
+    background: #d1fae5;
+    color: #065f46;
+    border-color: #a7f3d0;
+  }
+  .badge--rejected {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
+  }
+
+  .agents-note {
+    max-width: 380px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .agents-clickable-row {
+    cursor: pointer;
+  }
+
+  .agents-error {
+    margin: 10px 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #fecaca;
+    background: #fee2e2;
+    color: #7f1d1d;
+    font-weight: 600;
+  }
+
+  .agents-history-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 16px;
+    flex-wrap: wrap;
+  }
+
+  .agents-history-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 14px;
+    transition: 0.15s ease;
+    cursor: pointer;
+
+    &:hover {
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+
+    &.active {
+      background: #f7d74f;
+      color: #000;
+      border-color: #e6c547;
+
+      .agents-history-tab__count {
+        background: rgba(0, 0, 0, 0.15);
+        color: #000;
+      }
+    }
+  }
+
+  .agents-history-tab__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
+
+// ========== Модалка заявки (6.1, 6.2) — новый дизайн ==========
+.agent-cart-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+
+  .agent-cart-modal__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+  }
+
+  .agent-cart-modal__dialog {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    width: 95vw;
+    max-height: 92vh;
+    margin: auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .agent-cart-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(to bottom, #f8fafc, #fff);
+    flex-shrink: 0;
+  }
+
+  .agent-cart-modal__header-left {
+    min-width: 0;
+  }
+
+  .agent-cart-modal__title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.3;
+  }
+
+  .agent-cart-modal__meta-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .agent-cart-modal__id {
+    font-size: 12px;
+    color: #64748b;
+    font-family: ui-monospace, monospace;
+    word-break: break-all;
+  }
+
+  .agent-cart-modal__close {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .agent-cart-modal__close:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .agent-cart-modal__error {
+    margin: 0 24px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .agent-cart-modal__body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .agent-cart-modal__loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #64748b;
+    font-size: 15px;
+  }
+
+  .agent-cart-modal__section {
+    margin-bottom: 24px;
+  }
+
+  .agent-cart-modal__section:last-child {
+    margin-bottom: 0;
+  }
+
+  .agent-cart-modal__section-title {
+    margin: 0 0 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .agent-cart-modal__info {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .agent-cart-modal__info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px 20px;
+  }
+
+  @media (max-width: 600px) {
+    .agent-cart-modal__info-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .agent-cart-modal__field {
+    min-width: 0;
+  }
+
+  .agent-cart-modal__field--full {
+    grid-column: 1 / -1;
+  }
+
+  .agent-cart-modal__field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 4px;
+  }
+
+  .agent-cart-modal__field-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .agent-cart-modal__field-value--mono {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    color: #475569;
+  }
+
+  .agent-cart-modal__form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .agent-cart-modal__label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .agent-cart-modal__input {
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #0f172a;
+    background: #fff;
+    transition: border-color 0.15s;
+  }
+
+  .agent-cart-modal__input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  }
+
+  .agent-cart-modal__input:disabled {
+    background: #f1f5f9;
+    color: #64748b;
+    cursor: not-allowed;
+  }
+
+  .agent-cart-modal__textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .agent-cart-modal__hint {
+    margin: 0 0 12px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .agent-cart-modal__positions {
+    margin-top: 20px;
+  }
+
+  .agent-cart-modal__add-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 16px;
+    padding: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+  }
+
+  .agent-cart-modal__add-row--disabled {
+    opacity: 0.85;
+    pointer-events: none;
+  }
+
+  @media (max-width: 700px) {
+    .agent-cart-modal__add-row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .agent-cart-modal__add-search {
+    min-width: 0;
+  }
+
+  .agent-cart-modal__add-qty {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .agent-cart-modal__label-inline {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .agent-cart-modal__input--num {
+    width: 100%;
+    min-width: 100px;
+  }
+
+  .agent-cart-modal__picked {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+  }
+
+  .agent-cart-modal__picked-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-cart-modal__picked-clear {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+  }
+
+  .agent-cart-modal__picked-clear:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .agent-cart-modal__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  .agent-cart-modal__btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .agent-cart-modal__btn--primary {
+    background: #0f172a;
+    color: #fff;
+  }
+
+  .agent-cart-modal__btn--primary:hover:not(:disabled) {
+    background: #1e293b;
+  }
+
+  .agent-cart-modal__btn--secondary {
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+  }
+
+  .agent-cart-modal__btn--secondary:hover:not(:disabled) {
+    background: #e2e8f0;
+  }
+
+  .agent-cart-modal__btn--danger {
+    background: #dc2626;
+    color: #fff;
+  }
+
+  .agent-cart-modal__btn--danger:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+
+  .agent-cart-modal__table-wrap {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .agent-cart-modal__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 720px;
+  }
+
+  .agent-cart-modal__table th {
+    text-align: left;
+    padding: 12px 14px;
+    background: #f8fafc;
+    font-weight: 600;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .agent-cart-modal__table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: middle;
+  }
+
+  .agent-cart-modal__table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .agent-cart-modal__cell-name {
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .agent-cart-modal__cell-date {
+    font-size: 12px;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  .agent-cart-modal__input-inline {
+    width: 100%;
+    max-width: 120px;
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+
+  .agent-cart-modal__input-inline:disabled {
+    background: #f8fafc;
+    color: #64748b;
+  }
+
+  .agent-cart-modal__row-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .agent-cart-modal__btn-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .agent-cart-modal__btn-icon:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .agent-cart-modal__btn-icon--danger:hover:not(:disabled) {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+
+  .agent-cart-modal__empty {
+    text-align: center;
+    padding: 24px;
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .agent-cart-modal__footer {
+    padding: 16px 24px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    flex-shrink: 0;
+  }
+
+  .agent-cart-modal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+}
+
+// Общие бейджи/кнопки для страницы и модалки
+.agents-danger {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+.agents-primary {
+  background: #0f172a !important;
+  color: #fff !important;
+}
+
+.agents-modal,
+.agent-cart-modal {
+  .agents-options {
+    display: grid;
+    gap: 6px;
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 8px;
+    background: #fff;
+  }
+
+  .agents-option {
+    text-align: left;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    transition: 0.15s ease;
+  }
+
+  .agents-option:hover {
+    background: #f8fafc;
+  }
+
+  .agents-option__name {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 13px;
+  }
+
+  .agents-option__meta {
+    margin-top: 2px;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .agents-hint {
+    font-size: 12px;
+    color: #64748b;
+  }
+}
+

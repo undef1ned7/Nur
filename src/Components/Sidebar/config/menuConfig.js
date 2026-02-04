@@ -496,14 +496,26 @@ export const MENU_CONFIG = {
         children: [
           { label: "Продажа", to: "/crm/warehouse/documents/sale" },
           { label: "Покупка", to: "/crm/warehouse/documents/purchase" },
-          { label: "Возврат продажи", to: "/crm/warehouse/documents/sale_return" },
-          { label: "Возврат покупки", to: "/crm/warehouse/documents/purchase_return" },
+          {
+            label: "Возврат продажи",
+            to: "/crm/warehouse/documents/sale_return",
+          },
+          {
+            label: "Возврат покупки",
+            to: "/crm/warehouse/documents/purchase_return",
+          },
           { label: "Инвентаризация", to: "/crm/warehouse/documents/inventory" },
           { label: "Приход", to: "/crm/warehouse/documents/receipt" },
           { label: "Списание", to: "/crm/warehouse/documents/write_off" },
           { label: "Перемещение", to: "/crm/warehouse/documents/transfer" },
-          { label: "Приход (деньги)", to: "/crm/warehouse/documents/money/receipt" },
-          { label: "Расход (деньги)", to: "/crm/warehouse/documents/money/expense" },
+          {
+            label: "Приход (деньги)",
+            to: "/crm/warehouse/documents/money/receipt",
+          },
+          {
+            label: "Расход (деньги)",
+            to: "/crm/warehouse/documents/money/expense",
+          },
         ],
       },
       {
@@ -525,6 +537,13 @@ export const MENU_CONFIG = {
         to: "/crm/warehouse/counterparties",
         icon: menuIcons.filePerson,
         permission: "can_view_clients",
+        implemented: true,
+      },
+      {
+        label: "Агенты",
+        to: "/crm/warehouse/agents",
+        icon: menuIcons.user,
+        permission: "can_view_agent",
         implemented: true,
       },
 

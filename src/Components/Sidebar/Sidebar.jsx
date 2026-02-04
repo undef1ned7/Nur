@@ -20,6 +20,16 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
   const location = useLocation();
   const menuRef = useRef(null); // 👈 ref теперь на меню
+  const pathnameRef = useRef(location.pathname);
+  const openDropdownRef = useRef(openDropdown);
+
+  useEffect(() => {
+    pathnameRef.current = location.pathname;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    openDropdownRef.current = openDropdown;
+  }, [openDropdown]);
 
   // Раскрывать подменю «Документы» на странице документов, закрывать при уходе
   useEffect(() => {
@@ -44,6 +54,15 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
+        // На страницах документов склада фиксируем раскрытие «Документы»,
+        // чтобы при кликах по контенту (например, кнопка «Создать») dropdown
+        // не закрывался и не "открывался заново" после навигации.
+        const pathname = pathnameRef.current || "";
+        const currentOpen = openDropdownRef.current;
+        const isWarehouseDocuments = pathname.includes("warehouse/documents");
+        const isDocumentsDropdownOpen = currentOpen === "Документы";
+        if (isWarehouseDocuments && isDocumentsDropdownOpen) return;
+
         setOpenDropdown(null);
       }
     };

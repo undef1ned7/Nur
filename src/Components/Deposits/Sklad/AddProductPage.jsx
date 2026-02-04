@@ -48,6 +48,7 @@ import {
   ProductBasicInfo,
   ProductImagesSection,
 } from "./AddProductPage/components";
+import axios from "axios";
 
 const AddProductPage = () => {
   const { id: productId } = useParams();
