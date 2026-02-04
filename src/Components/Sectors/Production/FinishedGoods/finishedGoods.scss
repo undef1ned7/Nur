@@ -1898,16 +1898,6 @@
 }
 
 .finished-goods-add-modal__section {
-  margin-bottom: 20px;
-
-  @media (max-width: 768px) {
-    margin-bottom: 16px;
-  }
-
-  @media (max-width: 480px) {
-    margin-bottom: 14px;
-  }
-
   &:last-of-type {
     margin-bottom: 0;
   }

@@ -223,6 +223,10 @@ const Stocks = () => {
     }
   }, [navigate, warehouseId]);
 
+  const goBack = useCallback(() => {
+    navigate("/crm/warehouse/warehouses");
+  }, [navigate]);
+
   // Мемоизация сообщения для модального окна удаления
   const deleteModalMessage = useMemo(
     () => formatDeleteMessage(selectedCount),
@@ -232,6 +236,7 @@ const Stocks = () => {
   return (
     <div className="warehouse-page">
       <WarehouseHeader
+        onBack={goBack}
         onCreateProduct={handleCreateProduct}
         title={
           resolvedWarehouseName

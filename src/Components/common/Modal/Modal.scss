@@ -1,0 +1,168 @@
+/* Кроссплатформенная модалка: overlay + диалог со скроллом на всех устройствах */
+
+.common-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  /* safe-area для вырезов и notch на мобильных */
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.common-modal-dialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-width: 100%;
+  /* Ограничиваем высоту диалога, чтобы контент мог скроллиться */
+  max-height: min(90dvh, 90vh);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.common-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.common-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.common-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.common-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.common-modal-close:focus-visible {
+  outline: 2px solid #f7d74f;
+  outline-offset: 2px;
+}
+
+/* Область с children — единственная скроллируемая часть */
+.common-modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 20px;
+}
+
+/* Скроллбар (опционально, для десктопа) */
+.common-modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.common-modal-content::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.common-modal-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.common-modal-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Мобильные: меньше отступы, больше высота диалога */
+@media (max-width: 600px) {
+  .common-modal-overlay {
+    padding: 12px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+  }
+
+  .common-modal-dialog {
+    max-height: min(92dvh, 92vh);
+    border-radius: 12px;
+  }
+
+  .common-modal-header {
+    padding: 14px 16px;
+  }
+
+  .common-modal-title {
+    font-size: 16px;
+  }
+
+  .common-modal-content {
+    padding: 16px;
+  }
+}
+
+/* Небольшие экраны */
+@media (max-width: 380px) {
+  .common-modal-overlay {
+    padding: 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-left: max(8px, env(safe-area-inset-left));
+  }
+
+  .common-modal-dialog {
+    max-height: min(96dvh, 96vh);
+    border-radius: 10px;
+  }
+
+  .common-modal-header {
+    padding: 12px 14px;
+  }
+
+  .common-modal-content {
+    padding: 14px;
+  }
+}
+
+/* Высокие экраны: можно чуть увеличить высоту диалога */
+@media (min-height: 800px) {
+  .common-modal-dialog {
+    max-height: min(85dvh, 85vh);
+  }
+}

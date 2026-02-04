@@ -59,7 +59,9 @@ const CustomServiceModal = ({
                 quantity: e.target.value,
               }))
             }
-            type="text"
+            type="number"
+            onWheel={(e) => e.target.blur()}
+            min="0"
             placeholder="Введите количество товара"
           />
         </div>
