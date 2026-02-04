@@ -915,6 +915,7 @@ const Agents = () => {
   const [carts, setCarts] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [actionBusyId, setActionBusyId] = useState(null);
 
   const loadWarehouses = useCallback(async () => {
     try {
@@ -930,7 +931,13 @@ const Agents = () => {
     setCartsError("");
     try {
       const params = {};
-      if (statusFilter) params.status = statusFilter;
+      const effectiveStatus =
+        activeTab === "requests"
+          ? "submitted"
+          : activeTab === "history"
+          ? ""
+          : statusFilter;
+      if (effectiveStatus) params.status = effectiveStatus;
       if (search.trim()) params.search = search.trim();
       const data = await listAgentCarts(params);
       setCarts(normalizeList(data));
@@ -941,7 +948,7 @@ const Agents = () => {
     } finally {
       setCartsLoading(false);
     }
-  }, [statusFilter, search]);
+  }, [statusFilter, search, activeTab]);
 
   // stocks
   const [stocksLoading, setStocksLoading] = useState(false);
@@ -970,7 +977,12 @@ const Agents = () => {
   }, [loadWarehouses]);
 
   useEffect(() => {
-    if (activeTab === "carts" || activeTab === "history") loadCarts();
+    if (
+      activeTab === "carts" ||
+      activeTab === "history" ||
+      activeTab === "requests"
+    )
+      loadCarts();
     if (activeTab === "stocks") loadStocks();
   }, [activeTab, loadCarts, loadStocks]);
 
@@ -1039,6 +1051,38 @@ const Agents = () => {
   const historyCartsToShow =
     historySubTab === "approved" ? approvedCarts : rejectedCarts;
   const cartsToShow = filteredCarts;
+  const requestsToShow = useMemo(
+    () => normalizeList(carts).filter((c) => c.status === "submitted"),
+    [carts]
+  );
+
+  const handleApprove = async (cartId) => {
+    if (!cartId || actionBusyId) return;
+    setActionBusyId(cartId);
+    try {
+      await approveAgentCart(cartId);
+      loadCarts();
+    } catch (e) {
+      console.error(e);
+      alert(e?.detail || e?.message || "Не удалось одобрить заявку");
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
+  const handleReject = async (cartId) => {
+    if (!cartId || actionBusyId) return;
+    setActionBusyId(cartId);
+    try {
+      await rejectAgentCart(cartId);
+      loadCarts();
+    } catch (e) {
+      console.error(e);
+      alert(e?.detail || e?.message || "Не удалось отклонить заявку");
+    } finally {
+      setActionBusyId(null);
+    }
+  };
 
   return (
     <div className="warehouse-page agents-page">
@@ -1070,7 +1114,9 @@ const Agents = () => {
             </button>
           )}
           {isOwnerOrAdmin &&
-            (activeTab === "carts" || activeTab === "history") && (
+            (activeTab === "carts" ||
+              activeTab === "history" ||
+              activeTab === "requests") && (
               <button
                 className="warehouse-header__create-btn"
                 onClick={loadCarts}
@@ -1110,6 +1156,15 @@ const Agents = () => {
             История
           </button>
         )}
+        {isOwnerOrAdmin && (
+          <button
+            type="button"
+            className={`agents-tab ${activeTab === "requests" ? "active" : ""}`}
+            onClick={() => setActiveTab("requests")}
+          >
+            Запросы
+          </button>
+        )}
         <button
           type="button"
           className={`agents-tab ${activeTab === "stocks" ? "active" : ""}`}
@@ -1119,7 +1174,9 @@ const Agents = () => {
         </button>
       </div>
 
-      {(activeTab === "carts" || activeTab === "history") && (
+      {(activeTab === "carts" ||
+        activeTab === "history" ||
+        activeTab === "requests") && (
         <>
           <div className="warehouse-search-section">
             <div className="warehouse-search">
@@ -1134,7 +1191,7 @@ const Agents = () => {
             </div>
 
             <div className="warehouse-search__info flex flex-wrap items-center gap-2">
-              {activeTab !== "history" && (
+              {activeTab !== "history" && activeTab !== "requests" && (
                 <select
                   className="warehouse-search__input"
                   style={{ width: 220, maxWidth: "100%" }}
@@ -1156,6 +1213,8 @@ const Agents = () => {
                         ? "Одобренные"
                         : "Отклонённые"
                     }: ${historyCartsToShow.length}`
+                  : activeTab === "requests"
+                  ? `Запросы: ${requestsToShow.length}`
                   : `Всего: ${cartsToShow.length}`}
               </span>
 
@@ -1347,6 +1406,189 @@ const Agents = () => {
                           </span>
                         </div>
                       </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          ) : activeTab === "requests" ? (
+            <div className="warehouse-table-container w-full">
+              {viewMode === VIEW_MODES.TABLE ? (
+                <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <table className="warehouse-table w-full min-w-[900px]">
+                    <thead>
+                      <tr>
+                        <th>№</th>
+                        {isOwnerOrAdmin && <th>Агент</th>}
+                        <th>Склад</th>
+                        <th>Позиций</th>
+                        <th>Обновлено</th>
+                        <th>Отправлено</th>
+                        <th>Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cartsLoading ? (
+                        <tr>
+                          <td
+                            colSpan={isOwnerOrAdmin ? 7 : 6}
+                            className="warehouse-table__loading"
+                          >
+                            Загрузка…
+                          </td>
+                        </tr>
+                      ) : requestsToShow.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={isOwnerOrAdmin ? 7 : 6}
+                            className="warehouse-table__empty"
+                          >
+                            Нет заявок со статусом "Отправлено"
+                          </td>
+                        </tr>
+                      ) : (
+                        requestsToShow.map((c, idx) => (
+                          <tr
+                            key={c.id}
+                            className="warehouse-table__row agents-clickable-row"
+                            onClick={() => openExisting(c.id)}
+                            title="Открыть заявку"
+                          >
+                            <td>{idx + 1}</td>
+                            {isOwnerOrAdmin && (
+                              <td>
+                                {c.agent_name ||
+                                  c.agent_display ||
+                                  shortId(c.agent)}
+                              </td>
+                            )}
+                            <td>
+                              {warehousesById?.[c.warehouse]?.name ||
+                                shortId(c.warehouse)}
+                            </td>
+                            <td>
+                              {c.items_count ??
+                                c.items?.length ??
+                                c.items_qty ??
+                                0}
+                            </td>
+                            <td>{fmtDateTime(c.updated_date)}</td>
+                            <td>{fmtDateTime(c.submitted_at)}</td>
+                            <td>
+                              <div className="agents-row-actions">
+                                <button
+                                  type="button"
+                                  className="agents-action-btn agents-action-btn--approve"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleApprove(c.id);
+                                  }}
+                                  disabled={actionBusyId === c.id}
+                                >
+                                  <Check size={16} />
+                                  Одобрить
+                                </button>
+                                <button
+                                  type="button"
+                                  className="agents-action-btn agents-action-btn--reject"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleReject(c.id);
+                                  }}
+                                  disabled={actionBusyId === c.id}
+                                >
+                                  <X size={16} />
+                                  Отклонить
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="agents-cards-grid">
+                  {cartsLoading ? (
+                    <div className="agents-cards-empty">Загрузка…</div>
+                  ) : requestsToShow.length === 0 ? (
+                    <div className="agents-cards-empty">
+                      Нет заявок со статусом "Отправлено"
+                    </div>
+                  ) : (
+                    requestsToShow.map((c, idx) => (
+                      <div
+                        key={c.id}
+                        className="agents-card"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openExisting(c.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openExisting(c.id);
+                          }
+                        }}
+                      >
+                        <div className="agents-card__header">
+                          <div className="agents-card__title">
+                            Заявка #{idx + 1}
+                          </div>
+                          <div className="agents-card__meta">
+                            {fmtDateTime(c.updated_date)}
+                          </div>
+                        </div>
+                        {isOwnerOrAdmin && (
+                          <div className="agents-card__row">
+                            <span className="agents-card__label">Агент</span>
+                            <span className="agents-card__value">
+                              {c.agent_name ||
+                                c.agent_display ||
+                                shortId(c.agent)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="agents-card__row">
+                          <span className="agents-card__label">Склад</span>
+                          <span className="agents-card__value">
+                            {warehousesById?.[c.warehouse]?.name ||
+                              shortId(c.warehouse)}
+                          </span>
+                        </div>
+                        <div className="agents-card__row">
+                          <span className="agents-card__label">Отправлено</span>
+                          <span className="agents-card__value">
+                            {fmtDateTime(c.submitted_at)}
+                          </span>
+                        </div>
+                        <div className="agents-card__footer agents-card__footer--actions">
+                          <button
+                            type="button"
+                            className="agents-action-btn agents-action-btn--approve"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApprove(c.id);
+                            }}
+                            disabled={actionBusyId === c.id}
+                          >
+                            <Check size={16} />
+                            Одобрить
+                          </button>
+                          <button
+                            type="button"
+                            className="agents-action-btn agents-action-btn--reject"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReject(c.id);
+                            }}
+                            disabled={actionBusyId === c.id}
+                          >
+                            <X size={16} />
+                            Отклонить
+                          </button>
+                        </div>
+                      </div>
                     ))
                   )}
                 </div>

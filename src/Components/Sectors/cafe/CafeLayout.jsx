@@ -16,6 +16,8 @@ export default function CafeLayout() {
 
     const printedOrdersRef = useRef(new Set()); // orderId -> printed successfully once on this device
     const printingOrdersRef = useRef(new Set()); // orderId -> currently printing (avoid parallel)
+    const printedReceiptsRef = useRef(new Set()); // orderId -> cashier receipt printed once on this device
+    const printingReceiptsRef = useRef(new Set()); // orderId -> cashier receipt printing now
     const retryTimersRef = useRef(new Map()); // orderId -> timeoutId
     const notifiedOrdersRef = useRef(new Set()); // orderId -> notified once on this device (cook page)
     const kitchensCacheRef = useRef(null); // Map(kitchenId -> kitchen)
@@ -84,6 +86,106 @@ export default function CafeLayout() {
         const p = String(location?.pathname || "");
         return p.includes("/cafe/cook");
     }, [location?.pathname]);
+
+    const fullName = useCallback((u = {}) =>
+        [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() ||
+        u?.email ||
+        "Без имени", []);
+
+    const formatReceiptDate = useCallback((dateStr) => {
+        if (!dateStr) return "";
+        try {
+            const d = new Date(dateStr);
+            if (Number.isNaN(d.getTime())) return String(dateStr);
+            const day = String(d.getDate()).padStart(2, "0");
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const year = d.getFullYear();
+            const hours = String(d.getHours()).padStart(2, "0");
+            const minutes = String(d.getMinutes()).padStart(2, "0");
+            return `${day}.${month}.${year} ${hours}:${minutes}`;
+        } catch {
+            return String(dateStr);
+        }
+    }, []);
+
+    const linePrice = useCallback((it) => {
+        const v =
+            it?.price ??
+            it?.menu_item_price ??
+            it?.price_each ??
+            it?.unit_price ??
+            it?.menu_item?.price ??
+            0;
+        const n = Number(String(v).replace(",", "."));
+        return Number.isFinite(n) ? n : 0;
+    }, []);
+
+    const isPaidStatus = useCallback((order) => {
+        if (order?.is_paid === true) return true;
+        const s = String(order?.status || "").toLowerCase().trim();
+        return ["paid", "оплачен", "оплачено", "оплачён", "closed", "done", "completed"].includes(s);
+    }, []);
+
+    const buildReceiptPayload = useCallback((orderDetail) => {
+        const dt = formatReceiptDate(orderDetail?.created_at || orderDetail?.date || orderDetail?.created);
+        const tableNo = orderDetail?.table_number ?? orderDetail?.table ?? "—";
+        const items = Array.isArray(orderDetail?.items) ? orderDetail.items : [];
+        return {
+            company: localStorage.getItem("company_name") || "КАССА",
+            doc_no: `СТОЛ ${tableNo}`,
+            created_at: dt,
+            cashier_name: fullName(profile || {}),
+            discount: 0,
+            tax: 0,
+            paid_cash: 0,
+            paid_card: 0,
+            change: 0,
+            items: items.map((it) => ({
+                name: String(it.menu_item_title || it.title || "Позиция"),
+                qty: Math.max(1, Number(it.quantity) || 1),
+                price: linePrice(it),
+            })),
+        };
+    }, [formatReceiptDate, linePrice, fullName, profile]);
+
+    const printReceiptForOrder = useCallback(async (orderId) => {
+        const oid = String(orderId || "");
+        if (!oid) return;
+        if (printedReceiptsRef.current.has(oid)) return;
+        if (printingReceiptsRef.current.has(oid)) return;
+        try {
+            const alreadyPrinted = localStorage.getItem(`cafe_receipt_printed_${oid}`);
+            if (alreadyPrinted) return;
+        } catch { }
+
+        printingReceiptsRef.current.add(oid);
+        try {
+            const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
+            if (!receiptBinding) return;
+
+            await checkPrinterConnection().catch(() => false);
+            const detail = await api.get(`/cafe/orders/${encodeURIComponent(oid)}/`).then((r) => r?.data || null);
+            if (!detail) return;
+
+            const payload = buildReceiptPayload(detail);
+            const parsed = parsePrinterBinding(receiptBinding);
+            if (parsed.kind === "ip") {
+                await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+            } else if (parsed.kind === "usb") {
+                await setActivePrinterByKey(parsed.usbKey);
+                await printOrderReceiptJSONViaUSB(payload);
+            }
+
+            printedReceiptsRef.current.add(oid);
+            try {
+                localStorage.setItem(`cafe_receipt_printed_${oid}`, "true");
+            } catch { }
+        } catch (e) {
+            console.error("Auto receipt print error:", e);
+        } finally {
+            printingReceiptsRef.current.delete(oid);
+        }
+    }, [buildReceiptPayload]);
 
     const readKitchenPrinterMap = () => {
         try {
@@ -319,7 +421,16 @@ export default function CafeLayout() {
                 }).catch(() => { });
             }
         }
-    }, [orders?.lastMessage, profile?.id, isCookPage]);
+
+        // Auto print receipt on order paid (from any device)
+        if (type === "order_updated") {
+            const updatedOrder = data?.order;
+            const orderId = updatedOrder?.id;
+            if (orderId && isPaidStatus(updatedOrder)) {
+                printReceiptForOrder(orderId);
+            }
+        }
+    }, [orders?.lastMessage, profile?.id, isCookPage, isPaidStatus, printReceiptForOrder]);
 
     // Fallback polling: when order is created from another device (e.g. phone), this device (notebook) may not get WebSocket event — poll recent orders and print
     useEffect(() => {
