@@ -252,7 +252,11 @@ export const setItemMakeQuantity = createAsyncThunk(
   async ({ id, quantity }, { rejectWithValue, dispatch }) => {
     try {
       if (!id) throw new Error("id is required");
-      const { data } = await api.patch(`/main/items-make/${id}/`, { quantity });
+      // API: не более 3 знаков после запятой
+      const qty = Math.round(Number(quantity) * 1000) / 1000;
+      const { data } = await api.patch(`/main/items-make/${id}/`, {
+        quantity: qty,
+      });
       // рефреш списка после удачного PATCH
       try {
         await dispatch(getItemsMake()).unwrap();
@@ -279,18 +283,22 @@ export const consumeItemsMake = createAsyncThunk(
       if (!Array.isArray(recipe) || !recipe.length || !units) return [];
 
       const results = [];
+      const round3 = (v) => Math.round(Number(v) * 1000) / 1000;
       for (const r of recipe) {
         const id = String(r.id);
-        const perUnit = Number(r.qty_per_unit || 0);
+        const perUnit = round3(r.qty_per_unit || 0);
         if (!id || perUnit <= 0) continue;
 
         // 1) GET актуального остатка
         const currentRes = await api.get(`/main/items-make/${id}/`);
         const current = Number(currentRes?.data?.quantity ?? 0);
 
-        // 2) Счёт нового остатка
+        // 2) Счёт нового остатка; API: не более 3 знаков после запятой
         const delta = perUnit * Number(units);
-        const newQty = Math.max(0, current - delta);
+        const newQty = Math.max(
+          0,
+          Math.round((current - delta) * 1000) / 1000
+        );
 
         // 3) PATCH на бэк
         const { data } = await api.patch(`/main/items-make/${id}/`, {

@@ -63,9 +63,16 @@ const CreateSaleDocument = () => {
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [productsPage, setProductsPage] = useState(1);
+  const [productsPagination, setProductsPagination] = useState({
+    count: 0,
+    next: null,
+    previous: null,
+  });
   const [selectedProductIds, setSelectedProductIds] = useState(new Set());
-  const [showMoreProducts, setShowMoreProducts] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
+
+  const PRODUCTS_PAGE_SIZE = 100;
 
   const [warehouses, setWarehouses] = useState([]);
   const [warehouse, setWarehouse] = useState("");
@@ -201,6 +208,51 @@ const CreateSaleDocument = () => {
     }
   }, [warehouses, warehouse]);
 
+  // При смене склада удаляем из корзины товары, которых нет на новом складе
+  useEffect(() => {
+    if (!warehouse || !cartItems.length) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await dispatch(
+          fetchProductsAsync({ warehouse, page_size: 1000 })
+        );
+        if (cancelled) return;
+        if (fetchProductsAsync.fulfilled.match(result)) {
+          const list =
+            result.payload?.results ||
+            (Array.isArray(result.payload) ? result.payload : []);
+          const productById = new Map(
+            list.map((p) => [String(p.id), { id: p.id, quantity: p.quantity }])
+          );
+          setCartItems((prev) => {
+            const filtered = prev.filter((item) =>
+              productById.has(String(item.productId ?? item.product_id))
+            );
+            return filtered.map((item) => {
+              const p = productById.get(
+                String(item.productId ?? item.product_id)
+              );
+              const stock = Number(p?.quantity ?? 0);
+              const qty = Number(item.quantity ?? 0);
+              return {
+                ...item,
+                stock,
+                quantity: stock > 0 && qty > stock ? stock : item.quantity,
+              };
+            });
+          });
+        }
+      } catch (e) {
+        // игнорируем ошибку загрузки
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [warehouse]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Синхронизация выбранных товаров с товарами в корзине
   useEffect(() => {
     if (cartItems && cartItems.length > 0) {
@@ -326,18 +378,30 @@ const CreateSaleDocument = () => {
         (item) => item.productId === productId
       );
 
+      const stock = Number(product.quantity ?? 0);
+
       if (existingItemIndex >= 0) {
-        // Увеличиваем количество существующего товара
+        const existing = cartItems[existingItemIndex];
+        const currentQty = Number(existing.quantity || 0);
+        const maxQty = Number(existing.stock ?? stock);
+        if (currentQty >= maxQty) {
+          alert(`Нельзя добавить больше остатка. Остаток: ${maxQty}`);
+          return;
+        }
         setCartItems((prev) => {
           const updated = [...prev];
           updated[existingItemIndex] = {
             ...updated[existingItemIndex],
             quantity: updated[existingItemIndex].quantity + 1,
+            stock: maxQty,
           };
           return updated;
         });
       } else {
-        // Добавляем новый товар в корзину
+        if (stock < 1) {
+          alert("Нет остатка на складе");
+          return;
+        }
         const newItem = {
           id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           productId: product.id,
@@ -346,6 +410,7 @@ const CreateSaleDocument = () => {
           price: Number(product.price || 0),
           unit_price: Number(product.price || 0),
           quantity: 1,
+          stock,
           unit: product.unit || "шт",
           discount: 0,
           discount_percent: 0,
@@ -371,21 +436,22 @@ const CreateSaleDocument = () => {
 
     const qty = Number(newQuantity);
     if (qty <= 0 || isNaN(qty)) {
-      // Удаляем товар из корзины
-      setCartItems((prev) => prev.filter((item) => item.id !== itemId));
+      setCartItems((prev) => prev.filter((i) => i.id !== itemId));
       return;
     }
 
-    // Для piece items (шт) qty должно быть целым числом
     const unit = item.unit || "шт";
     const isPiece =
       unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
-    const finalQty = isPiece ? Math.floor(qty) : qty;
+    let finalQty = isPiece ? Math.floor(qty) : qty;
+    const maxQty = Number(item.stock ?? 0);
+    if (maxQty > 0 && finalQty > maxQty) {
+      finalQty = maxQty;
+    }
 
-    // Обновляем количество товара
     setCartItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, quantity: finalQty } : item
+      prev.map((i) =>
+        i.id === itemId ? { ...i, quantity: finalQty } : i
       )
     );
   };
@@ -452,6 +518,17 @@ const CreateSaleDocument = () => {
           error: `Скидка для товара "${
             item.productName || item.name
           }" должна быть в диапазоне 0-100%`,
+        };
+      }
+
+      // Проверка: количество не больше остатка на складе
+      const stock = Number(item.stock ?? 0);
+      if (stock > 0 && qty > stock) {
+        return {
+          valid: false,
+          error: `Количество товара "${
+            item.productName || item.name
+          }" не может превышать остаток на складе (${stock})`,
         };
       }
     }
@@ -908,6 +985,11 @@ const CreateSaleDocument = () => {
         <div className="create-sale-document__sidebar">
           <h2 className="create-sale-document__sidebar-title">
             КАТАЛОГ ТОВАРОВ
+            {cartItems.length > 0 && (
+              <span className="create-sale-document__selected-count">
+                {cartItems.length}
+              </span>
+            )}
           </h2>
           <div className="create-sale-document__search-wrapper">
             <div className="create-sale-document__search">
@@ -921,13 +1003,13 @@ const CreateSaleDocument = () => {
             </div>
           </div>
 
-          <button
+          {/* <button
             type="button"
             className="create-sale-document__create-product-btn"
           >
             <Plus size={18} />
             Новый товар
-          </button>
+          </button> */}
 
           <div className="create-sale-document__products-list">
             {productsLoading ? (
@@ -1216,6 +1298,16 @@ const CreateSaleDocument = () => {
                                 handleQuantityChange(item.id, e.target.value)
                               }
                               className="create-sale-document__qty-input"
+                              title={
+                                item.stock != null && item.stock > 0
+                                  ? `Остаток на складе: ${item.stock}`
+                                  : undefined
+                              }
+                              placeholder={
+                                item.stock != null && item.stock > 0
+                                  ? `макс. ${item.stock}`
+                                  : undefined
+                              }
                             />
                           </td>
                           <td>

@@ -265,7 +265,31 @@ const AddProductPage = () => {
           }
           setItemType(detectedItemType);
 
-          // Заполняем основные данные
+          // Бренд: строка, вложенный объект { name } или id — ищем в списке брендов
+          const brandName =
+            product.brand ||
+            (product.brand && typeof product.brand === "object"
+              ? product.brand.name
+              : null) ||
+            (product.brand != null && brands?.length
+              ? brands.find((b) => String(b.id) === String(product.brand))
+                  ?.name
+              : null) ||
+            "";
+
+          // Категория: строка, вложенный объект { name } или id — ищем в списке категорий
+          const categoryName =
+            product.category ||
+            (product.category && typeof product.category === "object"
+              ? product.category.name
+              : null) ||
+            (product.category != null && categories?.length
+              ? categories.find(
+                  (c) => String(c.id) === String(product.category)
+                )?.name
+            : null) ||
+            "";
+
           // Форматируем цену до 3 знаков после запятой при загрузке для редактирования
           const formatPrice3Decimals = (v) => {
             if (v === null || v === undefined || v === "") return "";
@@ -277,8 +301,8 @@ const AddProductPage = () => {
           setNewItemData({
             name: product.name || "",
             barcode: product.barcode || "",
-            brand_name: product.brand_name || "",
-            category_name: product.category_name || "",
+            brand_name: brandName,
+            category_name: categoryName,
             price: formatPrice3Decimals(product.price),
             quantity: product.quantity || "",
             client: product.client || "",
@@ -352,7 +376,7 @@ const AddProductPage = () => {
       };
       loadProduct();
     }
-  }, [isEditMode, productId]);
+  }, [isEditMode, productId, brands, categories]);
 
   // Обработка дублирования товара
   useEffect(() => {
@@ -379,12 +403,32 @@ const AddProductPage = () => {
           ? (Math.round(n * 1000) / 1000).toString()
           : String(v);
       };
+      // Бренд и категория: строка, объект { name } или id
+      const dupBrandName =
+        product.brand_name ||
+        (product.brand && typeof product.brand === "object"
+          ? product.brand.name
+          : null) ||
+        (product.brand != null && brands?.length
+          ? brands.find((b) => String(b.id) === String(product.brand))?.name
+          : null) ||
+        "";
+      const dupCategoryName =
+        product.category_name ||
+        (product.category && typeof product.category === "object"
+          ? product.category.name
+          : null) ||
+        (product.category != null && categories?.length
+          ? categories.find((c) => String(c.id) === String(product.category))
+              ?.name
+          : null) ||
+        "";
       // Заполняем основные данные (очищаем ID, штрих-код и количество для нового товара)
       setNewItemData({
         name: product.name || "",
         barcode: "", // Очищаем штрих-код для нового товара
-        brand_name: product.brand_name || "",
-        category_name: product.category_name || "",
+        brand_name: dupBrandName,
+        category_name: dupCategoryName,
         price: formatPrice3DecimalsDup(product.price),
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",

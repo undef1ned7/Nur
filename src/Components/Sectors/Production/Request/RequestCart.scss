@@ -549,7 +549,7 @@
   left: 0;
   right: 0;
   background: white;
-  border-top: 2px solid #007bff;
+  border-top: none !important;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
   z-index: 1001;
   max-height: calc(85vh - 70px);

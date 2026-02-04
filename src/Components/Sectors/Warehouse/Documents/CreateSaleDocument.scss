@@ -21,6 +21,16 @@ $due-red: #dc2626;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+
+    @include ifmobile {
+      max-height: 50dvh;
+    }
+    @include iflaptop {
+      max-height: 50dvh;
+    }
+    @include iftablet {
+      max-height: 50dvh;
+    }
   }
 
   &__sidebar-title {
@@ -30,6 +40,23 @@ $due-red: #dc2626;
     font-weight: 600;
     color: #0f172a;
     letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__selected-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    background: $primary;
+    color: #000;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   &__search-wrapper {
@@ -99,6 +126,7 @@ $due-red: #dc2626;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    margin-top: 10px;
   }
 
   &__product-item {
@@ -724,7 +752,6 @@ $due-red: #dc2626;
 
     &__sidebar {
       width: 100%;
-      max-height: 40vh;
       border-right: none;
       border-bottom: 1px solid #e5e7eb;
     }
@@ -806,9 +833,6 @@ $due-red: #dc2626;
     height: auto;
     min-height: 100vh;
 
-    &__sidebar {
-      max-height: 35vh;
-    }
 
     &__search-wrapper {
       padding: 12px;
@@ -976,9 +1000,7 @@ $due-red: #dc2626;
 
 @media (max-width: 480px) {
   .create-sale-document {
-    &__sidebar {
-      max-height: 30vh;
-    }
+   
 
     &__search-wrapper {
       padding: 10px;
@@ -1197,9 +1219,6 @@ $due-red: #dc2626;
 // Для очень маленьких экранов (высота)
 @media (max-height: 600px) {
   .create-sale-document {
-    &__sidebar {
-      max-height: 25vh;
-    }
 
     &__content {
       padding: 10px;

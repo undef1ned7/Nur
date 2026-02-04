@@ -8,6 +8,7 @@ import { useUser } from "../../../../../store/slices/userSlice";
 import InvoicePdfDocument from "./InvoicePdfDocument";
 
 import "./InvoicePreviewModal.scss";
+import { useAlert, useConfirm } from "../../../../../hooks/useDialog";
 
 const InvoicePreviewModal = ({
   invoiceId,
@@ -16,6 +17,8 @@ const InvoicePreviewModal = ({
   onClose,
   onEdit,
 }) => {
+  const alert = useAlert();
+  const confirm = useConfirm(); 
   const dispatch = useDispatch();
   const { company } = useUser();
   const [invoiceData, setInvoiceData] = useState(initialInvoiceData);

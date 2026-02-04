@@ -384,6 +384,32 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       return false;
     }
 
+    // Если выбран поставщик — тип оплаты обязателен
+    if (product.client && !dealStatus?.trim()) {
+      error("При выбранном поставщике укажите тип оплаты.");
+      return false;
+    }
+
+    // Долги: срок долга обязателен
+    if (dealStatus === "Долги") {
+      if (!debtMonths || Number(debtMonths) < 1) {
+        error("Укажите срок долга.");
+        return false;
+      }
+    }
+
+    // Предоплата: сумма предоплаты и срок долга обязательны
+    if (dealStatus === "Предоплата") {
+      if (!prepayment || Number(prepayment) < 0) {
+        error("Укажите сумму предоплаты.");
+        return false;
+      }
+      if (!debtMonths || Number(debtMonths) < 1) {
+        error("Укажите срок долга.");
+        return false;
+      }
+    }
+
     // Проверка количества сырья
     const units = Number(product.quantity || 0);
     if (recipeItems.length > 0 && units > 0) {
@@ -414,7 +440,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     }
 
     return true;
-  }, [product, recipeItems, materials]);
+  }, [product, recipeItems, materials, dealStatus, debtMonths, prepayment]);
 
   // submit
   const handleSubmit = async () => {
@@ -422,12 +448,13 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     if (!validateProduct()) return;
 
     // рецепт для списания: [{id, qty_per_unit}]
-    // ВАЖНО: recipeItems[].quantity — это qty_per_unit (расход сырья на 1 ед. товара),
-    // а общий расход считается как qty_per_unit × units.
+    // API допускает не более 3 знаков после запятой — округляем, чтобы избежать 84072.79999999999
+    const roundTo3 = (v) =>
+      Math.round(Number(v) * 1000) / 1000;
     const recipe = recipeItems
       .map((it) => ({
         id: String(it.materialId),
-        qty_per_unit: Number(it.quantity || 0),
+        qty_per_unit: roundTo3(it.quantity || 0),
       }))
       .filter((r) => r.qty_per_unit > 0);
 
@@ -727,65 +754,75 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
           )}
         </div>
 
-        <div className="finished-goods-add-modal__section">
-          <label>Тип оплаты *</label>
-          <select
-            name="category_name"
-            className="finished-goods-add-modal__input"
-            value={dealStatus}
-            onChange={(e) => setDealStatus(e.target.value)}
-            required
-          >
-            <option value="">-- Выберите тип оплаты --</option>
-            {DEAL_STATUS_RU?.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {dealStatus === "Долги" && (
-          <div className="finished-goods-add-modal__section">
-            <label>Срок долга</label>
-            <input
-              className="finished-goods-add-modal__input"
-              type="number"
-              min={1}
-              step={1}
-              value={debtMonths}
-              onChange={(e) => setDebtMonths(e.target.value)}
-              placeholder="Например, 6"
-            />
-          </div>
-        )}
-
-        {dealStatus === "Предоплата" && (
+        {product.client && (
           <>
             <div className="finished-goods-add-modal__section">
-              <label>Предоплата</label>
-              <input
+              <label>Тип оплаты *</label>
+              <select
+                name="category_name"
                 className="finished-goods-add-modal__input"
-                type="number"
-                min={1}
-                step={1}
-                value={prepayment}
-                onChange={(e) => setPrepayment(e.target.value)}
-                placeholder="Сумма предоплаты"
-              />
+                value={dealStatus}
+                onChange={(e) => setDealStatus(e.target.value)}
+                required
+              >
+                <option value="">-- Выберите тип оплаты --</option>
+                {DEAL_STATUS_RU?.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="finished-goods-add-modal__section">
-              <label>Срок долга</label>
-              <input
-                className="finished-goods-add-modal__input"
-                type="number"
-                min={1}
-                step={1}
-                value={debtMonths}
-                onChange={(e) => setDebtMonths(e.target.value)}
-                placeholder="Например, 6"
-              />
-            </div>
+
+            {dealStatus === "Долги" && (
+              <div className="finished-goods-add-modal__section">
+                <label>Срок долга *</label>
+                <input
+                  className="finished-goods-add-modal__input"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={debtMonths}
+                  onChange={(e) => setDebtMonths(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  placeholder="Например, 6"
+                  required
+                />
+              </div>
+            )}
+
+            {dealStatus === "Предоплата" && (
+              <>
+                <div className="finished-goods-add-modal__section">
+                  <label>Предоплата *</label>
+                  <input
+                    className="finished-goods-add-modal__input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={prepayment}
+                    onChange={(e) => setPrepayment(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    placeholder="Сумма предоплаты"
+                    required
+                  />
+                </div>
+                <div className="finished-goods-add-modal__section">
+                  <label>Срок долга *</label>
+                  <input
+                    className="finished-goods-add-modal__input"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={debtMonths}
+                    onChange={(e) => setDebtMonths(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    placeholder="Например, 6"
+                    required
+                  />
+                </div>
+              </>
+            )}
           </>
         )}
 
@@ -799,6 +836,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             placeholder="120"
             value={product.price}
             onChange={onProductChange}
+            onWheel={(e) => e.currentTarget.blur()}
             min="0"
             step="0.01"
             required
@@ -816,6 +854,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             placeholder="110"
             value={product.purchase_price}
             onChange={onProductChange}
+            onWheel={(e) => e.currentTarget.blur()}
             min="0"
             step="0.01"
             required
@@ -831,6 +870,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             placeholder="100"
             value={product.quantity}
             onChange={onProductChange}
+            onWheel={(e) => e.currentTarget.blur()}
             min="0"
             required
           />
@@ -1119,6 +1159,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                                 step: "0.0001",
                                 min: "0",
                                 max: units > 0 ? availableQty / units : undefined,
+                                onWheel: (e) => e.currentTarget.blur(),
                               }}
                               disabled={!checked}
                               value={qty}
@@ -1237,6 +1278,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                         step: "0.0001",
                         min: "0",
                         max: availableQty / (units || 1),
+                        onWheel: (e) => e.currentTarget.blur(),
                       }}
                       value={it.quantity}
                       onChange={(e) =>

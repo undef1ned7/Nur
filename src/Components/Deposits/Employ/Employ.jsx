@@ -107,24 +107,16 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
   };
 
   const availableDepts = ["Склад", "Маркетинг", "Продажи", "HR", "Бухгалтерия"];
-  const availableRoles = [
-    {
-      value: "admin",
-      label: "Администратор",
-    },
-    {
-      value: "manager",
-      label: "Менеджер",
-    },
-    {
-      value: "user",
-      label: "Пользователь",
-    },
-    {
-      value: "owner",
-      label: "Владелец",
-    },
+  const allRoles = [
+    { value: "admin", label: "Администратор" },
+    { value: "manager", label: "Менеджер" },
+    { value: "user", label: "Пользователь" },
+    { value: "owner", label: "Владелец" },
   ];
+  // При редактировании нельзя назначить владельца (показываем владельца только если сотрудник уже владелец)
+  const availableRoles = allRoles.filter(
+    (r) => r.value !== "owner" || editedEmployee.role === "owner"
+  );
 
   return (
     <div className="edit-modal">

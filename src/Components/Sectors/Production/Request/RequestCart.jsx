@@ -370,7 +370,7 @@ const RequestCart = ({
   isOpen = false,
   onOpenChange,
   totalItemsCount = 0,
-  onMobileOrderSectionChange,
+  isHiddenCart = false,
 }) => {
   const dispatch = useDispatch();
   const {
@@ -380,7 +380,6 @@ const RequestCart = ({
     error: clientError,
   } = useClient();
   const { company } = useUser();
-
   const [submitting, setSubmitting] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isClientSelectorOpen, setIsClientSelectorOpen] = useState(false);
@@ -669,9 +668,6 @@ const RequestCart = ({
     };
   }, []);
 
-  useEffect(() => {
-    onMobileOrderSectionChange?.(isMobile);
-  }, [isMobile, onMobileOrderSectionChange]);
 
   // Блокируем задний фон и прокрутку когда секция открыта
   useEffect(() => {
@@ -1298,7 +1294,6 @@ const RequestCart = ({
       </div>
     </div>
   );
-
   return (
     <>
       {/* Модалка корзины - открывается при нажатии на кнопку корзины в ProductionRequest */}
@@ -1455,7 +1450,7 @@ const RequestCart = ({
       )}
 
       {/* Кнопка корзины внизу экрана - для мобильных/планшетов */}
-      {isMobile && (() => {
+      {isMobile && !isHiddenCart && (() => {
         // Вычисляем итог запроса по той же логике, что и в RequestSummary
         let total = 0;
 

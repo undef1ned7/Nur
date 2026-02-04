@@ -1,7 +1,7 @@
 // src/components/Education/Masters.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaEdit, FaPlus, FaSearch, FaTrash } from "react-icons/fa";
+import { FaEdit, FaLock, FaPlus, FaSearch, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import RoleCreateModal from "./modals/RoleCreateModal";
@@ -1335,6 +1335,7 @@ const Masters = () => {
                       title="Управление доступами"
                       disabled={u.role === "owner"}
                     >
+                      <FaLock />
                       <span className="barbermasters__btnText">Доступы</span>
                     </button>
                     <button

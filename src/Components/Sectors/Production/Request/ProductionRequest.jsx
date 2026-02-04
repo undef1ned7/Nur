@@ -15,6 +15,7 @@ import ProductsGrid from "./components/ProductsGrid/ProductsGrid";
 import RequestCart from "./RequestCart";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import "./ProductionRequest.scss";
+import useResize from "../../../../hooks/useResize";
 
 const ProductionRequest = () => {
   const dispatch = useDispatch();
@@ -350,8 +351,7 @@ const ProductionRequest = () => {
     }
   };
 
-  const [isMobileView, setIsMobileView] = useState(false);
-
+  const { isMobile } = useResize()
   return (
     <div className="production-request">
       <CatalogControls
@@ -365,7 +365,7 @@ const ProductionRequest = () => {
         onViewModeChange={setViewMode}
         onOpenCart={handleOpenCart}
         totalItemsCount={totalItemsCount}
-        hideCartButton={isMobileView}
+        hideCartButton={isMobile}
       />
 
       {loading && (
@@ -416,7 +416,7 @@ const ProductionRequest = () => {
         isOpen={isCartSectionOpen}
         onOpenChange={setIsCartSectionOpen}
         totalItemsCount={totalItemsCount}
-        onMobileOrderSectionChange={setIsMobileView}
+        isHiddenCart={isOwner}
       />
 
       <AlertModal
