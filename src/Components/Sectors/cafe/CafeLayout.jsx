@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useCafeWebSocketManager } from '../../../hooks/useCafeWebSocket'
 import NotificationCafeSound from '../../common/Notification/NotificationCafeSound'
@@ -21,6 +21,8 @@ export default function CafeLayout() {
     const kitchensCacheRef = useRef(null); // Map(kitchenId -> kitchen)
     const menuKitchenCacheRef = useRef(new Map()); // menuItemId -> kitchenId
     const bridgeHealthRef = useRef({ checkedAt: 0, ok: null }); // cache health
+    const POLL_RECENT_ORDERS_MS = 15 * 1000; // 15 sec — fallback when order created from another device (e.g. phone)
+    const RECENT_ORDER_AGE_MS = 3 * 60 * 1000; // consider orders from last 3 minutes for auto-print
 
     const isAutoKitchenPrintEnabled = useMemo(() => {
         try {
@@ -248,6 +250,38 @@ export default function CafeLayout() {
             printingOrdersRef.current.delete(oid);
         }
     }
+
+    // Fallback: poll recent orders and print kitchen tickets for any unprinted (when order was created from another device, e.g. phone)
+    const pollRecentOrdersAndPrint = useCallback(async () => {
+        const enabled = await shouldAutoPrintNow();
+        if (!enabled) return;
+        try {
+            let res;
+            try {
+                res = await api.get("/cafe/orders/", {
+                    params: { page_size: 50, ordering: "-created_at" },
+                });
+            } catch {
+                res = await api.get("/cafe/orders/", { params: { page_size: 50 } });
+            }
+            const list = res?.data?.results ?? res?.data ?? [];
+            if (!Array.isArray(list)) return;
+            const cutoff = Date.now() - RECENT_ORDER_AGE_MS;
+            for (const o of list) {
+                const oid = String(o?.id ?? "");
+                if (!oid) continue;
+                const created = o?.created_at ?? o?.date;
+                const createdMs = created ? new Date(created).getTime() : 0;
+                if (createdMs < cutoff) continue;
+                if (printedOrdersRef.current.has(oid)) continue;
+                if (printingOrdersRef.current.has(oid)) continue;
+                await printKitchenTicketsForOrder(oid);
+            }
+        } catch (e) {
+            console.warn("CafeLayout poll recent orders:", e?.message || e);
+        }
+    }, []);
+
     useEffect(() => {
         const lastMessage = orders?.lastMessage;
         if (!lastMessage) return;
@@ -285,7 +319,23 @@ export default function CafeLayout() {
                 }).catch(() => { });
             }
         }
-    }, [orders?.lastMessage, profile?.id, isCookPage])
+    }, [orders?.lastMessage, profile?.id, isCookPage]);
+
+    // Fallback polling: when order is created from another device (e.g. phone), this device (notebook) may not get WebSocket event — poll recent orders and print
+    useEffect(() => {
+        const intervalId = setInterval(pollRecentOrdersAndPrint, POLL_RECENT_ORDERS_MS);
+        return () => clearInterval(intervalId);
+    }, [pollRecentOrdersAndPrint]);
+
+    // When user returns to this tab (e.g. notebook), immediately check for new orders to print
+    useEffect(() => {
+        const onVisibility = () => {
+            if (document.visibilityState === "visible") pollRecentOrdersAndPrint();
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => document.removeEventListener("visibilitychange", onVisibility);
+    }, [pollRecentOrdersAndPrint]);
+
     return (
         <>
             <NotificationCafeSound notification={notificationOrder} notificationKey={notificationDeps} />

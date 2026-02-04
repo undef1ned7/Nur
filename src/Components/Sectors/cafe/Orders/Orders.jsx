@@ -721,6 +721,27 @@ const Orders = () => {
   const [newClientPhone, setNewClientPhone] = useState("");
   const [addClientSaving, setAddClientSaving] = useState(false);
 
+  // Блокировка скролла фона при открытой модалке (мобильная версия: при скролле панели «Добавить блюда» не скроллится задний фон)
+  useEffect(() => {
+    if (!modalOpen) return;
+    const scrollY = window.scrollY;
+    const prevOverflow = document.body.style.overflow;
+    const prevPosition = document.body.style.position;
+    const prevWidth = document.body.style.width;
+    const prevTop = document.body.style.top;
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+    document.body.style.top = `-${scrollY}px`;
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prevPosition;
+      document.body.style.width = prevWidth;
+      document.body.style.top = prevTop;
+      window.scrollTo(0, scrollY);
+    };
+  }, [modalOpen]);
+
   useEffect(() => {
     if (!modalOpen) return;
     let mounted = true;

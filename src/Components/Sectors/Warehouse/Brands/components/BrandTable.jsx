@@ -5,26 +5,17 @@ import "./BrandTable.scss";
  * Мемоизированный компонент строки таблицы
  */
 const BrandRow = React.memo(
-  ({
-    brand,
-    isSelected,
-    rowNumber,
-    onRowSelect,
-    onBrandClick,
-  }) => {
+  ({ brand, isSelected, rowNumber, onRowSelect, onBrandClick }) => {
     return (
-      <tr
-        className="warehouse-table__row"
-        onClick={() => onBrandClick(brand)}
-      >
-        <td onClick={(e) => onRowSelect(brand.id, e)}>
+      <tr className="warehouse-table__row" onClick={() => onBrandClick(brand)}>
+        {/* <td onClick={(e) => onRowSelect(brand.id, e)}>
           <input
             type="checkbox"
             checked={isSelected}
             onChange={(e) => onRowSelect(brand.id, e)}
             onClick={(e) => e.stopPropagation()}
           />
-        </td>
+        </td> */}
 
         <td>{rowNumber}</td>
 
@@ -32,7 +23,7 @@ const BrandRow = React.memo(
           <span>{brand.name || "—"}</span>
         </td>
 
-        <td>{brand.id || "—"}</td>
+        {/* <td>{brand.id || "—"}</td> */}
       </tr>
     );
   },
@@ -106,16 +97,16 @@ const BrandTable = ({
       <table className="warehouse-table w-full min-w-[600px]">
         <thead>
           <tr>
-            <th>
+            {/* <th>
               <input
                 type="checkbox"
                 checked={isAllSelected}
                 onChange={onSelectAll}
               />
-            </th>
+            </th> */}
             <th>№</th>
             <th>Название</th>
-            <th>ID</th>
+            {/* <th>ID</th> */}
           </tr>
         </thead>
         <tbody>
@@ -142,12 +133,9 @@ const areEqual = (prevProps, nextProps) => {
     prevProps.isAllSelected === nextProps.isAllSelected &&
     prevProps.brands.length === nextProps.brands.length &&
     prevProps.selectedRows.size === nextProps.selectedRows.size &&
-    prevProps.brands.every(
-      (b, i) => b.id === nextProps.brands[i]?.id
-    ) &&
+    prevProps.brands.every((b, i) => b.id === nextProps.brands[i]?.id) &&
     prevProps.getRowNumber === nextProps.getRowNumber
   );
 };
 
 export default React.memo(BrandTable, areEqual);
-

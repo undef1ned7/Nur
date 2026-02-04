@@ -53,6 +53,8 @@ const MenuItem = ({
         onToggleDropdown();
         navigate(to);
       } else {
+        e.preventDefault();
+        onToggleDropdown();
         if (shouldCloseOnClick()) {
           toggleSidebar();
         }
@@ -64,15 +66,29 @@ const MenuItem = ({
     }
   };
 
+  // «Бренды и категории» в складе: одна страница с вкладками (brands/categories/payment_categories) — пункт сайдбара должен оставаться активным на любой вкладке
+  const brandCategoryPaths = [
+    "/crm/warehouse/brands",
+    "/crm/warehouse/categories",
+    "/crm/warehouse/payment_categories",
+  ];
+  const isBrandCategorySection =
+    to === "/crm/warehouse/brands" &&
+    brandCategoryPaths.some(
+      (path) =>
+        location.pathname === path || location.pathname.startsWith(path + "/")
+    );
+
   return (
     <li
       className={`sidebar__menu-item-wrapper ${children ? "has-children" : ""}`}
     >
       <NavLink
         to={to}
-        className={({ isActive }) =>
-          `sidebar__menu-item ${isActive ? "sidebar__menu-item--active" : ""}`
-        }
+        className={({ isActive }) => {
+          const active = isActive || isBrandCategorySection;
+          return `sidebar__menu-item ${active ? "sidebar__menu-item--active" : ""}`;
+        }}
         onClick={handleClick}
       >
         {IconComponent}
@@ -83,11 +99,13 @@ const MenuItem = ({
           {children.map((child) => {
             const ChildIcon =
               typeof child.icon === "function" ? child.icon() : child.icon;
+            const isMoneyDocument = child.to?.includes("/money/");
             const childPathSegment = child.to?.split("/").filter(Boolean).pop();
             const childDocType = DOC_TYPE_PATH_TO_API[childPathSegment];
             const isActiveOnCreatePage =
               isDocumentsSection &&
               isOnCreatePage &&
+              !isMoneyDocument &&
               childDocType &&
               createPageDocType === childDocType;
             return (

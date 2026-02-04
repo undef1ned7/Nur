@@ -31,3 +31,64 @@
   }
 }
 
+/* Адаптивность страницы брендов/категорий */
+.brand-category-page {
+  /* Общие мобильные отступы */
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+
+  /* Хедер: выстраиваем в колонку и растягиваем кнопку */
+  @media (max-width: 1024px) {
+    .warehouse-header {
+      flex-direction: column;
+      align-items: stretch;
+
+      &__left {
+        align-items: center;
+      }
+
+      &__create-btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  }
+
+  /* Табы и таблица на маленьких экранах */
+  @media (max-width: 768px) {
+    .brand-category-tabs {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+      margin-bottom: 16px;
+
+      &__tab {
+        white-space: nowrap;
+        padding: 10px 16px;
+        font-size: 13px;
+      }
+    }
+
+    .warehouse-table-container {
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+
+    .warehouse-table {
+      min-width: 640px;
+    }
+  }
+
+  /* Чуть уменьшаем заголовки на очень маленьких экранах */
+  @media (max-width: 480px) {
+    .warehouse-header__title {
+      font-size: 20px;
+    }
+
+    .warehouse-header__subtitle {
+      font-size: 13px;
+    }
+  }
+}
+

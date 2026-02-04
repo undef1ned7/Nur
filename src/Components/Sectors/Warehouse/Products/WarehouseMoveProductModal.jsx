@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import api from "../../../../api";
+import warehouseAPI from "../../../../api/warehouse";
 import { fetchWarehousesAsync } from "../../../../store/creators/warehouseCreators";
 import "../../Market/Warehouse/Warehouse.scss";
 
@@ -15,8 +15,17 @@ const WarehouseMoveProductModal = ({ open, onClose, product, onMoved }) => {
   }, [product]);
 
   const [toWarehouseId, setToWarehouseId] = useState("");
-  const [qty, setQty] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const formatQty = (v) => {
+    const n = Number(String(v ?? "").replace(",", "."));
+    return Number.isFinite(n) ? n.toFixed(3) : "0.000";
+  };
+
+  const formatPrice = (v) => {
+    const n = Number(String(v ?? "").replace(",", "."));
+    return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -28,7 +37,6 @@ const WarehouseMoveProductModal = ({ open, onClose, product, onMoved }) => {
   useEffect(() => {
     if (!open) return;
     setToWarehouseId("");
-    setQty("");
     setSubmitting(false);
   }, [open]);
 
@@ -41,27 +49,38 @@ const WarehouseMoveProductModal = ({ open, onClose, product, onMoved }) => {
     e.preventDefault();
     if (!product?.id) return;
 
-    const qtyNum = Number(qty);
     if (!toWarehouseId) {
       alert("Выберите склад-получатель");
       return;
     }
-    if (!qty || Number.isNaN(qtyNum) || qtyNum <= 0) {
-      alert("Введите корректное количество");
+
+    if (!fromWarehouseId) {
+      alert("Не найден склад-отправитель");
       return;
     }
 
     setSubmitting(true);
     try {
-      // Перемещение товара между складами
-      // Endpoint (по аналогии с GET списком): /warehouse/movements/
-      // Если бэкенд ожидает другие ключи — в ответе будет валидация, подстроим.
-      await api.post("/warehouse/movements/", {
-        product: product.id,
-        from_warehouse: fromWarehouseId || null,
-        to_warehouse: toWarehouseId,
-        qty: qtyNum,
-      });
+      const qtyCandidate =
+        product?.quantity ??
+        product?.qty ??
+        product?.stock ??
+        1;
+
+      const payload = {
+        warehouse_from: String(fromWarehouseId),
+        warehouse_to: String(toWarehouseId),
+        comment: "перемещение",
+        items: [
+          {
+            product: String(product.id),
+            qty: formatQty(qtyCandidate),
+            price: formatPrice(product?.purchase_price ?? product?.price ?? 0),
+          },
+        ],
+      };
+
+      await warehouseAPI.transferWarehouse(payload);
 
       if (typeof onMoved === "function") onMoved();
       onClose();
@@ -91,9 +110,7 @@ const WarehouseMoveProductModal = ({ open, onClose, product, onMoved }) => {
           </button>
         </div>
 
-        <p className="warehouse-filter-modal__subtitle">
-          Выберите склад-получатель и количество для перемещения
-        </p>
+        <p className="warehouse-filter-modal__subtitle">Выберите склад-получатель для перемещения</p>
 
         <form className="warehouse-filter-modal__content" onSubmit={handleSubmit}>
           <div className="warehouse-filter-modal__section">
@@ -117,20 +134,6 @@ const WarehouseMoveProductModal = ({ open, onClose, product, onMoved }) => {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="warehouse-filter-modal__section">
-            <label className="warehouse-filter-modal__label">Количество</label>
-            <input
-              className="warehouse-filter-modal__input"
-              type="number"
-              min="0"
-              step="any"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              disabled={submitting}
-              required
-            />
           </div>
 
           <div className="warehouse-filter-modal__footer">

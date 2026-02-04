@@ -198,6 +198,9 @@
   align-items: center;
   justify-content: center;
   z-index: 50;
+  padding: 12px;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 .purchasing__modal {
   background: var(--surface);
@@ -205,6 +208,10 @@
   padding: 20px;
   width: 100%;
   max-width: 720px;
+  max-height: min(90dvh, 760px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   animation: fade 0.18s ease;
 }
 @keyframes fade {

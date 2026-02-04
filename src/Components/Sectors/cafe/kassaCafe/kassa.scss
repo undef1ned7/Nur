@@ -84,6 +84,9 @@
 
   &__total {
     font-weight: 550;
+    @media screen and (max-width: 576px) {
+      margin-left: 0 !important;
+    }
   }
 
   &__controls {
@@ -268,31 +271,33 @@
   &__modalOverlay {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, .45);
+    background: rgba(15, 23, 42, 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 100;
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    animation: ck-overlay-in .18s ease-out both;
+    animation: ck-overlay-in 0.18s ease-out both;
     padding: 12px;
-    overflow: auto;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   &__modal {
     background: #fff;
     border-radius: 16px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, .18), 0 4px 16px rgba(0, 0, 0, .08);
-    width: min(480px, calc(100vw - 24px));
-    max-width: calc(100vw - 24px);
-    max-height: min(90vh, 760px);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
+    width: min(480px, calc(100% - 24px));
+    max-width: calc(100% - 24px);
+    max-height: min(90dvh, 760px);
     margin: auto;
-    overflow: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
-    animation: ck-pop-in .22s cubic-bezier(.2, .8, .2, 1) .04s both;
+    animation: ck-pop-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) 0.04s both;
   }
 
   &__modalHeader {
@@ -359,7 +364,7 @@
     justify-content: center;
     cursor: pointer;
     color: #475569;
-    transition: .15s;
+    transition: 0.15s;
     flex-shrink: 0;
     font-size: 18px;
     line-height: 1;
@@ -546,9 +551,9 @@
 
   @media (max-width: 560px) {
     &__modal {
-      width: calc(100vw - 16px);
-      max-width: calc(100vw - 16px);
-      max-height: 85vh;
+      width: calc(100% - 16px);
+      max-width: calc(100% - 16px);
+      max-height: calc(100dvh - 16px);
       border-radius: 12px;
     }
 
@@ -763,8 +768,9 @@
     }
 
     &__modal {
-      width: calc(100vw - 12px);
-      max-width: calc(100vw - 12px);
+      width: calc(100% - 12px);
+      max-width: calc(100% - 12px);
+      max-height: calc(100dvh - 12px);
       border-radius: 10px;
     }
 
@@ -875,9 +881,9 @@
     }
 
     &__modal {
-      width: 100vw;
-      max-width: 100vw;
-      max-height: 100vh;
+      width: 100%;
+      max-width: 100%;
+      max-height: 100dvh;
       border-radius: 8px 8px 0 0;
       margin: 0;
     }

@@ -9,6 +9,8 @@ import {
   Plus,
   Check,
   X,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
@@ -72,6 +74,7 @@ const Documents = () => {
     DOC_TYPE_FROM_PARAM[docTypeParam] ?? DOC_TYPE_FROM_PARAM.all;
 
   const [activeTab, setActiveTab] = useState("receipts");
+  const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(pageFromUrl || 1);
@@ -526,27 +529,48 @@ const Documents = () => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="documents__tabs">
-        <button
-          className={`documents__tab ${
-            activeTab === "receipts" ? "documents__tab--active" : ""
-          }`}
-          onClick={() => setActiveTab("receipts")}
-        >
-          Чеки
-        </button>
-        <button
-          className={`documents__tab ${
-            activeTab === "invoices" ? "documents__tab--active" : ""
-          }`}
-          onClick={() => setActiveTab("invoices")}
-        >
-          Накладные
-        </button>
+      {/* Tabs + view mode */}
+      <div className="documents__tabs-row">
+        <div className="documents__tabs">
+          <button
+            className={`documents__tab ${
+              activeTab === "receipts" ? "documents__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab("receipts")}
+          >
+            Чеки
+          </button>
+          <button
+            className={`documents__tab ${
+              activeTab === "invoices" ? "documents__tab--active" : ""
+            }`}
+            onClick={() => setActiveTab("invoices")}
+          >
+            Накладные
+          </button>
+        </div>
+        <div className="documents__view-toggle">
+          <button
+            type="button"
+            className={`documents__view-btn ${viewMode === "table" ? "documents__view-btn--active" : ""}`}
+            onClick={() => setViewMode("table")}
+            title="Таблица"
+          >
+            <List size={18} />
+          </button>
+          <button
+            type="button"
+            className={`documents__view-btn ${viewMode === "cards" ? "documents__view-btn--active" : ""}`}
+            onClick={() => setViewMode("cards")}
+            title="Карточки"
+          >
+            <LayoutGrid size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Table */}
+      {viewMode === "table" && (
       <div className="documents__table-wrapper">
         <table className="documents__table">
           <thead>
@@ -713,6 +737,92 @@ const Documents = () => {
           </tbody>
         </table>
       </div>
+      )}
+
+      {/* Карточки */}
+      {viewMode === "cards" && (
+        <div className="documents__cards">
+          {documentsLoading ? (
+            <div className="documents__cards-empty">Загрузка...</div>
+          ) : getCurrentData().length === 0 ? (
+            <div className="documents__cards-empty">Документы не найдены</div>
+          ) : (
+            getCurrentData().map((item) => (
+              <div key={item.id} className="documents__card">
+                <div className="documents__card-header">
+                  <span className="documents__card-number">{item.number}</span>
+                  <span
+                    className={`documents__status documents__status--${item.statusType}`}
+                  >
+                    {item.status}
+                  </span>
+                </div>
+                <div className="documents__card-body">
+                  <div className="documents__card-row">
+                    <span className="documents__card-label">
+                      {activeTab === "receipts" ? "Дата и время" : "Дата"}
+                    </span>
+                    <span className="documents__card-value">{item.date}</span>
+                  </div>
+                  <div className="documents__card-row">
+                    <span className="documents__card-label">Контрагент</span>
+                    <span className="documents__card-value">
+                      {activeTab === "receipts" ? item.client : item.counterparty}
+                    </span>
+                  </div>
+                  <div className="documents__card-row">
+                    <span className="documents__card-label">
+                      {activeTab === "receipts" ? "Товаров" : "Позиций"}
+                    </span>
+                    <span className="documents__card-value">
+                      {activeTab === "receipts" ? item.products : item.positions}
+                    </span>
+                  </div>
+                  <div className="documents__card-row documents__card-row--amount">
+                    <span className="documents__card-label">Сумма</span>
+                    <span className="documents__card-value">
+                      {formatAmount(item.amount)} сом
+                    </span>
+                  </div>
+                </div>
+                <div className="documents__card-actions">
+                  <button
+                    className="documents__action-btn"
+                    onClick={() => handleView(item)}
+                    title="Просмотр"
+                  >
+                    <Eye size={18} />
+                  </button>
+                  <button
+                    className="documents__action-btn"
+                    onClick={() => handlePrint(item)}
+                    title="Печать"
+                  >
+                    <Printer size={18} />
+                  </button>
+                  {item.statusType === "draft" ? (
+                    <button
+                      className="documents__action-btn"
+                      onClick={() => handlePost(item)}
+                      title="Провести документ"
+                    >
+                      <Check size={18} />
+                    </button>
+                  ) : (
+                    <button
+                      className="documents__action-btn"
+                      onClick={() => handleUnpost(item)}
+                      title="Отменить проведение"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Пагинация для чеков и накладных */}
       {totalPages > 1 && (

@@ -14,7 +14,7 @@
   // Layout
   box-sizing: border-box;
   width: 100%;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--cmo-bg);
   color: var(--cmo-text);
 
@@ -273,6 +273,50 @@
     font-size: 28px;
     color: var(--cmo-primary);
     letter-spacing: -0.02em;
+  }
+
+  // ===== PAGINATION =====
+  &__pagination {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--cmo-text-muted);
+  }
+
+  &__pageBtn {
+    min-width: 90px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid var(--cmo-border);
+    background: #fff;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 550;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s ease;
+
+    &:hover:not(:disabled) {
+      background: #f9fafb;
+      border-color: rgba(15, 23, 42, 0.2);
+      color: var(--cmo-text);
+      transform: translateY(-1px);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+    }
+  }
+
+  &__pageInfo {
+    font-weight: 500;
   }
 
   // ===== ERROR STATE =====

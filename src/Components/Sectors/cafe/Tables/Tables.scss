@@ -95,7 +95,7 @@
 
   /* ===== Scroll Container ===== */
   &__scroll {
-    max-height: calc(100vh - 240px);
+    max-height: calc(100dvh - 240px);
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 8px;
@@ -700,6 +700,8 @@
     padding: 12px;
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   &__modal {
@@ -708,11 +710,12 @@
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
     width: 100%;
     max-width: 720px;
-    max-height: min(90vh, 760px);
+    max-height: min(90dvh, 760px);
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
 
     &--confirm {
@@ -876,7 +879,7 @@
     }
 
     &__scroll {
-      max-height: calc(100vh - 280px);
+      max-height: calc(100dvh - 280px);
     }
 
     &__zoneGrid,
@@ -1003,7 +1006,7 @@
     }
 
     &__scroll {
-      max-height: calc(100vh - 300px);
+      max-height: calc(100dvh - 300px);
       padding-right: 4px;
     }
 
@@ -1049,8 +1052,8 @@
     }
 
     &__modal {
-      width: calc(100vw - 16px);
-      max-height: 90vh;
+      width: calc(100% - 16px);
+      max-height: calc(100dvh - 16px);
       border-radius: 14px;
     }
 
@@ -1161,7 +1164,7 @@
     }
 
     &__scroll {
-      max-height: calc(100vh - 280px);
+      max-height: calc(100dvh - 280px);
       padding-right: 2px;
     }
 

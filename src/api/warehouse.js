@@ -3,22 +3,17 @@ import api from "./index";
 /**
  * API для работы со складом (warehouse module)
  * Базовый префикс: /api/warehouse/
+ *
+ * Скоуп: все вьюхи используют CompanyBranchRestrictedMixin.
+ * Если у пользователя нет фиксированного филиала — передавайте ?branch=<uuid> в params.
+ * Пагинация: в списках поддерживается ?page=1|2|...
  */
 
 // ==================== ДОКУМЕНТЫ ====================
 
 /**
  * Получить список документов
- * @param {Object} params - Параметры запроса
- * @param {string} params.doc_type - Тип документа (SALE, PURCHASE, TRANSFER, etc.)
- * @param {string} params.status - Статус (DRAFT, POSTED)
- * @param {string} params.warehouse_from - UUID склада-отправителя
- * @param {string} params.warehouse_to - UUID склада-получателя
- * @param {string} params.counterparty - UUID контрагента
- * @param {string} params.date_from - Дата начала периода
- * @param {string} params.date_to - Дата окончания периода
- * @param {number} params.page - Номер страницы
- * @param {string} params.search - Поисковый запрос
+ * @param {Object} params - doc_type, status, warehouse_from, warehouse_to, counterparty, search (по number, comment), page, branch
  */
 export const listDocuments = async (params = {}) => {
   try {
@@ -133,7 +128,7 @@ export const deleteDocument = async (id) => {
  * Провести документ
  * @param {string} id - UUID документа
  * @param {Object} options - Опции проведения
- * @param {boolean} options.allow_negative - Разрешить проведение при недостаточном количестве товара
+ * @param {boolean|string} options.allow_negative - Обход проверки отрицательных остатков (true|"true"|"1"|"yes")
  */
 export const postDocument = async (id, options = {}) => {
   try {
@@ -466,14 +461,451 @@ export const createTransferDocument = async (payload) => {
   }
 };
 
-// ==================== ТОВАРЫ (CRUD) ====================
+/**
+ * Перемещение товаров между складами (transfer endpoint)
+ * POST /api/warehouse/transfer/
+ * @param {Object} payload - { warehouse_from, warehouse_to, comment, items[] }
+ */
+export const transferWarehouse = async (payload) => {
+  try {
+    const response = await api.post("warehouse/transfer/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Warehouse Transfer Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== БРЕНДЫ (2.2) ====================
 
 /**
- * Получить список товаров
- * @param {Object} params - Параметры запроса
- * @param {string} params.search - Поиск по name/article/barcode
- * @param {number} params.page - Номер страницы
- * @param {number} params.page_size - Размер страницы
+ * GET /api/warehouse/brands/
+ * @param {Object} params - name (icontains), branch, page
+ */
+export const listBrands = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/brands/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Brands Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const getBrandById = async (uuid) => {
+  try {
+    const response = await api.get(`warehouse/brands/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Brand Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const createBrand = async (payload) => {
+  try {
+    const response = await api.post("warehouse/brands/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Brand Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const updateBrand = async (uuid, payload) => {
+  try {
+    const response = await api.patch(`warehouse/brands/${uuid}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Brand Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const deleteBrand = async (uuid) => {
+  try {
+    const response = await api.delete(`warehouse/brands/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Brand Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== КАТЕГОРИИ (2.3) ====================
+
+/**
+ * GET /api/warehouse/category/
+ * @param {Object} params - branch, page
+ */
+export const listCategories = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/category/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Categories Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const getCategoryById = async (uuid) => {
+  try {
+    const response = await api.get(`warehouse/category/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const createCategory = async (payload) => {
+  try {
+    const response = await api.post("warehouse/category/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const updateCategory = async (uuid, payload) => {
+  try {
+    const response = await api.patch(`warehouse/category/${uuid}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const deleteCategory = async (uuid) => {
+  try {
+    const response = await api.delete(`warehouse/category/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Category Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== ТОВАРЫ: основной API (3.1) ====================
+
+/**
+ * 3.1 Список товаров по складу
+ * GET /api/warehouse/{warehouse_uuid}/products/
+ * @param {string} warehouseUuid - UUID склада
+ * @param {Object} params - name, article, price_min, price_max, purchase_price_min, purchase_price_max, markup_min, markup_max, brand, category, warehouse, status, stock, page
+ */
+export const listWarehouseProducts = async (warehouseUuid, params = {}) => {
+  try {
+    const response = await api.get(`warehouse/${warehouseUuid}/products/`, {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Warehouse Products Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 3.1 Создать товар на складе
+ * POST /api/warehouse/{warehouse_uuid}/products/
+ */
+export const createProductInWarehouse = async (warehouseUuid, payload) => {
+  try {
+    const response = await api.post(
+      `warehouse/${warehouseUuid}/products/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Product In Warehouse Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 3.1 Детали товара (глобально по uuid)
+ * GET /api/warehouse/products/{product_uuid}/
+ */
+export const getProductByUuid = async (uuid) => {
+  try {
+    const response = await api.get(`warehouse/products/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Product By Uuid Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 3.1 Обновить товар
+ * PATCH/PUT /api/warehouse/products/{product_uuid}/
+ */
+export const updateProductByUuid = async (uuid, payload) => {
+  try {
+    const response = await api.patch(`warehouse/products/${uuid}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Product By Uuid Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 3.1 Удалить товар
+ * DELETE /api/warehouse/products/{product_uuid}/
+ */
+export const deleteProductByUuid = async (uuid) => {
+  try {
+    const response = await api.delete(`warehouse/products/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Product By Uuid Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== ФОТО ТОВАРА (3.2) ====================
+
+/**
+ * GET /api/warehouse/products/{product_uuid}/images/
+ */
+export const listProductImages = async (productUuid) => {
+  try {
+    const response = await api.get(
+      `warehouse/products/${productUuid}/images/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Product Images Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * POST /api/warehouse/products/{product_uuid}/images/
+ * Content-Type: multipart/form-data, поле image (обязательно), опционально alt, is_primary
+ */
+export const createProductImage = async (productUuid, formData) => {
+  try {
+    const response = await api.post(
+      `warehouse/products/${productUuid}/images/`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Product Image Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * GET/PATCH/PUT/DELETE /api/warehouse/products/{product_uuid}/images/{image_uuid}/
+ */
+export const getProductImage = async (productUuid, imageUuid) => {
+  try {
+    const response = await api.get(
+      `warehouse/products/${productUuid}/images/${imageUuid}/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Product Image Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const updateProductImage = async (productUuid, imageUuid, formData) => {
+  try {
+    const response = await api.patch(
+      `warehouse/products/${productUuid}/images/${imageUuid}/`,
+      formData,
+      formData instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : {}
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Product Image Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const deleteProductImage = async (productUuid, imageUuid) => {
+  try {
+    const response = await api.delete(
+      `warehouse/products/${productUuid}/images/${imageUuid}/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Product Image Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== УПАКОВКИ ТОВАРА (3.3) ====================
+
+/**
+ * GET /api/warehouse/products/{product_uuid}/packages/
+ */
+export const listProductPackages = async (productUuid) => {
+  try {
+    const response = await api.get(
+      `warehouse/products/${productUuid}/packages/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Product Packages Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * POST /api/warehouse/products/{product_uuid}/packages/
+ * quantity_in_package > 0
+ */
+export const createProductPackage = async (productUuid, payload) => {
+  try {
+    const response = await api.post(
+      `warehouse/products/${productUuid}/packages/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Product Package Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const getProductPackage = async (productUuid, packageUuid) => {
+  try {
+    const response = await api.get(
+      `warehouse/products/${productUuid}/packages/${packageUuid}/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Product Package Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const updateProductPackage = async (
+  productUuid,
+  packageUuid,
+  payload
+) => {
+  try {
+    const response = await api.patch(
+      `warehouse/products/${productUuid}/packages/${packageUuid}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Product Package Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const deleteProductPackage = async (productUuid, packageUuid) => {
+  try {
+    const response = await api.delete(
+      `warehouse/products/${productUuid}/packages/${packageUuid}/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Product Package Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== ТОВАРЫ: простой CRUD для документов (3.4) ====================
+
+/**
+ * 3.4 Список товаров для выбора в документах
+ * GET /api/warehouse/crud/products/
+ * @param {Object} params - search (name/article/barcode), page
  */
 export const listProducts = async (params = {}) => {
   try {
@@ -560,11 +992,98 @@ export const deleteProduct = async (id) => {
   }
 };
 
-// ==================== СКЛАДЫ (CRUD) ====================
+// ==================== СКЛАДЫ ====================
 
 /**
- * Получить список складов
- * @param {Object} params - Параметры запроса
+ * 2.1 Склады (полный CRUD) — список с фильтрами
+ * GET /api/warehouse/
+ * @param {Object} params - name (icontains), status (active|inactive), created_after, created_before, branch, page
+ */
+export const listWarehousesFull = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Warehouses Full Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 2.1 Детали склада (полный CRUD)
+ * GET /api/warehouse/{warehouse_uuid}/
+ */
+export const getWarehouseByUuid = async (uuid) => {
+  try {
+    const response = await api.get(`warehouse/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Warehouse By Uuid Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 2.1 Создать склад
+ * POST /api/warehouse/
+ */
+export const createWarehouseFull = async (payload) => {
+  try {
+    const response = await api.post("warehouse/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Warehouse Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 2.1 Обновить склад
+ * PATCH/PUT /api/warehouse/{warehouse_uuid}/
+ */
+export const updateWarehouseFull = async (uuid, payload) => {
+  try {
+    const response = await api.patch(`warehouse/${uuid}/`, payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Warehouse Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 2.1 Удалить склад
+ * DELETE /api/warehouse/{warehouse_uuid}/
+ */
+export const deleteWarehouseFull = async (uuid) => {
+  try {
+    const response = await api.delete(`warehouse/${uuid}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Warehouse Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 3.5 Простой список складов (для селектов)
+ * GET /api/warehouse/crud/warehouses/
+ * @param {Object} params - branch, page
  */
 export const listWarehouses = async (params = {}) => {
   try {
@@ -580,8 +1099,8 @@ export const listWarehouses = async (params = {}) => {
 };
 
 /**
- * Получить склад по ID
- * @param {string} id - UUID склада
+ * Получить склад по ID (crud, для селектов)
+ * GET /api/warehouse/crud/warehouses/{id}/
  */
 export const getWarehouseById = async (id) => {
   try {
@@ -847,6 +1366,83 @@ export const deleteAgentCartItem = async (id) => {
 
 // ==================== АГЕНТЫ: ОСТАТКИ ====================
 
+// ==================== ДОКУМЕНТЫ АГЕНТА (4.2.1) ====================
+
+/**
+ * Документы агента (по своим товарам). Для агента нельзя TRANSFER и INVENTORY.
+ * GET /api/warehouse/agent/documents/
+ * @param {Object} params - doc_type, status, search, page
+ */
+export const listAgentDocuments = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/agent/documents/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Agent Documents Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const getAgentDocumentById = async (id) => {
+  try {
+    const response = await api.get(`warehouse/agent/documents/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Agent Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const createAgentDocument = async (payload) => {
+  try {
+    const response = await api.post("warehouse/agent/documents/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Agent Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const updateAgentDocument = async (id, payload) => {
+  try {
+    const response = await api.patch(
+      `warehouse/agent/documents/${id}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Agent Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+export const deleteAgentDocument = async (id) => {
+  try {
+    const response = await api.delete(`warehouse/agent/documents/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Agent Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== АГЕНТЫ: ОСТАТКИ ====================
+
 /**
  * 6.3 Остатки у агента (текущий пользователь)
  * GET /api/warehouse/agents/me/products/
@@ -886,10 +1482,9 @@ export const listOwnerAgentsProducts = async (params = {}) => {
 // ==================== КОНТРАГЕНТЫ (CRUD) ====================
 
 /**
- * Получить список контрагентов
- * @param {Object} params - Параметры запроса
- * @param {string} params.search - Поисковый запрос
- * @param {string} params.type - Тип контрагента (client, supplier, etc.)
+ * 2.4 Контрагенты
+ * GET /api/warehouse/crud/counterparties/
+ * @param {Object} params - search, type (CLIENT|SUPPLIER|BOTH), page, branch
  */
 export const listCounterparties = async (params = {}) => {
   try {
@@ -1032,7 +1627,7 @@ export const getCounterpartyPayments = async (id) => {
 /**
  * 5.1 Категории платежей
  * GET/POST /api/warehouse/money/categories/
- * GET/PATCH/PUT/DELETE /api/warehouse/money/categories/{id}/
+ * @param {Object} params - search (по title), branch, page
  */
 export const listMoneyCategories = async (params = {}) => {
   try {
@@ -1345,15 +1940,58 @@ export default {
   createWriteOffDocument,
   listTransferDocuments,
   createTransferDocument,
-  // Товары
+  transferWarehouse,
+  // Документы агента (4.2.1)
+  listAgentDocuments,
+  getAgentDocumentById,
+  createAgentDocument,
+  updateAgentDocument,
+  deleteAgentDocument,
+  // Склады: полный CRUD (2.1)
+  listWarehousesFull,
+  getWarehouseByUuid,
+  createWarehouseFull,
+  updateWarehouseFull,
+  deleteWarehouseFull,
+  // Склады: простой CRUD для селектов
+  listWarehouses,
+  getWarehouseById,
+  // Бренды (2.2)
+  listBrands,
+  getBrandById,
+  createBrand,
+  updateBrand,
+  deleteBrand,
+  // Категории (2.3)
+  listCategories,
+  getCategoryById,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  // Товары: основной API (3.1)
+  listWarehouseProducts,
+  createProductInWarehouse,
+  getProductByUuid,
+  updateProductByUuid,
+  deleteProductByUuid,
+  // Фото товара (3.2)
+  listProductImages,
+  createProductImage,
+  getProductImage,
+  updateProductImage,
+  deleteProductImage,
+  // Упаковки товара (3.3)
+  listProductPackages,
+  createProductPackage,
+  getProductPackage,
+  updateProductPackage,
+  deleteProductPackage,
+  // Товары: простой CRUD для документов (3.4)
   listProducts,
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
-  // Склады
-  listWarehouses,
-  getWarehouseById,
   // Агенты: заявки и остатки
   listAgentCarts,
   createAgentCart,
@@ -1376,7 +2014,7 @@ export default {
   getOwnerAnalytics,
   getAgentMeAnalytics,
   getOwnerAgentAnalytics,
-  // Контрагенты
+  // Контрагенты (2.4)
   listCounterparties,
   getCounterpartyById,
   createCounterparty,

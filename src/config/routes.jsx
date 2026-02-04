@@ -190,8 +190,7 @@ const WarehouseAnalyticsRoute = () => {
   const { profile } = useUser();
   const [searchParams] = useSearchParams();
   const agentId = searchParams.get("agent_id");
-  const isAgent =
-    profile?.role !== "owner" && profile?.role !== "admin";
+  const isAgent = profile?.role !== "owner" && profile?.role !== "admin";
   if (isAgent && !agentId) return <WarehouseAgentAnalytics />;
   if (agentId) return <WarehouseAgentAnalytics />;
   return <WarehouseAnalytics />;
