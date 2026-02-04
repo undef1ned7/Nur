@@ -662,7 +662,7 @@ const Catalog = () => {
 
   const checkoutHint = useMemo(() => {
     if (lines.length === 0) return "";
-    if (!showcasePhoneRaw) return "WhatsApp недоступен: у компании нет phones_howcase.";
+    if (!showcasePhoneRaw) return "WhatsApp недоступен: в ответе API компании (GET /main/public/companies/{slug}/) нет поля phones_howcase. Добавьте его в сериализатор публичной компании и укажите номер в настройках «Моя компания».";
     if (!phoneShowcaseDigits) return "WhatsApp недоступен: неверный номер витрины.";
     if (!String(clientPhone || "").trim()) return "Укажи номер клиента.";
     return "";

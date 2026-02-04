@@ -8,7 +8,8 @@ import { clearCurrentCounterparty } from "../../../../store/slices/counterpartyS
 import "./CounterpartyDetail.scss";
 
 const fmtMoney = (v) =>
-  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) + " с";
+  (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
+  " с";
 
 const fmtDate = (v) => {
   if (!v) return "—";
@@ -26,7 +27,10 @@ const CounterpartyDetail = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const current = useSelector((state) => state.counterparty.current);
-  const loadingCurrent = useSelector((state) => state.counterparty.loadingCurrent);
+  const loadingCurrent = useSelector(
+    (state) => state.counterparty.loadingCurrent
+  );
+  const company = useSelector((state) => state.user.company);
 
   const [operations, setOperations] = useState({ results: [] });
   const [loadingOperations, setLoadingOperations] = useState(true);
@@ -44,6 +48,13 @@ const CounterpartyDetail = () => {
 
   const name = current?.name ?? "—";
 
+  const getBranchParams = useCallback(() => {
+    const params = {};
+    if (company?.id) params.company = company.id;
+    if (company?.branch) params.branch = company.branch;
+    return params;
+  }, [company]);
+
   useEffect(() => {
     if (!id) return;
     dispatch(getWarehouseCounterpartyById(id));
@@ -58,32 +69,39 @@ const CounterpartyDetail = () => {
   useEffect(() => {
     const loadOptions = async () => {
       try {
+        const branchParams = getBranchParams();
         const [whData, catData] = await Promise.all([
-          warehouseAPI.listWarehouses(),
-          warehouseAPI.listMoneyCategories(),
+          warehouseAPI.listWarehouses(branchParams),
+          warehouseAPI.listMoneyCategories(branchParams),
         ]);
         setWarehouses(whData?.results ?? (Array.isArray(whData) ? whData : []));
-        setPaymentCategories(catData?.results ?? (Array.isArray(catData) ? catData : []));
+        setPaymentCategories(
+          catData?.results ?? (Array.isArray(catData) ? catData : [])
+        );
       } catch {
         setWarehouses([]);
         setPaymentCategories([]);
       }
     };
     loadOptions();
-  }, []);
+  }, [getBranchParams]);
 
   const loadOperations = useCallback(async () => {
     if (!id) return;
     setLoadingOperations(true);
     setErrorOperations("");
     try {
-      const params = {};
+      const params = { ...getBranchParams() };
       if (docTypeFilter) params.doc_type = docTypeFilter;
       if (statusFilter) params.status = statusFilter;
       if (warehouseFilter) params.warehouse = warehouseFilter;
-      if (paymentCategoryFilter) params.payment_category = paymentCategoryFilter;
+      if (paymentCategoryFilter)
+        params.payment_category = paymentCategoryFilter;
       if (searchDebounced) params.search = searchDebounced;
-      const data = await warehouseAPI.getCounterpartyMoneyOperations(id, params);
+      const data = await warehouseAPI.getCounterpartyMoneyOperations(
+        id,
+        params
+      );
       const list = data?.results ?? (Array.isArray(data) ? data : []);
       setOperations({ results: list });
     } catch (e) {
@@ -92,7 +110,15 @@ const CounterpartyDetail = () => {
     } finally {
       setLoadingOperations(false);
     }
-  }, [id, docTypeFilter, statusFilter, warehouseFilter, paymentCategoryFilter, searchDebounced]);
+  }, [
+    id,
+    docTypeFilter,
+    statusFilter,
+    warehouseFilter,
+    paymentCategoryFilter,
+    searchDebounced,
+    getBranchParams,
+  ]);
 
   useEffect(() => {
     loadOperations();
@@ -111,23 +137,36 @@ const CounterpartyDetail = () => {
       else if (row.doc_type === "MONEY_EXPENSE") sumExpense += amount;
     });
     return {
-      totalDebt: sumReceipt - sumExpense,
+      // Приход = контрагент платит нам → уменьшает его долг перед нами
+      // Расход = мы платим контрагенту → уменьшает наш долг перед ним
+      totalDebt: -(sumReceipt + sumExpense),
       transfers: sumReceipt + sumExpense,
       sales: sumReceipt,
     };
   }, [operationRows]);
 
   const docTypeLabel = (docType) =>
-    docType === "MONEY_RECEIPT" ? "Приход" : docType === "MONEY_EXPENSE" ? "Расход" : docType ?? "—";
-  const statusLabel = (s) => (s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—");
+    docType === "MONEY_RECEIPT"
+      ? "Приход"
+      : docType === "MONEY_EXPENSE"
+      ? "Расход"
+      : docType ?? "—";
+  const statusLabel = (s) =>
+    s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
 
   const goBack = () => navigate("/crm/warehouse/counterparties");
 
   if (!id) {
     return (
       <div className="counterparty-detail-page">
-        <div className="counterparty-detail-page__error">Контрагент не найден</div>
-        <button type="button" className="counterparty-detail-page__back" onClick={goBack}>
+        <div className="counterparty-detail-page__error">
+          Контрагент не найден
+        </div>
+        <button
+          type="button"
+          className="counterparty-detail-page__back"
+          onClick={goBack}
+        >
           <ArrowLeft size={20} /> Назад
         </button>
       </div>
@@ -150,26 +189,46 @@ const CounterpartyDetail = () => {
 
       <div className="counterparty-detail-page__body">
         {loadingCurrent ? (
-          <div className="counterparty-detail-page__loading">Загрузка данных контрагента...</div>
+          <div className="counterparty-detail-page__loading">
+            Загрузка данных контрагента...
+          </div>
         ) : (
           <>
             <div className="counterparty-detail-page__summary-cards">
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt">
-                <span className="counterparty-detail-page__summary-label">Общий долг</span>
+                <span className="counterparty-detail-page__summary-label">
+                  Общий долг
+                </span>
                 <span className="counterparty-detail-page__summary-value">
-                  {summary.totalDebt.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COM
+                  {summary.totalDebt.toLocaleString("ru-RU", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  COM
                 </span>
               </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">
-                <span className="counterparty-detail-page__summary-label">Переводы</span>
+                <span className="counterparty-detail-page__summary-label">
+                  Переводы
+                </span>
                 <span className="counterparty-detail-page__summary-value">
-                  {summary.transfers.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COM
+                  {summary.transfers.toLocaleString("ru-RU", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  COM
                 </span>
               </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
-                <span className="counterparty-detail-page__summary-label">Продажи</span>
+                <span className="counterparty-detail-page__summary-label">
+                  Продажи
+                </span>
                 <span className="counterparty-detail-page__summary-value">
-                  {summary.sales.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} COM
+                  {summary.sales.toLocaleString("ru-RU", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  COM
                 </span>
               </div>
             </div>
@@ -186,7 +245,11 @@ const CounterpartyDetail = () => {
               <div className="counterparty-detail-page__view-toggle">
                 <button
                   type="button"
-                  className={`counterparty-detail-page__view-btn ${viewMode === "table" ? "counterparty-detail-page__view-btn--active" : ""}`}
+                  className={`counterparty-detail-page__view-btn ${
+                    viewMode === "table"
+                      ? "counterparty-detail-page__view-btn--active"
+                      : ""
+                  }`}
                   onClick={() => setViewMode("table")}
                   title="Таблица"
                 >
@@ -194,7 +257,11 @@ const CounterpartyDetail = () => {
                 </button>
                 <button
                   type="button"
-                  className={`counterparty-detail-page__view-btn ${viewMode === "cards" ? "counterparty-detail-page__view-btn--active" : ""}`}
+                  className={`counterparty-detail-page__view-btn ${
+                    viewMode === "cards"
+                      ? "counterparty-detail-page__view-btn--active"
+                      : ""
+                  }`}
                   onClick={() => setViewMode("cards")}
                   title="Карточки"
                 >
@@ -258,11 +325,17 @@ const CounterpartyDetail = () => {
             </div>
 
             {loadingOperations ? (
-              <div className="counterparty-detail-page__loading">Загрузка...</div>
+              <div className="counterparty-detail-page__loading">
+                Загрузка...
+              </div>
             ) : errorOperations ? (
-              <div className="counterparty-detail-page__error">{errorOperations}</div>
+              <div className="counterparty-detail-page__error">
+                {errorOperations}
+              </div>
             ) : operationRows.length === 0 ? (
-              <div className="counterparty-detail-page__empty">Нет приходов и расходов</div>
+              <div className="counterparty-detail-page__empty">
+                Нет приходов и расходов
+              </div>
             ) : viewMode === "table" ? (
               <div className="counterparty-detail-page__table-wrap">
                 <table className="counterparty-detail-page__table">
@@ -295,34 +368,63 @@ const CounterpartyDetail = () => {
             ) : (
               <div className="counterparty-detail-page__cards">
                 {operationRows.map((row) => (
-                  <div key={row.id || Math.random()} className="counterparty-detail-page__card">
+                  <div
+                    key={row.id || Math.random()}
+                    className="counterparty-detail-page__card"
+                  >
                     <div className="counterparty-detail-page__card-header">
-                      <span className="counterparty-detail-page__card-number">{row.number ?? "—"}</span>
-                      <span className={`counterparty-detail-page__card-status counterparty-detail-page__card-status--${row.status === "POSTED" ? "posted" : "draft"}`}>
+                      <span className="counterparty-detail-page__card-number">
+                        {row.number ?? "—"}
+                      </span>
+                      <span
+                        className={`counterparty-detail-page__card-status counterparty-detail-page__card-status--${
+                          row.status === "POSTED" ? "posted" : "draft"
+                        }`}
+                      >
                         {statusLabel(row.status)}
                       </span>
                     </div>
                     <div className="counterparty-detail-page__card-body">
                       <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">Тип</span>
-                        <span className="counterparty-detail-page__card-value">{docTypeLabel(row.doc_type)}</span>
+                        <span className="counterparty-detail-page__card-label">
+                          Тип
+                        </span>
+                        <span className="counterparty-detail-page__card-value">
+                          {docTypeLabel(row.doc_type)}
+                        </span>
                       </div>
                       <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">Дата</span>
-                        <span className="counterparty-detail-page__card-value">{fmtDate(row.date ?? row.created_at)}</span>
+                        <span className="counterparty-detail-page__card-label">
+                          Дата
+                        </span>
+                        <span className="counterparty-detail-page__card-value">
+                          {fmtDate(row.date ?? row.created_at)}
+                        </span>
                       </div>
                       <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">Сумма</span>
-                        <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--amount">{fmtMoney(row.amount)}</span>
+                        <span className="counterparty-detail-page__card-label">
+                          Сумма
+                        </span>
+                        <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--amount">
+                          {fmtMoney(row.amount)}
+                        </span>
                       </div>
                       <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">Категория</span>
-                        <span className="counterparty-detail-page__card-value">{row.payment_category_title ?? "—"}</span>
+                        <span className="counterparty-detail-page__card-label">
+                          Категория
+                        </span>
+                        <span className="counterparty-detail-page__card-value">
+                          {row.payment_category_title ?? "—"}
+                        </span>
                       </div>
                       {(row.comment ?? "").trim() ? (
                         <div className="counterparty-detail-page__card-row">
-                          <span className="counterparty-detail-page__card-label">Комментарий</span>
-                          <span className="counterparty-detail-page__card-value">{row.comment}</span>
+                          <span className="counterparty-detail-page__card-label">
+                            Комментарий
+                          </span>
+                          <span className="counterparty-detail-page__card-value">
+                            {row.comment}
+                          </span>
                         </div>
                       ) : null}
                     </div>

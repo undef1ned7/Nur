@@ -1469,6 +1469,10 @@
   &__card .cafeMenu__form {
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
     box-sizing: border-box;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   &__grid {

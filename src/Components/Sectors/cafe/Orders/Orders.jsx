@@ -583,6 +583,9 @@ const Orders = () => {
         } else {
           throw new Error("Некорректная настройка принтера кассы");
         }
+        try {
+          localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
+        } catch { }
       } catch (e) {
         console.error("Receipt print error:", e);
       } finally {
@@ -1228,7 +1231,12 @@ const Orders = () => {
           }}
         >
           <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
-            <div className="cafeOrdersModal__card">
+            <div
+              className="cafeOrdersModal__card"
+              onClick={() => {
+                if (menuOpen) setMenuOpen(false);
+              }}
+            >
               <div className="cafeOrdersModal__header">
                 <h3 className="cafeOrdersModal__title">{isEditing ? "Редактировать заказ" : "Новый заказ"}</h3>
                 <button

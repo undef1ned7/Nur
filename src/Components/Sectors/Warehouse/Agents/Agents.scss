@@ -66,6 +66,51 @@
     cursor: pointer;
   }
 
+  .agents-row-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .agents-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    background: #fff;
+    cursor: pointer;
+    transition: 0.15s ease;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &--approve {
+      background: #dcfce7;
+      border-color: #bbf7d0;
+      color: #166534;
+
+      &:hover:not(:disabled) {
+        background: #bbf7d0;
+      }
+    }
+
+    &--reject {
+      background: #fee2e2;
+      border-color: #fecaca;
+      color: #991b1b;
+
+      &:hover:not(:disabled) {
+        background: #fecaca;
+      }
+    }
+  }
+
   .agents-error {
     margin: 10px 0;
     padding: 12px 14px;
@@ -205,6 +250,12 @@
     justify-content: space-between;
     gap: 8px;
     font-size: 12px;
+  }
+
+  .agents-card__footer--actions {
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   .agents-cards-empty {
