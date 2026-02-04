@@ -649,7 +649,7 @@ const MoneyDocumentsPage = () => {
                 </div>
               )}
               <div className="money-documents-page__field">
-                <label htmlFor="money-doc-warehouse">Счёт *</label>
+                <label htmlFor="money-doc-warehouse">Склад *</label>
                 <select
                   id="money-doc-warehouse"
                   value={form.warehouse}
@@ -658,7 +658,7 @@ const MoneyDocumentsPage = () => {
                   }
                   required
                 >
-                  <option value="">введите</option>
+                  <option value="">выберите</option>
                   {warehouses.map((w) => (
                     <option key={w.id} value={w.id}>
                       {w.name ?? w.title ?? w.id}
