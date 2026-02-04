@@ -25,6 +25,10 @@ export default function CafeLayout() {
     const bridgeHealthRef = useRef({ checkedAt: 0, ok: null }); // cache health
     const POLL_RECENT_ORDERS_MS = 15 * 1000; // 15 sec — fallback when order created from another device (e.g. phone)
     const RECENT_ORDER_AGE_MS = 3 * 60 * 1000; // consider orders from last 3 minutes for auto-print
+    const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
+    const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
+    const UUID_RE =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     const isAutoKitchenPrintEnabled = useMemo(() => {
         try {
@@ -108,6 +112,28 @@ export default function CafeLayout() {
         }
     }, []);
 
+    const normalizeTableLabel = useCallback((raw) => {
+        if (raw === null || raw === undefined) return "";
+        const v = String(raw).trim();
+        if (!v) return "";
+        if (UUID_RE.test(v)) return "";
+        return v;
+    }, []);
+
+    const resolveTableLabelFromOrder = useCallback((order) => {
+        const raw =
+            order?.table_name ||
+            order?.table_label ||
+            order?.table_title ||
+            order?.table?.title ||
+            order?.table?.name ||
+            order?.table?.label ||
+            order?.table_number ||
+            order?.table?.number ||
+            order?.table;
+        return normalizeTableLabel(raw) || "—";
+    }, [normalizeTableLabel]);
+
     const linePrice = useCallback((it) => {
         const v =
             it?.price ??
@@ -128,11 +154,11 @@ export default function CafeLayout() {
 
     const buildReceiptPayload = useCallback((orderDetail) => {
         const dt = formatReceiptDate(orderDetail?.created_at || orderDetail?.date || orderDetail?.created);
-        const tableNo = orderDetail?.table_number ?? orderDetail?.table ?? "—";
+        const tableLabel = resolveTableLabelFromOrder(orderDetail);
         const items = Array.isArray(orderDetail?.items) ? orderDetail.items : [];
         return {
             company: localStorage.getItem("company_name") || "КАССА",
-            doc_no: `СТОЛ ${tableNo}`,
+            doc_no: `СТОЛ ${tableLabel}`,
             created_at: dt,
             cashier_name: fullName(profile || {}),
             discount: 0,
@@ -146,7 +172,7 @@ export default function CafeLayout() {
                 price: linePrice(it),
             })),
         };
-    }, [formatReceiptDate, linePrice, fullName, profile]);
+    }, [formatReceiptDate, linePrice, fullName, profile, resolveTableLabelFromOrder]);
 
     const printReceiptForOrder = useCallback(async (orderId) => {
         const oid = String(orderId || "");
@@ -157,6 +183,7 @@ export default function CafeLayout() {
             const alreadyPrinted = localStorage.getItem(`cafe_receipt_printed_${oid}`);
             if (alreadyPrinted) return;
         } catch { }
+        if (!acquireReceiptPrintLock(oid)) return;
 
         printingReceiptsRef.current.add(oid);
         try {
@@ -184,6 +211,7 @@ export default function CafeLayout() {
             console.error("Auto receipt print error:", e);
         } finally {
             printingReceiptsRef.current.delete(oid);
+            releaseReceiptPrintLock(oid);
         }
     }, [buildReceiptPayload]);
 
@@ -194,6 +222,79 @@ export default function CafeLayout() {
         } catch {
             return {};
         }
+    }
+
+    const kitchenPrintLockKey = (orderId) => `cafe_kitchen_print_lock_${orderId}`;
+    const receiptPrintLockKey = (orderId) => `cafe_receipt_print_lock_${orderId}`;
+
+    const readKitchenPrintLock = (orderId) => {
+        try {
+            const raw = localStorage.getItem(kitchenPrintLockKey(orderId));
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (!data?.ts) return null;
+            if (Date.now() - Number(data.ts) > KITCHEN_PRINT_LOCK_TTL_MS) {
+                localStorage.removeItem(kitchenPrintLockKey(orderId));
+                return null;
+            }
+            return data;
+        } catch {
+            return null;
+        }
+    }
+
+    const acquireKitchenPrintLock = (orderId) => {
+        try {
+            if (readKitchenPrintLock(orderId)) return false;
+            const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const payload = { token, ts: Date.now() };
+            localStorage.setItem(kitchenPrintLockKey(orderId), JSON.stringify(payload));
+            const confirmed = readKitchenPrintLock(orderId);
+            return confirmed?.token === token;
+        } catch {
+            return true;
+        }
+    }
+
+    const releaseKitchenPrintLock = (orderId) => {
+        try {
+            localStorage.removeItem(kitchenPrintLockKey(orderId));
+        } catch { }
+    }
+
+    const readReceiptPrintLock = (orderId) => {
+        try {
+            const raw = localStorage.getItem(receiptPrintLockKey(orderId));
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (!data?.ts) return null;
+            if (Date.now() - Number(data.ts) > RECEIPT_PRINT_LOCK_TTL_MS) {
+                localStorage.removeItem(receiptPrintLockKey(orderId));
+                return null;
+            }
+            return data;
+        } catch {
+            return null;
+        }
+    }
+
+    const acquireReceiptPrintLock = (orderId) => {
+        try {
+            if (readReceiptPrintLock(orderId)) return false;
+            const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const payload = { token, ts: Date.now() };
+            localStorage.setItem(receiptPrintLockKey(orderId), JSON.stringify(payload));
+            const confirmed = readReceiptPrintLock(orderId);
+            return confirmed?.token === token;
+        } catch {
+            return true;
+        }
+    }
+
+    const releaseReceiptPrintLock = (orderId) => {
+        try {
+            localStorage.removeItem(receiptPrintLockKey(orderId));
+        } catch { }
     }
 
     const ensureKitchensMap = async () => {
@@ -219,7 +320,14 @@ export default function CafeLayout() {
         const kid = String(kitchenId || "");
         if (!kid) return "";
         const k = kitchensMap.get(kid);
-        const direct = String(k?.printer || k?.printer_key || "").trim();
+        const direct = String(
+            k?.printer ||
+            k?.printer_key ||
+            k?.printerKey ||
+            k?.printer_id ||
+            k?.printerId ||
+            ""
+        ).trim();
         if (direct) return direct;
         const ls = readKitchenPrinterMap();
         return String(ls?.[kid] || "").trim();
@@ -246,6 +354,10 @@ export default function CafeLayout() {
         if (!oid) return;
         if (printedOrdersRef.current.has(oid)) return;
         if (printingOrdersRef.current.has(oid)) return;
+        try {
+            if (localStorage.getItem(`cafe_kitchen_printed_${oid}`)) return;
+        } catch { }
+        if (!acquireKitchenPrintLock(oid)) return;
         printingOrdersRef.current.add(oid);
 
         const scheduleRetry = (why) => {
@@ -299,8 +411,9 @@ export default function CafeLayout() {
                 return;
             }
 
-            const dt = detail?.created_at || detail?.date || new Date().toISOString();
-            const tableNo = detail?.table_number ?? detail?.table ?? "—";
+            const dtRaw = detail?.created_at || detail?.date || detail?.created;
+            const dt = formatReceiptDate(dtRaw || new Date().toISOString());
+            const tableLabel = resolveTableLabelFromOrder(detail);
             const cashier = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || profile?.email || "";
 
             for (const [kid, kitItems] of groups.entries()) {
@@ -312,7 +425,7 @@ export default function CafeLayout() {
 
                 const payload = {
                     company: localStorage.getItem("company_name") || "КУХНЯ",
-                    doc_no: `${label} • СТОЛ ${tableNo}`,
+                    doc_no: `${label} • СТОЛ ${tableLabel}`,
                     created_at: dt,
                     cashier_name: cashier,
                     discount: 0,
@@ -341,6 +454,9 @@ export default function CafeLayout() {
 
             // Mark as printed only after successful run (no early dedupe)
             printedOrdersRef.current.add(oid);
+            try {
+                localStorage.setItem(`cafe_kitchen_printed_${oid}`, "true");
+            } catch { }
         } catch (e) {
             console.error("Auto kitchen print error:", e);
             // retry on transient errors
@@ -350,6 +466,7 @@ export default function CafeLayout() {
             } catch { }
         } finally {
             printingOrdersRef.current.delete(oid);
+            releaseKitchenPrintLock(oid);
         }
     }
 
@@ -406,8 +523,8 @@ export default function CafeLayout() {
                 const oid = String(data?.order?.id || "");
                 if (oid && !notifiedOrdersRef.current.has(oid)) {
                     notifiedOrdersRef.current.add(oid);
-                    const tableNo = data?.order?.table_number ?? data?.order?.table ?? "—";
-                    const msg = `Новый заказ \nстол №: ${tableNo}`;
+                    const tableLabel = resolveTableLabelFromOrder(data?.order || {});
+                    const msg = `Новый заказ \nстол: ${tableLabel}`;
                     const key = `order_created-${oid}`;
                     setNotificationDeps(key);
                     setNotificationOrder(msg);

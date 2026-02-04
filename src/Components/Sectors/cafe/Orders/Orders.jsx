@@ -17,7 +17,6 @@ import "./Orders.scss";
 import {
   attachUsbListenersOnce,
   checkPrinterConnection,
-  printOrderReceiptJSONViaUSBWithDialog,
   printOrderReceiptJSONViaUSB,
   setActivePrinterByKey,
   printViaWiFiSimple,
@@ -97,6 +96,17 @@ const stripEmpty = (obj) =>
     Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== "")
   );
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const normalizeTableLabel = (raw) => {
+  if (raw === null || raw === undefined) return "";
+  const v = String(raw).trim();
+  if (!v) return "";
+  if (UUID_RE.test(v)) return "";
+  return v;
+};
+
 const normalizeOrderPayload = (f, isNew = false) =>
   stripEmpty({
     table: toId(f.table),
@@ -138,6 +148,92 @@ const readKitchenPrinterMap = () => {
   } catch {
     return {};
   }
+};
+
+const isAutoKitchenPrintEnabled = () => {
+  try {
+    return localStorage.getItem("cafe_auto_kitchen_print") === "true";
+  } catch {
+    return false;
+  }
+};
+
+const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
+
+const kitchenPrintLockKey = (orderId) => `cafe_kitchen_print_lock_${orderId}`;
+
+const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
+
+const receiptPrintLockKey = (orderId) => `cafe_receipt_print_lock_${orderId}`;
+
+const readKitchenPrintLock = (orderId) => {
+  try {
+    const raw = localStorage.getItem(kitchenPrintLockKey(orderId));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data?.ts) return null;
+    if (Date.now() - Number(data.ts) > KITCHEN_PRINT_LOCK_TTL_MS) {
+      localStorage.removeItem(kitchenPrintLockKey(orderId));
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const acquireKitchenPrintLock = (orderId) => {
+  try {
+    if (readKitchenPrintLock(orderId)) return false;
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const payload = { token, ts: Date.now() };
+    localStorage.setItem(kitchenPrintLockKey(orderId), JSON.stringify(payload));
+    const confirmed = readKitchenPrintLock(orderId);
+    return confirmed?.token === token;
+  } catch {
+    return true;
+  }
+};
+
+const releaseKitchenPrintLock = (orderId) => {
+  try {
+    localStorage.removeItem(kitchenPrintLockKey(orderId));
+  } catch { }
+};
+
+const readReceiptPrintLock = (orderId) => {
+  try {
+    const raw = localStorage.getItem(receiptPrintLockKey(orderId));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data?.ts) return null;
+    if (Date.now() - Number(data.ts) > RECEIPT_PRINT_LOCK_TTL_MS) {
+      localStorage.removeItem(receiptPrintLockKey(orderId));
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const acquireReceiptPrintLock = (orderId) => {
+  try {
+    if (readReceiptPrintLock(orderId)) return false;
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const payload = { token, ts: Date.now() };
+    localStorage.setItem(receiptPrintLockKey(orderId), JSON.stringify(payload));
+    const confirmed = readReceiptPrintLock(orderId);
+    return confirmed?.token === token;
+  } catch {
+    return true;
+  }
+};
+
+const releaseReceiptPrintLock = (orderId) => {
+  try {
+    localStorage.removeItem(receiptPrintLockKey(orderId));
+  } catch { }
 };
 
 const statusFilterOptions =
@@ -433,6 +529,29 @@ const Orders = () => {
   }, [fetchOrders]);
 
   const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
+  const getOrderTableLabel = useCallback(
+    (order) => {
+      const t = tablesMap.get(order?.table);
+      const direct = normalizeTableLabel(
+        t?.title ||
+        t?.name ||
+        t?.label ||
+        t?.table_name ||
+        t?.table_label ||
+        t?.table_title ||
+        ""
+      );
+      if (direct) return direct;
+      if (t?.number != null && t?.number !== "") return String(t.number);
+      const fallback = normalizeTableLabel(
+        order?.table_name || order?.table_label || order?.table_title || order?.table_number
+      );
+      if (fallback) return fallback;
+      const raw = normalizeTableLabel(order?.table);
+      return raw || "—";
+    },
+    [tablesMap]
+  );
 
   const waiters = useMemo(
     () =>
@@ -536,14 +655,14 @@ const Orders = () => {
   /* ===== печать (оплата/чек) ===== */
   const buildPrintPayload = useCallback(
     (order) => {
-      const t = tablesMap.get(order?.table);
+      const tableLabel = getOrderTableLabel(order);
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
       const items = Array.isArray(order?.items) ? order.items : [];
 
       return {
         company: localStorage.getItem("company_name") || "КАССА",
-        doc_no: `СТОЛ ${t?.number ?? "—"}`,
+        doc_no: `СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
         discount: 0,
@@ -558,13 +677,17 @@ const Orders = () => {
         })),
       };
     },
-    [tablesMap, userData]
+    [getOrderTableLabel, userData]
   );
 
   const printOrder = useCallback(
     async (order) => {
       if (!order?.id) return;
       if (printingId) return;
+      try {
+        if (localStorage.getItem(`cafe_receipt_printed_${order.id}`)) return;
+      } catch { }
+      if (!acquireReceiptPrintLock(order.id)) return;
       setPrintingId(order.id);
       try {
 
@@ -590,6 +713,7 @@ const Orders = () => {
         console.error("Receipt print error:", e);
       } finally {
         setPrintingId(null);
+        releaseReceiptPrintLock(order.id);
       }
     },
     [buildPrintPayload, printingId]
@@ -598,13 +722,13 @@ const Orders = () => {
   /* ===== АВТОПЕЧАТЬ НА КУХНЮ ПОСЛЕ СОЗДАНИЯ ЗАКАЗА ===== */
   const buildKitchenTicketPayload = useCallback(
     ({ order, kitchenId, kitchenLabel, items }, label = 'КАССАА') => {
-      const t = tablesMap.get(order?.table);
+      const tableLabel = getOrderTableLabel(order);
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
 
       return {
         company: localStorage.getItem("company_name") || label,
-        doc_no: `${kitchenLabel || "КУХНЯ"} • СТОЛ ${t?.number ?? "—"}`,
+        doc_no: `${kitchenLabel || "КУХНЯ"} • СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
         discount: 0,
@@ -620,7 +744,7 @@ const Orders = () => {
         })),
       };
     },
-    [tablesMap, userData]
+    [getOrderTableLabel, userData]
   );
 
   const getKitchenPrinterKey = useCallback(
@@ -629,7 +753,14 @@ const Orders = () => {
       if (!kid) return "";
 
       const k = kitchensMap.get(kid);
-      const direct = String(k?.printer_key || k?.printerKey || k?.printer || k?.printer_id || "").trim();
+      const direct = String(
+        k?.printer_key ||
+        k?.printerKey ||
+        k?.printer ||
+        k?.printer_id ||
+        k?.printerId ||
+        ""
+      ).trim();
       if (direct) return direct;
       const ls = readKitchenPrinterMap();
       return String(ls?.[kid] || "").trim();
@@ -640,6 +771,11 @@ const Orders = () => {
   const autoPrintKitchenTickets = useCallback(
     async (createdOrderId) => {
       if (!createdOrderId) return;
+      if (!isAutoKitchenPrintEnabled()) return;
+      try {
+        if (localStorage.getItem(`cafe_kitchen_printed_${createdOrderId}`)) return;
+      } catch { }
+      if (!acquireKitchenPrintLock(createdOrderId)) return;
 
       try {
         const detail = await api.get(`/cafe/orders/${createdOrderId}/`).then((r) => r?.data || null);
@@ -665,8 +801,7 @@ const Orders = () => {
         for (const [kitchenId, kitItems] of groups.entries()) {
           const k = kitchensMap.get(String(kitchenId));
           const kitchenLabel = k?.label || k?.title || k?.name || "Кухня";
-          console.log('ASDASDASD',kitchenId, kitItems);
-          
+
           const printerKey = getKitchenPrinterKey(kitchenId);
 
           // if (!printerKey) {
@@ -691,9 +826,14 @@ const Orders = () => {
             console.warn("Kitchen print skipped: invalid printer binding for kitchen", kitchenId, printerKey);
           }
         }
+        try {
+          localStorage.setItem(`cafe_kitchen_printed_${createdOrderId}`, "true");
+        } catch { }
       } catch (e) {
         console.error("Auto kitchen print error:", e);
         // Ошибка отправки чека на кухню
+      } finally {
+        releaseKitchenPrintLock(createdOrderId);
       }
     },
     [buildKitchenTicketPayload, getKitchenPrinterKey, getMenuKitchenId, kitchensMap]
@@ -1115,7 +1255,7 @@ const Orders = () => {
         {loading && <div className="cafeOrders__alert">Загрузка…</div>}
         {
           visibleOrders.map((o) => {
-            const t = tablesMap.get(o.table);
+            const tableLabel = getOrderTableLabel(o);
             const totals = calcTotals(o);
             const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
 
@@ -1127,7 +1267,7 @@ const Orders = () => {
               <article key={o.id} className="cafeOrders__receipt relative">
                 <SimpleStamp date={o.paid_at} className="bottom-10 left-20" type={o.status} size={'md'} />
                 <div className="cafeOrders__receiptHeader">
-                  <div className="cafeOrders__receiptTable">СТОЛ {t?.number || "—"}</div>
+                  <div className="cafeOrders__receiptTable">СТОЛ {tableLabel}</div>
                   {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
                 </div>
 
@@ -1543,7 +1683,7 @@ const Orders = () => {
 
               <div className="cafeOrdersPay">
                 {(() => {
-                  const t = tablesMap.get(payOrder?.table);
+                  const tableLabel = getOrderTableLabel(payOrder);
                   const dt = formatReceiptDate(payOrder?.created_at || payOrder?.date || payOrder?.created);
                   const items = Array.isArray(payOrder?.items) ? payOrder.items : [];
                   const totals = calcTotals(payOrder);
@@ -1551,7 +1691,7 @@ const Orders = () => {
                   return (
                     <>
                       <div className="cafeOrdersPay__top">
-                        <div className="cafeOrdersPay__table">СТОЛ {t?.number ?? "—"}</div>
+                        <div className="cafeOrdersPay__table">СТОЛ {tableLabel}</div>
                         <div className="cafeOrdersPay__date">{dt || ""}</div>
                       </div>
 
