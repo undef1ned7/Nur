@@ -315,7 +315,6 @@ export const crmRoutes = (profile) => [
 
   // Market routes
   createProtectedRoute("market/bar", MarketBar),
-  createProtectedRoute("sklad", MarketWarehouse),
   createProtectedRoute("sklad/:id", MarketProductDetail),
   createProtectedRoute("market/cashier", MarketCashierPage),
   createProtectedRoute("market/categories", MarketCategories),
@@ -327,7 +326,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("market/analytics", MarketAnalytics),
 
   // Cafe routes
-  <Route element={<CafeLayout />} path="cafe">
+  <Route key="cafe" element={<CafeLayout />} path="cafe">
     {[
       createProtectedRoute("analytics", CafeAnalytics),
       createProtectedRoute("documents", CafeDocuments),

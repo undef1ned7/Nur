@@ -69,6 +69,7 @@ const CreateSaleDocument = () => {
     next: null,
     previous: null,
   });
+  const [showMoreProducts, setShowMoreProducts] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState(new Set());
   const [addingProduct, setAddingProduct] = useState(false);
 
