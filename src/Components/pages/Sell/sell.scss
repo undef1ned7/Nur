@@ -10,7 +10,9 @@
 
 .content.content--sidebar-open {
   .start__cart__body {
-    position: static !important;
+    @include iflaptop {
+      position: static !important;
+    }
   }
 }
 .sellObject {
