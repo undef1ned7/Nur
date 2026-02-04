@@ -209,6 +209,13 @@ const CreateSaleDocument = () => {
     }
   }, [warehouses, warehouse]);
 
+  // Ограничение по остатку только для операций отгрузки (продажа, возврат поставщику, списание, перемещение).
+  const isStockLimitRequired = useMemo(() => {
+    return ["SALE", "PURCHASE_RETURN", "WRITE_OFF", "TRANSFER"].includes(
+      docType
+    );
+  }, [docType]);
+
   // При смене склада удаляем из корзины товары, которых нет на новом складе
   useEffect(() => {
     if (!warehouse || !cartItems.length) return;
@@ -237,10 +244,12 @@ const CreateSaleDocument = () => {
               );
               const stock = Number(p?.quantity ?? 0);
               const qty = Number(item.quantity ?? 0);
+              const capByStock =
+                isStockLimitRequired && stock > 0 && qty > stock;
               return {
                 ...item,
                 stock,
-                quantity: stock > 0 && qty > stock ? stock : item.quantity,
+                quantity: capByStock ? stock : item.quantity,
               };
             });
           });
@@ -252,7 +261,7 @@ const CreateSaleDocument = () => {
     return () => {
       cancelled = true;
     };
-  }, [warehouse]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [warehouse, isStockLimitRequired]);
 
   // Синхронизация выбранных товаров с товарами в корзине
   useEffect(() => {
@@ -385,7 +394,11 @@ const CreateSaleDocument = () => {
         const existing = cartItems[existingItemIndex];
         const currentQty = Number(existing.quantity || 0);
         const maxQty = Number(existing.stock ?? stock);
-        if (currentQty >= maxQty) {
+        if (
+          isStockLimitRequired &&
+          maxQty > 0 &&
+          currentQty >= maxQty
+        ) {
           alert(`Нельзя добавить больше остатка. Остаток: ${maxQty}`);
           return;
         }
@@ -399,7 +412,7 @@ const CreateSaleDocument = () => {
           return updated;
         });
       } else {
-        if (stock < 1) {
+        if (isStockLimitRequired && stock < 1) {
           alert("Нет остатка на складе");
           return;
         }
@@ -446,7 +459,11 @@ const CreateSaleDocument = () => {
       unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
     let finalQty = isPiece ? Math.floor(qty) : qty;
     const maxQty = Number(item.stock ?? 0);
-    if (maxQty > 0 && finalQty > maxQty) {
+    if (
+      isStockLimitRequired &&
+      maxQty > 0 &&
+      finalQty > maxQty
+    ) {
       finalQty = maxQty;
     }
 
@@ -522,15 +539,17 @@ const CreateSaleDocument = () => {
         };
       }
 
-      // Проверка: количество не больше остатка на складе
-      const stock = Number(item.stock ?? 0);
-      if (stock > 0 && qty > stock) {
-        return {
-          valid: false,
-          error: `Количество товара "${
-            item.productName || item.name
-          }" не может превышать остаток на складе (${stock})`,
-        };
+      // Проверка: количество не больше остатка на складе (только для операций отгрузки)
+      if (isStockLimitRequired) {
+        const stock = Number(item.stock ?? 0);
+        if (stock > 0 && qty > stock) {
+          return {
+            valid: false,
+            error: `Количество товара "${
+              item.productName || item.name
+            }" не может превышать остаток на складе (${stock})`,
+          };
+        }
       }
     }
 
@@ -1300,12 +1319,16 @@ const CreateSaleDocument = () => {
                               }
                               className="create-sale-document__qty-input"
                               title={
-                                item.stock != null && item.stock > 0
+                                isStockLimitRequired &&
+                                item.stock != null &&
+                                item.stock > 0
                                   ? `Остаток на складе: ${item.stock}`
                                   : undefined
                               }
                               placeholder={
-                                item.stock != null && item.stock > 0
+                                isStockLimitRequired &&
+                                item.stock != null &&
+                                item.stock > 0
                                   ? `макс. ${item.stock}`
                                   : undefined
                               }
