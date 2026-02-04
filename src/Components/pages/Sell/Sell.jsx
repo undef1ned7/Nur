@@ -1,4 +1,4 @@
-import { Plus, Search, Trash } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
 import { useSearchParams } from "react-router-dom";
@@ -136,6 +136,8 @@ const Sell = () => {
 
   // выбор строк
   const [selectedIds, setSelectedIds] = useState(new Set());
+  // оптимистическое скрытие после возврата (чтобы карточка исчезала сразу)
+  const [hiddenIds, setHiddenIds] = useState(new Set());
   const isSelected = (id) => selectedIds.has(id);
   const toggleRow = (id) =>
     setSelectedIds((prev) => {
@@ -152,6 +154,40 @@ const Sell = () => {
     });
   const clearSelection = () => setSelectedIds(new Set());
 
+  const hideSaleId = (id) => {
+    const sid = String(id || "");
+    if (!sid) return;
+    setHiddenIds((prev) => new Set(prev).add(sid));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(sid);
+      return next;
+    });
+  };
+
+  // если данные перезагрузились — чистим "скрытые" id, которых уже нет в выдаче
+  useEffect(() => {
+    const all = new Set([
+      ...(Array.isArray(history) ? history.map((x) => String(x.id)) : []),
+      ...(Array.isArray(historyObjects)
+        ? historyObjects.map((x) => String(x.id))
+        : []),
+    ]);
+    setHiddenIds((prev) => {
+      if (!prev || prev.size === 0) return prev;
+      const next = new Set();
+      for (const id of prev) {
+        if (all.has(String(id))) next.add(String(id));
+      }
+      return next;
+    });
+  }, [history, historyObjects]);
+
+  // смена страницы/поиска — можно безопасно сбросить локальные скрытия
+  useEffect(() => {
+    setHiddenIds(new Set());
+  }, [currentPage]);
+
   const {
     isBuildingCompany,
     filterField,
@@ -162,8 +198,15 @@ const Sell = () => {
   } = useMemo(() => {
     const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
     const isBuildingCompany = sectorName === "строительная компания";
-    const filterSell = history.filter((item) => item.status !== "canceled");
-    const filterField = isBuildingCompany ? historyObjects : filterSell;
+    const hidden = hiddenIds;
+    const filterSell = (Array.isArray(history) ? history : []).filter(
+      (item) =>
+        item.status !== "canceled" && !hidden.has(String(item?.id ?? ""))
+    );
+    const filterObjects = (Array.isArray(historyObjects) ? historyObjects : []).filter(
+      (item) => !hidden.has(String(item?.id ?? ""))
+    );
+    const filterField = isBuildingCompany ? filterObjects : filterSell;
     const count = isBuildingCompany ? historyObjectsCount : historyCount;
     const next = isBuildingCompany ? historyObjectsNext : historyNext;
     const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
@@ -180,7 +223,18 @@ const Sell = () => {
       hasNextPage: !!next,
       hasPrevPage: !!previous
     }
-  }, [company, historyObjectsCount, historyObjectsNext, historyObjectsPrevious, historyPrevious, historyCount, historyNext])
+  }, [
+    company,
+    history,
+    historyObjects,
+    hiddenIds,
+    historyObjectsCount,
+    historyObjectsNext,
+    historyObjectsPrevious,
+    historyPrevious,
+    historyCount,
+    historyNext,
+  ])
   // Синхронизация URL с состоянием страницы
 
   useEffect(() => {
@@ -276,6 +330,63 @@ const Sell = () => {
   };
 
 
+
+  const formatMoney = (v) => {
+    const s = String(v ?? "").trim().replace(/,/g, ".");
+    const n = Number(s);
+    if (!Number.isFinite(n)) return String(v ?? "-");
+    return n.toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "-";
+    try {
+      const d = new Date(dateString);
+      return d.toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return String(dateString);
+    }
+  };
+
+  const getSaleThumb = (sale) => {
+    return (
+      sale?.first_item_image_url ||
+      sale?.first_item_image ||
+      sale?.primary_image_url ||
+      sale?.first_item?.primary_image_url ||
+      sale?.items?.[0]?.primary_image_url ||
+      sale?.products?.[0]?.primary_image_url ||
+      sale?.products?.[0]?.image_url ||
+      "/images/placeholder.avif"
+    );
+  };
+
+  const getItemsCount = (sale) => {
+    const v =
+      sale?.items_count ??
+      sale?.products_count ??
+      (Array.isArray(sale?.items) ? sale.items.length : null) ??
+      (Array.isArray(sale?.products) ? sale.products.length : null);
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+
+  const getStatusVariant = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "paid") return "paid";
+    if (s === "canceled" || s === "cancelled") return "canceled";
+    if (s === "debt") return "debt";
+    return "new";
+  };
 
   const translatePaymentMethod = (method) => {
     if (!method) return "-";
@@ -443,80 +554,131 @@ const Sell = () => {
             )}
           </div>
         </div>
-        <div className="sell__wrappper">
-          <table className="sell__table">
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={
-                      filterField.length > 0 &&
-                      filterField.every((i) => selectedIds.has(i.id))
-                    }
-                    onChange={() => toggleSelectAllOnPage(filterField)}
-                  />
-                </th>
-                <th>№</th>
-                <th>Клиент</th>
-                <th>Товар</th>
-                <th>Метод оплаты</th>
-                <th>Цена</th>
-                <th>Статус</th>
-                <th>Дата</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((item, idx) => {
+        <div className="sell__history">
+          <div className="sell__history-toolbar">
+            <label className="sell__selectAll">
+              <input
+                type="checkbox"
+                checked={
+                  filterField.length > 0 &&
+                  filterField.every((i) => selectedIds.has(i.id))
+                }
+                onChange={() => toggleSelectAllOnPage(filterField)}
+              />
+              <span>Выбрать все на странице</span>
+            </label>
+            <div className="sell__history-meta">
+              <span>Показано: {filterField.length}</span>
+              <span>Всего: {count || 0}</span>
+            </div>
+          </div>
+
+          {filterField.length === 0 ? (
+            <div className="sell__empty">Ничего не найдено</div>
+          ) : (
+            <div className="sell__cards">
+              {filterField.map((item, idx) => {
+                const thumb = getSaleThumb(item);
+                const itemsCount = getItemsCount(item);
+                const statusLabel =
+                  kindTranslate[item.status] || item.status || "-";
+                const statusVariant = getStatusVariant(item.status);
+                const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
+
                 return (
-                  <tr
+                  <div
                     key={item.id}
+                    className="sellCard"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       setSellId(item.id);
                       setShowDetailSell(true);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setSellId(item.id);
+                        setShowDetailSell(true);
+                      }
+                    }}
                   >
-                    <td onClick={(e) => e.stopPropagation()} data-label="">
-                      <input
-                        type="checkbox"
-                        checked={isSelected(item.id)}
-                        onChange={() => toggleRow(item.id)}
-                      />
-                    </td>
-                    <td data-label="№">{(currentPage - 1) * PAGE_SIZE + idx + 1}</td>
-                    <td data-label="Клиент">{item.client_name || "-"}</td>
-                    <td data-label="Товар">
-                      {/* {item.products
-                          .map((product) => product.name)
-                          .join(", ")} */}
-                      {item.first_item_name || "-"}
-                    </td>
-                    <td data-label="Метод оплаты">
-                      {translatePaymentMethod(item.payment_method)}
-                    </td>
-                    <td data-label="Цена">{item.total}</td>
-                    <td data-label="Статус">
-                      {kindTranslate[item.status] || item.status}
-                    </td>
-                    <td data-label="Дата">
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()} data-label="">
-                      {company.sector.name === "Магазин" && (
-                        <button
-                          className="sell__table-refund"
-                          onClick={() => handleOpen(item)}
+                    <div className="sellCard__top">
+                      <label
+                        className="sellCard__check"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected(item.id)}
+                          onChange={() => toggleRow(item.id)}
+                        />
+                        <span className="sellCard__no">№ {saleNo}</span>
+                      </label>
+                      <div className="sellCard__right">
+                        <span
+                          className={`sellBadge sellBadge--${statusVariant}`}
                         >
-                          Возврат
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                          {statusLabel}
+                        </span>
+                        <span className="sellCard__date">
+                          {formatDateTime(item.created_at)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="sellCard__body">
+                      <div className="sellCard__main">
+                        <div className="sellCard__title">
+                          {item.first_item_name || item.title || "—"}
+                        </div>
+                        <div className="sellCard__subtitle">
+                          Клиент: <b>{item.client_name || "-"}</b>
+                          {itemsCount !== null && itemsCount > 1 && (
+                            <span className="sellCard__count">
+                              + ещё {itemsCount - 1}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="sellCard__grid">
+                          <div className="sellCard__kv">
+                            <span>Оплата</span>
+                            <b>{translatePaymentMethod(item.payment_method)}</b>
+                          </div>
+                          <div className="sellCard__kv">
+                            <span>Сумма</span>
+                            <b>{formatMoney(item.total)} сом</b>
+                          </div>
+                          <div className="sellCard__kv">
+                            <span>Документ</span>
+                            <b>#{String(item.id).slice(0, 8)}</b>
+                          </div>
+                          <div className="sellCard__kv">
+                            <span>Позиции</span>
+                            <b>{itemsCount !== null ? itemsCount : "—"}</b>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className="sellCard__actions"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {company?.sector?.name === "Магазин" && (
+                          <button
+                            className="sellCard__refund"
+                            onClick={() => handleOpen(item)}
+                          >
+                            Возврат
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
 
         {/* Пагинация */}
@@ -561,6 +723,8 @@ const Sell = () => {
           item={itemId}
           onClose={() => setShowRefundModal(false)}
           onChanged={() => {
+            hideSaleId(itemId?.id);
+            setShowRefundModal(false);
             dispatch(historySellProduct({ search: "", page: currentPage }));
             dispatch(historySellObjects({ search: "", page: currentPage }));
           }}
