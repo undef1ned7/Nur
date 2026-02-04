@@ -495,18 +495,14 @@
 //   }
 // }
 
-
-
-
-
-
 // src/Components/pages/Info/Settings/Settings.scss
 
 .settings {
   min-height: 100vh;
   background: #fff;
   padding: 0;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
   color: #1a1a1a;
 
   &__header {
@@ -1070,6 +1066,13 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    @media screen and (max-width: 768px) {
+      flex-wrap: wrap;
+      button {
+        width: 100%;
+        flex: none;
+      }
+    }
   }
 
   &__cardsGrid {
@@ -1203,6 +1206,75 @@
     &__onlineBtns {
       justify-content: flex-end;
     }
+
+    /* Раздел Печать */
+    &__tab-content--print {
+      .settings__segmented {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+
+      .settings__segBtn {
+        // flex: 1;
+        min-width: 120px;
+      }
+
+      .settings__usbRow {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .settings__usbRow .settings__select {
+        width: 100%;
+      }
+
+      .settings__usbRow .settings__btnSmall {
+        width: 100%;
+      }
+
+      .settings__sectionHeadRow {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .settings__sectionHeadBtns {
+        justify-content: stretch;
+      }
+
+      .settings__sectionHeadBtns .settings__btnSmall {
+        // flex: 1;
+        min-width: 0;
+      }
+
+      .settings__cardHead {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .settings__chip {
+        max-width: 100%;
+      }
+
+      .settings__cardActions {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+
+      .settings__cardActions .settings__btnSmall {
+        // flex: 1;
+        min-width: 100px;
+        width: calc(50% - 4px);
+      }
+
+      .settings__actions {
+        flex-direction: column;
+      }
+
+      .settings__actions .settings__btn {
+        width: 100%;
+      }
+    }
   }
 }
 
@@ -1257,6 +1329,28 @@
       padding: 0.875rem 1.5rem;
       font-size: 0.95rem;
     }
+
+    /* Раздел Печать — планшеты и мелкие экраны */
+    &__tab-content--print {
+      .settings__segBtn {
+        min-width: 100px;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+
+      .settings__section-title {
+        font-size: 1.15rem;
+      }
+
+      .settings__cardTitle {
+        font-size: 14px;
+      }
+
+      .settings__chip {
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+    }
   }
 }
 
@@ -1306,6 +1400,38 @@
     &__btn {
       padding: 0.75rem 1.25rem;
       font-size: 0.9rem;
+    }
+
+    /* Раздел Печать — очень маленькие экраны */
+    &__tab-content--print {
+      .settings__segmented {
+        padding: 4px;
+      }
+
+      .settings__segBtn {
+        min-width: 0;
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+
+      .settings__section-title {
+        font-size: 1rem;
+      }
+
+      .settings__smallTitle,
+      .settings__cardTitle {
+        font-size: 13px;
+      }
+
+      .settings__card {
+        padding: 10px;
+      }
+
+      .settings__cardActions .settings__btnSmall {
+        min-width: 80px;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
     }
   }
 }
