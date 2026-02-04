@@ -1,3 +1,0 @@
-([('printer-agent',
-   '/Users/kuku/Desktop/nur_crm/tools/printer-agent/dist/printer-agent',
-   'EXECUTABLE')],)
