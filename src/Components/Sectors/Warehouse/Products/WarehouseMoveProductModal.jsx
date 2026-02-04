@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import warehouseAPI from "../../../../api/warehouse";
+import { transferWarehouse } from "../../../../api/warehouse";
 import { fetchWarehousesAsync } from "../../../../store/creators/warehouseCreators";
 import "../../Market/Warehouse/Warehouse.scss";
 
@@ -67,6 +67,7 @@ const WarehouseMoveProductModal = ({ open, onClose, product, onMoved }) => {
         product?.stock ??
         1;
 
+      // POST /api/warehouse/transfer
       const payload = {
         warehouse_from: String(fromWarehouseId),
         warehouse_to: String(toWarehouseId),
@@ -80,7 +81,7 @@ const WarehouseMoveProductModal = ({ open, onClose, product, onMoved }) => {
         ],
       };
 
-      await warehouseAPI.transferWarehouse(payload);
+      await transferWarehouse(payload);
 
       if (typeof onMoved === "function") onMoved();
       onClose();
