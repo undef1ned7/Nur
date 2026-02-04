@@ -31,8 +31,9 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
   const PREVIEW_SCALE = 2; // масштаб для предпросмотра
   const defaultSettings = useMemo(
     () => ({
-      fontId: "3",
-      textScale: 0.5,
+      // Default to raster (no encoding issues)
+      fontId: "__RASTER__",
+      textScale: 1,
       lineGap: 22,
       gapAfterTitle: 7,
       gapAfterPrice: 4,
@@ -42,7 +43,7 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
     }),
     []
   );
-  const [printSettings] = useState(defaultSettings);
+  const [printSettings, setPrintSettings] = useState(defaultSettings);
   const {
     fontId,
     textScale,
@@ -54,6 +55,21 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
     barcodeBarWidth,
   } = printSettings;
   const textScaleValue = Math.max(0.5, Number(textScale) || 1);
+  const availableFonts = useMemo(
+    () => [
+      { value: "__RASTER__", label: "Растер (без кодировок) — рекомендовано" },
+      // Built-in numeric fonts (firmware-dependent)
+      { value: "1", label: 'Font "1" (built-in)' },
+      { value: "2", label: 'Font "2" (built-in)' },
+      { value: "3", label: 'Font "3" (built-in)' },
+      { value: "4", label: 'Font "4" (built-in)' },
+      { value: "5", label: 'Font "5" (built-in)' },
+      // Common BF2 fonts on many TSPL firmwares (may or may not exist on a конкретном принтере)
+      { value: "TSS16.BF2", label: "TSS16.BF2 (часто лучше для кириллицы)" },
+      { value: "TSS24.BF2", label: "TSS24.BF2 (часто лучше для кириллицы)" },
+    ],
+    []
+  );
   const fontBaseMap = useMemo(
     () => ({
       1: 4,
@@ -193,10 +209,19 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
     const priceX = safeLeft;
     const barcodeModules = getBarcodeModuleCount(previewProduct?.barcode);
     const barcodeWidthDots = Math.round(barcodeModules * Math.max(1, barcodeBarWidth));
+    const barcodeShiftX = Math.round(previewLayout.widthDots * 0.03);
     const barcodeX =
-      safeLeft + Math.max(0, Math.round((safeW - barcodeWidthDots) / 2));
+      safeLeft + Math.max(0, Math.round((safeW - barcodeWidthDots) / 2)) - barcodeShiftX;
 
-    return { priceY, barcodeY: clampedBarcodeY, textX, priceX, barcodeX, textY };
+    return {
+      priceY,
+      barcodeY: clampedBarcodeY,
+      textX,
+      priceX,
+      barcodeX,
+      textY,
+      textW: safeW,
+    };
   }, [
     previewLines.length,
     previewPriceText,
@@ -378,10 +403,7 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      let format = "CODE128";
-      if (barcode.length === 13) format = "EAN13";
-      else if (barcode.length === 8) format = "EAN8";
-      else if (barcode.length === 12) format = "UPC";
+      const format = "EAN13";
 
       const barWidth = Math.max(1, Math.round(barcodeBarWidth * scale));
       const barHeight = Math.round(barcodeLayout.height * scale);
@@ -530,6 +552,54 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
       {previewProduct && (
         <UniversalModal title="Предпросмотр этикетки" onClose={handleClosePreview}>
           <div className="barcode-print-tab__preview">
+            <div
+              className="barcode-print-tab__preview-settings"
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                flexWrap: "wrap",
+                marginBottom: 12,
+              }}
+            >
+              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                Шрифт:
+                <select
+                  value={String(fontId || "")}
+                  onChange={(e) =>
+                    setPrintSettings((prev) => ({
+                      ...prev,
+                      fontId: e.target.value,
+                    }))
+                  }
+                >
+                  {availableFonts.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                Масштаб:
+                <select
+                  value={String(textScaleValue)}
+                  onChange={(e) =>
+                    setPrintSettings((prev) => ({
+                      ...prev,
+                      textScale: Number(e.target.value),
+                    }))
+                  }
+                  title="TSPL масштаб целочисленный. Для уменьшения — выбирайте другой шрифт."
+                >
+                  <option value="1">1×</option>
+                  <option value="2">2×</option>
+                  <option value="3">3×</option>
+                </select>
+              </label>
+            </div>
+
             <div className="barcode-print-tab__preview-label">
               <div
                 className="barcode-print-tab__preview-label-sheet"
@@ -559,6 +629,8 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
                         previewLayout.scale
                       }px`,
                       fontSize: `${previewLayout.text.size * previewLayout.scale}px`,
+                      width: `${previewPositions.textW * previewLayout.scale}px`,
+                      textAlign: "center",
                     }}
                   >
                     {line}
@@ -581,6 +653,9 @@ const BarcodePrintTab = ({ products, loading, searchTerm, onSearchChange }) => {
                         left: `${previewPositions.priceX * previewLayout.scale}px`,
                         top: `${previewPositions.priceY * previewLayout.scale}px`,
                         fontSize: `${previewLayout.text.size * previewLayout.scale}px`,
+                        fontWeight: 700,
+                        width: `${previewPositions.textW * previewLayout.scale}px`,
+                        textAlign: "center",
                       }}
                     >
                       {previewPriceText}
