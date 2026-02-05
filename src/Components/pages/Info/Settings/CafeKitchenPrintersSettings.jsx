@@ -82,7 +82,15 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
           if (!kid) continue;
           if (next[kid]) continue;
 
-          const raw = String(k?.printer || k?.printer_key || "").trim() || String(map?.[kid] || "").trim();
+          const raw =
+            String(
+              k?.printer ||
+              k?.printer_key ||
+              k?.printerKey ||
+              k?.printer_id ||
+              k?.printerId ||
+              ""
+            ).trim() || String(map?.[kid] || "").trim();
           const parsed = parsePrinterBinding(raw);
           if (parsed.kind === "usb") {
             next[kid] = { device: "usb", usbKey: parsed.usbKey || "", ipPort: "" };
@@ -118,7 +126,15 @@ export default function CafeKitchenPrintersSettings({ showAlert }) {
       const kid = String(k?.id ?? "");
       if (!kid) return "";
       const map = readKitchenPrinterMap();
-      return String(k?.printer || k?.printer_key || map?.[kid] || "").trim();
+      return String(
+        k?.printer ||
+        k?.printer_key ||
+        k?.printerKey ||
+        k?.printer_id ||
+        k?.printerId ||
+        map?.[kid] ||
+        ""
+      ).trim();
     },
     []
   );

@@ -24,7 +24,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
-import { formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, setActivePrinterByKey } from "../Orders/OrdersPrintService";
+import { formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, parsePrinterBinding, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -367,17 +367,26 @@ const Cook = () => {
         editingKitchen.title_name ??
         ""
       );
-      const printerSeparatorIndex = editingKitchen?.printer?.indexOf('/')
-      if (printerSeparatorIndex > -1) {
-        const printerKey = editingKitchen?.printer.slice(0, printerSeparatorIndex)
-        const printerData = editingKitchen?.printer.slice(printerSeparatorIndex + 1)
-        if (printerKey === 'usb') {
-          setSelectedKey(printerData)
-          setPrinterDevice('usb')
-        } else if (printerKey === 'ip') {
-          setIpPrinter(printerData)
-          setPrinterDevice('wifi')
-        }
+      const raw = String(
+        editingKitchen?.printer ||
+        editingKitchen?.printer_key ||
+        editingKitchen?.printerKey ||
+        editingKitchen?.printer_id ||
+        editingKitchen?.printerId ||
+        ""
+      ).trim();
+      const parsed = parsePrinterBinding(raw);
+      if (parsed.kind === "usb") {
+        setSelectedKey(parsed.usbKey || "");
+        setIpPrinter("");
+        setPrinterDevice("usb");
+      } else if (parsed.kind === "ip") {
+        setSelectedKey("");
+        setIpPrinter(parsed.port === 9100 ? parsed.ip : `${parsed.ip}:${parsed.port}`);
+        setPrinterDevice("wifi");
+      } else {
+        setSelectedKey("");
+        setIpPrinter("");
       }
     } else {
       setEditKitchenTitle("");
