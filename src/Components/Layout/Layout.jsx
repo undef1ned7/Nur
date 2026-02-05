@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import Header from "../Header/Header";
 import { Outlet, useLocation } from "react-router-dom";
@@ -55,7 +55,10 @@ const Layout = () => {
 
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
   const location = useLocation();
-  const isCashierPage = location.pathname.startsWith("/crm/market/cashier");
+  
+  const isHidden = useMemo(() => {
+    return location.pathname.startsWith("/crm/market/cashier") || location.pathname.startsWith("/crm/sell/start");
+  }, [location.pathname]);
 
   useEffect(() => {
     const savedSetting = localStorage.getItem("sidebarAutoClose");
@@ -85,7 +88,7 @@ const Layout = () => {
   useEffect(() => {
     const isMobile = window.innerWidth < 769;
 
-    if (isMobile && isSidebarOpen && !isCashierPage) {
+    if (isMobile && isSidebarOpen && isHidden) {
       const scrollY = window.scrollY;
 
       document.body.style.position = "fixed";
@@ -120,7 +123,7 @@ const Layout = () => {
         window.scrollTo(0, scrollY);
       };
     }
-  }, [isSidebarOpen, isCashierPage]);
+  }, [isSidebarOpen, isHidden]);
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -149,11 +152,11 @@ const Layout = () => {
       ></div>
 
       <div className={`App ${!isSidebarOpen ? "sidebar-collapsed" : ""}`}>
-        {!isCashierPage && (
+        {!isHidden && (
           <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
         )}
 
-        {isSidebarOpen && !isCashierPage && (
+        {isSidebarOpen && !isHidden && (
           <div
             className="sidebar-overlay"
             onClick={closeSidebar}
@@ -162,8 +165,8 @@ const Layout = () => {
         )}
 
         <div
-          className={`content ${languageFunc()} ${isSidebarOpen && !isCashierPage ? "content--sidebar-open" : ""
-            } ${isCashierPage ? "content--full-width" : ""}`}
+          className={`content ${languageFunc()} ${isSidebarOpen && !isHidden ? "content--sidebar-open" : ""
+            } ${isHidden ? "content--full-width" : ""}`}
         >
           {daysLeft !== null && !hideAnnouncement && (
             <div className="announcement">
@@ -186,7 +189,7 @@ const Layout = () => {
             </div>
           )}
 
-          {!isCashierPage && (
+          {!isHidden && (
             <>
               <Header
                 toggleSidebar={toggleSidebar}
@@ -196,7 +199,7 @@ const Layout = () => {
           )}
           <div className="content_content">
             <Outlet />
-            {lan === "ru" && !isCashierPage && (
+            {lan === "ru" && !isHidden && (
               <>
                 <img src={arnament} className="content_image1" alt="" />
                 <img src={arnament2} className="content_image2" alt="" />
