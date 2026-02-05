@@ -189,21 +189,13 @@ export default function NotificationCafeSound({
                         {
                             currentNotification.map(({ id, text, sticky }) => (
                                 <div
+                                    onClick={() => removeNotificationById(id)}
                                     key={id}
                                     className={`px-3 py-2 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800 shadow-sm border border-emerald-200 flex items-start gap-2`}
                                 >
                                     <div className="whitespace-pre-line flex-1">
                                         {text}
                                     </div>
-                                    <button
-                                        type="button"
-                                        aria-label="Закрыть уведомление"
-                                        title={sticky ? "Закрыть" : "Закрыть (или само исчезнет)"}
-                                        onClick={() => removeNotificationById(id)}
-                                        className="text-emerald-800/70 hover:text-emerald-900 leading-none px-1"
-                                    >
-                                        ×
-                                    </button>
                                 </div>
                             ))
                         }
