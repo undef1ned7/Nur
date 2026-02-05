@@ -421,12 +421,15 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
 
   const filters = [{ classCode: 0x07 }, { classCode: 0xff }];
   const dev = await navigator.usb.requestDevice({ filters });
-  try {
-    const key = keyOf(dev.vendorId, dev.productId, dev.serialNumber);
-    localStorage.setItem(LS_ACTIVE, key);
-  } catch { }
+  upsertSavedPrinter(dev);
 
+  if (usbState.dev && usbState.dev !== dev) {
+    try {
+      await usbState.dev.close();
+    } catch { }
+  }
   usbState.dev = dev;
+
   const { outEP } = await openUsbDevice(dev);
 
   const parts = buildPrettyReceiptFromJSON(payload);
@@ -435,7 +438,13 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
       await dev.transferOut(outEP, chunk);
     }
   }
-  return activedDev
+  return {
+    key: keyOf(dev.vendorId, dev.productId, dev.serialNumber),
+    vendorId: dev.vendorId,
+    productId: dev.productId,
+    serial: safeSerial(dev.serialNumber),
+    name: dev.productName || "USB Printer",
+  };
 }
 
 export function parsePrinterBinding(raw) {

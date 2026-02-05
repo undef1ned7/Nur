@@ -53,6 +53,7 @@ const AddWarehouseProductPage = () => {
   const { id: productId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+
   const dispatch = useDispatch();
   const { list } = useClient();
   const {
@@ -878,16 +879,15 @@ const AddWarehouseProductPage = () => {
         ).unwrap();
       }
 
-      // Добавление денежного потока при создании товара
-      // Создаем запрос на кассу только если не долг и не режим редактирования
+      // Запрос на кассу при добавлении товара вручную (не в режиме редактирования и не долг)
       if (!isEditMode && debt !== "Долги") {
-        // Используем цену продажи для amount
         const sellingPrice = price || newItemData.price || "0";
         const amountForCash = debt === "Предоплата" ? amount : sellingPrice;
-        // Используем selectCashBox если cashData.cashbox пустой
-        const cashboxId = cashData.cashbox || selectCashBox;
+        const cashboxId =
+          cashData.cashbox ||
+          selectCashBox ||
+          (cashBoxes?.[0]?.id ?? cashBoxes?.[0]);
 
-        // Создаем денежный поток если есть касса и сумма больше 0
         if (cashboxId && Number(amountForCash) > 0) {
           try {
             await dispatch(
@@ -906,15 +906,7 @@ const AddWarehouseProductPage = () => {
             ).unwrap();
           } catch (cashError) {
             console.warn("Ошибка при создании денежного потока:", cashError);
-            // Не блокируем создание товара, если ошибка с кассой
           }
-        } else {
-          console.log("CashFlow не создан:", {
-            cashboxId,
-            amountForCash,
-            hasCashbox: !!cashboxId,
-            amountGreaterThanZero: Number(amountForCash) > 0,
-          });
         }
       }
 
@@ -1317,6 +1309,14 @@ const AddWarehouseProductPage = () => {
                 </div>
               )}
               <AddProductBarcode
+                warehouseUuid={selectedWarehouse || undefined}
+                warehouseCategories={categories}
+                warehouseCategory={newItemData.category}
+                onWarehouseCategoryChange={(value) =>
+                  setNewItemData((prev) => ({ ...prev, category: value }))
+                }
+                selectCashBox={selectCashBox}
+                cashBoxes={cashBoxes}
                 onClose={() => {
                   if (selectedWarehouse) {
                     navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
@@ -1341,7 +1341,6 @@ const AddWarehouseProductPage = () => {
                 onShowErrorAlert={(errorMsg) => {
                   showAlert(errorMsg, "error", "Ошибка");
                 }}
-                selectCashBox={selectCashBox}
               />
             </div>
           ) : !loadingProduct ? (

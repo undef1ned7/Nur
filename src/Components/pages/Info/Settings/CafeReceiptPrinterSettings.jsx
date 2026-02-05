@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import api from "../../../../api";
 import {
   choosePrinterByDialog,
   getSavedPrinters,
   listAuthorizedPrinters,
+  formatPrinterBinding,
   parsePrinterBinding,
   printOrderReceiptJSONViaUSB,
   printViaWiFiSimple,
@@ -62,17 +64,33 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
     refreshUsb();
   }, [device, refreshUsb]);
 
-  const save = useCallback(() => {
+  const saveToBackend = useCallback(async (binding) => {
+    if (!binding) return false;
+    try {
+      await api.patch("/cafe/receipt-printer/", { printer: binding });
+      return true;
+    } catch (e) {
+      console.error("CafeReceiptPrinterSettings saveToBackend error:", e);
+      return false;
+    }
+  }, []);
+
+  const save = useCallback(async () => {
     if (device === "wifi") {
+      const binding = formatPrinterBinding({ kind: "ip", ipPort });
       const parsed = parsePrinterBinding(`ip/${ipPort}`);
-      if (parsed.kind !== "ip") {
+      if (!binding || parsed.kind !== "ip") {
         showAlert?.("error", "Введите IP:порт (например 192.168.1.200:9100)");
         return;
       }
-      const v = parsed.port === 9100 ? `ip/${parsed.ip}` : `ip/${parsed.ip}:${parsed.port}`;
-      localStorage.setItem("cafe_receipt_printer", v);
+      localStorage.setItem("cafe_receipt_printer", binding);
       localStorage.setItem("cafe_printer_bridge_url", bridgeUrl || "http://127.0.0.1:5179/print");
-      showAlert?.("success", "Принтер кассы сохранён");
+      const ok = await saveToBackend(binding);
+      if (ok) {
+        showAlert?.("success", "Принтер кассы сохранён");
+      } else {
+        showAlert?.("warning", "Сохранено локально, но сервер не принял принтер");
+      }
       return;
     }
 
@@ -80,10 +98,20 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
       showAlert?.("error", "Выберите USB‑принтер");
       return;
     }
-    localStorage.setItem("cafe_receipt_printer", `usb/${usbKey.trim()}`);
+    const binding = formatPrinterBinding({ kind: "usb", usbKey: usbKey.trim() });
+    if (!binding) {
+      showAlert?.("error", "Некорректный USB‑принтер");
+      return;
+    }
+    localStorage.setItem("cafe_receipt_printer", binding);
     localStorage.setItem("cafe_printer_bridge_url", bridgeUrl || "http://127.0.0.1:5179/print");
-    showAlert?.("success", "Принтер кассы сохранён");
-  }, [device, ipPort, usbKey, bridgeUrl, showAlert]);
+    const ok = await saveToBackend(binding);
+    if (ok) {
+      showAlert?.("success", "Принтер кассы сохранён");
+    } else {
+      showAlert?.("warning", "Сохранено локально, но сервер не принял принтер");
+    }
+  }, [device, ipPort, usbKey, bridgeUrl, showAlert, saveToBackend]);
 
   const chooseUsb = useCallback(async () => {
     setLoadingUsb(true);
