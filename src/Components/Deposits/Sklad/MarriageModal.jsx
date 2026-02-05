@@ -96,13 +96,36 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
     }
     setError("");
     try {
-      // списание брака — просто уменьшаем остаток
+      // списание брака — уменьшаем остаток
       await dispatch(
         updateProductAsync({
           productId: item.id,
           updatedData: { quantity: stockQty - q },
         })
       ).unwrap();
+
+      // отправка в аналитику (расход по себестоимости)
+      if (selectCashBox && expense > 0) {
+        try {
+          await dispatch(
+            addCashFlows({
+              cashbox: selectCashBox,
+              type: "expense",
+              name: `Списание брака: ${item?.name}`,
+              amount: expense,
+              source_cashbox_flow_id: item.id,
+              source_business_operation_id: "Списание брака",
+              status:
+                company?.subscription_plan?.name === "Старт"
+                  ? "approved"
+                  : "pending",
+            })
+          ).unwrap();
+        } catch (cashErr) {
+          console.warn("Ошибка при записи расхода в аналитику:", cashErr);
+        }
+      }
+
       alert('Товар списан!', () => {
         onChanged?.();
         onClose?.();

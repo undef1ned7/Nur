@@ -68,6 +68,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import usePlurize from "../../../../hooks/usePlurize";
 import useResize from "../../../../hooks/useResize";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -544,8 +545,10 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     } catch (err) {
       setCreating(false);
       setCreateError(err);
+      console.log('ERERERRR',err);
+      
       error(
-        `Ошибка при добавлении товара: ${err?.message || "неизвестная ошибка"}`
+        validateResErrors(err, 'Ошибка при добавлении товара')
       );
     }
   };

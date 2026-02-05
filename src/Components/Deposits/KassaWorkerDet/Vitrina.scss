@@ -780,7 +780,7 @@
   max-width: 500px;
   width: 90%;
   position: relative;
-  z-index: 1001; // Above overlay
+  z-index: 100; // Above overlay
   animation: fadeInScale 0.3s ease-out;
 }
 
