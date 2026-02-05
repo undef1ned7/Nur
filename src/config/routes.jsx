@@ -168,6 +168,7 @@ import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistor
 import SellLayout from "../Components/pages/Sell/SellLayout";
 import SellMainStart from "../Components/pages/Sell/SellMainStart";
 import CafeLayout from "../Components/Sectors/cafe/CafeLayout";
+import SellCashierPage from "../Components/pages/Sell/SellCashierPage";
 
 /**
  * Создает защищенный роут
@@ -254,12 +255,9 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("sklad/add-product/:id", AddProductPage),
   createProtectedRoute("barcodes", BarcodePrintPage),
   createProtectedRoute("scales", ScalesPage),
-  <Route path="sell" key={"sell"} element={<SellLayout />}>
-    {[
-      createProtectedRoute("", Sell, { index: true }),
-      createProtectedRoute("start", SellMainStart),
-    ]}
-  </Route>,
+  createProtectedRoute("sell", Sell),
+  createProtectedRoute("sell/start", SellCashierPage),
+
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),
   createProtectedRoute("sklad-accounting", WarehouseAccounting),

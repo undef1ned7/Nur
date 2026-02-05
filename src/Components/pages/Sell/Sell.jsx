@@ -1,7 +1,7 @@
 import { Plus, Search } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 // import "./Sklad.scss";
 
 import api from "../../../api";
@@ -91,6 +91,7 @@ const paymentMethodTranslate = {
 const PAGE_SIZE = 50;
 
 const Sell = () => {
+  const navigate = useNavigate();
   const alert = useAlert();
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -529,32 +530,32 @@ const Sell = () => {
               </span>
             </div>
           </div>
-          <div className="sell__header-left">
-            {selectedIds.size > 0 ? (
-              <SelectionActions pageItems={filterField} />
-            ) : (
-              <>
-                {isBuildingCompany ? (
+          <button className="sell__header-btn " onClick={() => navigate("start")}>Начать продажу</button>
+          {selectedIds.size > 0 ? (
+            <SelectionActions pageItems={filterField} />
+          ) : (
+            <>
+              {isBuildingCompany ? (
+                <button
+                  className="sklad__add"
+                  onClick={() => setShowBuilding(true)}
+                >
+                  <Plus size={16} style={{ marginRight: 4 }} /> Продать
+                  квартиру
+                </button>
+              ) : (
+                <>
                   <button
-                    className="sklad__add"
-                    onClick={() => setShowBuilding(true)}
+                    className="sell__header-btn"
+                    onClick={() => setShowAddCashboxModal(true)}
                   >
-                    <Plus size={16} style={{ marginRight: 4 }} /> Продать
-                    квартиру
+                    Прочие расходы
                   </button>
-                ) : (
-                  <>
-                    <button
-                      className="sell__header-btn"
-                      onClick={() => setShowAddCashboxModal(true)}
-                    >
-                      Прочие расходы
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </>
+          )}
+
         </div>
         <div className="sell__history">
           <div className="sell__history-toolbar">
