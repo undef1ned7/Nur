@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import {
   Search,
   Plus,
@@ -14,17 +15,23 @@ import {
 import "../Kassa/kassa.scss";
 import "./Vitrina.scss";
 import { useUser } from "../../../store/slices/userSlice";
+import { addCashFlows } from "../../../store/slices/cashSlice";
 import PendingModal from "../Kassa/PendingModal/PendingModal";
 import Pending from "../../pages/Pending/Pending";
 import useResize from "../../../hooks/useResize";
+import { useAlert } from "../../../hooks/useDialog";
+import { validateResErrors } from "../../../../tools/validateResErrors";
+import api from "../../../api";
+import Loading from "../../common/Loading/Loading";
 
 const KassaDet = () => {
   const { id } = useParams();
-
+  const dispatch = useDispatch();
+  const alert = useAlert();
   const cashboxId = id;
   const { company } = useUser();
   const navigate = useNavigate();
-
+  const { profile } = useUser();
   const [cashboxDetails, setCashboxDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -49,6 +56,7 @@ const KassaDet = () => {
   const [newCashbox, setNewCashbox] = useState({
     name: "",
     amount: 0,
+    status: profile.role === 'owner' ? 'approved' : 'pending',
     type: "expense", // Дефолтный тип для новой операции
   });
 
@@ -181,43 +189,22 @@ const KassaDet = () => {
 
   const handleAddCashbox = async () => {
     try {
-      const response = await fetch(
-        "https://app.nurcrm.kg/api/construction/cashflows/",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + localStorage.getItem("accessToken"),
-          },
-          body: JSON.stringify({
-            name: newCashbox.name,
-            amount: newCashbox.amount,
-            cashbox: cashboxId, // Важно: привязываем новую операцию к текущей кассе
-            type: newCashbox.type,
-          }),
-        }
-      );
+      await dispatch(
+        addCashFlows({
+          name: newCashbox.name,
+          amount: newCashbox.amount,
+          cashbox: cashboxId,
+          type: newCashbox.type,
+          status: profile.role === "owner" ? "approved" : "pending",
+        })
+      ).unwrap();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error adding cashflow:", errorData);
-        throw new Error(
-          `HTTP error! status: ${response.status} - ${JSON.stringify(
-            errorData
-          )}`
-        );
-      }
-
-      // После добавления операции, повторно получаем детали кассы, чтобы обновить список потоков
       setFlowsList(null);
       fetchCashboxDetails(cashboxId);
       setShowAddCashboxModal(false);
-      setNewCashbox({ name: "", amount: 0, type: "expense" }); // Сброс формы
+      setNewCashbox({ name: "", amount: 0, type: "expense" });
     } catch (err) {
-      console.error("Failed to add cashflow:", err);
-      setError(
-        "Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз."
-      );
+      alert(validateResErrors(err, 'Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз.'), true)
     }
   };
 
@@ -225,41 +212,21 @@ const KassaDet = () => {
     if (!selectedCashbox || !cashboxId) return;
 
     try {
-      const response = await fetch(
-        `https://app.nurcrm.kg/api/construction/cashboxes/${cashboxId}/`,
+      const { data: updatedCashbox } = await api.patch(
+        `/construction/cashboxes/${cashboxId}/`,
         {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + localStorage.getItem("accessToken"),
-          },
-          body: JSON.stringify({
-            title: selectedCashbox.title,
-            department: selectedCashbox.department,
-          }),
+          title: selectedCashbox.title,
+          department: selectedCashbox.department,
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error updating cashbox:", errorData);
-        throw new Error(
-          `HTTP error! status: ${response.status} - ${JSON.stringify(
-            errorData
-          )}`
-        );
-      }
-
-      const updatedCashbox = await response.json();
       setCashboxDetails(updatedCashbox);
       setShowEditCashboxModal(false);
       setSelectedCashbox(updatedCashbox);
       fetchCashboxDetails(cashboxId);
     } catch (err) {
-      console.error("Failed to edit cashbox:", err);
       setError(
-        "Не удалось обновить кассу. Пожалуйста, проверьте данные и попробуйте еще раз."
-      );
+        err);
     }
   };
 
@@ -481,47 +448,50 @@ const KassaDet = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFlowType, reportType, selectedMonth, selectedDate, cashboxId]);
 
-  if (loading) {
-    return (
-      <div className="kassa-page">
-        <div className="kassa-table__loading" style={{ padding: 40 }}>
-          Загрузка данных...
-        </div>
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="kassa-page">
-        <div
-          className="kassa__alert kassa__alert--error"
-          style={{ padding: 16 }}
-        >
-          {error}
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (error) {
+      alert(validateResErrors(error, 'Не удалось загрузить данные кассы. Пожалуйста, попробуйте еще раз.'), true)
+    }
+  }, [error])
 
-  if (!cashboxDetails) {
-    return (
-      <div className="kassa-page">
-        <div className="kassa-table__empty" style={{ padding: 40 }}>
-          Данные о кассе не доступны.
-        </div>
-      </div>
-    );
-  }
+  // if (error) {
+  //   return (
+  //     <div className="kassa-page">
+  //       <div
+  //         className="kassa__alert kassa__alert--error"
+  //         style={{ padding: 16 }}
+  //       >
+  //         {error}
+  //       </div>
+  //     </div>
+  //   );
+  // }
+
+
+  // if (!cashboxDetails) {
+  //   return (
+  //     <div className="kassa-page">
+  //       <div className="kassa-table__empty" style={{ padding: 40 }}>
+  //         Данные о кассе не доступны.
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="kassa-page">
+      {
+        loading && (
+          <Loading />
+        )
+      }
       <div className="kassa-header">
         <div className="kassa-header__left">
           <div className="kassa-header__icon-box">💰</div>
           <div className="kassa-header__title-section">
             <h2 className="kassa-header__title">
-              {cashboxDetails.department_name ?? cashboxDetails.name ?? "Касса"}
+              {cashboxDetails?.department_name ?? cashboxDetails?.name ?? "Касса"}
             </h2>
             <p className="kassa-header__subtitle">Движения по кассе</p>
           </div>

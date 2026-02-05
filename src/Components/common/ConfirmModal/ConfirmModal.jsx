@@ -6,7 +6,7 @@ const ConfirmModal = ({ message, isOpen, onConfirm, onCancel }) => {
 
     return (
         <ReactPortal wrapperId='modal'>
-            <div className='fixed top-0 left-0 flex w-full h-full justify-center items-center z-100'>
+            <div className='fixed top-0 left-0 flex w-full h-full justify-center items-center z-1000'>
                 <div className='modal-content max-w-100 p-5'>
                     <div className='max-h-75 overflow-y-auto'>
                         <div className="mx-auto flex mt-2.5 p-2.25 w-13.75 h-13.75 rounded-full bg-[#e4e6e7]">

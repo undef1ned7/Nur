@@ -6,7 +6,7 @@ export default function SellLayout() {
     const location = useLocation()
     const { text, path } = useMemo(() => {
         let isHistoryLocatin = location.pathname.split('/').map(el => el.trim()).filter(Boolean).at(-1) === 'start';
-        let text = !isHistoryLocatin ? 'Продажи' : 'Назад'
+        let text = !isHistoryLocatin ? 'Начать продажу' : 'Назад'
         let path = isHistoryLocatin ? '' : 'start'
         return {
             isHistoryLocatin,

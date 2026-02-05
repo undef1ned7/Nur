@@ -25,6 +25,7 @@ import SellDetail from "./SellDetail";
 import SellModal from "./SellModal";
 import SellMainStart from "./SellMainStart";
 import "./sell.scss";
+import { useAlert } from "../../../hooks/useDialog";
 
 /**
  * Создание долга для клиента.
@@ -90,6 +91,7 @@ const paymentMethodTranslate = {
 const PAGE_SIZE = 50;
 
 const Sell = () => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const { company } = useUser();
