@@ -295,10 +295,7 @@ export const consumeItemsMake = createAsyncThunk(
 
         // 2) Счёт нового остатка; API: не более 3 знаков после запятой
         const delta = perUnit * Number(units);
-        const newQty = Math.max(
-          0,
-          Math.round((current - delta) * 1000) / 1000
-        );
+        const newQty = Math.max(0, Math.round((current - delta) * 1000) / 1000);
 
         // 3) PATCH на бэк
         const { data } = await api.patch(`/main/items-make/${id}/`, {
@@ -352,6 +349,22 @@ export const createProductWithBarcode = createAsyncThunk(
       const { data } = await api.post(
         "/main/products/create-by-barcode/",
         barcode
+      );
+      return data;
+    } catch (e) {
+      return rejectWithValue(e);
+    }
+  }
+);
+
+/** Сканирование товара по штрих-коду в контексте склада (сфера склад). */
+export const scanWarehouseProductAsync = createAsyncThunk(
+  "products/scanWarehouse",
+  async ({ warehouse_uuid, ...payload }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `/warehouse/${warehouse_uuid}/products/scan/`,
+        payload
       );
       return data;
     } catch (e) {
