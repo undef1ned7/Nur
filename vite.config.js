@@ -13,7 +13,7 @@ export default defineConfig({
     server: {
         port: 3000,
         open: true,
-        allowedHosts: ["cbaea5812f6d.ngrok-free.app"]
+        allowedHosts: ["e654d2600b88.ngrok-free.app"]
     },
     build: {
         outDir: 'build',

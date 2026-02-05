@@ -114,8 +114,9 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
   const showCashierButton = useMemo(() => {
     if (!userProfile) return false;
-    return userProfile.can_view_cashier === true;
-  }, [userProfile]);
+    if (company?.sector?.name === "магазин") return true;
+    return false;
+  }, [userProfile, company?.sector?.name]);
 
   // const fetchProfile = async () => {
   //   try {
