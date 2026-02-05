@@ -146,6 +146,12 @@
 .brandSection {
   .edit-modal {
     font-family: "Inter", sans-serif;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    display: flex;
 
     &__overlay {
       position: fixed;
@@ -158,20 +164,27 @@
     }
 
     &__content {
-      position: fixed;
-      top: 50%;
-      right: 0;
-      height: 100dvh;
+      height: fit-content;
       background: #fff;
-      z-index: 1000;
+      z-index: 100;
       box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
       padding: 24px 16px;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
-      width: auto;
+      left: 50%;
+      bottom: 0;
+      max-height: 92vh;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      animation: em-sheet-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) 0.02s both;
+      @include ifmobile  {
+        height: fit-content;
+      }
     }
 
+
+   
     &__header {
       display: flex;
       justify-content: space-between;
@@ -191,7 +204,6 @@
     }
 
     .brand-category-page__edit-modal-content {
-      height: max-content;
       overflow-y: auto;
       border-radius: 16px;
       background: #fff;
@@ -201,6 +213,8 @@
       flex-direction: column;
       overflow-y: auto;
       min-width: 300px;
+      min-height: 50dvh;
+      margin: auto;
       .edit-modal__header {
         display: flex;
         h3 {
@@ -437,8 +451,8 @@
           24px
       );
       max-height: calc(
-        100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
-          24px
+        100dvh - env(safe-area-inset-top, 0px) -
+          env(safe-area-inset-bottom, 0px) - 24px
       );
     }
   }
