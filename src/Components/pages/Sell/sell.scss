@@ -1814,6 +1814,12 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  @include ifmobile {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
 }
 
 @media screen and (max-width: 1200px) {
