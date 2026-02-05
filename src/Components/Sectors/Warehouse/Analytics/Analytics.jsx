@@ -1,3 +1,72 @@
+/**
+ * Аналитика владельца/админа склада.
+ *
+ * Ожидаемый ответ API (getOwnerAnalytics):
+ *
+ * GET /api/warehouse/owner/analytics/?period=month&date=2026-02-05
+ *
+ * {
+ *   "period": "month",
+ *   "date_from": "2026-01-07",
+ *   "date_to": "2026-02-05",
+ *   "summary": {
+ *     "requests_approved": 8,
+ *     "items_approved": "20.000",
+ *     "sales_count": 0,
+ *     "sales_amount": "0.00",
+ *     "on_hand_qty": "20.000",
+ *     "on_hand_amount": "3709.08000"
+ *   },
+ *   "charts": {
+ *     "sales_by_date": []
+ *   },
+ *   "top_agents": {
+ *     "by_sales": [],
+ *     "by_received": [
+ *       {
+ *         "agent_id": "4478407d-660b-4683-a0af-ceb15c25b507",
+ *         "agent_name": "agentt agentt",
+ *         "items_approved": "16.000"
+ *       },
+ *       {
+ *         "agent_id": "062ca63c-0fe5-4070-ab01-a9ef554fce1e",
+ *         "agent_name": "agent agent",
+ *         "items_approved": "2.000"
+ *       },
+ *       {
+ *         "agent_id": "fab742f8-66ca-48fa-b318-9ac8a48fceab",
+ *         "agent_name": "warehouse warehouse",
+ *         "items_approved": "2.000"
+ *       }
+ *     ]
+ *   },
+ *   "details": {
+ *     "warehouses": [
+ *       {
+ *         "warehouse_id": "8f5d5f2c-6de6-4e2b-9747-273bc5aa3a19",
+ *         "warehouse_name": "new склад",
+ *         "carts_approved": 5,
+ *         "items_approved": "8.000",
+ *         "sales_count": 0,
+ *         "sales_amount": "0.00",
+ *         "on_hand_qty": "8.000",
+ *         "on_hand_amount": "589.08000"
+ *       },
+ *       {
+ *         "warehouse_id": "4cf95f0e-e72e-4621-8c4c-e5c88bafb09e",
+ *         "warehouse_name": "JAY",
+ *         "carts_approved": 3,
+ *         "items_approved": "12.000",
+ *         "sales_count": 0,
+ *         "sales_amount": "0.00",
+ *         "on_hand_qty": "12.000",
+ *         "on_hand_amount": "3120.00000"
+ *       }
+ *     ],
+ *     "sales_by_product": []
+ *   }
+ * }
+ */
 import {
   Check,
   Package,
@@ -217,6 +286,7 @@ const WarehouseAnalytics = () => {
   const summary = data?.summary || {};
   const charts = data?.charts || {};
   const topAgents = data?.top_agents || {};
+  const details = data?.details || {};
   const salesByDate = Array.isArray(charts?.sales_by_date)
     ? charts.sales_by_date
     : [];
@@ -230,13 +300,20 @@ const WarehouseAnalytics = () => {
   const byReceived = Array.isArray(topAgents?.by_received)
     ? topAgents.by_received
     : [];
+  const warehouses = Array.isArray(details?.warehouses)
+    ? details.warehouses
+    : [];
 
   const totalSalesAmount = bySales.reduce(
     (acc, a) => acc + Number(a.sales_amount ?? a.amount ?? 0),
     0
   );
   const totalReceivedItems = byReceived.reduce(
-    (acc, a) => acc + Number(a.items_received ?? a.items ?? a.count ?? 0),
+    (acc, a) =>
+      acc +
+      Number(
+        a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0
+      ),
     0
   );
 
@@ -255,8 +332,12 @@ const WarehouseAnalytics = () => {
     ];
   });
   const byReceivedRows = byReceived.map((a, i) => {
-    const items = Number(a.items_received ?? a.items ?? a.count ?? 0);
-    const requests = formatNum(a.requests_count ?? a.requests ?? a.count ?? 0);
+    const items = Number(
+      a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0
+    );
+    const requests = formatNum(
+      a.carts_approved ?? a.requests_count ?? a.requests ?? a.count ?? 0
+    );
     const share =
       totalReceivedItems > 0
         ? `${Math.round((items / totalReceivedItems) * 100)}%`
@@ -694,42 +775,78 @@ const WarehouseAnalytics = () => {
           </div>
 
           {isOwnerOrAdmin && (
-            <div className="warehouse-analytics__tablesRow">
+            <>
+              <div className="warehouse-analytics__tablesRow">
+                <div className="warehouse-analytics__card">
+                  <div className="warehouse-analytics__cardTitle">
+                    Топ агентов по продажам
+                  </div>
+                  {bySalesRows.length > 0 ? (
+                    <PaginatedTable
+                      head={["Агент", "Продажи", "Кол-во", "Доля"]}
+                      rows={bySalesRows}
+                      colTemplate="1fr 120px 90px 70px"
+                      numeric={[1, 2, 3]}
+                    />
+                  ) : (
+                    <div className="warehouse-analytics-table__empty">
+                      Нет данных за период.
+                    </div>
+                  )}
+                </div>
+                <div className="warehouse-analytics__card">
+                  <div className="warehouse-analytics__cardTitle">
+                    Топ агентов по полученным товарам
+                  </div>
+                  {byReceivedRows.length > 0 ? (
+                    <PaginatedTable
+                      head={["Агент", "Позиций", "Заявок", "Доля"]}
+                      rows={byReceivedRows}
+                      colTemplate="1fr 100px 80px 70px"
+                      numeric={[1, 2, 3]}
+                    />
+                  ) : (
+                    <div className="warehouse-analytics-table__empty">
+                      Нет данных за период.
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="warehouse-analytics__card">
                 <div className="warehouse-analytics__cardTitle">
-                  Топ агентов по продажам
+                  Склады
                 </div>
-                {bySalesRows.length > 0 ? (
+                {warehouses.length > 0 ? (
                   <PaginatedTable
-                    head={["Агент", "Продажи", "Кол-во", "Доля"]}
-                    rows={bySalesRows}
-                    colTemplate="1fr 120px 90px 70px"
-                    numeric={[1, 2, 3]}
+                    head={[
+                      "Склад",
+                      "Заявок одобрено",
+                      "Позиций одобрено",
+                      "Продаж",
+                      "Сумма продаж",
+                      "Остаток, шт",
+                      "Остаток, сом",
+                    ]}
+                    rows={warehouses.map((w) => [
+                      w.warehouse_name ?? w.name ?? "—",
+                      formatNum(w.carts_approved ?? w.requests_approved ?? 0),
+                      formatNum(w.items_approved ?? 0),
+                      formatNum(w.sales_count ?? 0),
+                      `${formatNum(w.sales_amount ?? 0)} сом`,
+                      formatNum(w.on_hand_qty ?? 0),
+                      `${formatNum(w.on_hand_amount ?? 0)} сом`,
+                    ])}
+                    colTemplate="1.2fr 130px 150px 90px 130px 110px 130px"
+                    numeric={[1, 2, 3, 4, 5, 6]}
                   />
                 ) : (
                   <div className="warehouse-analytics-table__empty">
-                    Нет данных за период.
+                    Нет данных по складам за период.
                   </div>
                 )}
               </div>
-              <div className="warehouse-analytics__card">
-                <div className="warehouse-analytics__cardTitle">
-                  Топ агентов по полученным товарам
-                </div>
-                {byReceivedRows.length > 0 ? (
-                  <PaginatedTable
-                    head={["Агент", "Позиций", "Заявок", "Доля"]}
-                    rows={byReceivedRows}
-                    colTemplate="1fr 100px 80px 70px"
-                    numeric={[1, 2, 3]}
-                  />
-                ) : (
-                  <div className="warehouse-analytics-table__empty">
-                    Нет данных за период.
-                  </div>
-                )}
-              </div>
-            </div>
+            </>
           )}
 
           {isAgentView && (
