@@ -201,13 +201,10 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       hasPermission(item.permission)
     );
     if (tariff !== "Старт") {
-      basicItems = basicItems.filter((item) => {
-        return item.to !== "/crm/sell";
-      });
-    }
-    console.log('basicItems', basicItems);
-    
-    // Секторные пункты меню
+      if (company.industry.name !== 'Парикмахерские')  {
+        basicItems = basicItems.filter((item) => item.to !== "/crm/sell");
+      }
+    } 
     const sectorItems = getSectorMenuItems();
 
     // Дополнительные услуги
