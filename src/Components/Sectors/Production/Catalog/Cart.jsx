@@ -49,6 +49,7 @@ const CartItem = ({
   item,
   onUpdateQuantity,
   onUpdateGift,
+  maxStock,
   onRemoveItem,
   editable,
 }) => {
@@ -93,7 +94,7 @@ const CartItem = ({
     console.log("CartItem: incrementing", item.id, "to", newQuantity);
     onUpdateQuantity(item.id, newQuantity);
   };
-
+  
   const handleDecrement = (e, id) => {
     e.stopPropagation();
     if (!editable) {
@@ -119,7 +120,7 @@ const CartItem = ({
       return;
     }
     const value = Number(raw);
-    if (!isNaN(value) && value >= 1) {
+    if (!isNaN(value) && value >= 1 && value <= maxStock + item.quantity) {
       setQuantity(value);
     }
   };
@@ -207,7 +208,7 @@ const CartItem = ({
               <Minus size={16} />
             </button>
             <input
-              type="text"
+              type="number"
               value={quantity}
               onChange={handleQuantityInputChange}
               onBlur={handleQuantityInputBlur}
@@ -215,6 +216,7 @@ const CartItem = ({
               onClick={(e) => e.stopPropagation()}
               className="quantity-input"
               disabled={!editable}
+              max={maxStock}
             />
             <button
               className="quantity-btn"
@@ -262,6 +264,7 @@ const CartItem = ({
 
         <div className="item-info">
           <p className="gift">Подарок: {Number(giftQty).toLocaleString()}</p>
+          <p className="gift">В наличии: {Number(maxStock + +item.quantity).toLocaleString()}</p>
           <p className="total-qty">
             Итого шт: {Number(item.quantity || 0).toLocaleString()}
           </p>
@@ -821,12 +824,14 @@ const Cart = ({
   agentCartId: agentCartIdProp = null,
   onNotify,
   onClose,
+  productsList,
   isOpen = false,
   onOpenChange,
   setAgentCartItemsCount,
   totalItemsCount = 0,
   onMobileViewChange,
 }) => {
+  
   const confirm = useConfirm();
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
@@ -1692,9 +1697,13 @@ const Cart = ({
             const cartStatus = agentCart?.status;
             const isEditable =
               !agentCart || cartStatus === "draft" || cartStatus === "active";
+
+            const maxStockTotal = productsList?.find(el => el.id === item.product)?.quantity || 0
+            
             return (
               <CartItem
                 key={item.id}
+                maxStock={maxStockTotal}
                 item={item}
                 onUpdateQuantity={handleUpdateQuantity}
                 onUpdateGift={handleUpdateGift}

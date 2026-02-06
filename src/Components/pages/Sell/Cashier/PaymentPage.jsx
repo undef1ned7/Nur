@@ -50,6 +50,7 @@ const PaymentPage = ({
   const [selectedBank, setSelectedBank] = useState("");
   const [receiptData, setReceiptData] = useState(null);
   const [prePayment, setPrePayment] = useState(0);
+  const [firstPaymentDate,setFirstPaymentDate] = useState('')
   const [printing, setPrinting] = useState(false);
   const [alertModal, setAlertModal] = useState({
     open: false,
@@ -298,7 +299,7 @@ const PaymentPage = ({
                     selectedCustomer.name ||
                     "Клиент",
                   phone: selectedCustomer.phone || "",
-                  due_date: dueDateString,
+                  due_date: firstPaymentDate || dueDateString,
                   amount:
                     typeof total === "number"
                       ? total.toFixed(2) - (prePayment || 0)
@@ -333,7 +334,7 @@ const PaymentPage = ({
                 prepayment: prePayment,
                 amount: total - (prePayment || 0),
                 debtMonths: typeof debtMonths === "number" ? debtMonths : 1, // Количество месяцев для рассрочки
-                first_due_date: null, // Можно добавить поле для выбора даты
+                first_due_date: firstPaymentDate || null, // Можно добавить поле для выбора даты
               })
             ).unwrap();
           } catch (debtError) {
@@ -824,7 +825,7 @@ const PaymentPage = ({
                 <input
                   type="date"
                   className="payment-page__debt-months-input"
-                  value={prePayment || ''}
+                  value={firstPaymentDate}
                   onChange={(e) => {
                     setFirstPaymentDate(e.target.value)
                   }}

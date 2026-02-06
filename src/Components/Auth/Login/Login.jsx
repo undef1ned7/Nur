@@ -131,7 +131,8 @@ const Login = () => {
                 id="email"
                 name="email"
                 placeholder="Введите email"
-                autoComplete="email"
+                autoComplete="off"
+                autoSave="off"
                 value={formData.email}
                 onChange={handleChange}
                 required
@@ -150,7 +151,8 @@ const Login = () => {
                   id="password"
                   name="password"
                   placeholder="Введите пароль"
-                  autoComplete="current-password"
+                  autoComplete="off"
+                  autoSave="off"
                   value={formData.password}
                   onChange={handleChange}
                   required
