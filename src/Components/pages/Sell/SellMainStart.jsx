@@ -164,7 +164,7 @@ const SellMainStart = () => {
   const [cashData, setCashData] = useState({
     cashbox: "",
     type: "income",
-    name: "",
+    name: "", 
     amount: "",
     source_cashbox_flow_id: "",
     source_business_operation_id: "Продажа",

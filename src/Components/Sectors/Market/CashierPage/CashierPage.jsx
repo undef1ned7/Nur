@@ -654,7 +654,7 @@ const CashierPage = () => {
               processedProductIds.add(item.id);
             }
           });
-        }
+      }
 
         // Затем добавляем новые элементы, которых нет в сохраненном порядке
         uniqueApiCart.forEach((item) => {
@@ -792,8 +792,6 @@ const CashierPage = () => {
     }
   };
 
-  // Товары уже отфильтрованы на сервере через query params
-  const filteredProducts = products;
 
   // Расчет пагинации
   // Используем фиксированный размер страницы
@@ -1328,6 +1326,28 @@ const CashierPage = () => {
     setShowOpenShiftPage(true);
   };
 
+  const filteredProducts = useMemo(() => {
+    const cartItemsMap = new Map(currentSale?.items?.map(el => [el.product, { qty: parseFloat(el.quantity), item: el }]))
+    return products.map(el => {
+      const qty = parseFloat(el.quantity);
+      const cartItem = cartItemsMap.get(el.id)
+      const cartQty = cartItem?.qty || 0;
+      const primaryImg = el.images.find(el => el.is_primary)
+      return {
+        ...el,
+        quantity: qty - cartQty,
+        isCart: !!cartQty,
+        cartItem: cartItem?.item,
+        img: primaryImg?.image_url ?? el.images[0]?.image_url ?? '/images/placeholder.avif'
+      }
+    })
+      .sort((a, b) => {
+        if (a.cartItem) return -1;
+        if (b.cartItem) return 1;
+        return 0;
+      })
+      .filter(el => !!el.quantity)
+  }, [products, currentSale])
   if (showShiftPage) {
     return <ShiftPage onBack={() => setShowShiftPage(false)} />;
   }

@@ -1571,7 +1571,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   }, [dispatch]);
 
   return (
-    <div className="product-edit-modal z-50!">
+    <div className="product-edit-modal z-100!">
       <div className="product-edit-modal__backdrop" onClick={onClose} />
       <div className="product-edit-modal__container">
         <div className="product-edit-modal__wrapper">

@@ -82,7 +82,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       return hasPermission(item.permission)
     }
     );
-    
+
     return filteredItems;
   }, [sector, company, hasPermission, profile, tariff]);
 
@@ -201,10 +201,10 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       hasPermission(item.permission)
     );
     if (tariff !== "Старт") {
-      if (company.industry.name !== 'Парикмахерские')  {
+      if (company.industry.name !== 'Парикмахерские' && company.industry.name !== 'Производство') {
         basicItems = basicItems.filter((item) => item.to !== "/crm/sell");
       }
-    } 
+    }
     const sectorItems = getSectorMenuItems();
 
     // Дополнительные услуги
