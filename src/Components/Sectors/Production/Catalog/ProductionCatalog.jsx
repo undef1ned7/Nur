@@ -906,7 +906,6 @@ const ProductionCatalog = () => {
       setViewMode('cards')
     }
   })
-  console.log('AGENT CART', agentCart);
 
   const [showFilters, setShowFilters] = useState(false);
   // const [showCart, setShowCart] = useState(false);
@@ -1688,6 +1687,7 @@ const ProductionCatalog = () => {
 
       {/* Компонент корзины - всегда рендерится, но секция заказа открывается условно */}
       <Cart
+        productsList={productsList}
         agentCartId={agentCartId}
         onNotify={handleNotify}
         onClose={handleCloseCart}

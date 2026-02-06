@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 import Header from "../Header/Header";
 import { Outlet, useLocation } from "react-router-dom";
@@ -10,6 +10,8 @@ import { X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
 import { useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
+import { FaArrowUp } from "react-icons/fa";
+import { useDebounce } from "../../hooks/useDebounce";
 const useAnnouncement = (company, setHideAnnouncement) => {
   const [daysLeft, setDaysLeft] = useState(null);
 
@@ -40,6 +42,10 @@ const useAnnouncement = (company, setHideAnnouncement) => {
 
 const Layout = () => {
   const { company } = useUser();
+  const rootBlock = useMemo(() => {
+    return document.getElementById('root')
+  }, [])
+  const [isArrowView, setIsArrowView] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window !== "undefined") {
@@ -55,7 +61,7 @@ const Layout = () => {
 
   const [hideAnnouncement, setHideAnnouncement] = useState(false);
   const location = useLocation();
-  
+
   const isHidden = useMemo(() => {
     return location.pathname.startsWith("/crm/market/cashier") || location.pathname.startsWith("/crm/sell/start");
   }, [location.pathname]);
@@ -69,6 +75,11 @@ const Layout = () => {
 
   useEffect(() => {
     const handleResize = () => {
+      if (rootBlock.scrollTop > 800) {
+        setIsArrowView(true)
+      } else if (isArrowView) {
+        setIsArrowView(false)
+      }
       const savedSetting = localStorage.getItem("sidebarAutoClose");
       const sidebarAutoClose = savedSetting === "true";
 
@@ -76,10 +87,21 @@ const Layout = () => {
         setIsSidebarOpen(true);
       }
     };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const scrollHandle = useCallback(useDebounce(() => {
+    if (rootBlock.scrollTop > 800) {
+      setIsArrowView(true)
+    } else if (isArrowView) {
+      setIsArrowView(false)
+    }
+  }), [rootBlock])
+  useEffect(() => {
+    rootBlock.addEventListener("scroll", scrollHandle);
+    return () => rootBlock.removeEventListener("scroll", scrollHandle);
+  }, [scrollHandle])
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -142,7 +164,6 @@ const Layout = () => {
   };
 
   const daysLeft = useAnnouncement(company, setHideAnnouncement);
-
   return (
     <div className="layout-wrapper">
       {/* насилное поставка вона  */}
@@ -205,7 +226,17 @@ const Layout = () => {
                 <img src={arnament2} className="content_image2" alt="" />
                 <img src={arnament3} className="content_image3" alt="" />
               </>
-            )}
+            )}{
+              isArrowView && (
+                <button onClick={() => {
+                  rootBlock?.scrollTo?.({
+                    top: 0,
+                    behavior: 'smooth'
+                  })
+                }
+                } className="bg-amber-400 fixed text-white p-2 rounded-full cursor-pointer z-50 bottom-10 right-10">
+                  <FaArrowUp />
+                </button>)}
           </div>
         </div>
       </div>

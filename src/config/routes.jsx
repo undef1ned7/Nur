@@ -168,7 +168,7 @@ import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistor
 import SellLayout from "../Components/pages/Sell/SellLayout";
 import SellMainStart from "../Components/pages/Sell/SellMainStart";
 import CafeLayout from "../Components/Sectors/cafe/CafeLayout";
-import SellCashierPage from "../Components/pages/Sell/SellCashierPage";
+import SellCashierPage from "../Components/pages/Sell/Cashier/SellCashierPage";
 
 /**
  * Создает защищенный роут

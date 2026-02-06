@@ -7,7 +7,7 @@ import {
   Trash2,
   UserPlus,
 } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
@@ -27,19 +27,21 @@ import { getCashBoxes, useCash } from "@/store/slices/cashSlice";
 import api from "@/api";
 import { useClient } from "@/store/slices/ClientSlice";
 import { useProducts } from "@/store/slices/productSlice";
-import {  useSale } from "@/store/slices/saleSlice";
+import { useSale } from "@/store/slices/saleSlice";
 import { useShifts } from "@/store/slices/shiftSlice";
-import { useUser } from "@/store/slices/userSlice";
 import AlertModal from "@/components/common/AlertModal/AlertModal";
+
 import CustomServiceModal from "@/components/pages/Sell/components/CustomServiceModal";
 import DiscountModal from "@/components/pages/Sell/components/DiscountModal";
 import "@/components/Sectors/Market/CashierPage/CashierPage.scss";
-import CustomerModal from "@/components/Sectors/Market/CashierPage/components/CustomerModal";
-import DebtPaymentModal from "@/components/Sectors/Market/CashierPage/components/DebtPaymentModal";
-import MenuModal from "@/components/Sectors/Market/CashierPage/components/MenuModal";
-import ReceiptsModal from "@/components/Sectors/Market/CashierPage/components/ReceiptsModal";
-import PaymentPage from "@/components/Sectors/Market/CashierPage/PaymentPage";
+import CustomerModal from "./components/CustomerModal";
+import DebtPaymentModal from "./components/DebtPaymentModal";
+import MenuModal from "./components/MenuModal";
+import ReceiptsModal from "./components/ReceiptsModal";
+import PaymentPage from "./PaymentPage";
 import { Button } from "@mui/material";
+import { useUser } from "@/store/slices/userSlice";
+import { openShiftAsync } from "@/store/creators/shiftThunk";
 
 const SellCashierPage = () => {
   const navigate = useNavigate();
@@ -52,6 +54,9 @@ const SellCashierPage = () => {
     loading: productsLoading,
   } = useProducts();
   const { list: clients } = useClient();
+  const { list: cashBoxes } = useCash();
+  const { currentUser, userId } = useUser();
+
   const { start: currentSale, loading: saleLoading } = useSale();
   const { shifts } = useShifts();
   const [openShiftState, setOpenShiftState] = useState(null); // Локальное состояние для открытой смены
@@ -106,17 +111,30 @@ const SellCashierPage = () => {
   const findOpenShift = useCallback(async () => {
     try {
       // Пробуем загрузить с фильтром по статусу (если API поддерживает)
+      const firstCashBox = cashBoxes[0];
+      if (!firstCashBox) return;
+      const cashboxId = firstCashBox?.id;
+      const cashierId = currentUser?.id || userId;
+      console.log('asdasdasdasdasd2222');
+
       try {
         const response = await api.get("/construction/shifts/", {
           params: { status: "open" },
         });
-        const openShiftFromApi = response.data?.results?.[0];
-        if (openShiftFromApi && openShiftFromApi.status === "open") {
-          setOpenShiftState(openShiftFromApi);
-          return openShiftFromApi;
+        const findedShift = response.data?.results?.find(el => el.status === 'open' && cashierId === el.cashier);
+        if (findedShift) {
+          setOpenShiftState(findedShift);
+          return
         }
-        // Если фильтр поддерживается и открытой смены нет — прекращаем поиск.
-        // Иначе будет лишнее сканирование страниц (много повторных запросов).
+        const data = await dispatch(
+          openShiftAsync({
+            cashbox: cashboxId,
+            cashier: cashierId,
+            opening_cash: 0,
+          })
+        ).unwrap();
+        console.log('OPEEND SHIDT', data);
+
         setOpenShiftState(null);
         return null;
       } catch (e) {
@@ -124,45 +142,21 @@ const SellCashierPage = () => {
         console.log("Filter by status not supported, searching all pages");
       }
 
-      // Если не нашли, ищем по всем страницам
-      let page = 1;
-      let hasNext = true;
-
-      while (hasNext) {
-        const response = await api.get("/construction/shifts/", {
-          params: { page },
-        });
-        const data = response.data;
-        const results = data?.results || [];
-
-        const openShift = results.find((s) => s.status === "open");
-        if (openShift) {
-          setOpenShiftState(openShift);
-          return openShift;
-        }
-
-        hasNext = !!data?.next;
-        page++;
-
-        // Защита от бесконечного цикла (максимум 10 страниц)
-        if (page > 10) break;
-      }
-
-      setOpenShiftState(null);
       return null;
     } catch (error) {
       console.error("Ошибка при поиске открытой смены:", error);
       setOpenShiftState(null);
       return null;
     }
-  }, []);
+  }, [currentUser, cashBoxes]);
 
   // Получаем текущую открытую смену (мемоизируем, чтобы избежать лишних пересчетов)
   // Используем локальное состояние, если оно есть, иначе ищем в загруженных сменах
   const openShift = React.useMemo(() => {
     if (openShiftState) return openShiftState;
     return shifts.find((s) => s.status === "open");
-  }, [shifts, openShiftState]);
+  }, [shifts, openShiftState, cashBoxes]);
+
   const openShiftId = openShift?.id;
 
 
@@ -539,7 +533,6 @@ const SellCashierPage = () => {
 
     dispatch(fetchProductsAsync(params));
   }, [dispatch, debouncedSearchTerm, currentPage]);
-
   // При изменении поиска возвращаемся на первую страницу
   useEffect(() => {
     if (debouncedSearchTerm) {
@@ -557,10 +550,9 @@ const SellCashierPage = () => {
   // Поиск открытой смены при загрузке и обновлении списка смен
   useEffect(() => {
     // Проверяем, есть ли открытая смена в загруженных сменах
-    const foundInLoaded = shifts.find((s) => s.status === "open");
+    const foundInLoaded = shifts.find((s) => s.status === "open" && s.cashier === userId);
 
     if (foundInLoaded) {
-      // Если нашли в загруженных, обновляем состояние
       setOpenShiftState(foundInLoaded);
     } else if (!openShiftState) {
       // Если в загруженных нет и локального состояния тоже нет, ищем на всех страницах
@@ -786,7 +778,7 @@ const SellCashierPage = () => {
   };
 
   // Товары уже отфильтрованы на сервере через query params
-  const filteredProducts = products;
+
 
   // Расчет пагинации
   // Используем фиксированный размер страницы
@@ -1011,7 +1003,7 @@ const SellCashierPage = () => {
   useEffect(() => {
     if (!openShiftId) return;
     dispatch(
-      startSale({ discount_total: 0, shift: openShiftId })
+      startSale({ shift: openShiftId })
     );
   }, [openShiftId])
 
@@ -1308,6 +1300,28 @@ const SellCashierPage = () => {
       setShowReceiptsModal(true);
     }
   };
+  const filteredProducts = useMemo(() => {
+    const cartItemsMap = new Map(currentSale?.items?.map(el => [el.product, { qty: parseFloat(el.quantity), item: el }]))
+    return products.map(el => {
+      const qty = parseFloat(el.quantity);
+      const cartItem = cartItemsMap.get(el.id)
+      const cartQty = cartItem?.qty || 0;
+      const primaryImg = el.images.find(el => el.is_primary)
+      return {
+        ...el,
+        quantity: qty - cartQty,
+        isCart: !!cartQty,
+        cartItem: cartItem?.item,
+        img: primaryImg?.image_url ?? el.images[0]?.image_url ?? '/images/placeholder.avif'
+      }
+    })
+      .sort((a, b) => {
+        if (a.cartItem) return -1;
+        if (b.cartItem) return 1;
+        return 0;
+      })
+      .filter(el => !!el.quantity)
+  }, [products, currentSale])
 
   if (showPaymentPage) {
     return (
@@ -1350,6 +1364,7 @@ const SellCashierPage = () => {
       />
     );
   }
+ 
 
   return (
     <div className="cashier-page">
