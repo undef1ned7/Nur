@@ -66,6 +66,10 @@
     color: #111827;
     max-width: 100%;
     margin: 0 auto;
+
+    @include ifmobile {
+      min-width: 500px;
+    }
   }
 
   &__created-date {

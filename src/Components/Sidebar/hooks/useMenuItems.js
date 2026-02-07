@@ -79,7 +79,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     }
 
     const filteredItems = sectorConfig.filter((item) => {
-      if ('production' === configKey && item.permission === 'can_view_catalog') return true
+      if ('production' === configKey && item.permission === 'can_view_catalog' && profile?.role === 'owner') return true
       return hasPermission(item.permission)
     }
     );
@@ -201,11 +201,13 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     let basicItems = MENU_CONFIG.basic.filter((item) =>
       hasPermission(item.permission)
     );
-    if (tariff !== "Старт") {
-      if (company.industry.name !== 'Парикмахерские' && company.industry.name !== 'Производство') {
-        basicItems = basicItems.filter((item) => item.to !== "/crm/sell");
-      }
-    }
+    // if (tariff !== "Старт") {
+    //   if (company.industry.name !== 'Парикмахерские' && company.industry.name !== 'Производство') {
+    //   }
+    //   basicItems = basicItems.filter((item) => item.to !== "/crm/sell");
+
+    // }
+
     const sectorItems = getSectorMenuItems();
 
     // Дополнительные услуги

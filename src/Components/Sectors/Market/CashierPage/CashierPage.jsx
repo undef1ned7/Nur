@@ -7,7 +7,7 @@ import {
   Trash2,
   UserPlus,
 } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import useScanDetection from "use-scan-detection";
@@ -46,8 +46,10 @@ import PaymentPage from "./PaymentPage";
 import ShiftPage from "./ShiftPage";
 import { Button } from "@mui/material";
 import sleep from "../../../../../tools/sleep";
+import { useAlert } from "../../../../hooks/useDialog";
 
 const CashierPage = () => {
+  const alert = useAlert()
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const {
@@ -1077,11 +1079,6 @@ const CashierPage = () => {
         // Проверяем, не превышает ли новое количество доступное
         const currentQty = normalizeQuantity(existingItem.quantity);
         const newQuantity = normalizeQuantity(currentQty + 1);
-        if (availableQuantity > 0 && newQuantity > availableQuantity) {
-          alert(`Доступно только ${availableQuantity} ${product.unit || "шт"}`);
-          return;
-        }
-
         // Обновляем количество
         await dispatch(
           updateManualFilling({
