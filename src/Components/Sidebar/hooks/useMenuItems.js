@@ -79,7 +79,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     }
 
     const filteredItems = sectorConfig.filter((item) => {
-      if ('production' === configKey && item.permission === 'can_view_catalog') return true
+      if ('production' === configKey && item.permission === 'can_view_catalog' && profile?.role === 'owner') return true
       return hasPermission(item.permission)
     }
     );
