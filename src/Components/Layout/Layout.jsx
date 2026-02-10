@@ -94,7 +94,7 @@ const Layout = () => {
   const scrollHandle = useCallback(useDebounce(() => {
     if (rootBlock.scrollTop > 800) {
       setIsArrowView(true)
-    } else if (isArrowView) {
+    } else {
       setIsArrowView(false)
     }
   }), [rootBlock])

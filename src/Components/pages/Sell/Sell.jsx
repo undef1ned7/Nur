@@ -583,6 +583,8 @@ const Sell = () => {
               {filterField.map((item, idx) => {
                 const thumb = getSaleThumb(item);
                 const itemsCount = getItemsCount(item);
+                console.log('STTUS', item.status);
+                
                 const statusLabel =
                   kindTranslate[item.status] || item.status || "-";
                 const statusVariant = getStatusVariant(item.status);

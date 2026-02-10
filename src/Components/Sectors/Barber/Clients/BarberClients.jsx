@@ -76,7 +76,7 @@ export const BarberClients = () => {
 
   /* фильтры */
   const [fltStatus, setFltStatus] = useState("all");
-  
+
   // Определяем начальный viewMode в зависимости от размера экрана
   const getInitialViewMode = () => {
     if (typeof window !== 'undefined') {
@@ -84,7 +84,7 @@ export const BarberClients = () => {
     }
     return "table";
   };
-  
+
   const [viewMode, setViewMode] = useState(getInitialViewMode());
 
 
@@ -277,7 +277,7 @@ export const BarberClients = () => {
       const isMobile = window.innerWidth <= 600;
       const shouldBeCards = isMobile;
       const shouldBeTable = !isMobile;
-      
+
       // Автоматически переключаем на карточки для мобильных, если сейчас таблица
       if (shouldBeCards && viewMode === "table") {
         setViewMode("cards");
@@ -478,9 +478,12 @@ export const BarberClients = () => {
         notes: form.notes || null,
         company: localStorage.getItem("company"),
       };
-
+      for (let [key, value] of Object.entries(payload)) {
+        if (!value) payload[key] = null;
+      }
       if (currentClient?.id) {
         const id = encodeURIComponent(currentClient.id);
+
         try {
           await api.patch(`/barbershop/clients/${id}/`, payload);
         } catch (err) {
