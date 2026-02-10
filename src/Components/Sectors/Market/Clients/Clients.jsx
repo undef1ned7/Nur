@@ -857,9 +857,9 @@ export default function MarketClients() {
     const variants = TYPE_VARIANTS_BY_TAB[activeTab] || [];
     const preferredFirst = acceptedTypeByTab[activeTab]
       ? [
-          acceptedTypeByTab[activeTab],
-          ...variants.filter((v) => v !== acceptedTypeByTab[activeTab]),
-        ]
+        acceptedTypeByTab[activeTab],
+        ...variants.filter((v) => v !== acceptedTypeByTab[activeTab]),
+      ]
       : variants;
 
     const tryList = preferredFirst.length
@@ -915,7 +915,6 @@ export default function MarketClients() {
         email: addEmail,
         date: addDate,
       });
-
       if (created?.id) navigate(`${CARD_BASE}${created.id}`); // абсолютный путь
       setRows((prev) => [created, ...(Array.isArray(prev) ? prev : [])]);
       setIsAddOpen(false);
@@ -940,14 +939,14 @@ export default function MarketClients() {
     activeTab === "clients"
       ? "Клиенты"
       : activeTab === "suppliers"
-      ? "Поставщики"
-      : activeTab === "resellers"
-      ? resellersTabLabel
-      : activeTab === "clientsBooking"
-      ? "Клиенты бронирование"
-      : activeTab === "debtors"
-      ? "Должники"
-      : "Клиенты";
+        ? "Поставщики"
+        : activeTab === "resellers"
+          ? resellersTabLabel
+          : activeTab === "clientsBooking"
+            ? "Клиенты бронирование"
+            : activeTab === "debtors"
+              ? "Должники"
+              : "Клиенты";
 
   // ───────────────────────── clientsBooking рендерит HostelClients
   if (activeTab === "clientsBooking") {
@@ -988,9 +987,8 @@ export default function MarketClients() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            className={`clients-tabs__tab ${
-              activeTab === t.key ? "clients-tabs__tab--active" : ""
-            }`}
+            className={`clients-tabs__tab ${activeTab === t.key ? "clients-tabs__tab--active" : ""
+              }`}
             onClick={() => setActiveTab(t.key)}
             type="button"
           >
@@ -1021,10 +1019,10 @@ export default function MarketClients() {
             {activeTab === "clients"
               ? "Новый клиент"
               : activeTab === "suppliers"
-              ? "Новый поставщик"
-              : sectorName === "Строительная компания"
-              ? "Новый подрядчик"
-              : "Новый реализатор"}
+                ? "Новый поставщик"
+                : sectorName === "Строительная компания"
+                  ? "Новый подрядчик"
+                  : "Новый реализатор"}
           </button>
         )}
       </div>
@@ -1052,9 +1050,8 @@ export default function MarketClients() {
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`clients-view-btn ${
-                viewMode === "table" ? "clients-view-btn--active" : ""
-              }`}
+              className={`clients-view-btn ${viewMode === "table" ? "clients-view-btn--active" : ""
+                }`}
             >
               <Table2 size={16} />
               Таблица
@@ -1063,9 +1060,8 @@ export default function MarketClients() {
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`clients-view-btn ${
-                viewMode === "cards" ? "clients-view-btn--active" : ""
-              }`}
+              className={`clients-view-btn ${viewMode === "cards" ? "clients-view-btn--active" : ""
+                }`}
             >
               <LayoutGrid size={16} />
               Карточки
@@ -1217,10 +1213,10 @@ export default function MarketClients() {
                 {activeTab === "clients"
                   ? "Новый клиент"
                   : activeTab === "suppliers"
-                  ? "Новый поставщик"
-                  : sectorName === "Строительная компания"
-                  ? "Новый подрядчик"
-                  : "Новый реализатор"}
+                    ? "Новый поставщик"
+                    : sectorName === "Строительная компания"
+                      ? "Новый подрядчик"
+                      : "Новый реализатор"}
               </h3>
             </div>
 
