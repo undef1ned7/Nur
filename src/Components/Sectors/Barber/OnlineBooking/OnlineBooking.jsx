@@ -117,6 +117,42 @@ const generateTimeSlots = (startHour = 9, endHour = 21, interval = 30) => {
 
 const TIME_SLOTS = generateTimeSlots();
 
+const SLOT_INTERVAL = 30;
+const TIMEZONE_OFFSET_HOURS = 6;
+
+function getBusySlotTimesForMasterOnDate(master, dateStr) {
+  const set = new Set();
+  (master.busy_slots || []).forEach((slot) => {
+    const startAt = slot.start_at;
+    const endAt = slot.end_at;
+    if (!startAt || !endAt) return;
+    const startMatch = startAt.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    const endMatch = endAt.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    if (!startMatch || !endMatch) return;
+    const startHourUTC = parseInt(startMatch[4], 10);
+    const startMinUTC = parseInt(startMatch[5], 10);
+    const endHourUTC = parseInt(endMatch[4], 10);
+    const endMinUTC = parseInt(endMatch[5], 10);
+    const startHourLocal = startHourUTC + TIMEZONE_OFFSET_HOURS;
+    const endHourLocal = endHourUTC + TIMEZONE_OFFSET_HOURS;
+    const startYear = parseInt(startMatch[1], 10);
+    const startMonth = parseInt(startMatch[2], 10) - 1;
+    const startDay = parseInt(startMatch[3], 10);
+    const startDateLocal = new Date(startYear, startMonth, startDay, startHourLocal, startMinUTC);
+    const slotDateStr = `${startDateLocal.getFullYear()}-${pad2(startDateLocal.getMonth() + 1)}-${pad2(startDateLocal.getDate())}`;
+    if (slotDateStr !== dateStr) return;
+    const startMins = startHourLocal * 60 + startMinUTC;
+    const endMins = endHourLocal * 60 + endMinUTC;
+    for (let mins = startMins; mins < endMins; mins += SLOT_INTERVAL) {
+      const hours = Math.floor(mins / 60);
+      if (hours >= 24) continue;
+      const minutes = mins % 60;
+      set.add(`${pad2(hours)}:${pad2(minutes)}`);
+    }
+  });
+  return set;
+}
+
 /* ===== Generate next 14 days ===== */
 const generateDates = (count = 14) => {
   const dates = [];
@@ -200,7 +236,12 @@ const OnlineBooking = () => {
       ]);
 
       setServices(servicesData || []);
-      setMasters(mastersData || []);
+      const normalizedMasters = (mastersData || []).map((m) => ({
+        ...m,
+        id: m.id ?? m.master_id ?? m.user_id ?? m.pk,
+        full_name: m.full_name ?? (m.first_name || m.last_name ? `${[m.first_name, m.last_name].filter(Boolean).join(" ")}`.trim() : null),
+      }));
+      setMasters(normalizedMasters);
       setCategories((categoriesData || []).map((c) => ({
         id: c.id,
         name: c.name,
@@ -334,8 +375,9 @@ const OnlineBooking = () => {
 
     // Если выбран конкретный мастер, фильтруем только его
     if (selectedMaster) {
+      const selId = selectedMaster.id ?? selectedMaster.master_id ?? selectedMaster.user_id;
       mastersToCheck = mastersToCheck.filter(
-        (m) => String(m.master_id) === String(selectedMaster.id)
+        (m) => String(m.master_id) === String(selId)
       );
     }
 
@@ -410,8 +452,9 @@ const OnlineBooking = () => {
 
     // Если выбран мастер, берём его рабочее время
     if (selectedMaster) {
+      const selId = selectedMaster.id ?? selectedMaster.master_id ?? selectedMaster.user_id;
       const masterData = availability.masters.find(
-        (m) => String(m.master_id) === String(selectedMaster.id)
+        (m) => String(m.master_id) === String(selId)
       );
       if (masterData?.work_start && masterData?.work_end) {
         const [startH] = masterData.work_start.split(":").map(Number);
@@ -470,6 +513,42 @@ const OnlineBooking = () => {
     if (!selectedTime) return null;
     return addMinutes(selectedTime, summary.totalDuration || 30);
   }, [selectedTime, summary.totalDuration]);
+
+  /* ===== Masters free at selected date+time (for "any master" auto-assign) ===== */
+  const mastersFreeAtSelectedSlot = useMemo(() => {
+    if (!selectedDate || !selectedTime || !availability?.masters?.length) return [];
+    const totalDuration = summary.totalDuration || 30;
+    const [h, m] = selectedTime.split(":").map(Number);
+    const startMins = h * 60 + m;
+    const endMins = startMins + totalDuration;
+    return availability.masters.filter((master) => {
+      const busy = getBusySlotTimesForMasterOnDate(master, selectedDate);
+      for (let mins = startMins; mins < endMins; mins += SLOT_INTERVAL) {
+        const slotTime = `${pad2(Math.floor(mins / 60))}:${pad2(mins % 60)}`;
+        if (busy.has(slotTime)) return false;
+      }
+      return true;
+    });
+  }, [selectedDate, selectedTime, availability, summary.totalDuration]);
+
+  /* ===== Effective master: selected by user or auto-assigned when "any" ===== */
+  const effectiveMaster = useMemo(() => {
+    if (selectedMaster) return selectedMaster;
+    if (mastersFreeAtSelectedSlot.length === 0 || !masters?.length) return null;
+    const firstFree = mastersFreeAtSelectedSlot[0];
+    const masterId = firstFree.master_id ?? firstFree.id;
+    const fromList = masters.find(
+      (m) => String(m.id ?? m.master_id ?? m.user_id) === String(masterId)
+    );
+    if (fromList) return fromList;
+    return {
+      id: masterId,
+      master_id: masterId,
+      full_name: firstFree.full_name || firstFree.name || "Мастер",
+      first_name: firstFree.first_name,
+      last_name: firstFree.last_name,
+    };
+  }, [selectedMaster, mastersFreeAtSelectedSlot, masters]);
 
   /* ===== Service toggle ===== */
   const toggleService = (service) => {
@@ -536,6 +615,11 @@ const OnlineBooking = () => {
 
     try {
       const slug = normStr(company_slug);
+      const master = effectiveMaster;
+      const masterId = master?.id ?? master?.master_id ?? master?.user_id ?? null;
+      const masterName = master?.full_name ||
+        (master ? `${[master.first_name, master.last_name].filter(Boolean).join(" ")}`.trim() : null) ||
+        null;
       const payload = {
         services: selectedServices.map((s) => ({
           service_id: s.id,
@@ -543,9 +627,8 @@ const OnlineBooking = () => {
           price: toNum(s.price),
           duration_min: parseDuration(s),
         })),
-        master_id: selectedMaster?.id || null,
-        master_name: selectedMaster?.full_name ||
-          (selectedMaster ? `${selectedMaster.first_name || ""} ${selectedMaster.last_name || ""}`.trim() : null),
+        master_id: masterId,
+        master_name: masterName,
         date: selectedDate,
         time_start: selectedTime + ":00",
         time_end: timeEnd + ":00",
@@ -840,16 +923,17 @@ const OnlineBooking = () => {
                   </button>
 
                   {filteredMasters.map((master) => {
-                    const isSelected = selectedMaster?.id === master.id;
+                    const mid = master.id ?? master.master_id ?? master.user_id ?? master.pk;
+                    const isSelected = selectedMaster != null && (selectedMaster.id === mid || selectedMaster.id === master.id);
                     const name = master.full_name ||
                       `${master.first_name || ""} ${master.last_name || ""}`.trim() || "Мастер";
 
                     return (
                       <button
-                        key={master.id}
+                        key={mid ?? master.id ?? master.master_id ?? master.user_id ?? master.pk}
                         type="button"
                         className={`ob__masterCard ${isSelected ? "is-selected" : ""}`}
-                        onClick={() => setSelectedMaster(master)}
+                        onClick={() => setSelectedMaster({ ...master, id: mid })}
                       >
                         <div className="ob__masterAvatar">
                           {master.avatar ? (
@@ -1061,9 +1145,9 @@ const OnlineBooking = () => {
                   <div className="ob__confirmRow">
                     <span className="ob__confirmLabel">Мастер</span>
                     <span className="ob__confirmValue">
-                      {selectedMaster
-                        ? (selectedMaster.full_name || `${selectedMaster.first_name || ""} ${selectedMaster.last_name || ""}`.trim())
-                        : "Любой свободный"}
+                      {effectiveMaster
+                        ? (effectiveMaster.full_name || `${[effectiveMaster.first_name, effectiveMaster.last_name].filter(Boolean).join(" ")}`.trim() || "Мастер")
+                        : "—"}
                     </span>
                   </div>
 
