@@ -14,6 +14,7 @@ const BOOKINGS_EP = "/barbershop/bookings/";
 
 const normPhone = (p) => String(p || "").replace(/[^\d]/g, "").trim();
 
+
 const normName = (s) =>
   String(s || "")
     .trim()
