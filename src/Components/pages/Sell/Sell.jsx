@@ -26,6 +26,7 @@ import SellModal from "./SellModal";
 import SellMainStart from "./SellMainStart";
 import "./sell.scss";
 import { useAlert } from "../../../hooks/useDialog";
+import DataContainer from "../../common/DataContainer/DataContainer";
 
 /**
  * Создание долга для клиента.
@@ -579,6 +580,8 @@ const Sell = () => {
           {filterField.length === 0 ? (
             <div className="sell__empty">Ничего не найдено</div>
           ) : (
+            <DataContainer>
+
             <div className="sell__cards">
               {filterField.map((item, idx) => {
                 const thumb = getSaleThumb(item);
@@ -683,6 +686,8 @@ const Sell = () => {
                 );
               })}
             </div>
+            </DataContainer>
+
           )}
         </div>
 

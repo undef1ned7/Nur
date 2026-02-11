@@ -26,6 +26,7 @@ import ReceiptEditModal from "./components/ReceiptEditModal";
 import InvoicePreviewModal from "./components/InvoicePreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 const Documents = () => {
   const dispatch = useDispatch();
@@ -378,6 +379,8 @@ const Documents = () => {
       </div>
 
       {/* Table */}
+      <DataContainer>
+
       <div className="documents__table-wrapper">
         <table className="documents__table">
           <thead>
@@ -510,6 +513,7 @@ const Documents = () => {
           </tbody>
         </table>
       </div>
+      </DataContainer>
 
       {/* Пагинация для чеков и накладных */}
       {totalPages > 1 && (

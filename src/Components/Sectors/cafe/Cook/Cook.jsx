@@ -25,6 +25,7 @@ import Pagination from "../../Market/Warehouse/components/Pagination";
 import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
 import { formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, parsePrinterBinding, setActivePrinterByKey } from "../Orders/OrdersPrintService";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -883,6 +884,8 @@ const Cook = () => {
         </div>
       ) : null}
 
+      <DataContainer>
+
       <div
         className="cafeCook__list"
         aria-busy={
@@ -968,28 +971,31 @@ const Cook = () => {
               </div>
             )}
 
-            {!loading &&
-              !error &&
-              tasks.map((g) => (
-                <CookReceiptCard
-                  key={g.id}
-                  group={g}
-                  activeTab={activeTab}
-                  collapsed={collapsed[g.key] !== false}
-                  onToggle={() => toggleGroup(g.key)}
-                  formatReceiptDate={formatReceiptDate}
-                  getStatusLabel={getStatusLabel}
-                  extractPortionsFromTask={extractPortionsFromTask}
-                  toNum={toNum}
-                  isUpdating={(id) => isUpdating(id)}
-                  onClaimOne={handleClaimOne}
-                  onReadyOne={handleReadyOne}
-                  onRemoveAfterReady={removeAfterReadyTask}
-                />
-              ))}
+              {!loading &&
+                !error &&
+                tasks.map((g) => (
+                  <CookReceiptCard
+                    key={g.id}
+                    group={g}
+                    activeTab={activeTab}
+                    collapsed={collapsed[g.key] !== false}
+                    onToggle={() => toggleGroup(g.key)}
+                    formatReceiptDate={formatReceiptDate}
+                    getStatusLabel={getStatusLabel}
+                    extractPortionsFromTask={extractPortionsFromTask}
+                    toNum={toNum}
+                    isUpdating={(id) => isUpdating(id)}
+                    onClaimOne={handleClaimOne}
+                    onReadyOne={handleReadyOne}
+                    onRemoveAfterReady={removeAfterReadyTask}
+                  />
+                ))}
+
           </>
         )}
       </div>
+      </DataContainer>
+
       {/* <Pagination
         currentPage={currentPage}
         totalPages={totalPages}

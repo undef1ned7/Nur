@@ -44,6 +44,7 @@ import "./productionAgents.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import useResize from "../../../../hooks/useResize";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 // Компонент для детального просмотра продажи
 const SaleDetailModal = ({ onClose, saleId }) => {
@@ -258,64 +259,68 @@ const PendingModal = ({ onClose, onChanged }) => {
         ) : filteredTransfers.length === 0 ? (
           <div className="add-modal__section">Нет передач для принятия.</div>
         ) : (
-          <div
-            className="table-wrapper"
-            style={{ maxHeight: 400, overflow: "auto" }}
-          >
-            <table className="sklad__table">
-              <thead>
-                <tr>
-                  <th>№</th>
-                  <th>Товар</th>
-                  {profile?.role === "owner" && <th>Агент</th>}
-                  <th>Количество</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransfers.map((transfer, idx) => (
-                  <tr key={transfer.id + idx}>
-                    <td data-label="№">{idx + 1}</td>
-                    <td data-label="Товар">{transfer.product_name || "—"}</td>
-                    {profile?.role === "owner" && (
-                      <td data-label="Агент">{transfer.agent_name || "—"}</td>
-                    )}
-                    <td data-label="Количество">
-                      {transfer.qty_transferred || 0}
-                    </td>
-                    <td data-label="Статус">
-                      <span
-                        className={`sell__badge--${transfer.status === "open" ? "warning" : "success"
-                          }`}
-                      >
-                        {transfer.status === "open" ? "Открыта" : "Закрыта"}
-                      </span>
-                    </td>
-                    <td data-label="Дата">
-                      {new Date(transfer.created_at).toLocaleDateString()}
-                    </td>
-                    <td data-label="Действия">
-                      {profile?.role !== "owner" ? (
-                        <button
-                          className="add-modal__save"
-                          style={{ marginRight: 8 }}
-                          title="Принять передачу"
-                          onClick={() => handleAcceptTransfer(transfer)}
-                          disabled={transfer.status !== "open"}
-                        >
-                          Принять
-                        </button>
-                      ) : (
-                        <span style={{ opacity: 0.7 }}>Просмотр</span>
-                      )}
-                    </td>
+          <DataContainer>
+
+            <div
+              className="table-wrapper"
+              style={{ maxHeight: 400, overflow: "auto" }}
+            >
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Товар</th>
+                    {profile?.role === "owner" && <th>Агент</th>}
+                    <th>Количество</th>
+                    <th>Статус</th>
+                    <th>Дата</th>
+                    <th>Действия</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredTransfers.map((transfer, idx) => (
+                    <tr key={transfer.id + idx}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Товар">{transfer.product_name || "—"}</td>
+                      {profile?.role === "owner" && (
+                        <td data-label="Агент">{transfer.agent_name || "—"}</td>
+                      )}
+                      <td data-label="Количество">
+                        {transfer.qty_transferred || 0}
+                      </td>
+                      <td data-label="Статус">
+                        <span
+                          className={`sell__badge--${transfer.status === "open" ? "warning" : "success"
+                            }`}
+                        >
+                          {transfer.status === "open" ? "Открыта" : "Закрыта"}
+                        </span>
+                      </td>
+                      <td data-label="Дата">
+                        {new Date(transfer.created_at).toLocaleDateString()}
+                      </td>
+                      <td data-label="Действия">
+                        {profile?.role !== "owner" ? (
+                          <button
+                            className="add-modal__save"
+                            style={{ marginRight: 8 }}
+                            title="Принять передачу"
+                            onClick={() => handleAcceptTransfer(transfer)}
+                            disabled={transfer.status !== "open"}
+                          >
+                            Принять
+                          </button>
+                        ) : (
+                          <span style={{ opacity: 0.7 }}>Просмотр</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataContainer>
+
         )}
 
         <div className="add-modal__footer">
@@ -500,15 +505,15 @@ const ProductionAgents = () => {
     agentProductsLoading,
     agentProductsError,
   } = useProducts();
-  
+
   const { start: startInAgent } = useAgent();
-  const {isMobile} = useResize((media) => {
-    const {isMobile} = media
+  const { isMobile } = useResize((media) => {
+    const { isMobile } = media
     if (isMobile) {
-        setViewMode('cards')
+      setViewMode('cards')
     }
   })
-  
+
   const [agents, setAgents] = useState([]);
   const [showAddCashboxModal, setShowAddCashboxModal] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -846,18 +851,18 @@ const ProductionAgents = () => {
                 </div>
                 <div className="flex mx-auto gap-3 lg:mr-0 flex-wrap justify-center">
                   {profile?.role !== "owner" ? (
-                  <div className="flex gap-2 align-middle">  <button
-                  className="warehouse-header__create-btn"
-                  onClick={() => setShowPendingModal(true)}
-                >
-                  <Plus size={16} />
-                  Мои передачи
-                </button>
-                {/* <button className="warehouse-header__create-btn" onClick={handleStartSale}>
+                    <div className="flex gap-2 align-middle">  <button
+                      className="warehouse-header__create-btn"
+                      onClick={() => setShowPendingModal(true)}
+                    >
+                      <Plus size={16} />
+                      Мои передачи
+                    </button>
+                      {/* <button className="warehouse-header__create-btn" onClick={handleStartSale}>
                   <Plus size={16} />
                   Продать товар
                 </button> */}
-                </div>
+                    </div>
                   ) : (
                     <button
                       className="warehouse-header__create-btn"
@@ -964,6 +969,8 @@ const ProductionAgents = () => {
               </div>
 
               {/* Products */}
+              <DataContainer>
+
               <div className="warehouse-table-container w-full">
                 {/* ===== TABLE ===== */}
                 {viewMode === "table" && (
@@ -1292,6 +1299,8 @@ const ProductionAgents = () => {
                   </div>
                 )}
               </div>
+              </DataContainer>
+
             </div>
           )}
 

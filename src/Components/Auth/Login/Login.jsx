@@ -115,7 +115,7 @@ const Login = () => {
 
           {!!errText && (
             <div className="login__message login__message--error" role="alert">
-              {errText}
+              Неправильный логин или пароль
             </div>
           )}
 

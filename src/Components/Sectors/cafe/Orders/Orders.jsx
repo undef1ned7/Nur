@@ -31,6 +31,7 @@ import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import { useUser } from "../../../../store/slices/userSlice";
 import Pagination from "../../Market/Counterparties/components/Pagination";
 import { useOutletContext } from "react-router-dom";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -1071,7 +1072,7 @@ const Orders = () => {
 
         setOrders((prev) => [...prev, res.data]);
         console.log('OREDERS', res);
-        
+
         await autoPrintKitchenTickets(res?.data?.id);
       } else {
         const payload = normalizeOrderPayload(form);
@@ -1250,113 +1251,116 @@ const Orders = () => {
           )}
         </div>
       </div>
+      <DataContainer>
 
-      <div className="cafeOrders__list">
-        {loading && <div className="cafeOrders__alert">Загрузка…</div>}
-        {
-          visibleOrders.map((o) => {
-            const tableLabel = getOrderTableLabel(o);
-            const totals = calcTotals(o);
-            const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
+        <div className="cafeOrders__list">
+          {loading && <div className="cafeOrders__alert">Загрузка…</div>}
+          {
+            visibleOrders.map((o) => {
+              const tableLabel = getOrderTableLabel(o);
+              const totals = calcTotals(o);
+              const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
 
-            const items = Array.isArray(o.items) ? o.items : [];
-            const expanded = expandedOrders.has(String(o.id));
-            const sliceItems = expanded ? items : items.slice(0, CARD_ITEMS_LIMIT);
-            const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
-            return (
-              <article key={o.id} className="cafeOrders__receipt relative">
-                <SimpleStamp date={o.paid_at} className="bottom-10 left-20" type={o.status} size={'md'} />
-                <div className="cafeOrders__receiptHeader">
-                  <div className="cafeOrders__receiptTable">СТОЛ {tableLabel}</div>
-                  {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
-                </div>
-
-                <div className="cafeOrders__receiptDivider" />
-
-                <div className="cafeOrders__receiptItems">
-                  {sliceItems.map((it, i) => {
-                    const itemPrice = linePrice(it);
-                    const itemTitle = it.menu_item_title || it.title || "Позиция";
-                    const itemQty = Number(it.quantity) || 0;
-                    const sum = itemPrice * itemQty;
-
-                    return (
-                      <div key={it.id || it.menu_item || i} className="cafeOrders__receiptItem">
-                        <span className="cafeOrders__receiptItemName">{itemTitle}</span>
-                        <span className="cafeOrders__receiptItemQty">x{itemQty}</span>
-                        <span className="cafeOrders__receiptItemPrice">{fmtShort(sum)}</span>
-                      </div>
-                    );
-                  })}
-
-                  {!expanded && rest > 0 && (
-                    <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
-                      Ещё {rest} поз.
-                    </button>
-                  )}
-
-                  {expanded && items.length > CARD_ITEMS_LIMIT && (
-                    <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
-                      Свернуть позиции ({items.length})
-                    </button>
-                  )}
-                </div>
-
-                <div className="cafeOrders__receiptFooter">
-                  <div className="cafeOrders__receiptDivider cafeOrders__receiptDivider--dashed" />
-
-                  <div className="cafeOrders__receiptTotal">
-                    <span className="cafeOrders__receiptTotalLabel">ИТОГО</span>
-                    <span className="cafeOrders__receiptTotalAmount">{fmtShort(totals.total)}</span>
+              const items = Array.isArray(o.items) ? o.items : [];
+              const expanded = expandedOrders.has(String(o.id));
+              const sliceItems = expanded ? items : items.slice(0, CARD_ITEMS_LIMIT);
+              const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
+              return (
+                <article key={o.id} className="cafeOrders__receipt relative">
+                  <SimpleStamp date={o.paid_at} className="bottom-10 left-20" type={o.status} size={'md'} />
+                  <div className="cafeOrders__receiptHeader">
+                    <div className="cafeOrders__receiptTable">СТОЛ {tableLabel}</div>
+                    {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
                   </div>
 
-                  <div className="cafeOrders__receiptActions">
-                    {
-                      !o.is_paid && o.status == 'open' && (<button
-                        className="cafeOrders__btn cafeOrders__btn--secondary"
-                        onClick={() => openEdit(o)}
-                        type="button"
-                        disabled={saving || paying || printingId === o.id}
-                      >
-                        <FaEdit /> Редактировать
-                      </button>)
-                    }
+                  <div className="cafeOrders__receiptDivider" />
 
-                    {
-                      !o.is_paid && o.status == 'open' && (<button
-                        className="cafeOrders__btn cafeOrders__btn--primary"
-                        onClick={() => openPay(o)}
-                        type="button"
-                        disabled={saving || paying || printingId === o.id}
-                      >
-                        <FaCheckCircle /> Оплатить
-                      </button>)
-                    }
+                  <div className="cafeOrders__receiptItems">
+                    {sliceItems.map((it, i) => {
+                      const itemPrice = linePrice(it);
+                      const itemTitle = it.menu_item_title || it.title || "Позиция";
+                      const itemQty = Number(it.quantity) || 0;
+                      const sum = itemPrice * itemQty;
+
+                      return (
+                        <div key={it.id || it.menu_item || i} className="cafeOrders__receiptItem">
+                          <span className="cafeOrders__receiptItemName">{itemTitle}</span>
+                          <span className="cafeOrders__receiptItemQty">x{itemQty}</span>
+                          <span className="cafeOrders__receiptItemPrice">{fmtShort(sum)}</span>
+                        </div>
+                      );
+                    })}
+
+                    {!expanded && rest > 0 && (
+                      <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
+                        Ещё {rest} поз.
+                      </button>
+                    )}
+
+                    {expanded && items.length > CARD_ITEMS_LIMIT && (
+                      <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
+                        Свернуть позиции ({items.length})
+                      </button>
+                    )}
                   </div>
-                </div>
-              </article>
-            );
-          })}
 
-        {!loading && !roleFiltered.length && (
-          <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
-        )}
-        <Pagination
-          currentPage={ordersPagination.currentPage}
-          totalPages={ordersPagination.totalPages}
-          count={ordersPagination.totalCount}
-          hasNextPage={ordersPagination.currentPage < ordersPagination.totalPages}
-          hasPrevPage={ordersPagination.currentPage > 1}
-          loading={loading}
-          onPageChange={(page) => {
-            setOrderPagination(prev => ({
-              ...prev,
-              currentPage: page
-            }))
-          }}
-        />
-      </div>
+                  <div className="cafeOrders__receiptFooter">
+                    <div className="cafeOrders__receiptDivider cafeOrders__receiptDivider--dashed" />
 
+                    <div className="cafeOrders__receiptTotal">
+                      <span className="cafeOrders__receiptTotalLabel">ИТОГО</span>
+                      <span className="cafeOrders__receiptTotalAmount">{fmtShort(totals.total)}</span>
+                    </div>
+
+                    <div className="cafeOrders__receiptActions">
+                      {
+                        !o.is_paid && o.status == 'open' && (<button
+                          className="cafeOrders__btn cafeOrders__btn--secondary"
+                          onClick={() => openEdit(o)}
+                          type="button"
+                          disabled={saving || paying || printingId === o.id}
+                        >
+                          <FaEdit /> Редактировать
+                        </button>)
+                      }
+
+                      {
+                        !o.is_paid && o.status == 'open' && (<button
+                          className="cafeOrders__btn cafeOrders__btn--primary"
+                          onClick={() => openPay(o)}
+                          type="button"
+                          disabled={saving || paying || printingId === o.id}
+                        >
+                          <FaCheckCircle /> Оплатить
+                        </button>)
+                      }
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+
+          {!loading && !roleFiltered.length && (
+            <div className="cafeOrders__alert cafeOrders__alert--muted">Ничего не найдено по «{query}».</div>
+          )}
+
+        </div>
+      </DataContainer>
+
+      <Pagination
+        currentPage={ordersPagination.currentPage}
+        totalPages={ordersPagination.totalPages}
+        count={ordersPagination.totalCount}
+        hasNextPage={ordersPagination.currentPage < ordersPagination.totalPages}
+        hasPrevPage={ordersPagination.currentPage > 1}
+        loading={loading}
+        onPageChange={(page) => {
+          setOrderPagination(prev => ({
+            ...prev,
+            currentPage: page
+          }))
+        }}
+      />
       {/* Modal create/edit */}
       {modalOpen && (
         <div

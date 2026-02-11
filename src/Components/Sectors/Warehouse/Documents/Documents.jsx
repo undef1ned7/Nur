@@ -37,6 +37,7 @@ import InvoicePreviewModal from "./components/InvoicePreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -53,7 +54,7 @@ const DOC_TYPE_FROM_PARAM = {
 
 const Documents = () => {
   const alert = useAlert();
-  const confirm = useConfirm(); 
+  const confirm = useConfirm();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { docType: docTypeParam } = useParams();
@@ -120,12 +121,12 @@ const Documents = () => {
       number: doc.number || getDocumentNumber(index, "ЧЕК"),
       date: doc.date || doc.created_at
         ? new Date(doc.date || doc.created_at).toLocaleString("ru-RU", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
         : "—",
       client:
         doc.counterparty?.name ||
@@ -147,10 +148,10 @@ const Documents = () => {
       number: doc.number || getDocumentNumber(index, "НАКЛ"),
       date: doc.date || doc.created_at
         ? new Date(doc.date || doc.created_at).toLocaleDateString("ru-RU", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
         : "—",
       counterparty:
         doc.counterparty?.name ||
@@ -294,7 +295,7 @@ const Documents = () => {
   // Отмена проведения документа
   const handleUnpost = async (item) => {
     if (!item?.id) return;
-    
+
     confirm(`Отменить проведение документа ${item.number}?`, async (ok) => {
       if (!ok) return;
       try {
@@ -324,7 +325,7 @@ const Documents = () => {
         const result = await dispatch(getWarehouseDocumentById(item.id));
         if (getWarehouseDocumentById.fulfilled.match(result)) {
           const doc = result.payload;
-          
+
           // Преобразуем данные в формат для PDF
           const seller = {
             id: company?.id || "",
@@ -339,29 +340,29 @@ const Documents = () => {
           };
           const buyer = doc.counterparty
             ? {
-                id: doc.counterparty.id,
-                name: doc.counterparty.name || "",
-                inn: doc.counterparty.inn || "",
-                okpo: doc.counterparty.okpo || "",
-                score: doc.counterparty.score || "",
-                bik: doc.counterparty.bik || "",
-                address: doc.counterparty.address || "",
-                phone: doc.counterparty.phone || null,
-                email: doc.counterparty.email || null,
-              }
+              id: doc.counterparty.id,
+              name: doc.counterparty.name || "",
+              inn: doc.counterparty.inn || "",
+              okpo: doc.counterparty.okpo || "",
+              score: doc.counterparty.score || "",
+              bik: doc.counterparty.bik || "",
+              address: doc.counterparty.address || "",
+              phone: doc.counterparty.phone || null,
+              email: doc.counterparty.email || null,
+            }
             : null;
           const items = Array.isArray(doc.items)
             ? doc.items.map((item) => ({
-                id: item.id,
-                name: item.product?.name || item.name || "Товар",
-                qty: String(item.qty || 0),
-                unit_price: String(Number(item.price || 0).toFixed(2)),
-                total: String(Number(item.total || item.qty * item.price || 0).toFixed(2)),
-                unit: item.product?.unit || item.unit || "ШТ",
-                article: item.product?.article || item.article || "",
-                discount_percent: Number(item.discount_percent || 0),
-                price_before_discount: String(Number(item.price || 0).toFixed(2)),
-              }))
+              id: item.id,
+              name: item.product?.name || item.name || "Товар",
+              qty: String(item.qty || 0),
+              unit_price: String(Number(item.price || 0).toFixed(2)),
+              total: String(Number(item.total || item.qty * item.price || 0).toFixed(2)),
+              unit: item.product?.unit || item.unit || "ШТ",
+              article: item.product?.article || item.article || "",
+              discount_percent: Number(item.discount_percent || 0),
+              price_before_discount: String(Number(item.price || 0).toFixed(2)),
+            }))
             : [];
           const subtotal = items.reduce(
             (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
@@ -371,7 +372,7 @@ const Documents = () => {
             (sum, item) =>
               sum +
               (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
-                100,
+              100,
             0
           );
           const total = subtotal - discountTotal;
@@ -413,9 +414,8 @@ const Documents = () => {
             <InvoicePdfDocument data={invoiceData} />
           ).toBlob();
 
-          const fileName = `invoice_${
-            invoiceData?.document?.number || item.id
-          }.pdf`;
+          const fileName = `invoice_${invoiceData?.document?.number || item.id
+            }.pdf`;
 
           // Скачиваем файл
           const url = window.URL.createObjectURL(blob);
@@ -533,17 +533,15 @@ const Documents = () => {
       <div className="documents__tabs-row">
         <div className="documents__tabs">
           <button
-            className={`documents__tab ${
-              activeTab === "receipts" ? "documents__tab--active" : ""
-            }`}
+            className={`documents__tab ${activeTab === "receipts" ? "documents__tab--active" : ""
+              }`}
             onClick={() => setActiveTab("receipts")}
           >
             Чеки
           </button>
           <button
-            className={`documents__tab ${
-              activeTab === "invoices" ? "documents__tab--active" : ""
-            }`}
+            className={`documents__tab ${activeTab === "invoices" ? "documents__tab--active" : ""
+              }`}
             onClick={() => setActiveTab("invoices")}
           >
             Накладные
@@ -568,261 +566,263 @@ const Documents = () => {
           </button>
         </div>
       </div>
+      <DataContainer>
 
-      {/* Table */}
-      {viewMode === "table" && (
-      <div className="documents__table-wrapper">
-        <table className="documents__table">
-          <thead>
-            <tr>
-              {activeTab === "receipts" && (
-                <>
-                  <th>Номер</th>
-                  <th>Дата и время</th>
-                  <th>Контрагент</th>
-                  <th>Товаров</th>
-                  <th>Сумма</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
-                </>
-              )}
-              {activeTab === "invoices" && (
-                <>
-                  <th>Номер</th>
-                  <th>Дата</th>
-                  <th>Контрагент</th>
-                  <th>Позиций</th>
-                  <th>Сумма</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {documentsLoading ? (
-              <tr>
-                <td colSpan={7} className="documents__empty">
-                  Загрузка...
-                </td>
-              </tr>
-            ) : getCurrentData().length === 0 ? (
-              <tr>
-                <td colSpan={7} className="documents__empty">
-                  Документы не найдены
-                </td>
-              </tr>
-            ) : (
-              getCurrentData().map((item, idx) => (
-                <tr key={item.id}>
+        {/* Table */}
+        {viewMode === "table" && (
+          <div className="documents__table-wrapper">
+            <table className="documents__table">
+              <thead>
+                <tr>
                   {activeTab === "receipts" && (
                     <>
-                      <td>{item.number}</td>
-                      <td>{item.date}</td>
-                      <td>{item.client}</td>
-                      <td>{item.products}</td>
-                      <td>{formatAmount(item.amount)} сом</td>
-                      <td>
-                        <span
-                          className={`documents__status documents__status--${item.statusType}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="documents__actions">
-                          <button
-                            className="documents__action-btn"
-                            onClick={() => handleView(item)}
-                            title="Просмотр"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          {/* <button
-                            className="documents__action-btn"
-                            onClick={() => handleEdit(item)}
-                            title="Редактировать"
-                          >
-                            <Pencil size={18} />
-                          </button> */}
-                          <button
-                            className="documents__action-btn"
-                            onClick={() => handlePrint(item)}
-                            title="Печать"
-                          >
-                            <Printer size={18} />
-                          </button>
-                          {item.statusType === "draft" ? (
-                            <button
-                              className="documents__action-btn"
-                              onClick={() => handlePost(item)}
-                              title="Провести документ"
-                            >
-                              <Check size={18} />
-                            </button>
-                          ) : (
-                            <button
-                              className="documents__action-btn"
-                              onClick={() => handleUnpost(item)}
-                              title="Отменить проведение"
-                            >
-                              <X size={18} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                      <th>Номер</th>
+                      <th>Дата и время</th>
+                      <th>Контрагент</th>
+                      <th>Товаров</th>
+                      <th>Сумма</th>
+                      <th>Статус</th>
+                      <th>Действия</th>
                     </>
                   )}
                   {activeTab === "invoices" && (
                     <>
-                      <td>{item.number}</td>
-                      <td>{item.date}</td>
-                      <td>{item.counterparty}</td>
-                      <td>{item.positions}</td>
-                      <td>{formatAmount(item.amount)} сом</td>
-                      <td>
-                        <span
-                          className={`documents__status documents__status--${item.statusType}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="documents__actions">
-                          <button
-                            className="documents__action-btn"
-                            onClick={() => handleView(item)}
-                            title="Просмотр"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          {/* <button
+                      <th>Номер</th>
+                      <th>Дата</th>
+                      <th>Контрагент</th>
+                      <th>Позиций</th>
+                      <th>Сумма</th>
+                      <th>Статус</th>
+                      <th>Действия</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {documentsLoading ? (
+                  <tr>
+                    <td colSpan={7} className="documents__empty">
+                      Загрузка...
+                    </td>
+                  </tr>
+                ) : getCurrentData().length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="documents__empty">
+                      Документы не найдены
+                    </td>
+                  </tr>
+                ) : (
+                  getCurrentData().map((item, idx) => (
+                    <tr key={item.id}>
+                      {activeTab === "receipts" && (
+                        <>
+                          <td>{item.number}</td>
+                          <td>{item.date}</td>
+                          <td>{item.client}</td>
+                          <td>{item.products}</td>
+                          <td>{formatAmount(item.amount)} сом</td>
+                          <td>
+                            <span
+                              className={`documents__status documents__status--${item.statusType}`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="documents__actions">
+                              <button
+                                className="documents__action-btn"
+                                onClick={() => handleView(item)}
+                                title="Просмотр"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              {/* <button
                             className="documents__action-btn"
                             onClick={() => handleEdit(item)}
                             title="Редактировать"
                           >
                             <Pencil size={18} />
                           </button> */}
-                          <button
+                              <button
+                                className="documents__action-btn"
+                                onClick={() => handlePrint(item)}
+                                title="Печать"
+                              >
+                                <Printer size={18} />
+                              </button>
+                              {item.statusType === "draft" ? (
+                                <button
+                                  className="documents__action-btn"
+                                  onClick={() => handlePost(item)}
+                                  title="Провести документ"
+                                >
+                                  <Check size={18} />
+                                </button>
+                              ) : (
+                                <button
+                                  className="documents__action-btn"
+                                  onClick={() => handleUnpost(item)}
+                                  title="Отменить проведение"
+                                >
+                                  <X size={18} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      )}
+                      {activeTab === "invoices" && (
+                        <>
+                          <td>{item.number}</td>
+                          <td>{item.date}</td>
+                          <td>{item.counterparty}</td>
+                          <td>{item.positions}</td>
+                          <td>{formatAmount(item.amount)} сом</td>
+                          <td>
+                            <span
+                              className={`documents__status documents__status--${item.statusType}`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="documents__actions">
+                              <button
+                                className="documents__action-btn"
+                                onClick={() => handleView(item)}
+                                title="Просмотр"
+                              >
+                                <Eye size={18} />
+                              </button>
+                              {/* <button
                             className="documents__action-btn"
-                            onClick={() => handlePrint(item)}
-                            title="Печать"
+                            onClick={() => handleEdit(item)}
+                            title="Редактировать"
                           >
-                            <Printer size={18} />
-                          </button>
-                          {item.statusType === "draft" ? (
-                            <button
-                              className="documents__action-btn"
-                              onClick={() => handlePost(item)}
-                              title="Провести документ"
-                            >
-                              <Check size={18} />
-                            </button>
-                          ) : (
-                            <button
-                              className="documents__action-btn"
-                              onClick={() => handleUnpost(item)}
-                              title="Отменить проведение"
-                            >
-                              <X size={18} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </>
-                  )}
-                </tr>
+                            <Pencil size={18} />
+                          </button> */}
+                              <button
+                                className="documents__action-btn"
+                                onClick={() => handlePrint(item)}
+                                title="Печать"
+                              >
+                                <Printer size={18} />
+                              </button>
+                              {item.statusType === "draft" ? (
+                                <button
+                                  className="documents__action-btn"
+                                  onClick={() => handlePost(item)}
+                                  title="Провести документ"
+                                >
+                                  <Check size={18} />
+                                </button>
+                              ) : (
+                                <button
+                                  className="documents__action-btn"
+                                  onClick={() => handleUnpost(item)}
+                                  title="Отменить проведение"
+                                >
+                                  <X size={18} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Карточки */}
+        {viewMode === "cards" && (
+          <div className="documents__cards">
+            {documentsLoading ? (
+              <div className="documents__cards-empty">Загрузка...</div>
+            ) : getCurrentData().length === 0 ? (
+              <div className="documents__cards-empty">Документы не найдены</div>
+            ) : (
+              getCurrentData().map((item) => (
+                <div key={item.id} className="documents__card">
+                  <div className="documents__card-header">
+                    <span className="documents__card-number">{item.number}</span>
+                    <span
+                      className={`documents__status documents__status--${item.statusType}`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                  <div className="documents__card-body">
+                    <div className="documents__card-row">
+                      <span className="documents__card-label">
+                        {activeTab === "receipts" ? "Дата и время" : "Дата"}
+                      </span>
+                      <span className="documents__card-value">{item.date}</span>
+                    </div>
+                    <div className="documents__card-row">
+                      <span className="documents__card-label">Контрагент</span>
+                      <span className="documents__card-value">
+                        {activeTab === "receipts" ? item.client : item.counterparty}
+                      </span>
+                    </div>
+                    <div className="documents__card-row">
+                      <span className="documents__card-label">
+                        {activeTab === "receipts" ? "Товаров" : "Позиций"}
+                      </span>
+                      <span className="documents__card-value">
+                        {activeTab === "receipts" ? item.products : item.positions}
+                      </span>
+                    </div>
+                    <div className="documents__card-row documents__card-row--amount">
+                      <span className="documents__card-label">Сумма</span>
+                      <span className="documents__card-value">
+                        {formatAmount(item.amount)} сом
+                      </span>
+                    </div>
+                  </div>
+                  <div className="documents__card-actions">
+                    <button
+                      className="documents__action-btn"
+                      onClick={() => handleView(item)}
+                      title="Просмотр"
+                    >
+                      <Eye size={18} />
+                    </button>
+                    <button
+                      className="documents__action-btn"
+                      onClick={() => handlePrint(item)}
+                      title="Печать"
+                    >
+                      <Printer size={18} />
+                    </button>
+                    {item.statusType === "draft" ? (
+                      <button
+                        className="documents__action-btn"
+                        onClick={() => handlePost(item)}
+                        title="Провести документ"
+                      >
+                        <Check size={18} />
+                      </button>
+                    ) : (
+                      <button
+                        className="documents__action-btn"
+                        onClick={() => handleUnpost(item)}
+                        title="Отменить проведение"
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
-      )}
-
-      {/* Карточки */}
-      {viewMode === "cards" && (
-        <div className="documents__cards">
-          {documentsLoading ? (
-            <div className="documents__cards-empty">Загрузка...</div>
-          ) : getCurrentData().length === 0 ? (
-            <div className="documents__cards-empty">Документы не найдены</div>
-          ) : (
-            getCurrentData().map((item) => (
-              <div key={item.id} className="documents__card">
-                <div className="documents__card-header">
-                  <span className="documents__card-number">{item.number}</span>
-                  <span
-                    className={`documents__status documents__status--${item.statusType}`}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-                <div className="documents__card-body">
-                  <div className="documents__card-row">
-                    <span className="documents__card-label">
-                      {activeTab === "receipts" ? "Дата и время" : "Дата"}
-                    </span>
-                    <span className="documents__card-value">{item.date}</span>
-                  </div>
-                  <div className="documents__card-row">
-                    <span className="documents__card-label">Контрагент</span>
-                    <span className="documents__card-value">
-                      {activeTab === "receipts" ? item.client : item.counterparty}
-                    </span>
-                  </div>
-                  <div className="documents__card-row">
-                    <span className="documents__card-label">
-                      {activeTab === "receipts" ? "Товаров" : "Позиций"}
-                    </span>
-                    <span className="documents__card-value">
-                      {activeTab === "receipts" ? item.products : item.positions}
-                    </span>
-                  </div>
-                  <div className="documents__card-row documents__card-row--amount">
-                    <span className="documents__card-label">Сумма</span>
-                    <span className="documents__card-value">
-                      {formatAmount(item.amount)} сом
-                    </span>
-                  </div>
-                </div>
-                <div className="documents__card-actions">
-                  <button
-                    className="documents__action-btn"
-                    onClick={() => handleView(item)}
-                    title="Просмотр"
-                  >
-                    <Eye size={18} />
-                  </button>
-                  <button
-                    className="documents__action-btn"
-                    onClick={() => handlePrint(item)}
-                    title="Печать"
-                  >
-                    <Printer size={18} />
-                  </button>
-                  {item.statusType === "draft" ? (
-                    <button
-                      className="documents__action-btn"
-                      onClick={() => handlePost(item)}
-                      title="Провести документ"
-                    >
-                      <Check size={18} />
-                    </button>
-                  ) : (
-                    <button
-                      className="documents__action-btn"
-                      onClick={() => handleUnpost(item)}
-                      title="Отменить проведение"
-                    >
-                      <X size={18} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </DataContainer>
 
       {/* Пагинация для чеков и накладных */}
       {totalPages > 1 && (

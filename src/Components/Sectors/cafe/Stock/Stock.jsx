@@ -4,6 +4,7 @@ import { FaSearch, FaPlus, FaBoxes, FaEdit, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
 import "./stock.scss";
 import { StockItemModal, StockMoveModal, StockDeleteModal } from "./components/StockModals";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -156,7 +157,7 @@ const Stock = () => {
             type: "expense",
             name: `Новый товар на склад: ${title}`,
             amount,
-          }).catch(() => {});
+          }).catch(() => { });
         }
       } else {
         // Редактирование товара
@@ -229,7 +230,7 @@ const Stock = () => {
           type: "expense",
           name: moveName,
           amount,
-        }).catch(() => {});
+        }).catch(() => { });
       }
     } catch (err) {
       // Ошибка применения движения
@@ -265,64 +266,65 @@ const Stock = () => {
           </button>
         </div>
       </div>
+      <DataContainer>
 
-      <div className="cafeStock__list">
-        {loading && <div className="cafeStock__alert">Загрузка…</div>}
+        <div className="cafeStock__list">
+          {loading && <div className="cafeStock__alert">Загрузка…</div>}
 
-        {!loading &&
-          filtered.map((s) => (
-            <article key={s.id} className="cafeStock__card">
-              <div className="cafeStock__cardLeft">
-                <div className="cafeStock__avatar">
-                  <FaBoxes />
-                </div>
-                <div>
-                  <h3 className="cafeStock__name">{s.title}</h3>
-                  <div className="cafeStock__meta">
-                    <span className="cafeStock__muted">
-                      Остаток: {toNum(s.remainder)} {s.unit}
-                    </span>
-                    <span
-                      className={`cafeStock__status ${
-                        isLow(s) ? "cafeStock__status--low" : "cafeStock__status--ok"
-                      }`}
-                    >
-                      {isLow(s) ? "Мало" : "Ок"}
-                    </span>
+          {!loading &&
+            filtered.map((s) => (
+              <article key={s.id} className="cafeStock__card">
+                <div className="cafeStock__cardLeft">
+                  <div className="cafeStock__avatar">
+                    <FaBoxes />
+                  </div>
+                  <div>
+                    <h3 className="cafeStock__name">{s.title}</h3>
+                    <div className="cafeStock__meta">
+                      <span className="cafeStock__muted">
+                        Остаток: {toNum(s.remainder)} {s.unit}
+                      </span>
+                      <span
+                        className={`cafeStock__status ${isLow(s) ? "cafeStock__status--low" : "cafeStock__status--ok"
+                          }`}
+                      >
+                        {isLow(s) ? "Мало" : "Ок"}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="cafeStock__rowActions">
-                <button
-                  className="cafeStock__btn cafeStock__btn--success"
-                  onClick={() => openMove(s)}
-                  type="button"
-                >
-                  Приход
-                </button>
-                <button
-                  className="cafeStock__btn cafeStock__btn--secondary"
-                  onClick={() => openEdit(s)}
-                  type="button"
-                >
-                  <FaEdit /> Изменить
-                </button>
-                <button
-                  className="cafeStock__btn cafeStock__btn--danger"
-                  onClick={() => openDelete(s)}
-                  type="button"
-                >
-                  <FaTrash /> Удалить
-                </button>
-              </div>
-            </article>
-          ))}
+                <div className="cafeStock__rowActions">
+                  <button
+                    className="cafeStock__btn cafeStock__btn--success"
+                    onClick={() => openMove(s)}
+                    type="button"
+                  >
+                    Приход
+                  </button>
+                  <button
+                    className="cafeStock__btn cafeStock__btn--secondary"
+                    onClick={() => openEdit(s)}
+                    type="button"
+                  >
+                    <FaEdit /> Изменить
+                  </button>
+                  <button
+                    className="cafeStock__btn cafeStock__btn--danger"
+                    onClick={() => openDelete(s)}
+                    type="button"
+                  >
+                    <FaTrash /> Удалить
+                  </button>
+                </div>
+              </article>
+            ))}
 
-        {!loading && !filtered.length && (
-          <div className="cafeStock__alert">Ничего не найдено по «{query}».</div>
-        )}
-      </div>
+          {!loading && !filtered.length && (
+            <div className="cafeStock__alert">Ничего не найдено по «{query}».</div>
+          )}
+        </div>
+      </DataContainer>
 
       {/* Модалка товара */}
       {modalOpen && (

@@ -23,6 +23,7 @@ import { useAlert } from "../../../hooks/useDialog";
 import { validateResErrors } from "../../../../tools/validateResErrors";
 import api from "../../../api";
 import Loading from "../../common/Loading/Loading";
+import DataContainer from "../../common/DataContainer/DataContainer";
 
 const KassaDet = () => {
   const { id } = useParams();
@@ -612,138 +613,142 @@ const KassaDet = () => {
               Загрузка отчета...
             </div>
           ) : reportData ? (
-            <div className="cashbox-reports__content">
-              <div className="cashbox-reports__summary">
-                <div className="cashbox-reports__summary-item">
-                  <span className="cashbox-reports__summary-label">
-                    Приход:
-                  </span>
-                  <span className="cashbox-reports__summary-value cashbox-reports__summary-value--income">
-                    {reportData.totalIncome.toFixed(2)} сом
-                  </span>
-                </div>
-                <div className="cashbox-reports__summary-item">
-                  <span className="cashbox-reports__summary-label">
-                    Расход:
-                  </span>
-                  <span className="cashbox-reports__summary-value cashbox-reports__summary-value--expense">
-                    {reportData.totalExpense.toFixed(2)} сом
-                  </span>
-                </div>
-                <div className="cashbox-reports__summary-item">
-                  <span className="cashbox-reports__summary-label">Итого:</span>
-                  <span
-                    className={`cashbox-reports__summary-value ${reportData.net >= 0
-                      ? "cashbox-reports__summary-value--income"
-                      : "cashbox-reports__summary-value--expense"
-                      }`}
-                  >
-                    {reportData.net.toFixed(2)} сом
-                  </span>
-                </div>
-              </div>
+            <DataContainer>
 
-              {reportType === "monthly" && reportData.dailyGroups ? (
-                <div className="cashbox-reports__monthly">
-                  {Object.entries(reportData.dailyGroups)
-                    .sort(([a], [b]) => new Date(b) - new Date(a))
-                    .map(([date, data]) => (
-                      <div key={date} className="cashbox-reports__day-group">
-                        <div className="cashbox-reports__day-header">
-                          <h4>
-                            {new Date(date).toLocaleDateString("ru-RU", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            })}
-                          </h4>
-                          <div className="cashbox-reports__day-totals">
-                            <span>Приход: {data.income.toFixed(2)} сом</span>
-                            <span>Расход: {data.expense.toFixed(2)} сом</span>
-                            <span>
-                              Итого: {(data.income - data.expense).toFixed(2)}{" "}
-                              сом
-                            </span>
+              <div className="cashbox-reports__content">
+                <div className="cashbox-reports__summary">
+                  <div className="cashbox-reports__summary-item">
+                    <span className="cashbox-reports__summary-label">
+                      Приход:
+                    </span>
+                    <span className="cashbox-reports__summary-value cashbox-reports__summary-value--income">
+                      {reportData.totalIncome.toFixed(2)} сом
+                    </span>
+                  </div>
+                  <div className="cashbox-reports__summary-item">
+                    <span className="cashbox-reports__summary-label">
+                      Расход:
+                    </span>
+                    <span className="cashbox-reports__summary-value cashbox-reports__summary-value--expense">
+                      {reportData.totalExpense.toFixed(2)} сом
+                    </span>
+                  </div>
+                  <div className="cashbox-reports__summary-item">
+                    <span className="cashbox-reports__summary-label">Итого:</span>
+                    <span
+                      className={`cashbox-reports__summary-value ${reportData.net >= 0
+                        ? "cashbox-reports__summary-value--income"
+                        : "cashbox-reports__summary-value--expense"
+                        }`}
+                    >
+                      {reportData.net.toFixed(2)} сом
+                    </span>
+                  </div>
+                </div>
+
+                {reportType === "monthly" && reportData.dailyGroups ? (
+                  <div className="cashbox-reports__monthly">
+                    {Object.entries(reportData.dailyGroups)
+                      .sort(([a], [b]) => new Date(b) - new Date(a))
+                      .map(([date, data]) => (
+                        <div key={date} className="cashbox-reports__day-group">
+                          <div className="cashbox-reports__day-header">
+                            <h4>
+                              {new Date(date).toLocaleDateString("ru-RU", {
+                                day: "numeric",
+                                month: "long",
+                                year: "numeric",
+                              })}
+                            </h4>
+                            <div className="cashbox-reports__day-totals">
+                              <span>Приход: {data.income.toFixed(2)} сом</span>
+                              <span>Расход: {data.expense.toFixed(2)} сом</span>
+                              <span>
+                                Итого: {(data.income - data.expense).toFixed(2)}{" "}
+                                сом
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                        <table className="kassa-table">
-                          <thead>
-                            <tr>
-                              <th>Тип</th>
-                              <th>Наименование</th>
-                              <th>Сумма</th>
-                              <th>Время</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {data.flows.map((flow) => (
-                              <tr key={flow.id}>
-                                <td data-label="Тип">
-                                  {flow.type === "income" ? "Приход" : "Расход"}
-                                </td>
-                                <td data-label="Наименование">
-                                  {flow.name || flow.title}
-                                </td>
-                                <td data-label="Сумма">{flow.amount}</td>
-                                <td data-label="Время">
-                                  {new Date(flow.created_at).toLocaleTimeString(
-                                    "ru-RU",
-                                    {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    }
-                                  )}
-                                </td>
+                          <table className="kassa-table">
+                            <thead>
+                              <tr>
+                                <th>Тип</th>
+                                <th>Наименование</th>
+                                <th>Сумма</th>
+                                <th>Время</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="cashbox-reports__daily">
-                  {reportData.flows && reportData.flows.length > 0 ? (
-                    <table className="kassa-table">
-                      <thead>
-                        <tr>
-                          <th>Тип</th>
-                          <th>Наименование</th>
-                          <th>Сумма</th>
-                          <th>Время</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reportData.flows.map((flow) => (
-                          <tr key={flow.id}>
-                            <td data-label="Тип">
-                              {flow.type === "income" ? "Приход" : "Расход"}
-                            </td>
-                            <td data-label="Наименование">
-                              {flow.name || flow.title}
-                            </td>
-                            <td data-label="Сумма">{flow.amount}</td>
-                            <td data-label="Время">
-                              {new Date(flow.created_at).toLocaleTimeString(
-                                "ru-RU",
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
-                            </td>
+                            </thead>
+                            <tbody>
+                              {data.flows.map((flow) => (
+                                <tr key={flow.id}>
+                                  <td data-label="Тип">
+                                    {flow.type === "income" ? "Приход" : "Расход"}
+                                  </td>
+                                  <td data-label="Наименование">
+                                    {flow.name || flow.title}
+                                  </td>
+                                  <td data-label="Сумма">{flow.amount}</td>
+                                  <td data-label="Время">
+                                    {new Date(flow.created_at).toLocaleTimeString(
+                                      "ru-RU",
+                                      {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      }
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="cashbox-reports__daily">
+                    {reportData.flows && reportData.flows.length > 0 ? (
+                      <table className="kassa-table">
+                        <thead>
+                          <tr>
+                            <th>Тип</th>
+                            <th>Наименование</th>
+                            <th>Сумма</th>
+                            <th>Время</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p style={{ padding: "20px", textAlign: "center" }}>
-                      Нет операций за выбранную дату
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+                        </thead>
+                        <tbody>
+                          {reportData.flows.map((flow) => (
+                            <tr key={flow.id}>
+                              <td data-label="Тип">
+                                {flow.type === "income" ? "Приход" : "Расход"}
+                              </td>
+                              <td data-label="Наименование">
+                                {flow.name || flow.title}
+                              </td>
+                              <td data-label="Сумма">{flow.amount}</td>
+                              <td data-label="Время">
+                                {new Date(flow.created_at).toLocaleTimeString(
+                                  "ru-RU",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p style={{ padding: "20px", textAlign: "center" }}>
+                        Нет операций за выбранную дату
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </DataContainer>
+
           ) : (
             <div style={{ padding: "20px", textAlign: "center" }}>
               Выберите период для просмотра отчета
@@ -800,89 +805,92 @@ const KassaDet = () => {
               </button>
             </div>
           </div>
+          <DataContainer>
 
-          <div className="kassa-table-container">
-            {flowsLoading ? (
-              <div className="kassa-table__loading" style={{ padding: 40 }}>
-                Загрузка…
-              </div>
-            ) : !filteredCashflows || filteredCashflows.length === 0 ? (
-              <div className="kassa-table__empty" style={{ padding: 40 }}>
-                Нет движений денежных средств для этой кассы
-                {activeFlowType === "income"
-                  ? " (Приходы)."
-                  : activeFlowType === "expense"
-                    ? " (Расходы)."
-                    : "."}
-              </div>
-            ) : viewMode === "table" ? (
-              <table className="kassa-table">
-                <thead>
-                  <tr>
-                    <th>Тип</th>
-                    <th>Наименование</th>
-                    <th>Сумма</th>
-                    <th>Дата создания</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCashflows.map((flow) => (
-                    <tr key={flow.id}>
-                      <td>{flow.type === "income" ? "Приход" : "Расход"}</td>
-                      <td>{flow.name}</td>
-                      <td>{flow.amount}</td>
-                      <td>{new Date(flow.created_at).toLocaleDateString()}</td>
+            <div className="kassa-table-container">
+              {flowsLoading ? (
+                <div className="kassa-table__loading" style={{ padding: 40 }}>
+                  Загрузка…
+                </div>
+              ) : !filteredCashflows || filteredCashflows.length === 0 ? (
+                <div className="kassa-table__empty" style={{ padding: 40 }}>
+                  Нет движений денежных средств для этой кассы
+                  {activeFlowType === "income"
+                    ? " (Приходы)."
+                    : activeFlowType === "expense"
+                      ? " (Расходы)."
+                      : "."}
+                </div>
+              ) : viewMode === "table" ? (
+                <table className="kassa-table">
+                  <thead>
+                    <tr>
+                      <th>Тип</th>
+                      <th>Наименование</th>
+                      <th>Сумма</th>
+                      <th>Дата создания</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="kassa-cards-wrapper">
-                <div className="kassa-cards">
-                  {filteredCashflows.map((flow) => (
-                    <div key={flow.id} className="kassa-card">
-                      <div className="kassa-card__header">
-                        <span
-                          className={`kassa-card__num ${flow.type === "income"
-                            ? "kassa-card__num--income"
-                            : "kassa-card__num--expense"
-                            }`}
-                        >
-                          {flow.type === "income" ? "Приход" : "Расход"}
-                        </span>
-                        <h3 className="kassa-card__title">
-                          {flow.name || "—"}
-                        </h3>
-                      </div>
-                      <div className="kassa-card__fields">
-                        <div className="kassa-card__field">
-                          <span className="kassa-card__label">Сумма</span>
+                  </thead>
+                  <tbody>
+                    {filteredCashflows.map((flow) => (
+                      <tr key={flow.id}>
+                        <td>{flow.type === "income" ? "Приход" : "Расход"}</td>
+                        <td>{flow.name}</td>
+                        <td>{flow.amount}</td>
+                        <td>{new Date(flow.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="kassa-cards-wrapper">
+                  <div className="kassa-cards">
+                    {filteredCashflows.map((flow) => (
+                      <div key={flow.id} className="kassa-card">
+                        <div className="kassa-card__header">
                           <span
-                            className={`kassa-card__value ${flow.type === "income"
-                              ? "kassa-card__value--income"
-                              : "kassa-card__value--expense"
+                            className={`kassa-card__num ${flow.type === "income"
+                              ? "kassa-card__num--income"
+                              : "kassa-card__num--expense"
                               }`}
                           >
-                            {flow.amount} с
+                            {flow.type === "income" ? "Приход" : "Расход"}
                           </span>
+                          <h3 className="kassa-card__title">
+                            {flow.name || "—"}
+                          </h3>
                         </div>
-                        <div className="kassa-card__field">
-                          <span className="kassa-card__label">Дата</span>
-                          <span className="kassa-card__value">
-                            {flow.created_at
-                              ? new Date(flow.created_at).toLocaleDateString(
-                                "ru-RU"
-                              )
-                              : "—"}
-                          </span>
+                        <div className="kassa-card__fields">
+                          <div className="kassa-card__field">
+                            <span className="kassa-card__label">Сумма</span>
+                            <span
+                              className={`kassa-card__value ${flow.type === "income"
+                                ? "kassa-card__value--income"
+                                : "kassa-card__value--expense"
+                                }`}
+                            >
+                              {flow.amount} с
+                            </span>
+                          </div>
+                          <div className="kassa-card__field">
+                            <span className="kassa-card__label">Дата</span>
+                            <span className="kassa-card__value">
+                              {flow.created_at
+                                ? new Date(flow.created_at).toLocaleDateString(
+                                  "ru-RU"
+                                )
+                                : "—"}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </DataContainer>
+
         </>
       )}
 

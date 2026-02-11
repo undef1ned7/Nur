@@ -14,6 +14,7 @@ import "./cafeclients.scss";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 
 import { ClientForm, ClientCard, ConfirmDeleteModal } from "./components/ClientsModals";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* ===== helpers ===== */
 const fmtMoney = (v) =>
@@ -162,10 +163,10 @@ const CafeClients = () => {
             const next = prev.map((c) =>
               String(c.id) === String(id)
                 ? {
-                    ...c,
-                    orders_count: stats.orders_count,
-                    updated_at_derived: stats.updated_at_derived,
-                  }
+                  ...c,
+                  orders_count: stats.orders_count,
+                  updated_at_derived: stats.updated_at_derived,
+                }
                 : c
             );
             return next.sort(
@@ -207,10 +208,10 @@ const CafeClients = () => {
         const arr = Array.isArray(c.orders) ? c.orders : [];
         const updated_at_derived = arr.length
           ? arr
-              .map((o) => o.created_at)
-              .filter(Boolean)
-              .sort()
-              .slice(-1)[0]
+            .map((o) => o.created_at)
+            .filter(Boolean)
+            .sort()
+            .slice(-1)[0]
           : null;
 
         return {
@@ -272,15 +273,15 @@ const CafeClients = () => {
             prev.map((x) =>
               String(x.id) === String(c.id)
                 ? {
-                    ...x,
-                    orders_count: stats.orders_count,
-                    updated_at_derived: stats.updated_at_derived,
-                  }
+                  ...x,
+                  orders_count: stats.orders_count,
+                  updated_at_derived: stats.updated_at_derived,
+                }
                 : x
             )
           )
         )
-        .catch(() => {});
+        .catch(() => { });
     };
 
     window.addEventListener("clients:refresh", onClientsRefresh);
@@ -298,10 +299,10 @@ const CafeClients = () => {
         prev.map((c) =>
           String(c.id) === String(o.client)
             ? {
-                ...c,
-                orders_count: (Number(c.orders_count) || 0) + 1,
-                updated_at_derived: new Date().toISOString(),
-              }
+              ...c,
+              orders_count: (Number(c.orders_count) || 0) + 1,
+              updated_at_derived: new Date().toISOString(),
+            }
             : c
         )
       );
@@ -490,6 +491,8 @@ const CafeClients = () => {
       {err && <div className="cafeclients__error">{err}</div>}
 
       {/* Desktop: table, Mobile: cards */}
+      <DataContainer>
+
       {!isNarrow ? (
         <div className="cafeclients__tableWrap">
           <table className="cafeclients__table">
@@ -559,65 +562,69 @@ const CafeClients = () => {
           </table>
         </div>
       ) : (
-        <div className="cafeclients__list">
-          {loading ? (
-            <div className="cafeclients__empty">Загрузка…</div>
-          ) : filtered.length ? (
-            filtered.map((c) => {
-              const updated = c.updated_at_derived || c.updated_at;
-              return (
-                <div key={c.id} className="cafeclients__listCard">
-                  <div className="cafeclients__listTop">
-                    <div className="cafeclients__listName" title={c.full_name}>
-                      {c.full_name || "—"}
-                    </div>
-                    <div className="cafeclients__listBadge">
-                      {c.orders_count ?? 0} заказ(ов)
-                    </div>
-                  </div>
 
-                  <div className="cafeclients__listMeta">
-                    <div>
-                      <span className="cafeclients__muted">Телефон:</span>{" "}
-                      {c.phone || "—"}
+          <div className="cafeclients__list">
+            {loading ? (
+              <div className="cafeclients__empty">Загрузка…</div>
+            ) : filtered.length ? (
+              filtered.map((c) => {
+                const updated = c.updated_at_derived || c.updated_at;
+                return (
+                  <div key={c.id} className="cafeclients__listCard">
+                    <div className="cafeclients__listTop">
+                      <div className="cafeclients__listName" title={c.full_name}>
+                        {c.full_name || "—"}
+                      </div>
+                      <div className="cafeclients__listBadge">
+                        {c.orders_count ?? 0} заказ(ов)
+                      </div>
                     </div>
-                    <div>
-                      <span className="cafeclients__muted">Обновлён:</span>{" "}
-                      {updated ? new Date(updated).toLocaleString() : "—"}
-                    </div>
-                  </div>
 
-                  <div className="cafeclients__rowActions">
-                    <button
-                      className="cafeclients__btn"
-                      onClick={() => onOpenCard(c.id)}
-                      type="button"
-                    >
-                      Открыть
-                    </button>
-                    <button
-                      className="cafeclients__btn"
-                      onClick={() => onEdit(c.id)}
-                      type="button"
-                    >
-                      Изм.
-                    </button>
-                    <button
-                      className="cafeclients__btn cafeclients__btn--secondary"
-                      onClick={() => askDelete(c.id)}
-                      type="button"
-                    >
-                      Удалить
-                    </button>
+                    <div className="cafeclients__listMeta">
+                      <div>
+                        <span className="cafeclients__muted">Телефон:</span>{" "}
+                        {c.phone || "—"}
+                      </div>
+                      <div>
+                        <span className="cafeclients__muted">Обновлён:</span>{" "}
+                        {updated ? new Date(updated).toLocaleString() : "—"}
+                      </div>
+                    </div>
+
+                    <div className="cafeclients__rowActions">
+                      <button
+                        className="cafeclients__btn"
+                        onClick={() => onOpenCard(c.id)}
+                        type="button"
+                      >
+                        Открыть
+                      </button>
+                      <button
+                        className="cafeclients__btn"
+                        onClick={() => onEdit(c.id)}
+                        type="button"
+                      >
+                        Изм.
+                      </button>
+                      <button
+                        className="cafeclients__btn cafeclients__btn--secondary"
+                        onClick={() => askDelete(c.id)}
+                        type="button"
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="cafeclients__empty">Ничего не найдено</div>
-          )}
-        </div>
+                );
+              })
+            ) : (
+              <div className="cafeclients__empty">Ничего не найдено</div>
+            )}
+          </div>
+
       )}
+        </DataContainer>
+
 
       {isFormOpen && (
         <ClientForm

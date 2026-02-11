@@ -24,6 +24,7 @@ import {
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 const Warehouse = () => {
   const dispatch = useDispatch();
@@ -228,42 +229,43 @@ const Warehouse = () => {
         onBulkDelete={handleBulkDelete}
         isDeleting={bulkDeleting}
       />
+      <DataContainer>
+        <div className="warehouse-table-container w-full">
+          {viewMode === VIEW_MODES.TABLE ? (
+            <ProductTable
+              products={products}
+              loading={loading}
+              selectedRows={selectedRows}
+              isAllSelected={isAllSelected}
+              onRowSelect={handleRowSelect}
+              onSelectAll={handleSelectAll}
+              onProductClick={handleProductClick}
+              getRowNumber={getRowNumber}
+            />
+          ) : (
+            <ProductCards
+              products={products}
+              loading={loading}
+              selectedRows={selectedRows}
+              isAllSelected={isAllSelected}
+              onRowSelect={handleRowSelect}
+              onSelectAll={handleSelectAll}
+              onProductClick={handleProductClick}
+              getRowNumber={getRowNumber}
+            />
+          )}
 
-      <div className="warehouse-table-container w-full">
-        {viewMode === VIEW_MODES.TABLE ? (
-          <ProductTable
-            products={products}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            count={count}
             loading={loading}
-            selectedRows={selectedRows}
-            isAllSelected={isAllSelected}
-            onRowSelect={handleRowSelect}
-            onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
-            getRowNumber={getRowNumber}
+            hasNextPage={hasNextPage}
+            hasPrevPage={hasPrevPage}
+            onPageChange={handlePageChange}
           />
-        ) : (
-          <ProductCards
-            products={products}
-            loading={loading}
-            selectedRows={selectedRows}
-            isAllSelected={isAllSelected}
-            onRowSelect={handleRowSelect}
-            onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
-            getRowNumber={getRowNumber}
-          />
-        )}
-
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          count={count}
-          loading={loading}
-          hasNextPage={hasNextPage}
-          hasPrevPage={hasPrevPage}
-          onPageChange={handlePageChange}
-        />
-      </div>
+        </div>
+      </DataContainer>
 
       {showFilterModal && (
         <ReactPortal modalId="warehouse-filter-modal">

@@ -36,6 +36,7 @@ import {
 } from "../../../../store/creators/agentCartCreators";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /**
  * Склеивает возвраты (returns) с передачами (transfers).
@@ -500,151 +501,153 @@ const PendingModal = ({ onClose, onChanged }) => {
                 : "Нет возвратов в статусе pending"}
             </div>
           ) : (
-            <div className="pending-modal__table-wrapper">
-              <table className="pending-modal__table">
-                <thead>
-                  <tr>
-                    <th>№</th>
-                    <th>Товары</th>
-                    <th>Агент</th>
-                    <th>Кол-во</th>
-                    <th>Дата возврата</th>
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredReturns.map((group, idx) => {
-                    const isExpanded = expandedRows.has(group.agentId);
-                    return (
-                      <React.Fragment key={group.agentId}>
-                        <tr
-                          style={{ cursor: "pointer" }}
-                          onClick={() => toggleRowExpansion(group.agentId)}
-                        >
-                          <td data-label="№">
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              {isExpanded ? (
-                                <ChevronUp
-                                  size={16}
-                                  style={{ color: "#6b7280" }}
-                                />
-                              ) : (
-                                <ChevronDown
-                                  size={16}
-                                  style={{ color: "#6b7280" }}
-                                />
-                              )}
-                              {idx + 1}
-                            </div>
-                          </td>
-                          <td data-label="Товары">
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                              }}
-                            >
-                              <Package size={14} style={{ color: "#6b7280" }} />
-                              {group.returns.length} возвратов
-                            </div>
-                          </td>
-                          <td data-label="Агент">{group.agentName}</td>
-                          <td data-label="Кол-во">{group.totalQty}</td>
-                          <td data-label="Дата возврата">
-                            {group.earliestDate
-                              ? group.earliestDate.toLocaleString("ru-RU", {
-                                timeZone: "Asia/Bishkek",
-                                day: "2-digit",
-                                month: "2-digit",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })
-                              : "—"}
-                          </td>
-                          <td
-                            data-label="Действия"
-                            onClick={(e) => e.stopPropagation()}
+            <DataContainer>
+              <div className="pending-modal__table-wrapper">
+                <table className="pending-modal__table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Товары</th>
+                      <th>Агент</th>
+                      <th>Кол-во</th>
+                      <th>Дата возврата</th>
+                      <th>Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredReturns.map((group, idx) => {
+                      const isExpanded = expandedRows.has(group.agentId);
+                      return (
+                        <React.Fragment key={group.agentId}>
+                          <tr
+                            style={{ cursor: "pointer" }}
+                            onClick={() => toggleRowExpansion(group.agentId)}
                           >
-                            <button
-                              className="pending-modal__btn pending-modal__btn--primary"
-                              onClick={() => handleAcceptReturn(group.agentId)}
-                              disabled={acceptingReturn === group.agentId}
-                              title="Принять все возвраты агента"
-                            >
-                              <CheckCircle
-                                size={16}
-                                style={{ marginRight: "6px" }}
-                              />
-                              {acceptingReturn === group.agentId
-                                ? "Принятие..."
-                                : "Принять все"}
-                            </button>
-                          </td>
-                        </tr>
-                        {isExpanded && group.returns.length > 0 && (
-                          <tr className="pending-modal__expanded-row">
-                            <td colSpan={6}>
-                              <div className="pending-modal__items-list">
-                                <div className="pending-modal__items-header">
-                                  <Package size={16} />
-                                  <span>
-                                    Возвраты агента ({group.returns.length})
-                                  </span>
-                                </div>
-                                <div className="pending-modal__items-grid">
-                                  {group.returns.map((returnItem, itemIdx) => (
-                                    <div
-                                      key={returnItem.id || itemIdx}
-                                      className="pending-modal__item-card"
-                                    >
-                                      <div className="pending-modal__item-name">
-                                        {returnItem.product ||
-                                          "Товар без названия"}
-                                      </div>
-                                      <div className="pending-modal__item-details">
-                                        <span className="pending-modal__item-quantity">
-                                          Количество:{" "}
-                                          <strong>{returnItem.qty || 0}</strong>
-                                        </span>
-                                        {returnItem.returned_at && (
-                                          <span className="pending-modal__item-price">
-                                            Дата:{" "}
-                                            <strong>
-                                              {new Date(
-                                                returnItem.returned_at
-                                              ).toLocaleString("ru-RU", {
-                                                timeZone: "Asia/Bishkek",
-                                                day: "2-digit",
-                                                month: "2-digit",
-                                                year: "numeric",
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                              })}
-                                            </strong>
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                            <td data-label="№">
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                }}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp
+                                    size={16}
+                                    style={{ color: "#6b7280" }}
+                                  />
+                                ) : (
+                                  <ChevronDown
+                                    size={16}
+                                    style={{ color: "#6b7280" }}
+                                  />
+                                )}
+                                {idx + 1}
                               </div>
                             </td>
+                            <td data-label="Товары">
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <Package size={14} style={{ color: "#6b7280" }} />
+                                {group.returns.length} возвратов
+                              </div>
+                            </td>
+                            <td data-label="Агент">{group.agentName}</td>
+                            <td data-label="Кол-во">{group.totalQty}</td>
+                            <td data-label="Дата возврата">
+                              {group.earliestDate
+                                ? group.earliestDate.toLocaleString("ru-RU", {
+                                  timeZone: "Asia/Bishkek",
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                                : "—"}
+                            </td>
+                            <td
+                              data-label="Действия"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                className="pending-modal__btn pending-modal__btn--primary"
+                                onClick={() => handleAcceptReturn(group.agentId)}
+                                disabled={acceptingReturn === group.agentId}
+                                title="Принять все возвраты агента"
+                              >
+                                <CheckCircle
+                                  size={16}
+                                  style={{ marginRight: "6px" }}
+                                />
+                                {acceptingReturn === group.agentId
+                                  ? "Принятие..."
+                                  : "Принять все"}
+                              </button>
+                            </td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          {isExpanded && group.returns.length > 0 && (
+                            <tr className="pending-modal__expanded-row">
+                              <td colSpan={6}>
+                                <div className="pending-modal__items-list">
+                                  <div className="pending-modal__items-header">
+                                    <Package size={16} />
+                                    <span>
+                                      Возвраты агента ({group.returns.length})
+                                    </span>
+                                  </div>
+                                  <div className="pending-modal__items-grid">
+                                    {group.returns.map((returnItem, itemIdx) => (
+                                      <div
+                                        key={returnItem.id || itemIdx}
+                                        className="pending-modal__item-card"
+                                      >
+                                        <div className="pending-modal__item-name">
+                                          {returnItem.product ||
+                                            "Товар без названия"}
+                                        </div>
+                                        <div className="pending-modal__item-details">
+                                          <span className="pending-modal__item-quantity">
+                                            Количество:{" "}
+                                            <strong>{returnItem.qty || 0}</strong>
+                                          </span>
+                                          {returnItem.returned_at && (
+                                            <span className="pending-modal__item-price">
+                                              Дата:{" "}
+                                              <strong>
+                                                {new Date(
+                                                  returnItem.returned_at
+                                                ).toLocaleString("ru-RU", {
+                                                  timeZone: "Asia/Bishkek",
+                                                  day: "2-digit",
+                                                  month: "2-digit",
+                                                  year: "numeric",
+                                                  hour: "2-digit",
+                                                  minute: "2-digit",
+                                                })}
+                                              </strong>
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </DataContainer>
           )}
         </div>
       ),
@@ -686,190 +689,192 @@ const PendingModal = ({ onClose, onChanged }) => {
                 : "Нет корзин в статусе submitted"}
             </div>
           ) : (
-            <div className="pending-modal__table-wrapper">
-              <table className="pending-modal__table">
-                <thead>
-                  <tr>
-                    <th>№</th>
-                    <th>Агент</th>
-                    <th>Клиент</th>
-                    <th>Комментарий</th>
-                    <th>Отправлено</th>
-                    <th>Позиций</th>
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRows.map((group, idx) => {
-                    const isExpanded = expandedRows.has(group.agentId);
-                    const allClients = Array.from(
-                      new Set(
-                        group.carts
-                          .map(
-                            (cart) =>
-                              cart?.client_name || cart?.client?.full_name
-                          )
-                          .filter(Boolean)
-                      )
-                    );
+            <DataContainer>
+              <div className="pending-modal__table-wrapper">
+                <table className="pending-modal__table">
+                  <thead>
+                    <tr>
+                      <th>№</th>
+                      <th>Агент</th>
+                      <th>Клиент</th>
+                      <th>Комментарий</th>
+                      <th>Отправлено</th>
+                      <th>Позиций</th>
+                      <th>Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRows.map((group, idx) => {
+                      const isExpanded = expandedRows.has(group.agentId);
+                      const allClients = Array.from(
+                        new Set(
+                          group.carts
+                            .map(
+                              (cart) =>
+                                cart?.client_name || cart?.client?.full_name
+                            )
+                            .filter(Boolean)
+                        )
+                      );
 
-                    return (
-                      <React.Fragment key={group.agentId}>
-                        <tr
-                          style={{ cursor: "pointer" }}
-                          onClick={() => toggleRowExpansion(group.agentId)}
-                        >
-                          <td data-label="№">
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              {isExpanded ? (
-                                <ChevronUp
-                                  size={16}
-                                  style={{ color: "#6b7280" }}
-                                />
-                              ) : (
-                                <ChevronDown
-                                  size={16}
-                                  style={{ color: "#6b7280" }}
-                                />
-                              )}
-                              {idx + 1}
-                            </div>
-                          </td>
-                          <td data-label="Агент">{group.agentName}</td>
-                          <td data-label="Клиенты">
-                            {allClients.length > 0
-                              ? allClients.length === 1
-                                ? allClients[0]
-                                : `${allClients.length} клиентов`
-                              : "—"}
-                          </td>
-                          <td data-label="Комментарий">
-                            {group.carts.length} корзин
-                          </td>
-                          <td data-label="Отправлено">
-                            {group.earliestDate
-                              ? group.earliestDate.toLocaleString("ru-RU")
-                              : "—"}
-                          </td>
-                          <td data-label="Позиций">
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                              }}
-                            >
-                              <Package size={14} style={{ color: "#6b7280" }} />
-                              {group.allItems.length}
-                            </div>
-                          </td>
-                          <td
-                            data-label="Действия"
-                            onClick={(e) => e.stopPropagation()}
+                      return (
+                        <React.Fragment key={group.agentId}>
+                          <tr
+                            style={{ cursor: "pointer" }}
+                            onClick={() => toggleRowExpansion(group.agentId)}
                           >
-                            <div
-                              className="flex gap-2 items-center flex-wrap"
-
+                            <td data-label="№">
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                }}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp
+                                    size={16}
+                                    style={{ color: "#6b7280" }}
+                                  />
+                                ) : (
+                                  <ChevronDown
+                                    size={16}
+                                    style={{ color: "#6b7280" }}
+                                  />
+                                )}
+                                {idx + 1}
+                              </div>
+                            </td>
+                            <td data-label="Агент">{group.agentName}</td>
+                            <td data-label="Клиенты">
+                              {allClients.length > 0
+                                ? allClients.length === 1
+                                  ? allClients[0]
+                                  : `${allClients.length} клиентов`
+                                : "—"}
+                            </td>
+                            <td data-label="Комментарий">
+                              {group.carts.length} корзин
+                            </td>
+                            <td data-label="Отправлено">
+                              {group.earliestDate
+                                ? group.earliestDate.toLocaleString("ru-RU")
+                                : "—"}
+                            </td>
+                            <td data-label="Позиций">
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                }}
+                              >
+                                <Package size={14} style={{ color: "#6b7280" }} />
+                                {group.allItems.length}
+                              </div>
+                            </td>
+                            <td
+                              data-label="Действия"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <button
-                                className="pending-modal__btn pending-modal__btn--primary"
-                                onClick={() => handleApprove(group.agentId)}
-                                disabled={actionLoadingId === group.agentId}
-                                title="Одобрить все корзины агента"
+                              <div
+                                className="flex gap-2 items-center flex-wrap"
+
                               >
-                                <CheckCircle
-                                  size={16}
-                                  style={{ marginRight: "6px" }}
-                                />
-                                {actionLoadingId === group.agentId
-                                  ? "…"
-                                  : "Одобрить все"}
-                              </button>
-                              <button
-                                className="pending-modal__btn pending-modal__btn--secondary"
-                                onClick={() => handleReject(group.agentId)}
-                                disabled={actionLoadingId === group.agentId}
-                                title="Отклонить все корзины агента"
-                              >
-                                <XCircle
-                                  size={16}
-                                  style={{ marginRight: "6px" }}
-                                />
-                                Отклонить все
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        {isExpanded && group.allItems.length > 0 && (
-                          <tr className="pending-modal__expanded-row">
-                            <td colSpan={7}>
-                              <div className="pending-modal__items-list">
-                                <div className="pending-modal__items-header">
-                                  <Package size={16} />
-                                  <span>
-                                    Товары агента ({group.allItems.length} из{" "}
-                                    {group.carts.length} корзин)
-                                  </span>
-                                </div>
-                                <div className="pending-modal__items-grid">
-                                  {group.allItems.map((item, itemIdx) => (
-                                    <div
-                                      key={item.id || itemIdx}
-                                      className="pending-modal__item-card"
-                                    >
-                                      <div className="pending-modal__item-name">
-                                        {item.product_name ||
-                                          item.name ||
-                                          "Товар без названия"}
-                                      </div>
-                                      <div className="pending-modal__item-details">
-                                        <span className="pending-modal__item-quantity">
-                                          Количество:{" "}
-                                          <strong>
-                                            {item.quantity_requested ||
-                                              item.total_quantity ||
-                                              item.quantity ||
-                                              0}
-                                          </strong>
-                                        </span>
-                                        {item.unit_price && (
-                                          <span className="pending-modal__item-price">
-                                            Цена:{" "}
-                                            <strong>
-                                              {Number(item.unit_price).toFixed(
-                                                2
-                                              )}
-                                            </strong>
-                                          </span>
-                                        )}
-                                        {item.total && (
-                                          <span className="pending-modal__item-total">
-                                            Итого:{" "}
-                                            <strong>
-                                              {Number(item.total).toFixed(2)}
-                                            </strong>
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                                <button
+                                  className="pending-modal__btn pending-modal__btn--primary"
+                                  onClick={() => handleApprove(group.agentId)}
+                                  disabled={actionLoadingId === group.agentId}
+                                  title="Одобрить все корзины агента"
+                                >
+                                  <CheckCircle
+                                    size={16}
+                                    style={{ marginRight: "6px" }}
+                                  />
+                                  {actionLoadingId === group.agentId
+                                    ? "…"
+                                    : "Одобрить все"}
+                                </button>
+                                <button
+                                  className="pending-modal__btn pending-modal__btn--secondary"
+                                  onClick={() => handleReject(group.agentId)}
+                                  disabled={actionLoadingId === group.agentId}
+                                  title="Отклонить все корзины агента"
+                                >
+                                  <XCircle
+                                    size={16}
+                                    style={{ marginRight: "6px" }}
+                                  />
+                                  Отклонить все
+                                </button>
                               </div>
                             </td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          {isExpanded && group.allItems.length > 0 && (
+                            <tr className="pending-modal__expanded-row">
+                              <td colSpan={7}>
+                                <div className="pending-modal__items-list">
+                                  <div className="pending-modal__items-header">
+                                    <Package size={16} />
+                                    <span>
+                                      Товары агента ({group.allItems.length} из{" "}
+                                      {group.carts.length} корзин)
+                                    </span>
+                                  </div>
+                                  <div className="pending-modal__items-grid">
+                                    {group.allItems.map((item, itemIdx) => (
+                                      <div
+                                        key={item.id || itemIdx}
+                                        className="pending-modal__item-card"
+                                      >
+                                        <div className="pending-modal__item-name">
+                                          {item.product_name ||
+                                            item.name ||
+                                            "Товар без названия"}
+                                        </div>
+                                        <div className="pending-modal__item-details">
+                                          <span className="pending-modal__item-quantity">
+                                            Количество:{" "}
+                                            <strong>
+                                              {item.quantity_requested ||
+                                                item.total_quantity ||
+                                                item.quantity ||
+                                                0}
+                                            </strong>
+                                          </span>
+                                          {item.unit_price && (
+                                            <span className="pending-modal__item-price">
+                                              Цена:{" "}
+                                              <strong>
+                                                {Number(item.unit_price).toFixed(
+                                                  2
+                                                )}
+                                              </strong>
+                                            </span>
+                                          )}
+                                          {item.total && (
+                                            <span className="pending-modal__item-total">
+                                              Итого:{" "}
+                                              <strong>
+                                                {Number(item.total).toFixed(2)}
+                                              </strong>
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </DataContainer>
           )}
         </div>
       ),
@@ -945,7 +950,7 @@ const ProductionWarehouse = () => {
   const [activeTab, setActiveTab] = useState(0);
   const dispatch = useDispatch();
   const { list: products } = useProducts();
- 
+
 
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [showAgentCartsModal, setShowAgentCartsModal] = useState(false);
@@ -1243,67 +1248,70 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
             Нет корзин в статусе submitted.
           </div>
         ) : (
-          <div
-            className="table-wrapper"
-            style={{ maxHeight: 420, overflow: "auto" }}
-          >
-            <table className="sklad__table">
-              <thead>
-                <tr>
-                  <th>№</th>
-                  <th>Агент</th>
-                  <th>Клиент</th>
-                  <th>Комментарий</th>
-                  <th>Отправлено</th>
-                  <th>Позиций</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((cart, idx) => (
-                  <tr key={cart.id}>
-                    <td data-label="№">{idx + 1}</td>
-                    <td data-label="Агент">
-                      {cart?.agent_name ||
-                        `${cart?.agent?.first_name || ""} ${cart?.agent?.last_name || ""
-                        }`}
-                    </td>
-                    <td data-label="Клиент">
-                      {cart?.client_name || cart?.client?.full_name || "—"}
-                    </td>
-                    <td data-label="Комментарий">{cart?.note || "—"}</td>
-                    <td data-label="Отправлено">
-                      {cart?.submitted_at
-                        ? new Date(cart.submitted_at).toLocaleString("ru-RU")
-                        : "—"}
-                    </td>
-                    <td data-label="Позиций">
-                      {Array.isArray(cart?.items) ? cart.items.length : 0}
-                    </td>
-                    <td data-label="">
-                      <button
-                        className="add-modal__save"
-                        style={{ marginRight: 8 }}
-                        onClick={() => handleApprove(cart.id)}
-                        disabled={actionLoadingId === cart.id}
-                        title="Одобрить корзину"
-                      >
-                        {actionLoadingId === cart.id ? "…" : "Одобрить"}
-                      </button>
-                      <button
-                        className="add-modal__cancel"
-                        onClick={() => handleReject(cart.id)}
-                        disabled={actionLoadingId === cart.id}
-                        title="Отклонить корзину"
-                      >
-                        Отклонить
-                      </button>
-                    </td>
+          <DataContainer>
+            <div
+              className="table-wrapper"
+              style={{ maxHeight: 420, overflow: "auto" }}
+            >
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Агент</th>
+                    <th>Клиент</th>
+                    <th>Комментарий</th>
+                    <th>Отправлено</th>
+                    <th>Позиций</th>
+                    <th>Действия</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredRows.map((cart, idx) => (
+                    <tr key={cart.id}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Агент">
+                        {cart?.agent_name ||
+                          `${cart?.agent?.first_name || ""} ${cart?.agent?.last_name || ""
+                          }`}
+                      </td>
+                      <td data-label="Клиент">
+                        {cart?.client_name || cart?.client?.full_name || "—"}
+                      </td>
+                      <td data-label="Комментарий">{cart?.note || "—"}</td>
+                      <td data-label="Отправлено">
+                        {cart?.submitted_at
+                          ? new Date(cart.submitted_at).toLocaleString("ru-RU")
+                          : "—"}
+                      </td>
+                      <td data-label="Позиций">
+                        {Array.isArray(cart?.items) ? cart.items.length : 0}
+                      </td>
+                      <td data-label="">
+                        <button
+                          className="add-modal__save"
+                          style={{ marginRight: 8 }}
+                          onClick={() => handleApprove(cart.id)}
+                          disabled={actionLoadingId === cart.id}
+                          title="Одобрить корзину"
+                        >
+                          {actionLoadingId === cart.id ? "…" : "Одобрить"}
+                        </button>
+                        <button
+                          className="add-modal__cancel"
+                          onClick={() => handleReject(cart.id)}
+                          disabled={actionLoadingId === cart.id}
+                          title="Отклонить корзину"
+                        >
+                          Отклонить
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataContainer>
+
         )}
 
         <div className="add-modal__footer" style={{ marginTop: "15px" }}>

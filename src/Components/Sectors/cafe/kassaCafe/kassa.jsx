@@ -4,6 +4,7 @@ import { Routes, Route, useNavigate, useParams, Link } from "react-router-dom";
 import api from "../../../../api";
 import "./kassa.scss";
 import { AddOperationModal } from "./components/KassaModals";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* helpers */
 const asArray = (d) => (Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : []);
@@ -165,58 +166,60 @@ const CashboxList = () => {
 
       {err && <div className="cafeKassa__alert cafeKassa__alert--error">{err}</div>}
 
-      <div className="cafeKassa__tableWrap">
-        <table className="cafeKassa__table">
-          <thead>
-            <tr>
-              <th>Касса</th>
-              <th>Приход</th>
-              <th>Расход</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      <DataContainer>
+        <div className="cafeKassa__tableWrap">
+          <table className="cafeKassa__table">
+            <thead>
               <tr>
-                <td colSpan={4}>Загрузка…</td>
+                <th>Касса</th>
+                <th>Приход</th>
+                <th>Расход</th>
+                <th>Действия</th>
               </tr>
-            ) : filtered.length ? (
-              filtered.map((r) => {
-                const key = boxKey(r);
-                const t = totals[key] || { income: 0, expense: 0 };
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4}>Загрузка…</td>
+                </tr>
+              ) : filtered.length ? (
+                filtered.map((r) => {
+                  const key = boxKey(r);
+                  const t = totals[key] || { income: 0, expense: 0 };
 
-                return (
-                  <tr key={key} className="cafeKassa__rowClickable" onClick={() => navigate(`/crm/cafe/kassa/${key}`)}>
-                    <td>
-                      <b>{r.department_name || r.name || "—"}</b>
-                    </td>
-                    <td>{money(t.income)}</td>
-                    <td>{money(t.expense)}</td>
-                    <td>
-                      <button
-                        className="cafeKassa__btn cafeKassa__btn--secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/crm/cafe/kassa/${key}`);
-                        }}
-                        type="button"
-                      >
-                        Открыть
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan={4} className="cafeKassa__center">
-                  Нет данных
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                  return (
+                    <tr key={key} className="cafeKassa__rowClickable" onClick={() => navigate(`/crm/cafe/kassa/${key}`)}>
+                      <td>
+                        <b>{r.department_name || r.name || "—"}</b>
+                      </td>
+                      <td>{money(t.income)}</td>
+                      <td>{money(t.expense)}</td>
+                      <td>
+                        <button
+                          className="cafeKassa__btn cafeKassa__btn--secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/crm/cafe/kassa/${key}`);
+                          }}
+                          type="button"
+                        >
+                          Открыть
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={4} className="cafeKassa__center">
+                    Нет данных
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </DataContainer>
     </div>
   );
 };
@@ -256,12 +259,12 @@ const CashboxDetail = () => {
 
       try {
         detail = (await api.get(`/construction/cashboxes/${id}/detail/owner/`)).data;
-      } catch {}
+      } catch { }
 
       if (!detail) {
         try {
           detail = (await api.get(`/construction/cashboxes/${id}/detail/`)).data;
-        } catch {}
+        } catch { }
       }
 
       if (!detail) {
@@ -279,14 +282,14 @@ const CashboxDetail = () => {
         try {
           const r1 = await api.get(`/construction/cashflows/`, { params: { cashbox: id } });
           flows = fromAny(r1);
-        } catch {}
+        } catch { }
       }
 
       if (!flows.length && detail?.uuid) {
         try {
           const r2 = await api.get(`/construction/cashflows/`, { params: { cashbox: detail.uuid } });
           flows = fromAny(r2);
-        } catch {}
+        } catch { }
       }
 
       const mapped = (flows || []).map((x, i) => {
@@ -363,7 +366,7 @@ const CashboxDetail = () => {
       if (orderId) {
         try {
           order = (await api.get(`/cafe/orders/${orderId}/`)).data;
-        } catch {}
+        } catch { }
       }
 
       const clientId = order?.client || raw.client || raw.client_id || raw.clientId || null;
@@ -371,7 +374,7 @@ const CashboxDetail = () => {
       if (clientId) {
         try {
           client = (await api.get(`/cafe/clients/${clientId}/`)).data;
-        } catch {}
+        } catch { }
       }
 
       const clientName = client?.name || client?.full_name || order?.client_name || raw.client_name || null;
@@ -393,10 +396,10 @@ const CashboxDetail = () => {
               try {
                 const zres = (await api.get(`/cafe/zones/${z}/`)).data;
                 zoneTitle = zres?.title || null;
-              } catch {}
+              } catch { }
             }
           }
-        } catch {}
+        } catch { }
       }
 
       const category = raw.category_name || raw.category || null;
@@ -496,6 +499,8 @@ const CashboxDetail = () => {
         </button>
       </div>
 
+      <DataContainer>
+
       <div className="cafeKassa__tableWrap">
         <table className="cafeKassa__table">
           <thead>
@@ -534,7 +539,7 @@ const CashboxDetail = () => {
           </tbody>
         </table>
       </div>
-
+      </DataContainer>
       {addOpOpen && (
         <AddOperationModal
           open={addOpOpen}
