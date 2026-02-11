@@ -69,6 +69,7 @@ import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog
 import usePlurize from "../../../../hooks/usePlurize";
 import useResize from "../../../../hooks/useResize";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -3033,6 +3034,8 @@ const FinishedGoods = ({ products, onChanged }) => {
       </div>
 
       {/* Products */}
+      <DataContainer>
+
       <div className="warehouse-table-container w-full">
         {/* ===== TABLE ===== */}
         {viewMode === "table" && (
@@ -3340,6 +3343,8 @@ const FinishedGoods = ({ products, onChanged }) => {
           </div>
         )}
       </div>
+      </DataContainer>
+
 
       {showAdd && (
         <AddModal

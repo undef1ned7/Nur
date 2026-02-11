@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { fetchShiftsAsync } from "../../../store/creators/shiftThunk";
 import "./Shifts.scss";
+import DataContainer from "../../common/DataContainer/DataContainer";
 
 const PAGE_SIZE = 50;
 
@@ -19,15 +20,15 @@ const Shifts = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { 
-    shifts, 
+  const {
+    shifts,
     loading,
     shiftsCount,
     shiftsNext,
     shiftsPrevious
   } = useSelector((state) => state.shifts);
   const [activeTab, setActiveTab] = useState("open"); // "open" или "closed"
-  
+
   // Refs для отслеживания изменений данных
   const isInitialMountRef = useRef(true);
   const prevShiftsRef = useRef([]);
@@ -158,9 +159,8 @@ const Shifts = () => {
       {/* Табы */}
       <div className="shifts-page__tabs">
         <button
-          className={`shifts-page__tab ${
-            activeTab === "open" ? "shifts-page__tab--active" : ""
-          }`}
+          className={`shifts-page__tab ${activeTab === "open" ? "shifts-page__tab--active" : ""
+            }`}
           onClick={() => {
             setActiveTab("open");
             // Сбрасываем на первую страницу при переключении таба
@@ -176,9 +176,8 @@ const Shifts = () => {
           )}
         </button>
         <button
-          className={`shifts-page__tab ${
-            activeTab === "closed" ? "shifts-page__tab--active" : ""
-          }`}
+          className={`shifts-page__tab ${activeTab === "closed" ? "shifts-page__tab--active" : ""
+            }`}
           onClick={() => {
             setActiveTab("closed");
             // Сбрасываем на первую страницу при переключении таба
@@ -196,133 +195,134 @@ const Shifts = () => {
           )}
         </button>
       </div>
+      <DataContainer>
+        <div className="shifts-page__list">
+          {displayedShifts.length === 0 ? (
+            <div className="shifts-page__empty">
+              {activeTab === "open"
+                ? "Открытые смены не найдены"
+                : "Закрытые смены не найдены"}
+            </div>
+          ) : (
+            <ul className="shifts-page__shift-list">
+              {displayedShifts.map((shift) => {
+                const shiftNumber =
+                  shift?.code ||
+                  (() => {
+                    const idStr = shift.id?.toString() || "";
+                    const digitsOnly = idStr.replace(/\D/g, "");
+                    return digitsOnly.length >= 4
+                      ? digitsOnly.slice(-8)
+                      : idStr.replace(/-/g, "").slice(-8).toUpperCase();
+                  })() ||
+                  "—";
 
-      <div className="shifts-page__list">
-        {displayedShifts.length === 0 ? (
-          <div className="shifts-page__empty">
-            {activeTab === "open"
-              ? "Открытые смены не найдены"
-              : "Закрытые смены не найдены"}
-          </div>
-        ) : (
-          <ul className="shifts-page__shift-list">
-            {displayedShifts.map((shift) => {
-              const shiftNumber =
-                shift?.code ||
-                (() => {
-                  const idStr = shift.id?.toString() || "";
-                  const digitsOnly = idStr.replace(/\D/g, "");
-                  return digitsOnly.length >= 4
-                    ? digitsOnly.slice(-8)
-                    : idStr.replace(/-/g, "").slice(-8).toUpperCase();
-                })() ||
-                "—";
-
-              return (
-                <li
-                  key={shift.id}
-                  className="shifts-page__shift-card"
-                  onClick={() => handleShiftClick(shift.id)}
-                >
-                  {/* Верхняя часть: информация о смене */}
-                  <div className="shifts-page__shift-header">
-                    <div className="shifts-page__shift-header-left">
-                      <div className="shifts-page__shift-icon">
-                        <Wallet size={24} style={{ color: "#fff" }} />
-                      </div>
-                      <div className="shifts-page__shift-header-info">
-                        <h3 className="shifts-page__shift-title">
-                          Смена #{shiftNumber}
-                        </h3>
-                        <div className="shifts-page__shift-date">
-                          <Calendar size={14} />
-                          <span>Открыта {formatDate(shift.opened_at)}</span>
+                return (
+                  <li
+                    key={shift.id}
+                    className="shifts-page__shift-card"
+                    onClick={() => handleShiftClick(shift.id)}
+                  >
+                    {/* Верхняя часть: информация о смене */}
+                    <div className="shifts-page__shift-header">
+                      <div className="shifts-page__shift-header-left">
+                        <div className="shifts-page__shift-icon">
+                          <Wallet size={24} style={{ color: "#fff" }} />
                         </div>
+                        <div className="shifts-page__shift-header-info">
+                          <h3 className="shifts-page__shift-title">
+                            Смена #{shiftNumber}
+                          </h3>
+                          <div className="shifts-page__shift-date">
+                            <Calendar size={14} />
+                            <span>Открыта {formatDate(shift.opened_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className={`shifts-page__shift-status shifts-page__shift-status--${shift.status}`}
+                      >
+                        {shift.status === "open" ? (
+                          <>
+                            <Lock size={14} />
+                            <span>Открыта</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle size={14} />
+                            <span>Закрыта</span>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div
-                      className={`shifts-page__shift-status shifts-page__shift-status--${shift.status}`}
-                    >
-                      {shift.status === "open" ? (
-                        <>
-                          <Lock size={14} />
-                          <span>Открыта</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle size={14} />
-                          <span>Закрыта</span>
-                        </>
+
+                    {/* Карточки с метриками */}
+                    <div className="shifts-page__shift-metrics">
+                      {/* Выручка */}
+                      {shift.sales_total !== null &&
+                        shift.sales_total !== undefined && (
+                          <div className="shifts-page__shift-metric-card shifts-page__shift-metric-card--revenue">
+                            <DollarSign size={20} />
+                            <div className="shifts-page__shift-metric-content">
+                              <div className="shifts-page__shift-metric-label">
+                                Выручка
+                              </div>
+                              <div className="shifts-page__shift-metric-value">
+                                {parseFloat(shift.sales_total || 0).toFixed(2)}{" "}
+                                сом
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                      {/* Продажи */}
+                      {shift.sales_count !== null &&
+                        shift.sales_count !== undefined && (
+                          <div className="shifts-page__shift-metric-card shifts-page__shift-metric-card--sales">
+                            <ShoppingCart size={20} />
+                            <div className="shifts-page__shift-metric-content">
+                              <div className="shifts-page__shift-metric-label">
+                                Продажи
+                              </div>
+                              <div className="shifts-page__shift-metric-value">
+                                {shift.sales_count || 0}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                      {/* Касса */}
+                      {shift.cashbox_name && (
+                        <div className="shifts-page__shift-metric-card shifts-page__shift-metric-card--cashbox">
+                          <Wallet size={20} />
+                          <div className="shifts-page__shift-metric-content">
+                            <div className="shifts-page__shift-metric-label">
+                              Касса
+                            </div>
+                            <div className="shifts-page__shift-metric-value">
+                              {shift.cashbox_name}
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
 
-                  {/* Карточки с метриками */}
-                  <div className="shifts-page__shift-metrics">
-                    {/* Выручка */}
-                    {shift.sales_total !== null &&
-                      shift.sales_total !== undefined && (
-                        <div className="shifts-page__shift-metric-card shifts-page__shift-metric-card--revenue">
-                          <DollarSign size={20} />
-                          <div className="shifts-page__shift-metric-content">
-                            <div className="shifts-page__shift-metric-label">
-                              Выручка
-                            </div>
-                            <div className="shifts-page__shift-metric-value">
-                              {parseFloat(shift.sales_total || 0).toFixed(2)}{" "}
-                              сом
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Продажи */}
-                    {shift.sales_count !== null &&
-                      shift.sales_count !== undefined && (
-                        <div className="shifts-page__shift-metric-card shifts-page__shift-metric-card--sales">
-                          <ShoppingCart size={20} />
-                          <div className="shifts-page__shift-metric-content">
-                            <div className="shifts-page__shift-metric-label">
-                              Продажи
-                            </div>
-                            <div className="shifts-page__shift-metric-value">
-                              {shift.sales_count || 0}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Касса */}
-                    {shift.cashbox_name && (
-                      <div className="shifts-page__shift-metric-card shifts-page__shift-metric-card--cashbox">
-                        <Wallet size={20} />
-                        <div className="shifts-page__shift-metric-content">
-                          <div className="shifts-page__shift-metric-label">
-                            Касса
-                          </div>
-                          <div className="shifts-page__shift-metric-value">
-                            {shift.cashbox_name}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Информация о кассире */}
-                  <div className="shifts-page__shift-footer">
-                    <span className="shifts-page__shift-footer-label">
-                      Кассир:
-                    </span>
-                    <span className="shifts-page__shift-footer-value">
-                      {shift.cashier_display || shift.cashier || "—"}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                    {/* Информация о кассире */}
+                    <div className="shifts-page__shift-footer">
+                      <span className="shifts-page__shift-footer-label">
+                        Кассир:
+                      </span>
+                      <span className="shifts-page__shift-footer-value">
+                        {shift.cashier_display || shift.cashier || "—"}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </DataContainer>
 
       {/* Пагинация */}
       {totalPages > 1 && (

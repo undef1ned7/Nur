@@ -1225,6 +1225,8 @@ import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import CafeReceiptPrinterSettings from "./CafeReceiptPrinterSettings";
 import CafeKitchenPrintersSettings from "./CafeKitchenPrintersSettings";
+import sleep from "../../../../../tools/sleep";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* helpers */
 const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
@@ -1293,8 +1295,8 @@ const Settings = () => {
         isMarketSector
           ? "Токен для весов"
           : canViewOnline
-          ? "Онлайн"
-          : "Безопасность"
+            ? "Онлайн"
+            : "Безопасность"
       );
     } else if (activeTab === "Токен для весов" && !isMarketSector) {
       setActiveTab(
@@ -1305,8 +1307,8 @@ const Settings = () => {
         isOwner
           ? "Моя компания"
           : isMarketSector
-          ? "Токен для весов"
-          : "Безопасность"
+            ? "Токен для весов"
+            : "Безопасность"
       );
     }
   }, [isMarketSector, isOwner, activeTab, isInitialized, canViewOnline]);
@@ -1806,7 +1808,7 @@ const Settings = () => {
               {/* Текущий пароль */}
               <div className="settings__form-group">
                 {!formData.current_password.trim() &&
-                errors?.current_password ? (
+                  errors?.current_password ? (
                   <label
                     style={{ color: "red" }}
                     className="settings__label"
@@ -1883,23 +1885,22 @@ const Settings = () => {
                 <div className="settings__password-strength">
                   <div className="settings__strength-bar">
                     <div
-                      className={`settings__strength-fill ${
-                        formData.new_password.length > 8
+                      className={`settings__strength-fill ${formData.new_password.length > 8
                           ? "strong"
                           : formData.new_password.length > 5
-                          ? "medium"
-                          : "weak"
-                      }`}
+                            ? "medium"
+                            : "weak"
+                        }`}
                     />
                   </div>
                   <span className="settings__strength-text">
                     {formData.new_password.length === 0
                       ? "Введите пароль"
                       : formData.new_password.length < 6
-                      ? "Слабый"
-                      : formData.new_password.length < 9
-                      ? "Средний"
-                      : "Сильный"}
+                        ? "Слабый"
+                        : formData.new_password.length < 9
+                          ? "Средний"
+                          : "Сильный"}
                   </span>
                 </div>
               </div>
@@ -1925,9 +1926,8 @@ const Settings = () => {
                     id="repeatPassword"
                     name="new_password2"
                     type={showPassword.repeat ? "text" : "password"}
-                    className={`settings__input ${
-                      passwordsMismatch ? "error" : ""
-                    }`}
+                    className={`settings__input ${passwordsMismatch ? "error" : ""
+                      }`}
                     placeholder="Повторите новый пароль"
                     value={formData.new_password2}
                     onChange={handlePasswordInputChange}
@@ -2234,10 +2234,10 @@ const Settings = () => {
         return (
           <div className="settings__tab-content settings__tab-content--print">
             {isCafeSector ? (
-              <>
+              <DataContainer>
                 <CafeReceiptPrinterSettings showAlert={showAlert} />
                 <CafeKitchenPrintersSettings showAlert={showAlert} />
-              </>
+              </DataContainer>
             ) : (
               <div className="settings__section">
                 <h2 className="settings__section-title">
@@ -2304,9 +2304,12 @@ const Settings = () => {
         <button
           className="settings__logout"
           type="button"
-          onClick={() => {
+          onClick={async () => {
             dispatch(logoutUser());
-            navigate("/");
+            navigate("/", {
+              replace: true,
+            });
+            window.location.reload();
           }}
         >
           Выйти из аккаунта

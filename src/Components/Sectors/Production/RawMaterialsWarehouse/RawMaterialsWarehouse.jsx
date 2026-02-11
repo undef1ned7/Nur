@@ -21,6 +21,7 @@ import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
 import "../../Market/Warehouse/Warehouse.scss";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import useResize from "../../../../hooks/useResize";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -594,177 +595,64 @@ const RawMaterialsWarehouse = () => {
       </div>
 
       {/* Products */}
-      <div className="warehouse-table-container w-full">
-        {/* ===== TABLE ===== */}
-        {viewMode === "table" && (
-          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="warehouse-table w-full min-w-[900px]">
-              <thead>
-                <tr>
-                  <th>№</th>
-                  <th>Название</th>
-                  <th>Ед.</th>
-                  <th>Дата</th>
-                  <th>Цена</th>
-                  <th>Количество</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
+      <DataContainer>
+        <div className="warehouse-table-container w-full">
+          {/* ===== TABLE ===== */}
+          {viewMode === "table" && (
+            <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <table className="warehouse-table w-full min-w-[900px]">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Название</th>
+                    <th>Ед.</th>
+                    <th>Дата</th>
+                    <th>Цена</th>
+                    <th>Количество</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
 
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="warehouse-table__loading">
-                      Загрузка...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={7} className="warehouse-table__empty">
-                      Ошибка загрузки
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="warehouse-table__empty">
-                      Сырье не найдено
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((item, index) => (
-                    <tr key={item.id} className="warehouse-table__row">
-                      <td>{index + 1}</td>
-                      <td className="warehouse-table__name">
-                        <div className="warehouse-table__name-cell">
-                          <span>{item.name || "—"}</span>
-                        </div>
-                      </td>
-                      <td>{item.unit || "—"}</td>
-                      <td>{new Date(item.created_at).toLocaleDateString()}</td>
-                      <td>{formatPrice(item.price)}</td>
-                      <td>
-                        {item.quantity === 0 ? (
-                          <span
-                            style={{
-                              padding: "4px 8px",
-                              background: "#fee2e2",
-                              color: "#dc2626",
-                              borderRadius: "6px",
-                              fontSize: "12px",
-                            }}
-                          >
-                            Нет в наличии
-                          </span>
-                        ) : (
-                          item.quantity
-                        )}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "8px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <button
-                            className="warehouse-header__create-btn"
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "12px",
-                              background: "#f7d74f",
-                              color: "black",
-                            }}
-                            onClick={() => handleOpen(item)}
-                          >
-                            Добавить
-                          </button>
-                          <button
-                            className="warehouse-header__create-btn"
-                            style={{
-                              padding: "6px 12px",
-                              fontSize: "12px",
-                              // background: "#3b82f6",
-                              // color: "#fff",
-                            }}
-                            onClick={() => openEdit(item)}
-                          >
-                            Редактировать
-                          </button>
-                        </div>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="warehouse-table__loading">
+                        Загрузка...
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ===== CARDS ===== */}
-        {viewMode === "cards" && (
-          <div className="block">
-            {loading ? (
-              <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Загрузка...
-              </div>
-            ) : error ? (
-              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Ошибка загрузки
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Сырье не найдено
-              </div>
-            ) : (
-              <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filtered.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-slate-500">#{idx + 1}</div>
-                      <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
-                        {item.name || "—"}
-                      </div>
-
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                        <span className="whitespace-nowrap">
-                          Ед. изм:{" "}
-                          <span className="font-medium">
-                            {item.unit || "—"}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-xl bg-slate-50 p-2">
-                        <div className="text-slate-500">Цена</div>
-                        <div className="mt-0.5 font-semibold text-slate-900">
-                          {formatPrice(item.price)}
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl bg-slate-50 p-2">
-                        <div className="text-slate-500">Дата</div>
-                        <div className="mt-0.5 font-semibold text-slate-900">
-                          {new Date(item.created_at).toLocaleDateString()}
-                        </div>
-                      </div>
-
-                      <div className="col-span-2 rounded-xl bg-slate-50 p-2">
-                        <div className="text-slate-500">Количество</div>
-                        <div className="mt-0.5 font-semibold text-slate-900">
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={7} className="warehouse-table__empty">
+                        Ошибка загрузки
+                      </td>
+                    </tr>
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="warehouse-table__empty">
+                        Сырье не найдено
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((item, index) => (
+                      <tr key={item.id} className="warehouse-table__row">
+                        <td>{index + 1}</td>
+                        <td className="warehouse-table__name">
+                          <div className="warehouse-table__name-cell">
+                            <span>{item.name || "—"}</span>
+                          </div>
+                        </td>
+                        <td>{item.unit || "—"}</td>
+                        <td>{new Date(item.created_at).toLocaleDateString()}</td>
+                        <td>{formatPrice(item.price)}</td>
+                        <td>
                           {item.quantity === 0 ? (
                             <span
                               style={{
-                                padding: "2px 6px",
+                                padding: "4px 8px",
                                 background: "#fee2e2",
                                 color: "#dc2626",
-                                borderRadius: "4px",
-                                fontSize: "11px",
+                                borderRadius: "6px",
+                                fontSize: "12px",
                               }}
                             >
                               Нет в наличии
@@ -772,50 +660,165 @@ const RawMaterialsWarehouse = () => {
                           ) : (
                             item.quantity
                           )}
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <button
+                              className="warehouse-header__create-btn"
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "12px",
+                                background: "#f7d74f",
+                                color: "black",
+                              }}
+                              onClick={() => handleOpen(item)}
+                            >
+                              Добавить
+                            </button>
+                            <button
+                              className="warehouse-header__create-btn"
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "12px",
+                                // background: "#3b82f6",
+                                // color: "#fff",
+                              }}
+                              onClick={() => openEdit(item)}
+                            >
+                              Редактировать
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ===== CARDS ===== */}
+          {viewMode === "cards" && (
+            <div className="block">
+              {loading ? (
+                <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Загрузка...
+                </div>
+              ) : error ? (
+                <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Ошибка загрузки
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Сырье не найдено
+                </div>
+              ) : (
+                <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {filtered.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs text-slate-500">#{idx + 1}</div>
+                        <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
+                          {item.name || "—"}
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                          <span className="whitespace-nowrap">
+                            Ед. изм:{" "}
+                            <span className="font-medium">
+                              {item.unit || "—"}
+                            </span>
+                          </span>
                         </div>
                       </div>
-                    </div>
 
-                    <div
-                      className="mt-4 flex flex-wrap gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        className="warehouse-header__create-btn"
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: "12px",
-                          background: "#f7d74f",
-                          color: "black",
-                          flex: "1",
-                          minWidth: "80px",
-                        }}
-                        onClick={() => handleOpen(item)}
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Цена</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {formatPrice(item.price)}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Дата</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </div>
+                        </div>
+
+                        <div className="col-span-2 rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Количество</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {item.quantity === 0 ? (
+                              <span
+                                style={{
+                                  padding: "2px 6px",
+                                  background: "#fee2e2",
+                                  color: "#dc2626",
+                                  borderRadius: "4px",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                Нет в наличии
+                              </span>
+                            ) : (
+                              item.quantity
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className="mt-4 flex flex-wrap gap-2"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        Добавить
-                      </button>
-                      <button
-                        className="warehouse-header__create-btn"
-                        style={{
-                          padding: "6px 12px",
-                          fontSize: "12px",
-                          // background: "#3b82f6",
-                          color: "#000",
-                          flex: "1",
-                          minWidth: "80px",
-                        }}
-                        onClick={() => openEdit(item)}
-                      >
-                        Редактировать
-                      </button>
+                        <button
+                          className="warehouse-header__create-btn"
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            background: "#f7d74f",
+                            color: "black",
+                            flex: "1",
+                            minWidth: "80px",
+                          }}
+                          onClick={() => handleOpen(item)}
+                        >
+                          Добавить
+                        </button>
+                        <button
+                          className="warehouse-header__create-btn"
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            // background: "#3b82f6",
+                            color: "#000",
+                            flex: "1",
+                            minWidth: "80px",
+                          }}
+                          onClick={() => openEdit(item)}
+                        >
+                          Редактировать
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </DataContainer>
 
       {showAddModal && (
         <AddModal

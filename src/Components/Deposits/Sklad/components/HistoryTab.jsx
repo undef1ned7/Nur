@@ -2,6 +2,7 @@ import SkladHeader from "./SkladHeader";
 import SkladTable from "./SkladTable";
 import SelectionActions from "./SelectionActions";
 import Pagination from "./Pagination";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /**
  * Компонент вкладки "История"
@@ -68,6 +69,8 @@ const HistoryTab = ({
       ) : filteredHistory.length === 0 ? (
         <p className="sklad__no-products-message">Нет доступных товаров.</p>
       ) : (
+        <DataContainer>
+
         <SkladTable
           products={filteredHistory}
           onEdit={onEdit}
@@ -75,6 +78,8 @@ const HistoryTab = ({
           toggleRow={toggleRow}
           toggleSelectAllOnPage={toggleSelectAllOnPage}
         />
+        </DataContainer>
+
       )}
 
       <Pagination

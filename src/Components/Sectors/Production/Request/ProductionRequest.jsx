@@ -16,6 +16,7 @@ import RequestCart from "./RequestCart";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import "./ProductionRequest.scss";
 import useResize from "../../../../hooks/useResize";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 const ProductionRequest = () => {
   const dispatch = useDispatch();
@@ -380,21 +381,22 @@ const ProductionRequest = () => {
           <p>Ошибка: {error}</p>
         </div>
       )}
-
-      {!loading && !error && (
-        <ProductsGrid
-          products={filteredProduts || []}
-          viewMode={viewMode}
-          onViewProduct={handleViewProduct}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          draggedItem={draggedItem}
-          onRequestWithCart={handleRequestWithCart}
-          onRequestWithoutCart={handleRequestWithoutCart}
-          onClearSearch={handleClearSearch}
-          isOwner={isOwner}
-        />
-      )}
+      <DataContainer>
+        {!loading && !error && (
+          <ProductsGrid
+            products={filteredProduts || []}
+            viewMode={viewMode}
+            onViewProduct={handleViewProduct}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            draggedItem={draggedItem}
+            onRequestWithCart={handleRequestWithCart}
+            onRequestWithoutCart={handleRequestWithoutCart}
+            onClearSearch={handleClearSearch}
+            isOwner={isOwner}
+          />
+        )}
+      </DataContainer>
 
       <ProductDetailModal
         product={detailProduct}
