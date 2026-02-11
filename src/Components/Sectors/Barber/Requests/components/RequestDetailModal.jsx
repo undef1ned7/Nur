@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   FaTimes,
   FaUser,
@@ -6,6 +6,8 @@ import {
   FaCalendarAlt,
   FaClock,
   FaComment,
+  FaCheck,
+  FaSpinner,
 } from "react-icons/fa";
 
 const fmtMoney = (n) =>
@@ -33,13 +35,35 @@ const STATUS_LABELS = {
   spam: "Спам/Ошибка",
 };
 
-const RequestDetailModal = ({ request, onClose }) => {
+const getMasterName = (request) => {
+  if (request.master_name) return request.master_name;
+  const m = request.master;
+  if (m && (m.full_name || m.first_name || m.last_name)) {
+    return m.full_name || [m.first_name, m.last_name].filter(Boolean).join(" ").trim() || "—";
+  }
+  return "—";
+};
+
+const RequestDetailModal = ({ request, onClose, onStatusChange }) => {
+  const [acceptLoading, setAcceptLoading] = useState(false);
+
   if (!request) return null;
 
   const statusKey = request.status || "new";
   const services = request.services || [];
   const totalDuration = request.total_duration_min || 
     services.reduce((sum, s) => sum + (s.duration_min || 0), 0);
+
+  const handleAccept = async () => {
+    if (!onStatusChange || acceptLoading) return;
+    setAcceptLoading(true);
+    try {
+      await onStatusChange(request.id, "confirmed");
+      onClose();
+    } finally {
+      setAcceptLoading(false);
+    }
+  };
 
   return (
     <>
@@ -99,7 +123,7 @@ const RequestDetailModal = ({ request, onClose }) => {
               </div>
               <div className="barberrequests__modalInfo">
                 <span className="barberrequests__modalLabel">Мастер</span>
-                <span className="barberrequests__modalValue">{request.master_name || "—"}</span>
+                <span className="barberrequests__modalValue">{getMasterName(request)}</span>
               </div>
             </div>
 
@@ -158,6 +182,23 @@ const RequestDetailModal = ({ request, onClose }) => {
               </div>
             </div>
           </div>
+          {statusKey === "new" && onStatusChange && (
+            <div className="barberrequests__modalFooter">
+              <button
+                type="button"
+                className="barberrequests__modalAcceptBtn"
+                disabled={acceptLoading}
+                onClick={handleAccept}
+              >
+                {acceptLoading ? (
+                  <FaSpinner className="barberrequests__modalAcceptBtnSpinner" />
+                ) : (
+                  <FaCheck className="barberrequests__modalAcceptBtnIcon" />
+                )}
+                Принять в запись
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>

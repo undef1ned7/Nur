@@ -12,6 +12,87 @@ import api from "../../../../api";
 
 const BOOKINGS_EP = "/barbershop/bookings/";
 
+const normPhone = (p) => String(p || "").replace(/[^\d]/g, "").trim();
+
+
+const normName = (s) =>
+  String(s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+const asArray = (d) =>
+  Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
+
+async function createAppointmentFromBooking(request) {
+  const company = localStorage.getItem("company");
+  let clientId = null;
+  const bookingName = normName(request.client_name);
+  const bookingPhone = normPhone(request.client_phone);
+
+  if (bookingPhone || request.client_name) {
+    const clientsRes = await api.get("/barbershop/clients/", {
+      params: { page_size: 1000 },
+    });
+    const list = asArray(clientsRes.data);
+    let found = null;
+    if (bookingPhone) {
+      const byPhone = list.filter(
+        (c) => normPhone(c.phone || c.phone_number) === bookingPhone
+      );
+      found = byPhone.find(
+        (c) => normName(c.full_name || c.name) === bookingName
+      );
+      if (!found && byPhone.length && !bookingName) {
+        found = byPhone[0];
+      }
+    }
+    if (found) {
+      clientId = found.id;
+    } else {
+      const { data } = await api.post("/barbershop/clients/", {
+        full_name: (request.client_name || "Клиент").trim(),
+        phone: (request.client_phone || "").trim() || null,
+        status: "active",
+        notes: null,
+        company,
+      });
+      clientId = data?.id ?? data?.data?.id;
+    }
+  }
+  const masterId =
+    request.master?.id ?? request.master ?? request.master_id;
+  if (!masterId) throw new Error("Нет мастера в заявке");
+  const dateStr =
+    request.date && String(request.date).length >= 10
+      ? String(request.date).slice(0, 10)
+      : null;
+  if (!dateStr || !request.time_start || !request.time_end)
+    throw new Error("Нет даты или времени в заявке");
+  const tStart = String(request.time_start).slice(0, 5);
+  const tEnd = String(request.time_end).slice(0, 5);
+  const start_at = `${dateStr}T${tStart}:00+06:00`;
+  const end_at = `${dateStr}T${tEnd}:00+06:00`;
+  const serviceIds = (request.services || [])
+    .map((s) => s.id ?? s.service_id ?? s.service)
+    .filter(Boolean);
+  const payload = {
+    client: clientId,
+    barber: masterId,
+    services: serviceIds.length ? serviceIds : [],
+    start_at,
+    end_at,
+    status: "confirmed",
+    comment: request.client_comment || null,
+    company,
+    price:
+      request.total_price != null && request.total_price !== ""
+        ? Number(request.total_price)
+        : null,
+  };
+  await api.post("/barbershop/appointments/", payload);
+}
+
 /* ===== Status tabs config ===== */
 const STATUS_TABS = [
   { value: "all", label: "Все" },
@@ -329,19 +410,23 @@ const Requests = () => {
 
   /* Handle status change via API */
   const handleStatusChange = useCallback(async (requestId, newStatus) => {
-    // Находим старую заявку для получения предыдущего статуса
     const oldRequest = requests.find((r) => r.id === requestId);
     const oldStatus = oldRequest?.status;
 
-    // Optimistic update
     setRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
     );
-    
+
     try {
+      if (newStatus === "confirmed" && oldRequest) {
+        await createAppointmentFromBooking(oldRequest);
+      }
       await api.patch(`${BOOKINGS_EP}${requestId}/status/`, { status: newStatus });
-      
-      // Обновляем counts: уменьшаем старый статус, увеличиваем новый
+
+      if (newStatus === "confirmed") {
+        window.dispatchEvent(new CustomEvent("barber:booking-confirmed"));
+      }
+
       if (oldStatus && oldStatus !== newStatus) {
         setStatusCounts((prev) => ({
           ...prev,
@@ -350,8 +435,6 @@ const Requests = () => {
         }));
       }
 
-      // Обновляем список после успешного изменения статуса
-      // Триггерим перезагрузку через изменение page
       if (page === 1) {
         setPage(2);
         setTimeout(() => setPage(1), 0);
@@ -360,7 +443,6 @@ const Requests = () => {
       }
     } catch (err) {
       console.error("Error updating status:", err);
-      // Revert on error - перезагружаем данные
       if (page === 1) {
         setPage(2);
         setTimeout(() => setPage(1), 0);
@@ -513,6 +595,7 @@ const Requests = () => {
       <RequestDetailModal
         request={selectedRequest}
         onClose={() => setSelectedRequest(null)}
+        onStatusChange={handleStatusChange}
       />
     </div>
   );
