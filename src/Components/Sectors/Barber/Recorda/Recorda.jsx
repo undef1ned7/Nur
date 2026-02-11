@@ -152,6 +152,12 @@ const Recorda = () => {
     fetchAll();
   }, []);
 
+  useEffect(() => {
+    const handler = () => fetchAll();
+    window.addEventListener("barber:booking-confirmed", handler);
+    return () => window.removeEventListener("barber:booking-confirmed", handler);
+  }, []);
+
   /* записи за выбранный день */
   // NOTE: Client-side filtering is a temporary solution
   // TODO: Backend should support ?date=YYYY-MM-DD&status= params for appointments
