@@ -42,6 +42,7 @@ import { countries } from "../../../../data/countries";
 import api from "../../../../api";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import "../../../Deposits/Sklad/AddProductPage.scss";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Функция для создания долга
 async function createDebt(payload) {
@@ -149,6 +150,7 @@ const AddWarehouseProductPage = () => {
     barcode: "",
     brand: "",
     category: "",
+    product_group: "",
     price: "",
     quantity: "",
     client: "",
@@ -156,6 +158,10 @@ const AddWarehouseProductPage = () => {
     plu: "",
     scale_type: "",
   });
+
+  const [warehouseGroups, setWarehouseGroups] = useState([]);
+  const [warehouseGroupsLoading, setWarehouseGroupsLoading] = useState(false);
+  const [warehouseGroupsError, setWarehouseGroupsError] = useState(null);
 
   const [state, setState] = useState({
     full_name: "",
@@ -233,6 +239,77 @@ const AddWarehouseProductPage = () => {
     }
   }, [location.search, warehouses]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadGroups = async () => {
+      if (!selectedWarehouse) {
+        setWarehouseGroups([]);
+        setWarehouseGroupsError(null);
+        setWarehouseGroupsLoading(false);
+        return;
+      }
+
+      // Если меняем склад при создании — сбрасываем выбранную группу
+      if (!isEditMode) {
+        setNewItemData((prev) => ({ ...prev, product_group: "" }));
+      }
+
+      setWarehouseGroupsLoading(true);
+      setWarehouseGroupsError(null);
+      try {
+        const { data } = await api.get(`/warehouse/${selectedWarehouse}/groups/`);
+        const list = Array.isArray(data) ? data : data?.results || [];
+        if (!cancelled) setWarehouseGroups(list);
+      } catch (e) {
+        console.error("Ошибка при загрузке групп склада:", e);
+        if (!cancelled) {
+          setWarehouseGroups([]);
+          setWarehouseGroupsError(e);
+        }
+      } finally {
+        if (!cancelled) setWarehouseGroupsLoading(false);
+      }
+    };
+
+    loadGroups();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedWarehouse, isEditMode]);
+
+  const groupOptions = useMemo(() => {
+    const groups = Array.isArray(warehouseGroups) ? warehouseGroups : [];
+    const byParent = new Map();
+    groups.forEach((g) => {
+      const parent = g?.parent ?? null;
+      const key = parent === null ? "root" : String(parent);
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key).push(g);
+    });
+    for (const [k, arr] of byParent.entries()) {
+      arr.sort((a, b) =>
+        String(a?.name || "").localeCompare(String(b?.name || ""))
+      );
+      byParent.set(k, arr);
+    }
+
+    const out = [];
+    const walk = (parentKey, depth) => {
+      const list = byParent.get(parentKey) || [];
+      list.forEach((g) => {
+        const gid = g?.id ?? g?.uuid;
+        if (!gid) return;
+        const key = String(gid);
+        const prefix = depth > 0 ? `${"—".repeat(depth)} ` : "";
+        out.push({ value: key, label: `${prefix}${g?.name || "—"}` });
+        walk(key, depth + 1);
+      });
+    };
+    walk("root", 0);
+    return out;
+  }, [warehouseGroups]);
+
   // Загрузка данных товара для редактирования
   useEffect(() => {
     if (isEditMode && productId) {
@@ -264,6 +341,13 @@ const AddWarehouseProductPage = () => {
             barcode: product.barcode || "",
             brand: product.brand || product.brand_name || "",
             category: product.category || product.category_name || "",
+            product_group:
+              String(
+                product?.product_group?.id ??
+                  product?.product_group?.uuid ??
+                  product?.product_group ??
+                  ""
+              ) || "",
             price: product.price || "",
             quantity: product.quantity || "",
             client: product.client || "",
@@ -357,6 +441,13 @@ const AddWarehouseProductPage = () => {
         barcode: "", // Очищаем штрих-код для нового товара
         brand: product.brand || product.brand_name || "",
         category: product.category || product.category_name || "",
+        product_group:
+          String(
+            product?.product_group?.id ??
+              product?.product_group?.uuid ??
+              product?.product_group ??
+              ""
+          ) || "",
         price: product.price || "",
         quantity: "", // Очищаем количество для нового товара
         client: product.client || "",
@@ -662,6 +753,7 @@ const AddWarehouseProductPage = () => {
       brand: brand || null,
       category: category || null,
       warehouse: selectedWarehouse, // Добавляем ID склада
+      product_group: newItemData.product_group || null,
       article: marketData.article || "",
       unit: marketData.unit || "шт",
       is_weight: isWeight,
@@ -945,8 +1037,9 @@ const AddWarehouseProductPage = () => {
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
+      const errorMessage = validateResErrors(err, 'Ошибка при добавлении товара')
       showAlert(
-        `Ошибка при добавлении товара: ${err.message || JSON.stringify(err)}`,
+        errorMessage,
         "error",
         "Ошибка"
       );
@@ -1351,6 +1444,7 @@ const AddWarehouseProductPage = () => {
               newItemData={newItemData}
               setNewItemData={setNewItemData}
               marketData={marketData}
+              groupOptions={groupOptions}
               handleMarketDataChange={handleMarketDataChange}
               handleChange={handleChange}
               brands={brands || []}
@@ -1661,6 +1755,38 @@ const AddWarehouseProductPage = () => {
                               </button>
                             </div>
                           </form>
+                        )}
+                      </div>
+
+                      <div className="add-product-page__form-group">
+                        <label className="add-product-page__label">
+                          Группа (необязательно)
+                        </label>
+                        <select
+                          name="product_group"
+                          className="add-product-page__input"
+                          value={newItemData.product_group}
+                          onChange={handleChange}
+                          disabled={!selectedWarehouse}
+                          title={
+                            !selectedWarehouse
+                              ? "Сначала выберите склад"
+                              : warehouseGroupsLoading
+                              ? "Загрузка…"
+                              : ""
+                          }
+                        >
+                          <option value="">Без группы</option>
+                          {groupOptions?.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                        {warehouseGroupsError && (
+                          <p className="add-product-page__hint">
+                            Не удалось загрузить группы склада
+                          </p>
                         )}
                       </div>
                     </>
@@ -2061,6 +2187,7 @@ const MarketProductForm = ({
   setDebtState,
   onChangeDebt,
   pickSupplier,
+  groupOptions,
   company,
   selectedWarehouse,
   setSelectedWarehouse,
@@ -2140,6 +2267,7 @@ const MarketProductForm = ({
     setCountrySearchTerm("");
   };
 
+ 
   // Автоматический расчет цены продажи для комплекта при изменении состава
   useEffect(() => {
     if (itemType === "kit") {
@@ -2609,6 +2737,32 @@ const MarketProductForm = ({
               </form>
             )}
           </div>
+        </div>
+
+        <div className="market-product-form__form-group">
+          <label className="market-product-form__label">
+            Группа (необязательно)
+          </label>
+          <select
+            name="product_group"
+            className="market-product-form__input"
+            value={newItemData.product_group}
+            onChange={handleChange}
+            disabled={!selectedWarehouse}
+            title={
+              !selectedWarehouse
+                ? "Сначала выберите склад"
+                : "Загрузка…"
+            }
+          >
+            <option value="">Без группы</option>
+            {groupOptions?.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        
         </div>
       </div>
 

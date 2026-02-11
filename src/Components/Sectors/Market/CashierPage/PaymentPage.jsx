@@ -193,6 +193,30 @@ const PaymentPage = ({
     .filter((bill) => bill >= total)
     .slice(0, 3);
 
+  const printReceiptSmart = async (payload) => {
+    try {
+      await handleCheckoutResponseForPrinting(payload, { interactive: false });
+      return true;
+    } catch (err) {
+      console.warn(
+        "[PaymentPage] Печать не удалась, запрашиваем выбор USB-принтера:",
+        err
+      );
+      const connected = await ensurePrinterConnectedInteractively({
+        forceChoose: true,
+      });
+      if (!connected) return false;
+
+      try {
+        await handleCheckoutResponseForPrinting(payload, { interactive: false });
+        return true;
+      } catch (err2) {
+        console.warn("[PaymentPage] Повторная печать не удалась:", err2);
+        return false;
+      }
+    }
+  };
+
   const handleAcceptPayment = async () => {
     if (!saleId) {
       showAlert("error", "Ошибка", "Продажа не найдена");
@@ -252,14 +276,10 @@ const PaymentPage = ({
         paymentMethodApi = "debt"; // Отправляем как долг
       }
 
-      // Проверяем (и при необходимости запрашиваем) подключение принтера ДО выполнения checkout.
-      // Здесь всегда вызываем интерактивное подключение, чтобы при отсутствии принтера
-      // браузер показал стандартное окно выбора USB‑устройства.
-      console.log("[PaymentPage] Проверка принтера перед оплатой (интерактивно)...");
-      const isPrinterConnected = await ensurePrinterConnectedInteractively();
-      console.log("[PaymentPage] Результат проверки принтера перед оплатой:", {
-        isPrinterConnected,
-      });
+      // ВАЖНО: перед оплатой НЕ показываем окно выбора USB-принтера.
+      // Пытаемся подключиться автоматически к ранее выбранному принтеру (если разрешение уже есть).
+      // Окно выбора будет показано только если печать реально не удалась.
+      const isPrinterConnected = await checkPrinterConnection();
 
       // Выполняем checkout
       // Передаем bool: true только если принтер подключен
@@ -378,38 +398,36 @@ const PaymentPage = ({
         const saleIdForReceipt =
           result.payload?.sale_id || result.payload?.id || saleId;
 
-        // Пытаемся автоматически распечатать чек только если принтер подключен
-        if (isPrinterConnected) {
-          try {
-            const receiptResult = await dispatch(
-              getProductCheckout(saleIdForReceipt)
-            );
+        // Пытаемся автоматически распечатать чек:
+        // - сначала "тихо" на сохранённый/разрешённый принтер
+        // - если печать не удалась — показываем окно выбора USB‑принтера и повторяем попытку
+        try {
+          const receiptResult = await dispatch(getProductCheckout(saleIdForReceipt));
 
-            if (
-              receiptResult.type === "products/getProductCheckout/fulfilled"
-            ) {
-              try {
-                await handleCheckoutResponseForPrinting(receiptResult.payload);
-              } catch (printError) {
-                // Ошибка печати не блокирует продажу
-                console.warn("Печать чека не удалась:", printError);
-                // Не показываем ошибку пользователю, только логируем
-              }
-            } else if (result.payload) {
-              // Если не удалось получить чек отдельно, пытаемся использовать данные из checkout
-              try {
-                await handleCheckoutResponseForPrinting(result.payload);
-              } catch (printError) {
-                // Ошибка печати не блокирует продажу
-                console.warn("Печать чека не удалась:", printError);
-                // Не показываем ошибку пользователю, только логируем
-              }
+          if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+            const ok = await printReceiptSmart(receiptResult.payload);
+            if (!ok) {
+              showAlert(
+                "warning",
+                "Печать",
+                "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
+              );
             }
-          } catch (receiptError) {
-            // Ошибка получения чека не блокирует продажу
-            console.warn("Не удалось получить чек для печати:", receiptError);
-            // Не показываем ошибку пользователю, только логируем
+          } else if (result.payload) {
+            // Если не удалось получить чек отдельно, пытаемся использовать данные из checkout
+            const ok = await printReceiptSmart(result.payload);
+            if (!ok) {
+              showAlert(
+                "warning",
+                "Печать",
+                "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
+              );
+            }
           }
+        } catch (receiptError) {
+          // Ошибка получения чека не блокирует продажу
+          console.warn("Не удалось получить чек для печати:", receiptError);
+          // Не показываем ошибку пользователю, только логируем
         }
 
         // Показываем модалку успеха с возможностью повторной печати
@@ -451,28 +469,6 @@ const PaymentPage = ({
       return;
     }
 
-    // Сначала проверяем, подключен ли принтер (с интерактивным запросом при необходимости).
-    // Если принтер не найден, будет показано окно выбора USB‑устройства.
-    console.log(
-      "[PaymentPage] Проверка принтера перед ручной печатью чека (интерактивно)..."
-    );
-    const isPrinterConnected = await ensurePrinterConnectedInteractively();
-    console.log(
-      "[PaymentPage] Результат проверки принтера перед ручной печатью:",
-      {
-        isPrinterConnected,
-      }
-    );
-
-    if (!isPrinterConnected) {
-      showAlert(
-        "warning",
-        "Принтер не подключен",
-        "Пожалуйста, подключите принтер перед печатью чека"
-      );
-      return;
-    }
-
     setPrinting(true);
     try {
       // Пытаемся получить чек с сервера
@@ -481,11 +477,24 @@ const PaymentPage = ({
       );
 
       if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-        // Используем сервис печати для обработки ответа
-        await handleCheckoutResponseForPrinting(receiptResult.payload);
+        const ok = await printReceiptSmart(receiptResult.payload);
+        if (!ok) {
+          showAlert(
+            "error",
+            "Ошибка печати",
+            "Не удалось распечатать чек. Проверьте принтер и повторите."
+          );
+        }
       } else if (receiptData.checkoutResponse) {
         // Если не удалось получить чек, пытаемся использовать данные из checkout
-        await handleCheckoutResponseForPrinting(receiptData.checkoutResponse);
+        const ok = await printReceiptSmart(receiptData.checkoutResponse);
+        if (!ok) {
+          showAlert(
+            "error",
+            "Ошибка печати",
+            "Не удалось распечатать чек. Проверьте принтер и повторите."
+          );
+        }
       } else {
         showAlert(
           "error",

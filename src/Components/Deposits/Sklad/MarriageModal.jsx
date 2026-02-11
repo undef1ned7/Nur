@@ -10,6 +10,7 @@ import {
 import { useUser } from "../../../store/slices/userSlice";
 import { useLocation } from "react-router-dom";
 import { useAlert, useConfirm } from "../../../hooks/useDialog";
+import "./MarriageModal.scss";
 
 const toNum = (v) => {
   const n = Number(String(v).replace(",", "."));
@@ -194,56 +195,67 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
   };
 
   return (
-    <div className="add-modal z-50!">
+    <div className="add-modal marriage-modal z-50!">
       <div className="add-modal__overlay z-50!" onClick={onClose} />
       <div className="add-modal__content z-50!" style={{ height: "auto" }}>
         <div className="add-modal__header">
-          <h3 className="text-xl">Списание брака / Возврат</h3>
+          <h3 className="text-xl marriage-modal__heading">
+            Списание брака / Возврат
+          </h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
         </div>
 
-        <form className="flex flex-col gap-2" onSubmit={onFormSubmit}>
-          <h4 className="text-lg font-medium">Товар: {item?.name}</h4>
-          <p>
-            В наличии: <b>{stockQty}</b> шт.
-          </p>
-          <p>
-            Себестоимость: <b>{unitCost}</b>
-          </p>
-          <input
-            type="number"
-            name="defectiveQty"
-            placeholder="Количество (для списания/возврата)"
-            className="debt__input border rounded-lg p-2 w-full"
-            value={defectiveQty}
-            onChange={(e) => setDefectiveQty(e.target.value)}
-            min={1}
-            step={1}
-          />
+        <form className="marriage-modal__form" onSubmit={onFormSubmit}>
+          <div className="marriage-modal__card">
+            <div className="marriage-modal__title">{item?.name}</div>
+            <div className="marriage-modal__meta">
+              <div>
+                В наличии: <b>{stockQty}</b> шт.
+              </div>
+              <div>
+                Себестоимость: <b>{unitCost}</b>
+              </div>
+              <div className="marriage-modal__amount">
+                Сумма: <b>{isFinite(expense) ? expense : 0}</b>
+              </div>
+            </div>
+          </div>
+
+          <div className="marriage-modal__field">
+            <label className="marriage-modal__label" htmlFor="defectiveQty">
+              Количество
+            </label>
+            <input
+              id="defectiveQty"
+              type="number"
+              name="defectiveQty"
+              placeholder="Введите количество"
+              className="marriage-modal__input"
+              value={defectiveQty}
+              onChange={(e) => setDefectiveQty(e.target.value)}
+              min={1}
+              max={stockQty}
+              onWheel={(e) => e.target.blur()}
+              step={1}
+              inputMode="numeric"
+            />
+            <div className="marriage-modal__hint">
+              Списание уменьшает остаток и фиксирует расход по себестоимости. Возврат
+              уменьшает остаток и делает приход в кассу.
+            </div>
+          </div>
 
           {/* касса автоматически выбирается - скрыто от пользователя */}
 
-          <div>
-            Сумма : <b>{isFinite(expense) ? expense : 0}</b>
-          </div>
-
           {error && (
-            <div
-              style={{
-                marginTop: 10,
-                color: "#c0392b",
-                fontSize: 14,
-                lineHeight: 1.3,
-              }}
-            >
+            <div className="marriage-modal__error" role="alert">
               {error}
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 15 }}>
+          <div className="marriage-modal__actions">
             <button
-              style={{ flex: 1, justifyContent: "center" }}
-              className="btn edit-btn"
+              className="btn marriage-modal__btn marriage-modal__btn--primary"
               type="submit"
               disabled={!!validateWriteoff()}
             >
@@ -252,8 +264,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
 
             <button
               type="button"
-              style={{ flex: 1, justifyContent: "center" }}
-              className="btn danger-btn"
+              className="btn marriage-modal__btn marriage-modal__btn--danger"
               onClick={onReturn}
               disabled={!!validateReturn()}
               title="Возврат на указанное количество: приход по себестоимости"

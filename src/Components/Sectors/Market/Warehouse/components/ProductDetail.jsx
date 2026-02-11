@@ -287,7 +287,7 @@ const ProductDetail = () => {
         </div>
 
         {/* Tabs */}
-        <div className="product-detail__tabs">
+        {/* <div className="product-detail__tabs">
           <button
             className={`product-detail__tab ${
               activeTab === "info" ? "product-detail__tab--active" : ""
@@ -304,10 +304,10 @@ const ProductDetail = () => {
           >
             История движения
           </button>
-        </div>
+        </div> */}
 
         {/* Tab Content */}
-        {activeTab === "info" ? (
+        {/* {activeTab === "info" ? ( */}
           <div className="product-detail__tab-content">
             {/* Information Section */}
             <div className="product-detail__section">
@@ -463,9 +463,9 @@ const ProductDetail = () => {
               </table>
             </div> */}
           </div>
-        ) : (
-          <MovementHistory productId={id} productCode={product.code} />
-        )}
+        {/* ) : ( */}
+          {/* <MovementHistory productId={id} productCode={product.code} /> */}
+        {/* )} */}
       </div>
 
       {/* Модальные окна */}

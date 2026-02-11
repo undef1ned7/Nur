@@ -76,7 +76,7 @@
 
         &::before {
           color: #f7d74f;
-          transform: scale(1.5);
+          transform: scalew(1.5);
         }
       }
     }
@@ -89,7 +89,7 @@
   // Показываем сайдбар на мобильных устройствах, когда он открыт
   &--visible {
     transform: translateX(0);
-    animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 
   @keyframes slideInLeft {

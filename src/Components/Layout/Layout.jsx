@@ -52,7 +52,6 @@ const Layout = () => {
       const isDesktop = window.innerWidth >= 769;
       const sidebarAutoClose =
         localStorage.getItem("sidebarAutoClose") === "true";
-
       if (isDesktop) return !sidebarAutoClose;
       return false;
     }

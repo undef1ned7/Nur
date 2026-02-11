@@ -12,6 +12,7 @@ import MenuItemModal from "./components/MenuItemModal";
 import MenuCategoryModal from "./components/MenuCategoryModal";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Утилиты
 const getListFromResponse = (res) => res?.data?.results || res?.data || [];
@@ -506,6 +507,7 @@ const Menu = () => {
       setImageFile(null);
       setImagePreview("");
     } catch (err) {
+      alert(validateResErrors(err, 'Произошла ошибка при сохранении блюда'), true)
       // Ошибка сохранения
     }
   };

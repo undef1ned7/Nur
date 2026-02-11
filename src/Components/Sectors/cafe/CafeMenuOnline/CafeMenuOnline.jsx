@@ -17,7 +17,7 @@ const toNum = (v) => {
 const fmtPrice = (v) =>
   new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(
     toNum(v)
-  ) + " ₽";
+  ) + " c";
 
 const normStr = (s) => String(s || "").trim();
 

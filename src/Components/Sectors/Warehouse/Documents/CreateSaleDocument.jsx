@@ -13,6 +13,8 @@ import {
   Printer,
   Package,
   User,
+  Folder,
+  FolderOpen,
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
@@ -24,6 +26,7 @@ import {
 } from "../../../../store/creators/warehouseThunk";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import warehouseAPI from "../../../../api/warehouse";
+import api from "../../../../api";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -61,19 +64,15 @@ const CreateSaleDocument = () => {
 
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
-  const [products, setProducts] = useState([]);
-  const [productsLoading, setProductsLoading] = useState(false);
-  const [productsPage, setProductsPage] = useState(1);
-  const [productsPagination, setProductsPagination] = useState({
-    count: 0,
-    next: null,
-    previous: null,
-  });
-  const [showMoreProducts, setShowMoreProducts] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState(new Set());
   const [addingProduct, setAddingProduct] = useState(false);
 
-  const PRODUCTS_PAGE_SIZE = 100;
+  const [groups, setGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState(null);
+  // expanded group keys: "all" | uuid
+  const [expandedGroupIds, setExpandedGroupIds] = useState(() => new Set());
+  const [groupProducts, setGroupProducts] = useState(() => ({}));
 
   const [warehouses, setWarehouses] = useState([]);
   const [warehouse, setWarehouse] = useState("");
@@ -97,6 +96,11 @@ const CreateSaleDocument = () => {
   );
 
   const debounceTimerRef = useRef(null);
+  const warehouseRef = useRef(warehouse);
+
+  useEffect(() => {
+    warehouseRef.current = warehouse;
+  }, [warehouse]);
 
   // Форматирование даты для отображения
   const formatDisplayDate = (dateString) => {
@@ -137,40 +141,300 @@ const CreateSaleDocument = () => {
     };
   }, [productSearch]);
 
-  // Загрузка товаров через новый warehouse API
-  // Загружаем товары только выбранного склада (не используем /main/products/list/)
   useEffect(() => {
-    // Не загружаем товары, если склад не выбран
     if (!warehouse) {
-      setProducts([]);
+      setGroups([]);
+      setGroupsError(null);
+      setExpandedGroupIds(new Set());
+      setGroupProducts({});
       return;
     }
 
-    const loadProducts = async () => {
-      setProductsLoading(true);
-      try {
-        const params = {
-          warehouse: warehouse, // Всегда передаем warehouse, чтобы использовать warehouse/${warehouse}/products/
-          search: debouncedProductSearch || undefined,
-          page_size: showMoreProducts ? 50 : 20,
-        };
+    // при смене склада — сразу сбрасываем прошлые группы/товары в каталоге,
+    // чтобы не показывались данные старого склада
+    setGroups([]);
+    setGroupsError(null);
+    setExpandedGroupIds(new Set());
+    setGroupProducts({});
 
-        const result = await dispatch(fetchProductsAsync(params));
-        if (fetchProductsAsync.fulfilled.match(result)) {
-          // Обрабатываем стандартный формат DRF пагинации
-          setProducts(
-            result.payload?.results ||
-              (Array.isArray(result.payload) ? result.payload : [])
-          );
+    let cancelled = false;
+
+    const loadGroups = async () => {
+      setGroupsLoading(true);
+      setGroupsError(null);
+      try {
+        const { data } = await api.get(`/warehouse/${warehouse}/groups/`);
+        const list = Array.isArray(data) ? data : data?.results || [];
+        if (!cancelled) setGroups(list);
+      } catch (e) {
+        console.error("Ошибка при загрузке групп:", e);
+        if (!cancelled) {
+          setGroups([]);
+          setGroupsError(e);
         }
-      } catch (error) {
-        console.error("Ошибка загрузки товаров:", error);
       } finally {
-        setProductsLoading(false);
+        if (!cancelled) setGroupsLoading(false);
       }
     };
-    loadProducts();
-  }, [dispatch, debouncedProductSearch, showMoreProducts, warehouse]);
+
+    loadGroups();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [warehouse]);
+
+  const groupsByParent = useMemo(() => {
+    const map = new Map();
+    (Array.isArray(groups) ? groups : []).forEach((g) => {
+      const parent = g?.parent ?? null;
+      const key = parent === null ? "root" : String(parent);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(g);
+    });
+    for (const [k, arr] of map.entries()) {
+      arr.sort((a, b) =>
+        String(a?.name || "").localeCompare(String(b?.name || ""))
+      );
+      map.set(k, arr);
+    }
+    return map;
+  }, [groups]);
+
+  const getUngroupedProducts = (list) => {
+    const arr = Array.isArray(list) ? list : [];
+    return arr.filter((p) => {
+      // API может вернуть product_group как id/uuid, объект или null
+      const pg = p?.product_group;
+      if (pg == null) return true;
+      if (typeof pg === "string" || typeof pg === "number") return false;
+      if (typeof pg === "object") {
+        const id = pg?.id ?? pg?.uuid;
+        return id == null || String(id).trim() === "";
+      }
+      return false;
+    });
+  };
+
+  const toggleGroupExpand = (groupKey) => {
+    const key = String(groupKey);
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev || []);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
+  const loadProductsForGroup = async (groupKey, groupIdOrNull) => {
+    if (!warehouse) return;
+    const requestWarehouse = warehouse;
+    const key = String(groupKey);
+
+    setGroupProducts((prev) => ({
+      ...(prev || {}),
+      [key]: {
+        ...(prev?.[key] || {}),
+        loading: true,
+        error: null,
+        search: debouncedProductSearch || "",
+      },
+    }));
+
+    try {
+      const params = {
+        warehouse,
+        page_size: 1000,
+      };
+      if (debouncedProductSearch?.trim()) {
+        params.search = debouncedProductSearch.trim();
+      }
+      if (groupIdOrNull) {
+        params.product_group = groupIdOrNull;
+      }
+
+      const result = await dispatch(fetchProductsAsync(params));
+      // если склад поменялся пока грузили — ничего не обновляем
+      if (warehouseRef.current !== requestWarehouse) return;
+
+      if (fetchProductsAsync.fulfilled.match(result)) {
+        const list =
+          result.payload?.results ||
+          (Array.isArray(result.payload) ? result.payload : []);
+        setGroupProducts((prev) => ({
+          ...(prev || {}),
+          [key]: {
+            items: list,
+            loading: false,
+            error: null,
+            search: debouncedProductSearch || "",
+          },
+        }));
+      } else {
+        setGroupProducts((prev) => ({
+          ...(prev || {}),
+          [key]: {
+            items: [],
+            loading: false,
+            error: result.payload || result.error || true,
+            search: debouncedProductSearch || "",
+          },
+        }));
+      }
+    } catch (e) {
+      console.error("Ошибка загрузки товаров группы:", e);
+      setGroupProducts((prev) => ({
+        ...(prev || {}),
+        [key]: {
+          items: [],
+          loading: false,
+          error: e,
+          search: debouncedProductSearch || "",
+        },
+      }));
+    }
+  };
+
+  const renderGroupTree = (parentId, depth = 0) => {
+    const key = parentId == null ? "root" : String(parentId);
+    const list = groupsByParent.get(key) || [];
+    if (!list.length) return null;
+
+    return list.map((g) => {
+      const gid = g?.id ?? g?.uuid;
+      if (!gid) return null;
+      const gKey = String(gid);
+      const children = groupsByParent.get(gKey) || [];
+      const hasChildren = children.length > 0;
+      const isExpanded = expandedGroupIds.has(gKey);
+      const cached = groupProducts?.[gKey];
+      const cachedCount = Array.isArray(cached?.items) ? cached.items.length : 0;
+      const count =
+        g?.products_count !== undefined && g?.products_count !== null
+          ? Number(g.products_count) || 0
+          : cachedCount;
+
+      return (
+        <div key={gKey} className="create-sale-document__group-node">
+          <div
+            className={`create-sale-document__group-item ${isExpanded ? "is-open" : ""}`}
+            style={{ paddingLeft: 10 + depth * 14 }}
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              toggleGroupExpand(gKey);
+              const entry = groupProducts?.[gKey];
+              const isStale =
+                (entry?.search || "") !== (debouncedProductSearch || "");
+              const notLoaded = !Array.isArray(entry?.items);
+              if (!isExpanded && (notLoaded || isStale)) {
+                loadProductsForGroup(gKey, gKey);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                toggleGroupExpand(gKey);
+                const entry = groupProducts?.[gKey];
+                const isStale =
+                  (entry?.search || "") !== (debouncedProductSearch || "");
+                const notLoaded = !Array.isArray(entry?.items);
+                if (!isExpanded && (notLoaded || isStale)) {
+                  loadProductsForGroup(gKey, gKey);
+                }
+              }
+            }}
+            title="Открыть товары группы"
+          >
+            <span
+              className="create-sale-document__group-expander"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleGroupExpand(gKey);
+                const entry = groupProducts?.[gKey];
+                const isStale =
+                  (entry?.search || "") !== (debouncedProductSearch || "");
+                const notLoaded = !Array.isArray(entry?.items);
+                if (!isExpanded && (notLoaded || isStale)) {
+                  loadProductsForGroup(gKey, gKey);
+                }
+              }}
+              title="Раскрыть"
+            >
+              <ChevronDown
+                size={14}
+                style={{
+                  transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)",
+                }}
+              />
+            </span>
+            <span className="create-sale-document__group-icon">
+              {isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
+            </span>
+            <span className="create-sale-document__group-name">{g?.name || "—"}</span>
+            <span className="create-sale-document__group-count">{count}</span>
+          </div>
+
+          {isExpanded && (
+            <div className="create-sale-document__group-body">
+              <div className="create-sale-document__group-products">
+                {cached?.loading ? (
+                  <div className="create-sale-document__group-products-empty">
+                    Загрузка…
+                  </div>
+                ) : cached?.error ? (
+                  <div className="create-sale-document__group-products-empty">
+                    Не удалось загрузить товары
+                  </div>
+                ) : Array.isArray(cached?.items) && cached.items.length === 0 ? (
+                  <div className="create-sale-document__group-products-empty">
+                    Нет товаров
+                  </div>
+                ) : (
+                  (cached?.items || []).map((product) => {
+                    const isSelected = selectedProductIds.has(String(product.id));
+                    const isInCart = cartItems.some(
+                      (item) => String(item.productId) === String(product.id)
+                    );
+                    return (
+                      <div
+                        key={product.id}
+                        className={`create-sale-document__group-product-item ${
+                          isSelected || isInCart ? "active" : ""
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddProduct(product);
+                        }}
+                      >
+                        <div className="create-sale-document__group-product-main">
+                          <div className="create-sale-document__group-product-name">
+                            {product.name}
+                          </div>
+                          <div className="create-sale-document__group-product-meta">
+                            <span className="create-sale-document__group-product-price">
+                              {formatPrice(product.price)} сом
+                            </span>
+                            <span className="create-sale-document__group-product-stock">
+                              {product.quantity ?? 0}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {hasChildren && (
+                <div className="create-sale-document__group-children">
+                  {renderGroupTree(gKey, depth + 1)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
 
   // Загрузка контрагентов через warehouse API
   useEffect(() => {
@@ -371,21 +635,24 @@ const CreateSaleDocument = () => {
   }, [cartItems, documentDiscount, isDocumentPosted]);
 
   // Добавление товара в корзину
-  const handleAddProduct = async (productId) => {
+  const handleAddProduct = async (productOrId) => {
     if (addingProduct) return; // Предотвращаем множественные клики
 
     setAddingProduct(true);
     try {
-      // Находим товар в списке продуктов
-      const product = products.find((p) => p.id === productId);
-      if (!product) {
+      const product =
+        typeof productOrId === "object" && productOrId
+          ? productOrId
+          : null;
+
+      if (!product?.id) {
         alert("Товар не найден");
         return;
       }
 
       // Проверяем, есть ли уже этот товар в корзине
       const existingItemIndex = cartItems.findIndex(
-        (item) => item.productId === productId
+        (item) => String(item.productId) === String(product.id)
       );
 
       const stock = Number(product.quantity ?? 0);
@@ -434,7 +701,7 @@ const CreateSaleDocument = () => {
       }
 
       // Добавляем товар в список выбранных
-      setSelectedProductIds((prev) => new Set([...prev, productId]));
+      setSelectedProductIds((prev) => new Set([...prev, String(product.id)]));
     } catch (error) {
       console.error("Ошибка при добавлении товара:", error);
       alert("Ошибка при добавлении товара");
@@ -447,13 +714,7 @@ const CreateSaleDocument = () => {
   const handleQuantityChange = (itemId, newQuantity) => {
     const item = cartItems.find((i) => i.id === itemId);
     if (!item) return;
-
     const qty = Number(newQuantity);
-    if (qty <= 0 || isNaN(qty)) {
-      setCartItems((prev) => prev.filter((i) => i.id !== itemId));
-      return;
-    }
-
     const unit = item.unit || "шт";
     const isPiece =
       unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
@@ -466,7 +727,6 @@ const CreateSaleDocument = () => {
     ) {
       finalQty = maxQty;
     }
-
     setCartItems((prev) =>
       prev.map((i) =>
         i.id === itemId ? { ...i, quantity: finalQty } : i
@@ -1023,6 +1283,138 @@ const CreateSaleDocument = () => {
             </div>
           </div>
 
+          <div className="create-sale-document__groups">
+            <div className="create-sale-document__group-tree">
+              {(() => {
+                const key = "all";
+                const isExpanded = expandedGroupIds.has(key);
+                const entry = groupProducts?.[key];
+                const isStale =
+                  (entry?.search || "") !== (debouncedProductSearch || "");
+                const notLoaded = !Array.isArray(entry?.items);
+                return (
+                  <div className="create-sale-document__group-node">
+                    <div
+                      className={`create-sale-document__group-item ${
+                        isExpanded ? "is-open" : ""
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        toggleGroupExpand(key);
+                        if (!isExpanded && (notLoaded || isStale)) {
+                          loadProductsForGroup(key, null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          toggleGroupExpand(key);
+                          if (!isExpanded && (notLoaded || isStale)) {
+                            loadProductsForGroup(key, null);
+                          }
+                        }
+                      }}
+                      title="Товары без группы"
+                    >
+                      <span className="create-sale-document__group-expander">
+                        <ChevronDown
+                          size={14}
+                          style={{
+                            transform: isExpanded
+                              ? "rotate(0deg)"
+                              : "rotate(-90deg)",
+                          }}
+                        />
+                      </span>
+                      <span className="create-sale-document__group-icon">
+                        {isExpanded ? (
+                          <FolderOpen size={16} />
+                        ) : (
+                          <Folder size={16} />
+                        )}
+                      </span>
+                      <span className="create-sale-document__group-name">
+                        Все товары
+                      </span>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="create-sale-document__group-body">
+                        <div className="create-sale-document__group-products">
+                          {entry?.loading ? (
+                            <div className="create-sale-document__group-products-empty">
+                              Загрузка…
+                            </div>
+                          ) : entry?.error ? (
+                            <div className="create-sale-document__group-products-empty">
+                              Не удалось загрузить товары
+                            </div>
+                          ) : getUngroupedProducts(entry?.items).length === 0 ? (
+                            <div className="create-sale-document__group-products-empty">
+                              Нет товаров
+                            </div>
+                          ) : (
+                            getUngroupedProducts(entry?.items).map((product) => {
+                              const isSelected = selectedProductIds.has(
+                                String(product.id)
+                              );
+                              const isInCart = cartItems.some(
+                                (item) =>
+                                  String(item.productId) === String(product.id)
+                              );
+                              return (
+                                <div
+                                  key={product.id}
+                                  className={`create-sale-document__group-product-item ${
+                                    isSelected || isInCart ? "active" : ""
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddProduct(product);
+                                  }}
+                                >
+                                  <div className="create-sale-document__group-product-main">
+                                    <div className="create-sale-document__group-product-name">
+                                      {product.name}
+                                    </div>
+                                    <div className="create-sale-document__group-product-meta">
+                                      <span className="create-sale-document__group-product-price">
+                                        {formatPrice(product.price)} сом
+                                      </span>
+                                      <span className="create-sale-document__group-product-stock">
+                                        {product.quantity ?? 0}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {groupsLoading ? (
+              <div className="create-sale-document__groups-empty">Загрузка…</div>
+            ) : groupsError ? (
+              <div className="create-sale-document__groups-empty">
+                Не удалось загрузить группы
+              </div>
+            ) : groups.length === 0 ? (
+              <div className="create-sale-document__groups-empty">
+                Групп нет
+              </div>
+            ) : (
+              <div className="create-sale-document__group-tree">
+                {renderGroupTree(null, 0)}
+              </div>
+            )}
+          </div>
+
           {/* <button
             type="button"
             className="create-sale-document__create-product-btn"
@@ -1031,67 +1423,6 @@ const CreateSaleDocument = () => {
             Новый товар
           </button> */}
 
-          <div className="create-sale-document__products-list">
-            {productsLoading ? (
-              <div className="create-sale-document__loading">Загрузка...</div>
-            ) : products.length === 0 ? (
-              <div className="create-sale-document__empty">
-                Товары не найдены
-              </div>
-            ) : (
-              products.map((product) => {
-                const isSelected = selectedProductIds.has(product.id);
-                const isInCart = cartItems.some(
-                  (item) => String(item.productId) === String(product.id)
-                );
-
-                return (
-                  <div
-                    key={product.id}
-                    className={`create-sale-document__product-item ${
-                      isSelected || isInCart ? "active" : ""
-                    }`}
-                    onClick={() => handleAddProduct(product.id)}
-                    style={{
-                      cursor: addingProduct ? "wait" : "pointer",
-                      opacity: addingProduct ? 0.6 : 1,
-                    }}
-                  >
-                    <div className="create-sale-document__product-info">
-                      {/* <div className="create-sale-document__product-id">
-                        {product.id}
-                      </div> */}
-                      <div className="create-sale-document__product-name">
-                        {product.name}
-                      </div>
-                      <div className="create-sale-document__product-details">
-                        <span className="create-sale-document__product-price">
-                          {formatPrice(product.price)} сом
-                        </span>
-                        <span className="create-sale-document__product-qty">
-                          Остаток: {product.quantity ?? 0}
-                        </span>
-                      </div>
-                    </div>
-                    <Package
-                      size={18}
-                      className="create-sale-document__product-icon"
-                    />
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {products.length > 0 && (
-            <button
-              type="button"
-              className="create-sale-document__show-more"
-              onClick={() => setShowMoreProducts(!showMoreProducts)}
-            >
-              Показать ещё
-            </button>
-          )}
         </div>
 
         {/* Основная область */}
@@ -1297,7 +1628,7 @@ const CreateSaleDocument = () => {
                       const itemPrice = Number(
                         item.price || item.unit_price || 0
                       );
-                      const itemQuantity = Number(item.quantity || 1);
+                      const itemQuantity = Number(item.quantity);
                       const itemDiscount = Number(
                         item.discount_percent ?? item.discount ?? 0
                       );

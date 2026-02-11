@@ -27,8 +27,10 @@ import InvoicePreviewModal from "./components/InvoicePreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { useAlert } from "../../../../hooks/useDialog";
 
 const Documents = () => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const {
