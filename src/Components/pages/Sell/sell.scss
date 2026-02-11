@@ -1803,6 +1803,146 @@
   font-size: 13px;
 }
 
+.sell__history-toolbarRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sell__viewToggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.sell__viewBtn {
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  color: #374151;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.05s ease;
+}
+
+.sell__viewBtn:hover {
+  background: rgba(17, 24, 39, 0.06);
+}
+
+.sell__viewBtn:active {
+  transform: translateY(1px);
+}
+
+.sell__viewBtn--active {
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 6px 14px rgba(17, 24, 39, 0.08);
+}
+
+.sellTable__wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sellTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  min-width: 920px;
+
+  th,
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f3f4f6;
+    text-align: left;
+    vertical-align: middle;
+    font-size: 13px;
+    color: #111827;
+    white-space: nowrap;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    background: #fafafa;
+    font-size: 12px;
+    font-weight: 900;
+    color: #6b7280;
+    z-index: 1;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.sellTable__row {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.sellTable__row:hover {
+  background: #f9fafb;
+}
+
+.sellTable__check input {
+  width: 16px;
+  height: 16px;
+}
+
+.sellTable__no {
+  font-weight: 800;
+}
+
+.sellTable__date {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.sellTable__title,
+.sellTable__client {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sellTable__money {
+  font-weight: 900;
+}
+
+.sellTable__actions {
+  text-align: right;
+}
+
+.sellTable__refund {
+  border: 1px solid #fbbf24;
+  background: #fffbeb;
+  color: #92400e;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sellTable__refund:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
 .sell__empty {
   padding: 18px 14px;
   background: #fff;

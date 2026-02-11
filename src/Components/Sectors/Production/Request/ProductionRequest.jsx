@@ -17,6 +17,7 @@ import AlertModal from "../../../common/AlertModal/AlertModal";
 import "./ProductionRequest.scss";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const ProductionRequest = () => {
   const dispatch = useDispatch();
@@ -215,11 +216,7 @@ const ProductionRequest = () => {
         }, 200);
       }
     } catch (error) {
-      console.log(error.response.data);
-      const firstErrorEntry = Object.values(error?.response?.data || {})[0];
-      const errorMessage =
-        (Array.isArray(firstErrorEntry) ? firstErrorEntry[0] : firstErrorEntry) ||
-        "Не удалось добавить товар в запрос";
+      const errorMessage = validateResErrors(error, 'Не удалось добавить товар в запрос')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
@@ -256,11 +253,7 @@ const ProductionRequest = () => {
       await loadOrCreateCart();
     } catch (error) {
       console.error("Error requesting without cart:", error);
-      const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось отправить запрос";
+      const errorMessage = validateResErrors(error, 'Не удалось отправить запрос')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
@@ -317,11 +310,7 @@ const ProductionRequest = () => {
       await refreshCart();
     } catch (error) {
       console.error("Error updating item quantity:", error);
-      const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось обновить количество";
+      const errorMessage = validateResErrors(error, 'Не удалось обновить количество')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
@@ -341,11 +330,7 @@ const ProductionRequest = () => {
       await refreshCart();
     } catch (error) {
       console.error("Error removing item:", error);
-      const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось удалить товар";
+      const errorMessage = validateResErrors(error, 'Не удалось удалить товар')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);

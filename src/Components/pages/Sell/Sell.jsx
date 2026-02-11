@@ -130,6 +130,7 @@ const Sell = () => {
   const [itemId, setItemId] = useState({});
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [error, setError] = useState(null);
+  const [historyView, setHistoryView] = useState("table"); // table | cards (по умолчанию таблица)
 
   const [newCashbox, setNewCashbox] = useState({
     name: "",
@@ -571,9 +572,33 @@ const Sell = () => {
               />
               <span>Выбрать все на странице</span>
             </label>
-            <div className="sell__history-meta">
-              <span>Показано: {filterField.length}</span>
-              <span>Всего: {count || 0}</span>
+
+            <div className="sell__history-toolbarRight">
+              <div className="sell__viewToggle" role="group" aria-label="Вид списка">
+                <button
+                  type="button"
+                  className={`sell__viewBtn ${
+                    historyView === "table" ? "sell__viewBtn--active" : ""
+                  }`}
+                  onClick={() => setHistoryView("table")}
+                >
+                  Таблица
+                </button>
+                <button
+                  type="button"
+                  className={`sell__viewBtn ${
+                    historyView === "cards" ? "sell__viewBtn--active" : ""
+                  }`}
+                  onClick={() => setHistoryView("cards")}
+                >
+                  Карточки
+                </button>
+              </div>
+
+              <div className="sell__history-meta">
+                <span>Показано: {filterField.length}</span>
+                <span>Всего: {count || 0}</span>
+              </div>
             </div>
           </div>
 
@@ -581,111 +606,209 @@ const Sell = () => {
             <div className="sell__empty">Ничего не найдено</div>
           ) : (
             <DataContainer>
-
-            <div className="sell__cards">
-              {filterField.map((item, idx) => {
-                const thumb = getSaleThumb(item);
-                const itemsCount = getItemsCount(item);
-                console.log('STTUS', item.status);
-                
-                const statusLabel =
-                  kindTranslate[item.status] || item.status || "-";
-                const statusVariant = getStatusVariant(item.status);
-                const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="sellCard"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setSellId(item.id);
-                      setShowDetailSell(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setSellId(item.id);
-                        setShowDetailSell(true);
-                      }
-                    }}
-                  >
-                    <div className="sellCard__top">
-                      <label
-                        className="sellCard__check"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected(item.id)}
-                          onChange={() => toggleRow(item.id)}
-                        />
-                        <span className="sellCard__no">№ {saleNo}</span>
-                      </label>
-                      <div className="sellCard__right">
-                        <span
-                          className={`sellBadge sellBadge--${statusVariant}`}
-                        >
-                          {statusLabel}
-                        </span>
-                        <span className="sellCard__date">
-                          {formatDateTime(item.created_at)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="sellCard__body">
-                      <div className="sellCard__main">
-                        <div className="sellCard__title">
-                          {item.first_item_name || item.title || "—"}
-                        </div>
-                        <div className="sellCard__subtitle">
-                          Клиент: <b>{item.client_name || "-"}</b>
-                          {itemsCount !== null && itemsCount > 1 && (
-                            <span className="sellCard__count">
-                              + ещё {itemsCount - 1}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="sellCard__grid">
-                          <div className="sellCard__kv">
-                            <span>Оплата</span>
-                            <b>{translatePaymentMethod(item.payment_method)}</b>
-                          </div>
-                          <div className="sellCard__kv">
-                            <span>Сумма</span>
-                            <b>{formatMoney(item.total)} сом</b>
-                          </div>
-                          <div className="sellCard__kv">
-                            <span>Документ</span>
-                            <b>#{String(item.id).slice(0, 8)}</b>
-                          </div>
-                          <div className="sellCard__kv">
-                            <span>Позиции</span>
-                            <b>{itemsCount !== null ? itemsCount : "—"}</b>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        className="sellCard__actions"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {company?.sector?.name === "Магазин" && (
-                          <button
-                            className="sellCard__refund"
-                            onClick={() => handleOpen(item)}
+              {historyView === "table" ? (
+                <div className="sellTable__wrap">
+                  <table className="sellTable">
+                    <thead>
+                      <tr>
+                        <th />
+                        <th>№</th>
+                        <th>Статус</th>
+                        <th>Товар</th>
+                        <th>Оплата</th>
+                        <th>Сумма</th>
+                        <th>Позиции</th>
+                        <th>Дата</th>
+                        <th>Клиент</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filterField.map((item, idx) => {
+                        const itemsCount = getItemsCount(item);
+                        const statusLabel =
+                          kindTranslate[item.status] || item.status || "-";
+                        const statusVariant = getStatusVariant(item.status);
+                        const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
+                        return (
+                          <tr
+                            key={item.id}
+                            className="sellTable__row"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              setSellId(item.id);
+                              setShowDetailSell(true);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                setSellId(item.id);
+                                setShowDetailSell(true);
+                              }
+                            }}
                           >
-                            Возврат
-                          </button>
-                        )}
+                            <td
+                              className="sellTable__check"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected(item.id)}
+                                onChange={() => toggleRow(item.id)}
+                              />
+                            </td>
+                            <td className="sellTable__no">№ {saleNo}</td>
+                            <td>
+                              <span
+                                className={`sellBadge sellBadge--${statusVariant}`}
+                              >
+                                {statusLabel}
+                              </span>
+                            </td>
+                        
+                            <td className="sellTable__title">
+                              {item.first_item_name || item.title || "—"}
+                            </td>
+                           
+                            <td>{translatePaymentMethod(item.payment_method)}</td>
+                            <td className="">
+                              {formatMoney(item.total)} сом
+                            </td>
+                            <td className="sellTable__count">
+                              {itemsCount !== null ? itemsCount : "—"}
+                            </td>
+                            <td className="sellTable__date">
+                              {formatDateTime(item.created_at)}
+                            </td>
+                            <td className="sellTable__client">
+                              {item.client_name || "-"}
+                            </td>
+                            <td
+                              className="sellTable__actions"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {company?.sector?.name === "Магазин" && (
+                                <button
+                                  type="button"
+                                  className="sellTable__refund"
+                                  onClick={() => handleOpen(item)}
+                                >
+                                  Возврат
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="sell__cards">
+                  {filterField.map((item, idx) => {
+                    const itemsCount = getItemsCount(item);
+                    const statusLabel =
+                      kindTranslate[item.status] || item.status || "-";
+                    const statusVariant = getStatusVariant(item.status);
+                    const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="sellCard"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setSellId(item.id);
+                          setShowDetailSell(true);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            setSellId(item.id);
+                            setShowDetailSell(true);
+                          }
+                        }}
+                      >
+                        <div className="sellCard__top">
+                          <label
+                            className="sellCard__check"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected(item.id)}
+                              onChange={() => toggleRow(item.id)}
+                            />
+                            <span className="sellCard__no">№ {saleNo}</span>
+                          </label>
+                          <div className="sellCard__right">
+                            <span
+                              className={`sellBadge sellBadge--${statusVariant}`}
+                            >
+                              {statusLabel}
+                            </span>
+                            <span className="sellCard__date">
+                              {formatDateTime(item.created_at)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="sellCard__body">
+                          <div className="sellCard__main">
+                            <div className="sellCard__title">
+                              {item.first_item_name || item.title || "—"}
+                            </div>
+                            <div className="sellCard__subtitle">
+                              Клиент: <b>{item.client_name || "-"}</b>
+                              {itemsCount !== null && itemsCount > 1 && (
+                                <span className="sellCard__count">
+                                  + ещё {itemsCount - 1}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="sellCard__grid">
+                              <div className="sellCard__kv">
+                                <span>Оплата</span>
+                                <b>
+                                  {translatePaymentMethod(item.payment_method)}
+                                </b>
+                              </div>
+                              <div className="sellCard__kv">
+                                <span>Сумма</span>
+                                <b>{formatMoney(item.total)} сом</b>
+                              </div>
+                              <div className="sellCard__kv">
+                                <span>Документ</span>
+                                <b>#{String(item.id).slice(0, 8)}</b>
+                              </div>
+                              <div className="sellCard__kv">
+                                <span>Позиции</span>
+                                <b>{itemsCount !== null ? itemsCount : "—"}</b>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            className="sellCard__actions"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {company?.sector?.name === "Магазин" && (
+                              <button
+                                type="button"
+                                className="sellCard__refund"
+                                onClick={() => handleOpen(item)}
+                              >
+                                Возврат
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              )}
             </DataContainer>
 
           )}

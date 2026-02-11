@@ -685,13 +685,9 @@ const Orders = () => {
     async (order) => {
       if (!order?.id) return;
       if (printingId) return;
-      try {
-        if (localStorage.getItem(`cafe_receipt_printed_${order.id}`)) return;
-      } catch { }
       if (!acquireReceiptPrintLock(order.id)) return;
       setPrintingId(order.id);
       try {
-
         await checkPrinterConnection().catch(() => false);
         const payload = buildPrintPayload(order);
 

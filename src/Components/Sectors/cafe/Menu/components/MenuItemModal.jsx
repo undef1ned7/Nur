@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { FaTimes, FaPlus, FaTrash } from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+import { useAlert } from "../../../../../hooks/useDialog";
 
 const safeStr = (value) => String(value ?? "");
 
@@ -44,8 +45,8 @@ const MenuItemModal = ({
         );
         const number = kitchen.number ?? kitchen.kitchen_number;
         const label = `${title || "Кухня"}${number !== undefined && number !== null && number !== ""
-            ? ` №${number}`
-            : ""
+          ? ` №${number}`
+          : ""
           }`;
         return { value: String(kitchen.id), label: safeStr(label) };
       })

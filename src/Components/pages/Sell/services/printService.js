@@ -224,12 +224,11 @@ function buildReceiptFromJSON(payload, opts = {}) {
   if (company) chunks.push(enc(company + "\n"));
   if (docNo) chunks.push(enc(`ЧЕК № ${docNo}\n`));
   chunks.push(enc(divider + "\n"));
-
+  chunks.push(enc(divider + "\n"));
   chunks.push(ESC(0x1b, 0x61, 0x00)); // left
   if (dt) chunks.push(enc(`Дата: ${dt}\n`));
   if (cashier) chunks.push(enc(`Кассир: ${cashier}\n`));
   chunks.push(enc(divider + "\n"));
-
   for (const it of items) {
     const name = String(it.name ?? "");
     const qty = Number(it.qty || 0);
@@ -260,6 +259,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
     if (change) chunks.push(enc(lr("Сдача:", money(change), width) + "\n"));
   }
 
+  chunks.push(enc(divider + "\n"));
   chunks.push(enc(divider + "\n"));
   chunks.push(ESC(0x1b, 0x61, 0x01));
   chunks.push(enc("Спасибо за покупку!\n\n"));
@@ -299,6 +299,8 @@ function saveVidPidToLS(dev) {
   try {
     localStorage.setItem("escpos_vid", dev.vendorId.toString(16));
     localStorage.setItem("escpos_pid", dev.productId.toString(16));
+    if (dev.serialNumber)
+      localStorage.setItem("escpos_serial", String(dev.serialNumber));
     if (dev.productName) localStorage.setItem("escpos_product", dev.productName);
     if (dev.manufacturerName)
       localStorage.setItem("escpos_manufacturer", dev.manufacturerName);
@@ -306,9 +308,13 @@ function saveVidPidToLS(dev) {
 }
 async function tryUsbAutoConnect() {
   if (!("usb" in navigator)) throw new Error("Браузер не поддерживает WebUSB");
+  const savedSerial = localStorage.getItem("escpos_serial") || "";
   const savedVid = parseInt(localStorage.getItem("escpos_vid") || "", 16);
   const savedPid = parseInt(localStorage.getItem("escpos_pid") || "", 16);
   const devs = await navigator.usb.getDevices();
+  if (savedSerial) {
+    return devs.find((d) => d.serialNumber === savedSerial) || null;
+  }
   return (
     devs.find(
       (d) =>
@@ -389,17 +395,20 @@ async function ensureUsbReadyAuto() {
  * Если не найдено – показывает диалог выбора USB-устройства.
  * Возвращает true, если после этого принтер доступен.
  */
-export async function ensurePrinterConnectedInteractively() {
+export async function ensurePrinterConnectedInteractively(options = {}) {
   if (!("usb" in navigator)) return false;
 
   // 1. Пытаемся автоматически подключиться к уже разрешённому устройству
-  try {
-    const state = await ensureUsbReadyAuto();
-    if (state && usbState.dev) {
-      return true;
+  // (если не требуется принудительно показать окно выбора).
+  if (!options?.forceChoose) {
+    try {
+      const state = await ensureUsbReadyAuto();
+      if (state && usbState.dev) {
+        return true;
+      }
+    } catch {
+      // игнорируем и пробуем интерактивное подключение ниже
     }
-  } catch {
-    // игнорируем и пробуем интерактивное подключение ниже
   }
 
   // 2. Если авто-подключение не сработало – запрашиваем устройство у пользователя
@@ -475,15 +484,19 @@ export async function checkPrinterConnection() {
 }
 
 /* ---------- Печать ---------- */
-async function printReceiptFromPdfUSB(pdfBlob) {
+async function printReceiptFromPdfUSB(pdfBlob, options = {}) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
   await ensureUsbReadyAuto();
   let dev = usbState.dev;
   if (!dev) {
+    if (options?.interactive === false) {
+      throw new Error("Принтер не подключен");
+    }
     dev = await requestUsbDevice();
     saveVidPidToLS(dev);
   }
   const { outEP } = await openUsbDevice(dev);
+  saveVidPidToLS(dev);
 
   // печатаем на ширину принтера
   const canvas = await pdfBlobToCanvas(pdfBlob, DOTS_PER_LINE);
@@ -500,10 +513,14 @@ async function printReceiptJSONViaUSB(payload, options = {}) {
   await ensureUsbReadyAuto();
   let dev = usbState.dev;
   if (!dev) {
+    if (options?.interactive === false) {
+      throw new Error("Принтер не подключен");
+    }
     dev = await requestUsbDevice();
     saveVidPidToLS(dev);
   }
   const { outEP } = await openUsbDevice(dev);
+  saveVidPidToLS(dev);
 
   // Жёстко печатаем в PC866 (без fallback/автоподбора)
   const parts = buildReceiptFromJSON(payload, {
@@ -518,15 +535,19 @@ async function printReceiptJSONViaUSB(payload, options = {}) {
 }
 
 /* ---------- Минимальная печать PC866 (XP-N160II) ---------- */
-export async function printRussianRawUsb(text = "Привет, мир!") {
+export async function printRussianRawUsb(text = "Привет, мир!", options = {}) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
   await ensureUsbReadyAuto();
   let dev = usbState.dev;
   if (!dev) {
+    if (options?.interactive === false) {
+      throw new Error("Принтер не подключен");
+    }
     dev = await requestUsbDevice();
     saveVidPidToLS(dev);
   }
   const { outEP } = await openUsbDevice(dev);
+  saveVidPidToLS(dev);
 
   // ESC/POS: init, Russia, codepage PC866, text, newline, cut
   const init = ESC(0x1b, 0x40);
@@ -555,28 +576,28 @@ export async function printRussianRawUsb(text = "Привет, мир!") {
 }
 
 /* ---------- Главная функция обработки ответа для печати ---------- */
-export async function handleCheckoutResponseForPrinting(res) {
+export async function handleCheckoutResponseForPrinting(res, options = {}) {
   if (
     res &&
     typeof res === "object" &&
     !(res instanceof Blob) &&
     Array.isArray(res.items)
   ) {
-    await printReceiptJSONViaUSB(res);
+    await printReceiptJSONViaUSB(res, options);
     return;
   }
   if (res instanceof Blob) {
     if (await looksLikePdf(res)) {
-      await printReceiptFromPdfUSB(res);
+      await printReceiptFromPdfUSB(res, options);
       return;
     }
     const parsed = await tryParseJsonFromBlob(res);
     if (parsed?.json) {
-      await printReceiptJSONViaUSB(parsed.json);
+      await printReceiptJSONViaUSB(parsed.json, options);
       return;
     }
     if (parsed?.pdfBlob && (await looksLikePdf(parsed.pdfBlob))) {
-      await printReceiptFromPdfUSB(parsed.pdfBlob);
+      await printReceiptFromPdfUSB(parsed.pdfBlob, options);
       return;
     }
     // не PDF и не JSON — сохраним как файл (фолбэк)
@@ -589,7 +610,7 @@ export async function handleCheckoutResponseForPrinting(res) {
     throw new Error("Получен невалидный PDF и не JSON: сохранён как файл.");
   }
   if (res && typeof res === "object" && Array.isArray(res.items)) {
-    await printReceiptJSONViaUSB(res);
+    await printReceiptJSONViaUSB(res, options);
     return;
   }
   throw new Error("Неизвестный формат ответа для печати");

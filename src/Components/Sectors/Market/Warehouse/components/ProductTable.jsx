@@ -1,4 +1,5 @@
 import React, { useMemo, useCallback } from "react";
+import { GripVertical } from "lucide-react";
 import { formatPrice, formatStock, getPrimaryImage } from "../utils";
 import noImage from "./placeholder.png";
 import "./ProductTable.scss";
@@ -14,6 +15,8 @@ const ProductRow = React.memo(
     rowNumber,
     onRowSelect,
     onProductClick,
+    enableDrag,
+    onProductDragStart,
   }) => {
     return (
       <tr
@@ -33,6 +36,23 @@ const ProductRow = React.memo(
 
         <td className="warehouse-table__name">
           <div className="warehouse-table__name-cell">
+            {enableDrag && onProductDragStart && (
+              <button
+                type="button"
+                className="warehouse-drag-handle"
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  onProductDragStart(product, e);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                title="Перетащить"
+                aria-label="Перетащить"
+              >
+                <GripVertical size={16} />
+              </button>
+            )}
             <img
               src={primaryImage?.image_url || noImage}
               alt={product.name || "Товар"}
@@ -63,7 +83,9 @@ const ProductRow = React.memo(
       prevProps.product.id === nextProps.product.id &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.rowNumber === nextProps.rowNumber &&
-      prevProps.primaryImage?.image_url === nextProps.primaryImage?.image_url
+      prevProps.primaryImage?.image_url === nextProps.primaryImage?.image_url &&
+      prevProps.enableDrag === nextProps.enableDrag &&
+      prevProps.onProductDragStart === nextProps.onProductDragStart
     );
   }
 );
@@ -82,6 +104,8 @@ const ProductTable = ({
   onSelectAll,
   onProductClick,
   getRowNumber,
+  enableDrag = false,
+  onProductDragStart,
 }) => {
   // Мемоизация вычислений для всех товаров (критическая оптимизация)
   const primaryImagesMap = useMemo(() => {
@@ -172,6 +196,8 @@ const ProductTable = ({
               rowNumber={rowNumbers[index]}
               onRowSelect={onRowSelect}
               onProductClick={onProductClick}
+              enableDrag={enableDrag}
+              onProductDragStart={onProductDragStart}
             />
           ))}
         </tbody>
@@ -187,7 +213,9 @@ const areEqual = (prevProps, nextProps) => {
     prevProps.loading !== nextProps.loading ||
     prevProps.isAllSelected !== nextProps.isAllSelected ||
     prevProps.selectedRows.size !== nextProps.selectedRows.size ||
-    prevProps.getRowNumber !== nextProps.getRowNumber
+    prevProps.getRowNumber !== nextProps.getRowNumber ||
+    prevProps.enableDrag !== nextProps.enableDrag ||
+    prevProps.onProductDragStart !== nextProps.onProductDragStart
   ) {
     return false;
   }

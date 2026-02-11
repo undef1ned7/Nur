@@ -86,7 +86,7 @@ const AddModal = ({ onClose, onSave, isLoading, error }) => {
             onChange={(e) => setSelectedDayLabel(e.target.value)}
           /> */}
 
-          <select>
+          <select className="add-modal__input">
             <option value="">Выберите сотрудника</option>
             {employees?.map((employee) => (
               <option key={employee.id} value={employee.id}>
