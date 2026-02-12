@@ -19,7 +19,9 @@ const CookReceiptCard = ({
   const isPending = status === "pending";
   const isInProgress = status === "in_progress";
   const isReady = status === "ready";
-  const updating = isUpdating(group.id);
+  const updating =
+    isUpdating(group.id) ||
+    (Array.isArray(group?.tasks_ids) && group.tasks_ids.some((id) => isUpdating(id)));
   const portions = extractPortionsFromTask(group);
 
   return (
@@ -56,7 +58,7 @@ const CookReceiptCard = ({
               {isPending && (
                 <button
                   className="cafeCook__btn cafeCook__btn--inProgress cafeCook__btn--compact"
-                  onClick={(e) => onClaimOne(group.id, e)}
+                  onClick={(e) => onClaimOne(group, e)}
                   disabled={updating}
                   type="button"
                 >
@@ -79,7 +81,10 @@ const CookReceiptCard = ({
               {isReady && (
                 <button
                   className="cafeCook__btn cafeCook__btn--ready cafeCook__btn--compact"
-                  onClick={(e) => {e.stopPropagation(); onRemoveAfterReady(group.id)}}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveAfterReady(group?.tasks_ids?.length ? group.tasks_ids : group.id);
+                  }}
                   type="button"
                 >
                   Убрать

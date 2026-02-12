@@ -63,17 +63,46 @@ export default function CafeReceiptPrinterSettings({ showAlert }) {
     if (device !== "usb") return;
     refreshUsb();
   }, [device, refreshUsb]);
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const { data } = await api.get("/cafe/receipt-printer/");
+        const { printer = "", bridge_url = "" } = data || {};
+        const parsed = parsePrinterBinding(printer);
+        if (parsed.kind === "usb") {
+          setDevice("usb");
+          setUsbKey(parsed.usbKey || "");
+        } else if (parsed.kind === "ip") {
+          setDevice("wifi");
+          setIpPort(parsed.port === 9100 ? parsed.ip : `${parsed.ip}:${parsed.port}`);
+        } else {
+          // иначе, сбрасываем в пустые значения (дефолт)
+          setDevice("wifi");
+          setIpPort("");
+          setUsbKey("");
+        }
+        setBridgeUrl(bridge_url || "http://127.0.0.1:5179/print");
+      } catch (e) {
+        // если ошибка, оставляем дефолтные значения
+        // Можно прижать set* к дефолтам, если нужно сбрасывать
+        // console.error("Не удалось получить настройки принтера:", e);
+      }
+    }
+    fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const saveToBackend = useCallback(async (binding) => {
     if (!binding) return false;
+    if (!bridgeUrl.trim()) return false;
     try {
-      await api.patch("/cafe/receipt-printer/", { printer: binding });
+      await api.patch("/cafe/receipt-printer/", { printer: binding, bridge_url: bridgeUrl });
       return true;
     } catch (e) {
       console.error("CafeReceiptPrinterSettings saveToBackend error:", e);
       return false;
     }
-  }, []);
+  }, [bridgeUrl]);
 
   const save = useCallback(async () => {
     if (device === "wifi") {

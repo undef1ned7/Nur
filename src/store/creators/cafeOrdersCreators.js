@@ -172,39 +172,54 @@ export const fetchKitchenTasksAsync = createAsyncThunk(
 // Взять задачу в работу
 export const claimKitchenTaskAsync = createAsyncThunk(
   "cafeOrders/claimTask",
-  async (taskId, { rejectWithValue, getState }) => {
+  async (taskIdsArg, { rejectWithValue, getState }) => {
     try {
+      const tasks_ids = Array.isArray(taskIdsArg)
+        ? taskIdsArg
+        : Array.isArray(taskIdsArg?.tasks_ids)
+          ? taskIdsArg.tasks_ids
+          : taskIdsArg
+            ? [taskIdsArg]
+            : [];
+
+      if (!tasks_ids.length) {
+        throw new Error("tasks_ids пустой");
+      }
+
       if (USE_MOCKS) {
         // Имитация задержки сети
         await new Promise((resolve) => setTimeout(resolve, 300));
 
-        // Находим задачу в состоянии и обновляем её
+        // Находим задачи в состоянии и обновляем их
         const state = getState();
-        const task = state.cafeOrders.tasks.find((t) => t.id === taskId);
-        if (!task) {
-          throw new Error("Задача не найдена");
+        const updatedTasks = [];
+        for (const id of tasks_ids) {
+          const task = state.cafeOrders.tasks.find((t) => t.id === id);
+          if (!task) {
+            throw new Error("Задача не найдена");
+          }
+
+          if (task.status !== "pending") {
+            throw new Error("Задача уже не pending");
+          }
+
+          if (task.cook !== null) {
+            throw new Error("Задача уже назначена повару");
+          }
+
+          updatedTasks.push({
+            ...task,
+            status: "in_progress",
+            cook: 73, // В моках предполагаем текущего повара
+            started_at: new Date().toISOString(),
+          });
         }
 
-        if (task.status !== "pending") {
-          throw new Error("Задача уже не pending");
-        }
-
-        if (task.cook !== null) {
-          throw new Error("Задача уже назначена повару");
-        }
-
-        const updatedTask = {
-          ...task,
-          status: "in_progress",
-          cook: 73, // В моках предполагаем текущего повара
-          started_at: new Date().toISOString(),
-        };
-
-        return updatedTask;
+        return updatedTasks;
       }
 
       // Реальный API вызов
-      const response = await api.post(`/cafe/kitchen/tasks/${taskId}/claim/`);
+      const response = await api.post(`/cafe/kitchen/tasks/claim/`, { task_ids: tasks_ids });
       return response.data;
     } catch (error) {
       return rejectWithValue(
@@ -217,39 +232,54 @@ export const claimKitchenTaskAsync = createAsyncThunk(
 // Отметить задачу как готово
 export const readyKitchenTaskAsync = createAsyncThunk(
   "cafeOrders/readyTask",
-  async (taskId, { rejectWithValue, getState }) => {
+  async (taskIdsArg, { rejectWithValue, getState }) => {
     try {
+      const tasks_ids = Array.isArray(taskIdsArg)
+        ? taskIdsArg
+        : Array.isArray(taskIdsArg?.tasks_ids)
+          ? taskIdsArg.tasks_ids
+          : taskIdsArg
+            ? [taskIdsArg]
+            : [];
+
+      if (!tasks_ids.length) {
+        throw new Error("tasks_ids пустой");
+      }
+
       if (USE_MOCKS) {
         // Имитация задержки сети
         await new Promise((resolve) => setTimeout(resolve, 300));
 
-        // Находим задачу в состоянии и обновляем её
+        // Находим задачи в состоянии и обновляем их
         const state = getState();
-        const task = state.cafeOrders.tasks.find((t) => t.id === taskId);
-        if (!task) {
-          throw new Error("Задача не найдена");
+        const updatedTasks = [];
+        for (const id of tasks_ids) {
+          const task = state.cafeOrders.tasks.find((t) => t.id === id);
+          if (!task) {
+            throw new Error("Задача не найдена");
+          }
+
+          if (task.status !== "in_progress") {
+            throw new Error("Задача не в работе");
+          }
+
+          // В моках предполагаем, что текущий повар имеет id 73
+          if (task.cook !== 73) {
+            throw new Error("Задача не принадлежит вам");
+          }
+
+          updatedTasks.push({
+            ...task,
+            status: "ready",
+            finished_at: new Date().toISOString(),
+          });
         }
 
-        if (task.status !== "in_progress") {
-          throw new Error("Задача не в работе");
-        }
-
-        // В моках предполагаем, что текущий повар имеет id 73
-        if (task.cook !== 73) {
-          throw new Error("Задача не принадлежит вам");
-        }
-
-        const updatedTask = {
-          ...task,
-          status: "ready",
-          finished_at: new Date().toISOString(),
-        };
-
-        return updatedTask;
+        return updatedTasks;
       }
 
       // Реальный API вызов
-      const response = await api.post(`/cafe/kitchen/tasks/${taskId}/ready/`);
+      const response = await api.post(`/cafe/kitchen/tasks/ready/`, { task_ids: tasks_ids });
       return response.data;
     } catch (error) {
       return rejectWithValue(
