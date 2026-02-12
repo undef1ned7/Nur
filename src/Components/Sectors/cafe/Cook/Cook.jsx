@@ -273,6 +273,112 @@ const Cook = () => {
   const [editKitchenTitle, setEditKitchenTitle] = useState("");
   const [kitchenSaving, setKitchenSaving] = useState(false);
 
+  const taskGroups = useMemo(() => {
+    // группируем по (order_id, menu_item_id) и сохраняем tasks_ids: [uuid]
+    const base = Array.isArray(tasks) ? tasks : [];
+    const grouped = new Map();
+
+    for (const task of base) {
+      const orderId = pickOrderId(task) || task?.order_id || null;
+      const menuItemId =
+        extractMenuIdFromTask(task) ||
+        task?.menu_item_id ||
+        task?.menu_id ||
+        null;
+
+      if (!orderId || !menuItemId) continue;
+
+      const key = `${orderId}__${menuItemId}`;
+      const orderObj =
+        task?.order && typeof task.order === "object" ? task.order : null;
+
+      if (!grouped.has(key)) {
+        const created_at = firstDefined(
+          task?.created_at,
+          task?.created,
+          task?.date,
+          orderObj?.created_at,
+          orderObj?.created,
+          orderObj?.date
+        );
+        const table_number = firstDefined(
+          task?.table_number,
+          orderObj?.table_number,
+          orderObj?.table
+        );
+        const waiter_label = firstDefined(
+          task?.waiter_label,
+          orderObj?.waiter_label,
+          orderObj?.waiter?.name,
+          orderObj?.waiter_name
+        );
+
+        grouped.set(key, {
+          key,
+          id: task?.id, // позже уточним под кнопку
+          order_id: orderId,
+          menu_item_id: menuItemId,
+          menu_item_title: extractMenuTitleFromTask(task),
+          created_at,
+          table_number,
+          waiter_label,
+          order: orderObj,
+          quantity: 0,
+          tasks: [],
+          tasks_ids: [],
+          status: String(task?.status || ""),
+        });
+      }
+
+      const g = grouped.get(key);
+      const portion = extractPortionsFromTask(task);
+      g.quantity += portion;
+      g.tasks.push(task);
+      if (task?.id) g.tasks_ids.push(task.id);
+
+      // берём первый непустой title
+      if (!g.menu_item_title) {
+        const t = extractMenuTitleFromTask(task);
+        if (t) g.menu_item_title = t;
+      }
+    }
+
+    const result = Array.from(grouped.values()).map((g) => {
+      const status = computeGroupStatus(g.tasks);
+      const pickId = () => {
+        if (status === "pending") {
+          const t = g.tasks.find((x) => String(x?.status) === "pending");
+          return t?.id || g.tasks?.[0]?.id;
+        }
+        if (status === "in_progress") {
+          const t = g.tasks.find((x) => String(x?.status) === "in_progress");
+          return t?.id || g.tasks?.[0]?.id;
+        }
+        return g.tasks?.[0]?.id;
+      };
+
+      return {
+        ...g,
+        id: pickId(),
+        status,
+      };
+    });
+
+    return result;
+  }, [tasks]);
+
+  useEffect(() => {
+    if (!taskGroups?.length) return;
+    setCollapsed((prev) => {
+      const next = { ...prev };
+      for (const g of taskGroups) if (next[g.key] === undefined) next[g.key] = true;
+      return next;
+    });
+  }, [taskGroups]);
+
+  const toggleGroup = useCallback((key) => {
+    setCollapsed((p) => ({ ...p, [key]: !p[key] }));
+  }, []);
 
   ////PRINT
   const [activeKey, setActiveKey] = useState(getActivePrinterKey());
@@ -728,11 +834,30 @@ const Cook = () => {
     };
   }, []);
   const handleClaimOne = useCallback(
-    async (taskId, e) => {
+    async (group, e) => {
       if (e?.preventDefault) e.preventDefault();
+
+      const pendingIds =
+        Array.isArray(group?.tasks) && group.tasks.length
+          ? group.tasks
+            .filter((t) => String(t?.status || "") === "pending")
+            .map((t) => t?.id)
+            .filter(Boolean)
+          : [];
+
+      const tasksIds =
+        pendingIds.length
+          ? pendingIds
+          : Array.isArray(group?.tasks_ids) && group.tasks_ids.length
+            ? group.tasks_ids
+            : group?.id
+              ? [group.id]
+              : [];
+
+      if (!tasksIds.length) return;
       try {
         suppressNextRefreshRef.current = true;
-        const response = await dispatch(claimKitchenTaskAsync(taskId)).unwrap();
+        await dispatch(claimKitchenTaskAsync({ tasks_ids: tasksIds })).unwrap();
         // await checkPrinterConnection().catch(() => false);
         // const payload = buildPrintPayload(response);
         // await printOrderReceiptJSONViaUSBWithDialog(payload);
@@ -753,14 +878,28 @@ const Cook = () => {
     async (task, e) => {
       if (e?.preventDefault) e.preventDefault();
 
-      const taskId = task?.id;
-      if (!taskId) return;
+      const inProgressIds =
+        Array.isArray(task?.tasks) && task.tasks.length
+          ? task.tasks
+            .filter((t) => String(t?.status || "") === "in_progress")
+            .map((t) => t?.id)
+            .filter(Boolean)
+          : [];
+
+      const tasksIds = inProgressIds.length
+        ? inProgressIds
+        : Array.isArray(task?.tasks_ids) && task.tasks_ids.length
+          ? task.tasks_ids
+        : task?.id
+          ? [task.id]
+          : [];
+      if (!tasksIds.length) return;
 
       try {
         suppressNextRefreshRef.current = true;
         try {
-          await dispatch(readyKitchenTaskAsync(taskId)).unwrap();
-          removeAfterReadyTask(taskId);
+          await dispatch(readyKitchenTaskAsync({ tasks_ids: tasksIds })).unwrap();
+          removeAfterReadyTask(tasksIds);
           showNotice("ok", "Отмечено как готово.");
         } catch (eReady) {
           try {
@@ -973,9 +1112,9 @@ const Cook = () => {
 
               {!loading &&
                 !error &&
-                tasks.map((g) => (
+                taskGroups.map((g) => (
                   <CookReceiptCard
-                    key={g.id}
+                    key={g.key}
                     group={g}
                     activeTab={activeTab}
                     collapsed={collapsed[g.key] !== false}
