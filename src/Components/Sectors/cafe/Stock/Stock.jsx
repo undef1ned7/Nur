@@ -122,6 +122,29 @@ const Stock = () => {
     setModalOpen(true);
   };
 
+  const postCashflowDelta = async ({ title, deltaAmount }) => {
+    const boxId =
+      cashboxId ||
+      String(cashboxes?.[0]?.id ?? cashboxes?.[0]?.uuid ?? "");
+    if (!boxId) return;
+
+    const amt = toNum(deltaAmount);
+    if (!Number.isFinite(amt) || Math.abs(amt) < 1e-9) return;
+
+    const type = amt > 0 ? "expense" : "income";
+    const amount = Math.abs(amt);
+    const signLabel = amt > 0 ? "Расход" : "Приход";
+
+    api
+      .post("/construction/cashflows/", {
+        cashbox: boxId,
+        type,
+        name: `${signLabel} (корректировка склада): ${title}`,
+        amount,
+      })
+      .catch(() => {});
+  };
+
   const saveItem = async (e) => {
     e.preventDefault();
 
@@ -161,9 +184,19 @@ const Stock = () => {
         }
       } else {
         // Редактирование товара
+        const prevItem = items.find((s) => s.id === editingId);
+        const prevQty = toNum(prevItem?.remainder);
+        const prevPrice = toNum(prevItem?.unit_price);
+        const prevTotal = prevQty * prevPrice;
+        const nextTotal = Math.max(0, remainderNum) * Math.max(0, unitPriceNum);
+        const deltaTotal = nextTotal - prevTotal;
+
         const res = await api.put(`/cafe/warehouse/${editingId}/`, payload);
         setItems((prev) => prev.map((s) => (s.id === editingId ? res.data : s)));
         setModalOpen(false);
+
+        // Корректировка кассы только на разницу (в зависимости от знака суммы)
+        await postCashflowDelta({ title, deltaAmount: deltaTotal });
       }
     } catch (err) {
       // Ошибка сохранения товара
@@ -181,6 +214,16 @@ const Stock = () => {
       await api.delete(`/cafe/warehouse/${deleteItem.id}/`);
       setItems((prev) => prev.filter((s) => s.id !== deleteItem.id));
       setDeleteOpen(false);
+
+      // При удалении корректируем кассу на всю "стоимость" остатка (как разницу до нуля)
+      const prevTotal =
+        Math.max(0, toNum(deleteItem.remainder)) *
+        Math.max(0, toNum(deleteItem.unit_price));
+      await postCashflowDelta({
+        title: deleteItem.title,
+        deltaAmount: 0 - prevTotal,
+      });
+
       setDeleteItem(null);
     } catch (err) {
       // Ошибка удаления товара

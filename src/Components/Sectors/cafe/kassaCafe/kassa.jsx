@@ -431,7 +431,7 @@ const CashboxDetail = () => {
     setOpLoading(false);
   };
 
-  const cashboxTitle = box?.department_name || box?.name || "—";
+  const cashboxTitle = box?.department_name || box?.name || "";
 
   return (
     <div className="cafeKassa">
@@ -501,44 +501,44 @@ const CashboxDetail = () => {
 
       <DataContainer>
 
-      <div className="cafeKassa__tableWrap">
-        <table className="cafeKassa__table">
-          <thead>
-            <tr>
-              <th>Тип</th>
-              <th>Наименование</th>
-              <th>Сумма</th>
-              <th>Дата создания</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+        <div className="cafeKassa__tableWrap">
+          <table className="cafeKassa__table">
+            <thead>
               <tr>
-                <td colSpan={4}>Загрузка…</td>
+                <th>Тип</th>
+                <th>Наименование</th>
+                <th>Сумма {tab !== 'all' ? `(${shown.reduce((acc, o) => acc + o.amount, 0)} c)` : ''}</th>
+                <th>Дата создания</th>
               </tr>
-            ) : err ? (
-              <tr>
-                <td colSpan={4} className="cafeKassa__alert cafeKassa__alert--error">
-                  {err}
-                </td>
-              </tr>
-            ) : shown.length ? (
-              shown.map((o) => (
-                <tr key={o.id} className="cafeKassa__rowClickable" onClick={() => openDetails(o)}>
-                  <td>{o.type === "income" ? "Приход" : "Расход"}</td>
-                  <td>{o.title}</td>
-                  <td>{money(o.amount)}</td>
-                  <td>{when(o.created_at)}</td>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4}>Загрузка…</td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={4}>Нет операций</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : err ? (
+                <tr>
+                  <td colSpan={4} className="cafeKassa__alert cafeKassa__alert--error">
+                    {err}
+                  </td>
+                </tr>
+              ) : shown.length ? (
+                shown.map((o) => (
+                  <tr key={o.id} className="cafeKassa__rowClickable" onClick={() => openDetails(o)}>
+                    <td>{o.type === "income" ? "Приход" : "Расход"}</td>
+                    <td>{o.title}</td>
+                    <td>{money(o.amount)}</td>
+                    <td>{when(o.created_at)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4}>Нет операций</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </DataContainer>
       {addOpOpen && (
         <AddOperationModal
