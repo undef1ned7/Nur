@@ -186,7 +186,116 @@ const createProtectedRoute = (path, Component, props) => (
   />
 );
 
-/** Аналитика склада: новая аналитика агента (AgentAnalytics) — для агента без agent_id или при agent_id в URL; иначе владелец/админ (WarehouseAnalytics) */
+/**
+ * Аналитика склада:
+ * - новая аналитика агента (WarehouseAgentAnalytics) — для агента без agent_id или при agent_id в URL;
+ * - аналитика владельца/админа (WarehouseAnalytics) — во всех остальных случаях.
+ *
+ * Ожидаемые структуры ответов API:
+ *
+ * 1) Владелец/админ — общая аналитика склада
+ *    GET /api/warehouse/owner/analytics/?period=month&date=2026-02-05
+ *
+ *    {
+ *      "period": "month",
+ *      "date_from": "2026-01-07",
+ *      "date_to": "2026-02-05",
+ *      "summary": {
+ *        "requests_approved": 8,
+ *        "items_approved": "20.000",
+ *        "sales_count": 0,
+ *        "sales_amount": "0.00",
+ *        "on_hand_qty": "20.000",
+ *        "on_hand_amount": "3709.08000"
+ *      },
+ *      "charts": {
+ *        "sales_by_date": []
+ *      },
+ *      "top_agents": {
+ *        "by_sales": [],
+ *        "by_received": [
+ *          {
+ *            "agent_id": "4478407d-660b-4683-a0af-ceb15c25b507",
+ *            "agent_name": "agentt agentt",
+ *            "items_approved": "16.000"
+ *          },
+ *          {
+ *            "agent_id": "062ca63c-0fe5-4070-ab01-a9ef554fce1e",
+ *            "agent_name": "agent agent",
+ *            "items_approved": "2.000"
+ *          },
+ *          {
+ *            "agent_id": "fab742f8-66ca-48fa-b318-9ac8a48fceab",
+ *            "agent_name": "warehouse warehouse",
+ *            "items_approved": "2.000"
+ *          }
+ *        ]
+ *      },
+ *      "details": {
+ *        "warehouses": [
+ *          {
+ *            "warehouse_id": "8f5d5f2c-6de6-4e2b-9747-273bc5aa3a19",
+ *            "warehouse_name": "new склад",
+ *            "carts_approved": 5,
+ *            "items_approved": "8.000",
+ *            "sales_count": 0,
+ *            "sales_amount": "0.00",
+ *            "on_hand_qty": "8.000",
+ *            "on_hand_amount": "589.08000"
+ *          },
+ *          {
+ *            "warehouse_id": "4cf95f0e-e72e-4621-8c4c-e5c88bafb09e",
+ *            "warehouse_name": "JAY",
+ *            "carts_approved": 3,
+ *            "items_approved": "12.000",
+ *            "sales_count": 0,
+ *            "sales_amount": "0.00",
+ *            "on_hand_qty": "12.000",
+ *            "on_hand_amount": "3120.00000"
+ *          }
+ *        ],
+ *        "sales_by_product": []
+ *      }
+ *    }
+ *
+ * 2) Владелец/админ — аналитика конкретного агента
+ *    GET /api/warehouse/owner/agents/{agent_id}/analytics/?period=month&date=2026-02-05
+ *
+ *    {
+ *      "period": "month",
+ *      "date_from": "2026-01-07",
+ *      "date_to": "2026-02-05",
+ *      "summary": {
+ *        "requests_submitted": 6,
+ *        "requests_approved": 6,
+ *        "requests_rejected": 0,
+ *        "items_approved": "16.000",
+ *        "sales_count": 0,
+ *        "sales_qty": "0.000",
+ *        "sales_amount": "0.00",
+ *        "returns_count": 0,
+ *        "returns_amount": "0.00",
+ *        "write_off_count": 0,
+ *        "write_off_qty": "0.000",
+ *        "on_hand_qty": "16.000",
+ *        "on_hand_amount": "3485.52000"
+ *      },
+ *      "charts": {
+ *        "requests_by_date": [
+ *          {
+ *            "date": "2026-02-05",
+ *            "carts_approved": 6,
+ *            "items_approved": 16.0
+ *          }
+ *        ],
+ *        "sales_by_date": []
+ *      },
+ *      "details": {
+ *        "sales_by_product": [],
+ *        "sales_by_warehouse": []
+ *      }
+ *    }
+ */
 const WarehouseAnalyticsRoute = () => {
   const { profile } = useUser();
   const [searchParams] = useSearchParams();

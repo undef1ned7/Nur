@@ -90,6 +90,7 @@ const CreateSaleDocument = () => {
   const dateInputRef = useRef(null);
   const [documentDiscount, setDocumentDiscount] = useState("");
   const [comment, setComment] = useState("");
+  const [paymentKind, setPaymentKind] = useState("cash"); // cash — сразу, credit — в долг (API: payment_kind)
   const [cartItems, setCartItems] = useState([]);
   const [documentId] = useState(
     () => `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -572,6 +573,13 @@ const CreateSaleDocument = () => {
     );
   }, [docType]);
 
+  // payment_kind (оплата сразу / в долг) только для SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN
+  const isPaymentKindRelevant = useMemo(() => {
+    return ["SALE", "PURCHASE", "SALE_RETURN", "PURCHASE_RETURN"].includes(
+      docType
+    );
+  }, [docType]);
+
   // Определяем, требуется ли второй склад (для TRANSFER)
   const isWarehouseToRequired = useMemo(() => {
     return docType === "TRANSFER";
@@ -896,33 +904,58 @@ const CreateSaleDocument = () => {
     }
 
     try {
+      // Скидка по документу (API: discount_percent, discount_amount)
+      const discountPercentNum = Number(documentDiscount) || 0;
+      const subtotalForDoc = cartItems.reduce(
+        (sum, item) =>
+          sum +
+          (Number(item.price || item.unit_price) || 0) * (Number(item.quantity) || 0),
+        0
+      );
+      const itemsDiscountSum = cartItems.reduce(
+        (sum, item) => {
+          const p = Number(item.price || item.unit_price) || 0;
+          const q = Number(item.quantity) || 0;
+          const d = Number(item.discount_percent || item.discount || 0);
+          return sum + (p * q * d) / 100;
+        },
+        0
+      );
+      const subtotalAfterItems = subtotalForDoc - itemsDiscountSum;
+      const documentDiscountAmount =
+        (subtotalAfterItems * discountPercentNum) / 100;
+
       // Формируем данные для создания документа через новый API
       const documentData = {
         doc_type: docType,
+        ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
         comment: comment || "",
+        discount_percent: String(discountPercentNum.toFixed(2)),
+        discount_amount: String(documentDiscountAmount.toFixed(2)),
         items: cartItems.map((item) => {
           const unit = item.unit || "шт";
           const isPiece =
             unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
           const qty = Number(item.quantity || 1);
           const finalQty = isPiece ? Math.floor(qty) : qty;
+          const price = Number(item.price || item.unit_price || 0);
+          const itemDiscPct = Math.max(
+            0,
+            Math.min(100, Number(item.discount_percent || item.discount || 0))
+          );
+          const itemDiscAmount = (price * finalQty * itemDiscPct) / 100;
+          const lineTotal = price * finalQty - itemDiscAmount;
 
           return {
             product: item.productId,
             qty: String(finalQty),
-            price: String((item.price || item.unit_price || 0).toFixed(2)),
-            discount_percent: String(
-              Math.max(
-                0,
-                Math.min(
-                  100,
-                  Number(item.discount_percent || item.discount || 0)
-                )
-              )
-            ),
+            price: String(price.toFixed(2)),
+            discount_percent: String(itemDiscPct.toFixed(2)),
+            discount_amount: String(itemDiscAmount.toFixed(2)),
+            line_total: String(lineTotal.toFixed(2)),
           };
         }),
       };
@@ -1002,32 +1035,56 @@ const CreateSaleDocument = () => {
 
     try {
       // Сначала создаем документ через новый API
+      const discountPercentNum = Number(documentDiscount) || 0;
+      const subtotalForDoc = cartItems.reduce(
+        (sum, item) =>
+          sum +
+          (Number(item.price || item.unit_price) || 0) * (Number(item.quantity) || 0),
+        0
+      );
+      const itemsDiscountSum = cartItems.reduce(
+        (sum, item) => {
+          const p = Number(item.price || item.unit_price) || 0;
+          const q = Number(item.quantity) || 0;
+          const d = Number(item.discount_percent || item.discount || 0);
+          return sum + (p * q * d) / 100;
+        },
+        0
+      );
+      const subtotalAfterItems = subtotalForDoc - itemsDiscountSum;
+      const documentDiscountAmount =
+        (subtotalAfterItems * discountPercentNum) / 100;
+
       const documentData = {
         doc_type: docType,
+        ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
         comment: comment || "",
+        discount_percent: String(discountPercentNum.toFixed(2)),
+        discount_amount: String(documentDiscountAmount.toFixed(2)),
         items: cartItems.map((item) => {
           const unit = item.unit || "шт";
           const isPiece =
             unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
           const qty = Number(item.quantity || 1);
           const finalQty = isPiece ? Math.floor(qty) : qty;
+          const price = Number(item.price || item.unit_price || 0);
+          const itemDiscPct = Math.max(
+            0,
+            Math.min(100, Number(item.discount_percent || item.discount || 0))
+          );
+          const itemDiscAmount = (price * finalQty * itemDiscPct) / 100;
+          const lineTotal = price * finalQty - itemDiscAmount;
 
           return {
             product: item.productId,
             qty: String(finalQty),
-            price: String((item.price || item.unit_price || 0).toFixed(2)),
-            discount_percent: String(
-              Math.max(
-                0,
-                Math.min(
-                  100,
-                  Number(item.discount_percent || item.discount || 0)
-                )
-              )
-            ),
+            price: String(price.toFixed(2)),
+            discount_percent: String(itemDiscPct.toFixed(2)),
+            discount_amount: String(itemDiscAmount.toFixed(2)),
+            line_total: String(lineTotal.toFixed(2)),
           };
         }),
       };
@@ -1061,80 +1118,96 @@ const CreateSaleDocument = () => {
         }
       }
 
-      // Получаем данные компании и контрагента
-      const selectedCounterparty = filteredCounterparties.find(
-        (c) => c.id === clientId
+      // Формируем данные для печати из ответа сервера (createdDocument)
+      const doc = createdDocument;
+      const docDiscountPercent = Number(doc.discount_percent || 0);
+      const docDiscountAmount = Number(doc.discount_amount || 0);
+
+      const items = Array.isArray(doc.items)
+        ? doc.items.map((item) => {
+            const price = Number(item.price || 0);
+            const qty = Number(item.qty || 0);
+            const lineTotal = price * qty;
+            return {
+              id: item.id,
+              name:
+                item.product_name ??
+                item.product?.name ??
+                item.name ??
+                item.product?.title ??
+                "Товар",
+              qty: String(qty),
+              unit_price: String(price.toFixed(2)),
+              total: String(
+                Number(item.line_total ?? item.total ?? lineTotal).toFixed(2)
+              ),
+              unit: item.product?.unit ?? item.unit ?? "ШТ",
+              article:
+                String(
+                  item.product?.article ??
+                    item.article ??
+                    item.product_article ??
+                    ""
+                ).trim() || "",
+              discount_percent: Number(item.discount_percent || 0),
+              discount_amount: Number(item.discount_amount || 0),
+              price_before_discount: String(price.toFixed(2)),
+            };
+          })
+        : [];
+
+      const subtotal = items.reduce(
+        (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
+        0
       );
-      const warehouseName = warehouse
-        ? warehouses.find((w) => w.id === warehouse)?.name ||
-          cashBoxes?.find((b) => b.id === warehouse)?.name ||
-          warehouse
-        : null;
-      const warehouseToName = warehouseTo
-        ? warehouses.find((w) => w.id === warehouseTo)?.name ||
-          cashBoxes?.find((b) => b.id === warehouseTo)?.name ||
-          warehouseTo
-        : null;
+      const itemsDiscountTotal = items.reduce(
+        (sum, item) =>
+          sum +
+          (Number(item.unit_price) *
+            Number(item.qty) *
+            Number(item.discount_percent || 0)) /
+            100,
+        0
+      );
+      const totalDiscount = itemsDiscountTotal + docDiscountAmount;
+      const total = Number(doc.total) || subtotal - totalDiscount;
 
-      // Получаем скидку по документу
-      const discountPercent = Number(documentDiscount) || 0;
-
-      // Формируем данные для PDF из текущей корзины
-      const items = cartItems.map((item, idx) => {
-        const itemName = item.productName || item.name || "Товар";
-        const itemPrice = Number(item.price || item.unit_price || 0);
-        const itemQty = Number(item.quantity || 1);
-        const itemDiscount = Number(
-          item.discount_percent || item.discount || 0
-        );
-        const itemSubtotal = itemPrice * itemQty;
-
-        // Скидка по позиции
-        const itemDiscountAmount = (itemSubtotal * itemDiscount) / 100;
-        const itemSubtotalAfterItemDiscount = itemSubtotal - itemDiscountAmount;
-
-        // Применяем скидку по документу к товару после скидки по позиции
-        // Скидка по документу применяется пропорционально к каждому товару
-        const documentDiscountAmount =
-          (itemSubtotalAfterItemDiscount * discountPercent) / 100;
-        const itemTotal =
-          itemSubtotalAfterItemDiscount - documentDiscountAmount;
-
-        return {
-          id: item.id || idx,
-          name: itemName,
-          qty: String(itemQty),
-          unit_price: String(itemPrice.toFixed(2)),
-          total: String(itemTotal.toFixed(2)),
-          unit: item.unit || "ШТ",
-          article: item.article || "",
-          discount_percent: itemDiscount,
-          price_before_discount: String(itemPrice.toFixed(2)), // Цена без скидки (исходная цена товара)
-        };
-      });
-
-      // Используем данные из созданного документа
       const docNumber =
-        createdDocument.number || documentId.substring(0, 8) || "00001";
-      const currentDate =
-        createdDocument.date || documentDateValue
-          ? new Date(createdDocument.date || documentDateValue)
-          : new Date();
+        doc.number || documentId.substring(0, 8) || "00001";
+      const currentDate = doc.date
+        ? new Date(doc.date)
+        : new Date(documentDateValue || undefined);
+      const warehouseName =
+        doc.warehouse_from_name ??
+        warehouses.find((w) => w.id === doc.warehouse_from)?.name ??
+        doc.warehouse_from;
+      const warehouseToName =
+        doc.warehouse_to_name ??
+        (doc.warehouse_to
+          ? warehouses.find((w) => w.id === doc.warehouse_to)?.name
+          : null) ??
+        null;
+      const selectedCounterparty = filteredCounterparties.find(
+        (c) => c.id === (doc.counterparty || clientId)
+      );
+      const buyerName =
+        doc.counterparty_display_name ?? selectedCounterparty?.name ?? "";
 
       if (printType === "invoice") {
-        // Формируем данные для накладной
         const invoiceData = {
-          doc_type: docType, // Передаем тип документа
+          doc_type: doc.doc_type || docType,
           document: {
             type: "sale_invoice",
-            doc_type: docType,
+            doc_type: doc.doc_type || docType,
             title: "Накладная",
-            id: createdDocument.id || documentId,
+            id: doc.id,
             number: docNumber,
             date: currentDate.toISOString().split("T")[0],
-            datetime: currentDate.toISOString(),
-            created_at: createdDocument.created_at || currentDate.toISOString(),
-            discount_percent: discountPercent, // Передаем скидку по документу
+            datetime: doc.date || currentDate.toISOString(),
+            created_at: doc.created_at || currentDate.toISOString(),
+            discount_percent: docDiscountPercent,
+            discount_amount: docDiscountAmount,
+            discount_total: docDiscountAmount,
           },
           seller: {
             id: company?.id || "",
@@ -1150,7 +1223,7 @@ const CreateSaleDocument = () => {
           buyer: selectedCounterparty
             ? {
                 id: selectedCounterparty.id,
-                name: selectedCounterparty.name || "",
+                name: selectedCounterparty.name || buyerName || "",
                 inn: selectedCounterparty.inn || "",
                 okpo: selectedCounterparty.okpo || "",
                 score: selectedCounterparty.score || "",
@@ -1159,16 +1232,28 @@ const CreateSaleDocument = () => {
                 phone: selectedCounterparty.phone || null,
                 email: selectedCounterparty.email || null,
               }
-            : null,
-          items: items,
+            : buyerName
+              ? {
+                  id: "",
+                  name: buyerName,
+                  inn: "",
+                  okpo: "",
+                  score: "",
+                  bik: "",
+                  address: "",
+                  phone: null,
+                  email: null,
+                }
+              : null,
+          items,
           totals: {
-            subtotal: String(totals.subtotal.toFixed(2)),
-            discount_total: String(totals.totalDiscount.toFixed(2)),
+            subtotal: String(subtotal.toFixed(2)),
+            discount_total: String(totalDiscount.toFixed(2)),
             tax_total: "0.00",
-            total: String(totals.total.toFixed(2)),
+            total: String(total.toFixed(2)),
           },
           warehouse: warehouseName,
-          warehouse_to: warehouseToName, // Склад получатель для TRANSFER
+          warehouse_to: warehouseToName,
         };
 
         // Генерируем PDF накладной
@@ -1177,16 +1262,15 @@ const CreateSaleDocument = () => {
         ).toBlob();
         downloadBlob(blob, `invoice_${docNumber}.pdf`);
       } else if (printType === "receipt") {
-        // Формируем данные для чека
         const receiptData = {
           document: {
             type: "receipt",
             title: "Товарный чек",
-            id: createdDocument.id || documentId,
+            id: doc.id,
             number: docNumber,
             doc_no: docNumber,
             date: currentDate.toISOString().split("T")[0],
-            created_at: createdDocument.created_at || currentDate.toISOString(),
+            created_at: doc.created_at || currentDate.toISOString(),
           },
           company: {
             id: company?.id || "",
@@ -1201,21 +1285,24 @@ const CreateSaleDocument = () => {
           client: selectedCounterparty
             ? {
                 id: selectedCounterparty.id,
-                full_name: selectedCounterparty.name || "",
+                full_name: selectedCounterparty.name || buyerName || "",
               }
-            : null,
-          items: items,
+            : buyerName
+              ? { id: "", full_name: buyerName }
+              : null,
+          items,
           totals: {
-            subtotal: String(totals.subtotal.toFixed(2)),
-            discount_total: String(totals.totalDiscount.toFixed(2)),
+            subtotal: String(subtotal.toFixed(2)),
+            discount_total: String(totalDiscount.toFixed(2)),
             tax_total: "0.00",
-            total: String(totals.total.toFixed(2)),
+            total: String(total.toFixed(2)),
           },
           payment: {
-            method: "cash",
-            cash_received: String(totals.total.toFixed(2)),
+            method: paymentKind,
+            cash_received: String(total.toFixed(2)),
             change: "0.00",
-            paid_at: currentDate.toISOString(),
+            paid_at: doc.date || currentDate.toISOString(),
+            is_credit: paymentKind === "credit",
           },
           warehouse: warehouseName,
         };
@@ -1465,6 +1552,30 @@ const CreateSaleDocument = () => {
                   />
                   <span>Документ проведён</span>
                 </label>
+                {isPaymentKindRelevant && (
+                  <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
+                    <label className="create-sale-document__payment-option">
+                      <input
+                        type="radio"
+                        name="payment_kind"
+                        value="cash"
+                        checked={paymentKind === "cash"}
+                        onChange={() => setPaymentKind("cash")}
+                      />
+                      <span>Сразу</span>
+                    </label>
+                    <label className="create-sale-document__payment-option">
+                      <input
+                        type="radio"
+                        name="payment_kind"
+                        value="credit"
+                        checked={paymentKind === "credit"}
+                        onChange={() => setPaymentKind("credit")}
+                      />
+                      <span>В долг</span>
+                    </label>
+                  </div>
+                )}
               </div>
               <input
                 ref={dateInputRef}

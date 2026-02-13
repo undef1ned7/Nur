@@ -369,19 +369,25 @@ export default function InvoicePdfDocument({ data }) {
   const isInventory = docType === "INVENTORY";
   const isTransfer = docType === "TRANSFER";
 
-  // Скидка на уровне документа (может быть в процентах или абсолютном значении)
+  // Скидка на уровне документа (процент 0–100 или сумма в валюте)
+  const docPercent = Number(doc.discount_percent);
+  const hasExplicitPercent =
+    !Number.isNaN(docPercent) && docPercent >= 0 && docPercent <= 100;
   const documentDiscount = Number(
     doc.order_discount_total ??
     doc.discount_total ??
+    doc.discount_amount ??
     doc.discount_percent ??
     data.order_discount_total ??
     0
   );
 
-  // Вычисляем процент скидки документа, если он не указан напрямую
   let documentDiscountPercent = 0;
-  if (documentDiscount > 0 && subtotal > 0) {
-    // Если скидка больше 100, считаем её абсолютным значением
+  if (hasExplicitPercent) {
+    // Явно передан процент (например 10%) — используем его
+    documentDiscountPercent = docPercent;
+  } else if (documentDiscount > 0 && subtotal > 0) {
+    // Иначе выводим процент из суммы: если число > 100, считаем суммой в валюте
     if (documentDiscount > 100) {
       documentDiscountPercent = (documentDiscount / subtotal) * 100;
     } else {

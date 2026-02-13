@@ -83,6 +83,8 @@ const Analytics = () => {
     // Cashboxes filters (используются те же что и sales)
     // Shifts filters
     status: "",
+    // Common
+    limit: "",
   });
 
   const currentDate = new Date();
@@ -112,13 +114,16 @@ const Analytics = () => {
   };
 
   // Маппинг внутренних названий вкладок на названия для API
-  // API поддерживает: sales|stock|cashboxes|shifts
+  // API поддерживает: sales|stock|cashboxes|shifts|products|users|finance
   const mapTabToAPI = (tab) => {
     const tabMap = {
       sales: "sales",
       warehouse: "stock", // "warehouse" -> "stock" для API
       cashiers: "cashboxes", // "cashiers" -> "cashboxes" для API
       shifts: "shifts",
+       products: "products",
+       users: "users",
+       finance: "finance",
     };
     return tabMap[tab] || "sales";
   };
@@ -133,8 +138,8 @@ const Analytics = () => {
         const apiTab = mapTabToAPI(tab);
         const params = {
           tab: apiTab,
-          date_from: formatDateForAPI(period.from, false),
-          date_to: formatDateForAPI(period.to, false),
+          period_start: formatDateForAPI(period.from, false),
+          period_end: formatDateForAPI(period.to, false),
         };
 
         // Добавляем branch и include_global если branch выбран
@@ -143,6 +148,10 @@ const Analytics = () => {
           if (filters.include_global) {
             params.include_global = "1";
           }
+        }
+
+        if (filters.limit) {
+          params.limit = filters.limit;
         }
 
         // Добавляем фильтры в зависимости от вкладки
@@ -201,6 +210,7 @@ const Analytics = () => {
       kind: "",
       low_only: false,
       status: "",
+      limit: "",
     });
   };
 
@@ -286,12 +296,22 @@ const Analytics = () => {
         },
         topProducts: [],
         documents: [],
+        paymentMethods: {
+          labels: [],
+          data: [],
+        },
       };
     }
 
     const cards = analyticsData.cards || {};
     const charts = analyticsData.charts || {};
     const tables = analyticsData.tables || {};
+
+    const paymentMethodLabels = {
+      cash: "Наличные",
+      card: "Карта",
+      transfer: "Перевод",
+    };
 
     return {
       kpis: [
@@ -367,6 +387,16 @@ const Analytics = () => {
           amount: parseFloat(doc.sum || 0),
           warehouse: doc.stock ? parseFloat(doc.stock) : 0,
         })) || [],
+      paymentMethods: {
+        labels:
+          charts.payment_methods?.map(
+            (item) => paymentMethodLabels[item.method] || item.method
+          ) || [],
+        data:
+          charts.payment_methods?.map((item) =>
+            parseFloat(item.total || item.count || 0)
+          ) || [],
+      },
     };
   }, [analyticsData, activeTab]);
 
@@ -437,7 +467,7 @@ const Analytics = () => {
         {
           title: "Всего товаров",
           value: formatNumber(cards.total_products || 0),
-          subtitle: `В ${cards.categories || 0} категориях`,
+          subtitle: `В ${cards.categories_count || cards.categories || 0} категориях`,
           icon: Package,
           color: "#f7d617",
         },
@@ -469,9 +499,13 @@ const Analytics = () => {
       },
       movementChart: {
         labels:
-          charts.movement_units?.map((item) => formatDateForChart(item.date)) ||
-          [],
-        data: charts.movement_units?.map((item) => item.units || 0) || [],
+          (charts.movement_units || charts.movement || []).map((item) =>
+            formatDateForChart(item.date)
+          ) || [],
+        data:
+          (charts.movement_units || charts.movement || []).map(
+            (item) => item.units || 0
+          ) || [],
       },
       lowStock:
         tables.low_stock?.map((item) => ({
@@ -749,6 +783,212 @@ const Analytics = () => {
     };
   }, [analyticsData, activeTab]);
 
+  // Данные для вкладки "Товары"
+  const productsData = useMemo(() => {
+    if (!analyticsData || activeTab !== "products") {
+      return {
+        kpis: [
+          {
+            title: "Стоимость остатков",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+          {
+            title: "Товаров с низким остатком",
+            value: "0",
+            icon: Package,
+            color: "#f7d617",
+          },
+        ],
+        topByRevenue: [],
+        topByQuantity: [],
+        categories: [],
+        brands: [],
+        lowStockProducts: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const tables = analyticsData.tables || {};
+
+    return {
+      kpis: [
+        {
+          title: "Стоимость остатков",
+          value: formatNumber(cards.stock_value || "0"),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Товаров с низким остатком",
+          value: formatNumber(cards.low_stock_count || 0),
+          icon: Package,
+          color: "#f7d617",
+        },
+      ],
+      topByRevenue: tables.top_by_revenue || [],
+      topByQuantity: tables.top_by_quantity || [],
+      categories: tables.categories || [],
+      brands: tables.brands || [],
+      lowStockProducts: tables.low_stock_products || [],
+    };
+  }, [analyticsData, activeTab]);
+
+  // Данные для вкладки "Сотрудники"
+  const usersData = useMemo(() => {
+    if (!analyticsData || activeTab !== "users") {
+      return {
+        kpis: [
+          {
+            title: "Всего смен",
+            value: "0",
+            icon: Calendar,
+            color: "#f7d617",
+          },
+          {
+            title: "Закрытых смен",
+            value: "0",
+            icon: Calendar,
+            color: "#f7d617",
+          },
+          {
+            title: "Открытых смен",
+            value: "0",
+            icon: Calendar,
+            color: "#f7d617",
+          },
+          {
+            title: "Расхождений в кассах",
+            value: "0",
+            icon: HelpCircle,
+            color: "#f7d617",
+          },
+        ],
+        usersPerformance: [],
+        shiftDiscrepancies: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const tables = analyticsData.tables || {};
+
+    return {
+      kpis: [
+        {
+          title: "Всего смен",
+          value: formatNumber(cards.total || 0),
+          icon: Calendar,
+          color: "#f7d617",
+        },
+        {
+          title: "Закрытых смен",
+          value: formatNumber(cards.closed || 0),
+          icon: Calendar,
+          color: "#f7d617",
+        },
+        {
+          title: "Открытых смен",
+          value: formatNumber(cards.open || 0),
+          icon: Calendar,
+          color: "#f7d617",
+        },
+        {
+          title: "Расхождений в кассах",
+          value: formatNumber(cards.discrepancies_count || 0),
+          icon: HelpCircle,
+          color: "#f7d617",
+        },
+      ],
+      usersPerformance: tables.users_performance || [],
+      shiftDiscrepancies: tables.shift_discrepancies || [],
+    };
+  }, [analyticsData, activeTab]);
+
+  // Данные для вкладки "Финансы"
+  const financeData = useMemo(() => {
+    if (!analyticsData || activeTab !== "finance") {
+      return {
+        kpis: [
+          {
+            title: "Доходы",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+          {
+            title: "Расходы",
+            value: "0",
+            currency: "сом",
+            icon: DollarSign,
+            color: "#f7d617",
+          },
+          {
+            title: "Чистый поток",
+            value: "0",
+            currency: "сом",
+            icon: TrendingUp,
+            color: "#f7d617",
+          },
+          {
+            title: "Операций",
+            value: "0",
+            icon: BarChart3,
+            color: "#f7d617",
+          },
+        ],
+        expenseBreakdown: [],
+        incomeBreakdown: [],
+        expenseItems: [],
+        incomeItems: [],
+      };
+    }
+
+    const cards = analyticsData.cards || {};
+    const tables = analyticsData.tables || {};
+
+    return {
+      kpis: [
+        {
+          title: "Доходы",
+          value: formatNumber(cards.income_total || "0"),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Расходы",
+          value: formatNumber(cards.expense_total || "0"),
+          currency: "сом",
+          icon: DollarSign,
+          color: "#f7d617",
+        },
+        {
+          title: "Чистый поток",
+          value: formatNumber(cards.net_flow || "0"),
+          currency: "сом",
+          icon: TrendingUp,
+          color: "#f7d617",
+        },
+        {
+          title: "Операций",
+          value: formatNumber(
+            (cards.income_count || 0) + (cards.expense_count || 0)
+          ),
+          icon: BarChart3,
+          color: "#f7d617",
+        },
+      ],
+      expenseBreakdown: tables.expense_breakdown || [],
+      incomeBreakdown: tables.income_breakdown || [],
+      expenseItems: tables.expense_items || [],
+      incomeItems: tables.income_items || [],
+    };
+  }, [analyticsData, activeTab]);
+
   const formatCurrency = (num, decimals = 2) => {
     if (typeof num === "string") {
       num = parseFloat(num);
@@ -935,6 +1175,22 @@ const Analytics = () => {
               </>
             )}
 
+            {/* Лимит записей для детальных вкладок */}
+            {(activeTab === "products" ||
+              activeTab === "users" ||
+              activeTab === "finance") && (
+              <div className="analytics-page__filter-group">
+                <label>Лимит записей</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={filters.limit}
+                  onChange={(e) => updateFilter("limit", e.target.value)}
+                  placeholder="Без лимита"
+                />
+              </div>
+            )}
+
             {/* Фильтры для Shifts */}
             {activeTab === "shifts" && (
               <>
@@ -1020,6 +1276,30 @@ const Analytics = () => {
           onClick={() => setActiveTab("shifts")}
         >
           Смены
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "products" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("products")}
+        >
+          Товары
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "users" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("users")}
+        >
+          Сотрудники
+        </button>
+        <button
+          className={`analytics-page__tab ${
+            activeTab === "finance" ? "analytics-page__tab--active" : ""
+          }`}
+          onClick={() => setActiveTab("finance")}
+        >
+          Финансы
         </button>
       </div>
 
@@ -1109,6 +1389,34 @@ const Analytics = () => {
               }}
             />
           </div>
+
+          {salesData.paymentMethods.labels.length > 0 && (
+            <div className="analytics-page__chart-card">
+              <h3 className="analytics-page__chart-title">
+                Продажи по способам оплаты
+              </h3>
+              <Doughnut
+                data={{
+                  labels: salesData.paymentMethods.labels,
+                  datasets: [
+                    {
+                      data: salesData.paymentMethods.data,
+                      backgroundColor: ["#f7d617", "#f59e0b", "#10b981"],
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: "bottom",
+                    },
+                  },
+                }}
+              />
+            </div>
+          )}
 
           <div className="analytics-page__grid">
             <div className="analytics-page__table-card">
@@ -1653,6 +1961,512 @@ const Analytics = () => {
                       <td>{formatNumber(cashier.avgCheck)} сом</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Вкладка Товары */}
+      {activeTab === "products" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {productsData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Топ по выручке
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th>Категория</th>
+                    <th>Бренд</th>
+                    <th>Продано</th>
+                    <th>Выручка</th>
+                    <th>Транзакций</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productsData.topByRevenue.length > 0 ? (
+                    productsData.topByRevenue.map((row) => (
+                      <tr key={row.product_id}>
+                        <td>{row.name}</td>
+                        <td>{row.category}</td>
+                        <td>{row.brand}</td>
+                        <td>{row.qty_sold}</td>
+                        <td>{formatCurrency(row.revenue, 0)}</td>
+                        <td>{row.transactions}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Топ по количеству
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Товар</th>
+                    <th>Продано</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productsData.topByQuantity.length > 0 ? (
+                    productsData.topByQuantity.map((row) => (
+                      <tr key={row.product_id}>
+                        <td>{row.name}</td>
+                        <td>{row.qty_sold}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={2}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Категории</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Категория</th>
+                    <th>Выручка</th>
+                    <th>Количество</th>
+                    <th>Товаров</th>
+                    <th>Транзакций</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productsData.categories.length > 0 ? (
+                    productsData.categories.map((row) => (
+                      <tr key={row.category_id}>
+                        <td>{row.category}</td>
+                        <td>{formatCurrency(row.revenue, 0)}</td>
+                        <td>{row.qty_sold}</td>
+                        <td>{row.products_count}</td>
+                        <td>{row.transactions}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Бренды</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Бренд</th>
+                    <th>Товаров</th>
+                    <th>Выручка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productsData.brands.length > 0 ? (
+                    productsData.brands.map((row) => (
+                      <tr key={row.brand_id}>
+                        <td>{row.brand}</td>
+                        <td>{row.products_count}</td>
+                        <td>{formatCurrency(row.revenue, 0)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="analytics-page__table-card">
+            <h3 className="analytics-page__table-title">
+              Товары с низким остатком
+            </h3>
+            <table className="analytics-page__table">
+              <thead>
+                <tr>
+                  <th>Код</th>
+                  <th>Товар</th>
+                  <th>Количество</th>
+                  <th>Цена</th>
+                  <th>Закупочная</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productsData.lowStockProducts.length > 0 ? (
+                  productsData.lowStockProducts.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.code}</td>
+                      <td>{row.name}</td>
+                      <td>{row.quantity}</td>
+                      <td>{formatCurrency(row.price, 0)}</td>
+                      <td>{formatCurrency(row.purchase_price, 0)}</td>
+                      <td>{row.status}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      style={{ textAlign: "center", color: "#6b7280" }}
+                    >
+                      Нет данных
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Вкладка Сотрудники */}
+      {activeTab === "users" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {usersData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Эффективность сотрудников
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Сотрудник</th>
+                    <th>Email</th>
+                    <th>Телефон</th>
+                    <th>Выручка</th>
+                    <th>Транзакций</th>
+                    <th>Средний чек</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersData.usersPerformance.length > 0 ? (
+                    usersData.usersPerformance.map((row) => (
+                      <tr key={row.user_id}>
+                        <td>{row.user}</td>
+                        <td>{row.email}</td>
+                        <td>{row.phone}</td>
+                        <td>{formatCurrency(row.revenue, 0)}</td>
+                        <td>{row.transactions}</td>
+                        <td>{formatCurrency(row.avg_check, 0)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">
+                Расхождения по сменам
+              </h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Кассир</th>
+                    <th>Касса</th>
+                    <th>Открыта</th>
+                    <th>Закрыта</th>
+                    <th>Ожидалось</th>
+                    <th>Фактически</th>
+                    <th>Разница</th>
+                    <th>Тип</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersData.shiftDiscrepancies.length > 0 ? (
+                    usersData.shiftDiscrepancies.map((row) => (
+                      <tr key={row.shift_id}>
+                        <td>{row.cashier}</td>
+                        <td>{row.cashbox}</td>
+                        <td>{row.opened_at}</td>
+                        <td>{row.closed_at}</td>
+                        <td>{formatCurrency(row.expected_cash, 0)}</td>
+                        <td>{formatCurrency(row.closing_cash, 0)}</td>
+                        <td>{formatCurrency(row.diff, 0)}</td>
+                        <td>{row.type}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Вкладка Финансы */}
+      {activeTab === "finance" && !loading && !error && (
+        <div className="analytics-page__content">
+          <div className="analytics-page__kpis">
+            {financeData.kpis.map((kpi, index) => {
+              const Icon = kpi.icon;
+              return (
+                <div key={index} className="analytics-page__kpi-card">
+                  <div className="analytics-page__kpi-header">
+                    <span className="analytics-page__kpi-title">
+                      {kpi.title}
+                    </span>
+                    <Icon size={24} style={{ color: kpi.color }} />
+                  </div>
+                  <div className="analytics-page__kpi-value">
+                    {kpi.currency && (
+                      <span className="analytics-page__kpi-currency">
+                        {kpi.currency}
+                      </span>
+                    )}
+                    {kpi.value}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Статьи расходов</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Статья</th>
+                    <th>Сумма</th>
+                    <th>Операций</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeData.expenseBreakdown.length > 0 ? (
+                    financeData.expenseBreakdown.map((row, idx) => (
+                      <tr key={`${row.name}-${idx}`}>
+                        <td>{row.name}</td>
+                        <td>{formatCurrency(row.total, 0)}</td>
+                        <td>{row.count}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Источники дохода</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Статья</th>
+                    <th>Сумма</th>
+                    <th>Операций</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeData.incomeBreakdown.length > 0 ? (
+                    financeData.incomeBreakdown.map((row, idx) => (
+                      <tr key={`${row.name}-${idx}`}>
+                        <td>{row.name}</td>
+                        <td>{formatCurrency(row.total, 0)}</td>
+                        <td>{row.count}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="analytics-page__grid">
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Расходы</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Название</th>
+                    <th>Сумма</th>
+                    <th>Касса</th>
+                    <th>Дата</th>
+                    <th>Создал</th>
+                    <th>Комментарий</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeData.expenseItems.length > 0 ? (
+                    financeData.expenseItems.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.name}</td>
+                        <td>{formatCurrency(row.amount, 0)}</td>
+                        <td>{row.cashbox}</td>
+                        <td>{row.created_at}</td>
+                        <td>{row.created_by}</td>
+                        <td>{row.description}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="analytics-page__table-card">
+              <h3 className="analytics-page__table-title">Доходы</h3>
+              <table className="analytics-page__table">
+                <thead>
+                  <tr>
+                    <th>Название</th>
+                    <th>Сумма</th>
+                    <th>Дата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {financeData.incomeItems.length > 0 ? (
+                    financeData.incomeItems.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.name}</td>
+                        <td>{formatCurrency(row.amount, 0)}</td>
+                        <td>{row.created_at}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        style={{ textAlign: "center", color: "#6b7280" }}
+                      >
+                        Нет данных
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
