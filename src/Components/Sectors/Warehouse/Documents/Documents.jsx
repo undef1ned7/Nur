@@ -135,6 +135,8 @@ const Documents = () => {
         "Без клиента",
       products: doc.items?.length || 0,
       amount: doc.total || "0.00",
+      discount_percent: doc.discount_percent ?? null,
+      discount_amount: doc.discount_amount ?? null,
       status: doc.status === "POSTED" ? "Проведен" : "Черновик",
       statusType: doc.status === "POSTED" ? "approved" : "draft",
       document: doc, // Сохраняем полный объект документа
@@ -160,6 +162,8 @@ const Documents = () => {
         "Без контрагента",
       positions: doc.items?.length || 0,
       amount: doc.total || "0.00",
+      discount_percent: doc.discount_percent ?? null,
+      discount_amount: doc.discount_amount ?? null,
       status: doc.status === "POSTED" ? "Проведен" : "Черновик",
       statusType: doc.status === "POSTED" ? "approved" : "draft",
       document: doc, // Сохраняем полный объект документа
@@ -351,31 +355,48 @@ const Documents = () => {
               email: doc.counterparty.email || null,
             }
             : null;
+          const docDiscountPercent = Number(doc.discount_percent || 0);
+          const docDiscountAmount = Number(doc.discount_amount || 0);
+
           const items = Array.isArray(doc.items)
-            ? doc.items.map((item) => ({
-              id: item.id,
-              name: item.product?.name || item.name || "Товар",
-              qty: String(item.qty || 0),
-              unit_price: String(Number(item.price || 0).toFixed(2)),
-              total: String(Number(item.total || item.qty * item.price || 0).toFixed(2)),
-              unit: item.product?.unit || item.unit || "ШТ",
-              article: item.product?.article || item.article || "",
-              discount_percent: Number(item.discount_percent || 0),
-              price_before_discount: String(Number(item.price || 0).toFixed(2)),
-            }))
+            ? doc.items.map((item) => {
+              const price = Number(item.price || 0);
+              const qty = Number(item.qty || 0);
+              // Сумма по строке = цена × кол-во (как на накладной из CreateSaleDocument), не используем line_total с бэка
+              const lineTotal = price * qty;
+              return {
+                id: item.id,
+                name:
+                  item.product_name ??
+                  item.product?.name ??
+                  item.name ??
+                  item.product?.title ??
+                  "Товар",
+                qty: String(qty),
+                unit_price: String(price.toFixed(2)),
+                total: String(lineTotal.toFixed(2)),
+                unit: item.product?.unit ?? item.unit ?? "ШТ",
+                article:
+                  String(item.product?.article ?? item.article ?? item.product_article ?? "").trim() || "",
+                discount_percent: Number(item.discount_percent || 0),
+                discount_amount: Number(item.discount_amount || 0),
+                price_before_discount: String(price.toFixed(2)),
+              };
+            })
             : [];
           const subtotal = items.reduce(
             (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
             0
           );
-          const discountTotal = items.reduce(
+          const itemsDiscountTotal = items.reduce(
             (sum, item) =>
               sum +
               (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
               100,
             0
           );
-          const total = subtotal - discountTotal;
+          const totalDiscount = itemsDiscountTotal + docDiscountAmount;
+          const total = Number(doc.total) || subtotal - totalDiscount;
           const warehouseName = doc.warehouse_from?.name || doc.warehouse?.name || "";
           const warehouseToName = doc.warehouse_to?.name || "";
 
@@ -390,14 +411,16 @@ const Documents = () => {
               date: doc.date || doc.created_at?.split("T")[0] || "",
               datetime: doc.created_at || doc.date || "",
               created_at: doc.created_at || "",
-              discount_percent: 0,
+              discount_percent: docDiscountPercent,
+              discount_amount: docDiscountAmount,
+              discount_total: docDiscountAmount,
             },
             seller,
             buyer,
             items,
             totals: {
               subtotal: String(subtotal.toFixed(2)),
-              discount_total: String(discountTotal.toFixed(2)),
+              discount_total: String(totalDiscount.toFixed(2)),
               tax_total: "0.00",
               total: String(total.toFixed(2)),
             },
@@ -581,6 +604,7 @@ const Documents = () => {
                       <th>Контрагент</th>
                       <th>Товаров</th>
                       <th>Сумма</th>
+                      <th>Скидка</th>
                       <th>Статус</th>
                       <th>Действия</th>
                     </>
@@ -592,6 +616,7 @@ const Documents = () => {
                       <th>Контрагент</th>
                       <th>Позиций</th>
                       <th>Сумма</th>
+                      <th>Скидка</th>
                       <th>Статус</th>
                       <th>Действия</th>
                     </>
@@ -601,13 +626,13 @@ const Documents = () => {
               <tbody>
                 {documentsLoading ? (
                   <tr>
-                    <td colSpan={7} className="documents__empty">
+                    <td colSpan={8} className="documents__empty">
                       Загрузка...
                     </td>
                   </tr>
                 ) : getCurrentData().length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="documents__empty">
+                    <td colSpan={8} className="documents__empty">
                       Документы не найдены
                     </td>
                   </tr>
@@ -621,6 +646,11 @@ const Documents = () => {
                           <td>{item.client}</td>
                           <td>{item.products}</td>
                           <td>{formatAmount(item.amount)} сом</td>
+                          <td>
+                            {item.discount_amount != null && Number(item.discount_amount) !== 0
+                              ? `${formatAmount(item.discount_amount)} сом${item.discount_percent != null && Number(item.discount_percent) !== 0 ? ` (${item.discount_percent}%)` : ""}`
+                              : "—"}
+                          </td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -679,6 +709,11 @@ const Documents = () => {
                           <td>{item.counterparty}</td>
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
+                          <td>
+                            {item.discount_amount != null && Number(item.discount_amount) !== 0
+                              ? `${formatAmount(item.discount_amount)} сом${item.discount_percent != null && Number(item.discount_percent) !== 0 ? ` (${item.discount_percent}%)` : ""}`
+                              : "—"}
+                          </td>
                           <td>
                             <span
                               className={`documents__status documents__status--${item.statusType}`}
@@ -783,6 +818,17 @@ const Documents = () => {
                         {formatAmount(item.amount)} сом
                       </span>
                     </div>
+                    {item.discount_amount != null && Number(item.discount_amount) !== 0 && (
+                      <div className="documents__card-row documents__card-row--discount">
+                        <span className="documents__card-label">Скидка</span>
+                        <span className="documents__card-value">
+                          {formatAmount(item.discount_amount)} сом
+                          {item.discount_percent != null && Number(item.discount_percent) !== 0
+                            ? ` (${item.discount_percent}%)`
+                            : ""}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="documents__card-actions">
                     <button

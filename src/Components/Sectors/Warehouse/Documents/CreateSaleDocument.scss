@@ -642,6 +642,38 @@ $due-red: #dc2626;
     }
   }
 
+  &__payment-kind {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+
+    &--header {
+      margin-top: 0;
+      align-items: center;
+    }
+  }
+
+  &__payment-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #475569;
+
+    input {
+      accent-color: $primary-dark;
+    }
+  }
+
+  &__payment-hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
   &__content-grid {
     display: grid;
     grid-template-columns: 1fr 320px;

@@ -58,19 +58,34 @@ const InvoicePreviewModal = ({
         }
       : null;
 
-    // Преобразуем товары
+    const docDiscountPercent = Number(doc.discount_percent || 0);
+    const docDiscountAmount = Number(doc.discount_amount || 0);
+
+    // Преобразуем товары (та же логика, что при скачивании из Documents.jsx)
     const items = Array.isArray(doc.items)
-      ? doc.items.map((item) => ({
-          id: item.id,
-          name: item.product?.name || item.name || "Товар",
-          qty: String(item.qty || item.quantity || 0),
-          unit_price: String(Number(item.price || 0).toFixed(2)),
-          total: String(Number(item.total || item.qty * item.price || 0).toFixed(2)),
-          unit: item.product?.unit || item.unit || "ШТ",
-          article: item.product?.article || item.article || "",
-          discount_percent: Number(item.discount_percent || 0),
-          price_before_discount: String(Number(item.price || 0).toFixed(2)),
-        }))
+      ? doc.items.map((item) => {
+          const price = Number(item.price || 0);
+          const qty = Number(item.qty || item.quantity || 0);
+          const lineTotal = price * qty;
+          return {
+            id: item.id,
+            name:
+              item.product_name ??
+              item.product?.name ??
+              item.name ??
+              item.product?.title ??
+              "Товар",
+            qty: String(qty),
+            unit_price: String(price.toFixed(2)),
+            total: String(lineTotal.toFixed(2)),
+            unit: item.product?.unit ?? item.unit ?? "ШТ",
+            article:
+              String(item.product?.article ?? item.article ?? item.product_article ?? "").trim() || "",
+            discount_percent: Number(item.discount_percent || 0),
+            discount_amount: Number(item.discount_amount || 0),
+            price_before_discount: String(price.toFixed(2)),
+          };
+        })
       : [];
 
     // Вычисляем итоги
@@ -78,14 +93,15 @@ const InvoicePreviewModal = ({
       (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
       0
     );
-    const discountTotal = items.reduce(
+    const itemsDiscountTotal = items.reduce(
       (sum, item) =>
         sum +
         (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
           100,
       0
     );
-    const total = subtotal - discountTotal;
+    const totalDiscount = itemsDiscountTotal + docDiscountAmount;
+    const total = Number(doc.total) || subtotal - totalDiscount;
 
     // Получаем название склада
     const warehouseName = doc.warehouse_from?.name || doc.warehouse?.name || "";
@@ -102,14 +118,16 @@ const InvoicePreviewModal = ({
         date: doc.date || doc.created_at?.split("T")[0] || "",
         datetime: doc.created_at || doc.date || "",
         created_at: doc.created_at || "",
-        discount_percent: 0,
+        discount_percent: docDiscountPercent,
+        discount_amount: docDiscountAmount,
+        discount_total: docDiscountAmount,
       },
       seller,
       buyer,
       items,
       totals: {
         subtotal: String(subtotal.toFixed(2)),
-        discount_total: String(discountTotal.toFixed(2)),
+        discount_total: String(totalDiscount.toFixed(2)),
         tax_total: "0.00",
         total: String(total.toFixed(2)),
       },
