@@ -1,0 +1,25 @@
+/* Доп. стили для кассы склада */
+.warehouse-kassa {
+  .kassa-header__create-btn.warehouse-kassa__btn--expense {
+    background: #fef2f2;
+    color: #b91c1c;
+    &:hover {
+      background: #fee2e2;
+    }
+  }
+  .kassa-header__create-btn.warehouse-kassa__btn--receipt {
+    background: #ecfdf5;
+    color: #047857;
+    &:hover {
+      background: #d1fae5;
+    }
+  }
+  .kassa-header__right {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  &.warehouse-kassa--detail .kassa-header {
+    flex-wrap: wrap;
+  }
+}

@@ -129,12 +129,12 @@ const MoneyDocumentsPage = () => {
 
   const title =
     docTypeParam === "receipt"
-      ? "Приход (деньги)"
+      ? "Приход в кассу"
       : docTypeParam === "expense"
-      ? "Расход (деньги)"
+      ? "Расход в кассу"
       : "Денежные документы";
   const createLabel =
-    docTypeParam === "receipt" ? "Создать приход" : "Создать расход";
+    docTypeParam === "receipt" ? "Создать приход в кассу" : "Создать расход из кассы";
 
   const load = useCallback(async () => {
     if (!apiDocType) return;
