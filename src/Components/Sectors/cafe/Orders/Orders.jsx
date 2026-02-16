@@ -100,6 +100,8 @@ const stripEmpty = (obj) =>
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const TAKEAWAY_LABEL = "С собой";
+
 const normalizeTableLabel = (raw) => {
   if (raw === null || raw === undefined) return "";
   const v = String(raw).trim();
@@ -532,6 +534,10 @@ const Orders = () => {
   const tablesMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
   const getOrderTableLabel = useCallback(
     (order) => {
+      // Если стол не выбран — считаем заказ "С собой"
+      if (order?.table === null || order?.table === undefined || order?.table === "") {
+        return TAKEAWAY_LABEL;
+      }
       const t = tablesMap.get(order?.table);
       const direct = normalizeTableLabel(
         t?.title ||
@@ -549,7 +555,7 @@ const Orders = () => {
       );
       if (fallback) return fallback;
       const raw = normalizeTableLabel(order?.table);
-      return raw || "—";
+      return raw || TAKEAWAY_LABEL;
     },
     [tablesMap]
   );
@@ -661,9 +667,10 @@ const Orders = () => {
       const cashier = fullName(userData || {});
       const items = Array.isArray(order?.items) ? order.items : [];
 
+      const isTakeaway = tableLabel === TAKEAWAY_LABEL;
       return {
         company: localStorage.getItem("company_name") || "КАССА",
-        doc_no: `СТОЛ ${tableLabel}`,
+        doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
         discount: 0,
@@ -722,10 +729,13 @@ const Orders = () => {
       const tableLabel = getOrderTableLabel(order);
       const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
       const cashier = fullName(userData || {});
+      const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
       return {
         company: localStorage.getItem("company_name") || label,
-        doc_no: `${kitchenLabel || "КУХНЯ"} • СТОЛ ${tableLabel}`,
+        doc_no: isTakeaway
+          ? `${kitchenLabel || "КУХНЯ"} • ${TAKEAWAY_LABEL}`
+          : `${kitchenLabel || "КУХНЯ"} • СТОЛ ${tableLabel}`,
         created_at: dt,
         cashier_name: cashier,
         discount: 0,
@@ -1051,7 +1061,7 @@ const Orders = () => {
 
   const saveForm = async (e) => {
     e.preventDefault();
-    if (!form.table || !form.items.length) return;
+    if (!form.items.length) return;
 
     setSaving(true);
     try {
@@ -1061,7 +1071,10 @@ const Orders = () => {
         const res = await postWithWaiterFallback("/cafe/orders/", basePayload, "post");
 
         try {
-          await api.patch(`/cafe/tables/${toId(form.table)}/`, { status: "busy" });
+          const tableId = toId(form.table);
+          if (tableId) {
+            await api.patch(`/cafe/tables/${tableId}/`, { status: "busy" });
+          }
         } catch {
           // молча
         }
@@ -1096,7 +1109,9 @@ const Orders = () => {
     if (!cashboxId) setCashboxId(firstKey);
 
     const t = tablesMap.get(order?.table);
-    const name = `Оплата стол ${t?.number ?? "—"}`;
+    const tableLabel = getOrderTableLabel(order);
+    const name =
+      tableLabel === TAKEAWAY_LABEL ? `Оплата: ${TAKEAWAY_LABEL}` : `Оплата стол ${t?.number ?? tableLabel}`;
 
     const res = await api.post("/construction/cashflows/", {
       cashbox: firstKey,
@@ -1183,13 +1198,15 @@ const Orders = () => {
 
   /* options */
   const tableOptions = useMemo(() => {
-    return (tables || [])
+    const opts = (tables || [])
       .filter((t) => !busyTableIds.has(t.id) || String(t.id) === String(form.table))
       .map((t) => ({
         value: String(t.id),
         label: `Стол ${t.number}${t.places ? ` • ${t.places} мест` : ""}`,
         search: `стол ${t.number} ${t.places || ""}`.trim(),
       }));
+    // value="" -> backend получит table=null (см. normalizeOrderPayload + toId)
+    return [{ value: "", label: TAKEAWAY_LABEL, search: "с собой собой takeaway" }, ...opts];
   }, [tables, busyTableIds, form.table]);
 
   const waiterOptions = useMemo(() => {
@@ -1256,6 +1273,7 @@ const Orders = () => {
               const tableLabel = getOrderTableLabel(o);
               const totals = calcTotals(o);
               const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
+              const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
               const items = Array.isArray(o.items) ? o.items : [];
               const expanded = expandedOrders.has(String(o.id));
@@ -1265,7 +1283,9 @@ const Orders = () => {
                 <article key={o.id} className="cafeOrders__receipt relative">
                   <SimpleStamp date={o.paid_at} className="bottom-10 left-20" type={o.status} size={'md'} />
                   <div className="cafeOrders__receiptHeader">
-                    <div className="cafeOrders__receiptTable">СТОЛ {tableLabel}</div>
+                    <div className="cafeOrders__receiptTable">
+                      {isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`}
+                    </div>
                     {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
                   </div>
 
@@ -1404,7 +1424,7 @@ const Orders = () => {
                     openId={openSelectId}
                     setOpenId={setOpenSelectId}
                     label="Стол"
-                    placeholder="— Выберите стол —"
+                    placeholder={TAKEAWAY_LABEL}
                     value={String(form.table ?? "")}
                     onChange={(val) => setForm((f) => ({ ...f, table: val }))}
                     options={tableOptions}
@@ -1632,7 +1652,7 @@ const Orders = () => {
                   <button
                     type="submit"
                     className="cafeOrders__btn cafeOrders__btn--primary"
-                    disabled={saving || !form.table || !form.items.length}
+                    disabled={saving || !form.items.length}
                   >
                     {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
                   </button>
@@ -1687,11 +1707,14 @@ const Orders = () => {
                   const dt = formatReceiptDate(payOrder?.created_at || payOrder?.date || payOrder?.created);
                   const items = Array.isArray(payOrder?.items) ? payOrder.items : [];
                   const totals = calcTotals(payOrder);
+                  const isTakeaway = tableLabel === TAKEAWAY_LABEL;
 
                   return (
                     <>
                       <div className="cafeOrdersPay__top">
-                        <div className="cafeOrdersPay__table">СТОЛ {tableLabel}</div>
+                        <div className="cafeOrdersPay__table">
+                          {isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`}
+                        </div>
                         <div className="cafeOrdersPay__date">{dt || ""}</div>
                       </div>
 

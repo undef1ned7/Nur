@@ -23,6 +23,7 @@ import {
 import api from "@/api";
 import "./PaymentPage.scss";
 import { createDebt } from "../Sell";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const PaymentPage = ({
   cart,
@@ -50,7 +51,7 @@ const PaymentPage = ({
   const [selectedBank, setSelectedBank] = useState("");
   const [receiptData, setReceiptData] = useState(null);
   const [prePayment, setPrePayment] = useState(0);
-  const [firstPaymentDate,setFirstPaymentDate] = useState('')
+  const [firstPaymentDate, setFirstPaymentDate] = useState('')
   const [printing, setPrinting] = useState(false);
   const [alertModal, setAlertModal] = useState({
     open: false,
@@ -302,22 +303,20 @@ const PaymentPage = ({
                   due_date: firstPaymentDate || dueDateString,
                   amount:
                     typeof total === "number"
-                      ? total.toFixed(2) - (prePayment || 0)
-                      : String(total) - (prePayment || 0),
+                      ? total.toFixed(2)
+                      : String(total),
                 })
               } catch (startDebtError) {
                 console.warn(
                   "Ошибка при создании долга для тарифа Старт:",
                   startDebtError
                 );
+                const errorMessage = validateResErrors(startDebtError, "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. ")
                 // Не блокируем успешную оплату, если ошибка с долгом
                 showAlert(
                   "warning",
                   "Предупреждение",
-                  "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. " +
-                  (startDebtError?.response?.data?.detail ||
-                    startDebtError?.message ||
-                    "Проверьте данные клиента.")
+                  errorMessage
                 );
                 return;
               }
@@ -332,19 +331,19 @@ const PaymentPage = ({
                   }`,
                 statusRu: "Долги",
                 prepayment: prePayment,
-                amount: total - (prePayment || 0),
+                amount: total,
                 debtMonths: typeof debtMonths === "number" ? debtMonths : 1, // Количество месяцев для рассрочки
                 first_due_date: firstPaymentDate || null, // Можно добавить поле для выбора даты
               })
             ).unwrap();
           } catch (debtError) {
             console.warn("Ошибка при создании долга:", debtError);
+            const errorMessage = validateResErrors(debtError, "Оплата оформлена, но не удалось создать запись о долге. ")
             // Не блокируем успешную оплату, если ошибка с долгом
             showAlert(
               "warning",
               "Предупреждение",
-              "Оплата оформлена, но не удалось создать запись о долге. " +
-              (debtError?.message || "Проверьте данные клиента.")
+              errorMessage
             );
           }
         }
@@ -368,8 +367,12 @@ const PaymentPage = ({
               })
             ).unwrap();
           } catch (cashError) {
-            console.warn("Ошибка при создании денежного потока:", cashError);
-            // Не блокируем успешную оплату, если ошибка с кассой
+            const errorMessage = validateResErrors(cashError, "Оплата оформлена, но не удалось создать запись о денежном потоке. ")
+            showAlert(
+              "warning",
+              "Предупреждение",
+              errorMessage
+            );
           }
         }
 
@@ -405,6 +408,7 @@ const PaymentPage = ({
               }
             }
           } catch (receiptError) {
+
             // Ошибка получения чека не блокирует продажу
             console.warn("Не удалось получить чек для печати:", receiptError);
             // Не показываем ошибку пользователю, только логируем
@@ -420,20 +424,20 @@ const PaymentPage = ({
           checkoutResponse: result.payload,
         });
       } else {
+        const errorMessage = validateResErrors(result.payload, "Ошибка при оформлении оплаты. ")
         showAlert(
           "error",
           "Ошибка",
-          "Ошибка при оформлении оплаты: " +
-          (result.payload?.message || "Неизвестная ошибка")
+          errorMessage
         );
       }
     } catch (error) {
       console.error("Ошибка при оформлении оплаты:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при оформлении оплаты. ")
       showAlert(
         "error",
         "Ошибка",
-        "Ошибка при оформлении оплаты: " +
-        (error.message || "Неизвестная ошибка")
+        errorMessage
       );
     }
   };
@@ -494,10 +498,11 @@ const PaymentPage = ({
       }
     } catch (error) {
       console.error("Ошибка при печати чека:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при печати чека. ")
       showAlert(
         "error",
         "Ошибка печати",
-        error.message || "Не удалось распечатать чек"
+        errorMessage
       );
     } finally {
       setPrinting(false);
@@ -829,7 +834,7 @@ const PaymentPage = ({
                   onChange={(e) => {
                     setFirstPaymentDate(e.target.value)
                   }}
-                
+
                 />
               </div>
               <div className="payment-page__debt-months">

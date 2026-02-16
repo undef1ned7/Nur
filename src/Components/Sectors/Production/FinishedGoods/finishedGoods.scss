@@ -36,6 +36,25 @@
   min-height: 100vh;
 }
 
+/* Link-like button to open detail page */
+.finished-goods__detailLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #111827;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.finished-goods__detailLink:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
 /* Header */
 .warehouse-header {
   display: flex;

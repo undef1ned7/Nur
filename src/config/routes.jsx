@@ -149,6 +149,7 @@ import MoneyDocumentsPage from "../Components/Sectors/Warehouse/Money/MoneyDocum
 import WarehouseAgents from "../Components/Sectors/Warehouse/Agents/Agents";
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
+import ProductionWarehouseProductDetail from "../Components/Sectors/Production/Warehouse/ProductionWarehouseProductDetail";
 import ProductionAgents from "../Components/Sectors/Production/ProductionAgents/ProductionAgents";
 import ProductionCatalog from "../Components/Sectors/Production/Catalog/ProductionCatalog";
 import ProductionRequest from "../Components/Sectors/Production/Request/ProductionRequest";
@@ -528,6 +529,10 @@ export const crmRoutes = (profile) => [
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),
+  createProtectedRoute(
+    "production/warehouse/:id",
+    ProductionWarehouseProductDetail
+  ),
   createProtectedRoute("production/analytics", ProductionAnalytics),
   createProtectedRoute("production/agents/:agentId/analytics", AgentAnalytics),
   createProtectedRoute("production/agents", ProductionAgents),

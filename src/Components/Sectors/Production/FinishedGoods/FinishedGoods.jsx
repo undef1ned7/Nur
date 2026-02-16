@@ -12,7 +12,6 @@ import { useDispatch, useSelector } from "react-redux";
 
 /* ---- Thunks / Creators ---- */
 import {
-  consumeItemsMake,
   createProductAsync,
   deleteProductAsync,
   fetchBrandsAsync,
@@ -52,6 +51,7 @@ import { useClient } from "../../../../store/slices/ClientSlice";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import { Checkbox, TextField } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { getEmployees } from "../../../../store/creators/departmentCreators";
 import { useDepartments } from "../../../../store/slices/departmentSlice";
 import MarriageModal from "../../../Deposits/Sklad/MarriageModal";
@@ -231,6 +231,15 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       return;
     }
 
+    // Поставщик: при смене/очистке сбрасываем зависимые поля долга/предоплаты
+    if (name === "client") {
+      setProduct((prev) => ({ ...prev, [name]: value }));
+      setDealStatus("");
+      setDebtMonths("");
+      setPrepayment("");
+      return;
+    }
+
     // quantity и price удобно хранить строкой (пустое значение тоже валидно)
     if (name === "quantity" || name === "price" || name === "purchase_price") {
       setProduct((prev) => ({ ...prev, [name]: value }));
@@ -392,18 +401,27 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       return false;
     }
 
-    // Долги: срок долга обязателен
-    if (dealStatus === "Долги") {
+    // Долги: срок долга обязателен (только если выбран поставщик)
+    if (product.client && dealStatus === "Долги") {
       if (!debtMonths || Number(debtMonths) < 1) {
         error("Укажите срок долга.");
         return false;
       }
     }
 
-    // Предоплата: сумма предоплаты и срок долга обязательны
-    if (dealStatus === "Предоплата") {
+    // Предоплата: сумма предоплаты и срок долга обязательны (только если выбран поставщик)
+    if (product.client && dealStatus === "Предоплата") {
       if (!prepayment || Number(prepayment) < 0) {
         error("Укажите сумму предоплаты.");
+        return false;
+      }
+      // ВАЖНО: мы покупаем у поставщика => все расчёты идут по закупочной цене
+      const purchaseTotal =
+        Number(product.purchase_price || 0) * Number(product.quantity || 0);
+      if (Number(prepayment) > purchaseTotal) {
+        error(
+          `Предоплата не может быть больше суммы закупки (${purchaseTotal.toFixed(2)}).`
+        );
         return false;
       }
       if (!debtMonths || Number(debtMonths) < 1) {
@@ -468,18 +486,16 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
     setCreating(true);
     try {
-      // списание сырья
-      if (recipe.length && units > 0) {
-        await dispatch(consumeItemsMake({ recipe, units })).unwrap();
-      }
-
       if (product.client !== "") {
+        // ВАЖНО: расчёт суммы для поставщика — по закупочной цене (а не по розничной)
+        const purchaseTotal =
+          Number(product.purchase_price || 0) * Number(product.quantity || 0);
         const result = await dispatch(
           createDeal({
             clientId: product.client,
             title: dealStatus, // заголовок
             statusRu: dealStatus, // маппинг в kind внутри thunk
-            amount: product.price * product.quantity,
+            amount: purchaseTotal,
             // prepayment только при "Предоплата"
             prepayment:
               dealStatus === "Предоплата" ? Number(prepayment) : undefined,
@@ -503,18 +519,24 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         client: product.client, // id поставщика
         purchase_price: product.purchase_price,
         stock: Boolean(product.stock), // Акционный товар
+        // Новый формат (см. docs/PRODUCTION_FINISHED_GOODS_RECIPE_AND_AUTO_CONSUMPTION_API.md)
+        // Backend сам списывает/возвращает сырьё по дельте.
+        recipe,
+        // Оставляем item_make для совместимости/поиска на бэке (можно удалить, когда бэк перейдёт полностью на recipe)
         item_make,
       };
 
       const created = await dispatch(createProductAsync(payload)).unwrap();
-
-      await dispatch(
-        addCashFlows({
-          ...cashData,
-          amount: (product?.purchase_price * product?.quantity).toFixed(2),
-          source_cashbox_flow_id: created.id,
-        })
-      ).unwrap();
+      const amount = (product?.purchase_price * product?.quantity).toFixed(2);
+      if (amount > 0) {
+        await dispatch(
+          addCashFlows({
+            ...cashData,
+            amount: amount,
+            source_cashbox_flow_id: created.id,
+          })
+        ).unwrap();
+      }
 
       // Загрузка изображений (после создания товара)
       try {
@@ -556,11 +578,14 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
   // актуализируем данные по кассе при изменениях
   useEffect(() => {
+    const purchaseTotal =
+      Number(product.purchase_price || 0) * Number(product.quantity || 0);
     setCashData((prev) => ({
       ...prev,
       cashbox: selectCashBox,
       name: product.name,
-      amount: product.price,
+      // по смыслу это закупка (расход) => сумма по закупочной цене
+      amount: purchaseTotal ? purchaseTotal.toFixed(2) : "",
     }));
   }, [product, selectCashBox]);
 
@@ -649,13 +674,12 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
           {/* Поставщик + быстрое создание */}
           <div className="finished-goods-add-modal__section">
-            <label>Поставщик {dealStatus ? "*" : ""}</label>
+            <label>Поставщик</label>
             <select
               name="client"
               className="finished-goods-add-modal__input"
               value={product.client}
               onChange={onProductChange}
-              required={!!dealStatus}
             >
               <option value="">-- Выберите поставщика --</option>
               {suppliers.map((s) => (
@@ -1367,7 +1391,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
     category_name: item.category_name || item.category || "",
     client: item.client || "",
     price: item.price ?? "",
-    purchase_price: item.purchase_price ?? "",
+    purchase_price: item.purchase_price ?? "0",
     quantity: item.quantity ?? "",
     stock: item.stock ?? false, // Акционный товар
   });
@@ -1787,7 +1811,6 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
                         min="0"
                         step="0.01"
                         placeholder="0.00"
-                        required
                       />
                       <span className="product-edit-modal__input-suffix">
                         сом
@@ -2733,6 +2756,7 @@ const safeDate = (s) => {
 
 const FinishedGoods = ({ products, onChanged }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { loading, error } = useProducts();
   const { list: cashBoxes } = useCash();
 
@@ -3114,7 +3138,17 @@ const FinishedGoods = ({ products, onChanged }) => {
 
                         <td className="warehouse-table__name">
                           <div className="warehouse-table__name-cell">
-                            <span>{item.name || "—"}</span>
+                            <button
+                              type="button"
+                              className="finished-goods__detailLink"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/crm/production/warehouse/${item.id}`);
+                              }}
+                              title="Открыть детальную страницу"
+                            >
+                              {item.name || "—"}
+                            </button>
                           </div>
                         </td>
 
@@ -3220,7 +3254,7 @@ const FinishedGoods = ({ products, onChanged }) => {
                     <div
                       key={item.id}
                       className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
-                      onClick={() => openEdit(item)}
+                      onClick={() => navigate(`/crm/production/warehouse/${item.id}`)}
                     >
                       <div className="flex items-start gap-3">
                         <img
@@ -3290,6 +3324,21 @@ const FinishedGoods = ({ products, onChanged }) => {
                         className="mt-4 flex flex-wrap gap-2"
                         onClick={(e) => e.stopPropagation()}
                       >
+                        <button
+                          className="warehouse-header__create-btn"
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            background: "#111827",
+                            color: "white",
+                            flex: "1",
+                            minWidth: "110px",
+                          }}
+                          type="button"
+                          onClick={() => openEdit(item)}
+                        >
+                          Редактировать
+                        </button>
                         <button
                           className="warehouse-header__create-btn"
                           style={{

@@ -29,6 +29,8 @@ import DataContainer from "../../../common/DataContainer/DataContainer";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
+const TAKEAWAY_LABEL = "С собой";
+
 const toNum = (x) => {
   if (x === null || x === undefined) return 0;
   const n = Number(String(x).replace(",", "."));
@@ -826,9 +828,10 @@ const Cook = () => {
     const dt = formatReceiptDate(
       order?.created_at || order?.date || order?.created
     );
+    const isTakeaway = t === null || t === undefined || t === "";
     return {
       company: localStorage.getItem("company_name") || "КУХНЯ",
-      doc_no: `СТОЛ ${t ?? "—"}`,
+      doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${t ?? "—"}`,
       created_at: dt,
       menu_title: order.menu_item_title,
     };
