@@ -72,6 +72,8 @@ import {
   Package,
   RefreshCw,
   ShoppingCart,
+  ChevronDown,
+  Warehouse,
 } from "lucide-react";
 import {
   Area,
@@ -148,42 +150,60 @@ const PaginatedTable = ({
   const total = Math.max(1, Math.ceil(rows.length / pageSize));
   const cur = Math.max(1, Math.min(page, total));
   const slice = rows.slice((cur - 1) * pageSize, cur * pageSize);
-  const template = colTemplate || `repeat(${head.length}, minmax(100px, 1fr))`;
+
+  useEffect(() => {
+    if (page > total) setPage(total);
+  }, [page, total]);
+
+  // Optional fixed column sizes (we only support CSS lengths like 120px/20%/10rem).
+  const colSizes = (colTemplate || "")
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, head.length);
+  const getColStyle = (idx) => {
+    const s = colSizes[idx];
+    if (!s) return undefined;
+    if (/^\d+(\.\d+)?(px|%|rem|em|vw)$/.test(s)) return { width: s };
+    return undefined;
+  };
 
   return (
-    <div className="warehouse-analytics-table" role="table">
-      <div
-        className="warehouse-analytics-table__head"
-        role="row"
-        style={{ gridTemplateColumns: template }}
-      >
-        {head.map((h, i) => (
-          <div key={i} className="warehouse-analytics-table__col" role="columnheader">
-            {h}
-          </div>
-        ))}
+    <div className="warehouse-analytics-tableWrap">
+      <div className="warehouse-analytics-tableScroll">
+        <table className="warehouse-analytics-table">
+          <colgroup>
+            {head.map((_, i) => (
+              <col key={i} style={getColStyle(i)} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {head.map((h, i) => (
+                <th key={i} scope="col">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {slice.map((r, i) => (
+              <tr key={i}>
+                {r.map((c, j) => (
+                  <td key={j} className={numeric.includes(j) ? "is-num" : ""}>
+                    {c}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      {slice.map((r, i) => (
-        <div
-          key={i}
-          className="warehouse-analytics-table__row"
-          role="row"
-          style={{ gridTemplateColumns: template }}
-        >
-          {r.map((c, j) => (
-            <div
-              key={j}
-              className={`warehouse-analytics-table__col ${numeric.includes(j) ? "is-num" : ""}`}
-              role="cell"
-            >
-              {c}
-            </div>
-          ))}
-        </div>
-      ))}
+
       {!slice.length && (
         <div className="warehouse-analytics-table__empty">Нет данных.</div>
       )}
+
       {rows.length > pageSize && (
         <div className="warehouse-analytics__pager" aria-label="Пагинация">
           <ul className="warehouse-analytics__pageList">
@@ -193,7 +213,9 @@ const PaginatedTable = ({
                 <li key={p}>
                   <button
                     type="button"
-                    className={`warehouse-analytics__pageBtn ${p === cur ? "is-active" : ""}`}
+                    className={`warehouse-analytics__pageBtn ${
+                      p === cur ? "is-active" : ""
+                    }`}
                     onClick={() => setPage(p)}
                     aria-current={p === cur ? "page" : undefined}
                   >
@@ -223,6 +245,62 @@ const KpiCard = ({ label, value, description, icon: Icon }) => (
     )}
   </div>
 );
+
+const AccordionItem = ({
+  id,
+  title,
+  icon: Icon,
+  badge,
+  defaultOpen = true,
+  children,
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = `${id}-panel`;
+  const btnId = `${id}-button`;
+
+  return (
+    <div className={`warehouse-analytics__accItem ${open ? "is-open" : ""}`}>
+      <button
+        id={btnId}
+        type="button"
+        className="warehouse-analytics__accBtn"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="warehouse-analytics__accLeft">
+          {Icon && (
+            <span className="warehouse-analytics__accIcon" aria-hidden="true">
+              <Icon size={18} />
+            </span>
+          )}
+          <span className="warehouse-analytics__accTitle">{title}</span>
+        </span>
+
+        <span className="warehouse-analytics__accRight">
+          {badge != null && badge !== "" && (
+            <span className="warehouse-analytics__accBadge">{badge}</span>
+          )}
+          <ChevronDown
+            size={18}
+            className="warehouse-analytics__accChevron"
+            aria-hidden="true"
+          />
+        </span>
+      </button>
+
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={btnId}
+        className="warehouse-analytics__accBody"
+        hidden={!open}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
 
 const WarehouseAnalytics = () => {
   const [searchParams] = useSearchParams();
@@ -776,75 +854,91 @@ const WarehouseAnalytics = () => {
 
           {isOwnerOrAdmin && (
             <>
-              <div className="warehouse-analytics__tablesRow">
-                <div className="warehouse-analytics__card">
-                  <div className="warehouse-analytics__cardTitle">
-                    Топ агентов по продажам
+              <div className="warehouse-analytics__accordion">
+                <AccordionItem
+                  id="wa-top-sales"
+                  title="Топ агентов по продажам"
+                  icon={ShoppingCart}
+                  badge={bySalesRows.length ? `${bySalesRows.length}` : "0"}
+                  defaultOpen
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {bySalesRows.length > 0 ? (
+                      <PaginatedTable
+                        head={["Агент", "Продажи", "Кол-во", "Доля"]}
+                        rows={bySalesRows}
+                        colTemplate="1fr 120px 90px 70px"
+                        numeric={[1, 2, 3]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет данных за период.
+                      </div>
+                    )}
                   </div>
-                  {bySalesRows.length > 0 ? (
-                    <PaginatedTable
-                      head={["Агент", "Продажи", "Кол-во", "Доля"]}
-                      rows={bySalesRows}
-                      colTemplate="1fr 120px 90px 70px"
-                      numeric={[1, 2, 3]}
-                    />
-                  ) : (
-                    <div className="warehouse-analytics-table__empty">
-                      Нет данных за период.
-                    </div>
-                  )}
-                </div>
-                <div className="warehouse-analytics__card">
-                  <div className="warehouse-analytics__cardTitle">
-                    Топ агентов по полученным товарам
-                  </div>
-                  {byReceivedRows.length > 0 ? (
-                    <PaginatedTable
-                      head={["Агент", "Позиций", "Заявок", "Доля"]}
-                      rows={byReceivedRows}
-                      colTemplate="1fr 100px 80px 70px"
-                      numeric={[1, 2, 3]}
-                    />
-                  ) : (
-                    <div className="warehouse-analytics-table__empty">
-                      Нет данных за период.
-                    </div>
-                  )}
-                </div>
-              </div>
+                </AccordionItem>
 
-              <div className="warehouse-analytics__card">
-                <div className="warehouse-analytics__cardTitle">
-                  Склады
-                </div>
-                {warehouses.length > 0 ? (
-                  <PaginatedTable
-                    head={[
-                      "Склад",
-                      "Заявок одобрено",
-                      "Позиций одобрено",
-                      "Продаж",
-                      "Сумма продаж",
-                      "Остаток, шт",
-                      "Остаток, сом",
-                    ]}
-                    rows={warehouses.map((w) => [
-                      w.warehouse_name ?? w.name ?? "—",
-                      formatNum(w.carts_approved ?? w.requests_approved ?? 0),
-                      formatNum(w.items_approved ?? 0),
-                      formatNum(w.sales_count ?? 0),
-                      `${formatNum(w.sales_amount ?? 0)} сом`,
-                      formatNum(w.on_hand_qty ?? 0),
-                      `${formatNum(w.on_hand_amount ?? 0)} сом`,
-                    ])}
-                    colTemplate="1.2fr 130px 150px 90px 130px 110px 130px"
-                    numeric={[1, 2, 3, 4, 5, 6]}
-                  />
-                ) : (
-                  <div className="warehouse-analytics-table__empty">
-                    Нет данных по складам за период.
+                <AccordionItem
+                  id="wa-top-received"
+                  title="Топ агентов по полученным товарам"
+                  icon={Package}
+                  badge={byReceivedRows.length ? `${byReceivedRows.length}` : "0"}
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {byReceivedRows.length > 0 ? (
+                      <PaginatedTable
+                        head={["Агент", "Позиций", "Заявок", "Доля"]}
+                        rows={byReceivedRows}
+                        colTemplate="1fr 100px 80px 70px"
+                        numeric={[1, 2, 3]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет данных за период.
+                      </div>
+                    )}
                   </div>
-                )}
+                </AccordionItem>
+
+                <AccordionItem
+                  id="wa-warehouses"
+                  title="Склады"
+                  icon={Warehouse}
+                  badge={warehouses.length ? `${warehouses.length}` : "0"}
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {warehouses.length > 0 ? (
+                      <PaginatedTable
+                        head={[
+                          "Склад",
+                          "Заявок одобрено",
+                          "Позиций одобрено",
+                          "Продаж",
+                          "Сумма продаж",
+                          "Остаток, шт",
+                          "Остаток, сом",
+                        ]}
+                        rows={warehouses.map((w) => [
+                          w.warehouse_name ?? w.name ?? "—",
+                          formatNum(w.carts_approved ?? w.requests_approved ?? 0),
+                          formatNum(w.items_approved ?? 0),
+                          formatNum(w.sales_count ?? 0),
+                          `${formatNum(w.sales_amount ?? 0)} сом`,
+                          formatNum(w.on_hand_qty ?? 0),
+                          `${formatNum(w.on_hand_amount ?? 0)} сом`,
+                        ])}
+                        colTemplate="1.2fr 130px 150px 90px 130px 110px 130px"
+                        numeric={[1, 2, 3, 4, 5, 6]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет данных по складам за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
               </div>
             </>
           )}
