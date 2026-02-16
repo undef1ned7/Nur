@@ -19,6 +19,10 @@ const CookReceiptCard = ({
   const isPending = status === "pending";
   const isInProgress = status === "in_progress";
   const isReady = status === "ready";
+  const isTakeaway =
+    group?.table_number === null ||
+    group?.table_number === undefined ||
+    group?.table_number === "";
   const updating =
     isUpdating(group.id) ||
     (Array.isArray(group?.tasks_ids) && group.tasks_ids.some((id) => isUpdating(id)));
@@ -28,7 +32,9 @@ const CookReceiptCard = ({
     <article className="cafeCook__receipt">
       <div className="cafeCook__receiptHeader">
         <div className="cafeCook__receiptLeft">
-          <div className="cafeCook__receiptTable">СТОЛ {group.table_number || "—"}</div>
+          <div className="cafeCook__receiptTable">
+            {isTakeaway ? "С собой" : `СТОЛ ${group.table_number || "—"}`}
+          </div>
           {group.waiter_label ? (
             <div className="cafeCook__receiptWaiter">Официант: {group.waiter_label}</div>
           ) : null}

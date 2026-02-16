@@ -13,11 +13,13 @@ import { deleteDebt, getClientDealDetail, payDebtDeal, updateDealDetail } from "
 import AlertModal from "../../../../common/AlertModal/AlertModal";
 import api from "../../../../../api";
 
-const DebtModal = ({ id, onClose, onChanged }) => {
+const DebtModal = ({ id, onClose, onChanged, clientType }) => {
   const dispatch = useDispatch();
   const { dealDetail } = useClient();
   const { list: cashBoxes } = useCash();
   const { id: clientId } = useParams();
+
+  const isSupplier = String(clientType || "").toLowerCase() === "suppliers";
 
   const [state, setState] = useState({
     amount: "",
@@ -25,12 +27,12 @@ const DebtModal = ({ id, onClose, onChanged }) => {
     first_due_date: "",
   });
   const [isEditing, setIsEditing] = useState(false);
-  const [cashData, setCashData] = useState({
+  const [cashData, setCashData] = useState(() => ({
     cashbox: "",
-    type: "income",
+    type: isSupplier ? "expense" : "income",
     name: "",
     amount: "",
-  });
+  }));
   const [alert, setAlert] = useState({
     open: false,
     type: "error",
@@ -49,6 +51,14 @@ const DebtModal = ({ id, onClose, onChanged }) => {
     dispatch(getClientDealDetail({ clientId, dealId: id }));
     dispatch(getCashBoxes());
   }, [id, dispatch, clientId]);
+
+  // Для поставщиков оплата долга должна идти как расход, для клиентов — как приход
+  useEffect(() => {
+    setCashData((prev) => ({
+      ...prev,
+      type: isSupplier ? "expense" : "income",
+    }));
+  }, [isSupplier]);
 
   useEffect(() => {
     if (cashBoxes && cashBoxes.length > 0 && !cashData.cashbox) {

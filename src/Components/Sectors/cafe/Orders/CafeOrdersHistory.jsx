@@ -301,6 +301,10 @@ const CafeOrderHistory = () => {
               const t = tablesMap.get(o.table);
               const totals = calcTotals(o);
               const orderDate = formatReceiptDate(o.created_at || o.date || o.created);
+              const tableLabel =
+                o.table === null || o.table === undefined || o.table === ""
+                  ? "С собой"
+                  : t?.number || "—";
 
               const items = Array.isArray(o.items) ? o.items : [];
               const expanded = expandedOrders.has(String(o.id));
@@ -310,7 +314,9 @@ const CafeOrderHistory = () => {
                 <article key={o.id} className="cafeOrders__receipt relative">
                   <SimpleStamp date={o.status === 'closed' ? o.paid_at : ''} className="bottom-10 left-20" type={o.status} size={'md'} />
                   <div className="cafeOrders__receiptHeader">
-                    <div className="cafeOrders__receiptTable">СТОЛ {t?.number || "—"}</div>
+                    <div className="cafeOrders__receiptTable">
+                      {tableLabel === "С собой" ? "С собой" : `СТОЛ ${tableLabel}`}
+                    </div>
                     {orderDate && <div className="cafeOrders__receiptDate">{orderDate}</div>}
                   </div>
 
