@@ -172,6 +172,19 @@ import SellMainStart from "../Components/pages/Sell/SellMainStart";
 import CafeLayout from "../Components/Sectors/cafe/CafeLayout";
 import SellCashierPage from "../Components/pages/Sell/Cashier/SellCashierPage";
 
+
+
+
+import BuildingLayout,
+{
+  BuildingAnalytics,
+  BuildingCashRegister,
+  BuildingClients,
+  BuildingDepartment,
+  BuildingEmployess,
+  BuildingNotification, BuildingProcurement, BuildingProjects, BuildingSalary, BuildingSell, BuildingStock, BuildingTreaty
+} from "../Components/pages/Building";
+
 /**
  * Создает защищенный роут
  */
@@ -298,6 +311,9 @@ const createProtectedRoute = (path, Component, props) => (
  *      }
  *    }
  */
+
+
+
 const WarehouseAnalyticsRoute = () => {
   const { profile } = useUser();
   const [searchParams] = useSearchParams();
@@ -387,9 +403,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-        createProtectedRoute("kassa/*", Kassa),
-        createProtectedRoute("kassa/:id", KassaDet),
-      ]
+      createProtectedRoute("kassa/*", Kassa),
+      createProtectedRoute("kassa/:id", KassaDet),
+    ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
@@ -435,6 +451,24 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("market/documents/create", CreateSaleDocument),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
+
+  <Route element={<BuildingLayout />} path="building">
+    {[
+      createProtectedRoute("analytics", BuildingAnalytics),
+      createProtectedRoute("cash-register", BuildingCashRegister),
+      createProtectedRoute("clients", BuildingClients),
+      createProtectedRoute("department", BuildingDepartment),
+      createProtectedRoute("employess", BuildingEmployess),
+      createProtectedRoute("notification", BuildingNotification),
+      createProtectedRoute("procurement", BuildingProcurement),
+      createProtectedRoute("projects", BuildingProjects),
+      createProtectedRoute("salary", BuildingSalary),
+      createProtectedRoute("sell", BuildingSell),
+      createProtectedRoute("stock", BuildingStock),
+      createProtectedRoute("treaty", BuildingTreaty),
+    ]}
+
+  </Route>,
   // Cafe routes
   <Route key="cafe" element={<CafeLayout />} path="cafe">
     {[
@@ -461,8 +495,8 @@ export const crmRoutes = (profile) => [
   </Route>,
 
   // Building routes
-  createProtectedRoute("building/work", BuildingWork),
-  createProtectedRoute("building/objects", Objects),
+  // createProtectedRoute("building/work", BuildingWork),
+  // createProtectedRoute("building/objects", Objects),
 
   // Consulting routes
   createProtectedRoute("consulting/client", ConsultingClients),

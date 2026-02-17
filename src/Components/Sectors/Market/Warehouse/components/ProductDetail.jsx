@@ -22,9 +22,12 @@ import AddProductModal from "../../../../Deposits/Sklad/AddProduct/AddProductMod
 import MarriageModal from "../../../../Deposits/Sklad/MarriageModal";
 import { deleteProductAsync } from "../../../../../store/creators/productCreators";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import {useAlert} from "@/hooks/useDialog";
 
 const ProductDetail = () => {
   const { id } = useParams();
+  const alert = useAlert();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [product, setProduct] = useState(null);
@@ -42,6 +45,11 @@ const ProductDetail = () => {
       setProduct(response.data);
     } catch (error) {
       console.error("Ошибка при загрузке товара:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при загрузке товара. ")
+      alert(
+        errorMessage,
+        true
+      );
     } finally {
       setLoading(false);
     }
@@ -79,9 +87,10 @@ const ProductDetail = () => {
     } catch (error) {
       console.error("Ошибка при удалении товара:", error);
       setShowDeleteConfirm(false);
+      const errorMessage = validateResErrors(error, "Ошибка при удалении товара. ")
       alert(
-        "Ошибка при удалении товара: " +
-          (error.message || JSON.stringify(error))
+        errorMessage,
+        true
       );
     }
   };

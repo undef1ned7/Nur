@@ -99,6 +99,42 @@ const Analytics = () => {
     dispatch(getCashBoxes());
   }, [dispatch]);
 
+  // На маркете кассу выбирать нельзя: фиксируем "Основная касса"
+  const DEFAULT_CASHBOX_NAME = "Основная касса";
+  const mainCashbox = useMemo(() => {
+    if (!Array.isArray(cashBoxes) || cashBoxes.length === 0) return null;
+
+    const getName = (box) => box?.name || box?.department_name || "";
+    const norm = (v) => String(v || "").trim().toLowerCase();
+
+    const exact = cashBoxes.find(
+      (box) => norm(getName(box)) === norm(DEFAULT_CASHBOX_NAME)
+    );
+    if (exact) return exact;
+
+    const fuzzy = cashBoxes.find((box) => {
+      const n = norm(getName(box));
+      return n.includes("основ") && n.includes("кас");
+    });
+    return fuzzy || cashBoxes[0];
+  }, [cashBoxes]);
+
+  const mainCashboxId =
+    mainCashbox?.id !== undefined && mainCashbox?.id !== null
+      ? String(mainCashbox.id)
+      : "";
+  const mainCashboxTitle =
+    mainCashbox?.name || mainCashbox?.department_name || DEFAULT_CASHBOX_NAME;
+
+  useEffect(() => {
+    if (!mainCashboxId) return;
+    setFilters((prev) => {
+      const prevId = prev?.cashbox ? String(prev.cashbox) : "";
+      if (prevId === mainCashboxId) return prev;
+      return { ...prev, cashbox: mainCashboxId };
+    });
+  }, [mainCashboxId]);
+
   // Форматирование даты для API (YYYY-MM-DD или YYYY-MM-DDTHH:MM:SS)
   const formatDateForAPI = (date, includeTime = true) => {
     const year = date.getFullYear();
@@ -199,7 +235,7 @@ const Analytics = () => {
     setFilters({
       branch: "",
       include_global: false,
-      cashbox: "",
+      cashbox: mainCashboxId || "",
       shift: "",
       cashier: "",
       payment_method: "",
@@ -1062,20 +1098,7 @@ const Analytics = () => {
             {/* Фильтры для Sales и Cashiers */}
             {(activeTab === "sales" || activeTab === "cashiers") && (
               <>
-                <div className="analytics-page__filter-group">
-                  <label>Касса</label>
-                  <select
-                    value={filters.cashbox}
-                    onChange={(e) => updateFilter("cashbox", e.target.value)}
-                  >
-                    <option value="">Все кассы</option>
-                    {cashBoxes.map((box) => (
-                      <option key={box.id} value={box.id}>
-                        {box.name || box.department_name || box.id}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            
 
                 <div className="analytics-page__filter-group">
                   <label>Способ оплаты</label>
@@ -1208,17 +1231,7 @@ const Analytics = () => {
 
                 <div className="analytics-page__filter-group">
                   <label>Касса</label>
-                  <select
-                    value={filters.cashbox}
-                    onChange={(e) => updateFilter("cashbox", e.target.value)}
-                  >
-                    <option value="">Все кассы</option>
-                    {cashBoxes.map((box) => (
-                      <option key={box.id} value={box.id}>
-                        {box.name || box.department_name || box.id}
-                      </option>
-                    ))}
-                  </select>
+                  <input value={mainCashboxTitle} disabled readOnly />
                 </div>
               </>
             )}

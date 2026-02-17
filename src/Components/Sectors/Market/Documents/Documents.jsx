@@ -28,6 +28,7 @@ import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const Documents = () => {
   const alert = useAlert();
@@ -175,15 +176,6 @@ const Documents = () => {
     }
   };
 
-  // Расчет пагинации
-  // Используем фиксированный размер страницы
-  // Если есть next или previous, значит есть еще страницы
-  const hasNextPage = !!documentsNext;
-  const hasPrevPage = !!documentsPrevious;
-
-  // Если есть следующая страница, значит текущая не последняя
-  // Если есть предыдущая страница, значит текущая не первая
-  // Рассчитываем общее количество страниц на основе count и размера страницы
   const totalPages =
     documentsCount && PAGE_SIZE ? Math.ceil(documentsCount / PAGE_SIZE) : 1;
 
@@ -218,15 +210,20 @@ const Documents = () => {
     });
   };
 
-  const handleSaved = () => {
+  const handleSaved = async () => {
     // Перезагружаем документы после сохранения
     if (activeTab === "receipts" || activeTab === "invoices") {
-      dispatch(
-        fetchDocuments({
-          page: currentPage,
-          search: debouncedSearchTerm,
-        })
-      );
+      try { 
+        await dispatch(
+          fetchDocuments({
+            page: currentPage,
+            search: debouncedSearchTerm,
+          })
+        ).unwrap();
+      } catch (error) {
+        const errorMessage = validateResErrors(error, "Ошибка при сохранении документа. ")
+        alert(errorMessage, true);
+      }
     }
   };
 
@@ -271,7 +268,8 @@ const Documents = () => {
 
         if (!isPrinterConnected) {
           alert(
-            "Принтер не подключен. Пожалуйста, подключите принтер перед печатью."
+            "Принтер не подключен. Пожалуйста, подключите принтер перед печатью.",
+            true
           );
           return;
         }
@@ -306,10 +304,8 @@ const Documents = () => {
         }
       }
     } catch (printError) {
-      console.error("Ошибка при печати:", printError);
-      alert(
-        "Ошибка при печати: " + (printError.message || "Неизвестная ошибка")
-      );
+      const errorMessage = validateResErrors(printError, "Ошибка при печати. ")
+      alert(errorMessage, true);
     }
   };
 

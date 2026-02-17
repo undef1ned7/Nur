@@ -119,13 +119,8 @@ const KassaDet = () => {
       setCashboxDetails(data);
       setSelectedCashbox(data);
     } catch (err) {
-      console.error(
-        `Failed to fetch cashbox details for ID ${idToFetch}:`,
-        err
-      );
-      setError(
-        `Не удалось загрузить данные кассы: ${err.message}. Пожалуйста, попробуйте еще раз.`
-      );
+      const errorMessage = validateResErrors(err, "Ошибка при загрузке данных кассы. ")
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -170,7 +165,8 @@ const KassaDet = () => {
       }
       setFlowsList(allFlows);
     } catch (err) {
-      console.error("Failed to fetch cashflows:", err);
+      const errorMessage = validateResErrors(err, "Ошибка при загрузке потоков. ")
+      alert(errorMessage, true);
       setFlowsList([]);
     } finally {
       setFlowsLoading(false);
@@ -189,6 +185,10 @@ const KassaDet = () => {
   }, [cashboxId, debouncedFilterSearch, activeFlowType]);
 
   const handleAddCashbox = async () => {
+    if (!newCashbox.name || !newCashbox.amount) {
+      alert("Пожалуйста, заполните все поля.", true);
+      return;
+    }
     try {
       await dispatch(
         addCashFlows({
@@ -205,7 +205,8 @@ const KassaDet = () => {
       setShowAddCashboxModal(false);
       setNewCashbox({ name: "", amount: 0, type: "expense" });
     } catch (err) {
-      alert(validateResErrors(err, 'Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз.'), true)
+      const errorMessage = validateResErrors(err, 'Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз.')
+      alert(errorMessage, true)
     }
   };
 
@@ -226,8 +227,8 @@ const KassaDet = () => {
       setSelectedCashbox(updatedCashbox);
       fetchCashboxDetails(cashboxId);
     } catch (err) {
-      setError(
-        err);
+      const errorMessage = validateResErrors(err, "Не удалось обновить кассу. Пожалуйста, проверьте данные и попробуйте еще раз.")
+      setError(errorMessage);
     }
   };
 
@@ -260,8 +261,8 @@ const KassaDet = () => {
       // Возможно, здесь вы захотите перенаправить пользователя на страницу списка касс
       // history.push('/cashboxes');
     } catch (err) {
-      console.error("Failed to delete cashbox:", err);
-      setError("Не удалось удалить кассу. Пожалуйста, попробуйте еще раз.");
+      const errorMessage = validateResErrors(err, "Не удалось удалить кассу. Пожалуйста, попробуйте еще раз.")
+      setError(errorMessage);
     }
   };
 
@@ -432,7 +433,8 @@ const KassaDet = () => {
       });
     } catch (err) {
       console.error("Failed to fetch daily report:", err);
-      setError(`Не удалось загрузить дневной отчет: ${err.message}`);
+      const errorMessage = validateResErrors(err, "Не удалось загрузить дневной отчет. ")
+      setError(errorMessage);
     } finally {
       setReportLoading(false);
     }
@@ -970,6 +972,7 @@ const KassaDet = () => {
             <div className="vitrina__modal-section">
               <label>Наименование</label>
               <input
+                required
                 type="text"
                 placeholder="Например, Закупка материалов"
                 className="vitrina__modal-input"

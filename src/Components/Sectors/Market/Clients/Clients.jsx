@@ -580,6 +580,7 @@ import "./Clients.scss";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const HostelClients = lazy(() => import("../../Hostel/Clients/Clients"));
 
@@ -661,6 +662,7 @@ const TYPE_VARIANTS_BY_TAB = {
 
 export default function MarketClients() {
   const navigate = useNavigate();
+
   const { company: user } = useUser();
   const sectorName = user?.sector?.name;
 
@@ -758,8 +760,8 @@ export default function MarketClients() {
 
       setRows(list);
     } catch (e) {
-      console.error(e);
-      setError("Не удалось загрузить список");
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке списка клиентов. ")
+      setError(errorMessage);
       setRows([]);
     } finally {
       setLoading(false);

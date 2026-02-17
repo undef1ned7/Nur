@@ -1,8 +1,20 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { Bell, Menu, ShoppingCart } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  Bell,
+  Menu,
+  ShoppingCart,
+  Building2,
+  Check,
+  X,
+} from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
+import { fetchBuildingProjects } from "../../store/creators/building/projectsCreators";
+import {
+  setSelectedBuildingProjectId,
+  useBuildingProjects,
+} from "../../store/slices/building/projectsSlice";
 import NotificationModal from "../NotificationModal/NotificationModal";
 import "./Header.scss";
 
@@ -92,12 +104,19 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const title = pageTitles[location.pathname] || "NurCRM";
+  const dispatch = useDispatch();
 
   const { list: notifications } = useSelector((state) => state.notification);
   const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
   const { company, profile: userProfile } = useUser();
+  const {
+    items: buildingProjects,
+    selectedProjectId,
+    loading: buildingProjectsLoading,
+  } = useBuildingProjects();
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProjectDrawer, setShowProjectDrawer] = useState(false);
   // const [profile, setProfile] = useState(null);
 
   // Проверяем, является ли сектор маркетом
@@ -150,6 +169,24 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     userProfile.email
     : "Гость";
 
+  const isBuildingRoute = useMemo(() => {
+    return location.pathname.startsWith("/crm/building");
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isBuildingRoute) return;
+    if (buildingProjectsLoading) return;
+    if (Array.isArray(buildingProjects) && buildingProjects.length > 0) return;
+    dispatch(fetchBuildingProjects());
+  }, [dispatch, isBuildingRoute, buildingProjects, buildingProjectsLoading]);
+
+  const handleProjectChange = (e) => {
+    const v = e.target.value;
+    dispatch(setSelectedBuildingProjectId(v || null));
+  };
+
+  const projectsList = Array.isArray(buildingProjects) ? buildingProjects : [];
+
   return (
     <div className="header">
       <div className="header__left">
@@ -159,6 +196,41 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         <h2 className="header__title">{title}</h2>
       </div>
       <div className="header__right">
+        {isBuildingRoute && (
+          <div className="header__project">
+            <div className="header__project-label">Проект</div>
+            <select
+              className="header__project-select"
+              value={selectedProjectId ?? ""}
+              onChange={handleProjectChange}
+            >
+              <option value="" disabled>
+                {buildingProjectsLoading ? "Загрузка..." : "Выберите проект"}
+              </option>
+              {projectsList.map((p, idx) => {
+                const id = p?.id ?? p?.uuid ?? String(idx);
+                return (
+                  <option key={id} value={id}>
+                    {p?.name || "—"}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
+
+        {isBuildingRoute && (
+          <button
+            type="button"
+            className="header__project-iconBtn"
+            onClick={() => setShowProjectDrawer(true)}
+            title="Выбрать проект"
+            aria-label="Выбрать проект"
+          >
+            <Building2 size={20} />
+          </button>
+        )}
+
         {showCashierButton && (
           <button
             className="header__cashier-btn"
@@ -200,6 +272,66 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
       {showNotifications && (
         <NotificationModal onClose={() => setShowNotifications(false)} />
+      )}
+
+      {showProjectDrawer && isBuildingRoute && (
+        <div
+          className="header__projectDrawerOverlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowProjectDrawer(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="header__projectDrawer" onClick={(e) => e.stopPropagation()}>
+            <div className="header__projectDrawerHeader">
+              <div className="header__projectDrawerTitle">Проекты</div>
+              <button
+                type="button"
+                className="header__projectDrawerClose"
+                onClick={() => setShowProjectDrawer(false)}
+                aria-label="Закрыть"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="header__projectDrawerBody">
+              {buildingProjectsLoading && (
+                <div className="header__projectDrawerState">Загрузка...</div>
+              )}
+
+              {!buildingProjectsLoading && projectsList.length === 0 && (
+                <div className="header__projectDrawerState">Нет проектов</div>
+              )}
+
+              {!buildingProjectsLoading &&
+                projectsList.map((p, idx) => {
+                  const id = p?.id ?? p?.uuid ?? String(idx);
+                  const active = String(selectedProjectId ?? "") === String(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={
+                        "header__projectDrawerItem " +
+                        (active ? "is-active" : "")
+                      }
+                      onClick={() => {
+                        dispatch(setSelectedBuildingProjectId(id));
+                        setShowProjectDrawer(false);
+                      }}
+                    >
+                      <span className="header__projectDrawerItemName">
+                        {p?.name || "—"}
+                      </span>
+                      {active && <Check size={16} />}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
