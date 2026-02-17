@@ -26,7 +26,6 @@ import {
 } from "../../../../store/creators/warehouseThunk";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import warehouseAPI from "../../../../api/warehouse";
-import api from "../../../../api";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -164,7 +163,7 @@ const CreateSaleDocument = () => {
       setGroupsLoading(true);
       setGroupsError(null);
       try {
-        const { data } = await api.get(`/warehouse/${warehouse}/groups/`);
+        const data = await warehouseAPI.listWarehouseGroups(warehouse);
         const list = Array.isArray(data) ? data : data?.results || [];
         if (!cancelled) setGroups(list);
       } catch (e) {
@@ -1709,6 +1708,11 @@ const CreateSaleDocument = () => {
                 onChange={(e) => setDocumentSearch(e.target.value)}
               />
             </div>
+            {docType === "INVENTORY" && (
+              <p className="create-sale-document__inventory-hint">
+                Для инвентаризации укажите <strong>фактический остаток</strong> по каждой позиции; при проведении будет создано движение на разницу с текущим остатком.
+              </p>
+            )}
             <div className="create-sale-document__table-wrapper">
               <table className="create-sale-document__table">
                 <thead>
@@ -1716,7 +1720,7 @@ const CreateSaleDocument = () => {
                     <th>#</th>
                     <th>НАИМЕНОВАНИЕ</th>
                     <th>ЕД. ИЗМ.</th>
-                    <th>КОЛ-ВО</th>
+                    <th>{docType === "INVENTORY" ? "ФАКТ. ОСТАТОК" : "КОЛ-ВО"}</th>
                     <th>ЦЕНА</th>
                     <th>СКИДКА %</th>
                     <th>СУММА</th>

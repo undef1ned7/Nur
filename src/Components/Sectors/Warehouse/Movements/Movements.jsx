@@ -1,98 +1,113 @@
-import React, { useMemo, useState } from "react";
-import { FaFileInvoiceDollar, FaShoppingCart, FaPlus, FaTimes } from "react-icons/fa";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  FaFileInvoiceDollar,
+  FaShoppingCart,
+  FaPlus,
+  FaTimes,
+} from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import warehouseAPI from "../../../../api/warehouse";
 import "./Movements.scss";
 
-/**
- * BEM root: .sklad-   — единый компонент "Приход / Отгрузки"
- * Только UI (демо), без сохранения.
- */
+const PAGE_SIZE = 15;
+
+const fmtDate = (v) => {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleDateString("ru-RU");
+  } catch {
+    return String(v);
+  }
+};
+
+const statusLabel = (s) =>
+  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+
 const WarehouseMovements = () => {
-  // справочники (демо)
-  const suppliers = ["ООО «Альфа»", "ИП Бета"];
-  const customers = ["Розничный покупатель", "Компания «Дельта»"];
-  const products  = ["Кофе зерновой 1 кг", "Чай зелёный 100 пак."];
-
-  const receiptStatuses = ["Принят", "Отказ", "В пути"];
-  const issueStatuses   = ["В очереди", "Отменено", "Выгружено"];
-
-  // демо-списки документов
-  const receiptList = useMemo(
-    () => [
-      { date: "2025-09-10", counterparty: "ООО «Альфа»", status: "Принят" },
-      { date: "2025-09-12", counterparty: "ИП Бета",     status: "В пути" },
-    ],
-    []
-  );
-  const issueList = useMemo(
-    () => [
-      { date: "2025-09-14", counterparty: "Розничный покупатель", status: "В очереди" },
-      { date: "2025-09-15", counterparty: "Компания «Дельта»",   status: "Выгружено" },
-    ],
-    []
-  );
-
-  // UI
-  const [tab, setTab] = useState("receipt"); // "receipt" | "issue"
-  const [q, setQ]   = useState("");
+  const navigate = useNavigate();
+  const [tab, setTab] = useState("receipt");
+  const [q, setQ] = useState("");
+  const [receiptDocs, setReceiptDocs] = useState([]);
+  const [saleDocs, setSaleDocs] = useState([]);
+  const [loadingReceipt, setLoadingReceipt] = useState(true);
+  const [loadingSale, setLoadingSale] = useState(true);
   const [page, setPage] = useState(1);
-  const pageSize = 15;
 
-  // модалка
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState("");
-  const [status, setStatus] = useState(receiptStatuses[0]);
-  const [counterparty, setCounterparty] = useState("");
+  const loadReceipt = useCallback(async () => {
+    setLoadingReceipt(true);
+    try {
+      const data = await warehouseAPI.listReceiptDocuments({ page_size: 200 });
+      const results = data?.results ?? (Array.isArray(data) ? data : []);
+      setReceiptDocs(results);
+    } catch {
+      setReceiptDocs([]);
+    } finally {
+      setLoadingReceipt(false);
+    }
+  }, []);
 
-  // позиции
-  const emptyReceiptRow = { product: "", qty: "", price: "" }; // приход
-  const emptyIssueRow   = { product: "", qty: "", amount: "" }; // отгрузка (только сумма)
-  const [rows, setRows] = useState([ { ...emptyReceiptRow } ]);
+  const loadSale = useCallback(async () => {
+    setLoadingSale(true);
+    try {
+      const data = await warehouseAPI.listSaleDocuments({ page_size: 200 });
+      const results = data?.results ?? (Array.isArray(data) ? data : []);
+      setSaleDocs(results);
+    } catch {
+      setSaleDocs([]);
+    } finally {
+      setLoadingSale(false);
+    }
+  }, []);
 
-  const source = tab === "receipt" ? receiptList : issueList;
-  const filtered = source.filter(
-    (r) =>
-      r.counterparty.toLowerCase().includes(q.toLowerCase()) ||
-      r.status.toLowerCase().includes(q.toLowerCase())
+  useEffect(() => {
+    loadReceipt();
+  }, [loadReceipt]);
+  useEffect(() => {
+    loadSale();
+  }, [loadSale]);
+
+  const safeIncludes = (str = "", needle = "") =>
+    (str + "").toLowerCase().includes((needle + "").toLowerCase());
+
+  const filteredReceipt = useMemo(
+    () =>
+      (receiptDocs || []).filter(
+        (r) =>
+          safeIncludes(r?.number, q) ||
+          safeIncludes(r?.counterparty_display_name, q) ||
+          safeIncludes(r?.comment, q) ||
+          safeIncludes(statusLabel(r?.status), q)
+      ),
+    [receiptDocs, q]
+  );
+  const filteredSale = useMemo(
+    () =>
+      (saleDocs || []).filter(
+        (r) =>
+          safeIncludes(r?.number, q) ||
+          safeIncludes(r?.counterparty_display_name, q) ||
+          safeIncludes(r?.comment, q) ||
+          safeIncludes(statusLabel(r?.status), q)
+      ),
+    [saleDocs, q]
   );
 
-  // пагинация (после 15)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const source = tab === "receipt" ? filteredReceipt : filteredSale;
+  const loading = tab === "receipt" ? loadingReceipt : loadingSale;
+  const totalPages = Math.max(1, Math.ceil(source.length / PAGE_SIZE));
   const validPage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((validPage - 1) * pageSize, validPage * pageSize);
+  const pageItems = source.slice(
+    (validPage - 1) * PAGE_SIZE,
+    validPage * PAGE_SIZE
+  );
 
-  const openModal = (mode) => {
-    setTab(mode);
-    setDate("");
-    setCounterparty("");
-    setStatus(mode === "receipt" ? receiptStatuses[0] : issueStatuses[0]);
-    setRows([ mode === "receipt" ? { ...emptyReceiptRow } : { ...emptyIssueRow } ]);
-    setOpen(true);
-  };
-  const closeModal = () => setOpen(false);
-
-  const addRow = () =>
-    setRows((prev) => [
-      ...prev,
-      tab === "receipt" ? { ...emptyReceiptRow } : { ...emptyIssueRow },
-    ]);
-
-  const updateRow = (idx, key, val) =>
-    setRows((prev) => {
-      const copy = [...prev];
-      copy[idx] = { ...copy[idx], [key]: val };
-      return copy;
-    });
-
-  const sumRow = (qty, price) => {
-    const qn = Number(qty);
-    const pn = Number(price);
-    if (!qn || !pn) return "";
-    return (qn * pn).toFixed(2);
-  };
+  const goToCreateReceipt = () =>
+    navigate("/crm/warehouse/documents/create?doc_type=RECEIPT");
+  const goToCreateSale = () =>
+    navigate("/crm/warehouse/documents/create?doc_type=SALE");
 
   return (
     <div className="sklad-movements">
-      {/* header */}
       <div className="sklad-movements__header">
         <div className="sklad-movements__titleWrap">
           <h2 className="sklad-movements__title">
@@ -102,21 +117,32 @@ const WarehouseMovements = () => {
               </>
             ) : (
               <>
-                <FaShoppingCart aria-hidden /> Отгрузки
+                <FaShoppingCart aria-hidden /> Отгрузки (продажа)
               </>
             )}
           </h2>
-          <div className="sklad-movements__subtitle">Учёт движений. Демоверсия UI.</div>
+          <div className="sklad-movements__subtitle">
+            Документы прихода товара на склад и отгрузки (продажи)
+          </div>
         </div>
 
         <div className="sklad-movements__actions">
-          <div className="sklad-movements__tabs" role="tablist" aria-label="Тип операции">
+          <div
+            className="sklad-movements__tabs"
+            role="tablist"
+            aria-label="Тип операции"
+          >
             <button
               type="button"
               role="tab"
               aria-selected={tab === "receipt"}
-              className={`sklad-movements__tab ${tab === "receipt" ? "is-active" : ""}`}
-              onClick={() => { setTab("receipt"); setPage(1); }}
+              className={`sklad-movements__tab ${
+                tab === "receipt" ? "is-active" : ""
+              }`}
+              onClick={() => {
+                setTab("receipt");
+                setPage(1);
+              }}
             >
               Приход
             </button>
@@ -124,8 +150,13 @@ const WarehouseMovements = () => {
               type="button"
               role="tab"
               aria-selected={tab === "issue"}
-              className={`sklad-movements__tab ${tab === "issue" ? "is-active" : ""}`}
-              onClick={() => { setTab("issue"); setPage(1); }}
+              className={`sklad-movements__tab ${
+                tab === "issue" ? "is-active" : ""
+              }`}
+              onClick={() => {
+                setTab("issue");
+                setPage(1);
+              }}
             >
               Отгрузки
             </button>
@@ -135,9 +166,12 @@ const WarehouseMovements = () => {
             <input
               className="sklad-movements__searchInput"
               type="text"
-              placeholder="Поиск: контрагент или статус…"
+              placeholder="Поиск: номер, контрагент, комментарий…"
               value={q}
-              onChange={(e) => { setQ(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setPage(1);
+              }}
               aria-label="Поиск"
             />
           </div>
@@ -145,7 +179,7 @@ const WarehouseMovements = () => {
           <button
             className="sklad-movements__btn sklad-movements__btn--primary"
             type="button"
-            onClick={() => openModal(tab)}
+            onClick={tab === "receipt" ? goToCreateReceipt : goToCreateSale}
           >
             <FaPlus aria-hidden />
             <span className="sklad-movements__btnText">
@@ -155,206 +189,84 @@ const WarehouseMovements = () => {
         </div>
       </div>
 
-      {/* таблица */}
-      <div className="sklad-movements-table" role="table" aria-label="Документы (таблица)">
-        <div className="sklad-movements-table__head" role="row">
-          <div className="sklad-movements-table__col" role="columnheader">Дата</div>
-          <div className="sklad-movements-table__col" role="columnheader">
-            {tab === "receipt" ? "Поставщик" : "Покупатель"}
-          </div>
-          <div className="sklad-movements-table__col" role="columnheader">Статус</div>
-          <div className="sklad-movements-table__col" role="columnheader">Действия</div>
-        </div>
-
-        {pageItems.map((r, i) => (
-          <div key={`${r.counterparty}-${i}`} className="sklad-movements-table__row" role="row">
-            <div className="sklad-movements-table__col sklad-movements__nowrap" data-label="Дата" role="cell">
-              {r.date}
-            </div>
-            <div
-              className="sklad-movements-table__col"
-              data-label={tab === "receipt" ? "Поставщик" : "Покупатель"}
-              role="cell"
-            >
-              {r.counterparty}
-            </div>
-            <div className="sklad-movements-table__col" data-label="Статус" role="cell">
-              <span className="sklad-movements__badge">{r.status}</span>
-            </div>
-            <div className="sklad-movements-table__col sklad-movements-table__col--actions" data-label="Действия" role="cell">
-              <button
-                type="button"
-                className="sklad-movements__btn sklad-movements__btn--secondary"
-                onClick={() => openModal(tab)}
-              >
-                Открыть
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {!pageItems.length && (
-          <div className="sklad-movements-table__empty">Ничего не найдено.</div>
-        )}
+      <div className="sklad-movements-table" aria-label="Документы">
+        <table className="sklad-movements-table__table">
+          <thead>
+            <tr className="sklad-movements-table__head">
+              <th className="sklad-movements-table__col">Номер</th>
+              <th className="sklad-movements-table__col">Дата</th>
+              <th className="sklad-movements-table__col">Контрагент</th>
+              <th className="sklad-movements-table__col">Склад</th>
+              <th className="sklad-movements-table__col">Сумма</th>
+              <th className="sklad-movements-table__col">Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="sklad-movements-table__empty">
+                  Загрузка…
+                </td>
+              </tr>
+            ) : !pageItems.length ? (
+              <tr>
+                <td colSpan={6} className="sklad-movements-table__empty">
+                  Нет документов.
+                </td>
+              </tr>
+            ) : (
+              pageItems.map((r) => (
+                <tr key={r.id} className="sklad-movements-table__row">
+                  <td className="sklad-movements-table__col" data-label="Номер">
+                    {r.number ?? "—"}
+                  </td>
+                  <td
+                    className="sklad-movements-table__col sklad-movements__nowrap"
+                    data-label="Дата"
+                  >
+                    {fmtDate(r.date)}
+                  </td>
+                  <td className="sklad-movements-table__col" data-label="Контрагент">
+                    {r.counterparty_display_name ?? "—"}
+                  </td>
+                  <td className="sklad-movements-table__col" data-label="Склад">
+                    {r.warehouse_from_name ?? "—"}
+                  </td>
+                  <td className="sklad-movements-table__col" data-label="Сумма">
+                    {r.total != null
+                      ? Number(r.total).toLocaleString("ru-RU")
+                      : "—"}
+                  </td>
+                  <td className="sklad-movements-table__col" data-label="Статус">
+                    <span className="sklad-movements__badge">
+                      {statusLabel(r.status)}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* пагинация после 15 */}
-      {filtered.length > pageSize && (
+      {source.length > PAGE_SIZE && (
         <div className="sklad-movements__pager" aria-label="Пагинация">
           <ul className="sklad-movements__pageList">
-            {Array.from({ length: totalPages }).map((_, i) => {
-              const p = i + 1;
-              return (
-                <li key={p}>
-                  <button
-                    type="button"
-                    className={`sklad-movements__pageBtn ${p === validPage ? "is-active" : ""}`}
-                    onClick={() => setPage(p)}
-                  >
-                    {p}
-                  </button>
-                </li>
-              );
-            })}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <li key={p}>
+                <button
+                  type="button"
+                  className={`sklad-movements__pageBtn ${
+                    p === validPage ? "is-active" : ""
+                  }`}
+                  onClick={() => setPage(p)}
+                >
+                  {p}
+                </button>
+              </li>
+            ))}
           </ul>
         </div>
-      )}
-
-      {/* модалка */}
-      {open && (
-        <>
-          <button className="sklad-movements__overlay" onClick={closeModal} aria-label="Закрыть" />
-          <div className="sklad-movements__modal" role="dialog" aria-modal="true">
-            <div className="sklad-movements__modalHeader">
-              <h3 className="sklad-movements__modalTitle">
-                {tab === "receipt" ? "Приход товара" : "Отгрузка товара"}
-              </h3>
-              <button className="sklad-movements__iconBtn" type="button" aria-label="Закрыть" onClick={closeModal}>
-                <FaTimes />
-              </button>
-            </div>
-
-            <div className="sklad-movements__form">
-              {/* верхняя часть формы */}
-              <div className="sklad-movements__grid">
-                <div className="sklad-movements__field">
-                  <label className="sklad-movements__label">
-                    {tab === "receipt" ? "Поставщик" : "Покупатель"} <b className="sklad-movements__req">*</b>
-                  </label>
-                  <select
-                    className="sklad-movements__input"
-                    value={counterparty}
-                    onChange={(e) => setCounterparty(e.target.value)}
-                  >
-                    <option value="">— выбрать —</option>
-                    {(tab === "receipt" ? suppliers : customers).map((v) => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sklad-movements__field">
-                  <label className="sklad-movements__label">Дата <b className="sklad-movements__req">*</b></label>
-                  <input
-                    type="date"
-                    className="sklad-movements__input"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="sklad-movements__field">
-                  <label className="sklad-movements__label">Статус <b className="sklad-movements__req">*</b></label>
-                  <select
-                    className="sklad-movements__input"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                  >
-                    {(tab === "receipt" ? receiptStatuses : issueStatuses).map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* позиции */}
-              <div className="sklad-movements-items">
-                <div className="sklad-movements-items__head">
-                  <div className="sklad-movements-items__col">Товар</div>
-                  <div className="sklad-movements-items__col">Кол-во</div>
-                  {tab === "receipt" && <div className="sklad-movements-items__col">Цена</div>}
-                  <div className="sklad-movements-items__col">Сумма</div>
-                </div>
-
-                {rows.map((row, idx) => (
-                  <div key={idx} className="sklad-movements-items__row">
-                    <select
-                      className="sklad-movements__input"
-                      value={row.product}
-                      onChange={(e) => updateRow(idx, "product", e.target.value)}
-                    >
-                      <option value="">— выбрать товар —</option>
-                      {products.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-
-                    <input
-                      className="sklad-movements__input"
-                      type="number"
-                      placeholder="0"
-                      value={row.qty}
-                      onChange={(e) => updateRow(idx, "qty", e.target.value)}
-                    />
-
-                    {tab === "receipt" ? (
-                      <>
-                        <input
-                          className="sklad-movements__input"
-                          type="number"
-                          placeholder="0.00"
-                          value={row.price}
-                          onChange={(e) => updateRow(idx, "price", e.target.value)}
-                        />
-                        <input
-                          className="sklad-movements__input sklad-movements__input--readonly"
-                          type="text"
-                          placeholder="0.00"
-                          value={sumRow(row.qty, row.price)}
-                          readOnly
-                        />
-                      </>
-                    ) : (
-                      <input
-                        className="sklad-movements__input"
-                        type="number"
-                        placeholder="0.00"
-                        value={row.amount}
-                        onChange={(e) => updateRow(idx, "amount", e.target.value)}
-                      />
-                    )}
-                  </div>
-                ))}
-
-                <div className="sklad-movements-items__footer">
-                  <button type="button" className="sklad-movements__btn" onClick={addRow}>
-                    <FaPlus aria-hidden />
-                    <span className="sklad-movements__btnText">Добавить позицию</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* футер */}
-              <div className="sklad-movements__footer">
-                <div className="sklad-movements__spacer" />
-                <button className="sklad-movements__btn" type="button" onClick={closeModal}>Отмена</button>
-                <button className="sklad-movements__btn sklad-movements__btn--primary" type="button" disabled title="Только UI">
-                  Сохранить
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
       )}
     </div>
   );

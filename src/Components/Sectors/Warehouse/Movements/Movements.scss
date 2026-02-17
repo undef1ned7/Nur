@@ -65,15 +65,18 @@
 .sklad-movements-table{
   border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;
 }
-.sklad-movements-table__head,
-.sklad-movements-table__row{
-  display:grid;align-items:center;
-  grid-template-columns:180px 1fr 180px 160px;
-}
+.sklad-movements-table__table{width:100%;border-collapse:collapse;border-spacing:0}
 .sklad-movements-table__head{background:rgba(0,0,0,.03);font-weight:800}
-.sklad-movements-table__col{padding:12px 14px;border-bottom:1px solid var(--border)}
+.sklad-movements-table__head .sklad-movements-table__col,
+.sklad-movements-table__row .sklad-movements-table__col{
+  padding:12px 14px;border-bottom:1px solid var(--border);text-align:left;
+}
 .sklad-movements-table__row:last-child .sklad-movements-table__col{border-bottom:none}
 .sklad-movements-table__empty{padding:14px;text-align:center;color:var(--muted)}
+.sklad-movements-table__table th:nth-child(1){min-width:100px}
+.sklad-movements-table__table th:nth-child(2){min-width:100px}
+.sklad-movements-table__table th:nth-child(3){min-width:140px}
+.sklad-movements-table__table th:nth-child(5){min-width:100px}
 
 /* pager */
 .sklad-movements__pager{display:flex;justify-content:center;margin-top:10px;flex-wrap:wrap}
@@ -123,16 +126,13 @@
    АДАПТАЦИЯ
    ========================= */
 
-/* немного ужимаем сетки на планшете */
 @media (max-width:1024px){
-  .sklad-movements-table__head,
-  .sklad-movements-table__row{ grid-template-columns:160px 1fr 160px 140px; }
   .sklad-movements__grid{ grid-template-columns:1fr 1fr; }
   .sklad-movements-items__head,
   .sklad-movements-items__row{ grid-template-columns:1.2fr 140px 140px 140px; }
 }
 
-/* МОБИЛКА: превращаем строки таблицы в компактные карточки с разделителем */
+/* МОБИЛКА: строки таблицы как карточки */
 @media (max-width:768px){
   .sklad-movements{ padding:16px; font-size:14px; }
   .sklad-movements__title{ font-size:18px; }
@@ -143,32 +143,29 @@
   .sklad-movements__btn--primary{ width:100%; justify-content:center; }
   .sklad-movements__badge{ font-size:12px; padding:3px 8px; }
 
-  .sklad-movements-table__head{ display:none; }
+  .sklad-movements-table thead{ display:none; }
 
   .sklad-movements-table__row{
-    grid-template-columns:1fr;
-    row-gap:6px;
+    display:block;
     padding:10px 12px;
     background:#fff;
-    border-bottom:1px solid var(--border);     /* ← чёткая линия между документами */
+    border-bottom:1px solid var(--border);
   }
-  .sklad-movements-table__row:nth-child(even){ background:#fafafa; } /* лёгкая зебра */
+  .sklad-movements-table__row:nth-child(even){ background:#fafafa; }
 
-  .sklad-movements-table__col{
+  .sklad-movements-table__row .sklad-movements-table__col{
     padding:0; border-bottom:0;
     display:flex; gap:10px; align-items:baseline;
   }
-  /* подписи слева для мобильной карточки */
-  .sklad-movements-table__col:nth-child(1)::before{ content:"Дата"; }
-  .sklad-movements-table__col:nth-child(2)::before{ content:"Контрагент"; } /* универсально: поставщик/покупатель */
-  .sklad-movements-table__col:nth-child(3)::before{ content:"Статус"; }
-  .sklad-movements-table__col:nth-child(4)::before{ content:""; display:none; }
-
+  .sklad-movements-table__col:nth-child(1)::before{ content:"Номер"; }
+  .sklad-movements-table__col:nth-child(2)::before{ content:"Дата"; }
+  .sklad-movements-table__col:nth-child(3)::before{ content:"Контрагент"; }
+  .sklad-movements-table__col:nth-child(4)::before{ content:"Склад"; }
+  .sklad-movements-table__col:nth-child(5)::before{ content:"Сумма"; }
+  .sklad-movements-table__col:nth-child(6)::before{ content:"Статус"; }
   .sklad-movements-table__col::before{
     flex:0 0 42%; color:var(--muted); font-weight:700; white-space:nowrap; font-size:13px;
   }
-
-  /* столбец с кнопкой действий — выравниваем вправо, без подписи */
   .sklad-movements-table__row > .sklad-movements-table__col:last-child{
     justify-content:flex-end; margin-top:4px;
   }

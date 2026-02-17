@@ -34,6 +34,8 @@ import {
   deleteWarehouseDocument,
   postWarehouseDocument,
   unpostWarehouseDocument,
+  cashApproveWarehouseDocument,
+  cashRejectWarehouseDocument,
   fetchWarehouseProducts,
   fetchWarehouseCounterparties,
 } from "../creators/warehouseThunk";
@@ -393,9 +395,20 @@ const saleSlice = createSlice({
         }
       })
       .addCase(unpostWarehouseDocument.fulfilled, (state, { payload }) => {
-        // Обновляем документ после отмены проведения
         const index = state.documents.findIndex((doc) => doc.id === payload.id);
         if (index !== -1) {
+          state.documents[index] = payload;
+        }
+      })
+      .addCase(cashApproveWarehouseDocument.fulfilled, (state, { payload }) => {
+        const index = state.documents.findIndex((doc) => doc.id === payload?.id);
+        if (index !== -1 && payload) {
+          state.documents[index] = payload;
+        }
+      })
+      .addCase(cashRejectWarehouseDocument.fulfilled, (state, { payload }) => {
+        const index = state.documents.findIndex((doc) => doc.id === payload?.id);
+        if (index !== -1 && payload) {
           state.documents[index] = payload;
         }
       })

@@ -572,11 +572,11 @@ export const MENU_CONFIG = {
           { label: "Списание", to: "/crm/warehouse/documents/write_off" },
           { label: "Перемещение", to: "/crm/warehouse/documents/transfer" },
           {
-            label: "Приход (деньги)",
+            label: "Приход в кассу",
             to: "/crm/warehouse/documents/money/receipt",
           },
           {
-            label: "Расход (деньги)",
+            label: "Расход в кассу",
             to: "/crm/warehouse/documents/money/expense",
           },
         ],
@@ -603,6 +603,13 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
+        label: "Касса",
+        to: "/crm/warehouse/kassa",
+        icon: menuIcons.cashRegister,
+        permission: "can_view_cashbox",
+        implemented: true,
+      },
+      {
         label: "Агенты",
         to: "/crm/warehouse/agents",
         icon: menuIcons.user,
@@ -624,27 +631,27 @@ export const MENU_CONFIG = {
       //   permission: "can_view_products",
       //   implemented: true,
       // },
-      // {
-      //   label: "Операции (Перемещения)",
-      //   to: "/crm/warehouse/movements",
-      //   icon: menuIcons.exchangeAlt,
-      //   permission: "can_view_products",
-      //   implemented: true,
-      // },
-      // {
-      //   label: "Поставки",
-      //   to: "/crm/warehouse/supply",
-      //   icon: menuIcons.truckLoading,
-      //   permission: "can_view_products",
-      //   implemented: true,
-      // },
-      // {
-      //   label: "Списание",
-      //   to: "/crm/warehouse/write_offs",
-      //   icon: menuIcons.trashAlt,
-      //   permission: "can_view_products",
-      //   implemented: true,
-      // },
+      {
+        label: "Операции (Приход / Отгрузки)",
+        to: "/crm/warehouse/movements",
+        icon: menuIcons.exchangeAlt,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Поставки",
+        to: "/crm/warehouse/supply",
+        icon: menuIcons.truckLoading,
+        permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Списание",
+        to: "/crm/warehouse/write_offs",
+        icon: menuIcons.trashAlt,
+        permission: "can_view_products",
+        implemented: true,
+      },
     ],
 
     production: [

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Download } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
-import api from "../../../../../api";
+import warehouseAPI from "../../../../../api/warehouse";
 import "./ReconciliationModal.scss";
 import ReconciliationPdfDocument from "./ReconciliationPdfDocument";
 
@@ -25,6 +25,7 @@ export default function ReconciliationModal({ open, onClose }) {
     currency: "KGS",
   });
   const [loading, setLoading] = useState(false);
+  const [loadingPdf, setLoadingPdf] = useState(false);
   const [err, setErr] = useState("");
   const [counterparties, setCounterparties] = useState([]);
   const [counterpartiesLoading, setCounterpartiesLoading] = useState(false);
@@ -38,11 +39,11 @@ export default function ReconciliationModal({ open, onClose }) {
   const loadCounterparties = async () => {
     setCounterpartiesLoading(true);
     try {
-      const res = await api.get("/warehouse/crud/counterparties/");
-      const list = Array.isArray(res?.data?.results)
-        ? res.data.results
-        : Array.isArray(res?.data)
-        ? res.data
+      const data = await warehouseAPI.listCounterparties({ page_size: 500 });
+      const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+        ? data
         : [];
       setCounterparties(list);
     } catch (e) {
@@ -101,12 +102,10 @@ export default function ReconciliationModal({ open, onClose }) {
         currency: filters.currency || "KGS",
       };
 
-      const res = await api.get(
-        `/warehouse/counterparties/${filters.counterpartyId}/reconciliation/json/`,
-        { params, headers: { Accept: "application/json" } }
+      const data = await warehouseAPI.getReconciliationJson(
+        filters.counterpartyId,
+        params
       );
-
-      const data = res?.data;
 
       const counterparty = counterparties.find(
         (c) => String(c.id) === String(filters.counterpartyId)
@@ -138,6 +137,33 @@ export default function ReconciliationModal({ open, onClose }) {
       setErr(msgFromError(e, "Не удалось загрузить акт сверки"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReconciliationPdfFromServer = async () => {
+    if (!filters.counterpartyId || !filters.start || !filters.end) {
+      setErr("Выберите контрагента и укажите период");
+      return;
+    }
+    setLoadingPdf(true);
+    setErr("");
+    try {
+      const params = {
+        start: filters.start,
+        end: filters.end,
+        currency: filters.currency || "KGS",
+      };
+      const blob = await warehouseAPI.getReconciliationPdf(
+        filters.counterpartyId,
+        params
+      );
+      const filename = `reconciliation_${filters.counterpartyId}_${filters.start}_${filters.end}.pdf`;
+      downloadBlob(blob, filename);
+    } catch (e) {
+      console.error(e);
+      setErr(msgFromError(e, "Не удалось скачать PDF с сервера"));
+    } finally {
+      setLoadingPdf(false);
     }
   };
 
@@ -240,13 +266,28 @@ export default function ReconciliationModal({ open, onClose }) {
             onClick={fetchReconciliation}
             disabled={
               loading ||
+              loadingPdf ||
               !filters.counterpartyId ||
               !filters.start ||
               !filters.end
             }
           >
             <Download size={18} />
-            {loading ? "Загрузка..." : "Загрузить акт"}
+            {loading ? "Загрузка…" : "Акт (сформировать PDF)"}
+          </button>
+          <button
+            className="reconciliation-modal__download-btn reconciliation-modal__download-btn--secondary"
+            onClick={fetchReconciliationPdfFromServer}
+            disabled={
+              loadingPdf ||
+              loading ||
+              !filters.counterpartyId ||
+              !filters.start ||
+              !filters.end
+            }
+          >
+            <Download size={18} />
+            {loadingPdf ? "Загрузка…" : "Скачать PDF с сервера"}
           </button>
         </div>
       </div>

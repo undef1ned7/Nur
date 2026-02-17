@@ -1,4 +1,4 @@
-import { Route, Navigate, useSearchParams } from "react-router-dom";
+import { Route, Navigate, useSearchParams, Outlet } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
 import { useUser } from "../store/slices/userSlice";
 
@@ -146,6 +146,7 @@ import WarehouseDocumentsLayout from "../Components/Sectors/Warehouse/Documents/
 import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
 import CreateWarehouseDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
 import MoneyDocumentsPage from "../Components/Sectors/Warehouse/Money/MoneyDocumentsPage";
+import WarehouseKassa from "../Components/Sectors/Warehouse/Kassa/WarehouseKassa";
 import WarehouseAgents from "../Components/Sectors/Warehouse/Agents/Agents";
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
@@ -469,7 +470,7 @@ export const crmRoutes = (profile) => [
 
   </Route>,
   // Cafe routes
-  <Route element={<CafeLayout />} path="cafe">
+  <Route key="cafe" element={<CafeLayout />} path="cafe">
     {[
       createProtectedRoute("analytics", CafeAnalytics),
       createProtectedRoute("documents", CafeDocuments),
@@ -553,6 +554,18 @@ export const crmRoutes = (profile) => [
     "warehouse/stocks/add-product/:id",
     AddWarehouseProductPage
   ),
+  <Route
+    key="warehouse/kassa"
+    path="warehouse/kassa"
+    element={
+      <ProtectedRoute>
+        <Outlet />
+      </ProtectedRoute>
+    }
+  >
+    <Route key="warehouse/kassa-index" index element={<WarehouseKassa />} />
+    <Route key="warehouse/kassa-id" path=":id" element={<WarehouseKassa />} />
+  </Route>,
   createProtectedRoute("warehouse/supply", WarehouseSupply),
   createProtectedRoute("warehouse/write_offs", WarehouseWriteOffs),
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
