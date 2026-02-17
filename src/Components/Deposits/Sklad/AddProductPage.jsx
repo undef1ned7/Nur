@@ -49,6 +49,7 @@ import {
   ProductImagesSection,
 } from "./AddProductPage/components";
 import axios from "axios";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 const AddProductPage = () => {
   const { id: productId } = useParams();
@@ -349,9 +350,9 @@ const AddProductPage = () => {
           }
         } catch (error) {
           console.error("Ошибка при загрузке товара:", error);
+          const errorMessage = validateResErrors(error, "Ошибка при загрузке товара. ")
           showAlert(
-            "Ошибка при загрузке товара: " +
-              (error.message || JSON.stringify(error)),
+            errorMessage,
             "error",
             "Ошибка"
           );
@@ -762,8 +763,9 @@ const AddProductPage = () => {
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
+      const errorMessage = validateResErrors(err, "Ошибка при добавлении товара. ")
       showAlert(
-        `Ошибка при добавлении товара: ${err.message || JSON.stringify(err)}`,
+        errorMessage,
         "error",
         "Ошибка"
       );

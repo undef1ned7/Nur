@@ -27,6 +27,8 @@ import {
 import { clearErrors } from "../../../store/slices/branchSlice";
 import AlertModal from "../../common/AlertModal/AlertModal";
 import "./Branch.scss";
+import { validateResErrors } from "../../../../tools/validateResErrors";
+import { useConfirm } from "@/hooks/useDialog";
 
 // Список популярных часовых поясов
 const TIMEZONES = [
@@ -54,6 +56,8 @@ const Branch = () => {
     deleteError,
     toggleError,
   } = useSelector((state) => state.branches);
+
+  const confirm = useConfirm();
 
   // Поиск
   const [query, setQuery] = useState("");
@@ -180,13 +184,7 @@ const Branch = () => {
   // Отслеживание ошибок создания
   useEffect(() => {
     if (createError && createError !== prevCreateError) {
-      const errorMessage =
-        createError?.detail ||
-        createError?.message ||
-        Object.values(createError || {})
-          .flat()
-          .join(", ") ||
-        "Не удалось создать филиал";
+      const errorMessage = validateResErrors(createError, "Ошибка при создании филиала. ")
       setAlertModal({
         open: true,
         type: "error",
@@ -200,13 +198,7 @@ const Branch = () => {
   // Отслеживание ошибок обновления
   useEffect(() => {
     if (updateError && updateError !== prevUpdateError) {
-      const errorMessage =
-        updateError?.detail ||
-        updateError?.message ||
-        Object.values(updateError || {})
-          .flat()
-          .join(", ") ||
-        "Не удалось обновить филиал";
+      const errorMessage = validateResErrors(updateError, "Ошибка при обновлении филиала. ")
       setAlertModal({
         open: true,
         type: "error",
@@ -220,13 +212,7 @@ const Branch = () => {
   // Отслеживание ошибок удаления
   useEffect(() => {
     if (deleteError && deleteError !== prevDeleteError) {
-      const errorMessage =
-        deleteError?.detail ||
-        deleteError?.message ||
-        Object.values(deleteError || {})
-          .flat()
-          .join(", ") ||
-        "Не удалось удалить филиал";
+      const errorMessage = validateResErrors(deleteError, "Ошибка при удалении филиала. ")
       setAlertModal({
         open: true,
         type: "error",
@@ -240,13 +226,7 @@ const Branch = () => {
   // Отслеживание ошибок переключения статуса
   useEffect(() => {
     if (toggleError && toggleError !== prevToggleError) {
-      const errorMessage =
-        toggleError?.detail ||
-        toggleError?.message ||
-        Object.values(toggleError || {})
-          .flat()
-          .join(", ") ||
-        "Не удалось изменить статус филиала";
+      const errorMessage = validateResErrors(toggleError, "Ошибка при изменении статуса филиала. ")
       setAlertModal({
         open: true,
         type: "error",
@@ -391,7 +371,8 @@ const Branch = () => {
       }
     } catch (err) {
       console.error("Ошибка сохранения филиала:", err);
-      setFormError("Не удалось сохранить филиал");
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении филиала. ")
+      setFormError(errorMessage);
     }
   };
 
@@ -405,19 +386,36 @@ const Branch = () => {
       );
     } catch (err) {
       console.error("Ошибка изменения статуса филиала:", err);
+      const errorMessage = validateResErrors(err, "Ошибка при изменении статуса филиала. ")
+      setAlertModal({
+        open: true,
+        type: "error",
+        title: "Ошибка",
+        message: errorMessage,
+      });
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Вы уверены, что хотите удалить этот филиал?")) {
-      return;
-    }
-
-    try {
-      await dispatch(deleteBranchAsync(id));
-    } catch (err) {
-      console.error("Ошибка удаления филиала:", err);
-    }
+    confirm(
+      "Вы уверены, что хотите удалить этот филиал?",
+      async (ok) => {
+        if (ok) {
+          try {
+            await dispatch(deleteBranchAsync(id));
+          } catch (err) {
+            console.error("Ошибка удаления филиала:", err);
+            const errorMessage = validateResErrors(err, "Ошибка при удалении филиала. ")
+            setAlertModal({
+              open: true,
+              type: "error",
+              title: "Ошибка",
+              message: errorMessage,
+            });
+          }
+        }
+      }
+    )
   };
 
   return (
@@ -472,9 +470,8 @@ const Branch = () => {
                       {branch.name || "Без названия"}
                     </h3>
                     <span
-                      className={`branch__status branch__status--${
-                        branch.is_active ? "active" : "inactive"
-                      }`}
+                      className={`branch__status branch__status--${branch.is_active ? "active" : "inactive"
+                        }`}
                     >
                       {branch.is_active ? (
                         <>
@@ -525,9 +522,8 @@ const Branch = () => {
                   <FaEye /> Просмотр
                 </button>
                 <button
-                  className={`branch__btn branch__btn--${
-                    branch.is_active ? "warning" : "success"
-                  }`}
+                  className={`branch__btn branch__btn--${branch.is_active ? "warning" : "success"
+                    }`}
                   onClick={() => toggleActive(branch)}
                   title={branch.is_active ? "Деактивировать" : "Активировать"}
                 >
@@ -727,8 +723,8 @@ const Branch = () => {
                   {creating || updating
                     ? "Сохранение…"
                     : editingId == null
-                    ? "Создать"
-                    : "Сохранить"}
+                      ? "Создать"
+                      : "Сохранить"}
                 </button>
               </div>
             </form>
@@ -768,9 +764,8 @@ const Branch = () => {
                 <div className="branch__detail-item">
                   <span className="branch__detail-label">Статус:</span>
                   <span
-                    className={`branch__status branch__status--${
-                      selectedBranch.is_active ? "active" : "inactive"
-                    }`}
+                    className={`branch__status branch__status--${selectedBranch.is_active ? "active" : "inactive"
+                      }`}
                   >
                     {selectedBranch.is_active ? (
                       <>

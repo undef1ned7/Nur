@@ -13,6 +13,7 @@ import DeleteRoleModal from "./modals/DeleteRoleModal";
 import DeleteEmployeeModal from "./modals/DeleteEmployeeModal";
 import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 import "./Masters.scss";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ===================== API endpoints ===================== */
 const EMPLOYEES_LIST_URL = "/users/employees/";
@@ -139,9 +140,8 @@ const RoleSelect = ({
         aria-expanded={open}
       >
         <span
-          className={`barbermasters__selectValue ${
-            value ? "" : "is-placeholder"
-          }`}
+          className={`barbermasters__selectValue ${value ? "" : "is-placeholder"
+            }`}
         >
           {value ? labelByKey.get(value) || placeholder : placeholder}
         </span>
@@ -171,9 +171,8 @@ const RoleSelect = ({
                 <button
                   key={o.key}
                   type="button"
-                  className={`barbermasters__selectItem ${
-                    o.key === value ? "is-active" : ""
-                  }`}
+                  className={`barbermasters__selectItem ${o.key === value ? "is-active" : ""
+                    }`}
                   onClick={() => {
                     onChange(o.key);
                     setOpen(false);
@@ -263,7 +262,7 @@ const Masters = () => {
       await navigator.clipboard.writeText(text);
       setCopied(key);
       setTimeout(() => setCopied(null), 1500);
-    } catch {}
+    } catch { }
   };
 
   /* ========= Fetch ========= */
@@ -298,8 +297,9 @@ const Masters = () => {
         setLoading(true);
         setError("");
         await Promise.all([fetchEmployees(), fetchRoles(), fetchBranches()]);
-      } catch {
-        setError("Не удалось загрузить данные.");
+      } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка загрузки данных. ")
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -619,8 +619,8 @@ const Masters = () => {
     const roleChoice = u.role
       ? `sys:${u.role}`
       : u.custom_role
-      ? `cus:${u.custom_role}`
-      : "";
+        ? `cus:${u.custom_role}`
+        : "";
     // Берем первый филиал из массива branches или используем branch
     const branchValue =
       Array.isArray(u.branches) && u.branches.length > 0
@@ -1072,9 +1072,8 @@ const Masters = () => {
                 {gap && <li className="barbermasters__dots">…</li>}
                 <li>
                   <button
-                    className={`barbermasters__pageBtn ${
-                      n === page ? "is-active" : ""
-                    }`}
+                    className={`barbermasters__pageBtn ${n === page ? "is-active" : ""
+                      }`}
                     aria-current={n === page ? "page" : undefined}
                     onClick={() => onChange(n)}
                   >
@@ -1106,15 +1105,13 @@ const Masters = () => {
             {loading
               ? "Загрузка…"
               : tab === "roles"
-              ? `${rolesForList.length} ролей${
-                  rolesForList.length > PAGE_SIZE
-                    ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
-                    : ""
+                ? `${rolesForList.length} ролей${rolesForList.length > PAGE_SIZE
+                  ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
+                  : ""
                 }`
-              : `${filteredEmployees.length} сотрудников${
-                  filteredEmployees.length > PAGE_SIZE
-                    ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
-                    : ""
+                : `${filteredEmployees.length} сотрудников${filteredEmployees.length > PAGE_SIZE
+                  ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
+                  : ""
                 }`}
           </span>
         </div>
@@ -1123,18 +1120,16 @@ const Masters = () => {
           <div className="barbermasters__tabs">
             <button
               type="button"
-              className={`barbermasters__btn barbermasters__btn--secondary ${
-                tab === "roles" ? "is-active" : ""
-              }`}
+              className={`barbermasters__btn barbermasters__btn--secondary ${tab === "roles" ? "is-active" : ""
+                }`}
               onClick={() => setTab("roles")}
             >
               Роли
             </button>
             <button
               type="button"
-              className={`barbermasters__btn barbermasters__btn--secondary ${
-                tab === "masters" ? "is-active" : ""
-              }`}
+              className={`barbermasters__btn barbermasters__btn--secondary ${tab === "masters" ? "is-active" : ""
+                }`}
               onClick={() => setTab("masters")}
             >
               Сотрудники
@@ -1269,8 +1264,8 @@ const Masters = () => {
               const roleLabel = u.role
                 ? ruLabelSys(u.role)
                 : roles.length
-                ? roleById.get(u.custom_role)?.name || u.role_display || "—"
-                : u.role_display || "—";
+                  ? roleById.get(u.custom_role)?.name || u.role_display || "—"
+                  : u.role_display || "—";
               return (
                 <article key={u.id} className="barbermasters__card">
                   <div className="barbermasters__cardLeft">

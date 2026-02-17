@@ -19,10 +19,14 @@ import "./Employ.scss";
 import { useUser } from "../../../store/slices/userSlice";
 import AccessList from "../../DepartmentDetails/AccessList";
 import { ALL_ACCESS_TYPES_MAPPING } from "../../DepartmentDetails/DepartmentDetails";
+import { useAlert, useConfirm } from "@/hooks/useDialog";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 const BASE_URL = "https://app.nurcrm.kg/api";
 const AUTH_TOKEN = localStorage.getItem("accessToken");
 
 const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
+  const alert = useAlert();
+  const confirm = useConfirm();
   const dispatch = useDispatch();
   const { updating, updateError, deleting, deleteError } = useSelector(
     (state) => state.employee
@@ -31,8 +35,8 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
   const [editedEmployee, setEditedEmployee] = useState(() => {
     const birthDate = employee.birth
       ? new Date(employee.birth.split(".").reverse().join("-"))
-          .toISOString()
-          .split("T")[0]
+        .toISOString()
+        .split("T")[0]
       : "";
     return {
       id: employee.id || "",
@@ -77,33 +81,34 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
       onSaveSuccess();
     } catch (err) {
       console.error("Failed to update employee:", err);
+      const errorMessage = validateResErrors(err, "Ошибка при обновлении сотрудника. ")
       alert(
-        `Ошибка при обновлении сотрудника: ${
-          err.message || JSON.stringify(err)
-        }`
+        errorMessage,
+        true
       );
     }
   };
 
-  const handleDelete = async () => {
-    if (
-      window.confirm(
-        `Вы уверены, что хотите удалить сотрудника ${employee?.name}?`
-      )
-    ) {
-      try {
-        await dispatch(deleteEmployeeAsync(employee.id)).unwrap();
-        onClose();
-        onDeleteConfirm();
-      } catch (err) {
-        console.error("Failed to delete employee:", err);
-        alert(
-          `Ошибка при удалении сотрудника: ${
-            err.message || JSON.stringify(err)
-          }`
-        );
+  const handleDelete = () => {
+    confirm(
+      `Вы уверены, что хотите удалить сотрудника ${employee?.name}?`,
+      async (ok) => {
+        if (ok) {
+          try {
+            await dispatch(deleteEmployeeAsync(employee.id)).unwrap();
+            onClose();
+            onDeleteConfirm();
+          } catch (err) {
+            console.error("Failed to delete employee:", err);
+            const errorMessage = validateResErrors(err, "Ошибка при удалении сотрудника. ")
+            alert(
+              errorMessage,
+              true
+            );
+          }
+        }
       }
-    }
+    )
   };
 
   const availableDepts = ["Склад", "Маркетинг", "Продажи", "HR", "Бухгалтерия"];
@@ -384,8 +389,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
     } catch (err) {
       console.error("Failed to create employee:", err);
       alert(
-        `Ошибка при добавлении сотрудника: ${
-          err.message || JSON.stringify(err)
+        `Ошибка при добавлении сотрудника: ${err.message || JSON.stringify(err)
         }`
       );
     }
@@ -733,8 +737,8 @@ export default function EmployeeTable() {
         const errorData = await response.json();
         throw new Error(
           errorData.detail ||
-            JSON.stringify(errorData) ||
-            "Не удалось обновить доступы сотрудника"
+          JSON.stringify(errorData) ||
+          "Не удалось обновить доступы сотрудника"
         );
       }
     } catch (err) {
@@ -830,7 +834,7 @@ export default function EmployeeTable() {
                     <td>{e.email}</td>
                     <td>
                       {profile?.owner?.role === "owner" ||
-                      profile?.owner?.role === "admin" ? (
+                        profile?.owner?.role === "admin" ? (
                         <AccessList
                           employeeAccesses={e.accesses}
                           onSaveAccesses={(newAccessesPayload) =>
@@ -850,11 +854,10 @@ export default function EmployeeTable() {
                     </td>
                     <td>
                       <span
-                        className={`employee__role ${
-                          e.role === "Маркетолог"
-                            ? "employee__role--red"
-                            : "employee__role--green"
-                        }`}
+                        className={`employee__role ${e.role === "Маркетолог"
+                          ? "employee__role--red"
+                          : "employee__role--green"
+                          }`}
                       >
                         {availableRoles.map((item) => {
                           return item.value === e.role ? item.label : false;

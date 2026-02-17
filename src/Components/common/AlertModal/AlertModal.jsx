@@ -74,10 +74,12 @@ const AlertModal = ({
             position: "relative",
             width: "min(420px, 92vw)",
             margin: "10vh auto 0",
+            maxHeight: '500px',
             background: "#fff",
             borderRadius: 16,
             boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
             padding: 24,
+            overflowY: 'auto',
             zIndex: 1001,
             textAlign: "center",
           }}

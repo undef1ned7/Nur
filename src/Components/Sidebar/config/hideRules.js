@@ -125,7 +125,25 @@ export const HIDE_RULES = [
   {
     when: { sector: "Строительная компания" },
     hide: {
-      toIncludes: ["/crm/debts", "/crm/obzor", "/crm/branch"],
+      toIncludes: [
+        "/crm/zakaz",
+        "/crm/kassa",
+        "/crm/cafe/reports",
+        "/crm/sell",
+        "/crm/cafe/payroll",
+        "/crm/obzor",
+        "/crm/raspisanie",
+        "/crm/sklad",
+        "/crm/cafe/reservation",
+        "/crm/cafe/purchasing",
+        "/crm/analytics",
+        "/crm/debts",
+        "/crm/brand-category",
+        '/crm/branch',
+        '/crm/additional-services',
+        '/crm/clients',
+        '/crm/employ',
+      ],
     },
   },
   {

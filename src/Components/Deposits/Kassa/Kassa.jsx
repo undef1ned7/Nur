@@ -12,6 +12,8 @@ import Reports from "./Reports/Reports";
 import "./kassa.scss";
 import { useUser } from "../../../store/slices/userSlice";
 import useResize from "../../../hooks/useResize";
+import { useAlert } from "@/hooks/useDialog";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 /* Base path */
 const BASE = "/crm/kassa";
@@ -81,6 +83,7 @@ const getInitialViewMode = () => {
 };
 
 const CashboxList = () => {
+  const alert = useAlert();
   const { company } = useUser();
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
@@ -109,8 +112,8 @@ const CashboxList = () => {
       const { data } = await api.get("/construction/cashboxes/");
       setRows(asArray(data));
     } catch (e) {
-      console.error(e);
-      setErr("Не удалось загрузить кассы");
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке касс. ")
+      setErr(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -144,8 +147,8 @@ const CashboxList = () => {
       setName("");
       load();
     } catch (e) {
-      console.error(e);
-      alert("Не удалось создать кассу");
+      const errorMessage = validateResErrors(e, "Ошибка при создании кассы. ")
+      alert(errorMessage, true);
     }
   };
 

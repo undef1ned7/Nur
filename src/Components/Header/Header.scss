@@ -27,6 +27,149 @@
     gap: 20px;
   }
 
+  &__project {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba($building-primary, 0.14);
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(2, 8, 23, 0.06);
+    max-width: 360px;
+  }
+
+  &__project-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(11, 42, 60, 0.85);
+    white-space: nowrap;
+  }
+
+  &__project-select {
+    border: 1px solid rgba($building-primary, 0.18);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 13px;
+    background: #fff;
+    color: #0b2a3c;
+    min-width: 210px;
+    max-width: 280px;
+    outline: none;
+  }
+
+  &__project-select:focus {
+    border-color: $building-primary;
+    box-shadow: 0 0 0 3px rgba(15, 76, 117, 0.14);
+  }
+
+  &__project-iconBtn {
+    display: none; /* показываем только на мобилке */
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid rgba($building-primary, 0.14);
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(2, 8, 23, 0.06);
+    cursor: pointer;
+    color: $building-primary;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  &__project-iconBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(2, 8, 23, 0.1);
+  }
+
+  &__projectDrawerOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 8, 23, 0.35);
+    z-index: 9999;
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  &__projectDrawer {
+    width: min(86vw, 360px);
+    height: 100%;
+    background: #fff;
+    border-right: 1px solid rgba($building-primary, 0.12);
+    box-shadow: 12px 0 34px rgba(2, 8, 23, 0.18);
+    display: flex;
+    flex-direction: column;
+    animation: headerProjectDrawerIn 160ms ease-out;
+  }
+
+  &__projectDrawerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 14px;
+    border-bottom: 1px solid rgba($building-primary, 0.12);
+  }
+
+  &__projectDrawerTitle {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0b2a3c;
+  }
+
+  &__projectDrawerClose {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__projectDrawerBody {
+    padding: 10px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__projectDrawerState {
+    padding: 10px 6px;
+    opacity: 0.75;
+    font-size: 13px;
+  }
+
+  &__projectDrawerItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba($building-primary, 0.12);
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    color: #0b2a3c;
+  }
+
+  &__projectDrawerItem.is-active {
+    border-color: rgba($building-primary, 0.28);
+    background: rgba($building-primary, 0.06);
+  }
+
+  &__projectDrawerItemName {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
   &__cashier-btn {
     display: flex;
     align-items: center;
@@ -209,6 +352,15 @@
       gap: 15px;
     }
 
+    /* На мобилке селект скрываем, вместо него показываем иконку */
+    &__project {
+      display: none;
+    }
+
+    &__project-iconBtn {
+      display: flex;
+    }
+
     &__notification {
       .material-icons {
         font-size: 20px;
@@ -228,6 +380,29 @@
         height: 20px;
       }
     }
+  }
+}
+
+/* На планшетах тоже скрываем селект и показываем иконку */
+@media screen and (max-width: 768px) {
+  .header {
+    &__project {
+      display: none;
+    }
+    &__project-iconBtn {
+      display: flex;
+    }
+  }
+}
+
+@keyframes headerProjectDrawerIn {
+  from {
+    transform: translateX(-8px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 

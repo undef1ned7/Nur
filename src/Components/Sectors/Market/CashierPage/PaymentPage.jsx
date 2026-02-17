@@ -15,6 +15,7 @@ import { useUser } from "../../../../store/slices/userSlice";
 import CustomerModal from "./components/CustomerModal";
 import SuccessPaymentModal from "./components/SuccessPaymentModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
@@ -341,14 +342,12 @@ const PaymentPage = ({
                   "Ошибка при создании долга для тарифа Старт:",
                   startDebtError
                 );
+                const errorMessage = validateResErrors(startDebtError, "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. ")
                 // Не блокируем успешную оплату, если ошибка с долгом
                 showAlert(
                   "warning",
                   "Предупреждение",
-                  "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. " +
-                  (startDebtError?.response?.data?.detail ||
-                    startDebtError?.message ||
-                    "Проверьте данные клиента.")
+                  errorMessage
                 );
                 return;
               }
@@ -370,12 +369,12 @@ const PaymentPage = ({
             ).unwrap();
           } catch (debtError) {
             console.warn("Ошибка при создании долга:", debtError);
+            const errorMessage = validateResErrors(debtError, "Оплата оформлена, но не удалось создать запись о долге. ")
             // Не блокируем успешную оплату, если ошибка с долгом
             showAlert(
               "warning",
               "Предупреждение",
-              "Оплата оформлена, но не удалось создать запись о долге. " +
-              (debtError?.message || "Проверьте данные клиента.")
+              errorMessage
             );
           }
         }
@@ -453,20 +452,20 @@ const PaymentPage = ({
           checkoutResponse: result.payload,
         });
       } else {
+        const errorMessage = validateResErrors(result.payload, "Ошибка при оформлении оплаты. ")
         showAlert(
           "error",
           "Ошибка",
-          "Ошибка при оформлении оплаты: " +
-          (result.payload?.message || "Неизвестная ошибка")
+          errorMessage
         );
       }
     } catch (error) {
       console.error("Ошибка при оформлении оплаты:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при оформлении оплаты. ")
       showAlert(
         "error",
         "Ошибка",
-        "Ошибка при оформлении оплаты: " +
-        (error.message || "Неизвестная ошибка")
+        errorMessage
       );
     }
   };
@@ -518,10 +517,11 @@ const PaymentPage = ({
       }
     } catch (error) {
       console.error("Ошибка при печати чека:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при печати чека. ")
       showAlert(
         "error",
         "Ошибка печати",
-        error.message || "Не удалось распечатать чек"
+        errorMessage
       );
     } finally {
       setPrinting(false);

@@ -20,6 +20,7 @@ import {
 import "./Employ.scss"; // ⚠️ тот же файл стилей
 import { useAlert, useConfirm } from "../../../hooks/useDialog";
 import { useDebouncedValue } from "../../../hooks/useDebounce";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 /* ------------------------------------------------------------------ */
 // Универсальный модал (создание / редактирование)
@@ -215,7 +216,8 @@ export default function BrandCategoryPage() {
       }
       setModalCfg(null);
     } catch (e) {
-      alert("Ошибка сохранения");
+      const errorMessage = validateResErrors(e, "Ошибка при сохранении. ")
+      alert(errorMessage);
       console.error(e);
     }
   };
@@ -233,8 +235,8 @@ export default function BrandCategoryPage() {
         }
         setModalCfg(null);
       } catch (e) {
-        alert("Ошибка удаления");
-        console.error(e);
+        const errorMessage = validateResErrors(e, "Ошибка при удалении. ")
+        alert(errorMessage);
       }
 
     });

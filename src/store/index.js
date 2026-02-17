@@ -27,6 +27,7 @@ import branchReducer from "./slices/branchSlice";
 import shiftReducer from "./slices/shiftSlice";
 import warehouseReducer from "./slices/warehouseSlice";
 import counterpartyReducer from "./slices/counterpartySlice";
+import buildingProjectsReducer from "./slices/building/projectsSlice";
 // import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
@@ -59,6 +60,7 @@ const store = configureStore({
     shifts: shiftReducer,
     warehouse: warehouseReducer,
     counterparty: counterpartyReducer,
+    buildingProjects: buildingProjectsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
