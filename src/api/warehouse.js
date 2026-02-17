@@ -167,6 +167,108 @@ export const unpostDocument = async (id) => {
   }
 };
 
+/**
+ * Подтвердить кассовый запрос (документ в CASH_PENDING → POSTED, при payment_kind=cash создаётся MONEY_*)
+ * POST /api/warehouse/documents/{id}/cash/approve/
+ * @param {string} id - UUID документа
+ * @param {Object} body - опционально { note: "комментарий" }
+ */
+export const cashDocumentApprove = async (id, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/documents/${id}/cash/approve/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Cash Approve Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Отклонить кассовый запрос (склад откатывается, документ → REJECTED)
+ * POST /api/warehouse/documents/{id}/cash/reject/
+ * @param {string} id - UUID документа
+ * @param {Object} body - опционально { note: "причина отказа" }
+ */
+export const cashDocumentReject = async (id, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/documents/${id}/cash/reject/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Cash Reject Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Inbox запросов кассы (документы в CASH_PENDING, ожидающие решения)
+ * GET /api/warehouse/cash/requests/
+ * @param {Object} params - status, requires_money, money_doc_type, document__doc_type, document__payment_kind, search, page
+ */
+export const listCashRequests = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/cash/requests/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Cash Requests Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Подтвердить запрос кассы по ID запроса
+ * POST /api/warehouse/cash/requests/{request_id}/approve/
+ */
+export const approveCashRequest = async (requestId, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/cash/requests/${requestId}/approve/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Approve Cash Request Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Отклонить запрос кассы по ID запроса
+ * POST /api/warehouse/cash/requests/{request_id}/reject/
+ */
+export const rejectCashRequest = async (requestId, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/cash/requests/${requestId}/reject/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Reject Cash Request Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== ТИПОВЫЕ СПИСКИ ДОКУМЕНТОВ ====================
 
 /**
@@ -709,6 +811,131 @@ export const deleteProductByUuid = async (uuid) => {
   } catch (error) {
     if (error.response) {
       console.error("Delete Product By Uuid Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * 3.1.1 Скан штрихкода (поиск или создание товара)
+ * POST /api/warehouse/{warehouse_uuid}/products/scan/
+ * @param {string} warehouseUuid - UUID склада
+ * @param {Object} payload - { barcode, name?, category? } — name и category обязательны при создании нового
+ * @returns {{ created: boolean, scan_qty?: string|null, product: Object }}
+ */
+export const scanProduct = async (warehouseUuid, payload) => {
+  try {
+    const response = await api.post(
+      `warehouse/${warehouseUuid}/products/scan/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Scan Product Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== ГРУППЫ ТОВАРОВ СКЛАДА (2.3.1) ====================
+
+/**
+ * Список групп склада
+ * GET /api/warehouse/{warehouse_uuid}/groups/
+ */
+export const listWarehouseGroups = async (warehouseUuid) => {
+  try {
+    const response = await api.get(`warehouse/${warehouseUuid}/groups/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Warehouse Groups Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Детали группы
+ * GET /api/warehouse/{warehouse_uuid}/groups/{group_uuid}/
+ */
+export const getWarehouseGroup = async (warehouseUuid, groupUuid) => {
+  try {
+    const response = await api.get(
+      `warehouse/${warehouseUuid}/groups/${groupUuid}/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Warehouse Group Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Создать группу
+ * POST /api/warehouse/{warehouse_uuid}/groups/
+ * @param {Object} payload - { name, parent?: uuid|null }
+ */
+export const createWarehouseGroup = async (warehouseUuid, payload) => {
+  try {
+    const response = await api.post(
+      `warehouse/${warehouseUuid}/groups/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Warehouse Group Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Обновить группу
+ * PATCH/PUT /api/warehouse/{warehouse_uuid}/groups/{group_uuid}/
+ */
+export const updateWarehouseGroup = async (
+  warehouseUuid,
+  groupUuid,
+  payload
+) => {
+  try {
+    const response = await api.patch(
+      `warehouse/${warehouseUuid}/groups/${groupUuid}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Warehouse Group Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Удалить группу
+ * DELETE /api/warehouse/{warehouse_uuid}/groups/{group_uuid}/
+ */
+export const deleteWarehouseGroup = async (warehouseUuid, groupUuid) => {
+  try {
+    const response = await api.delete(
+      `warehouse/${warehouseUuid}/groups/${groupUuid}/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Warehouse Group Error:", error.response.data);
       return Promise.reject(error.response.data);
     }
     return Promise.reject(error);
@@ -1622,6 +1849,120 @@ export const getCounterpartyPayments = async (id) => {
   }
 };
 
+// ==================== КАССА (CASH REGISTER) 5.0 ====================
+
+/**
+ * Список касс
+ * GET /api/warehouse/cash-registers/
+ */
+export const listCashRegisters = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/cash-registers/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Cash Registers Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Детали кассы
+ * GET /api/warehouse/cash-registers/{id}/
+ */
+export const getCashRegister = async (id) => {
+  try {
+    const response = await api.get(`warehouse/cash-registers/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Cash Register Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Создать кассу
+ * POST /api/warehouse/cash-registers/
+ * @param {Object} payload - { name, location? }
+ */
+export const createCashRegister = async (payload) => {
+  try {
+    const response = await api.post("warehouse/cash-registers/", payload);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Cash Register Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Обновить кассу
+ * PATCH/PUT /api/warehouse/cash-registers/{id}/
+ */
+export const updateCashRegister = async (id, payload) => {
+  try {
+    const response = await api.patch(
+      `warehouse/cash-registers/${id}/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Update Cash Register Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Удалить кассу
+ * DELETE /api/warehouse/cash-registers/{id}/
+ */
+export const deleteCashRegister = async (id) => {
+  try {
+    const response = await api.delete(`warehouse/cash-registers/${id}/`);
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Delete Cash Register Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Касса с балансом, приходами и расходами
+ * GET /api/warehouse/cash-registers/{id}/operations/
+ * @returns {{ id, name, balance, receipts_total, expenses_total, receipts[], expenses[] }}
+ */
+export const getCashRegisterOperations = async (id) => {
+  try {
+    const response = await api.get(
+      `warehouse/cash-registers/${id}/operations/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error(
+        "Get Cash Register Operations Error:",
+        error.response.data
+      );
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== ДЕНЕЖНЫЕ ДОКУМЕНТЫ (ПРИХОД/РАСХОД) ====================
 
 /**
@@ -1854,6 +2195,51 @@ export const getCounterpartyMoneyOperations = async (
   }
 };
 
+/**
+ * Акт сверки с контрагентом (JSON)
+ * GET /api/warehouse/counterparties/{counterparty_id}/reconciliation/json/
+ * @param {string} counterpartyId - UUID контрагента
+ * @param {Object} params - start (YYYY-MM-DD), end (YYYY-MM-DD), currency?, branch?
+ */
+export const getReconciliationJson = async (counterpartyId, params = {}) => {
+  try {
+    const response = await api.get(
+      `warehouse/counterparties/${counterpartyId}/reconciliation/json/`,
+      { params }
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Reconciliation JSON Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Акт сверки с контрагентом (PDF с сервера)
+ * GET /api/warehouse/counterparties/{counterparty_id}/reconciliation/
+ * @param {string} counterpartyId - UUID контрагента
+ * @param {Object} params - start, end, currency?, branch?
+ * @returns {Promise<Blob>}
+ */
+export const getReconciliationPdf = async (counterpartyId, params = {}) => {
+  try {
+    const response = await api.get(
+      `warehouse/counterparties/${counterpartyId}/reconciliation/`,
+      { params, responseType: "blob" }
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Get Reconciliation PDF Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== АНАЛИТИКА СКЛАДА ====================
 
 /**
@@ -1923,6 +2309,11 @@ export default {
   deleteDocument,
   postDocument,
   unpostDocument,
+  cashDocumentApprove,
+  cashDocumentReject,
+  listCashRequests,
+  approveCashRequest,
+  rejectCashRequest,
   // Типовые списки документов
   listSaleDocuments,
   createSaleDocument,
@@ -2038,4 +2429,21 @@ export default {
   postMoneyDocument,
   unpostMoneyDocument,
   getCounterpartyMoneyOperations,
+  getReconciliationJson,
+  getReconciliationPdf,
+  // Касса (5.0)
+  listCashRegisters,
+  getCashRegister,
+  createCashRegister,
+  updateCashRegister,
+  deleteCashRegister,
+  getCashRegisterOperations,
+  // Скан штрихкода (3.1.1)
+  scanProduct,
+  // Группы товаров склада (2.3.1)
+  listWarehouseGroups,
+  getWarehouseGroup,
+  createWarehouseGroup,
+  updateWarehouseGroup,
+  deleteWarehouseGroup,
 };

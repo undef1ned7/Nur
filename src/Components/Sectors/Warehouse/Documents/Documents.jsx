@@ -9,6 +9,7 @@ import {
   Plus,
   Check,
   X,
+  Undo2,
   LayoutGrid,
   List,
 } from "lucide-react";
@@ -23,6 +24,8 @@ import {
   fetchWarehouseDocuments,
   postWarehouseDocument,
   unpostWarehouseDocument,
+  cashApproveWarehouseDocument,
+  cashRejectWarehouseDocument,
   getWarehouseDocumentById,
 } from "../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -71,8 +74,7 @@ const Documents = () => {
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
 
   // Тип документа из URL (sidebar): all, sale, purchase, ...
-  const docType =
-    DOC_TYPE_FROM_PARAM[docTypeParam] ?? DOC_TYPE_FROM_PARAM.all;
+  const docType = DOC_TYPE_FROM_PARAM[docTypeParam] ?? DOC_TYPE_FROM_PARAM.all;
 
   const [activeTab, setActiveTab] = useState("receipts");
   const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
@@ -112,22 +114,48 @@ const Documents = () => {
     return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
   };
 
+  // Маппинг статусов по API (9): DRAFT | CASH_PENDING | POSTED | REJECTED
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "POSTED":
+        return "Проведён";
+      case "CASH_PENDING":
+        return "Ожидает кассы";
+      case "REJECTED":
+        return "Отклонён";
+      default:
+        return "Черновик";
+    }
+  };
+  const getStatusType = (status) => {
+    switch (status) {
+      case "POSTED":
+        return "approved";
+      case "CASH_PENDING":
+        return "cash_pending";
+      case "REJECTED":
+        return "rejected";
+      default:
+        return "draft";
+    }
+  };
+
   // Маппинг данных из Redux в формат для отображения
-  // Новый API возвращает документы в формате warehouse
   const receiptsData = useMemo(() => {
     if (activeTab !== "receipts") return [];
     return (documents || []).map((doc, index) => ({
       id: doc.id,
       number: doc.number || getDocumentNumber(index, "ЧЕК"),
-      date: doc.date || doc.created_at
-        ? new Date(doc.date || doc.created_at).toLocaleString("ru-RU", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-        : "—",
+      date:
+        doc.date || doc.created_at
+          ? new Date(doc.date || doc.created_at).toLocaleString("ru-RU", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
       client:
         doc.counterparty?.name ||
         doc.counterparty_display_name ||
@@ -137,9 +165,11 @@ const Documents = () => {
       amount: doc.total || "0.00",
       discount_percent: doc.discount_percent ?? null,
       discount_amount: doc.discount_amount ?? null,
-      status: doc.status === "POSTED" ? "Проведен" : "Черновик",
-      statusType: doc.status === "POSTED" ? "approved" : "draft",
-      document: doc, // Сохраняем полный объект документа
+      status: getStatusLabel(doc.status),
+      statusType: getStatusType(doc.status),
+      rawStatus: doc.status,
+      payment_kind: doc.payment_kind,
+      document: doc,
     }));
   }, [documents, activeTab, currentPage]);
 
@@ -148,13 +178,14 @@ const Documents = () => {
     return (documents || []).map((doc, index) => ({
       id: doc.id,
       number: doc.number || getDocumentNumber(index, "НАКЛ"),
-      date: doc.date || doc.created_at
-        ? new Date(doc.date || doc.created_at).toLocaleDateString("ru-RU", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })
-        : "—",
+      date:
+        doc.date || doc.created_at
+          ? new Date(doc.date || doc.created_at).toLocaleDateString("ru-RU", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
+          : "—",
       counterparty:
         doc.counterparty?.name ||
         doc.counterparty_display_name ||
@@ -164,9 +195,11 @@ const Documents = () => {
       amount: doc.total || "0.00",
       discount_percent: doc.discount_percent ?? null,
       discount_amount: doc.discount_amount ?? null,
-      status: doc.status === "POSTED" ? "Проведен" : "Черновик",
-      statusType: doc.status === "POSTED" ? "approved" : "draft",
-      document: doc, // Сохраняем полный объект документа
+      status: getStatusLabel(doc.status),
+      statusType: getStatusType(doc.status),
+      rawStatus: doc.status,
+      payment_kind: doc.payment_kind,
+      document: doc,
     }));
   }, [documents, activeTab, currentPage]);
 
@@ -279,24 +312,32 @@ const Documents = () => {
     confirm(`Провести документ ${item.number}?`, async (ok) => {
       if (!ok) return;
       try {
-        const result = await dispatch(postWarehouseDocument({ id: item.id, allowNegative: false }));
+        const result = await dispatch(
+          postWarehouseDocument({ id: item.id, allowNegative: false })
+        );
         if (postWarehouseDocument.fulfilled.match(result)) {
           alert("Документ успешно проведен");
           // Перезагружаем список документов
           handleSaved();
         } else {
           const error = result.payload || result.error;
-          const errorMessage = error?.detail || error?.message || "Ошибка при проведении документа";
+          const errorMessage =
+            error?.detail ||
+            error?.message ||
+            "Ошибка при проведении документа";
           alert("Ошибка: " + errorMessage);
         }
       } catch (error) {
         console.error("Ошибка при проведении документа:", error);
-        alert("Ошибка: " + (error?.message || "Не удалось провести документ"), true);
+        alert(
+          "Ошибка: " + (error?.message || "Не удалось провести документ"),
+          true
+        );
       }
     });
   };
 
-  // Отмена проведения документа
+  // Отмена проведения документа (DRAFT или CASH_PENDING → откат склада, документ в DRAFT)
   const handleUnpost = async (item) => {
     if (!item?.id) return;
 
@@ -306,18 +347,77 @@ const Documents = () => {
         const result = await dispatch(unpostWarehouseDocument(item.id));
         if (unpostWarehouseDocument.fulfilled.match(result)) {
           alert("Проведение документа отменено");
-          // Перезагружаем список документов
           handleSaved();
         } else {
           const error = result.payload || result.error;
-          const errorMessage = error?.detail || error?.message || "Ошибка при отмене проведения";
+          const errorMessage =
+            error?.detail || error?.message || "Ошибка при отмене проведения";
           alert("Ошибка: " + errorMessage);
         }
       } catch (error) {
         console.error("Ошибка при отмене проведения документа:", error);
-        alert("Ошибка: " + (error?.message || "Не удалось отменить проведение документа"), true);
+        alert(
+          "Ошибка: " +
+            (error?.message || "Не удалось отменить проведение документа"),
+          true
+        );
       }
     });
+  };
+
+  // Подтвердить кассой (CASH_PENDING → POSTED, при payment_kind=cash создаётся денежный документ)
+  const handleCashApprove = async (item) => {
+    if (!item?.id) return;
+    confirm(`Подтвердить документ ${item.number} в кассе?`, async (ok) => {
+      if (!ok) return;
+      try {
+        const result = await dispatch(
+          cashApproveWarehouseDocument({ id: item.id })
+        );
+        if (cashApproveWarehouseDocument.fulfilled.match(result)) {
+          alert("Документ подтверждён кассой");
+          handleSaved();
+        } else {
+          const error = result.payload || result.error;
+          const errorMessage =
+            error?.detail ||
+            error?.message ||
+            "Ошибка при подтверждении кассой";
+          alert("Ошибка: " + errorMessage);
+        }
+      } catch (error) {
+        console.error("Ошибка при подтверждении кассой:", error);
+        alert("Ошибка: " + (error?.message || "Не удалось подтвердить"), true);
+      }
+    });
+  };
+
+  // Отклонить кассой (склад откатывается, документ → REJECTED)
+  const handleCashReject = async (item) => {
+    if (!item?.id) return;
+    confirm(
+      `Отклонить документ ${item.number}? Склад будет откатан.`,
+      async (ok) => {
+        if (!ok) return;
+        try {
+          const result = await dispatch(
+            cashRejectWarehouseDocument({ id: item.id })
+          );
+          if (cashRejectWarehouseDocument.fulfilled.match(result)) {
+            alert("Документ отклонён");
+            handleSaved();
+          } else {
+            const error = result.payload || result.error;
+            const errorMessage =
+              error?.detail || error?.message || "Ошибка при отклонении";
+            alert("Ошибка: " + errorMessage);
+          }
+        } catch (error) {
+          console.error("Ошибка при отклонении:", error);
+          alert("Ошибка: " + (error?.message || "Не удалось отклонить"), true);
+        }
+      }
+    );
   };
 
   const handlePrint = async (item) => {
@@ -344,45 +444,50 @@ const Documents = () => {
           };
           const buyer = doc.counterparty
             ? {
-              id: doc.counterparty.id,
-              name: doc.counterparty.name || "",
-              inn: doc.counterparty.inn || "",
-              okpo: doc.counterparty.okpo || "",
-              score: doc.counterparty.score || "",
-              bik: doc.counterparty.bik || "",
-              address: doc.counterparty.address || "",
-              phone: doc.counterparty.phone || null,
-              email: doc.counterparty.email || null,
-            }
+                id: doc.counterparty.id,
+                name: doc.counterparty.name || "",
+                inn: doc.counterparty.inn || "",
+                okpo: doc.counterparty.okpo || "",
+                score: doc.counterparty.score || "",
+                bik: doc.counterparty.bik || "",
+                address: doc.counterparty.address || "",
+                phone: doc.counterparty.phone || null,
+                email: doc.counterparty.email || null,
+              }
             : null;
           const docDiscountPercent = Number(doc.discount_percent || 0);
           const docDiscountAmount = Number(doc.discount_amount || 0);
 
           const items = Array.isArray(doc.items)
             ? doc.items.map((item) => {
-              const price = Number(item.price || 0);
-              const qty = Number(item.qty || 0);
-              // Сумма по строке = цена × кол-во (как на накладной из CreateSaleDocument), не используем line_total с бэка
-              const lineTotal = price * qty;
-              return {
-                id: item.id,
-                name:
-                  item.product_name ??
-                  item.product?.name ??
-                  item.name ??
-                  item.product?.title ??
-                  "Товар",
-                qty: String(qty),
-                unit_price: String(price.toFixed(2)),
-                total: String(lineTotal.toFixed(2)),
-                unit: item.product?.unit ?? item.unit ?? "ШТ",
-                article:
-                  String(item.product?.article ?? item.article ?? item.product_article ?? "").trim() || "",
-                discount_percent: Number(item.discount_percent || 0),
-                discount_amount: Number(item.discount_amount || 0),
-                price_before_discount: String(price.toFixed(2)),
-              };
-            })
+                const price = Number(item.price || 0);
+                const qty = Number(item.qty || 0);
+                // Сумма по строке = цена × кол-во (как на накладной из CreateSaleDocument), не используем line_total с бэка
+                const lineTotal = price * qty;
+                return {
+                  id: item.id,
+                  name:
+                    item.product_name ??
+                    item.product?.name ??
+                    item.name ??
+                    item.product?.title ??
+                    "Товар",
+                  qty: String(qty),
+                  unit_price: String(price.toFixed(2)),
+                  total: String(lineTotal.toFixed(2)),
+                  unit: item.product?.unit ?? item.unit ?? "ШТ",
+                  article:
+                    String(
+                      item.product?.article ??
+                        item.article ??
+                        item.product_article ??
+                        ""
+                    ).trim() || "",
+                  discount_percent: Number(item.discount_percent || 0),
+                  discount_amount: Number(item.discount_amount || 0),
+                  price_before_discount: String(price.toFixed(2)),
+                };
+              })
             : [];
           const subtotal = items.reduce(
             (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
@@ -391,13 +496,16 @@ const Documents = () => {
           const itemsDiscountTotal = items.reduce(
             (sum, item) =>
               sum +
-              (Number(item.unit_price) * Number(item.qty) * Number(item.discount_percent || 0)) /
-              100,
+              (Number(item.unit_price) *
+                Number(item.qty) *
+                Number(item.discount_percent || 0)) /
+                100,
             0
           );
           const totalDiscount = itemsDiscountTotal + docDiscountAmount;
           const total = Number(doc.total) || subtotal - totalDiscount;
-          const warehouseName = doc.warehouse_from?.name || doc.warehouse?.name || "";
+          const warehouseName =
+            doc.warehouse_from?.name || doc.warehouse?.name || "";
           const warehouseToName = doc.warehouse_to?.name || "";
 
           const invoiceData = {
@@ -437,8 +545,9 @@ const Documents = () => {
             <InvoicePdfDocument data={invoiceData} />
           ).toBlob();
 
-          const fileName = `invoice_${invoiceData?.document?.number || item.id
-            }.pdf`;
+          const fileName = `invoice_${
+            invoiceData?.document?.number || item.id
+          }.pdf`;
 
           // Скачиваем файл
           const url = window.URL.createObjectURL(blob);
@@ -496,7 +605,8 @@ const Documents = () => {
     } catch (printError) {
       console.error("Ошибка при печати:", printError);
       alert(
-        "Ошибка при печати: " + (printError.message || "Неизвестная ошибка", true)
+        "Ошибка при печати: " +
+          (printError.message || "Неизвестная ошибка", true)
       );
     }
   };
@@ -556,15 +666,17 @@ const Documents = () => {
       <div className="documents__tabs-row">
         <div className="documents__tabs">
           <button
-            className={`documents__tab ${activeTab === "receipts" ? "documents__tab--active" : ""
-              }`}
+            className={`documents__tab ${
+              activeTab === "receipts" ? "documents__tab--active" : ""
+            }`}
             onClick={() => setActiveTab("receipts")}
           >
             Чеки
           </button>
           <button
-            className={`documents__tab ${activeTab === "invoices" ? "documents__tab--active" : ""
-              }`}
+            className={`documents__tab ${
+              activeTab === "invoices" ? "documents__tab--active" : ""
+            }`}
             onClick={() => setActiveTab("invoices")}
           >
             Накладные
@@ -573,7 +685,9 @@ const Documents = () => {
         <div className="documents__view-toggle">
           <button
             type="button"
-            className={`documents__view-btn ${viewMode === "table" ? "documents__view-btn--active" : ""}`}
+            className={`documents__view-btn ${
+              viewMode === "table" ? "documents__view-btn--active" : ""
+            }`}
             onClick={() => setViewMode("table")}
             title="Таблица"
           >
@@ -581,7 +695,9 @@ const Documents = () => {
           </button>
           <button
             type="button"
-            className={`documents__view-btn ${viewMode === "cards" ? "documents__view-btn--active" : ""}`}
+            className={`documents__view-btn ${
+              viewMode === "cards" ? "documents__view-btn--active" : ""
+            }`}
             onClick={() => setViewMode("cards")}
             title="Карточки"
           >
@@ -590,7 +706,6 @@ const Documents = () => {
         </div>
       </div>
       <DataContainer>
-
         {/* Table */}
         {viewMode === "table" && (
           <div className="documents__table-wrapper">
@@ -647,8 +762,14 @@ const Documents = () => {
                           <td>{item.products}</td>
                           <td>{formatAmount(item.amount)} сом</td>
                           <td>
-                            {item.discount_amount != null && Number(item.discount_amount) !== 0
-                              ? `${formatAmount(item.discount_amount)} сом${item.discount_percent != null && Number(item.discount_percent) !== 0 ? ` (${item.discount_percent}%)` : ""}`
+                            {item.discount_amount != null &&
+                            Number(item.discount_amount) !== 0
+                              ? `${formatAmount(item.discount_amount)} сом${
+                                  item.discount_percent != null &&
+                                  Number(item.discount_percent) !== 0
+                                    ? ` (${item.discount_percent}%)`
+                                    : ""
+                                }`
                               : "—"}
                           </td>
                           <td>
@@ -681,7 +802,7 @@ const Documents = () => {
                               >
                                 <Printer size={18} />
                               </button>
-                              {item.statusType === "draft" ? (
+                              {item.rawStatus === "DRAFT" && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handlePost(item)}
@@ -689,13 +810,43 @@ const Documents = () => {
                                 >
                                   <Check size={18} />
                                 </button>
-                              ) : (
+                              )}
+                              {item.rawStatus === "CASH_PENDING" && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn documents__action-btn--approve"
+                                    onClick={() => handleCashApprove(item)}
+                                    title="Подтвердить кассой"
+                                  >
+                                    <Check size={18} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn documents__action-btn--reject"
+                                    onClick={() => handleCashReject(item)}
+                                    title="Отклонить"
+                                  >
+                                    <X size={18} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn documents__action-btn--unpost"
+                                    onClick={() => handleUnpost(item)}
+                                    title="Отменить проведение"
+                                  >
+                                    <Undo2 size={18} />
+                                  </button>
+                                </>
+                              )}
+                              {item.rawStatus === "POSTED" && (
                                 <button
-                                  className="documents__action-btn"
+                                  type="button"
+                                  className="documents__action-btn documents__action-btn--unpost"
                                   onClick={() => handleUnpost(item)}
                                   title="Отменить проведение"
                                 >
-                                  <X size={18} />
+                                  <Undo2 size={18} />
                                 </button>
                               )}
                             </div>
@@ -710,8 +861,14 @@ const Documents = () => {
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
                           <td>
-                            {item.discount_amount != null && Number(item.discount_amount) !== 0
-                              ? `${formatAmount(item.discount_amount)} сом${item.discount_percent != null && Number(item.discount_percent) !== 0 ? ` (${item.discount_percent}%)` : ""}`
+                            {item.discount_amount != null &&
+                            Number(item.discount_amount) !== 0
+                              ? `${formatAmount(item.discount_amount)} сом${
+                                  item.discount_percent != null &&
+                                  Number(item.discount_percent) !== 0
+                                    ? ` (${item.discount_percent}%)`
+                                    : ""
+                                }`
                               : "—"}
                           </td>
                           <td>
@@ -744,7 +901,7 @@ const Documents = () => {
                               >
                                 <Printer size={18} />
                               </button>
-                              {item.statusType === "draft" ? (
+                              {item.rawStatus === "DRAFT" && (
                                 <button
                                   className="documents__action-btn"
                                   onClick={() => handlePost(item)}
@@ -752,13 +909,43 @@ const Documents = () => {
                                 >
                                   <Check size={18} />
                                 </button>
-                              ) : (
+                              )}
+                              {item.rawStatus === "CASH_PENDING" && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn documents__action-btn--approve"
+                                    onClick={() => handleCashApprove(item)}
+                                    title="Подтвердить кассой"
+                                  >
+                                    <Check size={18} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn documents__action-btn--reject"
+                                    onClick={() => handleCashReject(item)}
+                                    title="Отклонить"
+                                  >
+                                    <X size={18} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn documents__action-btn--unpost"
+                                    onClick={() => handleUnpost(item)}
+                                    title="Отменить проведение"
+                                  >
+                                    <Undo2 size={18} />
+                                  </button>
+                                </>
+                              )}
+                              {item.rawStatus === "POSTED" && (
                                 <button
-                                  className="documents__action-btn"
+                                  type="button"
+                                  className="documents__action-btn documents__action-btn--unpost"
                                   onClick={() => handleUnpost(item)}
                                   title="Отменить проведение"
                                 >
-                                  <X size={18} />
+                                  <Undo2 size={18} />
                                 </button>
                               )}
                             </div>
@@ -784,7 +971,9 @@ const Documents = () => {
               getCurrentData().map((item) => (
                 <div key={item.id} className="documents__card">
                   <div className="documents__card-header">
-                    <span className="documents__card-number">{item.number}</span>
+                    <span className="documents__card-number">
+                      {item.number}
+                    </span>
                     <span
                       className={`documents__status documents__status--${item.statusType}`}
                     >
@@ -801,7 +990,9 @@ const Documents = () => {
                     <div className="documents__card-row">
                       <span className="documents__card-label">Контрагент</span>
                       <span className="documents__card-value">
-                        {activeTab === "receipts" ? item.client : item.counterparty}
+                        {activeTab === "receipts"
+                          ? item.client
+                          : item.counterparty}
                       </span>
                     </div>
                     <div className="documents__card-row">
@@ -809,7 +1000,9 @@ const Documents = () => {
                         {activeTab === "receipts" ? "Товаров" : "Позиций"}
                       </span>
                       <span className="documents__card-value">
-                        {activeTab === "receipts" ? item.products : item.positions}
+                        {activeTab === "receipts"
+                          ? item.products
+                          : item.positions}
                       </span>
                     </div>
                     <div className="documents__card-row documents__card-row--amount">
@@ -818,17 +1011,19 @@ const Documents = () => {
                         {formatAmount(item.amount)} сом
                       </span>
                     </div>
-                    {item.discount_amount != null && Number(item.discount_amount) !== 0 && (
-                      <div className="documents__card-row documents__card-row--discount">
-                        <span className="documents__card-label">Скидка</span>
-                        <span className="documents__card-value">
-                          {formatAmount(item.discount_amount)} сом
-                          {item.discount_percent != null && Number(item.discount_percent) !== 0
-                            ? ` (${item.discount_percent}%)`
-                            : ""}
-                        </span>
-                      </div>
-                    )}
+                    {item.discount_amount != null &&
+                      Number(item.discount_amount) !== 0 && (
+                        <div className="documents__card-row documents__card-row--discount">
+                          <span className="documents__card-label">Скидка</span>
+                          <span className="documents__card-value">
+                            {formatAmount(item.discount_amount)} сом
+                            {item.discount_percent != null &&
+                            Number(item.discount_percent) !== 0
+                              ? ` (${item.discount_percent}%)`
+                              : ""}
+                          </span>
+                        </div>
+                      )}
                   </div>
                   <div className="documents__card-actions">
                     <button
@@ -845,7 +1040,7 @@ const Documents = () => {
                     >
                       <Printer size={18} />
                     </button>
-                    {item.statusType === "draft" ? (
+                    {item.rawStatus === "DRAFT" && (
                       <button
                         className="documents__action-btn"
                         onClick={() => handlePost(item)}
@@ -853,13 +1048,43 @@ const Documents = () => {
                       >
                         <Check size={18} />
                       </button>
-                    ) : (
+                    )}
+                    {item.rawStatus === "CASH_PENDING" && (
+                      <>
+                        <button
+                          type="button"
+                          className="documents__action-btn documents__action-btn--approve"
+                          onClick={() => handleCashApprove(item)}
+                          title="Подтвердить кассой"
+                        >
+                          <Check size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          className="documents__action-btn documents__action-btn--reject"
+                          onClick={() => handleCashReject(item)}
+                          title="Отклонить"
+                        >
+                          <X size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          className="documents__action-btn documents__action-btn--unpost"
+                          onClick={() => handleUnpost(item)}
+                          title="Отменить проведение"
+                        >
+                          <Undo2 size={18} />
+                        </button>
+                      </>
+                    )}
+                    {item.rawStatus === "POSTED" && (
                       <button
-                        className="documents__action-btn"
+                        type="button"
+                        className="documents__action-btn documents__action-btn--unpost"
                         onClick={() => handleUnpost(item)}
                         title="Отменить проведение"
                       >
-                        <X size={18} />
+                        <Undo2 size={18} />
                       </button>
                     )}
                   </div>

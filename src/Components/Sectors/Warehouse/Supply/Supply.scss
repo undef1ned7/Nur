@@ -56,31 +56,23 @@
 
 /* Таблицы */
 .sklad-supply__table{border:1px solid var(--border,#e5e7eb);border-radius:12px;background:#fff;overflow:hidden}
-.sklad-supply__thead,.sklad-supply__trow{display:grid;align-items:center;column-gap:12px}
-.sklad-supply__thead{background:rgba(0,0,0,.03);font-weight:800}
-.sklad-supply__th,.sklad-supply__td{padding:12px 14px;border-bottom:1px solid var(--border,#e5e7eb)}
-.sklad-supply__trow:last-child .sklad-supply__td{border-bottom:none}
+.sklad-supply__table .sklad-supply-table{width:100%;border-collapse:collapse;border-spacing:0}
+.sklad-supply__table thead tr{background:rgba(0,0,0,.03);font-weight:800}
+.sklad-supply__table .sklad-supply__th,
+.sklad-supply__table .sklad-supply__td{padding:12px 14px;border-bottom:1px solid var(--border,#e5e7eb);text-align:left}
+.sklad-supply__table tbody tr:last-child .sklad-supply__td{border-bottom:none}
 .sklad-supply__empty{text-align:center;color:var(--muted,#6b7280);padding:14px}
 .sklad-supply__nowrap{white-space:nowrap}
 
-/* Desktop сетки */
-.sklad-supply__table--sup .sklad-supply__thead,
-.sklad-supply__table--sup .sklad-supply__trow{
-  grid-template-columns:minmax(220px,1.3fr) minmax(120px,.7fr) minmax(170px,.9fr) minmax(130px,.7fr) minmax(120px,.6fr);
-}
-.sklad-supply__table--sup .sklad-supply__td:last-child{justify-self:end}
-
-.sklad-supply__table--po .sklad-supply__thead,
-.sklad-supply__table--po .sklad-supply__trow{
-  grid-template-columns:minmax(120px,.7fr) minmax(220px,1.2fr) minmax(140px,.9fr) minmax(120px,.6fr);
-}
-.sklad-supply__table--po .sklad-supply__td:last-child{justify-self:end}
-
-.sklad-supply__table--rt .sklad-supply__thead,
-.sklad-supply__table--rt .sklad-supply__trow{
-  grid-template-columns:minmax(120px,.7fr) minmax(220px,1.1fr) minmax(200px,1fr) minmax(120px,.6fr);
-}
-.sklad-supply__table--rt .sklad-supply__td:last-child{justify-self:end}
+/* Ширины колонок */
+.sklad-supply__table--sup .sklad-supply__th:nth-child(1),
+.sklad-supply__table--sup .sklad-supply__td:nth-child(1){min-width:180px}
+.sklad-supply__table--sup .sklad-supply__th:nth-child(3),
+.sklad-supply__table--sup .sklad-supply__td:nth-child(3){text-align:right}
+.sklad-supply__table--po .sklad-supply__th:nth-child(3),
+.sklad-supply__table--po .sklad-supply__td:nth-child(3){min-width:140px}
+.sklad-supply__table--po .sklad-supply__td:last-child{text-align:right}
+.sklad-supply__table--rt .sklad-supply__td:last-child{text-align:right}
 
 /* Inline add */
 .sklad-supply__inlineAdd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -128,41 +120,19 @@
 .sklad-supply-items__footer{padding:10px;background:#fff}
 
 /* ---------- Responsive ---------- */
-@media (max-width:980px){
-  .sklad-supply__table--sup .sklad-supply__thead,
-  .sklad-supply__table--sup .sklad-supply__trow{
-    grid-template-columns:minmax(200px,1.2fr) minmax(110px,.7fr) minmax(150px,.9fr) minmax(110px,.7fr) minmax(110px,.6fr);
-  }
-}
-
-/* === Скрываем «Телефон» и «Город» на узких экранах, чтобы не было эффекта “издалека” === */
-@media (max-width:920px){
-  /* скрыть 3ю и 4ю колонки */
-  .sklad-supply__table--sup .sklad-supply__th:nth-child(3),
-  .sklad-supply__table--sup .sklad-supply__th:nth-child(4),
-  .sklad-supply__table--sup .sklad-supply__td:nth-child(3),
-  .sklad-supply__table--sup .sklad-supply__td:nth-child(4){ display:none; }
-
-  .sklad-supply__table--sup .sklad-supply__thead,
-  .sklad-supply__table--sup .sklad-supply__trow{
-    grid-template-columns:minmax(220px,1.3fr) minmax(120px,.7fr) minmax(120px,.6fr); /* Название | Тип | Действия */
-  }
-  .sklad-supply__table--sup .sklad-supply__td:last-child{justify-self:end}
-}
-
-/* Телефон: карточки для всех таблиц, КРОМЕ поставщиков */
+/* Телефон: карточки для таблиц покупки и возвратов */
 @media (max-width:768px){
   .sklad-supply{padding:16px}
   .sklad-supply__header{grid-template-columns:1fr}
   .sklad-supply__actions{justify-self:stretch}
   .sklad-supply__searchInput{width:100%}
 
-  .sklad-supply__table:not(.sklad-supply__table--sup) .sklad-supply__thead{display:none}
-  .sklad-supply__table:not(.sklad-supply__table--sup) .sklad-supply__trow{
-    grid-template-columns:1fr; row-gap:8px; padding:8px 10px;
+  .sklad-supply__table:not(.sklad-supply__table--sup) thead{display:none}
+  .sklad-supply__table:not(.sklad-supply__table--sup) tbody tr{
+    display:block; padding:8px 10px; border-bottom:1px solid var(--border,#e5e7eb);
   }
   .sklad-supply__table:not(.sklad-supply__table--sup) .sklad-supply__td{
-    display:flex; align-items:baseline; gap:10px; border-bottom:0; background:#fff;
+    display:flex; align-items:baseline; gap:10px; border-bottom:0; padding:4px 0; background:transparent;
   }
   .sklad-supply__table:not(.sklad-supply__table--sup) .sklad-supply__td::before{
     content:attr(data-label); flex:0 0 42%; color:var(--muted,#6b7280); font-weight:700; white-space:nowrap;

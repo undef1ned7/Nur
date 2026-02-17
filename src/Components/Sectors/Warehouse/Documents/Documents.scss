@@ -246,6 +246,16 @@
       color: #92400e;
     }
 
+    &--cash_pending {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    &--rejected {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
     &--pending {
       background: #dbeafe;
       color: #1e40af;
@@ -294,6 +304,30 @@
 
     svg {
       pointer-events: none;
+    }
+
+    &--approve {
+      color: #059669;
+      &:hover {
+        background: #d1fae5;
+        color: #047857;
+      }
+    }
+
+    &--reject {
+      color: #dc2626;
+      &:hover {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+    }
+
+    &--unpost {
+      color: #6b7280;
+      &:hover {
+        background: #fef3c7;
+        color: #92400e;
+      }
     }
   }
 

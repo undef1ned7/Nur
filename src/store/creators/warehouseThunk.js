@@ -111,6 +111,38 @@ export const unpostWarehouseDocument = createAsyncThunk(
   }
 );
 
+// Подтвердить кассовый запрос (документ CASH_PENDING → POSTED)
+export const cashApproveWarehouseDocument = createAsyncThunk(
+  "warehouse/cashApproveDocument",
+  async ({ id, note }, { rejectWithValue }) => {
+    try {
+      const data = await warehouseAPI.cashDocumentApprove(
+        id,
+        note != null && note !== "" ? { note } : {}
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+// Отклонить кассовый запрос (склад откатывается, документ → REJECTED)
+export const cashRejectWarehouseDocument = createAsyncThunk(
+  "warehouse/cashRejectDocument",
+  async ({ id, note }, { rejectWithValue }) => {
+    try {
+      const data = await warehouseAPI.cashDocumentReject(
+        id,
+        note != null && note !== "" ? { note } : {}
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
 // Загрузка товаров склада
 export const fetchWarehouseProducts = createAsyncThunk(
   "warehouse/fetchProducts",

@@ -711,6 +711,15 @@ $due-red: #dc2626;
     }
   }
 
+  &__inventory-hint {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    background: #fef3c7;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #92400e;
+  }
+
   &__table-wrapper {
     background: #fff;
     border-radius: 12px;
