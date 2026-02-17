@@ -167,6 +167,108 @@ export const unpostDocument = async (id) => {
   }
 };
 
+/**
+ * Подтвердить кассовый запрос (документ в CASH_PENDING → POSTED, при payment_kind=cash создаётся MONEY_*)
+ * POST /api/warehouse/documents/{id}/cash/approve/
+ * @param {string} id - UUID документа
+ * @param {Object} body - опционально { note: "комментарий" }
+ */
+export const cashDocumentApprove = async (id, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/documents/${id}/cash/approve/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Cash Approve Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Отклонить кассовый запрос (склад откатывается, документ → REJECTED)
+ * POST /api/warehouse/documents/{id}/cash/reject/
+ * @param {string} id - UUID документа
+ * @param {Object} body - опционально { note: "причина отказа" }
+ */
+export const cashDocumentReject = async (id, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/documents/${id}/cash/reject/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Cash Reject Document Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Inbox запросов кассы (документы в CASH_PENDING, ожидающие решения)
+ * GET /api/warehouse/cash/requests/
+ * @param {Object} params - status, requires_money, money_doc_type, document__doc_type, document__payment_kind, search, page
+ */
+export const listCashRequests = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/cash/requests/", { params });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Cash Requests Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Подтвердить запрос кассы по ID запроса
+ * POST /api/warehouse/cash/requests/{request_id}/approve/
+ */
+export const approveCashRequest = async (requestId, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/cash/requests/${requestId}/approve/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Approve Cash Request Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Отклонить запрос кассы по ID запроса
+ * POST /api/warehouse/cash/requests/{request_id}/reject/
+ */
+export const rejectCashRequest = async (requestId, body = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/cash/requests/${requestId}/reject/`,
+      Object.keys(body).length ? body : undefined
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Reject Cash Request Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== ТИПОВЫЕ СПИСКИ ДОКУМЕНТОВ ====================
 
 /**
@@ -2207,6 +2309,11 @@ export default {
   deleteDocument,
   postDocument,
   unpostDocument,
+  cashDocumentApprove,
+  cashDocumentReject,
+  listCashRequests,
+  approveCashRequest,
+  rejectCashRequest,
   // Типовые списки документов
   listSaleDocuments,
   createSaleDocument,

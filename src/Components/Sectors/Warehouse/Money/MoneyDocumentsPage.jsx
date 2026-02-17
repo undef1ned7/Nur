@@ -35,7 +35,7 @@ const statusLabel = (s) =>
   s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
 
 const initialForm = {
-  warehouse: "",
+  cash_register: "",
   counterparty: "",
   payment_category: "",
   amount: "",
@@ -51,7 +51,7 @@ const MoneyDocumentsPage = () => {
   const [list, setList] = useState({ results: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [warehouses, setWarehouses] = useState([]);
+  const [cashRegisters, setCashRegisters] = useState([]);
   const [counterparties, setCounterparties] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -176,12 +176,14 @@ const MoneyDocumentsPage = () => {
   useEffect(() => {
     (async () => {
       try {
-        const [whData, cpData, catData] = await Promise.all([
-          warehouseAPI.listWarehouses(),
+        const [cashData, cpData, catData] = await Promise.all([
+          warehouseAPI.listCashRegisters({ page_size: 200 }),
           warehouseAPI.listCounterparties(),
           warehouseAPI.listMoneyCategories(),
         ]);
-        setWarehouses(whData?.results ?? (Array.isArray(whData) ? whData : []));
+        setCashRegisters(
+          cashData?.results ?? (Array.isArray(cashData) ? cashData : [])
+        );
         setCounterparties(
           cpData?.results ?? (Array.isArray(cpData) ? cpData : [])
         );
@@ -250,12 +252,12 @@ const MoneyDocumentsPage = () => {
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     setCreateError("");
-    const warehouse = form.warehouse?.trim();
+    const cash_register = form.cash_register?.trim();
     const counterparty = form.counterparty?.trim();
     const payment_category = form.payment_category?.trim();
     const amount = String(form.amount ?? "").trim();
-    if (!warehouse || !counterparty || !payment_category || !amount) {
-      setCreateError("Заполните склад, контрагента, категорию и сумму");
+    if (!cash_register || !counterparty || !payment_category || !amount) {
+      setCreateError("Заполните кассу, контрагента, категорию и сумму");
       return;
     }
     const amountNum = Number(amount.replace(/\s/g, "").replace(",", "."));
@@ -267,7 +269,7 @@ const MoneyDocumentsPage = () => {
     try {
       const created = await warehouseAPI.createMoneyDocument({
         doc_type: apiDocType,
-        warehouse,
+        cash_register,
         counterparty,
         payment_category,
         amount: amountNum,
@@ -649,19 +651,19 @@ const MoneyDocumentsPage = () => {
                 </div>
               )}
               <div className="money-documents-page__field">
-                <label htmlFor="money-doc-warehouse">Склад *</label>
+                <label htmlFor="money-doc-cash-register">Касса *</label>
                 <select
-                  id="money-doc-warehouse"
-                  value={form.warehouse}
+                  id="money-doc-cash-register"
+                  value={form.cash_register}
                   onChange={(e) =>
-                    handleFormChange("warehouse", e.target.value)
+                    handleFormChange("cash_register", e.target.value)
                   }
                   required
                 >
                   <option value="">выберите</option>
-                  {warehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name ?? w.title ?? w.id}
+                  {cashRegisters.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name ?? c.id}
                     </option>
                   ))}
                 </select>

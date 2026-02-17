@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Search, Plus, X } from "lucide-react";
+import { Search, Plus, X, Inbox, Check } from "lucide-react";
 import warehouseAPI from "../../../../api/warehouse";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import "../../../Deposits/Kassa/kassa.scss";
 import "./WarehouseKassa.scss";
 
@@ -11,14 +12,143 @@ const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
 const money = (v) =>
   (Number(v) || 0).toLocaleString("ru-RU", { minimumFractionDigits: 0 }) + " с";
-const fmtDate = (v) =>
-  v ? new Date(v).toLocaleDateString("ru-RU") : "—";
+const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("ru-RU") : "—");
 const statusLabel = (s) =>
   s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+
+/* ──────────────────────────────── Запросы кассы (inbox) ──────────────────────────────── */
+const CashRequestsInbox = () => {
+  const alert = useAlert();
+  const confirm = useConfirm();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [actingId, setActingId] = useState(null);
+
+  const load = useCallback(async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const data = await warehouseAPI.listCashRequests({ status: "PENDING" });
+      setRequests(asArray(data));
+    } catch (e) {
+      console.error(e);
+      setErr("Не удалось загрузить запросы");
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleApprove = (requestId) => {
+    confirm("Подтвердить запрос кассы?", async (ok) => {
+      if (!ok) return;
+      setActingId(requestId);
+      try {
+        await warehouseAPI.approveCashRequest(requestId);
+        alert("Запрос подтверждён");
+        load();
+      } catch (e) {
+        alert(e?.detail || e?.message || "Ошибка при подтверждении", true);
+      } finally {
+        setActingId(null);
+      }
+    });
+  };
+
+  const handleReject = (requestId) => {
+    confirm("Отклонить запрос кассы?", async (ok) => {
+      if (!ok) return;
+      setActingId(requestId);
+      try {
+        await warehouseAPI.rejectCashRequest(requestId);
+        alert("Запрос отклонён");
+        load();
+      } catch (e) {
+        alert(e?.detail || e?.message || "Ошибка при отклонении", true);
+      } finally {
+        setActingId(null);
+      }
+    });
+  };
+
+  return (
+    <div className="warehouse-kassa__inbox">
+      <h3 className="warehouse-kassa__inbox-title">
+        <Inbox size={20} />
+        Запросы кассы (ожидают решения)
+      </h3>
+      {err && <div className="kassa__alert kassa__alert--error">{err}</div>}
+      {loading ? (
+        <div className="kassa-table__loading" style={{ padding: 24 }}>
+          Загрузка…
+        </div>
+      ) : !requests.length ? (
+        <div className="kassa-table__empty" style={{ padding: 24 }}>
+          Нет запросов
+        </div>
+      ) : (
+        <div className="kassa-table-scroll">
+          <table className="kassa-table">
+            <thead>
+              <tr>
+                <th>Документ</th>
+                <th>Тип</th>
+                <th>Дата</th>
+                <th>Контрагент</th>
+                <th>Сумма</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((r) => {
+                const doc = r.document || {};
+                const busy = actingId === r.id;
+                return (
+                  <tr key={r.id}>
+                    <td>{doc.number ?? "—"}</td>
+                    <td>{doc.doc_type ?? "—"}</td>
+                    <td>{fmtDate(doc.date)}</td>
+                    <td>{doc.counterparty_display_name ?? "—"}</td>
+                    <td>{money(r.amount)}</td>
+                    <td>
+                      <button
+                        className="kassa__btn kassa__btn--primary"
+                        disabled={busy}
+                        onClick={() => handleApprove(r.id)}
+                        title="Подтвердить"
+                      >
+                        <Check size={14} /> Подтвердить
+                      </button>{" "}
+                      <button
+                        className="kassa__btn kassa__btn--secondary"
+                        disabled={busy}
+                        onClick={() => handleReject(r.id)}
+                        title="Отклонить"
+                      >
+                        <X size={14} /> Отклонить
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
 
 /* ──────────────────────────────── Список касс ──────────────────────────────── */
 const CashRegisterList = () => {
   const navigate = useNavigate();
+  const alert = useAlert();
+  const [tab, setTab] = useState("registers"); // "registers" | "requests"
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -59,8 +189,17 @@ const CashRegisterList = () => {
   }, [rows, q]);
 
   const onCreate = async () => {
+    if (rows.length >= 1) {
+      alert("Разрешена только одна касса.", true);
+      setCreateOpen(false);
+      load();
+      return;
+    }
     const title = (name || "").trim();
-    if (!title) return alert("Введите название кассы");
+    if (!title) {
+      alert("Введите название кассы");
+      return;
+    }
     try {
       await warehouseAPI.createCashRegister({
         name: title,
@@ -72,7 +211,7 @@ const CashRegisterList = () => {
       load();
     } catch (e) {
       console.error(e);
-      alert(e?.detail || e?.message || "Не удалось создать кассу");
+      alert(e?.detail || e?.message || "Не удалось создать кассу", true);
     }
   };
 
@@ -83,99 +222,142 @@ const CashRegisterList = () => {
           <div className="kassa-header__icon-box">💰</div>
           <div className="kassa-header__title-section">
             <h1 className="kassa-header__title">Касса</h1>
-            <p className="kassa-header__subtitle">Кассы склада — приход и расход денег</p>
+            <p className="kassa-header__subtitle">
+              Кассы склада — приход и расход денег
+            </p>
           </div>
         </div>
-        <div className="kassa-header__right">
-          <button
-            className="kassa-header__create-btn"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus size={16} />
-            Создать кассу
-          </button>
+        <div className="flex gap-2 items-center">
+          <nav className="kassa-header__nav-tabs kassa-header__nav-tabs--top">
+            <button
+              type="button"
+              className={`kassa-header__nav-tab ${
+                tab === "registers" ? "kassa-header__nav-tab--active" : ""
+              }`}
+              onClick={() => setTab("registers")}
+            >
+              Кассы
+            </button>
+            <button
+              type="button"
+              className={`kassa-header__nav-tab flex gap-2 items-center ${
+                tab === "requests" ? "kassa-header__nav-tab--active" : ""
+              }`}
+              onClick={() => setTab("requests")}
+            >
+              <Inbox size={16} />
+              Запросы
+            </button>
+          </nav>
+          <div className="kassa-header__right">
+            {tab === "registers" && rows.length === 0 && (
+              <button
+                className="kassa-header__create-btn"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus size={16} />
+                Создать кассу
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="kassa-search-section">
-        <div className="kassa-search">
-          <Search className="kassa-search__icon" size={18} />
-          <input
-            type="text"
-            className="kassa-search__input"
-            placeholder="Поиск по названию или расположению…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <div className="kassa-search__meta">
-          <span className="kassa-search__info">Всего: {filtered.length}</span>
-        </div>
-      </div>
+      {tab === "requests" ? (
+        <CashRequestsInbox />
+      ) : (
+        <>
+          <div className="kassa-search-section">
+            <div className="kassa-search">
+              <Search className="kassa-search__icon" size={18} />
+              <input
+                type="text"
+                className="kassa-search__input"
+                placeholder="Поиск по названию или расположению…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+            <div className="kassa-search__meta">
+              <span className="kassa-search__info">
+                Всего: {filtered.length}
+              </span>
+            </div>
+          </div>
 
-      {err && <div className="kassa__alert kassa__alert--error">{err}</div>}
+          {err && <div className="kassa__alert kassa__alert--error">{err}</div>}
 
-      <div className="kassa-table-container">
-        <div className="kassa-table-scroll">
-          <table className="kassa-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Название</th>
-                  <th>Расположение</th>
-                  <th>Приход</th>
-                  <th>Расход</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
+          <div className="kassa-table-container">
+            <div className="kassa-table-scroll">
+              <table className="kassa-table">
+                <thead>
                   <tr>
-                    <td colSpan={6} className="kassa-table__loading">
-                      Загрузка…
-                    </td>
+                    <th>#</th>
+                    <th>Название</th>
+                    <th>Расположение</th>
+                    <th>Приход</th>
+                    <th>Расход</th>
+                    <th>Действия</th>
                   </tr>
-                ) : filtered.length ? (
-                  filtered.map((r, i) => (
-                    <tr
-                      key={r.id}
-                      className="kassa__rowClickable"
-                      onClick={() => navigate(`${BASE}/${r.id}`)}
-                    >
-                      <td>{i + 1}</td>
-                      <td><b>{r.name || "—"}</b></td>
-                      <td>{r.location || "—"}</td>
-                      <td>—</td>
-                      <td>—</td>
-                      <td>
-                        <button
-                          className="kassa__btn kassa__btn--secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`${BASE}/${r.id}`);
-                          }}
-                        >
-                          Открыть
-                        </button>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="kassa-table__loading">
+                        Загрузка…
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="kassa-table__empty">
-                      Нет касс
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-        </div>
-      </div>
+                  ) : filtered.length ? (
+                    filtered.map((r, i) => (
+                      <tr
+                        key={r.id}
+                        className="kassa__rowClickable"
+                        onClick={() => navigate(`${BASE}/${r.id}`)}
+                      >
+                        <td>{i + 1}</td>
+                        <td>
+                          <b>{r.name || "—"}</b>
+                        </td>
+                        <td>{r.location || "—"}</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td>
+                          <button
+                            className="kassa__btn kassa__btn--secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`${BASE}/${r.id}`);
+                            }}
+                          >
+                            Открыть
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="kassa-table__empty">
+                        Нет касс
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {createOpen && (
         <div className="kassa-modal" style={{ display: "block" }}>
-          <div className="kassa-modal__overlay" onClick={() => setCreateOpen(false)} />
-          <div className="kassa-modal__card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="kassa-modal__overlay"
+            onClick={() => setCreateOpen(false)}
+          />
+          <div
+            className="kassa-modal__card"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="kassa-modal__header">
               <h3 className="kassa-modal__title">Создать кассу</h3>
               <button
@@ -207,10 +389,16 @@ const CashRegisterList = () => {
               />
             </div>
             <div className="kassa-modal__footer">
-              <button className="kassa__btn" onClick={() => setCreateOpen(false)}>
+              <button
+                className="kassa__btn"
+                onClick={() => setCreateOpen(false)}
+              >
                 Отмена
               </button>
-              <button className="kassa__btn kassa__btn--primary" onClick={onCreate}>
+              <button
+                className="kassa__btn kassa__btn--primary"
+                onClick={onCreate}
+              >
                 Сохранить
               </button>
             </div>
@@ -281,7 +469,8 @@ const CashRegisterDetail = () => {
   const allDocs = useMemo(
     () =>
       [...receipts, ...expenses].sort(
-        (a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at)
+        (a, b) =>
+          new Date(b.date || b.created_at) - new Date(a.date || a.created_at)
       ),
     [receipts, expenses]
   );
@@ -293,12 +482,22 @@ const CashRegisterDetail = () => {
   }, [activeTab, allDocs, receipts, expenses]);
 
   const openReceiptModal = () => {
-    setForm({ counterparty: "", payment_category: "", amount: "", comment: "" });
+    setForm({
+      counterparty: "",
+      payment_category: "",
+      amount: "",
+      comment: "",
+    });
     setCreateError("");
     setShowReceiptModal(true);
   };
   const openExpenseModal = () => {
-    setForm({ counterparty: "", payment_category: "", amount: "", comment: "" });
+    setForm({
+      counterparty: "",
+      payment_category: "",
+      amount: "",
+      comment: "",
+    });
     setCreateError("");
     setShowExpenseModal(true);
   };
@@ -333,7 +532,9 @@ const CashRegisterDetail = () => {
       load();
     } catch (err) {
       setCreateError(
-        err?.detail || err?.message || (typeof err === "string" ? err : "Ошибка создания")
+        err?.detail ||
+          err?.message ||
+          (typeof err === "string" ? err : "Ошибка создания")
       );
     } finally {
       setCreating(false);
@@ -343,7 +544,9 @@ const CashRegisterDetail = () => {
   if (!id) {
     return (
       <div className="kassa-page">
-        <div className="kassa__alert kassa__alert--error">ID кассы не указан</div>
+        <div className="kassa__alert kassa__alert--error">
+          ID кассы не указан
+        </div>
       </div>
     );
   }
@@ -358,7 +561,9 @@ const CashRegisterDetail = () => {
               {operations?.name ?? "Касса"}
             </h2>
             <p className="kassa-header__subtitle">
-              Баланс: {money(operations?.balance)} · Приход: {money(operations?.receipts_total)} · Расход: {money(operations?.expenses_total)}
+              Баланс: {money(operations?.balance)} · Приход:{" "}
+              {money(operations?.receipts_total)} · Расход:{" "}
+              {money(operations?.expenses_total)}
             </p>
           </div>
         </div>
@@ -372,21 +577,27 @@ const CashRegisterDetail = () => {
           </button>
           <button
             type="button"
-            className={`kassa-header__nav-tab ${activeTab === "all" ? "kassa-header__nav-tab--active" : ""}`}
+            className={`kassa-header__nav-tab ${
+              activeTab === "all" ? "kassa-header__nav-tab--active" : ""
+            }`}
             onClick={() => setActiveTab("all")}
           >
             Все
           </button>
           <button
             type="button"
-            className={`kassa-header__nav-tab ${activeTab === "expense" ? "kassa-header__nav-tab--active" : ""}`}
+            className={`kassa-header__nav-tab ${
+              activeTab === "expense" ? "kassa-header__nav-tab--active" : ""
+            }`}
             onClick={() => setActiveTab("expense")}
           >
             Расход
           </button>
           <button
             type="button"
-            className={`kassa-header__nav-tab ${activeTab === "receipt" ? "kassa-header__nav-tab--active" : ""}`}
+            className={`kassa-header__nav-tab ${
+              activeTab === "receipt" ? "kassa-header__nav-tab--active" : ""
+            }`}
             onClick={() => setActiveTab("receipt")}
           >
             Приход
@@ -464,25 +675,43 @@ const CashRegisterDetail = () => {
       {/* Модалка приход */}
       {showReceiptModal && (
         <div className="kassa-modal" style={{ display: "block" }}>
-          <div className="kassa-modal__overlay" onClick={() => setShowReceiptModal(false)} />
-          <div className="kassa-modal__card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="kassa-modal__overlay"
+            onClick={() => setShowReceiptModal(false)}
+          />
+          <div
+            className="kassa-modal__card"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="kassa-modal__header">
               <h3 className="kassa-modal__title">Приход в кассу</h3>
-              <button className="kassa-modal__close" onClick={() => setShowReceiptModal(false)} aria-label="Закрыть">
+              <button
+                className="kassa-modal__close"
+                onClick={() => setShowReceiptModal(false)}
+                aria-label="Закрыть"
+              >
                 <X size={20} />
               </button>
             </div>
-            {createError && <div className="kassa__alert kassa__alert--error">{createError}</div>}
+            {createError && (
+              <div className="kassa__alert kassa__alert--error">
+                {createError}
+              </div>
+            )}
             <div className="kassa-modal__section">
               <label className="kassa-modal__label">Контрагент *</label>
               <select
                 className="kassa-modal__input"
                 value={form.counterparty}
-                onChange={(e) => setForm((p) => ({ ...p, counterparty: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, counterparty: e.target.value }))
+                }
               >
                 <option value="">— выбрать —</option>
                 {counterparties.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name ?? c.id}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name ?? c.id}
+                  </option>
                 ))}
               </select>
             </div>
@@ -491,11 +720,15 @@ const CashRegisterDetail = () => {
               <select
                 className="kassa-modal__input"
                 value={form.payment_category}
-                onChange={(e) => setForm((p) => ({ ...p, payment_category: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, payment_category: e.target.value }))
+                }
               >
                 <option value="">— выбрать —</option>
                 {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title ?? c.id}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.title ?? c.id}
+                  </option>
                 ))}
               </select>
             </div>
@@ -508,7 +741,9 @@ const CashRegisterDetail = () => {
                 step="0.01"
                 placeholder="0"
                 value={form.amount}
-                onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, amount: e.target.value }))
+                }
               />
             </div>
             <div className="kassa-modal__section">
@@ -517,7 +752,9 @@ const CashRegisterDetail = () => {
                 className="kassa-modal__input"
                 type="text"
                 value={form.comment}
-                onChange={(e) => setForm((p) => ({ ...p, comment: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, comment: e.target.value }))
+                }
               />
             </div>
             <div className="kassa-modal__section">
@@ -526,12 +763,17 @@ const CashRegisterDetail = () => {
                   type="checkbox"
                   checked={createAsPosted}
                   onChange={(e) => setCreateAsPosted(e.target.checked)}
-                />
-                {" "}Провести сразу
+                />{" "}
+                Провести сразу
               </label>
             </div>
             <div className="kassa-modal__footer">
-              <button className="kassa__btn" onClick={() => setShowReceiptModal(false)}>Отмена</button>
+              <button
+                className="kassa__btn"
+                onClick={() => setShowReceiptModal(false)}
+              >
+                Отмена
+              </button>
               <button
                 className="kassa__btn kassa__btn--primary"
                 disabled={creating}
@@ -547,25 +789,43 @@ const CashRegisterDetail = () => {
       {/* Модалка расход */}
       {showExpenseModal && (
         <div className="kassa-modal" style={{ display: "block" }}>
-          <div className="kassa-modal__overlay" onClick={() => setShowExpenseModal(false)} />
-          <div className="kassa-modal__card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="kassa-modal__overlay"
+            onClick={() => setShowExpenseModal(false)}
+          />
+          <div
+            className="kassa-modal__card"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="kassa-modal__header">
               <h3 className="kassa-modal__title">Расход из кассы</h3>
-              <button className="kassa-modal__close" onClick={() => setShowExpenseModal(false)} aria-label="Закрыть">
+              <button
+                className="kassa-modal__close"
+                onClick={() => setShowExpenseModal(false)}
+                aria-label="Закрыть"
+              >
                 <X size={20} />
               </button>
             </div>
-            {createError && <div className="kassa__alert kassa__alert--error">{createError}</div>}
+            {createError && (
+              <div className="kassa__alert kassa__alert--error">
+                {createError}
+              </div>
+            )}
             <div className="kassa-modal__section">
               <label className="kassa-modal__label">Контрагент *</label>
               <select
                 className="kassa-modal__input"
                 value={form.counterparty}
-                onChange={(e) => setForm((p) => ({ ...p, counterparty: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, counterparty: e.target.value }))
+                }
               >
                 <option value="">— выбрать —</option>
                 {counterparties.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name ?? c.id}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name ?? c.id}
+                  </option>
                 ))}
               </select>
             </div>
@@ -574,11 +834,15 @@ const CashRegisterDetail = () => {
               <select
                 className="kassa-modal__input"
                 value={form.payment_category}
-                onChange={(e) => setForm((p) => ({ ...p, payment_category: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, payment_category: e.target.value }))
+                }
               >
                 <option value="">— выбрать —</option>
                 {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title ?? c.id}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.title ?? c.id}
+                  </option>
                 ))}
               </select>
             </div>
@@ -591,7 +855,9 @@ const CashRegisterDetail = () => {
                 step="0.01"
                 placeholder="0"
                 value={form.amount}
-                onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, amount: e.target.value }))
+                }
               />
             </div>
             <div className="kassa-modal__section">
@@ -600,7 +866,9 @@ const CashRegisterDetail = () => {
                 className="kassa-modal__input"
                 type="text"
                 value={form.comment}
-                onChange={(e) => setForm((p) => ({ ...p, comment: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, comment: e.target.value }))
+                }
               />
             </div>
             <div className="kassa-modal__section">
@@ -609,12 +877,17 @@ const CashRegisterDetail = () => {
                   type="checkbox"
                   checked={createAsPosted}
                   onChange={(e) => setCreateAsPosted(e.target.checked)}
-                />
-                {" "}Провести сразу
+                />{" "}
+                Провести сразу
               </label>
             </div>
             <div className="kassa-modal__footer">
-              <button className="kassa__btn" onClick={() => setShowExpenseModal(false)}>Отмена</button>
+              <button
+                className="kassa__btn"
+                onClick={() => setShowExpenseModal(false)}
+              >
+                Отмена
+              </button>
               <button
                 className="kassa__btn kassa__btn--primary"
                 disabled={creating}

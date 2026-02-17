@@ -19,7 +19,29 @@
     gap: 10px;
     flex-wrap: wrap;
   }
+  .kassa-header__nav-tabs--top {
+    display: flex;
+    gap: 4px;
+  }
   &.warehouse-kassa--detail .kassa-header {
     flex-wrap: wrap;
+  }
+
+  &__inbox {
+    margin-top: 16px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+  &__inbox-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 16px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
   }
 }
