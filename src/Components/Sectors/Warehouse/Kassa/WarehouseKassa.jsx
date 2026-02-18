@@ -157,16 +157,54 @@ const CashRegisterList = () => {
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
 
+  const [totalsById, setTotalsById] = useState({});
+
   const load = useCallback(async () => {
     try {
       setErr("");
       setLoading(true);
       const data = await warehouseAPI.listCashRegisters({ page_size: 200 });
-      setRows(asArray(data));
+      const list = asArray(data);
+      setRows(list);
+
+      if (list.length === 0) {
+        setTotalsById({});
+        return;
+      }
+      const hasRootTotals =
+        data.receipts_total != null && data.expenses_total != null;
+      if (list.length === 1 && hasRootTotals) {
+        setTotalsById({
+          [list[0].id]: {
+            receipts_total: data.receipts_total,
+            expenses_total: data.expenses_total,
+          },
+        });
+        return;
+      }
+      const next = {};
+      await Promise.all(
+        list.map(async (r) => {
+          try {
+            const ops = await warehouseAPI.getCashRegisterOperations(r.id);
+            next[r.id] = {
+              receipts_total: ops?.receipts_total ?? "0.00",
+              expenses_total: ops?.expenses_total ?? "0.00",
+            };
+          } catch {
+            next[r.id] = {
+              receipts_total: "0.00",
+              expenses_total: "0.00",
+            };
+          }
+        })
+      );
+      setTotalsById(next);
     } catch (e) {
       console.error(e);
       setErr("Не удалось загрузить кассы");
       setRows([]);
+      setTotalsById({});
     } finally {
       setLoading(false);
     }
@@ -308,20 +346,22 @@ const CashRegisterList = () => {
                       </td>
                     </tr>
                   ) : filtered.length ? (
-                    filtered.map((r, i) => (
-                      <tr
-                        key={r.id}
-                        className="kassa__rowClickable"
-                        onClick={() => navigate(`${BASE}/${r.id}`)}
-                      >
-                        <td>{i + 1}</td>
-                        <td>
-                          <b>{r.name || "—"}</b>
-                        </td>
-                        <td>{r.location || "—"}</td>
-                        <td>—</td>
-                        <td>—</td>
-                        <td>
+                    filtered.map((r, i) => {
+                      const totals = totalsById[r.id];
+                      return (
+                        <tr
+                          key={r.id}
+                          className="kassa__rowClickable"
+                          onClick={() => navigate(`${BASE}/${r.id}`)}
+                        >
+                          <td>{i + 1}</td>
+                          <td>
+                            <b>{r.name || "—"}</b>
+                          </td>
+                          <td>{r.location || "—"}</td>
+                          <td>{totals ? money(totals.receipts_total) : "—"}</td>
+                          <td>{totals ? money(totals.expenses_total) : "—"}</td>
+                          <td>
                           <button
                             className="kassa__btn kassa__btn--secondary"
                             onClick={(e) => {
@@ -333,7 +373,8 @@ const CashRegisterList = () => {
                           </button>
                         </td>
                       </tr>
-                    ))
+                    );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={6} className="kassa-table__empty">
