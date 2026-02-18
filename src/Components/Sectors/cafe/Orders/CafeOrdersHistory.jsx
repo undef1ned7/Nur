@@ -2,12 +2,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FaSearch,
+  FaTimes,
+  FaClipboardList,
 } from "react-icons/fa";
 import api from "../../../../api";
 import "./Orders.scss";
 
 import {
   attachUsbListenersOnce,
+  checkPrinterConnection,
+  parsePrinterBinding,
+  printOrderReceiptJSONViaUSB,
+  printViaWiFiSimple,
+  setActivePrinterByKey,
 } from "./OrdersPrintService";
 
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
@@ -28,6 +35,11 @@ const toNum = (x) => {
 };
 
 const fmtShort = (n) => String(Math.round(toNum(n)));
+
+const fullName = (u) =>
+  [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() ||
+  u?.email ||
+  "Без имени";
 
 
 const safeUserData = () => {
@@ -79,6 +91,20 @@ const CafeOrderHistory = () => {
 
   const [expandedOrders, setExpandedOrders] = useState(() => new Set());
   const CARD_ITEMS_LIMIT = 4;
+
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [printingId, setPrintingId] = useState(null);
+
+  const openView = useCallback((order) => {
+    setViewOrder(order || null);
+    setViewOpen(true);
+  }, []);
+
+  const closeView = useCallback(() => {
+    setViewOpen(false);
+    setViewOrder(null);
+  }, []);
 
 
   /* ===== API ===== */
@@ -249,6 +275,71 @@ const CafeOrderHistory = () => {
     }
   };
 
+  const buildPrintPayload = useCallback(
+    (order) => {
+      const t = tablesMap.get(order?.table);
+      const tableLabel =
+        order?.table === null || order?.table === undefined || order?.table === ""
+          ? "С собой"
+          : t?.number || "—";
+
+      const dt = formatReceiptDate(order?.created_at || order?.date || order?.created);
+      const cashier = fullName(userData || {});
+      const items = Array.isArray(order?.items) ? order.items : [];
+      const isTakeaway = tableLabel === "С собой";
+
+      return {
+        company: localStorage.getItem("company_name") || "КАССА",
+        doc_no: isTakeaway ? "С собой" : `СТОЛ ${tableLabel}`,
+        created_at: dt,
+        cashier_name: cashier,
+        discount: 0,
+        tax: 0,
+        paid_cash: 0,
+        paid_card: 0,
+        change: 0,
+        items: items.map((it) => ({
+          name: String(it.menu_item_title || it.title || "Позиция"),
+          qty: Math.max(1, Number(it.quantity) || 1),
+          price: linePrice(it),
+        })),
+      };
+    },
+    [formatReceiptDate, linePrice, tablesMap, userData]
+  );
+
+  const printOrder = useCallback(
+    async (order) => {
+      if (!order?.id) return;
+      if (printingId) return;
+      setPrintingId(order.id);
+      try {
+        await checkPrinterConnection().catch(() => false);
+        const payload = buildPrintPayload(order);
+
+        const receiptBinding = localStorage.getItem("cafe_receipt_printer") || "";
+        if (!receiptBinding) throw new Error("Не настроен принтер кассы (чековый аппарат)");
+        const parsed = parsePrinterBinding(receiptBinding);
+        if (parsed.kind === "ip") {
+          await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+        } else if (parsed.kind === "usb") {
+          await setActivePrinterByKey(parsed.usbKey);
+          await printOrderReceiptJSONViaUSB(payload);
+        } else {
+          throw new Error("Некорректная настройка принтера кассы");
+        }
+        try {
+          localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
+        } catch { }
+      } catch (e) {
+        console.error("Receipt print error:", e);
+      } finally {
+        setPrintingId(null);
+      }
+    },
+    [buildPrintPayload, printingId]
+  );
+
   const toggleExpandedOrder = (id) => {
     setExpandedOrders((prev) => {
       const next = new Set(prev);
@@ -311,7 +402,16 @@ const CafeOrderHistory = () => {
               const sliceItems = expanded ? items : items.slice(0, CARD_ITEMS_LIMIT);
               const rest = Math.max(0, items.length - Math.min(items.length, CARD_ITEMS_LIMIT));
               return (
-                <article key={o.id} className="cafeOrders__receipt relative">
+                <article
+                  key={o.id}
+                  className="cafeOrders__receipt relative cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openView(o)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") openView(o);
+                  }}
+                >
                   <SimpleStamp date={o.status === 'closed' ? o.paid_at : ''} className="bottom-10 left-20" type={o.status} size={'md'} />
                   <div className="cafeOrders__receiptHeader">
                     <div className="cafeOrders__receiptTable">
@@ -337,12 +437,26 @@ const CafeOrderHistory = () => {
                       );
                     })}
                     {!expanded && rest > 0 && (
-                      <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
+                      <button
+                        type="button"
+                        className="cafeOrders__moreItemsBtn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpandedOrder(o.id);
+                        }}
+                      >
                         Ещё {rest} поз.
                       </button>
                     )}
                     {expanded && items.length > CARD_ITEMS_LIMIT && (
-                      <button type="button" className="cafeOrders__moreItemsBtn" onClick={() => toggleExpandedOrder(o.id)}>
+                      <button
+                        type="button"
+                        className="cafeOrders__moreItemsBtn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpandedOrder(o.id);
+                        }}
+                      >
                         Свернуть позиции ({items.length})
                       </button>
                     )}
@@ -382,6 +496,105 @@ const CafeOrderHistory = () => {
           }))
         }}
       />
+
+      {/* View modal (like pay modal, but without pay button) */}
+      {viewOpen && viewOrder && (
+        <div className="cafeOrdersModal__overlay z-100!" onClick={closeView}>
+          <div className="cafeOrdersModal__shell" onClick={(e) => e.stopPropagation()}>
+            <div className="cafeOrdersModal__card">
+              <div className="cafeOrdersModal__header">
+                <h3 className="cafeOrdersModal__title">Чек</h3>
+                <button
+                  className="cafeOrdersModal__close"
+                  onClick={closeView}
+                  aria-label="Закрыть"
+                  type="button"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              <div className="cafeOrdersPay">
+                {(() => {
+                  const t = tablesMap.get(viewOrder.table);
+                  const tableLabel =
+                    viewOrder.table === null || viewOrder.table === undefined || viewOrder.table === ""
+                      ? "С собой"
+                      : t?.number || "—";
+                  const dt = formatReceiptDate(viewOrder?.created_at || viewOrder?.date || viewOrder?.created);
+                  const items = Array.isArray(viewOrder?.items) ? viewOrder.items : [];
+                  const totals = calcTotals(viewOrder);
+                  const isTakeaway = tableLabel === "С собой";
+
+                  return (
+                    <>
+                      <div className="cafeOrdersPay__top">
+                        <div className="cafeOrdersPay__table">
+                          {isTakeaway ? "С собой" : `СТОЛ ${tableLabel}`}
+                        </div>
+                        <div className="cafeOrdersPay__date">{dt || ""}</div>
+                      </div>
+
+                      <div className="cafeOrdersPay__divider" />
+
+                      <div className="cafeOrdersPay__list">
+                        {items.length ? (
+                          items.map((it, idx) => {
+                            const title = it.menu_item_title || it.title || "Позиция";
+                            const qty = Number(it.quantity) || 0;
+                            const price = linePrice(it);
+                            const sum = price * qty;
+
+                            return (
+                              <div key={it.id || it.menu_item || idx} className="cafeOrdersPay__row">
+                                <span className="cafeOrdersPay__name" title={title}>
+                                  {title}
+                                </span>
+                                <span className="cafeOrdersPay__qty">x{qty}</span>
+                                <span className="cafeOrdersPay__sum">{fmtShort(sum)}</span>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="cafeOrdersPay__empty">Позиции заказа не найдены.</div>
+                        )}
+                      </div>
+
+                      <div className="cafeOrdersPay__divider cafeOrdersPay__divider--dashed" />
+
+                      <div className="cafeOrdersPay__total">
+                        <span>ИТОГО</span>
+                        <span>{fmtShort(totals.total)}</span>
+                      </div>
+                    </>
+                  );
+                })()}
+
+                <div className="cafeOrdersPay__actions">
+                  <button
+                    type="button"
+                    className="cafeOrders__btn cafeOrders__btn--secondary"
+                    onClick={closeView}
+                    disabled={printingId === viewOrder.id}
+                  >
+                    Закрыть
+                  </button>
+
+                  <button
+                    type="button"
+                    className="cafeOrders__btn cafeOrders__btn--secondary"
+                    onClick={() => printOrder(viewOrder)}
+                    disabled={printingId === viewOrder.id}
+                    title="Распечатать чек"
+                  >
+                    <FaClipboardList /> {printingId === viewOrder.id ? "Печать…" : "Чек"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
