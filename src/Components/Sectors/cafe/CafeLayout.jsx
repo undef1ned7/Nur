@@ -19,6 +19,7 @@ export default function CafeLayout() {
     const printingOrdersRef = useRef(new Set()); // orderId -> currently printing (avoid parallel)
     const printedReceiptsRef = useRef(new Set()); // orderId -> cashier receipt printed once on this device
     const printingReceiptsRef = useRef(new Set()); // orderId -> cashier receipt printing now
+    const printingKitchenDiffRef = useRef(new Set()); // orderId -> diff printing now
     const retryTimersRef = useRef(new Map()); // orderId -> timeoutId
     const notifiedOrdersRef = useRef(new Set()); // orderId -> notified once on this device (cook page)
     const kitchensCacheRef = useRef(null); // Map(kitchenId -> kitchen)
@@ -146,6 +147,23 @@ export default function CafeLayout() {
         const n = Number(String(v).replace(",", "."));
         return Number.isFinite(n) ? n : 0;
     }, []);
+
+    const orderItemsSnapshotKey = useCallback((orderId) => `cafe_order_items_snapshot_${orderId}`, []);
+
+    const readOrderItemsSnapshot = useCallback((orderId) => {
+        try {
+            const raw = localStorage.getItem(orderItemsSnapshotKey(orderId));
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    }, [orderItemsSnapshotKey]);
+
+    const writeOrderItemsSnapshot = useCallback((orderId, snapshot) => {
+        try {
+            localStorage.setItem(orderItemsSnapshotKey(orderId), JSON.stringify(snapshot || null));
+        } catch { }
+    }, [orderItemsSnapshotKey]);
 
     const isPaidStatus = useCallback((order) => {
         if (order?.is_paid === true) return true;
@@ -350,6 +368,21 @@ export default function CafeLayout() {
         }
     }
 
+    const buildItemsQtyMap = useCallback((items) => {
+        const map = new Map(); // menuId -> { qty, title }
+        const arr = Array.isArray(items) ? items : [];
+        for (const it of arr) {
+            const menuId = it?.menu_item || it?.menu_item_id || it?.menuItem;
+            const mid = String(menuId || "");
+            if (!mid) continue;
+            const qty = Number(it?.quantity) || 0;
+            if (!qty) continue;
+            const title = String(it?.menu_item_title || it?.title || "Позиция");
+            map.set(mid, { qty, title });
+        }
+        return map;
+    }, []);
+
     const printKitchenTicketsForOrder = async (orderId, attempt = 0) => {
         const oid = String(orderId || "");
         if (!oid) return;
@@ -458,6 +491,14 @@ export default function CafeLayout() {
             try {
                 localStorage.setItem(`cafe_kitchen_printed_${oid}`, "true");
             } catch { }
+
+            // Snapshot items after successful print (for diff printing on edits)
+            try {
+                const snapMap = buildItemsQtyMap(detail?.items);
+                const snapObj = {};
+                for (const [mid, v] of snapMap.entries()) snapObj[mid] = v;
+                writeOrderItemsSnapshot(oid, { orderId: oid, savedAt: Date.now(), items: snapObj });
+            } catch { }
         } catch (e) {
             console.error("Auto kitchen print error:", e);
             // retry on transient errors
@@ -470,6 +511,166 @@ export default function CafeLayout() {
             releaseKitchenPrintLock(oid);
         }
     }
+
+    const shouldPrintKitchenDiffForStatus = useCallback((order) => {
+        const s = String(order?.status || "").toLowerCase().trim();
+        if (isPaidStatus(order)) return false;
+        if (["cancelled", "canceled", "отменен", "отменён"].includes(s)) return false;
+        return true;
+    }, [isPaidStatus]);
+
+    const printKitchenDiffTicketsForOrder = useCallback(async (orderId) => {
+        const oid = String(orderId || "");
+        if (!oid) return;
+        if (printingKitchenDiffRef.current.has(oid)) return;
+
+        const enabled = await shouldAutoPrintNow().catch(() => false);
+        if (!enabled) return;
+
+        if (!acquireKitchenPrintLock(oid)) return;
+        printingKitchenDiffRef.current.add(oid);
+
+        try {
+            const detail = await api.get(`/cafe/orders/${encodeURIComponent(oid)}/`).then((r) => r?.data || null);
+            if (!detail) return;
+
+            if (!shouldPrintKitchenDiffForStatus(detail)) return;
+
+            const newMap = buildItemsQtyMap(detail?.items);
+            const prevSnap = readOrderItemsSnapshot(oid);
+            const prevItems = prevSnap?.items && typeof prevSnap.items === "object" ? prevSnap.items : {};
+            const oldMap = new Map(); // menuId -> { qty, title }
+            for (const [k, v] of Object.entries(prevItems || {})) {
+                const mid = String(k || "");
+                if (!mid) continue;
+                const qty = Number(v?.qty) || 0;
+                if (!qty) continue;
+                const title = String(v?.title || "Позиция");
+                oldMap.set(mid, { qty, title });
+            }
+
+            const allMenuIds = Array.from(new Set([...Array.from(oldMap.keys()), ...Array.from(newMap.keys())]));
+            if (!allMenuIds.length) {
+                // nothing to diff; still store snapshot
+                const snapObj = {};
+                for (const [mid, v] of newMap.entries()) snapObj[mid] = v;
+                writeOrderItemsSnapshot(oid, { orderId: oid, savedAt: Date.now(), items: snapObj });
+                return;
+            }
+
+            const kitchensMap = await ensureKitchensMap();
+
+            // Resolve kitchen for each menu item id (cached)
+            const menuToKitchen = new Map(); // mid -> kid
+            for (const mid of allMenuIds) {
+                // eslint-disable-next-line no-await-in-loop
+                const kid = await resolveMenuKitchenId(mid);
+                if (kid) menuToKitchen.set(mid, String(kid));
+            }
+
+            const addedByKitchen = new Map(); // kid -> [{name, qty}]
+            const removedByKitchen = new Map(); // kid -> [{name, qty}]
+
+            for (const mid of allMenuIds) {
+                const kid = menuToKitchen.get(mid);
+                if (!kid) continue;
+
+                const oldQty = oldMap.get(mid)?.qty ?? 0;
+                const newQty = newMap.get(mid)?.qty ?? 0;
+                if (oldQty === newQty) continue;
+
+                const title = newMap.get(mid)?.title || oldMap.get(mid)?.title || "Позиция";
+
+                if (newQty > oldQty) {
+                    const qty = Math.max(1, Number(newQty - oldQty) || 0);
+                    if (!addedByKitchen.has(kid)) addedByKitchen.set(kid, []);
+                    addedByKitchen.get(kid).push({ name: String(title), qty });
+                } else {
+                    const qty = Math.max(1, Number(oldQty - newQty) || 0);
+                    if (!removedByKitchen.has(kid)) removedByKitchen.set(kid, []);
+                    removedByKitchen.get(kid).push({ name: String(title), qty });
+                }
+            }
+
+            if (!addedByKitchen.size && !removedByKitchen.size) {
+                // no changes
+                return;
+            }
+
+            const dtRaw = detail?.updated_at || detail?.updated || detail?.modified_at || detail?.created_at || detail?.date || new Date().toISOString();
+            const dt = formatReceiptDate(dtRaw);
+            const tableLabel = resolveTableLabelFromOrder(detail);
+            const cashier = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || profile?.email || "";
+
+            const printOne = async (kid, menuTitle, items) => {
+                const k = kitchensMap.get(String(kid));
+                const label = kitchenLabel(k);
+                const binding = resolveKitchenPrinterBinding(kitchensMap, kid);
+                const parsed = parsePrinterBinding(binding);
+                if (parsed.kind !== "ip" && parsed.kind !== "usb") return;
+
+                const payload = {
+                    company: localStorage.getItem("company_name") || "КУХНЯ",
+                    doc_no: `${label} | СТОЛ ${tableLabel} | ИЗМЕНЕНИЕ`,
+                    created_at: dt,
+                    cashier_name: cashier,
+                    discount: 0,
+                    tax: 0,
+                    paid_cash: 0,
+                    paid_card: 0,
+                    change: 0,
+                    kitchen_id: Number(kid) || kid,
+                    menu_title: menuTitle,
+                    items: (items || []).map((it) => ({
+                        name: String(it.name || "Позиция"),
+                        qty: Math.max(1, Number(it.qty) || 1),
+                    })),
+                };
+
+                if (parsed.kind === "ip") {
+                    await printViaWiFiSimple(payload, parsed.ip, parsed.port);
+                } else if (parsed.kind === "usb") {
+                    await setActivePrinterByKey(parsed.usbKey);
+                    await printOrderReceiptJSONViaUSB(payload);
+                }
+            };
+
+            // Print added first, then removed (per kitchen)
+            for (const [kid, items] of addedByKitchen.entries()) {
+                // eslint-disable-next-line no-await-in-loop
+                await printOne(kid, "ДОБАВИТЬ", items);
+            }
+            for (const [kid, items] of removedByKitchen.entries()) {
+                // eslint-disable-next-line no-await-in-loop
+                await printOne(kid, "УБРАТЬ", items);
+            }
+
+            // Update snapshot only after successful diff print
+            const snapObj = {};
+            for (const [mid, v] of newMap.entries()) snapObj[mid] = v;
+            writeOrderItemsSnapshot(oid, { orderId: oid, savedAt: Date.now(), items: snapObj });
+        } catch (e) {
+            console.error("Auto kitchen diff print error:", e);
+        } finally {
+            printingKitchenDiffRef.current.delete(oid);
+            releaseKitchenPrintLock(oid);
+        }
+    }, [
+        buildItemsQtyMap,
+        ensureKitchensMap,
+        formatReceiptDate,
+        profile?.email,
+        profile?.first_name,
+        profile?.last_name,
+        readOrderItemsSnapshot,
+        releaseKitchenPrintLock,
+        resolveKitchenPrinterBinding,
+        resolveMenuKitchenId,
+        resolveTableLabelFromOrder,
+        shouldAutoPrintNow,
+        shouldPrintKitchenDiffForStatus,
+        writeOrderItemsSnapshot,
+    ]);
 
     // Fallback: poll recent orders and print kitchen tickets for any unprinted (when order was created from another device, e.g. phone)
     const pollRecentOrdersAndPrint = useCallback(async () => {
@@ -549,8 +750,12 @@ export default function CafeLayout() {
             if (orderId && isPaidStatus(updatedOrder)) {
                 printReceiptForOrder(orderId);
             }
+            // Auto print kitchen diff on order edit (added/removed items)
+            if (orderId && !isPaidStatus(updatedOrder)) {
+                printKitchenDiffTicketsForOrder(orderId);
+            }
         }
-    }, [orders?.lastMessage, profile?.id, isCookPage, isPaidStatus, printReceiptForOrder]);
+    }, [orders?.lastMessage, profile?.id, isCookPage, isPaidStatus, printReceiptForOrder, printKitchenDiffTicketsForOrder]);
 
     // Fallback polling: when order is created from another device (e.g. phone), this device (notebook) may not get WebSocket event — poll recent orders and print
     useEffect(() => {
