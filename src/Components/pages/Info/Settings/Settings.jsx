@@ -1227,6 +1227,7 @@ import CafeReceiptPrinterSettings from "./CafeReceiptPrinterSettings";
 import CafeKitchenPrintersSettings from "./CafeKitchenPrintersSettings";
 import sleep from "../../../../../tools/sleep";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* helpers */
 const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
@@ -1371,7 +1372,7 @@ const Settings = () => {
       score: company?.score || "",
       bik: company?.bik || "",
       address: company?.address || "",
-      phones_howcase: company?.phones_howcase || "",
+      whatsapp_phone: company?.whatsapp_phone || "",
     });
   }, [company]);
 
@@ -1409,8 +1410,8 @@ const Settings = () => {
       await dispatch(updateUserCompanyName(companyState)).unwrap();
       showAlert("success", "Данные компании успешно сохранены");
     } catch (err) {
-      console.error("Failed to update company:", err);
-      showAlert("error", "Ошибка при сохранении данных компании");
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении данных компании");
+      showAlert("error", errorMessage);
     } finally {
       setSaving(false);
     }
@@ -1442,10 +1443,8 @@ const Settings = () => {
         new_password2: "",
       });
     } catch (err) {
-      console.error("Failed to update password:", err);
-      const errorsText = Object.values(err).join("\n");
-      console.log(errorsText);
-      showAlert("error", `Ошибка при изменении пароля\n${errorsText}`);
+      const errorMessage = validateResErrors(err, "Ошибка при изменении пароля");
+      showAlert("error", errorMessage);
     } finally {
       setSaving(false);
     }
@@ -1460,7 +1459,7 @@ const Settings = () => {
       score: company?.score || "",
       bik: company?.bik || "",
       address: company?.address || "",
-      phones_howcase: company?.phones_howcase || "",
+      whatsapp_phone: company?.whatsapp_phone || "",
     });
   };
 
@@ -1474,8 +1473,8 @@ const Settings = () => {
       localStorage.setItem("sidebarAutoClose", String(sidebarAutoClose));
       showAlert("success", "Настройки интерфейса успешно сохранены");
     } catch (err) {
-      console.error("Failed to save interface settings:", err);
-      showAlert("error", "Ошибка при сохранении настроек интерфейса");
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении настроек интерфейса");
+      showAlert("error", errorMessage);
     }
   };
 
@@ -1553,12 +1552,13 @@ const Settings = () => {
         if (e.target === modal) document.body.removeChild(modal);
       };
     } catch (err) {
-      console.error("Ошибка при создании токена:", err);
-      const errorMessage =
-        err?.detail ||
-        err?.message ||
-        (typeof err === "string" ? err : "Не удалось создать токен");
-      showAlert("error", `Ошибка: ${errorMessage}`);
+      const errorMessage = validateResErrors(err, "Ошибка при создании токена");
+      showAlert("error", errorMessage);
+      // const errorMessage =
+      //   err?.detail ||
+      //   err?.message ||
+      //   (typeof err === "string" ? err : "Не удалось создать токен");
+      // showAlert("error", `Ошибка: ${errorMessage}`);
     }
   };
 
@@ -1621,9 +1621,9 @@ const Settings = () => {
       try {
         await navigator.clipboard.writeText(String(text));
         showAlert("success", "Скопировано");
-      } catch (e) {
-        console.error("Clipboard copy failed:", e);
-        showAlert("error", "Не удалось скопировать. Скопируйте вручную.");
+      } catch (e) { 
+        const errorMessage = validateResErrors(e, "Не удалось скопировать. Скопируйте вручную.");
+        showAlert("error", errorMessage);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1715,7 +1715,7 @@ const Settings = () => {
                     placeholder: "Введите адрес",
                   },
                   {
-                    id: "phones_howcase",
+                    id: "whatsapp_phone",
                     label: "Телефоны для витрины (WhatsApp)",
                     placeholder: "Введите телефоны для витрины (WhatsApp)",
                   },

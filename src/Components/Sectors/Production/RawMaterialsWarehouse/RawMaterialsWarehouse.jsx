@@ -22,6 +22,7 @@ import "../../Market/Warehouse/Warehouse.scss";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -87,8 +88,8 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
         onClose();
       })
     } catch (e) {
-      console.log(e);
-      error(`Ошибка: ${e?.message || "не удалось добавить сырьё"}`);
+      const errorMessage = validateResErrors(e, "Ошибка при добавлении сырья");
+      error(errorMessage);
     }
   };
 
@@ -227,9 +228,8 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
         onClose();
       })
     } catch (e) {
-
-      console.error(e);
-      alert(`Не удалось обновить: ${e?.message || "ошибка"}`,
+      const errorMessage = validateResErrors(e, "Ошибка при обновлении сырья");
+      alert(errorMessage,
         () => {
           setSaving(false);
         }, true);
@@ -247,8 +247,8 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
           onClose();
         } catch (e) {
           setDeleting(false);
-          console.error(e);
-          alert(`Не удалось удалить: ${e?.message || "ошибка"}`);
+          const errorMessage = validateResErrors(e, "Ошибка при удалении сырья");
+          alert(errorMessage, true);
         }
       } else {
         setDeleting(false);

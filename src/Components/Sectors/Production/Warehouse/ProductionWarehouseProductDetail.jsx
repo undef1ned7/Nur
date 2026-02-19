@@ -25,6 +25,7 @@ import {
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { useProducts } from "../../../../store/slices/productSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 const toIdArray = (value) => {
   if (!Array.isArray(value)) return [];
@@ -297,9 +298,9 @@ const ProductionWarehouseProductDetail = () => {
       console.error(e);
       setSaveError(
         e?.detail ||
-          e?.message ||
-          e?.response?.data?.detail ||
-          "Не удалось сохранить изменения"
+        e?.message ||
+        e?.response?.data?.detail ||
+        "Не удалось сохранить изменения"
       );
     } finally {
       setSaving(false);
@@ -634,54 +635,55 @@ const ProductionWarehouseProductDetail = () => {
                 )}
 
                 <div className="production-product-detail__materialsGrid">
-                  <div className="production-product-detail__materialsList">
-                    {itemsMakeLoading ? (
-                      <div className="production-product-detail__empty">
-                        Загрузка сырья...
-                      </div>
-                    ) : filteredMaterials.length ? (
-                      filteredMaterials.map((m) => {
-                        const checked = selectedMaterials.has(String(m.id));
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            className={`production-product-detail__materialRow ${
-                              checked ? "is-checked" : ""
-                            }`}
-                            onClick={() => {
-                              if (!editMode) return;
-                              toggleMaterial(m.id);
-                            }}
-                            disabled={!editMode}
-                            title={!editMode ? "Включите редактирование" : ""}
-                          >
-                            <span className="production-product-detail__materialLeft">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleMaterial(m.id)}
-                                onClick={(e) => e.stopPropagation()}
-                                disabled={!editMode}
-                              />
-                              <span className="production-product-detail__materialName">
-                                {m.name || `#${m.id}`}
+                  <DataContainer>
+                    <div className="production-product-detail__materialsList">
+                      {itemsMakeLoading ? (
+                        <div className="production-product-detail__empty">
+                          Загрузка сырья...
+                        </div>
+                      ) : filteredMaterials.length ? (
+                        filteredMaterials.map((m) => {
+                          const checked = selectedMaterials.has(String(m.id));
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              className={`production-product-detail__materialRow ${checked ? "is-checked" : ""
+                                }`}
+                              onClick={() => {
+                                if (!editMode) return;
+                                toggleMaterial(m.id);
+                              }}
+                              disabled={!editMode}
+                              title={!editMode ? "Включите редактирование" : ""}
+                            >
+                              <span className="production-product-detail__materialLeft">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleMaterial(m.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  disabled={!editMode}
+                                />
+                                <span className="production-product-detail__materialName">
+                                  {m.name || `#${m.id}`}
+                                </span>
                               </span>
-                            </span>
-                            <span className="production-product-detail__materialMeta">
-                              {m.quantity != null
-                                ? `${m.quantity} ${m.unit || ""}`
-                                : ""}
-                            </span>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="production-product-detail__empty">
-                        Ничего не найдено.
-                      </div>
-                    )}
-                  </div>
+                              <span className="production-product-detail__materialMeta">
+                                {m.quantity != null
+                                  ? `${m.quantity} ${m.unit || ""}`
+                                  : ""}
+                              </span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="production-product-detail__empty">
+                          Ничего не найдено.
+                        </div>
+                      )}
+                    </div>
+                  </DataContainer>
 
                   <div className="production-product-detail__selectedBox">
                     <div className="production-product-detail__selectedTitle">

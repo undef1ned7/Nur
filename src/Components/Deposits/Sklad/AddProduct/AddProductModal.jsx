@@ -12,6 +12,7 @@ import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { updateProductAsync } from "../../../../store/creators/productCreators";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import "./AddProductModal.scss";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const toNum = (v) => {
   const n = Number(String(v ?? "").replace(",", "."));
@@ -146,8 +147,8 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
         onClose?.();
       })
     } catch (e) {
-      console.log(e);
-      alert("Не удалось сохранить. Попробуйте ещё раз.", true)
+      const errorMessage = validateResErrors(e, "Не удалось сохранить. Попробуйте ещё раз.");
+      alert(errorMessage, true)
     }
   };
 

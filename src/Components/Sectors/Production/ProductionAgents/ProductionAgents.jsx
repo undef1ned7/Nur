@@ -41,13 +41,15 @@ import {
 } from "../../../../store/creators/saleThunk";
 import "../../Market/Warehouse/Warehouse.scss";
 import "./productionAgents.scss";
-import { useAlert } from "../../../../hooks/useDialog";
+import { useAlert } from "@/hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Компонент для детального просмотра продажи
 const SaleDetailModal = ({ onClose, saleId }) => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { historyDetail: saleDetail } = useSale();
 
@@ -75,7 +77,8 @@ const SaleDetailModal = ({ onClose, saleId }) => {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.detail);
+      const errorMessage = validateResErrors(err, "Ошибка при печати чека");
+      alert(errorMessage, true);
     }
   };
 
@@ -91,7 +94,8 @@ const SaleDetailModal = ({ onClose, saleId }) => {
       link1.click();
       window.URL.revokeObjectURL(url1);
     } catch (err) {
-      alert(err.detail);
+      const errorMessage = validateResErrors(err, "Ошибка при печати накладной");
+      alert(errorMessage, true);
     }
   };
 
@@ -217,11 +221,8 @@ const PendingModal = ({ onClose, onChanged }) => {
         onClose?.();
       });
     } catch (error) {
-      console.error("Accept transfer failed:", error);
-      alert(
-        `Ошибка при принятии передачи: ${error?.message || "неизвестная ошибка"
-        }`, true
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при принятии передачи");
+      alert(errorMessage, true);
     }
   };
 
@@ -518,11 +519,8 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
         onClose();
       });
     } catch (error) {
-      console.error("Return creation failed:", error);
-      alert(
-        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка"
-        }`, true
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании возврата");
+      alert(errorMessage, true);
     }
   };
 
@@ -602,6 +600,7 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 /* ---- UI ---- */
 
 const ProductionAgents = () => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { profile } = useUser();
   const { list: transfers } = useSelector(
@@ -697,9 +696,11 @@ const ProductionAgents = () => {
         data?.returns_summary || { pending_count: 0, pending_qty: 0 }
       );
     } catch (e) {
-      console.error("Failed to load my returns:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке моих возвратов");
+      alert(errorMessage, true);
       setMyReturns([]);
       setMyReturnsSummary({ pending_count: 0, pending_qty: 0 });
+
     } finally {
       setMyReturnsLoading(false);
     }
@@ -844,8 +845,8 @@ const ProductionAgents = () => {
       await dispatch(startSaleInAgent()).unwrap();
       setShowStart(true);
     } catch (error) {
-      console.error("Ошибка при инициализации продажи:", error);
-      alert("Не удалось начать продажу. Попробуйте еще раз.");
+      const errorMessage = validateResErrors(error, "Ошибка при инициализации продажи");
+      alert(errorMessage, true);
     }
   };
 
@@ -856,7 +857,8 @@ const ProductionAgents = () => {
       const result = await dispatch(historySellProduct({})).unwrap();
       setSalesHistory(result);
     } catch (error) {
-      console.error("Ошибка загрузки истории продаж:", error);
+      const errorMessage = validateResErrors(error, "Ошибка загрузки истории продаж");
+      alert(errorMessage, true);
     } finally {
       setSalesHistoryLoading(false);
     }

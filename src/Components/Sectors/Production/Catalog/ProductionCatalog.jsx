@@ -55,6 +55,7 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useAlert } from "../../../../hooks/useDialog";
 import useResize from "../../../../hooks/useResize";
 import { useAgentCart } from "../../../../store/slices/agentCartSlice";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Моковые данные для демонстрации
 const mockProducts = [
@@ -965,7 +966,8 @@ const ProductionCatalog = () => {
         setAgentCartItemsCount(0);
       }
     } catch (error) {
-      console.error("Error fetching cart items:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при получении корзины");
+      alert(errorMessage, true);
       setAgentCartItemsCount(0);
     }
   }, [dispatch, agentCartId]);
@@ -986,7 +988,8 @@ const ProductionCatalog = () => {
         setAgentProductsMap(map);
       }
     } catch (error) {
-      console.error("Error refreshing agent products:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при получении агентских продуктов");
+      alert(errorMessage, true);
     }
   }, [dispatch]);
 
@@ -1052,7 +1055,8 @@ const ProductionCatalog = () => {
         }
       } catch (e) {
         // ignore; will fallback to local cart until user retries
-        console.error("Error initializing agent cart:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при инициализации корзины");
+        alert(errorMessage, true);
       }
     })();
   }, [dispatch]);
@@ -1142,7 +1146,8 @@ const ProductionCatalog = () => {
       try {
         await dispatch(updateProductsOrder(productsOrder));
       } catch (error) {
-        console.error("Ошибка при обновлении порядка товаров:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при обновлении порядка товаров");
+        alert(errorMessage, true);
       }
     }
   };
@@ -1249,8 +1254,8 @@ const ProductionCatalog = () => {
         dispatch(addToCart({ product, quantity, store: "Default Store" }));
       }
     } catch (error) {
-      alert(error?.data?.detail || 'Ошибка при добавлении в корзину!')
-      console.error("Error adding product to cart:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при добавлении в корзину");
+      alert(errorMessage, true);
       // Fallback to local cart on error
       if (error?.status >= 500) {
         dispatch(addToCart({ product, quantity, store: "Default Store" }));
@@ -1371,16 +1376,8 @@ const ProductionCatalog = () => {
       dispatch(fetchProducts());
       refreshAgentProducts();
     } catch (error) {
-      console.error("Error adding to cart without saving:", error);
-      const errorMessage =
-        error?.response?.data?.shift_id?.[0] ||
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось отправить заказ";
-      setAlertType("error");
-      setAlertMessage(errorMessage);
-      setAlertOpen(true);
+      const errorMessage = validateResErrors(error, "Ошибка при добавлении в корзину без сохранения");  
+      alert(errorMessage, true);
     }
   };
 
@@ -1407,7 +1404,8 @@ const ProductionCatalog = () => {
         await refreshCartItems();
       }
     } catch (e) {
-      console.error("Error opening cart:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при открытии корзины");
+      alert(errorMessage, true);
       // keep null; component will fallback to local items
     } finally {
       setIsCartSectionOpen(true);

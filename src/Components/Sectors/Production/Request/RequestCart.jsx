@@ -25,6 +25,8 @@ import { useClient } from "../../../../store/slices/ClientSlice";
 import { createDeal } from "../../../../store/creators/saleThunk";
 import { useUser } from "../../../../store/slices/userSlice";
 import "./RequestCart.scss";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
   const [quantity, setQuantity] = useState(
@@ -379,6 +381,7 @@ const RequestCart = ({
     creating,
     error: clientError,
   } = useClient();
+  const alert = useAlert();
   const { company } = useUser();
   const [submitting, setSubmitting] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -863,6 +866,8 @@ const RequestCart = ({
     } catch (e) {
       console.error("Error creating client:", e);
       // error handled in slice
+      const errorMessage = validateResErrors(e, "Ошибка при создании клиента");
+      alert(errorMessage, true);
     }
   };
 
@@ -979,15 +984,8 @@ const RequestCart = ({
         setIsOrderSectionOpen(false);
       }
     } catch (e) {
-      console.error("Error submitting request:", e);
-      const errorMessage =
-        e?.response?.data?.detail ||
-        e?.response?.data?.message ||
-        e?.message ||
-        e?.detail ||
-        "неизвестная ошибка";
-      onNotify &&
-        onNotify("error", `Не удалось отправить запрос: ${errorMessage}`);
+      const errorMessage = validateResErrors(e, "Ошибка при отправке запроса");
+      alert(errorMessage, true);
     } finally {
       setSubmitting(false);
     }

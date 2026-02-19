@@ -11,6 +11,7 @@ import { useUser } from "../../../store/slices/userSlice";
 import { useLocation } from "react-router-dom";
 import { useAlert, useConfirm } from "../../../hooks/useDialog";
 import "./MarriageModal.scss";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 const toNum = (v) => {
   const n = Number(String(v).replace(",", "."));
@@ -132,8 +133,8 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
         onClose?.();
       })
     } catch (e) {
-      console.log(e);
-      alert("Не удалось сохранить. Попробуйте ещё раз.", true)
+      const errorMessage = validateResErrors(e, "Не удалось сохранить. Попробуйте ещё раз.");
+      alert(errorMessage, true)
     }
   };
 
@@ -187,8 +188,8 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
             onClose?.();
           })
         } catch (e) {
-          console.log(e);
-          alert("Не удалось выполнить возврат. Попробуйте ещё раз.", true)
+          const errorMessage = validateResErrors(e, "Не удалось выполнить возврат. Попробуйте ещё раз.");
+          alert(errorMessage, true)
         }
       }
     })

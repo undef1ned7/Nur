@@ -568,8 +568,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     } catch (err) {
       setCreating(false);
       setCreateError(err);
-      console.log('ERERERRR',err);
-      
+      console.log('ERERERRR', err);
+
       error(
         validateResErrors(err, 'Ошибка при добавлении товара')
       );
@@ -1451,7 +1451,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
         } catch (error) {
           console.error("Ошибка удаления изображения:", error);
-          alert("Не удалось удалить изображение", null, true);
+          const errorMessage = validateResErrors(error, "Ошибка удаления изображения");
+          alert(errorMessage, null, true);
         }
       }
     })
@@ -1471,7 +1472,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
       );
     } catch (error) {
       console.error("Ошибка установки главного изображения:", error);
-      alert("Не удалось установить главное изображение");
+      const errorMessage = validateResErrors(error, "Ошибка установки главного изображения");
+      alert(errorMessage);
     }
   };
 
@@ -1551,7 +1553,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           });
         if (uploads.length) await Promise.allSettled(uploads);
       } catch (e) {
-        alert("Загрузка новых изображений не удалась", true);
+        const errorMessage = validateResErrors(e, "Загрузка новых изображений не удалась");
+        alert(errorMessage, true);
         // не блокируем основной флоу
       }
       alert('Товар отредактирован!', () => {
@@ -1559,11 +1562,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
         onSaveSuccess?.();
       })
     } catch (err) {
-      console.error("Failed to update product:", err);
-      alert(
-        `Ошибка при обновлении товара: ${err.message || JSON.stringify(err)}`,
-        true
-      );
+      const errorMessage = validateResErrors(err, "Ошибка при обновлении товара");
+      alert(errorMessage, true);
     }
   };
 
@@ -1577,12 +1577,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
             onDeleteConfirm?.();
           })
         } catch (err) {
-          console.error("Failed to delete product:", err);
-          alert(
-            `Ошибка при удалении товара: ${err.message || JSON.stringify(err)}`,
-            null,
-            true
-          );
+          const errorMessage = validateResErrors(err, "Ошибка при удалении товара");
+          alert(errorMessage, null, true);
         }
       }
     })
@@ -2190,11 +2186,8 @@ const TransferProductModal = ({
         onClose();
       });
     } catch (error) {
-      console.error("Transfer creation failed:", error);
-      error(
-        `Ошибка при создании передачи: ${error?.message || "неизвестная ошибка"
-        }`
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании передачи");
+      alert(errorMessage, true);
     }
   };
 
@@ -2469,10 +2462,8 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
       );
 
     } catch (error) {
-      console.error("Accept inline failed:", error);
-      alert(
-        `Ошибка при создании приёмки: ${error?.message || "неизвестная ошибка"}`, true
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании приёмки");
+      alert(errorMessage, true);
     }
   };
 
@@ -2663,10 +2654,8 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 
     } catch (error) {
       console.error("Return creation failed:", error);
-      alert(
-        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка", true
-        }`
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании возврата");
+      alert(errorMessage, true);
     }
   };
 
@@ -3060,338 +3049,356 @@ const FinishedGoods = ({ products, onChanged }) => {
       {/* Products */}
       <DataContainer>
 
-      <div className="warehouse-table-container w-full">
-        {/* ===== TABLE ===== */}
-        {viewMode === "table" && (
-          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="warehouse-table w-full min-w-275">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>№</th>
-                  <th></th>
-                  <th>Название</th>
-                  <th>Поставщик</th>
-                  <th>Цена</th>
-                  <th>Дата</th>
-                  <th>Количество / У агентов</th>
-                  <th>Категория</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {loading ? (
+        <div className="warehouse-table-container w-full">
+          {/* ===== TABLE ===== */}
+          {viewMode === "table" && (
+            <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <table className="warehouse-table w-full min-w-275">
+                <thead>
                   <tr>
-                    <td colSpan={10} className="warehouse-table__loading">
-                      Загрузка...
-                    </td>
+                    <th></th>
+                    <th>№</th>
+                    <th></th>
+                    <th>Название</th>
+                    <th>Поставщик</th>
+                    <th>Цена</th>
+                    <th>Дата</th>
+                    <th>Количество / У агентов</th>
+                    <th>Категория</th>
+                    <th>Действия</th>
                   </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={10} className="warehouse-table__empty">
-                      Ошибка загрузки
-                    </td>
-                  </tr>
-                ) : viewProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="warehouse-table__empty">
-                      Товары не найдены
-                    </td>
-                  </tr>
-                ) : (
-                  viewProducts.map((item, idx) => {
-                    const primaryImage = getPrimaryImage(item);
-                    return (
-                      <tr
-                        key={item.id}
-                        className="warehouse-table__row"
-                        onClick={() => openEdit(item)}
-                      >
-                        <td>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEdit(item);
-                            }}
-                            className="warehouse-table__edit-btn"
-                            title="Редактировать"
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-                        </td>
+                </thead>
 
-                        <td>{idx + 1}</td>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={10} className="warehouse-table__loading">
+                        Загрузка...
+                      </td>
+                    </tr>
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={10} className="warehouse-table__empty">
+                        Ошибка загрузки
+                      </td>
+                    </tr>
+                  ) : viewProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="warehouse-table__empty">
+                        Товары не найдены
+                      </td>
+                    </tr>
+                  ) : (
+                    viewProducts.map((item, idx) => {
+                      const primaryImage = getPrimaryImage(item);
+                      return (
+                        <tr
+                          key={item.id}
+                          className="warehouse-table__row"
+                          onClick={() =>
+                            navigate(`/crm/production/warehouse/${item.id}`)
 
-                        <td>
-                          <img
-                            src={getImageUrl(primaryImage)}
-                            alt={primaryImage?.alt || item.name || "Товар"}
-                            className="warehouse-table__product-image"
-                            onError={(e) => {
-                              e.currentTarget.src = noImage;
-                            }}
-                            loading="lazy"
-                          />
-                        </td>
-
-                        <td className="warehouse-table__name">
-                          <div className="warehouse-table__name-cell">
+                          }
+                        >
+                          <td>
                             <button
                               type="button"
-                              className="finished-goods__detailLink"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/crm/production/warehouse/${item.id}`);
+                                openEdit(item);
                               }}
-                              title="Открыть детальную страницу"
+                              className="warehouse-table__edit-btn"
+                              title="Редактировать"
                             >
-                              {item.name || "—"}
+                              <MoreVertical size={16} />
                             </button>
-                          </div>
-                        </td>
+                          </td>
 
-                        <td>{item.client_name || "—"}</td>
-                        <td>{formatPrice(item.price)}</td>
-                        <td>
-                          {new Date(item.created_at).toLocaleDateString()}
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "4px",
-                            }}
-                          >
-                            <div>На складе: {item.quantity || 0}</div>
-                            {item.qty_on_agent > 0 && (
-                              <div style={{ fontSize: "12px", color: "#666" }}>
-                                У агентов: {item.qty_on_agent}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td>{item.category || item.category_name || "—"}</td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "8px",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <button
-                              className="warehouse-header__create-btn"
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "12px",
-                                background: "#f59e0b",
-                                color: "white",
+                          <td>{idx + 1}</td>
+
+                          <td>
+                            <img
+                              src={getImageUrl(primaryImage)}
+                              alt={primaryImage?.alt || item.name || "Товар"}
+                              className="warehouse-table__product-image"
+                              onError={(e) => {
+                                e.currentTarget.src = noImage;
                               }}
-                              onClick={() => handleOpen(item)}
-                            >
-                              В брак
-                            </button>
-                            <button
-                              className="warehouse-header__create-btn"
+                              loading="lazy"
+                            />
+                          </td>
+
+                          <td className="warehouse-table__name">
+                            <div className="warehouse-table__name-cell">
+                              <button
+                                type="button"
+                                className="finished-goods__detailLink"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/crm/production/warehouse/${item.id}`);
+                                }}
+                                title="Открыть детальную страницу"
+                              >
+                                {item.name || "—"}
+                              </button>
+                            </div>
+                          </td>
+
+                          <td>{item.client_name || "—"}</td>
+                          <td>{formatPrice(item.price)}</td>
+                          <td>
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </td>
+                          <td>
+                            <div
                               style={{
-                                padding: "6px 12px",
-                                fontSize: "12px",
-                                background: "#f7d74f",
-                                color: "black",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "4px",
                               }}
-                              onClick={() => handleOpen1(item)}
                             >
-                              Добавить
-                            </button>
-                            {item.qty_on_agent > 0 && (
+                              <div>На складе: {item.quantity || 0}</div>
+                              {item.qty_on_agent > 0 && (
+                                <div style={{ fontSize: "12px", color: "#666" }}>
+                                  У агентов: {item.qty_on_agent}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td>{item.category || item.category_name || "—"}</td>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "8px",
+                                flexWrap: "wrap",
+                              }}
+                            >
                               <button
                                 className="warehouse-header__create-btn"
                                 style={{
                                   padding: "6px 12px",
                                   fontSize: "12px",
-                                  background: "#3b82f6",
+                                  background: "#111827",
                                   color: "white",
                                 }}
-                                onClick={() => handleOpen3(item)}
+                                type="button"
+                                onClick={() =>
+                                  openEdit(item)
+                                }
                               >
-                                Принять возврат
+                                Редактировать
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                              <button
+                                className="warehouse-header__create-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  background: "#f59e0b",
+                                  color: "white",
+                                }}
+                                onClick={() => handleOpen(item)}
+                              >
+                                В брак
+                              </button>
+                              <button
+                                className="warehouse-header__create-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  background: "#f7d74f",
+                                  color: "black",
+                                }}
+                                onClick={() => handleOpen1(item)}
+                              >
+                                Добавить
+                              </button>
+                              {item.qty_on_agent > 0 && (
+                                <button
+                                  className="warehouse-header__create-btn"
+                                  style={{
+                                    padding: "6px 12px",
+                                    fontSize: "12px",
+                                    background: "#3b82f6",
+                                    color: "white",
+                                  }}
+                                  onClick={() => handleOpen3(item)}
+                                >
+                                  Принять возврат
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {/* ===== CARDS ===== */}
-        {viewMode === "cards" && (
-          <div className="block">
-            {loading ? (
-              <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Загрузка...
-              </div>
-            ) : error ? (
-              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Ошибка загрузки
-              </div>
-            ) : viewProducts.length === 0 ? (
-              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Товары не найдены
-              </div>
-            ) : (
-              <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {viewProducts.map((item, idx) => {
-                  const primaryImage = getPrimaryImage(item);
-                  return (
-                    <div
-                      key={item.id}
-                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
-                      onClick={() => navigate(`/crm/production/warehouse/${item.id}`)}
-                    >
-                      <div className="flex items-start gap-3">
-                        <img
-                          src={getImageUrl(primaryImage)}
-                          alt={item.name || "Товар"}
-                          className="warehouse-table__product-image h-12 w-12 flex-none rounded-xl border border-slate-200 object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = noImage;
-                          }}
-                          loading="lazy"
-                        />
-
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-slate-500">
-                            #{idx + 1}
-                          </div>
-                          <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
-                            {item.name || "—"}
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                            <span className="whitespace-nowrap">
-                              Поставщик:{" "}
-                              <span className="font-medium">
-                                {item.client_name || "—"}
-                              </span>
-                            </span>
-                            <span className="whitespace-nowrap">
-                              Категория:{" "}
-                              <span className="font-medium">
-                                {item.category || item.category_name || "—"}
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-xl bg-slate-50 p-2">
-                          <div className="text-slate-500">Цена</div>
-                          <div className="mt-0.5 font-semibold text-slate-900">
-                            {formatPrice(item.price)}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-slate-50 p-2">
-                          <div className="text-slate-500">Дата</div>
-                          <div className="mt-0.5 font-semibold text-slate-900">
-                            {new Date(item.created_at).toLocaleDateString()}
-                          </div>
-                        </div>
-
-                        <div className="col-span-2 rounded-xl bg-slate-50 p-2">
-                          <div className="text-slate-500">Количество</div>
-                          <div className="mt-0.5 font-semibold text-slate-900">
-                            На складе: {item.quantity || 0}
-                            {item.qty_on_agent > 0 && (
-                              <span className="ml-2 text-xs text-slate-600">
-                                • У агентов: {item.qty_on_agent}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
+          {/* ===== CARDS ===== */}
+          {viewMode === "cards" && (
+            <div className="block">
+              {loading ? (
+                <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Загрузка...
+                </div>
+              ) : error ? (
+                <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Ошибка загрузки
+                </div>
+              ) : viewProducts.length === 0 ? (
+                <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Товары не найдены
+                </div>
+              ) : (
+                <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {viewProducts.map((item, idx) => {
+                    const primaryImage = getPrimaryImage(item);
+                    return (
                       <div
-                        className="mt-4 flex flex-wrap gap-2"
-                        onClick={(e) => e.stopPropagation()}
+                        key={item.id}
+                        className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                        onClick={() => navigate(`/crm/production/warehouse/${item.id}`)}
                       >
-                        <button
-                          className="warehouse-header__create-btn"
-                          style={{
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            background: "#111827",
-                            color: "white",
-                            flex: "1",
-                            minWidth: "110px",
-                          }}
-                          type="button"
-                          onClick={() => openEdit(item)}
+                        <div className="flex items-start gap-3">
+                          <img
+                            src={getImageUrl(primaryImage)}
+                            alt={item.name || "Товар"}
+                            className="warehouse-table__product-image h-12 w-12 flex-none rounded-xl border border-slate-200 object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = noImage;
+                            }}
+                            loading="lazy"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-slate-500">
+                              #{idx + 1}
+                            </div>
+                            <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
+                              {item.name || "—"}
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                              <span className="whitespace-nowrap">
+                                Поставщик:{" "}
+                                <span className="font-medium">
+                                  {item.client_name || "—"}
+                                </span>
+                              </span>
+                              <span className="whitespace-nowrap">
+                                Категория:{" "}
+                                <span className="font-medium">
+                                  {item.category || item.category_name || "—"}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">Цена</div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              {formatPrice(item.price)}
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">Дата</div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              {new Date(item.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+
+                          <div className="col-span-2 rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">Количество</div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              На складе: {item.quantity || 0}
+                              {item.qty_on_agent > 0 && (
+                                <span className="ml-2 text-xs text-slate-600">
+                                  • У агентов: {item.qty_on_agent}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          className="mt-4 flex flex-wrap gap-2"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          Редактировать
-                        </button>
-                        <button
-                          className="warehouse-header__create-btn"
-                          style={{
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            background: "#f59e0b",
-                            color: "white",
-                            flex: "1",
-                            minWidth: "80px",
-                          }}
-                          onClick={() => handleOpen(item)}
-                        >
-                          В брак
-                        </button>
-                        <button
-                          className="warehouse-header__create-btn"
-                          style={{
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            background: "#f7d74f",
-                            color: "black",
-                            flex: "1",
-                            minWidth: "80px",
-                          }}
-                          onClick={() => handleOpen1(item)}
-                        >
-                          Добавить
-                        </button>
-                        {item.qty_on_agent > 0 && (
                           <button
                             className="warehouse-header__create-btn"
                             style={{
                               padding: "6px 12px",
                               fontSize: "12px",
-                              background: "#3b82f6",
+                              background: "#111827",
+                              color: "white",
+                              flex: "1",
+                              minWidth: "110px",
+                            }}
+                            type="button"
+                            onClick={() => openEdit(item)}
+                          >
+                            Редактировать
+                          </button>
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              background: "#f59e0b",
                               color: "white",
                               flex: "1",
                               minWidth: "80px",
                             }}
-                            onClick={() => handleOpen3(item)}
+                            onClick={() => handleOpen(item)}
                           >
-                            Принять возврат
+                            В брак
                           </button>
-                        )}
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              background: "#f7d74f",
+                              color: "black",
+                              flex: "1",
+                              minWidth: "80px",
+                            }}
+                            onClick={() => handleOpen1(item)}
+                          >
+                            Добавить
+                          </button>
+                          {item.qty_on_agent > 0 && (
+                            <button
+                              className="warehouse-header__create-btn"
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "12px",
+                                background: "#3b82f6",
+                                color: "white",
+                                flex: "1",
+                                minWidth: "80px",
+                              }}
+                              onClick={() => handleOpen3(item)}
+                            >
+                              Принять возврат
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </DataContainer>
 
 

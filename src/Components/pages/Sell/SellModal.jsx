@@ -35,6 +35,8 @@ import { createDebt, DEAL_STATUS_RU } from "./Sell";
 import { fetchTransfersAsync } from "../../../store/creators/transferCreators";
 import { useProducts } from "../../../store/slices/productSlice";
 import { fetchAgentProductsAsync } from "../../../store/creators/productCreators";
+import { validateResErrors } from "../../../../tools/validateResErrors";
+import { useAlert } from "../../../hooks/useDialog";
 
 /* =========================
    0) Фильтрация (остатки у агента)
@@ -640,7 +642,7 @@ async function printCyrPagesTest() {
 const SellModal = ({ onClose, id, selectCashBox }) => {
   const dispatch = useDispatch();
   const location = useLocation();
-
+  const  alert = useAlert();
   const { list: cashBoxes } = useCash();
   const { list: clients } = useClient();
   const { company, profile } = useUser();
@@ -827,8 +829,9 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           );
           return;
         }
-        console.error(err);
-        alert("Не удалось применить изменения");
+        console.error(err);   
+        const errorMessage = validateResErrors(err, "Ошибка при применении изменений");
+        alert(errorMessage, true);
       }
     },
     [id, quantity, discount, run, guardQty]
@@ -849,8 +852,8 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           );
           return;
         }
-        console.error(err);
-        alert("Не удалось добавить товар");
+        const errorMessage = validateResErrors(err, "Ошибка при добавлении товара");
+        alert(errorMessage, true);
       }
     },
     [id, run, guardQty, getCartQtyById]
@@ -881,7 +884,8 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           return;
         }
         console.error(err);
-        alert("Не удалось обновить корзину");
+        const errorMessage = validateResErrors(err, "Ошибка при обновлении корзины");
+        alert(errorMessage, true);
       }
     },
     [id, run]
@@ -904,7 +908,8 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
             return;
           }
           console.error(err);
-          alert("Не удалось удалить позицию");
+          const errorMessage = validateResErrors(err, "Ошибка при удалении позиции");
+          alert(errorMessage, true);
         }
         return;
       }
@@ -927,7 +932,8 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           return;
         }
         console.error(err);
-        alert("Не удалось обновить количество");
+        const errorMessage = validateResErrors(err, "Ошибка при обновлении количества");
+        alert(errorMessage, true);
       }
     },
     [id, run]
@@ -943,8 +949,8 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
         setPhone(created?.phone || newClient.phone || "");
         setShowCreateClient(false);
       } catch (err) {
-        console.error(err);
-        alert("Не удалось создать клиента");
+        const errorMessage = validateResErrors(err, "Ошибка при создании клиента");
+        alert(errorMessage, true);
       }
     },
     [newClient, run, dispatch]
@@ -978,7 +984,8 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           return;
         }
         console.error(err);
-        alert("Не удалось добавить услугу");
+        const errorMessage = validateResErrors(err, "Ошибка при добавлении услуги");
+        alert(errorMessage, true);
       }
     },
     [customService, id, run]
@@ -1067,7 +1074,8 @@ const SellModal = ({ onClose, id, selectCashBox }) => {
           return;
         }
         console.error(err);
-        alert("Не удалось оформить продажу");
+        const errorMessage = validateResErrors(err, "Ошибка при оформлении продажи");
+        alert(errorMessage, true);
       }
     },
     [

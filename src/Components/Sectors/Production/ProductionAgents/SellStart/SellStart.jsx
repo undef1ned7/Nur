@@ -45,6 +45,7 @@ import { DEAL_STATUS_RU } from "../../../../pages/Sell/Sell";
 import AlertModal from "../../../../common/AlertModal/AlertModal";
 import axios from "axios";
 import api from "../../../../../api";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
 
 const cx = (...args) => args.filter(Boolean).join(" ");
 const toNum = (v) => {
@@ -675,10 +676,11 @@ const SellStart = ({ show, setShow }) => {
       setSelectedAgent(tempSelectedAgent);
       setShowAgentModal(false);
     } catch (error) {
+      const errorMessage = validateResErrors(error, "Ошибка при создании корзины агента");
       setAlert({
         open: true,
         type: "error",
-        message: "Ошибка при создании корзины агента",
+        message: errorMessage,
       });
     }
   };
@@ -712,10 +714,11 @@ const SellStart = ({ show, setShow }) => {
       setBarcodeInput("");
       onRefresh();
     } catch (error) {
+      const errorMessage = validateResErrors(error, "Ошибка при сканировании товара");
       setAlert({
         open: true,
         type: "error",
-        message: error?.data?.detail || "Ошибка при сканировании товара",
+        message: errorMessage,
       });
     }
   };
@@ -755,11 +758,11 @@ const SellStart = ({ show, setShow }) => {
         message: "Кастомная позиция добавлена в корзину",
       });
     } catch (error) {
+      const errorMessage = validateResErrors(error, "Ошибка при добавлении кастомной позиции");
       setAlert({
         open: true,
         type: "error",
-        message:
-          error?.data?.detail || "Ошибка при добавлении кастомной позиции",
+        message: errorMessage,
       });
     }
   };
@@ -790,7 +793,14 @@ const SellStart = ({ show, setShow }) => {
     api
       .get("/main/owners/agents/products/")
       .then(({ data }) => setAgentListProducts(data))
-      .catch((e) => console.log(e));
+      .catch((e) => {
+        const errorMessage = validateResErrors(e, "Ошибка при загрузке товаров агента");
+        setAlert({
+          open: true,
+          type: "error",
+          message: errorMessage,
+        });
+      });
   }, [show]);
 
   useEffect(() => {
@@ -798,7 +808,14 @@ const SellStart = ({ show, setShow }) => {
       api
         .get("/main/owners/agents/products/")
         .then(({ data }) => setAgents(data))
-        .catch((e) => console.log(e));
+        .catch((e) => {
+          const errorMessage = validateResErrors(e, "Ошибка при загрузке товаров агента");
+          setAlert({
+            open: true,
+            type: "error",
+            message: errorMessage,
+          });
+        });
     }
   }, [isPilorama]);
 
@@ -826,11 +843,11 @@ const SellStart = ({ show, setShow }) => {
         ).unwrap();
         onRefresh();
       } catch (error) {
-        console.error("Ошибка при увеличении количества:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при увеличении количества");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при увеличении количества",
+          message: errorMessage,
         });
       }
     } else {
@@ -844,11 +861,11 @@ const SellStart = ({ show, setShow }) => {
         ).unwrap();
         onRefresh();
       } catch (error) {
-        console.error("Ошибка при увеличении количества:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при уменьшении количества");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при увеличении количества",
+          message: errorMessage,
         });
       }
     }
@@ -873,11 +890,11 @@ const SellStart = ({ show, setShow }) => {
         ).unwrap();
         onRefresh();
       } catch (error) {
-        console.error("Ошибка при уменьшении количества:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при уменьшении количества");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при уменьшении количества",
+          message: errorMessage,
         });
       }
     } else {
@@ -894,11 +911,11 @@ const SellStart = ({ show, setShow }) => {
         ).unwrap();
         onRefresh();
       } catch (error) {
-        console.error("Ошибка при уменьшении количества:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при уменьшении количества");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при уменьшении количества",
+          message: errorMessage,
         });
       }
     }
@@ -919,11 +936,11 @@ const SellStart = ({ show, setShow }) => {
           setSelectedId(null);
         }
       } catch (error) {
-        console.error("Ошибка при удалении товара:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при удалении товара");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при удалении товара",
+          message: errorMessage,
         });
       }
     } else {
@@ -942,11 +959,11 @@ const SellStart = ({ show, setShow }) => {
           setSelectedId(null);
         }
       } catch (error) {
-        console.error("Ошибка при удалении товара:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при удалении товара");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при удалении товара",
+          message: errorMessage,
         });
       }
     }
@@ -989,11 +1006,11 @@ const SellStart = ({ show, setShow }) => {
         ).unwrap();
         onRefresh();
       } catch (error) {
-        console.error("Ошибка при обновлении количества:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при обновлении количества");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при обновлении количества",
+          message: errorMessage,
         });
       }
     } else {
@@ -1023,11 +1040,11 @@ const SellStart = ({ show, setShow }) => {
         ).unwrap();
         onRefresh();
       } catch (error) {
-        console.error("Ошибка при обновлении количества:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при обновлении количества");
         setAlert({
           open: true,
           type: "error",
-          message: error?.data?.detail || "Ошибка при обновлении количества",
+          message: errorMessage,
         });
       }
     }
@@ -1165,7 +1182,12 @@ const SellStart = ({ show, setShow }) => {
       setSubmitTried(false);
       setErrors({});
     } catch (e) {
-      console.log(e);
+      const errorMessage = validateResErrors(e, "Ошибка при создании клиента");
+      setAlert({
+        open: true,
+        type: "error",
+        message: errorMessage,
+      });
     }
   };
 
@@ -1303,6 +1325,7 @@ const SellStart = ({ show, setShow }) => {
           const resp = await run(getProductCheckout(result.sale_id));
           await handleCheckoutResponseForPrinting(resp);
         } catch (e) {
+          
           console.error("Печать чека не удалась:", e);
           alert(
             "Не удалось распечатать чек. Проверьте WinUSB и формат ответа (JSON/PDF)."

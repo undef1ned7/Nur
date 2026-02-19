@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import styles from "./Documents.module.scss";
 import api from "../../../../api";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ========== helpers ========== */
 function normalizeResp(data) {
@@ -105,7 +106,8 @@ function Documents() {
         setFolderDetail(null);
       }
     } catch (e) {
-      setFoldErr(e?.response?.data?.detail || "Не удалось загрузить папки");
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке папок");
+      setFoldErr(errorMessage);
     } finally {
       setFoldLoading(false);
     }
@@ -159,7 +161,8 @@ function Documents() {
         setCreateFolderOpen(false);
         setCreateFolderName("");
       } catch (e2) {
-        setFoldErr(e2?.response?.data?.detail || "Не удалось создать папку");
+        const errorMessage = validateResErrors(e2, "Ошибка при создании папки");
+        setFoldErr(errorMessage);
       } finally {
         setCreateFolderBusy(false);
       }
@@ -188,7 +191,8 @@ function Documents() {
         setEditFolderOpen(false);
         if (selectedFolderId === editFolderId) loadFolderDetail(editFolderId);
       } catch (e2) {
-        setFoldErr(e2?.response?.data?.detail || "Не удалось изменить папку");
+        const errorMessage = validateResErrors(e2, "Ошибка при изменении папки");
+        setFoldErr(errorMessage);
       } finally {
         setEditFolderBusy(false);
       }
@@ -208,10 +212,8 @@ function Documents() {
           setFolderDetail(null);
         }
       } catch (e2) {
-        setFoldErr(
-          e2?.response?.data?.detail ||
-            "Не удалось удалить папку. Убедитесь, что в папке нет документов."
-        );
+        const errorMessage = validateResErrors(e2, "Ошибка при удалении папки");
+        setFoldErr(errorMessage);
       }
     },
     [loadFolders, selectedFolderId]
@@ -273,7 +275,8 @@ function Documents() {
         setDocViewerUrl("");
       }
     } catch (e) {
-      setDocErr(e?.response?.data?.detail || "Не удалось загрузить документы");
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке документов");
+      setDocErr(errorMessage);
     } finally {
       setDocLoading(false);
     }
@@ -318,7 +321,8 @@ function Documents() {
         setCreateDocFolder(docFolderFilter || selectedFolderId || "");
         setCreateDocFile(null);
       } catch (e2) {
-        setDocErr(e2?.response?.data?.detail || "Не удалось создать документ");
+        const errorMessage = validateResErrors(e2, "Ошибка при создании документа");
+        setDocErr(errorMessage);
       } finally {
         setCreateDocBusy(false);
       }
@@ -352,7 +356,8 @@ function Documents() {
         setEditDocOpen(false);
         if (selectedDocId === editDocId) loadDocDetail(editDocId);
       } catch (e2) {
-        setDocErr(e2?.response?.data?.detail || "Не удалось изменить документ");
+        const errorMessage = validateResErrors(e2, "Ошибка при изменении документа");
+        setDocErr(errorMessage);
       } finally {
         setEditDocBusy(false);
       }
@@ -372,7 +377,8 @@ function Documents() {
           setDocViewerUrl("");
         }
       } catch (e2) {
-        setDocErr(e2?.response?.data?.detail || "Не удалось удалить документ");
+        const errorMessage = validateResErrors(e2, "Ошибка при удалении документа");
+        setDocErr(errorMessage);
       }
     },
     [loadDocs, selectedDocId]

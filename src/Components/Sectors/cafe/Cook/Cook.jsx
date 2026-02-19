@@ -26,6 +26,7 @@ import { removeAfterReady } from "../../../../store/slices/cafeOrdersSlice";
 import { useOutletContext } from "react-router-dom";
 import { formatPrinterBinding, getActivePrinterKey, getSavedPrinters, listAuthorizedPrinters, parsePrinterBinding, setActivePrinterByKey } from "../Orders/OrdersPrintService";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const listFrom = (res) => res?.data?.results || res?.data || [];
 
@@ -520,8 +521,8 @@ const Cook = () => {
       refetchKitchens();
       showNotice("ok", "Кухня сохранена");
     } catch (e) {
-      console.error("Kitchen update error:", e);
-      showNotice("error", e?.response?.data?.detail || "Не удалось сохранить");
+      const errorMessage = validateResErrors(e, "Ошибка при сохранении кухни");
+      showNotice("error", errorMessage);
     } finally {
       setKitchenSaving(false);
     }
@@ -541,8 +542,8 @@ const Cook = () => {
           refetchKitchens();
           showNotice("ok", "Кухня удалена");
         } catch (e) {
-          console.error("Kitchen delete error:", e);
-          showNotice("error", e?.response?.data?.detail || "Не удалось удалить");
+          const errorMessage = validateResErrors(e, "Ошибка при удалении кухни");
+          showNotice("error", errorMessage);
         } finally {
           setKitchenSaving(false);
         }
@@ -893,9 +894,9 @@ const Cook = () => {
         ? inProgressIds
         : Array.isArray(task?.tasks_ids) && task.tasks_ids.length
           ? task.tasks_ids
-        : task?.id
-          ? [task.id]
-          : [];
+          : task?.id
+            ? [task.id]
+            : [];
       if (!tasksIds.length) return;
 
       try {
@@ -1028,90 +1029,90 @@ const Cook = () => {
 
       <DataContainer>
 
-      <div
-        className="cafeCook__list"
-        aria-busy={
-          activeTab === "kitchens"
-            ? kitchensLoading
-            : loading
-              ? "true"
-              : "false"
-        }
-      >
-        {activeTab === "kitchens" ? (
-          <>
-            {kitchensLoading && (
-              <div className="cafeCook__alert cafeCook__alert--neutral">
-                Загрузка…
-              </div>
-            )}
-            {!kitchensLoading && kitchensList.length === 0 && (
-              <div className="cafeCook__alert cafeCook__alert--neutral">
-                Нет кухонь
-              </div>
-            )}
-            {!kitchensLoading && kitchensList.length > 0 && (
-              <div className="cafeCook__kitchens">
-                <ul className="cafeCook__kitchensList">
-                  {kitchensList.map((k) => (
-                    <li
-                      key={k.id ?? k.uuid ?? k.name}
-                      className="cafeCook__kitchenItem"
-                    >
-                      <span className="cafeCook__kitchenName">
-                        {k.name ?? k.title ?? k.title_name ?? "—"}
-                      </span>
-                      <div className="cafeCook__kitchenActions">
-                        <button
-                          type="button"
-                          className="cafeCook__kitchenBtn cafeCook__kitchenBtn--edit"
-                          onClick={() => setEditingKitchen(k)}
-                          disabled={kitchenSaving}
-                          title="Редактировать"
-                          aria-label="Редактировать"
-                        >
-                          <FaPencilAlt />
-                        </button>
-                        <button
-                          type="button"
-                          className="cafeCook__kitchenBtn cafeCook__kitchenBtn--delete"
-                          onClick={() => handleDeleteKitchen(k)}
-                          disabled={kitchenSaving}
-                          title="Удалить"
-                          aria-label="Удалить"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            {loading && (
-              <div className="cafeCook__alert cafeCook__alert--neutral">
-                Загрузка…
-              </div>
-            )}
+        <div
+          className="cafeCook__list"
+          aria-busy={
+            activeTab === "kitchens"
+              ? kitchensLoading
+              : loading
+                ? "true"
+                : "false"
+          }
+        >
+          {activeTab === "kitchens" ? (
+            <>
+              {kitchensLoading && (
+                <div className="cafeCook__alert cafeCook__alert--neutral">
+                  Загрузка…
+                </div>
+              )}
+              {!kitchensLoading && kitchensList.length === 0 && (
+                <div className="cafeCook__alert cafeCook__alert--neutral">
+                  Нет кухонь
+                </div>
+              )}
+              {!kitchensLoading && kitchensList.length > 0 && (
+                <div className="cafeCook__kitchens">
+                  <ul className="cafeCook__kitchensList">
+                    {kitchensList.map((k) => (
+                      <li
+                        key={k.id ?? k.uuid ?? k.name}
+                        className="cafeCook__kitchenItem"
+                      >
+                        <span className="cafeCook__kitchenName">
+                          {k.name ?? k.title ?? k.title_name ?? "—"}
+                        </span>
+                        <div className="cafeCook__kitchenActions">
+                          <button
+                            type="button"
+                            className="cafeCook__kitchenBtn cafeCook__kitchenBtn--edit"
+                            onClick={() => setEditingKitchen(k)}
+                            disabled={kitchenSaving}
+                            title="Редактировать"
+                            aria-label="Редактировать"
+                          >
+                            <FaPencilAlt />
+                          </button>
+                          <button
+                            type="button"
+                            className="cafeCook__kitchenBtn cafeCook__kitchenBtn--delete"
+                            onClick={() => handleDeleteKitchen(k)}
+                            disabled={kitchenSaving}
+                            title="Удалить"
+                            aria-label="Удалить"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {loading && (
+                <div className="cafeCook__alert cafeCook__alert--neutral">
+                  Загрузка…
+                </div>
+              )}
 
-            {error && (
-              <div className="cafeCook__alert">
-                Ошибка: {error?.message || error?.detail || String(error)}
-              </div>
-            )}
+              {error && (
+                <div className="cafeCook__alert">
+                  Ошибка: {error?.message || error?.detail || String(error)}
+                </div>
+              )}
 
-            {!loading && !historyLoading && !error && tasks?.length === 0 && (
-              <div className="cafeCook__alert cafeCook__alert--neutral">
-                {query.trim()
-                  ? `Ничего не найдено по запросу «${query}»`
-                  : activeTab === "current"
-                    ? "Нет текущих задач"
-                    : "История пуста"}
-              </div>
-            )}
+              {!loading && !historyLoading && !error && tasks?.length === 0 && (
+                <div className="cafeCook__alert cafeCook__alert--neutral">
+                  {query.trim()
+                    ? `Ничего не найдено по запросу «${query}»`
+                    : activeTab === "current"
+                      ? "Нет текущих задач"
+                      : "История пуста"}
+                </div>
+              )}
 
               {!loading &&
                 !error &&
@@ -1133,9 +1134,9 @@ const Cook = () => {
                   />
                 ))}
 
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
       </DataContainer>
 
       {/* <Pagination

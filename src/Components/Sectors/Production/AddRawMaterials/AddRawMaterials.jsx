@@ -12,6 +12,7 @@ import {
   updateProductAsync,
 } from "../../../../store/creators/productCreators";
 import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const toNum = (v) => {
   const n = Number(String(v ?? "").replace(",", "."));
@@ -120,8 +121,8 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
         onClose?.();
       })
     } catch (e) {
-      console.log(e);
-      alert("Не удалось сохранить. Попробуйте ещё раз.", true)
+      const errorMessage = validateResErrors(e, "Ошибка при добавлении товара");
+      alert(errorMessage, true)
     }
   };
   const disabled = !!validate();
