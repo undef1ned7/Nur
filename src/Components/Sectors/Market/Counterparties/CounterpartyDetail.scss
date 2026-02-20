@@ -40,6 +40,12 @@
     text-overflow: ellipsis;
   }
 
+  &__agent {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-secondary, #6b7280);
+  }
+
   &__body {
     display: flex;
     flex-direction: column;

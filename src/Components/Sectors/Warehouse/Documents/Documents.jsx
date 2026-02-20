@@ -41,6 +41,7 @@ import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { getOwnerAnalytics } from "../../../../api/warehouse";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -61,7 +62,7 @@ const Documents = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { docType: docTypeParam } = useParams();
-  const { company } = useUser();
+  const { company, profile } = useUser();
   const {
     documents,
     documentsCount,
@@ -88,6 +89,14 @@ const Documents = () => {
   const [editReceiptData, setEditReceiptData] = useState(null);
   const debounceTimerRef = useRef(null);
 
+  // Фильтр по агенту (только для продаж; владелец/админ)
+  const showAgentFilter =
+    docType === "SALE" &&
+    (profile?.role === "owner" || profile?.role === "admin");
+  const [agentFilterId, setAgentFilterId] = useState("");
+  const [agentsList, setAgentsList] = useState([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+
   // Debounce для поиска
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -105,6 +114,40 @@ const Documents = () => {
       }
     };
   }, [searchTerm]);
+
+  // Загрузка списка агентов для фильтра (продажи, владелец/админ)
+  useEffect(() => {
+    if (!showAgentFilter) {
+      setAgentsList([]);
+      return;
+    }
+    let cancelled = false;
+    setAgentsLoading(true);
+    getOwnerAnalytics({ period: "month" })
+      .then((data) => {
+        if (cancelled) return;
+        const top = data?.top_agents || {};
+        const bySales = top.by_sales || [];
+        const byReceived = top.by_received || [];
+        const map = new Map();
+        [...bySales, ...byReceived].forEach((a) => {
+          const id = a.agent_id;
+          if (id && !map.has(id)) {
+            map.set(id, a.agent_name || id);
+          }
+        });
+        setAgentsList(Array.from(map.entries()).map(([id, name]) => ({ id, name })));
+      })
+      .catch(() => {
+        if (!cancelled) setAgentsList([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAgentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showAgentFilter]);
 
   // Функция для генерации порядкового номера чека/накладной
   // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
@@ -140,10 +183,19 @@ const Documents = () => {
     }
   };
 
+  // Фильтрация по агенту (для продаж)
+  const filteredDocuments = useMemo(() => {
+    const list = documents || [];
+    if (docType !== "SALE" || !agentFilterId) return list;
+    return list.filter(
+      (doc) => String(doc.agent || "") === String(agentFilterId)
+    );
+  }, [documents, docType, agentFilterId]);
+
   // Маппинг данных из Redux в формат для отображения
   const receiptsData = useMemo(() => {
     if (activeTab !== "receipts") return [];
-    return (documents || []).map((doc, index) => ({
+    return (filteredDocuments || []).map((doc, index) => ({
       id: doc.id,
       number: doc.number || getDocumentNumber(index, "ЧЕК"),
       date:
@@ -170,12 +222,15 @@ const Documents = () => {
       rawStatus: doc.status,
       payment_kind: doc.payment_kind,
       document: doc,
+      agentDisplay:
+        doc.agent_display?.trim?.() ||
+        (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
     }));
-  }, [documents, activeTab, currentPage]);
+  }, [filteredDocuments, activeTab, currentPage]);
 
   const invoicesData = useMemo(() => {
     if (activeTab !== "invoices") return [];
-    return (documents || []).map((doc, index) => ({
+    return (filteredDocuments || []).map((doc, index) => ({
       id: doc.id,
       number: doc.number || getDocumentNumber(index, "НАКЛ"),
       date:
@@ -200,8 +255,11 @@ const Documents = () => {
       rawStatus: doc.status,
       payment_kind: doc.payment_kind,
       document: doc,
+      agentDisplay:
+        doc.agent_display?.trim?.() ||
+        (doc.agent ? `${String(doc.agent).slice(0, 8)}…` : "—"),
     }));
-  }, [documents, activeTab, currentPage]);
+  }, [filteredDocuments, activeTab, currentPage]);
 
   // Обновление URL только при изменении страницы (без поиска)
   useEffect(() => {
@@ -218,9 +276,10 @@ const Documents = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
-  // Сброс страницы при смене таба или типа документа
+  // Сброс страницы и фильтра по агенту при смене таба или типа документа
   useEffect(() => {
     setCurrentPage(1);
+    if (docType !== "SALE") setAgentFilterId("");
   }, [activeTab, docType]);
 
   // Загрузка данных через Redux при изменении таба, страницы, типа документа или поиска
@@ -632,6 +691,28 @@ const Documents = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        {showAgentFilter && (
+          <div className="documents__agent-filter">
+            <label className="documents__agent-filter-label">Агент:</label>
+            <select
+              className="documents__agent-filter-select"
+              value={agentFilterId}
+              onChange={(e) => {
+                setAgentFilterId(e.target.value);
+                setCurrentPage(1);
+              }}
+              disabled={agentsLoading}
+              title="Показать продажи только этого агента"
+            >
+              <option value="">Все агенты</option>
+              {agentsList.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="documents__header-actions">
           <button
             className="documents__create-btn"
@@ -717,6 +798,7 @@ const Documents = () => {
                       <th>Номер</th>
                       <th>Дата и время</th>
                       <th>Контрагент</th>
+                      {docType === "SALE" && <th>Агент</th>}
                       <th>Товаров</th>
                       <th>Сумма</th>
                       <th>Скидка</th>
@@ -729,6 +811,7 @@ const Documents = () => {
                       <th>Номер</th>
                       <th>Дата</th>
                       <th>Контрагент</th>
+                      {docType === "SALE" && <th>Агент</th>}
                       <th>Позиций</th>
                       <th>Сумма</th>
                       <th>Скидка</th>
@@ -741,13 +824,19 @@ const Documents = () => {
               <tbody>
                 {documentsLoading ? (
                   <tr>
-                    <td colSpan={8} className="documents__empty">
+                    <td
+                      colSpan={docType === "SALE" ? 9 : 8}
+                      className="documents__empty"
+                    >
                       Загрузка...
                     </td>
                   </tr>
                 ) : getCurrentData().length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="documents__empty">
+                    <td
+                      colSpan={docType === "SALE" ? 9 : 8}
+                      className="documents__empty"
+                    >
                       Документы не найдены
                     </td>
                   </tr>
@@ -759,6 +848,9 @@ const Documents = () => {
                           <td>{item.number}</td>
                           <td>{item.date}</td>
                           <td>{item.client}</td>
+                          {docType === "SALE" && (
+                            <td>{item.agentDisplay ?? "—"}</td>
+                          )}
                           <td>{item.products}</td>
                           <td>{formatAmount(item.amount)} сом</td>
                           <td>
@@ -858,6 +950,9 @@ const Documents = () => {
                           <td>{item.number}</td>
                           <td>{item.date}</td>
                           <td>{item.counterparty}</td>
+                          {docType === "SALE" && (
+                            <td>{item.agentDisplay ?? "—"}</td>
+                          )}
                           <td>{item.positions}</td>
                           <td>{formatAmount(item.amount)} сом</td>
                           <td>
@@ -995,6 +1090,14 @@ const Documents = () => {
                           : item.counterparty}
                       </span>
                     </div>
+                    {docType === "SALE" && (
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">Агент</span>
+                        <span className="documents__card-value">
+                          {item.agentDisplay ?? "—"}
+                        </span>
+                      </div>
+                    )}
                     <div className="documents__card-row">
                       <span className="documents__card-label">
                         {activeTab === "receipts" ? "Товаров" : "Позиций"}

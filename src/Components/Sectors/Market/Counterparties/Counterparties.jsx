@@ -14,6 +14,7 @@ import {
   bulkDeleteWarehouseCounterparties,
   fetchWarehouseCounterparties,
 } from "../../../../store/creators/warehouseThunk";
+import { useUser } from "../../../../store/slices/userSlice";
 import { useSearch } from "./hooks/useSearch";
 import { usePagination } from "./hooks/usePagination";
 import { useCounterpartySelection } from "./hooks/useCounterpartySelection";
@@ -22,9 +23,15 @@ import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 
+/** Показывать колонку «Агент» для владельца и админа */
+const showAgentColumn = (profile) =>
+  profile?.role === "owner" || profile?.role === "admin";
+
 const Counterparties = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { profile } = useUser() || {};
+  const showAgent = showAgentColumn(profile);
 
   // Состояние фильтров и модальных окон
   const [filters, setFilters] = useState({});
@@ -191,6 +198,7 @@ const Counterparties = () => {
             onSelectAll={handleSelectAll}
             onCounterpartyClick={handleCounterpartyClick}
             getRowNumber={getRowNumber}
+            showAgentColumn={showAgent}
           />
         ) : (
           <CounterpartyCards
@@ -202,6 +210,7 @@ const Counterparties = () => {
             onSelectAll={handleSelectAll}
             onCounterpartyClick={handleCounterpartyClick}
             getRowNumber={getRowNumber}
+            showAgentColumn={showAgent}
           />
         )}
 

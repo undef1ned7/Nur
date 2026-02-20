@@ -5,6 +5,8 @@ import warehouseAPI from "../../../../api/warehouse";
 import { useDispatch, useSelector } from "react-redux";
 import { getWarehouseCounterpartyById } from "../../../../store/creators/warehouseThunk";
 import { clearCurrentCounterparty } from "../../../../store/slices/counterpartySlice";
+import { useUser } from "../../../../store/slices/userSlice";
+import { getAgentDisplay } from "./utils";
 import "./CounterpartyDetail.scss";
 
 const fmtMoney = (v) =>
@@ -22,10 +24,14 @@ const fmtDate = (v) => {
  * GET /api/warehouse/money/counterparties/{counterparty_id}/operations/
  * Фильтры: doc_type, status, warehouse, payment_category. Поиск: search (по number, comment).
  */
+const showAgentBlock = (profile) =>
+  profile?.role === "owner" || profile?.role === "admin";
+
 const CounterpartyDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { profile } = useUser() || {};
   const current = useSelector((state) => state.counterparty.current);
   const loadingCurrent = useSelector(
     (state) => state.counterparty.loadingCurrent
@@ -185,6 +191,11 @@ const CounterpartyDetail = () => {
           <ArrowLeft size={20} /> Назад
         </button>
         <h1 className="counterparty-detail-page__title">Контрагент: {name}</h1>
+        {showAgentBlock(profile) && (current?.agent || current?.agent_display) && (
+          <p className="counterparty-detail-page__agent">
+            Привязан к агенту: {getAgentDisplay(current)}
+          </p>
+        )}
       </header>
 
       <div className="counterparty-detail-page__body">

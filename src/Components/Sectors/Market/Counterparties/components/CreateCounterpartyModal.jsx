@@ -2,13 +2,19 @@ import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { X } from "lucide-react";
 import { createWarehouseCounterparty } from "../../../../../store/creators/warehouseThunk";
+import { useUser } from "../../../../../store/slices/userSlice";
 import "../Counterparties.scss";
+
+/** Роль агента: контрагент при создании автоматически привязывается к текущему пользователю на бэкенде */
+const isAgentRole = (profile) =>
+  profile && profile.role !== "owner" && profile.role !== "admin";
 
 /**
  * Модальное окно для создания контрагента
  */
 const CreateCounterpartyModal = ({ onClose }) => {
   const dispatch = useDispatch();
+  const { profile } = useUser() || {};
   const [formData, setFormData] = useState({
     name: "",
     type: "CLIENT",
@@ -167,6 +173,21 @@ const CreateCounterpartyModal = ({ onClose }) => {
                 <option value="BOTH">Клиент и поставщик</option>
               </select>
             </div>
+
+            {isAgentRole(profile) && (
+              <div
+                className="warehouse-filter-modal__section"
+                style={{
+                  padding: "10px 12px",
+                  background: "var(--color-info-bg, #e8f4fd)",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  color: "var(--color-info-text, #0c5460)",
+                }}
+              >
+                Контрагент будет привязан к вам (агент).
+              </div>
+            )}
           </div>
 
           <div className="warehouse-filter-modal__footer">

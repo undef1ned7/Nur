@@ -411,7 +411,10 @@ const CreateSaleDocument = () => {
                           </div>
                           <div className="create-sale-document__group-product-meta">
                             <span className="create-sale-document__group-product-price">
-                              {formatPrice(product.price)} сом
+                              {formatPrice(
+                                getProductPriceForDocument(product)
+                              )}{" "}
+                              сом
                             </span>
                             <span className="create-sale-document__group-product-stock">
                               {product.quantity ?? 0}
@@ -472,6 +475,18 @@ const CreateSaleDocument = () => {
       return;
     }
   }, [warehouses, warehouse]);
+
+  // Цена для подстановки в позицию: при покупке — закупочная, при продаже — цена продажи
+  const getProductPriceForDocument = (product) => {
+    if (!product) return 0;
+    const isPurchase =
+      docType === "PURCHASE" || docType === "PURCHASE_RETURN";
+    return Number(
+      isPurchase
+        ? product.purchase_price ?? product.price ?? 0
+        : product.price ?? 0
+    );
+  };
 
   // Ограничение по остатку только для операций отгрузки (продажа, возврат поставщику, списание, перемещение).
   const isStockLimitRequired = useMemo(() => {
@@ -626,9 +641,10 @@ const CreateSaleDocument = () => {
     // Общая скидка (скидка по позициям + скидка по документу)
     const totalDiscount = itemsDiscount + documentDiscountAmount;
 
-    // Итоговая сумма с учетом всех скидок
+    // Итоговая сумма с учетом всех скидок (в черновике показываем 0 до проведения)
     const total = subtotalAfterItemsDiscount - documentDiscountAmount;
     const paid = isDocumentPosted ? total : 0;
+    const displayTotal = isDocumentPosted ? total : 0;
 
     return {
       subtotal,
@@ -636,6 +652,7 @@ const CreateSaleDocument = () => {
       documentDiscount: documentDiscountAmount,
       totalDiscount,
       total,
+      displayTotal,
       paid,
       taxes: 0,
     };
@@ -690,13 +707,14 @@ const CreateSaleDocument = () => {
           alert("Нет остатка на складе");
           return;
         }
+        const priceForDoc = getProductPriceForDocument(product);
         const newItem = {
           id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           productId: product.id,
           productName: product.name,
           name: product.name,
-          price: Number(product.price || 0),
-          unit_price: Number(product.price || 0),
+          price: priceForDoc,
+          unit_price: priceForDoc,
           quantity: 1,
           stock,
           unit: product.unit || "шт",
@@ -1465,7 +1483,10 @@ const CreateSaleDocument = () => {
                                     </div>
                                     <div className="create-sale-document__group-product-meta">
                                       <span className="create-sale-document__group-product-price">
-                                        {formatPrice(product.price)} сом
+                                        {formatPrice(
+                                          getProductPriceForDocument(product)
+                                        )}{" "}
+                                        сом
                                       </span>
                                       <span className="create-sale-document__group-product-stock">
                                         {product.quantity ?? 0}
@@ -1898,7 +1919,7 @@ const CreateSaleDocument = () => {
                 </div>
                 <div className="create-sale-document__summary-row create-sale-document__summary-row--total">
                   <span>Итого:</span>
-                  <span>{formatPrice(totals.total)} сом</span>
+                  <span>{formatPrice(totals.displayTotal)} сом</span>
                 </div>
                 <div className="create-sale-document__summary-row">
                   <span>Оплачено:</span>
@@ -1906,7 +1927,7 @@ const CreateSaleDocument = () => {
                 </div>
                 <div className="create-sale-document__summary-row create-sale-document__summary-row--due">
                   <span>К оплате:</span>
-                  <span>{formatPrice(totals.total - totals.paid)} сом</span>
+                  <span>{formatPrice(totals.displayTotal - totals.paid)} сом</span>
                 </div>
               </aside>
             </div>
