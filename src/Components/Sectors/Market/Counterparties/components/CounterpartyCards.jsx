@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { formatPhone, getCounterpartyName } from "../utils";
+import { formatPhone, getCounterpartyName, getAgentDisplay } from "../utils";
 import "./CounterpartyCards.scss";
 
 /**
@@ -12,6 +12,7 @@ const CounterpartyCard = React.memo(
     rowNumber,
     onRowSelect,
     onCounterpartyClick,
+    showAgentColumn,
   }) => {
     const name = getCounterpartyName(counterparty);
     const phone = formatPhone(counterparty?.phone);
@@ -56,6 +57,14 @@ const CounterpartyCard = React.memo(
                 Тип:{" "}
                 <span className="font-medium">{typeLabel}</span>
               </span>
+              {showAgentColumn && (counterparty?.agent || counterparty?.agent_display) && (
+                <span className="whitespace-nowrap">
+                  Агент:{" "}
+                  <span className="font-medium">
+                    {getAgentDisplay(counterparty)}
+                  </span>
+                </span>
+              )}
               {phone !== "—" && (
                 <span className="whitespace-nowrap">
                   Телефон:{" "}
@@ -114,7 +123,8 @@ const CounterpartyCard = React.memo(
     return (
       prevProps.counterparty.id === nextProps.counterparty.id &&
       prevProps.isSelected === nextProps.isSelected &&
-      prevProps.rowNumber === nextProps.rowNumber
+      prevProps.rowNumber === nextProps.rowNumber &&
+      prevProps.showAgentColumn === nextProps.showAgentColumn
     );
   }
 );
@@ -133,6 +143,7 @@ const CounterpartyCards = ({
   onSelectAll,
   onCounterpartyClick,
   getRowNumber,
+  showAgentColumn = false,
 }) => {
   const selectedRowsSize = selectedRows.size;
   const counterpartiesData = useMemo(() => {
@@ -195,6 +206,7 @@ const CounterpartyCards = ({
             rowNumber={data.rowNumber}
             onRowSelect={onRowSelect}
             onCounterpartyClick={onCounterpartyClick}
+            showAgentColumn={showAgentColumn}
           />
         ))}
       </div>
@@ -207,7 +219,8 @@ const areEqual = (prevProps, nextProps) => {
     prevProps.loading !== nextProps.loading ||
     prevProps.isAllSelected !== nextProps.isAllSelected ||
     prevProps.selectedRows.size !== nextProps.selectedRows.size ||
-    prevProps.getRowNumber !== nextProps.getRowNumber
+    prevProps.getRowNumber !== nextProps.getRowNumber ||
+    prevProps.showAgentColumn !== nextProps.showAgentColumn
   ) {
     return false;
   }
