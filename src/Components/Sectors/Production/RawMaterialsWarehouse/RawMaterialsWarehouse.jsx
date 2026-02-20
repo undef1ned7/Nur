@@ -723,7 +723,7 @@ const RawMaterialsWarehouse = () => {
                   {filtered.map((item, idx) => (
                     <div
                       key={item.id}
-                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="text-xs text-slate-500">#{idx + 1}</div>
