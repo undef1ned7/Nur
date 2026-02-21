@@ -22,6 +22,7 @@ import "../../Market/Warehouse/Warehouse.scss";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -87,8 +88,8 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
         onClose();
       })
     } catch (e) {
-      console.log(e);
-      error(`Ошибка: ${e?.message || "не удалось добавить сырьё"}`);
+      const errorMessage = validateResErrors(e, "Ошибка при добавлении сырья");
+      error(errorMessage);
     }
   };
 
@@ -227,9 +228,8 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
         onClose();
       })
     } catch (e) {
-
-      console.error(e);
-      alert(`Не удалось обновить: ${e?.message || "ошибка"}`,
+      const errorMessage = validateResErrors(e, "Ошибка при обновлении сырья");
+      alert(errorMessage,
         () => {
           setSaving(false);
         }, true);
@@ -247,8 +247,8 @@ const EditModal = ({ item, onClose, onSaved, onDeleted }) => {
           onClose();
         } catch (e) {
           setDeleting(false);
-          console.error(e);
-          alert(`Не удалось удалить: ${e?.message || "ошибка"}`);
+          const errorMessage = validateResErrors(e, "Ошибка при удалении сырья");
+          alert(errorMessage, true);
         }
       } else {
         setDeleting(false);
@@ -723,7 +723,7 @@ const RawMaterialsWarehouse = () => {
                   {filtered.map((item, idx) => (
                     <div
                       key={item.id}
-                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="text-xs text-slate-500">#{idx + 1}</div>

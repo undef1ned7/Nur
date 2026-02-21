@@ -3,12 +3,14 @@ import { useDispatch } from "react-redux";
 import useScanDetection from "use-scan-detection";
 import { sendBarCode, startSale } from "../../../store/creators/saleThunk";
 import { useSale } from "../../../store/slices/saleSlice";
+import { useAlert } from "@/hooks/useDialog";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 // import { sendBarCode } from "../../../store/creators/productCreators";
 
 const BarcodeScanner = ({ id }) => {
   const [barcodeScan, setBarcodeScan] = useState("");
   const { barcodeError } = useSale();
-
+  const alert = useAlert();
   const dispatch = useDispatch();
   // const id = "some-sale-id";
   useScanDetection({
@@ -30,12 +32,13 @@ const BarcodeScanner = ({ id }) => {
         await dispatch(startSale()).unwrap();
 
         if (result?.error) {
-          console.log("Ошибка от сервера:", result.error);
+          const errorMessage = validateResErrors(result.error, "Ошибка от сервера");
+          alert(errorMessage, true);
           return;
         }
       } catch (err) {
-        // log something readable
-        console.error("sendBarCode/startSale failed:", err);
+        const errorMessage = validateResErrors(err, "Ошибка при сканировании штрих-кода");
+        alert(errorMessage, true);
       }
     })();
   }, [barcodeScan, dispatch, id]);

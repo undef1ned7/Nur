@@ -37,6 +37,7 @@ import {
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /**
  * Склеивает возвраты (returns) с передачами (transfers).
@@ -192,14 +193,13 @@ const PendingModal = ({ onClose, onChanged }) => {
       setTimeout(() => {
         onClose?.();
       }, 1500);
-    } catch (error) {
-      console.error("Accept returns failed:", error);
+    } catch (error) {   
+      const errorMessage = validateResErrors(error, "Ошибка при принятии возвратов");
       setAlertModal({
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при принятии возвратов: ${error?.message || "неизвестная ошибка"
-          }`,
+        message: errorMessage,
       });
     } finally {
       setAcceptingReturn(null);
@@ -1135,13 +1135,12 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
       // Вызываем callback для обновления данных в родительском компоненте
       onChanged?.();
     } catch (e) {
-      console.error("Ошибка при одобрении корзины:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при одобрении корзины");
       setAlertModal({
         open: true,
         type: "error",
         title: "Ошибка",
-        message: `Ошибка при одобрении корзины: ${e?.message || "неизвестная ошибка"
-          }`,
+        message: errorMessage,
       });
     } finally {
       setActionLoadingId(null);
@@ -1160,11 +1159,12 @@ const AgentCartsPendingModal = ({ onClose, onChanged }) => {
       });
       await load();
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка при отклонении корзины");
       setAlertModal({
         open: true,
         type: "error",
         title: "Ошибка",
-        message: "Ошибка при отклонении корзины",
+        message: errorMessage,
       });
     } finally {
       setActionLoadingId(null);

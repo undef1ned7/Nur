@@ -25,6 +25,7 @@ import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const Warehouse = () => {
   const dispatch = useDispatch();
@@ -177,11 +178,8 @@ const Warehouse = () => {
       setSelectedRows(new Set());
       dispatch(fetchProductsAsync(requestParams));
     } catch (e) {
-      console.error("Ошибка при удалении товаров:", e);
-      alert(
-        "Не удалось удалить товары: " +
-        (e?.message || e?.detail || "Неизвестная ошибка")
-      );
+      const errorMessage = validateResErrors(e, "Ошибка при удалении товаров");
+      alert(errorMessage, true);
     } finally {
       setBulkDeleting(false);
     }

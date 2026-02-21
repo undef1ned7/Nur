@@ -42,7 +42,8 @@ import { useShifts } from "../../../../store/slices/shiftSlice";
 import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
 // Alert is handled by parent (ProductionCatalog) via onNotify
 import "./Cart.scss";
-import { useConfirm } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 
 const CartItem = ({
@@ -831,7 +832,7 @@ const Cart = ({
   totalItemsCount = 0,
   onMobileViewChange,
 }) => {
-  
+  const alert  = useAlert();
   const confirm = useConfirm();
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
@@ -934,7 +935,8 @@ const Cart = ({
           setAgentItems([]);
         }
       } catch (e) {
-        console.error("Error loading cart:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при загрузке корзины");
+        alert(errorMessage, true);
       } finally {
         setLoadingAgentItems(false);
       }
@@ -948,7 +950,7 @@ const Cart = ({
       agentCartId,
     });
     if (newQuantity < 0) {
-      console.log("Cart: invalid quantity", newQuantity);
+      alert("Количество не может быть отрицательным", true);
       return;
     }
 
@@ -982,7 +984,8 @@ const Cart = ({
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
         }
       } catch (e) {
-        console.error("Error updating quantity:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при обновлении количества");
+        alert(errorMessage, true);
         // Восстанавливаем предыдущее значение при ошибке
       }
     } else {
@@ -1021,7 +1024,8 @@ const Cart = ({
         setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
       }
     } catch (e) {
-      console.error("Error updating gift quantity:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при обновлении количества");
+      alert(errorMessage, true);
     }
   };
 
@@ -1046,7 +1050,8 @@ const Cart = ({
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
         }
       } catch (e) {
-        console.error("Error removing item:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при удалении товара");
+        alert(errorMessage, true);
       }
     } else {
       dispatch(removeFromCart(itemId));
@@ -1065,7 +1070,8 @@ const Cart = ({
           setAgentCart(cart);
           setAgentItems(Array.isArray(cart.items) ? cart.items : []);
         } catch (e) {
-          console.error("Error refreshing cart:", e);
+          const errorMessage = validateResErrors(e, "Ошибка при обновлении корзины");
+          alert(errorMessage, true);
         }
       })();
     }
@@ -1092,7 +1098,8 @@ const Cart = ({
         setAgentItems([]);
       }
     } catch (e) {
-      console.error("Error refreshing cart:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при обновлении корзины");
+      alert(errorMessage, true);
     } finally {
       setLoadingAgentItems(false);
     }
@@ -1122,8 +1129,9 @@ const Cart = ({
           getAgentCart({ agent: null, order_discount_total: "0.00" })
         ).unwrap();
         setAgentCart((prev) => (prev ? { ...prev, client } : prev));
-      } catch (e) {
-        console.error("Error updating client:", e);
+      } catch (e) { 
+        const errorMessage = validateResErrors(e, "Ошибка при обновлении клиента");
+        alert(errorMessage, true);
       }
     }
   };
@@ -1287,11 +1295,7 @@ const Cart = ({
         setIsOrderSectionOpen(false);
       }
     } catch (e) {
-      console.error("Error submitting cart:", e);
-      const errorMessage =
-        e?.response?.data?.shift_id?.[0] ||
-        e?.message ||
-        "Не удалось оформить заказ. Попробуйте ещё раз.";
+      const errorMessage = validateResErrors(e, "Ошибка при оформлении заказа");
       onNotify && onNotify("error", errorMessage);
     } finally {
       setSubmitting(false);

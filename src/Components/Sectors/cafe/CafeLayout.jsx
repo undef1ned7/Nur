@@ -29,6 +29,7 @@ export default function CafeLayout() {
     const RECENT_ORDER_AGE_MS = 3 * 60 * 1000; // consider orders from last 3 minutes for auto-print
     const KITCHEN_PRINT_LOCK_TTL_MS = 30 * 1000;
     const RECEIPT_PRINT_LOCK_TTL_MS = 30 * 1000;
+    const TAKEAWAY_LABEL = "С собой";
     const UUID_RE =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -93,6 +94,22 @@ export default function CafeLayout() {
         return p.includes("/cafe/cook");
     }, [location?.pathname]);
 
+    const tablesMap = useMemo(() => {
+        const m = new Map();
+        const list =
+            Array.isArray(tables) ? tables :
+                Array.isArray(tables?.tables) ? tables.tables :
+                    Array.isArray(tables?.results) ? tables.results :
+                        Array.isArray(tables?.data?.results) ? tables.data.results :
+                            [];
+
+        list.forEach((t) => {
+            if (t?.id === null || t?.id === undefined || t?.id === "") return;
+            m.set(String(t.id), t);
+        });
+        return m;
+    }, [tables]);
+
     const fullName = useCallback((u = {}) =>
         [u?.last_name || "", u?.first_name || ""].filter(Boolean).join(" ").trim() ||
         u?.email ||
@@ -123,18 +140,36 @@ export default function CafeLayout() {
     }, []);
 
     const resolveTableLabelFromOrder = useCallback((order) => {
-        const raw =
-            order?.table_name ||
-            order?.table_label ||
-            order?.table_title ||
-            order?.table?.title ||
-            order?.table?.name ||
-            order?.table?.label ||
-            order?.table_number ||
-            order?.table?.number ||
+        const tableId =
+            order?.table_id ??
+            order?.tableId ??
+            order?.table?.id ??
             order?.table;
-        return normalizeTableLabel(raw) || "—";
-    }, [normalizeTableLabel]);
+
+        const hasTable = !(tableId === null || tableId === undefined || tableId === "");
+        if (!hasTable) return TAKEAWAY_LABEL;
+
+        const t = tablesMap.get(String(tableId));
+        const direct = normalizeTableLabel(
+            t?.title ||
+            t?.name ||
+            t?.label ||
+            t?.table_name ||
+            t?.table_label ||
+            t?.table_title ||
+            ""
+        );
+        if (direct) return direct;
+        if (t?.number !== null && t?.number !== undefined && t?.number !== "") return String(t.number);
+
+        const fallback = normalizeTableLabel(
+            order?.table_name || order?.table_label || order?.table_title || order?.table_number
+        );
+        if (fallback) return fallback;
+
+        const raw = normalizeTableLabel(tableId);
+        return raw || "—";
+    }, [TAKEAWAY_LABEL, normalizeTableLabel, tablesMap]);
 
     const linePrice = useCallback((it) => {
         const v =
@@ -175,9 +210,11 @@ export default function CafeLayout() {
         const dt = formatReceiptDate(orderDetail?.created_at || orderDetail?.date || orderDetail?.created);
         const tableLabel = resolveTableLabelFromOrder(orderDetail);
         const items = Array.isArray(orderDetail?.items) ? orderDetail.items : [];
+        const isTakeaway = tableLabel === TAKEAWAY_LABEL;
+    
         return {
             company: localStorage.getItem("company_name") || "КАССА",
-            doc_no: `СТОЛ ${tableLabel}`,
+            doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`,
             created_at: dt,
             cashier_name: fullName(profile || {}),
             discount: 0,
@@ -191,7 +228,7 @@ export default function CafeLayout() {
                 price: linePrice(it),
             })),
         };
-    }, [formatReceiptDate, linePrice, fullName, profile, resolveTableLabelFromOrder]);
+    }, [formatReceiptDate, linePrice, fullName, profile, resolveTableLabelFromOrder, TAKEAWAY_LABEL]);
 
     const printReceiptForOrder = useCallback(async (orderId) => {
         const oid = String(orderId || "");
@@ -449,6 +486,7 @@ export default function CafeLayout() {
             const dt = formatReceiptDate(dtRaw || new Date().toISOString());
             const tableLabel = resolveTableLabelFromOrder(detail);
             const cashier = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || profile?.email || "";
+            const kitchenDocNo = tableLabel === TAKEAWAY_LABEL ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`;
 
             for (const [kid, kitItems] of groups.entries()) {
                 const k = kitchensMap.get(String(kid));
@@ -459,7 +497,7 @@ export default function CafeLayout() {
 
                 const payload = {
                     company: localStorage.getItem("company_name") || "КУХНЯ",
-                    doc_no: `${label} • СТОЛ ${tableLabel}`,
+                    doc_no: `${label} • ${kitchenDocNo}`,
                     created_at: dt,
                     cashier_name: cashier,
                     discount: 0,
@@ -601,6 +639,7 @@ export default function CafeLayout() {
             const dt = formatReceiptDate(dtRaw);
             const tableLabel = resolveTableLabelFromOrder(detail);
             const cashier = `${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || profile?.email || "";
+            const diffDocNo = tableLabel === TAKEAWAY_LABEL ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`;
 
             const printOne = async (kid, menuTitle, items) => {
                 const k = kitchensMap.get(String(kid));
@@ -611,7 +650,7 @@ export default function CafeLayout() {
 
                 const payload = {
                     company: localStorage.getItem("company_name") || "КУХНЯ",
-                    doc_no: `${label} | СТОЛ ${tableLabel} | ИЗМЕНЕНИЕ`,
+                    doc_no: `${label} | ${diffDocNo} | ИЗМЕНЕНИЕ`,
                     created_at: dt,
                     cashier_name: cashier,
                     discount: 0,
@@ -669,6 +708,7 @@ export default function CafeLayout() {
         resolveTableLabelFromOrder,
         shouldAutoPrintNow,
         shouldPrintKitchenDiffForStatus,
+        TAKEAWAY_LABEL,
         writeOrderItemsSnapshot,
     ]);
 

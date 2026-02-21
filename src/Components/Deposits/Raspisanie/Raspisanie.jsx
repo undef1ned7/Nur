@@ -15,8 +15,11 @@ import {
   updateEventAsync,
 } from "../../../store/creators/eventsCreators";
 import AddModal from "../AddModal/AddModal";
+import { useAlert } from "../../../hooks/useDialog";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 const EditModal = ({ eventData, onClose, onSave, isLoading, error }) => {
+  const alert = useAlert();
   const [title, setTitle] = useState(eventData?.title || "");
   const [datetime, setDatetime] = useState(
     eventData ? eventData.datetime.slice(0, 16) : ""
@@ -118,6 +121,7 @@ const EditModal = ({ eventData, onClose, onSave, isLoading, error }) => {
 };
 
 export default function Raspisanie() {
+  const alert = useAlert()
   const dispatch = useDispatch();
   const { list: events, creating, createError } = useSelector((s) => s.event);
   const calendarRef = useRef(null);
@@ -163,7 +167,8 @@ export default function Raspisanie() {
       setShowEditModal(false);
       setEditingEvent(null);
     } catch (err) {
-      console.error(err);
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении события"); 
+      alert(errorMessage, true);
     }
   };
 
