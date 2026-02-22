@@ -893,14 +893,21 @@ const AddProductPage = () => {
   }, []);
 
   // Генерируем код товара на основе count из API (только для создания)
+  // Всегда синхронизируем с count при изменении, чтобы после загрузки API (обновление страницы) код был правильным
   useEffect(() => {
-    if (!isEditMode && !marketData.code) {
-      // Новый код = count + 1, форматируем как 4-значное число
-      // Например, если count = 20, новый будет 0021
+    if (!isEditMode) {
       const newCode = String((count || 0) + 1).padStart(4, "0");
-      setMarketData((prev) => ({ ...prev, code: newCode }));
+      setMarketData((prev) => {
+        const articleUnchanged =
+          prev.article === "" || prev.article === prev.code;
+        return {
+          ...prev,
+          code: newCode,
+          article: articleUnchanged ? newCode : prev.article,
+        };
+      });
     }
-  }, [isEditMode, count, marketData.code]);
+  }, [isEditMode, count]);
 
   // Автоматическая генерация PLU для весового товара или дробной услуги
   useEffect(() => {

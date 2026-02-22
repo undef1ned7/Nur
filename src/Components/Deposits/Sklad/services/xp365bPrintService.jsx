@@ -445,6 +445,44 @@ function normalizeEan13(raw) {
   return digits + String(check);
 }
 
+function normalizeEan8(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length === 8) return digits;
+  if (digits.length !== 7) return "";
+  let sum = 0;
+  for (let i = 0; i < 7; i += 1) {
+    const d = Number(digits[i] || 0);
+    sum += (i % 2 === 0 ? 3 : 1) * d;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return digits + String(check);
+}
+
+/** Возвращает { code, format: "EAN13" | "EAN8" | "CODE128" } */
+function normalizeBarcode(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) throw new Error("Пустой штрих-код");
+  // EAN-13: 12 или 13 цифр
+  if (digits.length === 12 || digits.length === 13) {
+    const code = normalizeEan13(raw);
+    if (code) return { code, format: "EAN13" };
+  }
+  // EAN-8: 7 или 8 цифр
+  if (digits.length === 7 || digits.length === 8) {
+    const code = normalizeEan8(raw);
+    if (code) return { code, format: "EAN8" };
+  }
+  // 10 или 11 цифр — дополняем нулями слева до 12 и печатаем как EAN-13
+  if (digits.length === 10 || digits.length === 11) {
+    const padded = digits.padStart(12, "0");
+    const code = normalizeEan13(padded);
+    if (code) return { code, format: "EAN13" };
+  }
+  // Любая другая длина (1–6, 9, 14+ цифр) — CODE128
+  if (digits.length >= 1 && digits.length <= 32) return { code: digits, format: "CODE128" };
+  throw new Error("Штрих-код слишком длинный (макс. 32 символа для CODE128). Сейчас: " + digits.length + " цифр.");
+}
+
 function buildLabel({
   title,
   barcode,
@@ -463,9 +501,7 @@ function buildLabel({
 }) {
   const t0 = safeTsplText(title || "ТОВАР");
   const rawCode = safeTsplText(barcode || "");
-  if (!rawCode) throw new Error("Пустой штрих-код");
-  const code = normalizeEan13(rawCode);
-  if (!code) throw new Error("EAN‑13 требует 12 или 13 цифр");
+  const { code, format: bcType } = normalizeBarcode(rawCode);
 
   const priceText =
     price !== undefined && price !== null && String(price).trim() !== ""
@@ -542,16 +578,15 @@ function buildLabel({
   const lineCount = Math.max(1, lines.filter(Boolean).length);
   const lineWidth = (line) => (line ? line.length * charWidth : 0);
 
-  // barcode type: force EAN-13
-  const bcType = "EAN13";
-
+  // TSPL: EAN13/EAN8 как есть, CODE128 → "128"
+  const tsplBcType = bcType === "CODE128" ? "128" : bcType;
   // estimate barcode width to center it
   const getBarcodeModuleCount = (value) => {
     const codeValue = String(value || "");
     if (/^\d{13}$/.test(codeValue)) return 95 + 20;
     if (/^\d{8}$/.test(codeValue)) return 67 + 20;
     if (/^\d{12}$/.test(codeValue)) return 95 + 20;
-    return 11 * codeValue.length + 35 + 20;
+    return 11 * codeValue.length + 55;
   };
   const barcodeModules = getBarcodeModuleCount(code);
   const barcodeWidthDots = Math.round(barcodeModules * barcodeBarWidthDots);
@@ -612,7 +647,7 @@ function buildLabel({
     priceText && priceY != null
       ? `TEXT ${priceX + 1},${priceY},"${font}",0,${textScaleInt},${textScaleInt},"${priceText}"`
       : "",
-    `BARCODE ${bcX},${bcY},"${bcType}",${barcodeHeightDots},1,0,${narrow},${wide},"${code}"`,
+    `BARCODE ${bcX},${bcY},"${tsplBcType}",${barcodeHeightDots},1,0,${narrow},${wide},"${code}"`,
     "PRINT 1",
     "\r\n",
   ]
@@ -671,9 +706,7 @@ async function buildRasterLabelBytes({
 }) {
   const t0 = safeTsplText(title || "ТОВАР");
   const rawCode = safeTsplText(barcode || "");
-  if (!rawCode) throw new Error("Пустой штрих-код");
-  const code = normalizeEan13(rawCode);
-  if (!code) throw new Error("EAN‑13 требует 12 или 13 цифр");
+  const { code, format: barcodeFormat } = normalizeBarcode(rawCode);
 
   const priceText =
     price !== undefined && price !== null && String(price).trim() !== ""
@@ -794,10 +827,9 @@ async function buildRasterLabelBytes({
 
   // barcode: draw on temp canvas
   const barcodeCanvas = document.createElement("canvas");
-  const format = "EAN13";
 
   JsBarcode(barcodeCanvas, code, {
-    format,
+    format: barcodeFormat,
     width: Math.max(1, barcodeBarWidthDots),
     height: Math.max(1, barcodeHeightDots),
     displayValue: false,

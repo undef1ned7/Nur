@@ -77,7 +77,7 @@ const Documents = () => {
   // Тип документа из URL (sidebar): all, sale, purchase, ...
   const docType = DOC_TYPE_FROM_PARAM[docTypeParam] ?? DOC_TYPE_FROM_PARAM.all;
 
-  const [activeTab, setActiveTab] = useState("receipts");
+  const [activeTab, setActiveTab] = useState("invoices");
   const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -157,6 +157,33 @@ const Documents = () => {
     return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
   };
 
+  // Сумма документа: если total не пришёл (черновик), считаем по позициям
+  const getDocumentAmount = (doc) => {
+    const fromBackend = Number(doc.total);
+    if (fromBackend > 0) return fromBackend;
+    const items = doc.items;
+    if (!Array.isArray(items) || items.length === 0) return 0;
+    const subtotal = items.reduce(
+      (sum, item) =>
+        sum +
+        (Number(item.price ?? item.unit_price ?? 0) || 0) *
+          (Number(item.qty ?? item.quantity ?? 0) || 0),
+      0
+    );
+    const itemsDiscountTotal = items.reduce(
+      (sum, item) =>
+        sum +
+        ((Number(item.price ?? item.unit_price ?? 0) || 0) *
+          (Number(item.qty ?? item.quantity ?? 0) || 0) *
+          (Number(item.discount_percent ?? 0) || 0)) /
+          100,
+      0
+    );
+    const docDiscountAmount = Number(doc.discount_amount ?? 0) || 0;
+    const totalDiscount = itemsDiscountTotal + docDiscountAmount;
+    return Math.max(0, subtotal - totalDiscount);
+  };
+
   // Маппинг статусов по API (9): DRAFT | CASH_PENDING | POSTED | REJECTED
   const getStatusLabel = (status) => {
     switch (status) {
@@ -214,7 +241,7 @@ const Documents = () => {
         doc.counterparty ||
         "Без клиента",
       products: doc.items?.length || 0,
-      amount: doc.total || "0.00",
+      amount: getDocumentAmount(doc),
       discount_percent: doc.discount_percent ?? null,
       discount_amount: doc.discount_amount ?? null,
       status: getStatusLabel(doc.status),
@@ -247,7 +274,7 @@ const Documents = () => {
         doc.counterparty ||
         "Без контрагента",
       positions: doc.items?.length || 0,
-      amount: doc.total || "0.00",
+      amount: getDocumentAmount(doc),
       discount_percent: doc.discount_percent ?? null,
       discount_amount: doc.discount_amount ?? null,
       status: getStatusLabel(doc.status),

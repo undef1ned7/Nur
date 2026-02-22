@@ -38,7 +38,8 @@ const CounterpartyDetail = () => {
   );
   const company = useSelector((state) => state.user.company);
 
-  const [operations, setOperations] = useState({ results: [] });
+  /** Операции: при include_debts=1 API возвращает { money, debt_operations, operations } (API 5.3). */
+  const [operations, setOperations] = useState({ results: [], debt_operations: [], money: [] });
   const [loadingOperations, setLoadingOperations] = useState(true);
   const [errorOperations, setErrorOperations] = useState("");
   const [warehouses, setWarehouses] = useState([]);
@@ -97,7 +98,7 @@ const CounterpartyDetail = () => {
     setLoadingOperations(true);
     setErrorOperations("");
     try {
-      const params = { ...getBranchParams() };
+      const params = { ...getBranchParams(), include_debts: 1 };
       if (docTypeFilter) params.doc_type = docTypeFilter;
       if (statusFilter) params.status = statusFilter;
       if (warehouseFilter) params.warehouse = warehouseFilter;
@@ -108,11 +109,19 @@ const CounterpartyDetail = () => {
         id,
         params
       );
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setOperations({ results: list });
+      if (data?.operations != null && Array.isArray(data.operations)) {
+        setOperations({
+          results: data.operations,
+          debt_operations: data.debt_operations ?? [],
+          money: data.money ?? [],
+        });
+      } else {
+        const list = data?.results ?? (Array.isArray(data) ? data : []);
+        setOperations({ results: list, debt_operations: [], money: list });
+      }
     } catch (e) {
       setErrorOperations("Не удалось загрузить приход/расход");
-      setOperations({ results: [] });
+      setOperations({ results: [], debt_operations: [], money: [] });
     } finally {
       setLoadingOperations(false);
     }
@@ -131,8 +140,12 @@ const CounterpartyDetail = () => {
   }, [loadOperations]);
 
   const operationRows = operations.results || [];
+  const debtOperationsList = operations.debt_operations || [];
+  const hasUnifiedOperations = operationRows.some(
+    (r) => r.source != null || r.debt_delta != null
+  );
 
-  // Сводка по операциям (results): Общий долг, Переводы, Продажи
+  // Сводка по операциям: переводы, приходы (продажи), долговые операции (API 5.3)
   const summary = useMemo(() => {
     const list = operationRows;
     let sumReceipt = 0;
@@ -143,13 +156,11 @@ const CounterpartyDetail = () => {
       else if (row.doc_type === "MONEY_EXPENSE") sumExpense += amount;
     });
     return {
-      // Приход = контрагент платит нам → уменьшает его долг перед нами
-      // Расход = мы платим контрагенту → уменьшает наш долг перед ним
-      totalDebt: -(sumReceipt + sumExpense),
       transfers: sumReceipt + sumExpense,
       sales: sumReceipt,
+      debtOperationsCount: debtOperationsList.length,
     };
-  }, [operationRows]);
+  }, [operationRows, debtOperationsList.length]);
 
   const docTypeLabel = (docType) =>
     docType === "MONEY_RECEIPT"
@@ -157,6 +168,22 @@ const CounterpartyDetail = () => {
       : docType === "MONEY_EXPENSE"
       ? "Расход"
       : docType ?? "—";
+  const sourceLabel = (row) => {
+    if (row.source != null) return row.source === "money" ? "Денежный документ" : "Складской документ (долг)";
+    if (row.doc_type) return docTypeLabel(row.doc_type);
+    return "—";
+  };
+  const debtDeltaLabel = (row) => {
+    const d = row.debt_delta;
+    if (d == null || (typeof d === "string" && d.trim() === "")) return "—";
+    const n = Number(d);
+    if (Number.isNaN(n) || n === 0) return "—";
+    const formatted = Math.abs(n).toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return n > 0 ? `+${formatted}` : `−${formatted}`;
+  };
   const statusLabel = (s) =>
     s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
 
@@ -206,18 +233,6 @@ const CounterpartyDetail = () => {
         ) : (
           <>
             <div className="counterparty-detail-page__summary-cards">
-              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt">
-                <span className="counterparty-detail-page__summary-label">
-                  Общий долг
-                </span>
-                <span className="counterparty-detail-page__summary-value">
-                  {summary.totalDebt.toLocaleString("ru-RU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  COM
-                </span>
-              </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">
                 <span className="counterparty-detail-page__summary-label">
                   Переводы
@@ -240,6 +255,17 @@ const CounterpartyDetail = () => {
                     maximumFractionDigits: 2,
                   })}{" "}
                   COM
+                </span>
+              </div>
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt-ops">
+                <span className="counterparty-detail-page__summary-label">
+                  Долговые операции (в долг)
+                </span>
+                <span className="counterparty-detail-page__summary-value">
+                  {summary.debtOperationsCount}
+                </span>
+                <span className="counterparty-detail-page__summary-hint">
+                  кредитных документов
                 </span>
               </div>
             </div>
@@ -328,7 +354,7 @@ const CounterpartyDetail = () => {
               <button
                 type="button"
                 className="counterparty-detail-page__refresh-btn"
-                onClick={loadOperations}
+                onClick={() => loadOperations()}
                 disabled={loadingOperations}
               >
                 {loadingOperations ? "Загрузка…" : "Обновить"}
@@ -352,10 +378,11 @@ const CounterpartyDetail = () => {
                 <table className="counterparty-detail-page__table">
                   <thead>
                     <tr>
-                      <th>Тип</th>
+                      <th>{hasUnifiedOperations ? "Источник" : "Тип"}</th>
                       <th>Номер</th>
                       <th>Дата</th>
                       <th>Сумма</th>
+                      {hasUnifiedOperations && <th>Изменение долга</th>}
                       <th>Категория</th>
                       <th>Статус</th>
                       <th>Комментарий</th>
@@ -364,13 +391,18 @@ const CounterpartyDetail = () => {
                   <tbody>
                     {operationRows.map((row) => (
                       <tr key={row.id || Math.random()}>
-                        <td>{docTypeLabel(row.doc_type)}</td>
-                        <td>{row.number ?? "—"}</td>
-                        <td>{fmtDate(row.date ?? row.created_at)}</td>
+                        <td>{sourceLabel(row)}</td>
+                        <td>{row.number ?? row.document?.number ?? "—"}</td>
+                        <td>{fmtDate(row.date ?? row.created_at ?? row.document?.date)}</td>
                         <td>{fmtMoney(row.amount)}</td>
-                        <td>{row.payment_category_title ?? "—"}</td>
-                        <td>{statusLabel(row.status)}</td>
-                        <td>{row.comment ?? "—"}</td>
+                        {hasUnifiedOperations && (
+                          <td className="counterparty-detail-page__debt-delta">
+                            {debtDeltaLabel(row)}
+                          </td>
+                        )}
+                        <td>{row.payment_category_title ?? row.document?.payment_category_title ?? "—"}</td>
+                        <td>{statusLabel(row.status ?? row.document?.status)}</td>
+                        <td>{row.comment ?? row.document?.comment ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -398,12 +430,22 @@ const CounterpartyDetail = () => {
                     <div className="counterparty-detail-page__card-body">
                       <div className="counterparty-detail-page__card-row">
                         <span className="counterparty-detail-page__card-label">
-                          Тип
+                          {hasUnifiedOperations ? "Источник" : "Тип"}
                         </span>
                         <span className="counterparty-detail-page__card-value">
-                          {docTypeLabel(row.doc_type)}
+                          {sourceLabel(row)}
                         </span>
                       </div>
+                      {hasUnifiedOperations && debtDeltaLabel(row) !== "—" && (
+                        <div className="counterparty-detail-page__card-row">
+                          <span className="counterparty-detail-page__card-label">
+                            Изменение долга
+                          </span>
+                          <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--debt-delta">
+                            {debtDeltaLabel(row)}
+                          </span>
+                        </div>
+                      )}
                       <div className="counterparty-detail-page__card-row">
                         <span className="counterparty-detail-page__card-label">
                           Дата
