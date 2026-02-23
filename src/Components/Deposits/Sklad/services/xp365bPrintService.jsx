@@ -1,4 +1,5 @@
 import JsBarcode from "jsbarcode";
+import iconv from "iconv-lite";
 
 /**
  * XPrinter XP-350B / XP-365B — TSPL • 203 DPI
@@ -8,14 +9,15 @@ import JsBarcode from "jsbarcode";
  * - TSPL: CODEPAGE WPC1251
  * - Encoding: Windows-1251 (CP1251)
  *
- * При необходимости можно переключить на CP866:
- * - localStorage.setItem("xp365b_codepage", "866")
+ * При необходимости можно переключить:
+ * - CP866: localStorage.setItem("xp365b_codepage", "866")
+ * - PC936 (GBK, китайский): localStorage.setItem("xp365b_codepage", "936")
  *
  * Примечание: названия CODEPAGE в TSPL зависят от прошивки.
  * Тут для 1251 отправляем строго WPC1251 (как вы просили).
  */
 
-const LS_CODEPAGE = "xp365b_codepage"; // "WPC1251" | "1251" | "866"
+const LS_CODEPAGE = "xp365b_codepage"; // "WPC1251" | "1251" | "866" | "936"
 const LS_ORIENTATION = "xp365b_orientation"; // "normal" | "rotated"
 const LS_RENDER_MODE = "xp365b_render_mode"; // "raster" | "tspl"
 const RASTER_FONT_FAMILY_LS = "xp365b_raster_font_family";
@@ -55,6 +57,9 @@ function normalizeCodepage(value) {
   if (/^cp\s*1251$/i.test(raw)) return 1251;
   if (/^1251$/i.test(raw)) return 1251;
   if (/^866$/i.test(raw)) return 866;
+  if (/^pc\s*936$/i.test(raw)) return 936;
+  if (/^cp\s*936$/i.test(raw)) return 936;
+  if (/^936$/i.test(raw)) return 936;
   return DEFAULT_CODEPAGE;
 }
 
@@ -76,8 +81,9 @@ function getTsplCodepageToken() {
   const cp = getXp365bCodepage();
   // Requested: WPC1251
   if (cp === 1251) return DEFAULT_CODEPAGE_TOKEN;
-  // For CP866 most firmwares accept numeric "866"
-  return "866";
+  if (cp === 866) return "866";
+  if (cp === 936) return "936"; // PC936 / GBK
+  return DEFAULT_CODEPAGE_TOKEN;
 }
 
 function getOrientation() {
@@ -140,7 +146,7 @@ export function setXp365bRasterInvert(v) {
   } catch { }
 }
 
-/* ====================== ENCODING: CP866 / CP1251 ====================== */
+/* ====================== ENCODING: CP866 / CP1251 / PC936 (GBK) ====================== */
 
 function encodeCP866(str = "") {
   const out = [];
@@ -173,9 +179,16 @@ function encodeCP1251(str = "") {
   return new Uint8Array(out);
 }
 
+function encodeGBK(str = "") {
+  const buf = iconv.encode(String(str), "gbk");
+  return new Uint8Array(buf);
+}
+
 function encodeForPrinter(str = "") {
   const cp = getXp365bCodepage();
-  return cp === 866 ? encodeCP866(str) : encodeCP1251(str);
+  if (cp === 866) return encodeCP866(str);
+  if (cp === 936) return encodeGBK(str);
+  return encodeCP1251(str);
 }
 
 /* ====================== WEBUSB CONNECT ====================== */

@@ -1567,10 +1567,16 @@ const CreateSaleDocument = () => {
                 <label className="create-sale-document__toggle">
                   <input
                     type="checkbox"
+                    className="create-sale-document__toggle-input"
                     checked={isDocumentPosted}
                     onChange={(e) => setIsDocumentPosted(e.target.checked)}
                   />
-                  <span>Документ проведён</span>
+                  <span className="create-sale-document__toggle-track">
+                    <span className="create-sale-document__toggle-thumb">
+                      <Check size={14} strokeWidth={2.5} />
+                    </span>
+                  </span>
+                  <span className="create-sale-document__toggle-label">Документ проведён</span>
                 </label>
                 {isPaymentKindRelevant && (
                   <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
