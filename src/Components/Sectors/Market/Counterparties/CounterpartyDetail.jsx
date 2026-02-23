@@ -194,19 +194,25 @@ const CounterpartyDetail = () => {
   );
 
   // Сводка по операциям: сальдо (приходы − расходы), переводы (оборот), долговые операции (API 5.3)
+  // В Сальдо и Переводы включаем только реальные денежные приходы/расходы (source === "money"),
+  // чтобы покупки в долг (складские документы) не дублировались в сальдо.
+  // Общие долги = остаток: сумма по debt_operations + сумма debt_delta по operations (оплаты дают отрицательный debt_delta).
   const summary = useMemo(() => {
     const list = operationRows;
     let sumReceipt = 0;
     let sumExpense = 0;
     list.forEach((row) => {
+      if (row.source != null && row.source !== "money") return;
       const amount = Number(row.amount) || 0;
       if (row.doc_type === "MONEY_RECEIPT") sumReceipt += amount;
       else if (row.doc_type === "MONEY_EXPENSE") sumExpense += amount;
     });
-    const totalDebtAmount = debtOperationsList.reduce(
-      (acc, d) => acc + Number(d.total ?? d.amount ?? 0),
+    // Остаток долга = сумма debt_delta по всем operations (продажи в долг дают +, оплаты −).
+    const debtDeltaSum = list.reduce(
+      (acc, row) => acc + (Number(row.debt_delta) || 0),
       0
     );
+    const totalDebtAmount = Math.max(0, debtDeltaSum);
     return {
       balance: sumReceipt - sumExpense,
       transfers: sumReceipt + sumExpense,
