@@ -58,6 +58,47 @@
     gap: 16px;
   }
 
+  &__reconciliation-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+
+    .counterparty-detail-page__summary-hint {
+      margin-top: 0;
+    }
+  }
+
+  &__reconciliation-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: var(--text, #111827);
+  }
+
+  &__reconciliation-label-text {
+    font-weight: 500;
+    color: var(--text-secondary, #6b7280);
+    white-space: nowrap;
+  }
+
+  &__reconciliation-date {
+    padding: 8px 10px;
+    font-size: 14px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    background: white;
+    color: var(--text, #111827);
+
+    &:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+    }
+  }
+
   &__summary-card {
     border-radius: 12px;
     padding: 20px;
@@ -117,6 +158,12 @@
       font-weight: 600;
       color: #059669;
     }
+
+    &--debt-total {
+      font-size: 16px;
+      margin-top: 4px;
+      color: #5b21b6;
+    }
   }
 
   &__debt-who {
@@ -129,7 +176,7 @@
     font-size: 13px;
     color: #2563eb;
     text-decoration: none;
-    margin-top: 8px;
+    // margin-top: 8px;
     display: inline-block;
     background: none;
     border: none;

@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, LayoutGrid, List } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useDispatch, useSelector } from "react-redux";
 import { getWarehouseCounterpartyById } from "../../../../store/creators/warehouseThunk";
 import { clearCurrentCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import { getAgentDisplay } from "./utils";
+import ReconciliationPdfDocument from "../../Warehouse/Documents/components/ReconciliationPdfDocument";
 import "./CounterpartyDetail.scss";
 
 const fmtMoney = (v) =>
@@ -42,6 +44,14 @@ const CounterpartyDetail = () => {
   const [operations, setOperations] = useState({ results: [], debt_operations: [], money: [] });
   const [loadingOperations, setLoadingOperations] = useState(true);
   const [errorOperations, setErrorOperations] = useState("");
+  const [reconciliationPdfLoading, setReconciliationPdfLoading] = useState(false);
+  const [reconciliationStart, setReconciliationStart] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
+  });
+  const [reconciliationEnd, setReconciliationEnd] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const [warehouses, setWarehouses] = useState([]);
   const [paymentCategories, setPaymentCategories] = useState([]);
 
@@ -139,13 +149,51 @@ const CounterpartyDetail = () => {
     loadOperations();
   }, [loadOperations]);
 
+  /** Скачать акт сверки (PDF через ReconciliationPdfDocument). Использует выбранные даты. */
+  const downloadReconciliationPdf = useCallback(async () => {
+    if (!id) return;
+    const startStr = reconciliationStart || new Date().toISOString().slice(0, 10);
+    const endStr = reconciliationEnd || new Date().toISOString().slice(0, 10);
+    setReconciliationPdfLoading(true);
+    const params = {
+      start: startStr,
+      end: endStr,
+      currency: "KGS",
+      ...getBranchParams(),
+    };
+    try {
+      const data = await warehouseAPI.getReconciliationJson(id, params);
+      const blob = await pdf(
+        <ReconciliationPdfDocument
+          data={data}
+          meta={{
+            start: startStr,
+            end: endStr,
+            currency: "KGS",
+            counterpartyName: name,
+          }}
+        />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `akt-sverki-${name || id}-${startStr}-${endStr}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Акт сверки:", e);
+    } finally {
+      setReconciliationPdfLoading(false);
+    }
+  }, [id, name, getBranchParams, reconciliationStart, reconciliationEnd]);
+
   const operationRows = operations.results || [];
   const debtOperationsList = operations.debt_operations || [];
   const hasUnifiedOperations = operationRows.some(
     (r) => r.source != null || r.debt_delta != null
   );
 
-  // Сводка по операциям: переводы, приходы (продажи), долговые операции (API 5.3)
+  // Сводка по операциям: сальдо (приходы − расходы), переводы (оборот), долговые операции (API 5.3)
   const summary = useMemo(() => {
     const list = operationRows;
     let sumReceipt = 0;
@@ -155,12 +203,17 @@ const CounterpartyDetail = () => {
       if (row.doc_type === "MONEY_RECEIPT") sumReceipt += amount;
       else if (row.doc_type === "MONEY_EXPENSE") sumExpense += amount;
     });
+    const totalDebtAmount = debtOperationsList.reduce(
+      (acc, d) => acc + Number(d.total ?? d.amount ?? 0),
+      0
+    );
     return {
+      balance: sumReceipt - sumExpense,
       transfers: sumReceipt + sumExpense,
-      sales: sumReceipt,
       debtOperationsCount: debtOperationsList.length,
+      totalDebtAmount,
     };
-  }, [operationRows, debtOperationsList.length]);
+  }, [operationRows, debtOperationsList]);
 
   const docTypeLabel = (docType) =>
     docType === "MONEY_RECEIPT"
@@ -233,6 +286,21 @@ const CounterpartyDetail = () => {
         ) : (
           <>
             <div className="counterparty-detail-page__summary-cards">
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
+                <span className="counterparty-detail-page__summary-label">
+                  Сальдо
+                </span>
+                <span className="counterparty-detail-page__summary-value">
+                  {summary.balance.toLocaleString("ru-RU", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  COM
+                </span>
+                <span className="counterparty-detail-page__summary-hint">
+                  приходы − расходы по контрагенту
+                </span>
+              </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">
                 <span className="counterparty-detail-page__summary-label">
                   Переводы
@@ -245,29 +313,54 @@ const CounterpartyDetail = () => {
                   COM
                 </span>
               </div>
-              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt-ops">
                 <span className="counterparty-detail-page__summary-label">
-                  Продажи
+                  Общие долги
                 </span>
-                <span className="counterparty-detail-page__summary-value">
-                  {summary.sales.toLocaleString("ru-RU", {
+                <span className="counterparty-detail-page__summary-value counterparty-detail-page__summary-value--debt-total">
+                  {summary.totalDebtAmount.toLocaleString("ru-RU", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{" "}
-                  COM
-                </span>
-              </div>
-              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt-ops">
-                <span className="counterparty-detail-page__summary-label">
-                  Долговые операции (в долг)
-                </span>
-                <span className="counterparty-detail-page__summary-value">
-                  {summary.debtOperationsCount}
+                  с
                 </span>
                 <span className="counterparty-detail-page__summary-hint">
-                  кредитных документов
+                  {summary.debtOperationsCount} кредитных документов
                 </span>
               </div>
+            </div>
+
+            <div className="counterparty-detail-page__reconciliation-block">
+              <label className="counterparty-detail-page__reconciliation-label">
+                <span className="counterparty-detail-page__reconciliation-label-text">Дата с</span>
+                <input
+                  type="date"
+                  value={reconciliationStart}
+                  onChange={(e) => setReconciliationStart(e.target.value)}
+                  className="counterparty-detail-page__reconciliation-date"
+                  aria-label="Начало периода акта сверки"
+                />
+              </label>
+              <label className="counterparty-detail-page__reconciliation-label">
+                <span className="counterparty-detail-page__reconciliation-label-text">Дата по</span>
+                <input
+                  type="date"
+                  value={reconciliationEnd}
+                  onChange={(e) => setReconciliationEnd(e.target.value)}
+                  className="counterparty-detail-page__reconciliation-date"
+                  aria-label="Конец периода акта сверки"
+                />
+              </label>
+              <button
+                type="button"
+                className="counterparty-detail-page__reconciliation-pdf"
+                onClick={downloadReconciliationPdf}
+                disabled={reconciliationPdfLoading}
+              >
+                {reconciliationPdfLoading
+                  ? "Формирование…"
+                  : "Скачать акт сверки (PDF)"}
+              </button>
             </div>
 
             <div className="counterparty-detail-page__operations-toolbar">
