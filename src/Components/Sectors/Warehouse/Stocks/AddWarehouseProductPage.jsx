@@ -589,9 +589,6 @@ const AddWarehouseProductPage = () => {
     if (!selectedWarehouse) {
       errors.warehouse = "Обязательное поле.";
     }
-    if (!category || (typeof category === "string" && !category.trim())) {
-      errors.category = "Обязательное поле.";
-    }
     if (!name || !name.trim()) {
       errors.name = "Обязательное поле";
     }
@@ -1687,7 +1684,7 @@ const AddWarehouseProductPage = () => {
 
                       <div className="add-product-page__form-group">
                         <label className="add-product-page__label">
-                          Категория *
+                          Категория
                         </label>
                         <div className="add-product-page__supplier-row">
                           <select
@@ -1695,7 +1692,6 @@ const AddWarehouseProductPage = () => {
                             className="add-product-page__input"
                             value={newItemData.category}
                             onChange={handleChange}
-                            required
                           >
                             <option value="">Выберите категорию</option>
                             {categories.map((category, idx) => (
@@ -2328,12 +2324,16 @@ const MarketProductForm = ({
     isPriceManuallyChanged,
   ]);
 
-  // Сброс флага ручного изменения при изменении цены закупки или наценки
-  useEffect(() => {
-    if (itemType === "product") {
-      setIsPriceManuallyChanged(false);
-    }
-  }, [newItemData.purchase_price, marketData.markup, itemType]);
+  // Сброс флага только при явном редактировании полей (не при программном обновлении наценки из handlePriceChange)
+  const handlePurchasePriceChange = (e) => {
+    if (itemType === "product") setIsPriceManuallyChanged(false);
+    handleChange(e);
+  };
+  const handleMarkupFieldChange = (e) => {
+    setIsMarkupManuallyChanged(true);
+    if (itemType === "product") setIsPriceManuallyChanged(false);
+    handleMarketDataChange("markup", e.target.value);
+  };
 
   // Обработчик изменения цены продажи вручную
   const handlePriceChange = (e) => {
@@ -2623,7 +2623,6 @@ const MarketProductForm = ({
                 className="market-product-form__input"
                 value={newItemData.category}
                 onChange={handleChange}
-                required
               >
                 <option value="">Выберите категорию</option>
                 {categories.map((category, idx) => (
@@ -3096,7 +3095,7 @@ const MarketProductForm = ({
                     name="purchase_price"
                     className="market-product-form__input"
                     value={newItemData.purchase_price}
-                    onChange={handleChange}
+                    onChange={handlePurchasePriceChange}
                   />
                   <span className="market-product-form__currency">COM</span>
                 </div>
@@ -3113,10 +3112,7 @@ const MarketProductForm = ({
                     type="text"
                     className="market-product-form__input"
                     value={marketData.markup}
-                    onChange={(e) => {
-                      setIsMarkupManuallyChanged(true);
-                      handleMarketDataChange("markup", e.target.value);
-                    }}
+                    onChange={handleMarkupFieldChange}
                   />
                   <span className="market-product-form__currency">%</span>
                 </div>

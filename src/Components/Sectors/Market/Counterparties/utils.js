@@ -60,3 +60,31 @@ export const getAgentDisplay = (counterparty) => {
   return formatAgentDisplay(counterparty?.agent);
 };
 
+/**
+ * Группирует контрагентов по агенту (agent id или null для "Без агента")
+ * @param {Array} counterparties - Список контрагентов
+ * @param {Function} getAgentDisplayFn - Функция получения отображаемого имени агента
+ * @returns {Array<{ agentKey: string|null, agentDisplay: string, counterparties: Array }>}
+ */
+export const groupCounterpartiesByAgent = (counterparties, getAgentDisplayFn = getAgentDisplay) => {
+  if (!Array.isArray(counterparties) || counterparties.length === 0) {
+    return [];
+  }
+  const map = new Map();
+  for (const cp of counterparties) {
+    const agentId = cp?.agent ?? null;
+    const key = agentId ?? "__no_agent__";
+    if (!map.has(key)) {
+      map.set(key, {
+        agentKey: agentId,
+        agentDisplay: agentId ? getAgentDisplayFn(cp) : "Без агента",
+        counterparties: [],
+      });
+    }
+    map.get(key).counterparties.push(cp);
+  }
+  const result = Array.from(map.values());
+  result.sort((a, b) => a.agentDisplay.localeCompare(b.agentDisplay, "ru"));
+  return result;
+};
+

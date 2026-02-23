@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, LayoutGrid, List } from "lucide-react";
+import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useDispatch, useSelector } from "react-redux";
 import { getWarehouseCounterpartyById } from "../../../../store/creators/warehouseThunk";
 import { clearCurrentCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
 import { getAgentDisplay } from "./utils";
+import ReconciliationPdfDocument from "../../Warehouse/Documents/components/ReconciliationPdfDocument";
 import "./CounterpartyDetail.scss";
 
 const fmtMoney = (v) =>
@@ -38,9 +40,18 @@ const CounterpartyDetail = () => {
   );
   const company = useSelector((state) => state.user.company);
 
-  const [operations, setOperations] = useState({ results: [] });
+  /** Операции: при include_debts=1 API возвращает { money, debt_operations, operations } (API 5.3). */
+  const [operations, setOperations] = useState({ results: [], debt_operations: [], money: [] });
   const [loadingOperations, setLoadingOperations] = useState(true);
   const [errorOperations, setErrorOperations] = useState("");
+  const [reconciliationPdfLoading, setReconciliationPdfLoading] = useState(false);
+  const [reconciliationStart, setReconciliationStart] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
+  });
+  const [reconciliationEnd, setReconciliationEnd] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const [warehouses, setWarehouses] = useState([]);
   const [paymentCategories, setPaymentCategories] = useState([]);
 
@@ -97,7 +108,7 @@ const CounterpartyDetail = () => {
     setLoadingOperations(true);
     setErrorOperations("");
     try {
-      const params = { ...getBranchParams() };
+      const params = { ...getBranchParams(), include_debts: 1 };
       if (docTypeFilter) params.doc_type = docTypeFilter;
       if (statusFilter) params.status = statusFilter;
       if (warehouseFilter) params.warehouse = warehouseFilter;
@@ -108,11 +119,19 @@ const CounterpartyDetail = () => {
         id,
         params
       );
-      const list = data?.results ?? (Array.isArray(data) ? data : []);
-      setOperations({ results: list });
+      if (data?.operations != null && Array.isArray(data.operations)) {
+        setOperations({
+          results: data.operations,
+          debt_operations: data.debt_operations ?? [],
+          money: data.money ?? [],
+        });
+      } else {
+        const list = data?.results ?? (Array.isArray(data) ? data : []);
+        setOperations({ results: list, debt_operations: [], money: list });
+      }
     } catch (e) {
       setErrorOperations("Не удалось загрузить приход/расход");
-      setOperations({ results: [] });
+      setOperations({ results: [], debt_operations: [], money: [] });
     } finally {
       setLoadingOperations(false);
     }
@@ -130,9 +149,51 @@ const CounterpartyDetail = () => {
     loadOperations();
   }, [loadOperations]);
 
-  const operationRows = operations.results || [];
+  /** Скачать акт сверки (PDF через ReconciliationPdfDocument). Использует выбранные даты. */
+  const downloadReconciliationPdf = useCallback(async () => {
+    if (!id) return;
+    const startStr = reconciliationStart || new Date().toISOString().slice(0, 10);
+    const endStr = reconciliationEnd || new Date().toISOString().slice(0, 10);
+    setReconciliationPdfLoading(true);
+    const params = {
+      start: startStr,
+      end: endStr,
+      currency: "KGS",
+      ...getBranchParams(),
+    };
+    try {
+      const data = await warehouseAPI.getReconciliationJson(id, params);
+      const blob = await pdf(
+        <ReconciliationPdfDocument
+          data={data}
+          meta={{
+            start: startStr,
+            end: endStr,
+            currency: "KGS",
+            counterpartyName: name,
+          }}
+        />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `akt-sverki-${name || id}-${startStr}-${endStr}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Акт сверки:", e);
+    } finally {
+      setReconciliationPdfLoading(false);
+    }
+  }, [id, name, getBranchParams, reconciliationStart, reconciliationEnd]);
 
-  // Сводка по операциям (results): Общий долг, Переводы, Продажи
+  const operationRows = operations.results || [];
+  const debtOperationsList = operations.debt_operations || [];
+  const hasUnifiedOperations = operationRows.some(
+    (r) => r.source != null || r.debt_delta != null
+  );
+
+  // Сводка по операциям: сальдо (приходы − расходы), переводы (оборот), долговые операции (API 5.3)
   const summary = useMemo(() => {
     const list = operationRows;
     let sumReceipt = 0;
@@ -142,14 +203,17 @@ const CounterpartyDetail = () => {
       if (row.doc_type === "MONEY_RECEIPT") sumReceipt += amount;
       else if (row.doc_type === "MONEY_EXPENSE") sumExpense += amount;
     });
+    const totalDebtAmount = debtOperationsList.reduce(
+      (acc, d) => acc + Number(d.total ?? d.amount ?? 0),
+      0
+    );
     return {
-      // Приход = контрагент платит нам → уменьшает его долг перед нами
-      // Расход = мы платим контрагенту → уменьшает наш долг перед ним
-      totalDebt: -(sumReceipt + sumExpense),
+      balance: sumReceipt - sumExpense,
       transfers: sumReceipt + sumExpense,
-      sales: sumReceipt,
+      debtOperationsCount: debtOperationsList.length,
+      totalDebtAmount,
     };
-  }, [operationRows]);
+  }, [operationRows, debtOperationsList]);
 
   const docTypeLabel = (docType) =>
     docType === "MONEY_RECEIPT"
@@ -157,6 +221,22 @@ const CounterpartyDetail = () => {
       : docType === "MONEY_EXPENSE"
       ? "Расход"
       : docType ?? "—";
+  const sourceLabel = (row) => {
+    if (row.source != null) return row.source === "money" ? "Денежный документ" : "Складской документ (долг)";
+    if (row.doc_type) return docTypeLabel(row.doc_type);
+    return "—";
+  };
+  const debtDeltaLabel = (row) => {
+    const d = row.debt_delta;
+    if (d == null || (typeof d === "string" && d.trim() === "")) return "—";
+    const n = Number(d);
+    if (Number.isNaN(n) || n === 0) return "—";
+    const formatted = Math.abs(n).toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return n > 0 ? `+${formatted}` : `−${formatted}`;
+  };
   const statusLabel = (s) =>
     s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
 
@@ -206,16 +286,19 @@ const CounterpartyDetail = () => {
         ) : (
           <>
             <div className="counterparty-detail-page__summary-cards">
-              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt">
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
                 <span className="counterparty-detail-page__summary-label">
-                  Общий долг
+                  Сальдо
                 </span>
                 <span className="counterparty-detail-page__summary-value">
-                  {summary.totalDebt.toLocaleString("ru-RU", {
+                  {summary.balance.toLocaleString("ru-RU", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{" "}
                   COM
+                </span>
+                <span className="counterparty-detail-page__summary-hint">
+                  приходы − расходы по контрагенту
                 </span>
               </div>
               <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--transfers">
@@ -230,18 +313,54 @@ const CounterpartyDetail = () => {
                   COM
                 </span>
               </div>
-              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--sales">
+              <div className="counterparty-detail-page__summary-card counterparty-detail-page__summary-card--debt-ops">
                 <span className="counterparty-detail-page__summary-label">
-                  Продажи
+                  Общие долги
                 </span>
-                <span className="counterparty-detail-page__summary-value">
-                  {summary.sales.toLocaleString("ru-RU", {
+                <span className="counterparty-detail-page__summary-value counterparty-detail-page__summary-value--debt-total">
+                  {summary.totalDebtAmount.toLocaleString("ru-RU", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{" "}
-                  COM
+                  с
+                </span>
+                <span className="counterparty-detail-page__summary-hint">
+                  {summary.debtOperationsCount} кредитных документов
                 </span>
               </div>
+            </div>
+
+            <div className="counterparty-detail-page__reconciliation-block">
+              <label className="counterparty-detail-page__reconciliation-label">
+                <span className="counterparty-detail-page__reconciliation-label-text">Дата с</span>
+                <input
+                  type="date"
+                  value={reconciliationStart}
+                  onChange={(e) => setReconciliationStart(e.target.value)}
+                  className="counterparty-detail-page__reconciliation-date"
+                  aria-label="Начало периода акта сверки"
+                />
+              </label>
+              <label className="counterparty-detail-page__reconciliation-label">
+                <span className="counterparty-detail-page__reconciliation-label-text">Дата по</span>
+                <input
+                  type="date"
+                  value={reconciliationEnd}
+                  onChange={(e) => setReconciliationEnd(e.target.value)}
+                  className="counterparty-detail-page__reconciliation-date"
+                  aria-label="Конец периода акта сверки"
+                />
+              </label>
+              <button
+                type="button"
+                className="counterparty-detail-page__reconciliation-pdf"
+                onClick={downloadReconciliationPdf}
+                disabled={reconciliationPdfLoading}
+              >
+                {reconciliationPdfLoading
+                  ? "Формирование…"
+                  : "Скачать акт сверки (PDF)"}
+              </button>
             </div>
 
             <div className="counterparty-detail-page__operations-toolbar">
@@ -328,7 +447,7 @@ const CounterpartyDetail = () => {
               <button
                 type="button"
                 className="counterparty-detail-page__refresh-btn"
-                onClick={loadOperations}
+                onClick={() => loadOperations()}
                 disabled={loadingOperations}
               >
                 {loadingOperations ? "Загрузка…" : "Обновить"}
@@ -352,10 +471,11 @@ const CounterpartyDetail = () => {
                 <table className="counterparty-detail-page__table">
                   <thead>
                     <tr>
-                      <th>Тип</th>
+                      <th>{hasUnifiedOperations ? "Источник" : "Тип"}</th>
                       <th>Номер</th>
                       <th>Дата</th>
                       <th>Сумма</th>
+                      {hasUnifiedOperations && <th>Изменение долга</th>}
                       <th>Категория</th>
                       <th>Статус</th>
                       <th>Комментарий</th>
@@ -364,13 +484,18 @@ const CounterpartyDetail = () => {
                   <tbody>
                     {operationRows.map((row) => (
                       <tr key={row.id || Math.random()}>
-                        <td>{docTypeLabel(row.doc_type)}</td>
-                        <td>{row.number ?? "—"}</td>
-                        <td>{fmtDate(row.date ?? row.created_at)}</td>
+                        <td>{sourceLabel(row)}</td>
+                        <td>{row.number ?? row.document?.number ?? "—"}</td>
+                        <td>{fmtDate(row.date ?? row.created_at ?? row.document?.date)}</td>
                         <td>{fmtMoney(row.amount)}</td>
-                        <td>{row.payment_category_title ?? "—"}</td>
-                        <td>{statusLabel(row.status)}</td>
-                        <td>{row.comment ?? "—"}</td>
+                        {hasUnifiedOperations && (
+                          <td className="counterparty-detail-page__debt-delta">
+                            {debtDeltaLabel(row)}
+                          </td>
+                        )}
+                        <td>{row.payment_category_title ?? row.document?.payment_category_title ?? "—"}</td>
+                        <td>{statusLabel(row.status ?? row.document?.status)}</td>
+                        <td>{row.comment ?? row.document?.comment ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -398,12 +523,22 @@ const CounterpartyDetail = () => {
                     <div className="counterparty-detail-page__card-body">
                       <div className="counterparty-detail-page__card-row">
                         <span className="counterparty-detail-page__card-label">
-                          Тип
+                          {hasUnifiedOperations ? "Источник" : "Тип"}
                         </span>
                         <span className="counterparty-detail-page__card-value">
-                          {docTypeLabel(row.doc_type)}
+                          {sourceLabel(row)}
                         </span>
                       </div>
+                      {hasUnifiedOperations && debtDeltaLabel(row) !== "—" && (
+                        <div className="counterparty-detail-page__card-row">
+                          <span className="counterparty-detail-page__card-label">
+                            Изменение долга
+                          </span>
+                          <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--debt-delta">
+                            {debtDeltaLabel(row)}
+                          </span>
+                        </div>
+                      )}
                       <div className="counterparty-detail-page__card-row">
                         <span className="counterparty-detail-page__card-label">
                           Дата

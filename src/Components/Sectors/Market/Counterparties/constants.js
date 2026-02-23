@@ -8,6 +8,24 @@ export const VIEW_MODES = {
   CARDS: "cards",
 };
 
+/** Вкладки по типу контрагента: клиент / поставщик */
+export const TYPE_TABS = {
+  CLIENT: "client",
+  SUPPLIER: "supplier",
+};
+
+export const TYPE_TAB_LABELS = {
+  [TYPE_TABS.CLIENT]: "Клиент",
+  [TYPE_TABS.SUPPLIER]: "Поставщик",
+};
+
+/** Типы контрагента в API */
+export const COUNTERPARTY_TYPES = {
+  CLIENT: "CLIENT",
+  SUPPLIER: "SUPPLIER",
+  BOTH: "BOTH",
+};
+
 export const getInitialViewMode = () => {
   if (typeof window === "undefined") return VIEW_MODES.TABLE;
   const saved = localStorage.getItem(STORAGE_KEY);

@@ -29,6 +29,8 @@ const BarcodePrintTab = ({
   onPageChange,
 }) => {
   const [printingIds, setPrintingIds] = useState(() => new Set());
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [isBatchPrinting, setIsBatchPrinting] = useState(false);
   const [isPrinterConnected, setIsPrinterConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
@@ -294,6 +296,36 @@ const BarcodePrintTab = ({
     });
   }, [products, searchTerm]);
 
+  // выбранные товары с штрих-кодом (для массовой печати)
+  const selectedWithBarcode = useMemo(() => {
+    return filteredProducts.filter(
+      (p) => selectedIds.has(p.id) && String(p.barcode || "").trim()
+    );
+  }, [filteredProducts, selectedIds]);
+
+  const toggleSelection = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllOnPage = useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      filteredProducts.forEach((p) => {
+        if (String(p.barcode || "").trim()) next.add(p.id);
+      });
+      return next;
+    });
+  }, [filteredProducts]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
   const handleConnectPrinter = async () => {
     try {
       setIsConnecting(true);
@@ -393,6 +425,93 @@ const BarcodePrintTab = ({
       });
     }
   };
+
+  const handlePrintSelected = useCallback(async () => {
+    if (selectedWithBarcode.length === 0 || !isPrinterConnected) return;
+
+    const { widthMm, heightMm } = currentLabel;
+    const gapTitle = Math.max(0, Math.round(gapAfterTitle));
+    const gapPrice = Math.max(0, Math.round(gapAfterPrice));
+    const barcodeRaiseDots = Math.max(0, Math.round(barcodeRaise));
+    const lineGapDots = Math.max(1, Math.round(lineGap));
+    const textScaleForPrint = Math.max(1, Math.round(textScaleValue));
+    const barcodeHeightDots = Math.max(1, Math.round(barcodeHeight));
+    const barcodeBarWidthDots = Math.max(1, Math.round(barcodeBarWidth));
+
+    setIsBatchPrinting(true);
+    setPrintingIds((prev) => {
+      const next = new Set(prev);
+      selectedWithBarcode.forEach((p) => next.add(p.id));
+      return next;
+    });
+
+    let printed = 0;
+    const total = selectedWithBarcode.length;
+
+    try {
+      for (const product of selectedWithBarcode) {
+        await printXp365bBarcodeLabel({
+          barcode: String(product.barcode),
+          title: product.name || "Товар",
+          price: product.price,
+          widthMm,
+          heightMm,
+          gapAfterTitle: gapTitle,
+          gapAfterPrice: gapPrice,
+          barcodeRaise: barcodeRaiseDots,
+          lineGap: lineGapDots,
+          textScale: textScaleForPrint,
+          fontId,
+          barcodeHeight: barcodeHeightDots,
+          barcodeBarWidth: barcodeBarWidthDots,
+        });
+        printed += 1;
+        setPrintingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(product.id);
+          return next;
+        });
+      }
+
+      const connected = await checkXp365bConnection();
+      setIsPrinterConnected(connected);
+      setSelectedIds(new Set());
+      if (printed === total) {
+        alert(`Напечатано этикеток: ${printed}`);
+      }
+    } catch (error) {
+      console.error("Ошибка при массовой печати:", error);
+      const connected = await checkXp365bConnection();
+      setIsPrinterConnected(connected);
+      const msg = String(error?.message || "");
+      let errorMessage = "Не удалось отправить данные на принтер";
+      if (msg.includes("WebUSB")) {
+        errorMessage = "Браузер не поддерживает WebUSB. Используйте Chrome или Edge.";
+      } else if (msg.includes("не найден") || msg.includes("не найдено")) {
+        errorMessage = "Принтер не подключен. Подключите принтер XP-365B и попробуйте снова.";
+      } else if (msg) errorMessage = msg;
+      alert(`${errorMessage}\nНапечатано до ошибки: ${printed} из ${total}`);
+    } finally {
+      setIsBatchPrinting(false);
+      setPrintingIds((prev) => {
+        const next = new Set(prev);
+        selectedWithBarcode.forEach((p) => next.delete(p.id));
+        return next;
+      });
+    }
+  }, [
+    selectedWithBarcode,
+    isPrinterConnected,
+    currentLabel,
+    gapAfterTitle,
+    gapAfterPrice,
+    barcodeRaise,
+    lineGap,
+    textScaleValue,
+    barcodeHeight,
+    barcodeBarWidth,
+    fontId,
+  ]);
 
   // Генерация визуализации штрих-кода для предпросмотра
   useEffect(() => {
@@ -521,13 +640,94 @@ const BarcodePrintTab = ({
           </div>
         ) : (
           <>
+            <div className="barcode-print-tab__selection-bar">
+              <span className="barcode-print-tab__selection-count">
+                Выбрано: {selectedIds.size}
+                {selectedWithBarcode.length < selectedIds.size && selectedIds.size > 0 && (
+                  <span className="barcode-print-tab__selection-hint">
+                    {" "}(с штрих-кодом: {selectedWithBarcode.length})
+                  </span>
+                )}
+              </span>
+              <div className="barcode-print-tab__selection-actions">
+                <button
+                  type="button"
+                  className="barcode-print-tab__selection-btn"
+                  onClick={selectAllOnPage}
+                  disabled={isBatchPrinting || filteredProducts.length === 0}
+                >
+                  Выбрать все на странице
+                </button>
+                <button
+                  type="button"
+                  className="barcode-print-tab__selection-btn"
+                  onClick={clearSelection}
+                  disabled={selectedIds.size === 0 || isBatchPrinting}
+                >
+                  Снять выбор
+                </button>
+                <button
+                  type="button"
+                  className="barcode-print-tab__batch-print-btn"
+                  onClick={handlePrintSelected}
+                  disabled={
+                    isBatchPrinting ||
+                    !isPrinterConnected ||
+                    selectedWithBarcode.length === 0
+                  }
+                  title={
+                    !isPrinterConnected
+                      ? "Подключите принтер"
+                      : selectedWithBarcode.length === 0
+                      ? "Выберите товары с штрих-кодом"
+                      : `Распечатать ${selectedWithBarcode.length} этикеток`
+                  }
+                >
+                  {isBatchPrinting ? (
+                    <>
+                      <span className="barcode-print-tab__spinner" />
+                      Печать...
+                    </>
+                  ) : (
+                    <>
+                      <span className="barcode-print-tab__print-icon">🖨️</span>
+                      Печать выбранных ({selectedWithBarcode.length})
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
             <div className="barcode-print-tab__grid">
               {filteredProducts.map((product) => {
                 const isItemPrinting = printingIds.has(product.id);
+                const hasBarcode = Boolean(String(product.barcode || "").trim());
+                const isSelected = selectedIds.has(product.id);
 
                 return (
-                  <div key={product.id} className="barcode-print-tab__card">
+                  <div
+                    key={product.id}
+                    className={`barcode-print-tab__card ${
+                      isSelected ? "barcode-print-tab__card--selected" : ""
+                    }`}
+                  >
                     <div className="barcode-print-tab__card-header">
+                      <label className="barcode-print-tab__card-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(product.id)}
+                          disabled={!hasBarcode || isBatchPrinting}
+                          title={
+                            !hasBarcode
+                              ? "У товара нет штрих-кода"
+                              : "Выбрать для печати"
+                          }
+                        />
+                        <span className="barcode-print-tab__card-checkbox-label">
+                          В печать
+                        </span>
+                      </label>
                       <div className="barcode-print-tab__barcode-label">Штрих-код:</div>
                       <div className="barcode-print-tab__barcode-value">
                         {product.barcode || "—"}
@@ -538,9 +738,9 @@ const BarcodePrintTab = ({
                       <button
                         className="barcode-print-tab__print-btn"
                         onClick={() => handleOpenPreview(product)}
-                        disabled={!product.barcode || isItemPrinting}
+                        disabled={!hasBarcode || isItemPrinting}
                         title={
-                          !product.barcode
+                          !hasBarcode
                             ? "У товара отсутствует штрих-код"
                             : isItemPrinting
                             ? "Идёт печать..."
