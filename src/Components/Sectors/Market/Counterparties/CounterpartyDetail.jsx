@@ -41,10 +41,15 @@ const CounterpartyDetail = () => {
   const company = useSelector((state) => state.user.company);
 
   /** Операции: при include_debts=1 API возвращает { money, debt_operations, operations } (API 5.3). */
-  const [operations, setOperations] = useState({ results: [], debt_operations: [], money: [] });
+  const [operations, setOperations] = useState({
+    results: [],
+    debt_operations: [],
+    money: [],
+  });
   const [loadingOperations, setLoadingOperations] = useState(true);
   const [errorOperations, setErrorOperations] = useState("");
-  const [reconciliationPdfLoading, setReconciliationPdfLoading] = useState(false);
+  const [reconciliationPdfLoading, setReconciliationPdfLoading] =
+    useState(false);
   const [reconciliationStart, setReconciliationStart] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
@@ -152,7 +157,8 @@ const CounterpartyDetail = () => {
   /** Скачать акт сверки (PDF через ReconciliationPdfDocument). Использует выбранные даты. */
   const downloadReconciliationPdf = useCallback(async () => {
     if (!id) return;
-    const startStr = reconciliationStart || new Date().toISOString().slice(0, 10);
+    const startStr =
+      reconciliationStart || new Date().toISOString().slice(0, 10);
     const endStr = reconciliationEnd || new Date().toISOString().slice(0, 10);
     setReconciliationPdfLoading(true);
     const params = {
@@ -228,7 +234,10 @@ const CounterpartyDetail = () => {
       ? "Расход"
       : docType ?? "—";
   const sourceLabel = (row) => {
-    if (row.source != null) return row.source === "money" ? "Денежный документ" : "Складской документ (долг)";
+    if (row.source != null)
+      return row.source === "money"
+        ? "Денежный документ"
+        : "Складской документ (долг)";
     if (row.doc_type) return docTypeLabel(row.doc_type);
     return "—";
   };
@@ -277,11 +286,12 @@ const CounterpartyDetail = () => {
           <ArrowLeft size={20} /> Назад
         </button>
         <h1 className="counterparty-detail-page__title">Контрагент: {name}</h1>
-        {showAgentBlock(profile) && (current?.agent || current?.agent_display) && (
-          <p className="counterparty-detail-page__agent">
-            Привязан к агенту: {getAgentDisplay(current)}
-          </p>
-        )}
+        {showAgentBlock(profile) &&
+          (current?.agent || current?.agent_display) && (
+            <p className="counterparty-detail-page__agent">
+              Привязан к агенту: {getAgentDisplay(current)}
+            </p>
+          )}
       </header>
 
       <div className="counterparty-detail-page__body">
@@ -338,7 +348,9 @@ const CounterpartyDetail = () => {
 
             <div className="counterparty-detail-page__reconciliation-block">
               <label className="counterparty-detail-page__reconciliation-label">
-                <span className="counterparty-detail-page__reconciliation-label-text">Дата с</span>
+                <span className="counterparty-detail-page__reconciliation-label-text">
+                  Дата с
+                </span>
                 <input
                   type="date"
                   value={reconciliationStart}
@@ -348,7 +360,9 @@ const CounterpartyDetail = () => {
                 />
               </label>
               <label className="counterparty-detail-page__reconciliation-label">
-                <span className="counterparty-detail-page__reconciliation-label-text">Дата по</span>
+                <span className="counterparty-detail-page__reconciliation-label-text">
+                  Дата по
+                </span>
                 <input
                   type="date"
                   value={reconciliationEnd}
@@ -492,15 +506,25 @@ const CounterpartyDetail = () => {
                       <tr key={row.id || Math.random()}>
                         <td>{sourceLabel(row)}</td>
                         <td>{row.number ?? row.document?.number ?? "—"}</td>
-                        <td>{fmtDate(row.date ?? row.created_at ?? row.document?.date)}</td>
+                        <td>
+                          {fmtDate(
+                            row.date ?? row.created_at ?? row.document?.date
+                          )}
+                        </td>
                         <td>{fmtMoney(row.amount)}</td>
                         {hasUnifiedOperations && (
                           <td className="counterparty-detail-page__debt-delta">
                             {debtDeltaLabel(row)}
                           </td>
                         )}
-                        <td>{row.payment_category_title ?? row.document?.payment_category_title ?? "—"}</td>
-                        <td>{statusLabel(row.status ?? row.document?.status)}</td>
+                        <td>
+                          {row.payment_category_title ??
+                            row.document?.payment_category_title ??
+                            "—"}
+                        </td>
+                        <td>
+                          {statusLabel(row.status ?? row.document?.status)}
+                        </td>
                         <td>{row.comment ?? row.document?.comment ?? "—"}</td>
                       </tr>
                     ))}

@@ -1,5 +1,4 @@
 import JsBarcode from "jsbarcode";
-import iconv from "iconv-lite";
 
 /**
  * XPrinter XP-350B / XP-365B — TSPL • 203 DPI
@@ -74,7 +73,7 @@ export function getXp365bCodepage() {
 export function setXp365bCodepage(cp) {
   try {
     localStorage.setItem(LS_CODEPAGE, String(cp));
-  } catch { }
+  } catch {}
 }
 
 function getTsplCodepageToken() {
@@ -88,7 +87,9 @@ function getTsplCodepageToken() {
 
 function getOrientation() {
   try {
-    const v = String(localStorage.getItem(LS_ORIENTATION) || "").trim().toLowerCase();
+    const v = String(localStorage.getItem(LS_ORIENTATION) || "")
+      .trim()
+      .toLowerCase();
     return v === "rotated" ? "rotated" : DEFAULT_ORIENTATION;
   } catch {
     return DEFAULT_ORIENTATION;
@@ -97,28 +98,35 @@ function getOrientation() {
 
 export function setXp365bOrientation(v) {
   try {
-    localStorage.setItem(LS_ORIENTATION, v === "rotated" ? "rotated" : "normal");
-  } catch { }
+    localStorage.setItem(
+      LS_ORIENTATION,
+      v === "rotated" ? "rotated" : "normal"
+    );
+  } catch {}
 }
 
 function getRenderMode(requested) {
   if (requested === "raster" || requested === "tspl") return requested;
   try {
-    const raw = String(localStorage.getItem(LS_RENDER_MODE) || "").trim().toLowerCase();
+    const raw = String(localStorage.getItem(LS_RENDER_MODE) || "")
+      .trim()
+      .toLowerCase();
     if (raw === "raster" || raw === "tspl") return raw;
-  } catch { }
+  } catch {}
   return DEFAULT_RENDER_MODE;
 }
 
 export function setXp365bRenderMode(mode) {
   try {
     localStorage.setItem(LS_RENDER_MODE, mode === "tspl" ? "tspl" : "raster");
-  } catch { }
+  } catch {}
 }
 
 function getRasterFontFamily() {
   try {
-    const raw = String(localStorage.getItem(RASTER_FONT_FAMILY_LS) || "").trim();
+    const raw = String(
+      localStorage.getItem(RASTER_FONT_FAMILY_LS) || ""
+    ).trim();
     return raw || "Arial";
   } catch {
     return "Arial";
@@ -128,14 +136,16 @@ function getRasterFontFamily() {
 export function setXp365bRasterFontFamily(name) {
   try {
     localStorage.setItem(RASTER_FONT_FAMILY_LS, String(name || "Arial"));
-  } catch { }
+  } catch {}
 }
 
 function getRasterInvert() {
   try {
-    const raw = String(localStorage.getItem(RASTER_INVERT_LS) || "").trim().toLowerCase();
+    const raw = String(localStorage.getItem(RASTER_INVERT_LS) || "")
+      .trim()
+      .toLowerCase();
     if (raw === "0" || raw === "false" || raw === "no") return false;
-  } catch { }
+  } catch {}
   // Default to true because many TSPL firmwares treat 0 as black.
   return true;
 }
@@ -143,7 +153,7 @@ function getRasterInvert() {
 export function setXp365bRasterInvert(v) {
   try {
     localStorage.setItem(RASTER_INVERT_LS, v ? "true" : "false");
-  } catch { }
+  } catch {}
 }
 
 /* ====================== ENCODING: CP866 / CP1251 / PC936 (GBK) ====================== */
@@ -179,9 +189,24 @@ function encodeCP1251(str = "") {
   return new Uint8Array(out);
 }
 
+/**
+ * Encode string to GBK (CP936) for browser. Uses native TextEncoder('gbk') when
+ * available (e.g. Chrome on Windows), otherwise falls back to ASCII + ? for non-ASCII.
+ */
 function encodeGBK(str = "") {
-  const buf = iconv.encode(String(str), "gbk");
-  return new Uint8Array(buf);
+  const s = String(str);
+  try {
+    const enc = new TextEncoder("gbk");
+    return new Uint8Array(enc.encode(s));
+  } catch {
+    // Fallback: ASCII as-is, other code points as 0x3f (?) for browser compatibility
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) {
+      const c = s.codePointAt(i);
+      out[i] = c <= 0x7f ? c : 0x3f;
+    }
+    return out;
+  }
 }
 
 function encodeForPrinter(str = "") {
@@ -205,7 +230,7 @@ async function requestUsbDevice() {
 
 async function openUsbDevice(dev) {
   await dev.open();
-  if (!dev.configuration) await dev.selectConfiguration(1).catch(() => { });
+  if (!dev.configuration) await dev.selectConfiguration(1).catch(() => {});
 
   const cfg = dev.configuration;
   if (!cfg) throw new Error("Нет активной USB-конфигурации");
@@ -232,7 +257,7 @@ async function openUsbDevice(dev) {
       } catch {
         try {
           await dev.releaseInterface(intf.interfaceNumber);
-        } catch { }
+        } catch {}
         continue;
       }
 
@@ -244,7 +269,9 @@ async function openUsbDevice(dev) {
   }
 
   if (outEP == null || intfNum == null) {
-    throw new Error("Bulk OUT endpoint не найден (проверь WinUSB/Zadig и что принтер не занят)");
+    throw new Error(
+      "Bulk OUT endpoint не найден (проверь WinUSB/Zadig и что принтер не занят)"
+    );
   }
 
   usbState.dev = dev;
@@ -304,7 +331,7 @@ async function initPrinter() {
 export async function connectXprinter() {
   if (usbState.dev && usbState.outEP != null && usbState.dev.opened) {
     // Re-apply settings to avoid "random" codepage after power cycle
-    await initPrinter().catch(() => { });
+    await initPrinter().catch(() => {});
     return;
   }
 
@@ -321,7 +348,8 @@ export function attachXp365bUsbListenersOnce() {
   if (usbListenersAttached) return;
   usbListenersAttached = true;
 
-  if (typeof navigator === "undefined" || !navigator.usb?.addEventListener) return;
+  if (typeof navigator === "undefined" || !navigator.usb?.addEventListener)
+    return;
 
   navigator.usb.addEventListener("disconnect", (event) => {
     if (usbState.dev && event?.device === usbState.dev) {
@@ -436,7 +464,8 @@ function drawFullWidthText(
     size = Math.max(6, Math.floor(size * 0.9));
   }
 
-  const gap = str.length > 1 ? Math.max(0, (width - totalWidth) / (str.length - 1)) : 0;
+  const gap =
+    str.length > 1 ? Math.max(0, (width - totalWidth) / (str.length - 1)) : 0;
   let cursor = x;
   for (let i = 0; i < str.length; i += 1) {
     ctx.fillText(str[i], cursor, y);
@@ -492,8 +521,13 @@ function normalizeBarcode(raw) {
     if (code) return { code, format: "EAN13" };
   }
   // Любая другая длина (1–6, 9, 14+ цифр) — CODE128
-  if (digits.length >= 1 && digits.length <= 32) return { code: digits, format: "CODE128" };
-  throw new Error("Штрих-код слишком длинный (макс. 32 символа для CODE128). Сейчас: " + digits.length + " цифр.");
+  if (digits.length >= 1 && digits.length <= 32)
+    return { code: digits, format: "CODE128" };
+  throw new Error(
+    "Штрих-код слишком длинный (макс. 32 символа для CODE128). Сейчас: " +
+      digits.length +
+      " цифр."
+  );
 }
 
 function buildLabel({
@@ -608,14 +642,21 @@ function buildLabel({
   const priceBlockHeight = priceText ? gapAfterTitleDots + lineGapDots : 0;
   const gapToBarcode = priceText ? gapAfterPriceDots : gapAfterTitleDots;
   const barcodeBottomGap = 2;
-  const barcodeBlockHeight = gapToBarcode + barcodeHeightDots + barcodeBottomGap;
+  const barcodeBlockHeight =
+    gapToBarcode + barcodeHeightDots + barcodeBottomGap;
   const contentHeight = textBlockHeight + priceBlockHeight + barcodeBlockHeight;
   const startY = safeTop + Math.max(0, Math.round((safeH - contentHeight) / 2));
 
   const titleY = startY;
-  const desiredPriceY = priceText ? titleY + textBlockHeight + gapAfterTitleDots : null;
+  const desiredPriceY = priceText
+    ? titleY + textBlockHeight + gapAfterTitleDots
+    : null;
   const desiredBarcodeY =
-    titleY + textBlockHeight + priceBlockHeight + gapToBarcode - barcodeRaiseDots;
+    titleY +
+    textBlockHeight +
+    priceBlockHeight +
+    gapToBarcode -
+    barcodeRaiseDots;
 
   const maxBarcodeY = safeTop + safeH - barcodeHeightDots - barcodeBottomGap;
   const bcY = Math.min(desiredBarcodeY, maxBarcodeY);
@@ -634,7 +675,9 @@ function buildLabel({
   );
   const barcodeShiftX = Math.round(W * 0.03);
   // Barcode centered, then shifted a bit left
-  const bcX = sx(Math.max(0, Math.round((W - barcodeWidthDots) / 2) - barcodeShiftX));
+  const bcX = sx(
+    Math.max(0, Math.round((W - barcodeWidthDots) / 2) - barcodeShiftX)
+  );
 
   const narrow = barcodeBarWidthDots;
   const wide = barcodeBarWidthDots;
@@ -650,15 +693,21 @@ function buildLabel({
     "CLS",
     `CODEPAGE ${getTsplCodepageToken()}`,
     ...border,
-    `TEXT ${titleX1},${titleY},"${font}",0,${textScaleInt},${textScaleInt},"${lines[0] || ""}"`,
+    `TEXT ${titleX1},${titleY},"${font}",0,${textScaleInt},${textScaleInt},"${
+      lines[0] || ""
+    }"`,
     lines[1]
-      ? `TEXT ${titleX2},${titleY + lineGapDots},"${font}",0,${textScaleInt},${textScaleInt},"${lines[1]}"`
+      ? `TEXT ${titleX2},${
+          titleY + lineGapDots
+        },"${font}",0,${textScaleInt},${textScaleInt},"${lines[1]}"`
       : "",
     priceText && priceY != null
       ? `TEXT ${priceX},${priceY},"${font}",0,${textScaleInt},${textScaleInt},"${priceText}"`
       : "",
     priceText && priceY != null
-      ? `TEXT ${priceX + 1},${priceY},"${font}",0,${textScaleInt},${textScaleInt},"${priceText}"`
+      ? `TEXT ${
+          priceX + 1
+        },${priceY},"${font}",0,${textScaleInt},${textScaleInt},"${priceText}"`
       : "",
     `BARCODE ${bcX},${bcY},"${tsplBcType}",${barcodeHeightDots},1,0,${narrow},${wide},"${code}"`,
     "PRINT 1",
@@ -696,7 +745,7 @@ function canvasToMonoRaster(canvas, threshold = 180, invert = false) {
   }
   if (invert) {
     for (let i = 0; i < raster.length; i += 1) {
-      raster[i] = (~raster[i]) & 0xff;
+      raster[i] = ~raster[i] & 0xff;
     }
   }
   return { raster, bytesPerLine, width: w, height: h };
@@ -820,12 +869,21 @@ async function buildRasterLabelBytes({
     ctx.fillText(line, textX, titleY + i * lineGapDots);
   });
 
-  const desiredPriceY = priceText ? titleY + textBlockHeight + gapAfterTitleDots : null;
+  const desiredPriceY = priceText
+    ? titleY + textBlockHeight + gapAfterTitleDots
+    : null;
   const desiredBarcodeY =
-    titleY + textBlockHeight + priceBlockHeight + gapToBarcode - barcodeRaiseDots;
+    titleY +
+    textBlockHeight +
+    priceBlockHeight +
+    gapToBarcode -
+    barcodeRaiseDots;
 
   const maxBarcodeY =
-    safeTop + safeH - (barcodeHeightDots + barcodeTextHeight) - barcodeBottomGap;
+    safeTop +
+    safeH -
+    (barcodeHeightDots + barcodeTextHeight) -
+    barcodeBottomGap;
   const bcY = Math.min(desiredBarcodeY, maxBarcodeY);
 
   const maxPriceY = bcY - gapAfterPriceDots - lineGapDots;
@@ -852,7 +910,10 @@ async function buildRasterLabelBytes({
   });
 
   const barcodeShiftX = Math.round(W * 0.03);
-  const bcX = Math.max(0, Math.round((W - barcodeCanvas.width) / 2) - barcodeShiftX);
+  const bcX = Math.max(
+    0,
+    Math.round((W - barcodeCanvas.width) / 2) - barcodeShiftX
+  );
   ctx.drawImage(barcodeCanvas, bcX, bcY);
   // make bars a bit bolder
   ctx.drawImage(barcodeCanvas, bcX + 1, bcY);
@@ -891,7 +952,9 @@ async function buildRasterLabelBytes({
 
   const headerBytes = bytesFromAscii(header);
   const footerBytes = bytesFromAscii(footer);
-  const total = new Uint8Array(headerBytes.length + raster.length + footerBytes.length);
+  const total = new Uint8Array(
+    headerBytes.length + raster.length + footerBytes.length
+  );
   total.set(headerBytes, 0);
   total.set(raster, headerBytes.length);
   total.set(footerBytes, headerBytes.length + raster.length);
