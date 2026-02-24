@@ -681,26 +681,7 @@ const CreateSaleDocument = () => {
     return all;
   }, [counterparties, docType]);
 
-  const agents = useMemo(() => {
-    const list = Array.isArray(employees) ? employees : [];
-    return list
-      .filter((e) => {
-        const role =
-          e?.role_display ??
-          e?.role_name ??
-          e?.role ??
-          e?.position ??
-          e?.post ??
-          "";
-        return String(role).trim() === "Агент" && filteredCounterparties.some((c) => c.agent === e.id);
-      })
-      .sort((a, b) =>
-        String(a?.full_name || a?.name || a?.email || "").localeCompare(
-          String(b?.full_name || b?.name || b?.email || ""),
-          "ru"
-        )
-      );
-  }, [employees, filteredCounterparties]);
+  const isAgentFilterRelevant = docType === "SALE" || docType === "SALE_RETURN";
 
   const getCounterpartyAgentId = (cp) => {
     const a = cp?.agent;
@@ -712,11 +693,41 @@ const CreateSaleDocument = () => {
     return String(a);
   };
 
+  const agents = useMemo(() => {
+    const list = Array.isArray(employees) ? employees : [];
+    const baseAgents = list.filter((e) => {
+      const role =
+        e?.role_display ??
+        e?.role_name ??
+        e?.role ??
+        e?.position ??
+        e?.post ??
+        "";
+      return String(role).trim() === "Агент";
+    });
+
+    const filteredAgents = isAgentFilterRelevant
+      ? baseAgents.filter((e) =>
+          filteredCounterparties.some(
+            (c) => getCounterpartyAgentId(c) === String(e?.id ?? "")
+          )
+        )
+      : baseAgents;
+
+    return filteredAgents.sort((a, b) =>
+      String(a?.full_name || a?.name || a?.email || "").localeCompare(
+        String(b?.full_name || b?.name || b?.email || ""),
+        "ru"
+      )
+    );
+  }, [employees, filteredCounterparties, isAgentFilterRelevant]);
+
   const counterpartyOptions = useMemo(() => {
     const list = Array.isArray(filteredCounterparties)
       ? filteredCounterparties
       : [];
-    const agentKey = agentId ? String(agentId) : "";
+    const agentKey =
+      isAgentFilterRelevant && agentId ? String(agentId) : "";
     const filtered =
       agentKey.trim() === ""
         ? list
@@ -733,7 +744,7 @@ const CreateSaleDocument = () => {
         searchText: `${cp.name || ""} ${cp.full_name || ""} ${cp.title || ""
           } ${cp.phone || ""} ${cp.inn || ""}`.trim(),
       }));
-  }, [filteredCounterparties, agentId]);
+  }, [filteredCounterparties, agentId, isAgentFilterRelevant]);
 
   const agentOptions = useMemo(() => {
     return (Array.isArray(agents) ? agents : []).map((a) => ({
