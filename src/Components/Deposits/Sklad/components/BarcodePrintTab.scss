@@ -81,6 +81,22 @@
     }
   }
 
+  &__copies-input {
+    width: 90px;
+    padding: 8px 10px;
+    border: 1px solid #d6d6d6;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    transition: all 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: $color-primary;
+      box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.12);
+    }
+  }
+
   &__printer-status {
     display: flex;
     align-items: center;

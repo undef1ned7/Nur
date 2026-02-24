@@ -28,6 +28,18 @@ const DEFAULT_ORIENTATION = "normal";
 const DEFAULT_RENDER_MODE = "raster";
 const DEFAULT_FONT_ID = "1";
 
+// Базовые настройки под этикетку 30x20 (203dpi ~ 8 dots/mm).
+// На более крупных размерах эти значения должны масштабироваться,
+// иначе рамка растёт, а текст остаётся мелким.
+const DEFAULT_LABEL_PRESET = {
+  lineGap: 22,
+  gapAfterTitle: 7,
+  gapAfterPrice: 4,
+  barcodeRaise: 3,
+  barcodeHeight: 44,
+  barcodeBarWidth: 2,
+};
+
 /* ====================== USB STATE ====================== */
 
 const usbState = {
@@ -534,6 +546,7 @@ function buildLabel({
   title,
   barcode,
   price,
+  copies = 1,
   widthMm = 30,
   heightMm = 20,
   gapMm = 2,
@@ -681,6 +694,7 @@ function buildLabel({
 
   const narrow = barcodeBarWidthDots;
   const wide = barcodeBarWidthDots;
+  const copiesInt = Math.max(1, Math.min(100, Math.round(Number(copies) || 1)));
 
   return [
     `SIZE ${w} mm,${h} mm`,
@@ -710,7 +724,7 @@ function buildLabel({
         },${priceY},"${font}",0,${textScaleInt},${textScaleInt},"${priceText}"`
       : "",
     `BARCODE ${bcX},${bcY},"${tsplBcType}",${barcodeHeightDots},1,0,${narrow},${wide},"${code}"`,
-    "PRINT 1",
+    `PRINT ${copiesInt}`,
     "\r\n",
   ]
     .filter(Boolean)
@@ -755,6 +769,7 @@ async function buildRasterLabelBytes({
   title,
   barcode,
   price,
+  copies = 1,
   widthMm = 30,
   heightMm = 20,
   gapMm = 2,
@@ -948,7 +963,8 @@ async function buildRasterLabelBytes({
     "CLS",
     `BITMAP 0,0,${bytesPerLine},${height},0,`,
   ].join("\r\n");
-  const footer = "\r\nPRINT 1\r\n";
+  const copiesInt = Math.max(1, Math.min(100, Math.round(Number(copies) || 1)));
+  const footer = `\r\nPRINT ${copiesInt}\r\n`;
 
   const headerBytes = bytesFromAscii(header);
   const footerBytes = bytesFromAscii(footer);
@@ -964,12 +980,40 @@ async function buildRasterLabelBytes({
 /* ====================== MAIN API ====================== */
 
 export async function printXp365bBarcodeLabel(opts) {
-  const options = opts || {};
+  const options = { ...(opts || {}) };
   await connectXprinter();
 
   const mode = getRenderMode(options?.renderMode);
   const fontId = String(options?.fontId || "");
   const preferRaster = mode === "raster" || fontId === "__RASTER__";
+  const copies = Math.max(1, Math.min(100, Math.round(Number(options?.copies) || 1)));
+  options.copies = copies;
+
+  // Auto-scale defaults by label size if caller didn't pass tuning params.
+  // Goal: on bigger labels not only border/geometry grows, but fonts too.
+  const heightMm = Number(options?.heightMm || 20);
+  const factor = Math.max(0.75, (Number.isFinite(heightMm) ? heightMm : 20) / 20);
+  const scaled = (v) => Math.round(Number(v || 0) * factor);
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+  if (options.lineGap == null)
+    options.lineGap = clamp(scaled(DEFAULT_LABEL_PRESET.lineGap), 16, 64);
+  if (options.gapAfterTitle == null)
+    options.gapAfterTitle = clamp(scaled(DEFAULT_LABEL_PRESET.gapAfterTitle), 0, 40);
+  if (options.gapAfterPrice == null)
+    options.gapAfterPrice = clamp(scaled(DEFAULT_LABEL_PRESET.gapAfterPrice), 0, 40);
+  if (options.barcodeRaise == null)
+    options.barcodeRaise = clamp(scaled(DEFAULT_LABEL_PRESET.barcodeRaise), 0, 40);
+  if (options.barcodeHeight == null)
+    options.barcodeHeight = clamp(scaled(DEFAULT_LABEL_PRESET.barcodeHeight), 20, 200);
+  if (options.barcodeBarWidth == null)
+    options.barcodeBarWidth = DEFAULT_LABEL_PRESET.barcodeBarWidth;
+
+  // textScale: for TSPL it controls font size; for raster we keep it 1 by default
+  // to avoid quadratic scaling inside raster renderer.
+  if (options.textScale == null) {
+    options.textScale = preferRaster ? 1 : clamp(Math.round(factor), 1, 3);
+  }
 
   if (preferRaster) {
     const bytes = await buildRasterLabelBytes(options);

@@ -36,6 +36,7 @@ const BarcodePrintTab = ({
   const [previewProduct, setPreviewProduct] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [labelSize, setLabelSize] = useState("30x20"); // размер этикетки по умолчанию
+  const [didTouchTextScale, setDidTouchTextScale] = useState(false);
   const barcodeCanvasRef = useRef(null);
 
   // ====== Настройки/утилиты ======
@@ -46,6 +47,7 @@ const BarcodePrintTab = ({
       // Default to raster (no encoding issues)
       fontId: "__RASTER__",
       textScale: 1,
+      copies: 1,
       lineGap: 22,
       gapAfterTitle: 7,
       gapAfterPrice: 4,
@@ -59,6 +61,7 @@ const BarcodePrintTab = ({
   const {
     fontId,
     textScale,
+    copies,
     lineGap,
     gapAfterTitle,
     gapAfterPrice,
@@ -67,6 +70,7 @@ const BarcodePrintTab = ({
     barcodeBarWidth,
   } = printSettings;
   const textScaleValue = Math.max(0.5, Number(textScale) || 1);
+  const copiesValue = Math.max(1, Math.min(100, Math.round(Number(copies) || 1)));
   const availableFonts = useMemo(
     () => [
       { value: "__RASTER__", label: "Растер (без кодировок) — рекомендовано" },
@@ -110,11 +114,81 @@ const BarcodePrintTab = ({
   );
 
   const currentLabel = sizeMap[labelSize] || sizeMap["30x20"];
+  const isRasterFont = String(fontId || "") === "__RASTER__";
+
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+  const getAutoPrintSettingsBySize = useCallback(
+    ({ heightMm, fontId: currentFontId }) => {
+      // Базовая калибровка была под 30x20 и raster (lineGap=22).
+      // Для более крупных этикеток увеличиваем lineGap (а значит и fontSize в raster),
+      // и при TSPL-шрифтах увеличиваем textScale.
+      const base = defaultSettings;
+      const factor = Math.max(0.75, Number(heightMm || 20) / 20);
+      const isRaster = String(currentFontId || "") === "__RASTER__";
+
+      const scaled = (v) => Math.round(Number(v || 0) * factor);
+
+      // Для raster: textScale оставляем 1 (иначе в сервисе оно квадратично влияет на fontSize),
+      // для TSPL: textScale зависит от высоты.
+      const autoTextScale = isRaster
+        ? 1
+        : clamp(Math.round(factor), 1, 3);
+
+      return {
+        // текст
+        textScale: autoTextScale,
+        lineGap: clamp(scaled(base.lineGap), 16, 64),
+        gapAfterTitle: clamp(scaled(base.gapAfterTitle), 0, 40),
+        gapAfterPrice: clamp(scaled(base.gapAfterPrice), 0, 40),
+
+        // штрих‑код (не критично, но на больших этикетках выглядит гармоничнее)
+        barcodeRaise: clamp(scaled(base.barcodeRaise), 0, 40),
+        barcodeHeight: clamp(scaled(base.barcodeHeight), 20, 200),
+        barcodeBarWidth: base.barcodeBarWidth,
+      };
+    },
+    [defaultSettings]
+  );
+
+  // Автоматически подстраиваем параметры под выбранный размер,
+  // чтобы на больших этикетках текст реально становился крупнее.
+  useEffect(() => {
+    const { heightMm } = currentLabel;
+    setPrintSettings((prev) => {
+      const auto = getAutoPrintSettingsBySize({
+        heightMm,
+        fontId: prev.fontId,
+      });
+
+      return {
+        ...prev,
+        // lineGap и связанные интервалы всегда масштабируем по размеру
+        lineGap: auto.lineGap,
+        gapAfterTitle: auto.gapAfterTitle,
+        gapAfterPrice: auto.gapAfterPrice,
+        barcodeRaise: auto.barcodeRaise,
+        barcodeHeight: auto.barcodeHeight,
+        barcodeBarWidth: auto.barcodeBarWidth,
+
+        // textScale меняем автоматически только если пользователь сам не трогал масштаб
+        ...(didTouchTextScale ? null : { textScale: auto.textScale }),
+      };
+    });
+  }, [
+    labelSize,
+    currentLabel.heightMm,
+    getAutoPrintSettingsBySize,
+    didTouchTextScale,
+  ]);
 
   const previewLayout = useMemo(() => {
     const fontBase = fontBaseMap[Number(fontId)] ?? 6;
     const lineGapDots = Math.max(1, Math.round(lineGap));
-    const textSizeDots = Math.max(3, fontBase * textScaleValue);
+    const textScaleInt = Math.max(1, Math.round(textScaleValue));
+    const textSizeDots = isRasterFont
+      ? Math.max(8, Math.round(lineGapDots * 0.85 * textScaleInt))
+      : Math.max(3, fontBase * textScaleValue);
     const widthDots = Math.max(1, Math.round(currentLabel.widthMm * DOTS_PER_MM));
     const heightDots = Math.max(1, Math.round(currentLabel.heightMm * DOTS_PER_MM));
 
@@ -146,6 +220,7 @@ const BarcodePrintTab = ({
     textScaleValue,
     barcodeHeight,
     fontId,
+    isRasterFont,
   ]);
 
   const wrapPreviewText = (text = "", width = 16, maxLines = 2) => {
@@ -369,6 +444,7 @@ const BarcodePrintTab = ({
     const textScaleForPrint = Math.max(1, Math.round(textScaleValue));
     const barcodeHeightDots = Math.max(1, Math.round(barcodeHeight));
     const barcodeBarWidthDots = Math.max(1, Math.round(barcodeBarWidth));
+    const copiesForPrint = copiesValue;
 
     setIsPrinting(true);
     setPrintingIds((prev) => {
@@ -382,6 +458,7 @@ const BarcodePrintTab = ({
         barcode: String(previewProduct.barcode),
         title: previewProduct.name || "Товар",
         price: previewProduct.price,
+        copies: copiesForPrint,
         widthMm,
         heightMm,
         gapAfterTitle: gapTitle,
@@ -437,6 +514,7 @@ const BarcodePrintTab = ({
     const textScaleForPrint = Math.max(1, Math.round(textScaleValue));
     const barcodeHeightDots = Math.max(1, Math.round(barcodeHeight));
     const barcodeBarWidthDots = Math.max(1, Math.round(barcodeBarWidth));
+    const copiesForPrint = copiesValue;
 
     setIsBatchPrinting(true);
     setPrintingIds((prev) => {
@@ -454,6 +532,7 @@ const BarcodePrintTab = ({
           barcode: String(product.barcode),
           title: product.name || "Товар",
           price: product.price,
+          copies: copiesForPrint,
           widthMm,
           heightMm,
           gapAfterTitle: gapTitle,
@@ -477,7 +556,13 @@ const BarcodePrintTab = ({
       setIsPrinterConnected(connected);
       setSelectedIds(new Set());
       if (printed === total) {
-        alert(`Напечатано этикеток: ${printed}`);
+        const copiesN = copiesForPrint;
+        const totalLabels = printed * copiesN;
+        alert(
+          copiesN > 1
+            ? `Напечатано: ${printed} товаров × ${copiesN} копий = ${totalLabels} этикеток`
+            : `Напечатано этикеток: ${printed}`
+        );
       }
     } catch (error) {
       console.error("Ошибка при массовой печати:", error);
@@ -490,7 +575,13 @@ const BarcodePrintTab = ({
       } else if (msg.includes("не найден") || msg.includes("не найдено")) {
         errorMessage = "Принтер не подключен. Подключите принтер XP-365B и попробуйте снова.";
       } else if (msg) errorMessage = msg;
-      alert(`${errorMessage}\nНапечатано до ошибки: ${printed} из ${total}`);
+      const copiesN = copiesForPrint;
+      const totalLabels = printed * copiesN;
+      alert(
+        copiesN > 1
+          ? `${errorMessage}\nНапечатано до ошибки: ${printed} из ${total} товаров (${totalLabels} этикеток)`
+          : `${errorMessage}\nНапечатано до ошибки: ${printed} из ${total}`
+      );
     } finally {
       setIsBatchPrinting(false);
       setPrintingIds((prev) => {
@@ -503,6 +594,7 @@ const BarcodePrintTab = ({
     selectedWithBarcode,
     isPrinterConnected,
     currentLabel,
+    copiesValue,
     gapAfterTitle,
     gapAfterPrice,
     barcodeRaise,
@@ -522,8 +614,16 @@ const BarcodePrintTab = ({
     if (!barcode) return;
 
     const { scale, barcode: barcodeLayout } = previewLayout;
+    const lineGapDots = Math.max(1, Math.round(lineGap));
+    const textScaleInt = Math.max(1, Math.round(textScaleValue));
+    const autoBarcodeFontDots = isRasterFont
+      ? Math.max(8, Math.round(lineGapDots * 0.72 * textScaleInt))
+      : Math.round(10 * textScaleValue);
+    const extraBelowBarcodeDots = Math.max(18, autoBarcodeFontDots + 8);
     const barcodeCanvasWidth = Math.round(previewLayout.widthDots * scale);
-    const barcodeCanvasHeight = Math.round((barcodeLayout.height + 18) * scale);
+    const barcodeCanvasHeight = Math.round(
+      (barcodeLayout.height + extraBelowBarcodeDots) * scale
+    );
 
     canvas.width = barcodeCanvasWidth;
     canvas.height = barcodeCanvasHeight;
@@ -542,7 +642,7 @@ const BarcodePrintTab = ({
         width: barWidth,
         height: barHeight,
         displayValue: true,
-        fontSize: Math.round(10 * scale * textScaleValue),
+        fontSize: Math.round(autoBarcodeFontDots * scale),
         textMargin: Math.round(2 * scale),
         margin: 0,
         background: "transparent",
@@ -566,7 +666,9 @@ const BarcodePrintTab = ({
     previewLayout.scale,
     previewLayout.barcode.height,
     barcodeBarWidth,
+    lineGap,
     textScaleValue,
+    isRasterFont,
   ]);
 
   if (loading) {
@@ -597,12 +699,34 @@ const BarcodePrintTab = ({
               <select
                 className="barcode-print-tab__size-select"
                 value={labelSize}
-                onChange={(e) => setLabelSize(e.target.value)}
+                  onChange={(e) => {
+                    setLabelSize(e.target.value);
+                    setDidTouchTextScale(false);
+                  }}
               >
                 <option value="30x20">30×20 мм</option>
                 <option value="58x40">58×40 мм</option>
                 <option value="58x30">58×30 мм</option>
               </select>
+            </label>
+
+            <label className="barcode-print-tab__size-label">
+              Копий:
+              <input
+                className="barcode-print-tab__copies-input"
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={copiesValue}
+                onChange={(e) =>
+                  setPrintSettings((prev) => ({
+                    ...prev,
+                    copies: e.target.value,
+                  }))
+                }
+                title="Сколько раз печатать одну и ту же этикетку"
+              />
             </label>
           </div>
 
@@ -680,6 +804,8 @@ const BarcodePrintTab = ({
                       ? "Подключите принтер"
                       : selectedWithBarcode.length === 0
                       ? "Выберите товары с штрих-кодом"
+                      : copiesValue > 1
+                      ? `Распечатать ${selectedWithBarcode.length} × ${copiesValue} этикеток`
                       : `Распечатать ${selectedWithBarcode.length} этикеток`
                   }
                 >
@@ -691,7 +817,8 @@ const BarcodePrintTab = ({
                   ) : (
                     <>
                       <span className="barcode-print-tab__print-icon">🖨️</span>
-                      Печать выбранных ({selectedWithBarcode.length})
+                      Печать выбранных ({selectedWithBarcode.length}
+                      {copiesValue > 1 ? ` × ${copiesValue}` : ""})
                     </>
                   )}
                 </button>
@@ -828,18 +955,38 @@ const BarcodePrintTab = ({
                 Масштаб:
                 <select
                   value={String(textScaleValue)}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setDidTouchTextScale(true);
                     setPrintSettings((prev) => ({
                       ...prev,
                       textScale: Number(e.target.value),
-                    }))
-                  }
+                    }));
+                  }}
                   title="TSPL масштаб целочисленный. Для уменьшения — выбирайте другой шрифт."
                 >
                   <option value="1">1×</option>
                   <option value="2">2×</option>
                   <option value="3">3×</option>
                 </select>
+              </label>
+
+              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                Копий:
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={copiesValue}
+                  onChange={(e) =>
+                    setPrintSettings((prev) => ({
+                      ...prev,
+                      copies: e.target.value,
+                    }))
+                  }
+                  style={{ width: 80 }}
+                  title="Сколько раз печатать одну и ту же этикетку"
+                />
               </label>
             </div>
 
