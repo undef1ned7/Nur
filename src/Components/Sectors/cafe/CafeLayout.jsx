@@ -4,7 +4,13 @@ import { useCafeWebSocketManager } from '../../../hooks/useCafeWebSocket'
 import NotificationCafeSound from '../../common/Notification/NotificationCafeSound'
 import { useUser } from '../../../store/slices/userSlice'
 import api from '../../../api'
-import { checkPrinterConnection, parsePrinterBinding, printOrderReceiptJSONViaUSB, printViaWiFiSimple, setActivePrinterByKey } from './Orders/OrdersPrintService'
+import {
+    checkPrinterConnection,
+    parsePrinterBinding,
+    printOrderReceiptJSONViaUSB,
+    printViaWiFiSimple,
+    setActivePrinterByKey
+} from './Orders/OrdersPrintService'
 import * as logger from '../../../utils/logger'
 
 export default function CafeLayout() {
