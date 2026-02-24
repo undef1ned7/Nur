@@ -126,6 +126,37 @@ const AddWarehouseProductPage = () => {
   // Изображения товара
   const [images, setImages] = useState([]);
   const fileInputRef = useRef(null);
+  const rootRef = useRef(null);
+
+  // Отключаем подсказки/сохранение браузером (autocomplete/autosave) на инпутах
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const apply = () => {
+      // формы
+      root.querySelectorAll("form").forEach((f) => {
+        try {
+          f.setAttribute("autocomplete", "off");
+        } catch { }
+      });
+      // инпуты/текстовые поля
+      root.querySelectorAll("input, textarea").forEach((el) => {
+        try {
+          el.setAttribute("autocomplete", "off");
+          el.setAttribute("autocorrect", "off");
+          el.setAttribute("autocapitalize", "none");
+          el.setAttribute("spellcheck", "false");
+          el.setAttribute("autosave", "off");
+        } catch { }
+      });
+    };
+
+    apply();
+    const obs = new MutationObserver(() => apply());
+    obs.observe(root, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
 
   // Состояние для AlertModal
   const [alertModal, setAlertModal] = useState({
@@ -344,9 +375,9 @@ const AddWarehouseProductPage = () => {
             product_group:
               String(
                 product?.product_group?.id ??
-                  product?.product_group?.uuid ??
-                  product?.product_group ??
-                  ""
+                product?.product_group?.uuid ??
+                product?.product_group ??
+                ""
               ) || "",
             price: product.price || "",
             quantity: product.quantity || "",
@@ -406,7 +437,7 @@ const AddWarehouseProductPage = () => {
           console.error("Ошибка при загрузке товара:", error);
           showAlert(
             "Ошибка при загрузке товара: " +
-              (error.message || JSON.stringify(error)),
+            (error.message || JSON.stringify(error)),
             "error",
             "Ошибка"
           );
@@ -444,9 +475,9 @@ const AddWarehouseProductPage = () => {
         product_group:
           String(
             product?.product_group?.id ??
-              product?.product_group?.uuid ??
-              product?.product_group ??
-              ""
+            product?.product_group?.uuid ??
+            product?.product_group ??
+            ""
           ) || "",
         price: product.price || "",
         quantity: "", // Очищаем количество для нового товара
@@ -538,8 +569,8 @@ const AddWarehouseProductPage = () => {
         name === "scale_type"
           ? value
           : prevData.scale_type || productType === "piece"
-          ? "piece"
-          : "weight",
+            ? "piece"
+            : "weight",
     }));
   };
 
@@ -580,8 +611,8 @@ const AddWarehouseProductPage = () => {
     // Нормализуем наценку: если не заполнена, считаем её 0
     const normalizedMarkup =
       marketData.markup !== undefined &&
-      marketData.markup !== null &&
-      String(marketData.markup).trim() !== ""
+        marketData.markup !== null &&
+        String(marketData.markup).trim() !== ""
         ? String(marketData.markup)
         : "0";
 
@@ -714,8 +745,8 @@ const AddWarehouseProductPage = () => {
       itemType === "product"
         ? marketData.isWeightProduct
         : itemType === "service"
-        ? marketData.isFractionalService
-        : false;
+          ? marketData.isFractionalService
+          : false;
 
     // Автоматическая генерация PLU для весовых товаров или дробных услуг, если не указан
     let pluValue = null;
@@ -860,12 +891,12 @@ const AddWarehouseProductPage = () => {
         const kitPackages =
           itemType === "kit"
             ? (marketData.kitProducts || [])
-                .filter((p) => p.id)
-                .map((p) => ({
-                  name: p.name || "",
-                  quantity_in_package: Number(p.quantity || 1),
-                  unit: p.unit || marketData.unit || "шт",
-                }))
+              .filter((p) => p.id)
+              .map((p) => ({
+                name: p.name || "",
+                quantity_in_package: Number(p.quantity || 1),
+                unit: p.unit || marketData.unit || "шт",
+              }))
             : [];
 
         const packagesPayload =
@@ -1321,7 +1352,7 @@ const AddWarehouseProductPage = () => {
         message={alertModal.message}
         onClose={() => setAlertModal({ ...alertModal, open: false })}
       />
-      <div className="add-product-page">
+      <div className="add-product-page" ref={rootRef}>
         <div className="add-product-page__header">
           <button
             className="add-product-page__back"
@@ -1365,18 +1396,16 @@ const AddWarehouseProductPage = () => {
           {!isEditMode && !loadingProduct && (
             <div className="add-product-page__tabs">
               <button
-                className={`add-product-page__tab  text-[12px] md:text-[14px] ${
-                  activeTab === 0 ? "add-product-page__tab--active" : ""
-                }`}
+                className={`add-product-page__tab  text-[12px] md:text-[14px] ${activeTab === 0 ? "add-product-page__tab--active" : ""
+                  }`}
                 onClick={() => setActiveTab(0)}
               >
                 <Package size={18} />
                 Ввод вручную
               </button>
               <button
-                className={`add-product-page__tab  text-[12px] md:text-[14px] py-2.5 px-3 md:py-3 md:px-6 ${
-                  activeTab === 1 ? "add-product-page__tab--active" : ""
-                }`}
+                className={`add-product-page__tab  text-[12px] md:text-[14px] py-2.5 px-3 md:py-3 md:px-6 ${activeTab === 1 ? "add-product-page__tab--active" : ""
+                  }`}
                 onClick={() => setActiveTab(1)}
               >
                 <Scan size={18} />
@@ -1511,11 +1540,10 @@ const AddWarehouseProductPage = () => {
                   </label>
                   <div className="add-product-page__type-selector">
                     <button
-                      className={`add-product-page__type-card ${
-                        productType === "piece"
+                      className={`add-product-page__type-card ${productType === "piece"
                           ? "add-product-page__type-card--active"
                           : ""
-                      }`}
+                        }`}
                       onClick={() => {
                         setProductType("piece");
                         setNewItemData((prev) => ({
@@ -1528,11 +1556,10 @@ const AddWarehouseProductPage = () => {
                       <span>Штучный товар</span>
                     </button>
                     <button
-                      className={`add-product-page__type-card ${
-                        productType === "weight"
+                      className={`add-product-page__type-card ${productType === "weight"
                           ? "add-product-page__type-card--active"
                           : ""
-                      }`}
+                        }`}
                       onClick={() => {
                         setProductType("weight");
                         setNewItemData((prev) => ({
@@ -1768,8 +1795,8 @@ const AddWarehouseProductPage = () => {
                             !selectedWarehouse
                               ? "Сначала выберите склад"
                               : warehouseGroupsLoading
-                              ? "Загрузка…"
-                              : ""
+                                ? "Загрузка…"
+                                : ""
                           }
                         >
                           <option value="">Без группы</option>
@@ -2194,6 +2221,36 @@ const MarketProductForm = ({
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearchTerm, setCountrySearchTerm] = useState("");
   const countryDropdownRef = useRef(null);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const apply = () => {
+      // формы
+      root.querySelectorAll("form").forEach((f) => {
+        try {
+          f.setAttribute("autocomplete", "off");
+        } catch { }
+      });
+      // инпуты/текстовые поля
+      root.querySelectorAll("input, textarea").forEach((el) => {
+        try {
+          el.setAttribute("autocomplete", "off");
+          el.setAttribute("autocorrect", "off");
+          el.setAttribute("autocapitalize", "none");
+          el.setAttribute("spellcheck", "false");
+          el.setAttribute("autosave", "off");
+        } catch { }
+      });
+    };
+
+    apply();
+    const obs = new MutationObserver(() => apply());
+    obs.observe(root, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
 
   // Закрытие dropdown при клике вне его
   useEffect(() => {
@@ -2263,7 +2320,7 @@ const MarketProductForm = ({
     setCountrySearchTerm("");
   };
 
- 
+
   // Автоматический расчет цены продажи для комплекта при изменении состава
   useEffect(() => {
     if (itemType === "kit") {
@@ -2355,16 +2412,15 @@ const MarketProductForm = ({
   };
 
   return (
-    <div className="market-product-form">
+    <div className="market-product-form" ref={rootRef}>
       {/* Выбор типа: Товар, Услуга, Комплект - скрыт в режиме редактирования */}
       {!isEditMode && (
         <div className="market-product-form__type-selector">
           <button
-            className={`market-product-form__type-card ${
-              itemType === "product"
+            className={`market-product-form__type-card ${itemType === "product"
                 ? "market-product-form__type-card--active"
                 : ""
-            }`}
+              }`}
             onClick={() => setItemType("product")}
           >
             <h3 className="text-center">Товар</h3>
@@ -2373,20 +2429,18 @@ const MarketProductForm = ({
             </p>
           </button>
           <button
-            className={`market-product-form__type-card ${
-              itemType === "service"
+            className={`market-product-form__type-card ${itemType === "service"
                 ? "market-product-form__type-card--active"
                 : ""
-            }`}
+              }`}
             onClick={() => setItemType("service")}
           >
             <h3 className="text-center">Услуга</h3>
             <p className="text-center">Продукт, не имеющий остатка на складе</p>
           </button>
           <button
-            className={`market-product-form__type-card ${
-              itemType === "kit" ? "market-product-form__type-card--active" : ""
-            }`}
+            className={`market-product-form__type-card ${itemType === "kit" ? "market-product-form__type-card--active" : ""
+              }`}
             onClick={() => setItemType("kit")}
           >
             <h3 className="text-center">Комплект</h3>
@@ -2761,7 +2815,7 @@ const MarketProductForm = ({
               </option>
             ))}
           </select>
-        
+
         </div>
       </div>
 
@@ -2901,44 +2955,44 @@ const MarketProductForm = ({
       {/* Добавить PLU код - показывается для весового товара или дробной услуги */}
       {((itemType === "product" && marketData.isWeightProduct) ||
         (itemType === "service" && marketData.isFractionalService)) && (
-        <div className="market-product-form__section">
-          <div className="market-product-form__form-group">
-            <label className="market-product-form__label">
-              Добавить PLU код
-            </label>
-            <div className="market-product-form__plu-input-wrapper">
-              <input
-                type="text"
-                className="market-product-form__input"
-                placeholder="Введите PLU код"
-                value={marketData.plu}
-                onChange={(e) => handleMarketDataChange("plu", e.target.value)}
-              />
-              <div className="market-product-form__help-wrapper">
-                <button
-                  type="button"
-                  className="market-product-form__help-btn"
-                  onMouseEnter={() => setShowPluTooltip(true)}
-                  onMouseLeave={() => setShowPluTooltip(false)}
-                >
-                  <HelpCircle size={20} />
-                </button>
-                {showPluTooltip && (
-                  <div className="market-product-form__tooltip">
-                    <p>
-                      PLU код применяется в весах с печатью этикетки содержащей
-                      информацию о весе товара. Формат штрих-кода для настройки
-                      весов: undefined PPPPP WWWWW S где: PPPPP - PLU код
-                      товара; WWWWW - вес товара в тысячных единицах; S -
-                      контрольная сумма
-                    </p>
-                  </div>
-                )}
+          <div className="market-product-form__section">
+            <div className="market-product-form__form-group">
+              <label className="market-product-form__label">
+                Добавить PLU код
+              </label>
+              <div className="market-product-form__plu-input-wrapper">
+                <input
+                  type="text"
+                  className="market-product-form__input"
+                  placeholder="Введите PLU код"
+                  value={marketData.plu}
+                  onChange={(e) => handleMarketDataChange("plu", e.target.value)}
+                />
+                <div className="market-product-form__help-wrapper">
+                  <button
+                    type="button"
+                    className="market-product-form__help-btn"
+                    onMouseEnter={() => setShowPluTooltip(true)}
+                    onMouseLeave={() => setShowPluTooltip(false)}
+                  >
+                    <HelpCircle size={20} />
+                  </button>
+                  {showPluTooltip && (
+                    <div className="market-product-form__tooltip">
+                      <p>
+                        PLU код применяется в весах с печатью этикетки содержащей
+                        информацию о весе товара. Формат штрих-кода для настройки
+                        весов: undefined PPPPP WWWWW S где: PPPPP - PLU код
+                        товара; WWWWW - вес товара в тысячных единицах; S -
+                        контрольная сумма
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Характеристики товара */}
       <div className="market-product-form__section">
@@ -3033,9 +3087,8 @@ const MarketProductForm = ({
                 </div>
                 <ChevronDown
                   size={20}
-                  className={`market-product-form__country-chevron ${
-                    showCountryDropdown ? "open" : ""
-                  }`}
+                  className={`market-product-form__country-chevron ${showCountryDropdown ? "open" : ""
+                    }`}
                 />
               </div>
               {showCountryDropdown && (
@@ -3055,11 +3108,10 @@ const MarketProductForm = ({
                       filteredCountries.map((country) => (
                         <div
                           key={country.code}
-                          className={`market-product-form__country-item ${
-                            marketData.country === country.name
+                          className={`market-product-form__country-item ${marketData.country === country.name
                               ? "selected"
                               : ""
-                          }`}
+                            }`}
                           onClick={() => handleSelectCountry(country.name)}
                         >
                           <span className="market-product-form__country-flag">
@@ -3652,8 +3704,8 @@ const MarketProductForm = ({
               ? "Сохранение..."
               : "Создание..."
             : isEditMode
-            ? "Сохранить изменения"
-            : "Создать товар"}
+              ? "Сохранить изменения"
+              : "Создать товар"}
         </button>
       </div>
     </div>

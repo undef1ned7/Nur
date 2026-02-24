@@ -836,6 +836,12 @@ export default function InvoicePdfDocument({ data }) {
         {showPriceColumns && (
           <>
             <View style={s.totalsSection}>
+              {discountTotal > 0 && (
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>Скидка:</Text>
+                  <Text style={s.totalValue}>{n2(discountTotal)}</Text>
+                </View>
+              )}
               <View style={[s.totalRow, s.totalBold]}>
                 <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
                 <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>

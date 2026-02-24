@@ -44,19 +44,32 @@ const InvoicePreviewModal = ({
     };
 
     // Получаем данные контрагента
-    const buyer = doc.counterparty
-      ? {
-          id: doc.counterparty.id,
-          name: doc.counterparty.name || "",
-          inn: doc.counterparty.inn || "",
-          okpo: doc.counterparty.okpo || "",
-          score: doc.counterparty.score || "",
-          bik: doc.counterparty.bik || "",
-          address: doc.counterparty.address || "",
-          phone: doc.counterparty.phone || null,
-          email: doc.counterparty.email || null,
-        }
-      : null;
+    const buyer =
+      doc.counterparty && typeof doc.counterparty === "object"
+        ? {
+            id: doc.counterparty.id,
+            name: doc.counterparty.name || "",
+            inn: doc.counterparty.inn || "",
+            okpo: doc.counterparty.okpo || "",
+            score: doc.counterparty.score || "",
+            bik: doc.counterparty.bik || "",
+            address: doc.counterparty.address || "",
+            phone: doc.counterparty.phone || null,
+            email: doc.counterparty.email || null,
+          }
+        : doc.counterparty_display_name
+          ? {
+              id: String(doc.counterparty || ""),
+              name: doc.counterparty_display_name || "",
+              inn: "",
+              okpo: "",
+              score: "",
+              bik: "",
+              address: "",
+              phone: null,
+              email: null,
+            }
+          : null;
 
     const docDiscountPercent = Number(doc.discount_percent || 0);
     const docDiscountAmount = Number(doc.discount_amount || 0);
@@ -552,6 +565,12 @@ const InvoicePreviewModal = ({
 
             {/* Итоги */}
             <div className="invoice-preview-modal__totals">
+              {discount > 0 && (
+                <div className="invoice-preview-modal__total-row">
+                  <span>Скидка:</span>
+                  <span>{formatMoney(discount)}</span>
+                </div>
+              )}
               <div className="invoice-preview-modal__total-row invoice-preview-modal__total-row--bold">
                 <span>ИТОГО:</span>
                 <span>{formatMoney(total)}</span>
