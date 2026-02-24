@@ -528,19 +528,32 @@ const Documents = () => {
             phone: company?.phone || null,
             email: company?.email || null,
           };
-          const buyer = doc.counterparty
-            ? {
-                id: doc.counterparty.id,
-                name: doc.counterparty.name || "",
-                inn: doc.counterparty.inn || "",
-                okpo: doc.counterparty.okpo || "",
-                score: doc.counterparty.score || "",
-                bik: doc.counterparty.bik || "",
-                address: doc.counterparty.address || "",
-                phone: doc.counterparty.phone || null,
-                email: doc.counterparty.email || null,
-              }
-            : null;
+          const buyer =
+            doc.counterparty && typeof doc.counterparty === "object"
+              ? {
+                  id: doc.counterparty.id,
+                  name: doc.counterparty.name || "",
+                  inn: doc.counterparty.inn || "",
+                  okpo: doc.counterparty.okpo || "",
+                  score: doc.counterparty.score || "",
+                  bik: doc.counterparty.bik || "",
+                  address: doc.counterparty.address || "",
+                  phone: doc.counterparty.phone || null,
+                  email: doc.counterparty.email || null,
+                }
+              : doc.counterparty_display_name
+                ? {
+                    id: String(doc.counterparty || ""),
+                    name: doc.counterparty_display_name || "",
+                    inn: "",
+                    okpo: "",
+                    score: "",
+                    bik: "",
+                    address: "",
+                    phone: null,
+                    email: null,
+                  }
+                : null;
           const docDiscountPercent = Number(doc.discount_percent || 0);
           const docDiscountAmount = Number(doc.discount_amount || 0);
 

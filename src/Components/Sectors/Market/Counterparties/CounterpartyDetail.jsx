@@ -21,6 +21,22 @@ const fmtDate = (v) => {
   return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString("ru-RU");
 };
 
+const fmtDateTime = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime())
+    ? v
+    : d.toLocaleString("ru-RU", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+};
+
+const emptyPage = { count: 0, next: null, previous: null, results: [] };
+
 /**
  * Страница контрагента: только денежные операции по контрагенту (API 5.3).
  * GET /api/warehouse/money/counterparties/{counterparty_id}/operations/
@@ -28,6 +44,43 @@ const fmtDate = (v) => {
  */
 const showAgentBlock = (profile) =>
   profile?.role === "owner" || profile?.role === "admin";
+
+const getRowDateValue = (row) => {
+  const raw = row?.date ?? row?.created_at ?? row?.document?.date ?? null;
+  const d = raw ? new Date(raw) : null;
+  const t = d && !Number.isNaN(d.getTime()) ? d.getTime() : 0;
+  return t;
+};
+
+const getRowKey = (row, idx) =>
+  row?.id ??
+  `${row?.source ?? "row"}-${row?.number ?? row?.document?.number ?? "n"}-${
+    row?.date ?? row?.created_at ?? row?.document?.date ?? "d"
+  }-${idx}`;
+
+const AccordionSection = ({
+  title,
+  subtitle,
+  defaultOpen = false,
+  children,
+}) => (
+  <details className="counterparty-detail-page__accordion" open={defaultOpen}>
+    <summary className="counterparty-detail-page__accordion-summary">
+      <div className="counterparty-detail-page__accordion-summary-main">
+        <span className="counterparty-detail-page__accordion-title">
+          {title}
+        </span>
+        {subtitle ? (
+          <span className="counterparty-detail-page__accordion-subtitle">
+            {subtitle}
+          </span>
+        ) : null}
+      </div>
+      <span className="counterparty-detail-page__accordion-chevron" />
+    </summary>
+    <div className="counterparty-detail-page__accordion-body">{children}</div>
+  </details>
+);
 
 const CounterpartyDetail = () => {
   const { id } = useParams();
@@ -41,11 +94,11 @@ const CounterpartyDetail = () => {
   const company = useSelector((state) => state.user.company);
 
   /** Операции: при include_debts=1 API возвращает { money, debt_operations, operations } (API 5.3). */
-  const [operations, setOperations] = useState({
+  const [operations, setOperations] = useState(() => ({
     results: [],
     debt_operations: [],
-    money: [],
-  });
+    money: emptyPage,
+  }));
   const [loadingOperations, setLoadingOperations] = useState(true);
   const [errorOperations, setErrorOperations] = useState("");
   const [reconciliationPdfLoading, setReconciliationPdfLoading] =
@@ -125,18 +178,26 @@ const CounterpartyDetail = () => {
         params
       );
       if (data?.operations != null && Array.isArray(data.operations)) {
+        const moneyPage =
+          data?.money && typeof data.money === "object"
+            ? { ...emptyPage, ...data.money }
+            : emptyPage;
         setOperations({
           results: data.operations,
           debt_operations: data.debt_operations ?? [],
-          money: data.money ?? [],
+          money: moneyPage,
         });
       } else {
         const list = data?.results ?? (Array.isArray(data) ? data : []);
-        setOperations({ results: list, debt_operations: [], money: list });
+        setOperations({
+          results: list,
+          debt_operations: [],
+          money: { ...emptyPage, results: list, count: list.length },
+        });
       }
     } catch (e) {
       setErrorOperations("Не удалось загрузить приход/расход");
-      setOperations({ results: [], debt_operations: [], money: [] });
+      setOperations({ results: [], debt_operations: [], money: emptyPage });
     } finally {
       setLoadingOperations(false);
     }
@@ -193,9 +254,35 @@ const CounterpartyDetail = () => {
     }
   }, [id, name, getBranchParams, reconciliationStart, reconciliationEnd]);
 
-  const operationRows = operations.results || [];
-  const debtOperationsList = operations.debt_operations || [];
-  const hasUnifiedOperations = operationRows.some(
+  const operationRows = Array.isArray(operations.results)
+    ? operations.results
+    : [];
+  const debtOperationsList = Array.isArray(operations.debt_operations)
+    ? operations.debt_operations
+    : [];
+  const moneyPage =
+    operations?.money && typeof operations.money === "object"
+      ? { ...emptyPage, ...operations.money }
+      : emptyPage;
+  const moneyRows = Array.isArray(moneyPage.results) ? moneyPage.results : [];
+
+  const sortedAllRows = useMemo(
+    () => [...operationRows].sort((a, b) => getRowDateValue(b) - getRowDateValue(a)),
+    [operationRows]
+  );
+  const sortedMoneyRows = useMemo(
+    () => [...moneyRows].sort((a, b) => getRowDateValue(b) - getRowDateValue(a)),
+    [moneyRows]
+  );
+  const sortedDebtRows = useMemo(
+    () =>
+      [...debtOperationsList].sort(
+        (a, b) => getRowDateValue(b) - getRowDateValue(a)
+      ),
+    [debtOperationsList]
+  );
+
+  const hasUnifiedOperations = sortedAllRows.some(
     (r) => r.source != null || r.debt_delta != null
   );
 
@@ -204,7 +291,7 @@ const CounterpartyDetail = () => {
   // чтобы покупки в долг (складские документы) не дублировались в сальдо.
   // Общие долги = остаток: сумма по debt_operations + сумма debt_delta по operations (оплаты дают отрицательный debt_delta).
   const summary = useMemo(() => {
-    const list = operationRows;
+    const list = sortedAllRows;
     let sumReceipt = 0;
     let sumExpense = 0;
     list.forEach((row) => {
@@ -218,14 +305,13 @@ const CounterpartyDetail = () => {
       (acc, row) => acc + (Number(row.debt_delta) || 0),
       0
     );
-    const totalDebtAmount = Math.max(0, debtDeltaSum);
     return {
       balance: sumReceipt - sumExpense,
       transfers: sumReceipt + sumExpense,
       debtOperationsCount: debtOperationsList.length,
-      totalDebtAmount,
+      debtBalance: debtDeltaSum,
     };
-  }, [operationRows, debtOperationsList]);
+  }, [sortedAllRows, debtOperationsList]);
 
   const docTypeLabel = (docType) =>
     docType === "MONEY_RECEIPT"
@@ -254,6 +340,139 @@ const CounterpartyDetail = () => {
   };
   const statusLabel = (s) =>
     s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+
+  const renderRowsContent = (rows, { showSource, showDebtDelta }) => {
+    if (!rows || rows.length === 0) {
+      return (
+        <div className="counterparty-detail-page__empty">Нет операций</div>
+      );
+    }
+
+    if (viewMode === "table") {
+      return (
+        <div className="counterparty-detail-page__table-wrap">
+          <table className="counterparty-detail-page__table">
+            <thead>
+              <tr>
+                <th>{showSource ? "Источник" : "Тип"}</th>
+                <th>Номер</th>
+                <th>Дата</th>
+                <th>Сумма</th>
+                {showDebtDelta && <th>Изменение долга</th>}
+                <th>Категория</th>
+                <th>Статус</th>
+                <th>Комментарий</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr key={getRowKey(row, idx)}>
+                  <td>{showSource ? sourceLabel(row) : docTypeLabel(row.doc_type)}</td>
+                  <td>{row.number ?? row.document?.number ?? "—"}</td>
+                  <td>
+                    {fmtDateTime(
+                      row.date ?? row.created_at ?? row.document?.date
+                    )}
+                  </td>
+                  <td>{fmtMoney(row.amount)}</td>
+                  {showDebtDelta && (
+                    <td className="counterparty-detail-page__debt-delta">
+                      {debtDeltaLabel(row)}
+                    </td>
+                  )}
+                  <td>
+                    {row.payment_category_title ??
+                      row.document?.payment_category_title ??
+                      "—"}
+                  </td>
+                  <td>{statusLabel(row.status ?? row.document?.status)}</td>
+                  <td>{row.comment ?? row.document?.comment ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    return (
+      <div className="counterparty-detail-page__cards">
+        {rows.map((row, idx) => (
+          <div
+            key={getRowKey(row, idx)}
+            className="counterparty-detail-page__card"
+          >
+            <div className="counterparty-detail-page__card-header">
+              <span className="counterparty-detail-page__card-number">
+                {row.number ?? "—"}
+              </span>
+              <span
+                className={`counterparty-detail-page__card-status counterparty-detail-page__card-status--${
+                  (row.status ?? row.document?.status) === "POSTED"
+                    ? "posted"
+                    : "draft"
+                }`}
+              >
+                {statusLabel(row.status ?? row.document?.status)}
+              </span>
+            </div>
+            <div className="counterparty-detail-page__card-body">
+              <div className="counterparty-detail-page__card-row">
+                <span className="counterparty-detail-page__card-label">
+                  {showSource ? "Источник" : "Тип"}
+                </span>
+                <span className="counterparty-detail-page__card-value">
+                  {showSource ? sourceLabel(row) : docTypeLabel(row.doc_type)}
+                </span>
+              </div>
+              {showDebtDelta && debtDeltaLabel(row) !== "—" && (
+                <div className="counterparty-detail-page__card-row">
+                  <span className="counterparty-detail-page__card-label">
+                    Изменение долга
+                  </span>
+                  <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--debt-delta">
+                    {debtDeltaLabel(row)}
+                  </span>
+                </div>
+              )}
+              <div className="counterparty-detail-page__card-row">
+                <span className="counterparty-detail-page__card-label">Дата</span>
+                <span className="counterparty-detail-page__card-value">
+                  {fmtDate(row.date ?? row.created_at ?? row.document?.date)}
+                </span>
+              </div>
+              <div className="counterparty-detail-page__card-row">
+                <span className="counterparty-detail-page__card-label">Сумма</span>
+                <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--amount">
+                  {fmtMoney(row.amount)}
+                </span>
+              </div>
+              <div className="counterparty-detail-page__card-row">
+                <span className="counterparty-detail-page__card-label">
+                  Категория
+                </span>
+                <span className="counterparty-detail-page__card-value">
+                  {row.payment_category_title ??
+                    row.document?.payment_category_title ??
+                    "—"}
+                </span>
+              </div>
+              {(row.comment ?? row.document?.comment ?? "").trim() ? (
+                <div className="counterparty-detail-page__card-row">
+                  <span className="counterparty-detail-page__card-label">
+                    Комментарий
+                  </span>
+                  <span className="counterparty-detail-page__card-value">
+                    {row.comment ?? row.document?.comment}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const goBack = () => navigate("/crm/warehouse/counterparties");
 
@@ -334,11 +553,18 @@ const CounterpartyDetail = () => {
                   Общие долги
                 </span>
                 <span className="counterparty-detail-page__summary-value counterparty-detail-page__summary-value--debt-total">
-                  {summary.totalDebtAmount.toLocaleString("ru-RU", {
+                  {Math.abs(summary.debtBalance).toLocaleString("ru-RU", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{" "}
                   с
+                </span>
+                <span className="counterparty-detail-page__debt-who">
+                  {summary.debtBalance > 0
+                    ? "Контрагент должен вам"
+                    : summary.debtBalance < 0
+                    ? "Вы должны контрагенту"
+                    : "Долг закрыт"}
                 </span>
                 <span className="counterparty-detail-page__summary-hint">
                   {summary.debtOperationsCount} кредитных документов
@@ -482,130 +708,44 @@ const CounterpartyDetail = () => {
               <div className="counterparty-detail-page__error">
                 {errorOperations}
               </div>
-            ) : operationRows.length === 0 ? (
+            ) : sortedAllRows.length === 0 &&
+              sortedMoneyRows.length === 0 &&
+              sortedDebtRows.length === 0 ? (
               <div className="counterparty-detail-page__empty">
                 Нет приходов и расходов
               </div>
-            ) : viewMode === "table" ? (
-              <div className="counterparty-detail-page__table-wrap">
-                <table className="counterparty-detail-page__table">
-                  <thead>
-                    <tr>
-                      <th>{hasUnifiedOperations ? "Источник" : "Тип"}</th>
-                      <th>Номер</th>
-                      <th>Дата</th>
-                      <th>Сумма</th>
-                      {hasUnifiedOperations && <th>Изменение долга</th>}
-                      <th>Категория</th>
-                      <th>Статус</th>
-                      <th>Комментарий</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {operationRows.map((row) => (
-                      <tr key={row.id || Math.random()}>
-                        <td>{sourceLabel(row)}</td>
-                        <td>{row.number ?? row.document?.number ?? "—"}</td>
-                        <td>
-                          {fmtDate(
-                            row.date ?? row.created_at ?? row.document?.date
-                          )}
-                        </td>
-                        <td>{fmtMoney(row.amount)}</td>
-                        {hasUnifiedOperations && (
-                          <td className="counterparty-detail-page__debt-delta">
-                            {debtDeltaLabel(row)}
-                          </td>
-                        )}
-                        <td>
-                          {row.payment_category_title ??
-                            row.document?.payment_category_title ??
-                            "—"}
-                        </td>
-                        <td>
-                          {statusLabel(row.status ?? row.document?.status)}
-                        </td>
-                        <td>{row.comment ?? row.document?.comment ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             ) : (
-              <div className="counterparty-detail-page__cards">
-                {operationRows.map((row) => (
-                  <div
-                    key={row.id || Math.random()}
-                    className="counterparty-detail-page__card"
-                  >
-                    <div className="counterparty-detail-page__card-header">
-                      <span className="counterparty-detail-page__card-number">
-                        {row.number ?? "—"}
-                      </span>
-                      <span
-                        className={`counterparty-detail-page__card-status counterparty-detail-page__card-status--${
-                          row.status === "POSTED" ? "posted" : "draft"
-                        }`}
-                      >
-                        {statusLabel(row.status)}
-                      </span>
-                    </div>
-                    <div className="counterparty-detail-page__card-body">
-                      <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">
-                          {hasUnifiedOperations ? "Источник" : "Тип"}
-                        </span>
-                        <span className="counterparty-detail-page__card-value">
-                          {sourceLabel(row)}
-                        </span>
-                      </div>
-                      {hasUnifiedOperations && debtDeltaLabel(row) !== "—" && (
-                        <div className="counterparty-detail-page__card-row">
-                          <span className="counterparty-detail-page__card-label">
-                            Изменение долга
-                          </span>
-                          <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--debt-delta">
-                            {debtDeltaLabel(row)}
-                          </span>
-                        </div>
-                      )}
-                      <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">
-                          Дата
-                        </span>
-                        <span className="counterparty-detail-page__card-value">
-                          {fmtDate(row.date ?? row.created_at)}
-                        </span>
-                      </div>
-                      <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">
-                          Сумма
-                        </span>
-                        <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--amount">
-                          {fmtMoney(row.amount)}
-                        </span>
-                      </div>
-                      <div className="counterparty-detail-page__card-row">
-                        <span className="counterparty-detail-page__card-label">
-                          Категория
-                        </span>
-                        <span className="counterparty-detail-page__card-value">
-                          {row.payment_category_title ?? "—"}
-                        </span>
-                      </div>
-                      {(row.comment ?? "").trim() ? (
-                        <div className="counterparty-detail-page__card-row">
-                          <span className="counterparty-detail-page__card-label">
-                            Комментарий
-                          </span>
-                          <span className="counterparty-detail-page__card-value">
-                            {row.comment}
-                          </span>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
+              <div className="counterparty-detail-page__accordion-list">
+                <AccordionSection
+                  title="Все операции"
+                  subtitle={`${sortedAllRows.length} шт.`}
+                  defaultOpen
+                >
+                  {renderRowsContent(sortedAllRows, {
+                    showSource: hasUnifiedOperations,
+                    showDebtDelta: hasUnifiedOperations,
+                  })}
+                </AccordionSection>
+
+                <AccordionSection
+                  title="Денежные документы"
+                  subtitle={`${moneyPage.count ?? sortedMoneyRows.length} шт.`}
+                >
+                  {renderRowsContent(sortedMoneyRows, {
+                    showSource: true,
+                    showDebtDelta: true,
+                  })}
+                </AccordionSection>
+
+                <AccordionSection
+                  title="Долговые операции (кредитные документы)"
+                  subtitle={`${sortedDebtRows.length} шт.`}
+                >
+                  {renderRowsContent(sortedDebtRows, {
+                    showSource: true,
+                    showDebtDelta: true,
+                  })}
+                </AccordionSection>
               </div>
             )}
           </>

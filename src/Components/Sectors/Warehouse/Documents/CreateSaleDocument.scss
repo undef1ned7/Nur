@@ -674,6 +674,65 @@ $due-red: #dc2626;
       }
     }
 
+    .create-sale-document__searchselect {
+      position: relative;
+    }
+    .create-sale-document__searchselect-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 14px;
+      background: #fff;
+      cursor: text;
+
+      &:focus {
+        outline: none;
+        border-color: $primary-dark;
+      }
+      &:disabled {
+        background: #f8fafc;
+        cursor: not-allowed;
+      }
+    }
+    .create-sale-document__searchselect-menu {
+      position: absolute;
+      z-index: 30;
+      left: 0;
+      right: 0;
+      margin-top: 6px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      max-height: 280px;
+      overflow: auto;
+      padding: 6px;
+    }
+    .create-sale-document__searchselect-item {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      padding: 10px 10px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      color: #0f172a;
+
+      &:hover {
+        background: #f8fafc;
+      }
+      &--active {
+        background: rgba(59, 130, 246, 0.08);
+      }
+    }
+    .create-sale-document__searchselect-empty {
+      padding: 10px 10px;
+      font-size: 13px;
+      color: #64748b;
+    }
+
     &--with-icon {
       display: flex;
       align-items: flex-start;

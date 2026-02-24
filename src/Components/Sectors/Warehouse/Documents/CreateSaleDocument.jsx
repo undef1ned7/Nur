@@ -29,6 +29,8 @@ import warehouseAPI from "../../../../api/warehouse";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import { getEmployees } from "../../../../store/creators/departmentCreators";
+import { useDepartments } from "../../../../store/slices/departmentSlice";
 import "./CreateSaleDocument.scss";
 import { useAlert } from "../../../../hooks/useDialog";
 
@@ -43,6 +45,97 @@ const VALID_DOC_TYPES = [
   "TRANSFER",
 ];
 
+const SearchSelect = ({
+  value,
+  onChange,
+  options,
+  placeholder = "Выберите...",
+  disabled = false,
+  emptyText = "Ничего не найдено",
+}) => {
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selected = useMemo(() => {
+    const v = value == null ? "" : String(value);
+    return (Array.isArray(options) ? options : []).find(
+      (o) => String(o.value) === v
+    );
+  }, [options, value]);
+
+  const filtered = useMemo(() => {
+    const list = Array.isArray(options) ? options : [];
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((o) => {
+      const text = String(o.searchText || o.label || "").toLowerCase();
+      return text.includes(q);
+    });
+  }, [options, query]);
+
+  useEffect(() => {
+    const onDocDown = (e) => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (!el.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", onDocDown);
+    return () => document.removeEventListener("mousedown", onDocDown);
+  }, []);
+
+  return (
+    <div className="create-sale-document__searchselect" ref={containerRef}>
+      <input
+        ref={inputRef}
+        className="create-sale-document__searchselect-input"
+        type="text"
+        disabled={disabled}
+        value={open ? query : selected?.label || ""}
+        placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          if (!open) setOpen(true);
+          setQuery(e.target.value);
+        }}
+      />
+
+      {open && !disabled && (
+        <div className="create-sale-document__searchselect-menu">
+          {filtered.length === 0 ? (
+            <div className="create-sale-document__searchselect-empty">
+              {emptyText}
+            </div>
+          ) : (
+            filtered.map((o) => (
+              <button
+                key={String(o.value)}
+                type="button"
+                className={`create-sale-document__searchselect-item ${String(o.value) === String(value)
+                  ? "create-sale-document__searchselect-item--active"
+                  : ""
+                  }`}
+                onClick={() => {
+                  onChange?.(o.value);
+                  setOpen(false);
+                  setQuery("");
+                  inputRef.current?.blur?.();
+                }}
+              >
+                {o.label}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CreateSaleDocument = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -51,6 +144,7 @@ const CreateSaleDocument = () => {
   const { company, profile: userProfile } = useUser();
   const { list: cashBoxes } = useCash();
   const { list: counterparties } = useCounterparty();
+  const { employees } = useDepartments();
   const alert = useAlert();
   const urlDocType = searchParams.get("doc_type");
   const initialDocType =
@@ -58,8 +152,8 @@ const CreateSaleDocument = () => {
       ? urlDocType
       : location.state?.docType &&
         VALID_DOC_TYPES.includes(location.state.docType)
-      ? location.state.docType
-      : "SALE";
+        ? location.state.docType
+        : "SALE";
 
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
@@ -77,6 +171,7 @@ const CreateSaleDocument = () => {
   const [warehouse, setWarehouse] = useState("");
   const [warehouseTo, setWarehouseTo] = useState("");
   const [clientId, setClientId] = useState("");
+  const [agentId, setAgentId] = useState("");
   const [docType, setDocType] = useState(initialDocType);
   const [activeTab, setActiveTab] = useState("products");
   const [documentSearch, setDocumentSearch] = useState("");
@@ -194,7 +289,9 @@ const CreateSaleDocument = () => {
     });
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) =>
-        String(a?.name || "").localeCompare(String(b?.name || ""))
+        String(a?.name || "").localeCompare(String(b?.name || ""), "ru", {
+          sensitivity: "base",
+        })
       );
       map.set(k, arr);
     }
@@ -397,9 +494,8 @@ const CreateSaleDocument = () => {
                     return (
                       <div
                         key={product.id}
-                        className={`create-sale-document__group-product-item ${
-                          isSelected || isInCart ? "active" : ""
-                        }`}
+                        className={`create-sale-document__group-product-item ${isSelected || isInCart ? "active" : ""
+                          }`}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleAddProduct(product);
@@ -461,6 +557,11 @@ const CreateSaleDocument = () => {
       }
     };
     loadWarehouses();
+  }, [dispatch]);
+
+  // Загружаем сотрудников (для выбора агента)
+  useEffect(() => {
+    dispatch(getEmployees());
   }, [dispatch]);
 
   // Автоматически выбираем первый склад по умолчанию
@@ -580,6 +681,113 @@ const CreateSaleDocument = () => {
     return all;
   }, [counterparties, docType]);
 
+  const agents = useMemo(() => {
+    const list = Array.isArray(employees) ? employees : [];
+    return list
+      .filter((e) => {
+        const role =
+          e?.role_display ??
+          e?.role_name ??
+          e?.role ??
+          e?.position ??
+          e?.post ??
+          "";
+        return String(role).trim() === "Агент" && filteredCounterparties.some((c) => c.agent === e.id);
+      })
+      .sort((a, b) =>
+        String(a?.full_name || a?.name || a?.email || "").localeCompare(
+          String(b?.full_name || b?.name || b?.email || ""),
+          "ru"
+        )
+      );
+  }, [employees, filteredCounterparties]);
+
+  const getCounterpartyAgentId = (cp) => {
+    const a = cp?.agent;
+    if (!a) return null;
+    if (typeof a === "object") {
+      const id = a?.id ?? a?.uuid;
+      return id != null ? String(id) : null;
+    }
+    return String(a);
+  };
+
+  const counterpartyOptions = useMemo(() => {
+    const list = Array.isArray(filteredCounterparties)
+      ? filteredCounterparties
+      : [];
+    const agentKey = agentId ? String(agentId) : "";
+    const filtered =
+      agentKey.trim() === ""
+        ? list
+        : list.filter((cp) => getCounterpartyAgentId(cp) === agentKey);
+
+    return filtered
+      .slice()
+      .sort((a, b) =>
+        String(a?.name || "").localeCompare(String(b?.name || ""), "ru")
+      )
+      .map((cp) => ({
+        value: cp.id,
+        label: cp.name || cp.full_name || cp.title || "Без названия",
+        searchText: `${cp.name || ""} ${cp.full_name || ""} ${cp.title || ""
+          } ${cp.phone || ""} ${cp.inn || ""}`.trim(),
+      }));
+  }, [filteredCounterparties, agentId]);
+
+  const agentOptions = useMemo(() => {
+    return (Array.isArray(agents) ? agents : []).map((a) => ({
+      value: a.id,
+      label: a.full_name || a.name || a.email || `#${a.id}`,
+      searchText: `${a.full_name || ""} ${a.name || ""} ${a.email || ""} ${a.phone || ""
+        }`.trim(),
+    }));
+  }, [agents]);
+
+  const warehouseOptions = useMemo(() => {
+    return (Array.isArray(warehouses) ? warehouses : [])
+      .slice()
+      .sort((a, b) =>
+        String(a?.name || a?.title || "").localeCompare(
+          String(b?.name || b?.title || ""),
+          "ru"
+        )
+      )
+      .map((wh) => ({
+        value: wh.id || wh.uuid,
+        label: wh.name || wh.title || String(wh.id || wh.uuid),
+        searchText: `${wh.name || ""} ${wh.title || ""} ${wh.address || ""
+          }`.trim(),
+      }));
+  }, [warehouses]);
+
+  const warehouseToOptions = useMemo(() => {
+    return (Array.isArray(warehouses) ? warehouses : [])
+      .filter((wh) => String(wh.id) !== String(warehouse))
+      .slice()
+      .sort((a, b) =>
+        String(a?.name || a?.title || "").localeCompare(
+          String(b?.name || b?.title || ""),
+          "ru"
+        )
+      )
+      .map((wh) => ({
+        value: wh.id || wh.uuid,
+        label: wh.name || wh.title || String(wh.id || wh.uuid),
+        searchText: `${wh.name || ""} ${wh.title || ""} ${wh.address || ""
+          }`.trim(),
+      }));
+  }, [warehouses, warehouse]);
+
+  // Если при выборе агента текущий контрагент не подходит — сбрасываем контрагента
+  useEffect(() => {
+    if (!clientId) return;
+    const exists = counterpartyOptions.some(
+      (o) => String(o.value) === String(clientId)
+    );
+    if (!exists) setClientId("");
+  }, [agentId, counterpartyOptions]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Определяем, требуется ли контрагент для текущего типа документа
   const isCounterpartyRequired = useMemo(() => {
     return ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(
@@ -616,7 +824,7 @@ const CreateSaleDocument = () => {
       (sum, item) =>
         sum +
         (Number(item.price || item.unit_price) || 0) *
-          (Number(item.quantity) || 0),
+        (Number(item.quantity) || 0),
       0
     );
 
@@ -805,9 +1013,8 @@ const CreateSaleDocument = () => {
       if (isPiece && !Number.isInteger(qty)) {
         return {
           valid: false,
-          error: `Для товара "${
-            item.productName || item.name
-          }" количество должно быть целым числом (единица измерения: ${unit})`,
+          error: `Для товара "${item.productName || item.name
+            }" количество должно быть целым числом (единица измерения: ${unit})`,
         };
       }
 
@@ -818,9 +1025,8 @@ const CreateSaleDocument = () => {
       if (discountPercent < 0 || discountPercent > 100) {
         return {
           valid: false,
-          error: `Скидка для товара "${
-            item.productName || item.name
-          }" должна быть в диапазоне 0-100%`,
+          error: `Скидка для товара "${item.productName || item.name
+            }" должна быть в диапазоне 0-100%`,
         };
       }
 
@@ -830,9 +1036,8 @@ const CreateSaleDocument = () => {
         if (stock > 0 && qty > stock) {
           return {
             valid: false,
-            error: `Количество товара "${
-              item.productName || item.name
-            }" не может превышать остаток на складе (${stock})`,
+            error: `Количество товара "${item.productName || item.name
+              }" не может превышать остаток на складе (${stock})`,
           };
         }
       }
@@ -1142,35 +1347,35 @@ const CreateSaleDocument = () => {
 
       const items = Array.isArray(doc.items)
         ? doc.items.map((item) => {
-            const price = Number(item.price || 0);
-            const qty = Number(item.qty || 0);
-            const lineTotal = price * qty;
-            return {
-              id: item.id,
-              name:
-                item.product_name ??
-                item.product?.name ??
-                item.name ??
-                item.product?.title ??
-                "Товар",
-              qty: String(qty),
-              unit_price: String(price.toFixed(2)),
-              total: String(
-                Number(item.line_total ?? item.total ?? lineTotal).toFixed(2)
-              ),
-              unit: item.product?.unit ?? item.unit ?? "ШТ",
-              article:
-                String(
-                  item.product?.article ??
-                    item.article ??
-                    item.product_article ??
-                    ""
-                ).trim() || "",
-              discount_percent: Number(item.discount_percent || 0),
-              discount_amount: Number(item.discount_amount || 0),
-              price_before_discount: String(price.toFixed(2)),
-            };
-          })
+          const price = Number(item.price || 0);
+          const qty = Number(item.qty || 0);
+          const lineTotal = price * qty;
+          return {
+            id: item.id,
+            name:
+              item.product_name ??
+              item.product?.name ??
+              item.name ??
+              item.product?.title ??
+              "Товар",
+            qty: String(qty),
+            unit_price: String(price.toFixed(2)),
+            total: String(
+              Number(item.line_total ?? item.total ?? lineTotal).toFixed(2)
+            ),
+            unit: item.product?.unit ?? item.unit ?? "ШТ",
+            article:
+              String(
+                item.product?.article ??
+                item.article ??
+                item.product_article ??
+                ""
+              ).trim() || "",
+            discount_percent: Number(item.discount_percent || 0),
+            discount_amount: Number(item.discount_amount || 0),
+            price_before_discount: String(price.toFixed(2)),
+          };
+        })
         : [];
 
       const subtotal = items.reduce(
@@ -1183,7 +1388,7 @@ const CreateSaleDocument = () => {
           (Number(item.unit_price) *
             Number(item.qty) *
             Number(item.discount_percent || 0)) /
-            100,
+          100,
         0
       );
       const totalDiscount = itemsDiscountTotal + docDiscountAmount;
@@ -1239,28 +1444,28 @@ const CreateSaleDocument = () => {
           },
           buyer: selectedCounterparty
             ? {
-                id: selectedCounterparty.id,
-                name: selectedCounterparty.name || buyerName || "",
-                inn: selectedCounterparty.inn || "",
-                okpo: selectedCounterparty.okpo || "",
-                score: selectedCounterparty.score || "",
-                bik: selectedCounterparty.bik || "",
-                address: selectedCounterparty.address || "",
-                phone: selectedCounterparty.phone || null,
-                email: selectedCounterparty.email || null,
-              }
+              id: selectedCounterparty.id,
+              name: selectedCounterparty.name || buyerName || "",
+              inn: selectedCounterparty.inn || "",
+              okpo: selectedCounterparty.okpo || "",
+              score: selectedCounterparty.score || "",
+              bik: selectedCounterparty.bik || "",
+              address: selectedCounterparty.address || "",
+              phone: selectedCounterparty.phone || null,
+              email: selectedCounterparty.email || null,
+            }
             : buyerName
               ? {
-                  id: "",
-                  name: buyerName,
-                  inn: "",
-                  okpo: "",
-                  score: "",
-                  bik: "",
-                  address: "",
-                  phone: null,
-                  email: null,
-                }
+                id: "",
+                name: buyerName,
+                inn: "",
+                okpo: "",
+                score: "",
+                bik: "",
+                address: "",
+                phone: null,
+                email: null,
+              }
               : null,
           items,
           totals: {
@@ -1301,9 +1506,9 @@ const CreateSaleDocument = () => {
           },
           client: selectedCounterparty
             ? {
-                id: selectedCounterparty.id,
-                full_name: selectedCounterparty.name || buyerName || "",
-              }
+              id: selectedCounterparty.id,
+              full_name: selectedCounterparty.name || buyerName || "",
+            }
             : buyerName
               ? { id: "", full_name: buyerName }
               : null,
@@ -1348,8 +1553,8 @@ const CreateSaleDocument = () => {
       const errorMessage =
         error?.response?.data || error?.payload || error?.error
           ? formatApiError(
-              error?.response?.data || error?.payload || error?.error
-            )
+            error?.response?.data || error?.payload || error?.error
+          )
           : error?.message || "Не удалось сгенерировать PDF";
       alert("Ошибка: " + errorMessage);
     }
@@ -1399,9 +1604,8 @@ const CreateSaleDocument = () => {
                 return (
                   <div className="create-sale-document__group-node">
                     <div
-                      className={`create-sale-document__group-item ${
-                        isExpanded ? "is-open" : ""
-                      }`}
+                      className={`create-sale-document__group-item ${isExpanded ? "is-open" : ""
+                        }`}
                       role="button"
                       tabIndex={0}
                       onClick={() => {
@@ -1469,9 +1673,8 @@ const CreateSaleDocument = () => {
                               return (
                                 <div
                                   key={product.id}
-                                  className={`create-sale-document__group-product-item ${
-                                    isSelected || isInCart ? "active" : ""
-                                  }`}
+                                  className={`create-sale-document__group-product-item ${isSelected || isInCart ? "active" : ""
+                                    }`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleAddProduct(product);
@@ -1657,69 +1860,75 @@ const CreateSaleDocument = () => {
                   <label>
                     Склад {isWarehouseToRequired ? "отправитель" : ""} *
                   </label>
-                  <select
+                  <SearchSelect
                     value={warehouse}
-                    onChange={(e) => setWarehouse(e.target.value)}
-                    required
-                  >
-                    <option value="">Выберите склад</option>
-                    {warehouses
-                      .filter(
-                        (wh) => !isWarehouseToRequired || wh.id !== warehouseTo
-                      )
-                      .map((wh) => (
-                        <option key={wh.id} value={wh.id}>
-                          {wh.name || wh.title || wh.id}
-                        </option>
-                      ))}
-                  </select>
+                    onChange={(v) => setWarehouse(String(v || ""))}
+                    options={
+                      isWarehouseToRequired && warehouseTo
+                        ? warehouseOptions.filter(
+                          (o) => String(o.value) !== String(warehouseTo)
+                        )
+                        : warehouseOptions
+                    }
+                    placeholder="Выберите склад"
+                  />
                 </div>
               </div>
               {isWarehouseToRequired && (
                 <div className="create-sale-document__field">
                   <label>Склад получатель *</label>
-                  <select
+                  <SearchSelect
                     value={warehouseTo}
-                    onChange={(e) => setWarehouseTo(e.target.value)}
-                    required
-                  >
-                    <option value="">Выберите склад получатель</option>
-                    {warehouses
-                      .filter((wh) => wh.id !== warehouse)
-                      .map((wh) => (
-                        <option key={wh.id} value={wh.id}>
-                          {wh.name || wh.title || wh.id}
-                        </option>
-                      ))}
-                  </select>
+                    onChange={(v) => setWarehouseTo(String(v || ""))}
+                    options={warehouseToOptions}
+                    placeholder="Выберите склад получатель"
+                  />
                 </div>
               )}
               {isCounterpartyRequired && (
-                <div className="create-sale-document__field create-sale-document__field--with-icon">
-                  <User
-                    size={18}
-                    className="create-sale-document__field-icon"
-                  />
-                  <div className="create-sale-document__field-inner">
-                    <label>Контрагент *</label>
-                    <select
-                      value={clientId}
-                      onChange={(e) => setClientId(e.target.value)}
-                      required={isCounterpartyRequired}
-                    >
-                      <option value="">
-                        {docType === "SALE" || docType === "SALE_RETURN"
-                          ? "Выберите клиента"
-                          : "Выберите поставщика"}
-                      </option>
-                      {filteredCounterparties.map((counterparty) => (
-                        <option key={counterparty.id} value={counterparty.id}>
-                          {counterparty.name || "Без названия"}
-                        </option>
-                      ))}
-                    </select>
+                <>
+                  <div className="create-sale-document__field create-sale-document__field--with-icon">
+                    <User
+                      size={18}
+                      className="create-sale-document__field-icon"
+                    />
+                    <div className="create-sale-document__field-inner">
+                      <label>Агент</label>
+                      <SearchSelect
+                        value={agentId}
+                        onChange={(v) => setAgentId(String(v || ""))}
+                        options={[
+                          { value: "", label: "Все агенты", searchText: "Все агенты" },
+                          ...agentOptions,
+                        ]}
+                        placeholder="Выберите агента (необязательно)"
+                        emptyText="Агенты не найдены"
+                      />
+
+                    </div>
                   </div>
-                </div>
+                  <div className="create-sale-document__field create-sale-document__field--with-icon">
+                    <User
+                      size={18}
+                      className="create-sale-document__field-icon"
+                    />
+                    <div className="create-sale-document__field-inner">
+                      <label>Контрагент *</label>
+                      <SearchSelect
+                        value={clientId}
+                        onChange={(v) => setClientId(String(v || ""))}
+                        options={counterpartyOptions}
+                        placeholder={
+                          docType === "SALE" || docType === "SALE_RETURN"
+                            ? "Выберите клиента"
+                            : "Выберите поставщика"
+                        }
+                        emptyText="Контрагенты не найдены"
+                      />
+                    </div>
+                  </div>
+                </>
+
               )}
             </div>
 
@@ -1793,15 +2002,15 @@ const CreateSaleDocument = () => {
                               className="create-sale-document__qty-input"
                               title={
                                 isStockLimitRequired &&
-                                item.stock != null &&
-                                item.stock > 0
+                                  item.stock != null &&
+                                  item.stock > 0
                                   ? `Остаток на складе: ${item.stock}`
                                   : undefined
                               }
                               placeholder={
                                 isStockLimitRequired &&
-                                item.stock != null &&
-                                item.stock > 0
+                                  item.stock != null &&
+                                  item.stock > 0
                                   ? `макс. ${item.stock}`
                                   : undefined
                               }
