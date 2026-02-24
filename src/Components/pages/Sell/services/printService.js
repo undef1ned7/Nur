@@ -20,7 +20,7 @@ const safeLsGet = (k) => {
 const safeLsSet = (k, v) => {
   try {
     localStorage.setItem(k, v);
-  } catch {}
+  } catch { }
 };
 const safeNumber = (raw, fallback) => {
   const n = Number(raw);
@@ -67,8 +67,10 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 export function setEscposCodepage(n) {
   safeLsSet("escpos_cp", String(n));
 }
+
 const PC866_CODES = new Set([66, 17, 18, 59]); // 17 — частый ESC/POS номер PC866, 59 — PC866(Russian)
 const CP1251_CODES = new Set([73, 22]);
+const PC936_CODES = new Set([255]);
 
 function encodeCP1251(s = "") {
   const out = [];
@@ -104,9 +106,19 @@ const getEncoder = (n) =>
   PC866_CODES.has(n)
     ? encodePC866
     : CP1251_CODES.has(n)
-    ? encodeCP1251
-    : encodeCP1251;
-
+      ? encodeCP1251
+      : PC936_CODES.has(n)
+        ? encodePC936
+        : encodeCP1251;       
+function encodePC936(s = "") {
+  const out = [];
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c <= 0x7f) out.push(c);
+    else out.push(0x3f);
+  }
+  return new Uint8Array(out);
+}
 export function getEscposRuntimeConfig() {
   const fontRaw = String(safeLsGet("escpos_font") || DEFAULT_FONT).toUpperCase();
   const font = fontRaw === "A" ? "A" : "B";
@@ -200,10 +212,10 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
 
   const total = new Uint8Array(
     init.length +
-      alignLeft.length +
-      header.length +
-      raster.length +
-      feedAndCut.length
+    alignLeft.length +
+    header.length +
+    raster.length +
+    feedAndCut.length
   );
   let o = 0;
   total.set(init, o);
@@ -340,7 +352,7 @@ function saveVidPidToLS(dev) {
     if (dev.productName) localStorage.setItem("escpos_product", dev.productName);
     if (dev.manufacturerName)
       localStorage.setItem("escpos_manufacturer", dev.manufacturerName);
-  } catch {}
+  } catch { }
 }
 async function tryUsbAutoConnect() {
   if (!("usb" in navigator)) throw new Error("Браузер не поддерживает WebUSB");
@@ -368,10 +380,10 @@ async function openUsbDevice(dev) {
   if (!dev.opened) await dev.open();
 
   if (dev.configuration == null) {
-    await dev.selectConfiguration(1).catch(() => {});
+    await dev.selectConfiguration(1).catch(() => { });
     if (dev.configuration == null && dev.configurations?.length) {
       const cfgNum = dev.configurations[0]?.configurationValue ?? 1;
-      await dev.selectConfiguration(cfgNum).catch(() => {});
+      await dev.selectConfiguration(cfgNum).catch(() => { });
     }
   }
   const cfg = dev.configuration;
@@ -395,7 +407,7 @@ async function openUsbDevice(dev) {
       } catch {
         try {
           await dev.releaseInterface(intf.interfaceNumber);
-        } catch {}
+        } catch { }
         continue;
       }
       return {
