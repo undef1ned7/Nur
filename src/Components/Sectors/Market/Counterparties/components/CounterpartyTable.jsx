@@ -20,7 +20,7 @@ const CounterpartyRow = React.memo(
     const type = counterparty?.type || "—";
     const inn = counterparty?.inn || "—";
 
-    // Маппинг типов для отображения
+    // Маппинг типов для отображения 
     const typeLabels = {
       CLIENT: "Клиент",
       SUPPLIER: "Поставщик",

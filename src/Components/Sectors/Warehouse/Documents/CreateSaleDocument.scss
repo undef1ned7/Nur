@@ -564,17 +564,67 @@ $due-red: #dc2626;
   &__checkbox {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     font-size: 14px;
     font-weight: 500;
     color: #0f172a;
     cursor: pointer;
+    user-select: none;
+  }
 
-    input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
+  &__toggle-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  &__toggle-track {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    background: #f7d74f;
+    transition: background-color 0.2s ease;
+  }
+
+  &__toggle-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f7d74f;
+    transition: transform 0.2s ease;
+    pointer-events: none;
+
+    svg {
+      opacity: 0;
+      transition: opacity 0.2s ease;
     }
+  }
+
+  &__toggle-input:checked + &__toggle-track &__toggle-thumb {
+    transform: translateX(20px);
+
+    svg {
+      opacity: 1;
+    }
+  }
+
+  &__toggle-label {
+    flex: 0 0 auto;
   }
 
   &__content {
@@ -1055,7 +1105,6 @@ $due-red: #dc2626;
     height: auto;
     min-height: 100vh;
 
-
     &__search-wrapper {
       padding: 12px;
     }
@@ -1222,8 +1271,6 @@ $due-red: #dc2626;
 
 @media (max-width: 480px) {
   .create-sale-document {
-   
-
     &__search-wrapper {
       padding: 10px;
       gap: 6px;
@@ -1441,7 +1488,6 @@ $due-red: #dc2626;
 // Для очень маленьких экранов (высота)
 @media (max-height: 600px) {
   .create-sale-document {
-
     &__content {
       padding: 10px;
     }
@@ -1465,4 +1511,3 @@ $due-red: #dc2626;
     }
   }
 }
-
