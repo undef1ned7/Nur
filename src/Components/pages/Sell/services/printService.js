@@ -27,8 +27,13 @@ const safeNumber = (raw, fallback) => {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 const safeByte = (raw, fallback) => {
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 && n <= 255 ? n : fallback;
+  if (raw == null) return fallback;
+  const s = String(raw).trim();
+  if (!s) return fallback;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return fallback;
+  const b = Math.trunc(n);
+  return b >= 0 && b <= 255 ? b : fallback;
 };
 
 // Быстрые тюнеры (пригодятся в консоли):
@@ -519,7 +524,7 @@ export async function checkPrinterConnection() {
     console.log("[PrintService] checkPrinterConnection ->", {
       hasState: !!state,
       hasDevice: !!usbState.dev,
-      connected,
+      connected,bui
     });
     return connected;
   } catch (err) {
