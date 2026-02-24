@@ -28,6 +28,7 @@ import LogisticsPage from "../Components/Sectors/logistics/LogisticsPage/Logisti
 import LogisticsAnalytics from "../Components/pages/LogisticsAnalytics/LogisticsAnalytics";
 import Shifts from "../Components/pages/Shifts/Shifts";
 import ShiftDetail from "../Components/pages/Shifts/ShiftDetail";
+import PosPrintSettings from "../Components/pages/Info/Settings/PosPrintSettings";
 
 // Deposits
 import Obzor from "../Components/Deposits/Obzor/Obzor";
@@ -371,6 +372,8 @@ export const publicRoutes = [
 export const crmRoutes = (profile) => [
   // Common routes
   createProtectedRoute("set", Set),
+  // Скрытая страница тонкой настройки POS‑печати (ESC/POS)
+  createProtectedRoute("pos-print-settings", PosPrintSettings),
   createProtectedRoute("raspisanie", Raspisanie),
   createProtectedRoute("registration", Registration),
   createProtectedRoute("obzor", Obzor),

@@ -5,6 +5,7 @@ import NotificationCafeSound from '../../common/Notification/NotificationCafeSou
 import { useUser } from '../../../store/slices/userSlice'
 import api from '../../../api'
 import { checkPrinterConnection, parsePrinterBinding, printOrderReceiptJSONViaUSB, printViaWiFiSimple, setActivePrinterByKey } from './Orders/OrdersPrintService'
+import * as logger from '../../../utils/logger'
 
 export default function CafeLayout() {
     const { orders, tables } = useCafeWebSocketManager();
@@ -33,6 +34,38 @@ export default function CafeLayout() {
     const UUID_RE =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+
+    // const [kitchens, setKitchens] = useState([]);
+    // const fetchKitchens = useCallback(async () => {
+    //     const { data } = await api.get("/cafe/kitchens/");
+    //     setKitchens(data.results);
+    // }, []);
+
+    // useEffect(() => {
+    //     fetchKitchens();
+    // }, [fetchKitchens]);
+
+    // useEffect(() => {
+    //     (async () => {
+    //         try {
+    //             const { data } = await api.get("/cafe/receipt-printer/");
+    //             const { bridge_url, printer } = data || {};
+    //             localStorage.setItem("cafe_printer_bridge_url", bridge_url);
+    //             localStorage.setItem("cafe_receipt_printer", printer);
+    //         } catch (e) {
+    //             logger.error("CafeLayout useEffect error:", e);
+    //         }
+    //     })();
+    // }, []);
+
+    // const kitchensMap = useMemo(() => {
+    //     return new Map(kitchens.map((kitchen) => {
+    //         return [String(kitchen.id), kitchen];
+    //     }, {}))
+    // }, [kitchens]);
+    // logger.info('kitchensMap', kitchensMap);
+
+
     const isAutoKitchenPrintEnabled = useMemo(() => {
         try {
             return localStorage.getItem("cafe_auto_kitchen_print") === "true";
@@ -40,7 +73,6 @@ export default function CafeLayout() {
             return false;
         }
     }, []);
-
     const shouldAutoPrintNow = async () => {
         // If explicitly disabled -> never auto print
         try {
@@ -211,7 +243,7 @@ export default function CafeLayout() {
         const tableLabel = resolveTableLabelFromOrder(orderDetail);
         const items = Array.isArray(orderDetail?.items) ? orderDetail.items : [];
         const isTakeaway = tableLabel === TAKEAWAY_LABEL;
-    
+
         return {
             company: localStorage.getItem("company_name") || "КАССА",
             doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${tableLabel}`,
