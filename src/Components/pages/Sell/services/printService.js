@@ -6,34 +6,43 @@
 // Глобальное состояние USB
 const usbState = { dev: null, opening: null };
 
-// ====== НАСТРОЙКИ БУМАГИ 72 мм (80мм принтер) ======
-const DOTS_PER_LINE = Number(localStorage.getItem("escpos_dpl") || 576);
-// Шрифт: 'A' или 'B'
-const FONT = (localStorage.getItem("escpos_font") || "B").toUpperCase();
-// ширина символа в точках (Font A ~12, Font B ~9)
-const CHAR_DOT_WIDTH = FONT === "B" ? 9 : 12;
-// межстрочный интервал
-const LINE_DOT_HEIGHT = Number(
-  localStorage.getItem("escpos_line") || (FONT === "B" ? 22 : 24)
-);
-// ширина строки в символах
-const CHARS_PER_LINE = Number(
-  localStorage.getItem("escpos_cpl") ||
-    Math.floor(DOTS_PER_LINE / CHAR_DOT_WIDTH)
-);
+const DEFAULT_DOTS_PER_LINE = 576; // 80мм принтер обычно 576 точек
+const DEFAULT_FONT = "B";
+const DEFAULT_CODEPAGE = 17; // PC866 (часто 17 или 66)
+
+const safeLsGet = (k) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
+};
+const safeLsSet = (k, v) => {
+  try {
+    localStorage.setItem(k, v);
+  } catch {}
+};
+const safeNumber = (raw, fallback) => {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+const safeByte = (raw, fallback) => {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && n <= 255 ? n : fallback;
+};
 
 // Быстрые тюнеры (пригодятся в консоли):
 export function setEscposDotsPerLine(n) {
-  localStorage.setItem("escpos_dpl", String(n));
+  safeLsSet("escpos_dpl", String(n));
 }
 export function setEscposCharsPerLine(n) {
-  localStorage.setItem("escpos_cpl", String(n));
+  safeLsSet("escpos_cpl", String(n));
 }
 export function setEscposLineHeight(n) {
-  localStorage.setItem("escpos_line", String(n));
+  safeLsSet("escpos_line", String(n));
 }
 export function setEscposFont(ch) {
-  localStorage.setItem("escpos_font", String(ch).toUpperCase());
+  safeLsSet("escpos_font", String(ch).toUpperCase());
 }
 
 const ESC = (...b) => new Uint8Array(b);
@@ -54,10 +63,9 @@ const chunkBytes = (u8, size = 12 * 1024) => {
 // ====== ЖЁСТКАЯ НАСТРОЙКА ДЛЯ XP-N160II: PC866 ======
 // Важно: у части Xprinter (в т.ч. XP-N160II) PC866 на ESC/POS бывает как 17 или 66.
 // Если будет "корябяза", поменяйте 17 <-> 66.
-const FORCED_CODEPAGE = 17; // PC866
 // printRussianRawUsb("Тест: Привет, мир! Ёё №");
 export function setEscposCodepage(n) {
-  localStorage.setItem("escpos_cp", String(n));
+  safeLsSet("escpos_cp", String(n));
 }
 const PC866_CODES = new Set([66, 17, 18, 59]); // 17 — частый ESC/POS номер PC866, 59 — PC866(Russian)
 const CP1251_CODES = new Set([73, 22]);
@@ -98,6 +106,34 @@ const getEncoder = (n) =>
     : CP1251_CODES.has(n)
     ? encodeCP1251
     : encodeCP1251;
+
+export function getEscposRuntimeConfig() {
+  const fontRaw = String(safeLsGet("escpos_font") || DEFAULT_FONT).toUpperCase();
+  const font = fontRaw === "A" ? "A" : "B";
+  const charDotWidth = font === "B" ? 9 : 12;
+
+  const dotsPerLine = safeNumber(safeLsGet("escpos_dpl"), DEFAULT_DOTS_PER_LINE);
+  const charsPerLine = safeNumber(
+    safeLsGet("escpos_cpl"),
+    Math.floor(dotsPerLine / charDotWidth)
+  );
+  const lineDotHeight = safeNumber(
+    safeLsGet("escpos_line"),
+    font === "B" ? 22 : 24
+  );
+  const codepage = safeByte(safeLsGet("escpos_cp"), DEFAULT_CODEPAGE);
+  const encoder = getEncoder(codepage);
+
+  return {
+    font,
+    charDotWidth,
+    dotsPerLine,
+    charsPerLine,
+    lineDotHeight,
+    codepage,
+    encoder,
+  };
+}
 
 /* ---------- PDF → растер ---------- */
 async function ensurePdfJs() {
@@ -191,11 +227,11 @@ function lr(left, right, width = 32) {
   return L + " ".repeat(spaces) + R;
 }
 function buildReceiptFromJSON(payload, opts = {}) {
-  const width = opts.width || CHARS_PER_LINE;
+  const cfg = getEscposRuntimeConfig();
+  const width = opts.width || cfg.charsPerLine;
   const divider = "-".repeat(width);
-  // Жёстко используем PC866 (и для ESC t n, и для энкодинга текста)
-  const codepage = FORCED_CODEPAGE;
-  const enc = encodePC866;
+  const codepage = opts.codepage || cfg.codepage;
+  const enc = opts.encoder || getEncoder(codepage);
 
   const company = payload.company ?? "";
   const docNo = payload.doc_no ?? "";
@@ -499,7 +535,8 @@ async function printReceiptFromPdfUSB(pdfBlob, options = {}) {
   saveVidPidToLS(dev);
 
   // печатаем на ширину принтера
-  const canvas = await pdfBlobToCanvas(pdfBlob, DOTS_PER_LINE);
+  const cfg = getEscposRuntimeConfig();
+  const canvas = await pdfBlobToCanvas(pdfBlob, cfg.dotsPerLine);
   const { raster, bytesPerLine, h } = canvasToRasterBytes(canvas);
   const escpos = buildEscPosForRaster(raster, bytesPerLine, h);
 
@@ -522,10 +559,11 @@ async function printReceiptJSONViaUSB(payload, options = {}) {
   const { outEP } = await openUsbDevice(dev);
   saveVidPidToLS(dev);
 
-  // Жёстко печатаем в PC866 (без fallback/автоподбора)
+  const cfg = getEscposRuntimeConfig();
   const parts = buildReceiptFromJSON(payload, {
-    width: CHARS_PER_LINE,
-    codepage: FORCED_CODEPAGE,
+    width: cfg.charsPerLine,
+    codepage: cfg.codepage,
+    encoder: cfg.encoder,
   });
   for (const data of parts) {
     for (const chunk of chunkBytes(data)) {
@@ -549,11 +587,12 @@ export async function printRussianRawUsb(text = "Привет, мир!", options
   const { outEP } = await openUsbDevice(dev);
   saveVidPidToLS(dev);
 
-  // ESC/POS: init, Russia, codepage PC866, text, newline, cut
+  const cfg = getEscposRuntimeConfig();
+  // ESC/POS: init, Russia, codepage, text, newline, cut
   const init = ESC(0x1b, 0x40);
   const intl = ESC(0x1b, 0x52, 0x07);
-  const cp = ESC(0x1b, 0x74, FORCED_CODEPAGE); // PC866
-  const body = encodePC866(String(text) + "\n");
+  const cp = ESC(0x1b, 0x74, cfg.codepage);
+  const body = cfg.encoder(String(text) + "\n");
   const cut = ESC(0x1d, 0x56, 0x00);
 
   const data = new Uint8Array(
