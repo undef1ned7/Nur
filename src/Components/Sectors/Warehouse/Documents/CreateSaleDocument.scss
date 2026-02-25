@@ -776,6 +776,33 @@ $due-red: #dc2626;
     }
   }
 
+  &__prepayment {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+  }
+
+  &__prepayment-label {
+    font-size: 14px;
+    color: #475569;
+    white-space: nowrap;
+  }
+
+  &__prepayment-input {
+    width: 100px;
+    padding: 6px 10px;
+    font-size: 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-dark;
+    }
+  }
+
   &__payment-hint {
     margin: 8px 0 0;
     font-size: 12px;

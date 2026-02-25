@@ -185,6 +185,7 @@ const CreateSaleDocument = () => {
   const [documentDiscount, setDocumentDiscount] = useState("");
   const [comment, setComment] = useState("");
   const [paymentKind, setPaymentKind] = useState("cash"); // cash — сразу, credit — в долг (API: payment_kind)
+  const [prepaymentAmount, setPrepaymentAmount] = useState(""); // предоплата по долгу (только при payment_kind=credit)
   const [cartItems, setCartItems] = useState([]);
   const [documentId] = useState(
     () => `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -1147,10 +1148,20 @@ const CreateSaleDocument = () => {
       const documentDiscountAmount =
         (subtotalAfterItems * discountPercentNum) / 100;
 
+      // Предоплата по долгу (API: prepayment_amount, только при payment_kind=credit)
+      const prepaymentNum = Number(prepaymentAmount) || 0;
+      const hasPrepayment =
+        isPaymentKindRelevant &&
+        paymentKind === "credit" &&
+        prepaymentNum > 0;
+
       // Формируем данные для создания документа через новый API
       const documentData = {
         doc_type: docType,
         ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
+        ...(hasPrepayment && {
+          prepayment_amount: String(prepaymentNum.toFixed(2)),
+        }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
@@ -1221,6 +1232,7 @@ const CreateSaleDocument = () => {
       setClientId("");
       setWarehouseTo("");
       setDocumentDiscount("");
+      setPrepaymentAmount("");
       setComment("");
       setDocumentSearch("");
 
@@ -1277,9 +1289,18 @@ const CreateSaleDocument = () => {
       const documentDiscountAmount =
         (subtotalAfterItems * discountPercentNum) / 100;
 
+      const prepaymentNum = Number(prepaymentAmount) || 0;
+      const hasPrepayment =
+        isPaymentKindRelevant &&
+        paymentKind === "credit" &&
+        prepaymentNum > 0;
+
       const documentData = {
         doc_type: docType,
         ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
+        ...(hasPrepayment && {
+          prepayment_amount: String(prepaymentNum.toFixed(2)),
+        }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
@@ -1543,6 +1564,7 @@ const CreateSaleDocument = () => {
       setSelectedProductIds(new Set());
       setClientId("");
       setDocumentDiscount("");
+      setPrepaymentAmount("");
       setComment("");
       setDocumentSearch("");
 
@@ -1803,6 +1825,35 @@ const CreateSaleDocument = () => {
                       />
                       <span>В долг</span>
                     </label>
+                    {paymentKind === "credit" && (
+                      <div className="create-sale-document__prepayment">
+                        <label className="create-sale-document__prepayment-label">
+                          Предоплата, сом
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className="create-sale-document__prepayment-input"
+                          placeholder="0"
+                          value={prepaymentAmount}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "") setPrepaymentAmount("");
+                            else {
+                              const n = Number(v);
+                              if (!isNaN(n) && n >= 0) setPrepaymentAmount(v);
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const v = e.target.value;
+                            if (v !== "" && !isNaN(Number(v)) && Number(v) >= 0) {
+                              setPrepaymentAmount(Number(v).toFixed(2));
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
