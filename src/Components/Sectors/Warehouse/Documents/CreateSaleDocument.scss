@@ -1,3 +1,5 @@
+@use "sass:color";
+
 $primary: #f7d74f;
 $primary-dark: #e6c547;
 $summary-bg: #fefce8;
@@ -800,6 +802,169 @@ $due-red: #dc2626;
     &:focus {
       outline: none;
       border-color: $primary-dark;
+    }
+  }
+
+  &__prepayment-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 12px;
+    padding: 6px 12px;
+    background: $summary-bg;
+    border: 1px solid $primary-dark;
+    border-radius: 8px;
+  }
+
+  &__prepayment-badge-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  &__prepayment-badge-btn {
+    font-size: 13px;
+    font-weight: 600;
+    color: $primary-dark;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 4px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: color.adjust($primary-dark, $lightness: -12%);
+    }
+  }
+
+  &__prepayment-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(4px);
+  }
+
+  &__prepayment-modal {
+    background: #fff;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+  }
+
+  &__prepayment-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  &__prepayment-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+  }
+
+  &__prepayment-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+
+    &:hover {
+      color: #111827;
+      background: #f3f4f6;
+    }
+  }
+
+  &__prepayment-modal-content {
+    padding: 24px;
+  }
+
+  &__prepayment-modal-hint {
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.5;
+    margin: 0 0 16px;
+  }
+
+  &__prepayment-modal-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+
+  &__prepayment-modal-input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-dark;
+    }
+
+    &::placeholder {
+      color: #9ca3af;
+    }
+  }
+
+  &__prepayment-modal-actions {
+    display: flex;
+    gap: 12px;
+    padding: 16px 24px 24px;
+    justify-content: flex-end;
+  }
+
+  &__prepayment-modal-cancel {
+    padding: 10px 20px;
+    background: #fff;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+      background: #f9fafb;
+    }
+  }
+
+  &__prepayment-modal-save {
+    padding: 10px 20px;
+    background: $primary-dark;
+    color: #111827;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+      background: color.adjust($primary-dark, $lightness: -8%);
     }
   }
 
