@@ -32,6 +32,9 @@ import { useUser } from "../../../../store/slices/userSlice";
 import Pagination from "../../Market/Counterparties/components/Pagination";
 import { useOutletContext } from "react-router-dom";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { useAlert } from "../../../../hooks/useDialog";
+import * as logger from "../../../../utils/logger";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -251,6 +254,7 @@ const statusFilterOptions =
    Orders
    ========================================================= */
 const Orders = () => {
+  const alert = useAlert();
   const { profile } = useUser();
   const [tables, setTables] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -1187,9 +1191,10 @@ const Orders = () => {
       // успех — снимаем guard
       localStorage.removeItem(guardKey);
     } catch (e) {
-      console.error("Ошибка оплаты (delete order):", e);
-
-      // Ошибка оплаты заказа
+      logger.error("Ошибка оплаты (delete order):", e);
+      const errorMessage = validateResErrors(e);
+      alert(errorMessage, true);
+      // Ошибка оплаты заказa
     } finally {
       setPaying(false);
     }
