@@ -104,7 +104,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     price: "",
     quantity: "", // ВАЖНО: храним как строку для удобного двустороннего биндинга
     client: "",
-    purchase_price: "",
+    purchase_price: '0',
     stock: false, // Акционный товар
   });
 

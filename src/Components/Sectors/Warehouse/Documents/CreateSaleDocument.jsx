@@ -714,7 +714,7 @@ const CreateSaleDocument = () => {
   const agents = useMemo(() => {
     const list = Array.isArray(employees) ? employees : [];
     const baseAgents = list.filter((e) => {
-      const role =
+      const role = 
         e?.role_display ??
         e?.role_name ??
         e?.role ??

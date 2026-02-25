@@ -4,12 +4,14 @@ import { useEffect, useMemo } from "react";
 import { MENU_CONFIG } from "./Components/Sidebar/config/menuConfig";
 import { useMenuPermissions } from "./Components/Sidebar/hooks/useMenuPermissions";
 import { useDebounce } from "./hooks/useDebounce";
+import { useAlert } from "./hooks/useDialog";
 
 
 const BASE_ROUTES = ['/srm/set']
 
 const ProtectedRoute = ({ children }) => {
   const { company, companyLoading, profile, tariff, sector } = useUser();
+  const alert = useAlert();
   // const { hasPermission, isAllowed } = useMenuPermissions();
   // const { pathname } = useLocation()
   // const navigate = useNavigate()
@@ -65,10 +67,11 @@ const ProtectedRoute = ({ children }) => {
   // Пока грузим компанию — ждём
   if (companyLoading) {
     return <div>Загрузка...</div>;
-  }
 
+  }
   // Если компания не пришла → редирект
   if (!company?.end_date) {
+    alert('Срок действия компании не установлен', true);
     return <Navigate to="/" replace />;
   }
 
@@ -80,6 +83,7 @@ const ProtectedRoute = ({ children }) => {
   now.setHours(0, 0, 0, 0);
 
   if (endDate < now) {
+    alert('Срок действия компании истек', true);
     return <Navigate to="/" replace />;
   }
 
