@@ -115,10 +115,11 @@ const SearchSelect = ({
               <button
                 key={String(o.value)}
                 type="button"
-                className={`create-sale-document__searchselect-item ${String(o.value) === String(value)
-                  ? "create-sale-document__searchselect-item--active"
-                  : ""
-                  }`}
+                className={`create-sale-document__searchselect-item ${
+                  String(o.value) === String(value)
+                    ? "create-sale-document__searchselect-item--active"
+                    : ""
+                }`}
                 onClick={() => {
                   onChange?.(o.value);
                   setOpen(false);
@@ -152,8 +153,8 @@ const CreateSaleDocument = () => {
       ? urlDocType
       : location.state?.docType &&
         VALID_DOC_TYPES.includes(location.state.docType)
-        ? location.state.docType
-        : "SALE";
+      ? location.state.docType
+      : "SALE";
 
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
@@ -185,6 +186,9 @@ const CreateSaleDocument = () => {
   const [documentDiscount, setDocumentDiscount] = useState("");
   const [comment, setComment] = useState("");
   const [paymentKind, setPaymentKind] = useState("cash"); // cash — сразу, credit — в долг (API: payment_kind)
+  const [prepaymentAmount, setPrepaymentAmount] = useState(""); // предоплата по долгу (только при payment_kind=credit)
+  const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
+  const [modalPrepaymentValue, setModalPrepaymentValue] = useState("");
   const [cartItems, setCartItems] = useState([]);
   const [documentId] = useState(
     () => `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -196,6 +200,13 @@ const CreateSaleDocument = () => {
   useEffect(() => {
     warehouseRef.current = warehouse;
   }, [warehouse]);
+
+  // При открытии модалки предоплаты подставляем текущее значение
+  useEffect(() => {
+    if (showPrepaymentModal) {
+      setModalPrepaymentValue(prepaymentAmount || "");
+    }
+  }, [showPrepaymentModal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Форматирование даты для отображения
   const formatDisplayDate = (dateString) => {
@@ -404,7 +415,9 @@ const CreateSaleDocument = () => {
       const hasChildren = children.length > 0;
       const isExpanded = expandedGroupIds.has(gKey);
       const cached = groupProducts?.[gKey];
-      const cachedCount = Array.isArray(cached?.items) ? cached.items.length : 0;
+      const cachedCount = Array.isArray(cached?.items)
+        ? cached.items.length
+        : 0;
       const count =
         g?.products_count !== undefined && g?.products_count !== null
           ? Number(g.products_count) || 0
@@ -413,7 +426,9 @@ const CreateSaleDocument = () => {
       return (
         <div key={gKey} className="create-sale-document__group-node">
           <div
-            className={`create-sale-document__group-item ${isExpanded ? "is-open" : ""}`}
+            className={`create-sale-document__group-item ${
+              isExpanded ? "is-open" : ""
+            }`}
             style={{ paddingLeft: 10 + depth * 14 }}
             role="button"
             tabIndex={0}
@@ -466,7 +481,9 @@ const CreateSaleDocument = () => {
             <span className="create-sale-document__group-icon">
               {isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
             </span>
-            <span className="create-sale-document__group-name">{g?.name || "—"}</span>
+            <span className="create-sale-document__group-name">
+              {g?.name || "—"}
+            </span>
             <span className="create-sale-document__group-count">{count}</span>
           </div>
 
@@ -481,21 +498,25 @@ const CreateSaleDocument = () => {
                   <div className="create-sale-document__group-products-empty">
                     Не удалось загрузить товары
                   </div>
-                ) : Array.isArray(cached?.items) && cached.items.length === 0 ? (
+                ) : Array.isArray(cached?.items) &&
+                  cached.items.length === 0 ? (
                   <div className="create-sale-document__group-products-empty">
                     Нет товаров
                   </div>
                 ) : (
                   (cached?.items || []).map((product) => {
-                    const isSelected = selectedProductIds.has(String(product.id));
+                    const isSelected = selectedProductIds.has(
+                      String(product.id)
+                    );
                     const isInCart = cartItems.some(
                       (item) => String(item.productId) === String(product.id)
                     );
                     return (
                       <div
                         key={product.id}
-                        className={`create-sale-document__group-product-item ${isSelected || isInCart ? "active" : ""
-                          }`}
+                        className={`create-sale-document__group-product-item ${
+                          isSelected || isInCart ? "active" : ""
+                        }`}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleAddProduct(product);
@@ -507,9 +528,7 @@ const CreateSaleDocument = () => {
                           </div>
                           <div className="create-sale-document__group-product-meta">
                             <span className="create-sale-document__group-product-price">
-                              {formatPrice(
-                                getProductPriceForDocument(product)
-                              )}{" "}
+                              {formatPrice(getProductPriceForDocument(product))}{" "}
                               сом
                             </span>
                             <span className="create-sale-document__group-product-stock">
@@ -580,8 +599,7 @@ const CreateSaleDocument = () => {
   // Цена для подстановки в позицию: при покупке — закупочная, при продаже — цена продажи
   const getProductPriceForDocument = (product) => {
     if (!product) return 0;
-    const isPurchase =
-      docType === "PURCHASE" || docType === "PURCHASE_RETURN";
+    const isPurchase = docType === "PURCHASE" || docType === "PURCHASE_RETURN";
     return Number(
       isPurchase
         ? product.purchase_price ?? product.price ?? 0
@@ -741,8 +759,9 @@ const CreateSaleDocument = () => {
       .map((cp) => ({
         value: cp.id,
         label: cp.name || cp.full_name || cp.title || "Без названия",
-        searchText: `${cp.name || ""} ${cp.full_name || ""} ${cp.title || ""
-          } ${cp.phone || ""} ${cp.inn || ""}`.trim(),
+        searchText: `${cp.name || ""} ${cp.full_name || ""} ${cp.title || ""} ${
+          cp.phone || ""
+        } ${cp.inn || ""}`.trim(),
       }));
   }, [filteredCounterparties, agentId, isAgentFilterRelevant]);
 
@@ -750,8 +769,9 @@ const CreateSaleDocument = () => {
     return (Array.isArray(agents) ? agents : []).map((a) => ({
       value: a.id,
       label: a.full_name || a.name || a.email || `#${a.id}`,
-      searchText: `${a.full_name || ""} ${a.name || ""} ${a.email || ""} ${a.phone || ""
-        }`.trim(),
+      searchText: `${a.full_name || ""} ${a.name || ""} ${a.email || ""} ${
+        a.phone || ""
+      }`.trim(),
     }));
   }, [agents]);
 
@@ -767,8 +787,9 @@ const CreateSaleDocument = () => {
       .map((wh) => ({
         value: wh.id || wh.uuid,
         label: wh.name || wh.title || String(wh.id || wh.uuid),
-        searchText: `${wh.name || ""} ${wh.title || ""} ${wh.address || ""
-          }`.trim(),
+        searchText: `${wh.name || ""} ${wh.title || ""} ${
+          wh.address || ""
+        }`.trim(),
       }));
   }, [warehouses]);
 
@@ -785,8 +806,9 @@ const CreateSaleDocument = () => {
       .map((wh) => ({
         value: wh.id || wh.uuid,
         label: wh.name || wh.title || String(wh.id || wh.uuid),
-        searchText: `${wh.name || ""} ${wh.title || ""} ${wh.address || ""
-          }`.trim(),
+        searchText: `${wh.name || ""} ${wh.title || ""} ${
+          wh.address || ""
+        }`.trim(),
       }));
   }, [warehouses, warehouse]);
 
@@ -835,7 +857,7 @@ const CreateSaleDocument = () => {
       (sum, item) =>
         sum +
         (Number(item.price || item.unit_price) || 0) *
-        (Number(item.quantity) || 0),
+          (Number(item.quantity) || 0),
       0
     );
 
@@ -860,10 +882,23 @@ const CreateSaleDocument = () => {
     // Общая скидка (скидка по позициям + скидка по документу)
     const totalDiscount = itemsDiscount + documentDiscountAmount;
 
-    // Итоговая сумма с учетом всех скидок (в черновике показываем 0 до проведения)
+    // Итоговая сумма с учетом всех скидок
     const total = subtotalAfterItemsDiscount - documentDiscountAmount;
-    const paid = isDocumentPosted ? total : 0;
-    const displayTotal = isDocumentPosted ? total : 0;
+
+    // Предоплата (только для продажи/покупки в долг)
+    const prepaymentNum =
+      isPaymentKindRelevant && paymentKind === "credit"
+        ? Math.max(0, Number(prepaymentAmount) || 0)
+        : 0;
+
+    // Оплачено: для оплаты сразу считаем всю сумму, для кредита — только предоплату
+    const paid = isDocumentPosted
+      ? paymentKind === "cash"
+        ? total
+        : prepaymentNum
+      : prepaymentNum;
+
+    const displayTotal = total;
 
     return {
       subtotal,
@@ -873,9 +908,17 @@ const CreateSaleDocument = () => {
       total,
       displayTotal,
       paid,
+      prepayment: prepaymentNum,
       taxes: 0,
     };
-  }, [cartItems, documentDiscount, isDocumentPosted]);
+  }, [
+    cartItems,
+    documentDiscount,
+    isDocumentPosted,
+    isPaymentKindRelevant,
+    paymentKind,
+    prepaymentAmount,
+  ]);
 
   // Добавление товара в корзину
   const handleAddProduct = async (productOrId) => {
@@ -884,9 +927,7 @@ const CreateSaleDocument = () => {
     setAddingProduct(true);
     try {
       const product =
-        typeof productOrId === "object" && productOrId
-          ? productOrId
-          : null;
+        typeof productOrId === "object" && productOrId ? productOrId : null;
 
       if (!product?.id) {
         alert("Товар не найден");
@@ -904,11 +945,7 @@ const CreateSaleDocument = () => {
         const existing = cartItems[existingItemIndex];
         const currentQty = Number(existing.quantity || 0);
         const maxQty = Number(existing.stock ?? stock);
-        if (
-          isStockLimitRequired &&
-          maxQty > 0 &&
-          currentQty >= maxQty
-        ) {
+        if (isStockLimitRequired && maxQty > 0 && currentQty >= maxQty) {
           alert(`Нельзя добавить больше остатка. Остаток: ${maxQty}`);
           return;
         }
@@ -964,17 +1001,11 @@ const CreateSaleDocument = () => {
       unit.toLowerCase() === "шт" || unit.toLowerCase() === "штук";
     let finalQty = isPiece ? Math.floor(qty) : qty;
     const maxQty = Number(item.stock ?? 0);
-    if (
-      isStockLimitRequired &&
-      maxQty > 0 &&
-      finalQty > maxQty
-    ) {
+    if (isStockLimitRequired && maxQty > 0 && finalQty > maxQty) {
       finalQty = maxQty;
     }
     setCartItems((prev) =>
-      prev.map((i) =>
-        i.id === itemId ? { ...i, quantity: finalQty } : i
-      )
+      prev.map((i) => (i.id === itemId ? { ...i, quantity: finalQty } : i))
     );
   };
 
@@ -1024,8 +1055,9 @@ const CreateSaleDocument = () => {
       if (isPiece && !Number.isInteger(qty)) {
         return {
           valid: false,
-          error: `Для товара "${item.productName || item.name
-            }" количество должно быть целым числом (единица измерения: ${unit})`,
+          error: `Для товара "${
+            item.productName || item.name
+          }" количество должно быть целым числом (единица измерения: ${unit})`,
         };
       }
 
@@ -1036,8 +1068,9 @@ const CreateSaleDocument = () => {
       if (discountPercent < 0 || discountPercent > 100) {
         return {
           valid: false,
-          error: `Скидка для товара "${item.productName || item.name
-            }" должна быть в диапазоне 0-100%`,
+          error: `Скидка для товара "${
+            item.productName || item.name
+          }" должна быть в диапазоне 0-100%`,
         };
       }
 
@@ -1047,8 +1080,9 @@ const CreateSaleDocument = () => {
         if (stock > 0 && qty > stock) {
           return {
             valid: false,
-            error: `Количество товара "${item.productName || item.name
-              }" не может превышать остаток на складе (${stock})`,
+            error: `Количество товара "${
+              item.productName || item.name
+            }" не может превышать остаток на складе (${stock})`,
           };
         }
       }
@@ -1142,26 +1176,32 @@ const CreateSaleDocument = () => {
       const subtotalForDoc = cartItems.reduce(
         (sum, item) =>
           sum +
-          (Number(item.price || item.unit_price) || 0) * (Number(item.quantity) || 0),
+          (Number(item.price || item.unit_price) || 0) *
+            (Number(item.quantity) || 0),
         0
       );
-      const itemsDiscountSum = cartItems.reduce(
-        (sum, item) => {
-          const p = Number(item.price || item.unit_price) || 0;
-          const q = Number(item.quantity) || 0;
-          const d = Number(item.discount_percent || item.discount || 0);
-          return sum + (p * q * d) / 100;
-        },
-        0
-      );
+      const itemsDiscountSum = cartItems.reduce((sum, item) => {
+        const p = Number(item.price || item.unit_price) || 0;
+        const q = Number(item.quantity) || 0;
+        const d = Number(item.discount_percent || item.discount || 0);
+        return sum + (p * q * d) / 100;
+      }, 0);
       const subtotalAfterItems = subtotalForDoc - itemsDiscountSum;
       const documentDiscountAmount =
         (subtotalAfterItems * discountPercentNum) / 100;
+
+      // Предоплата по долгу (API: prepayment_amount, только при payment_kind=credit)
+      const prepaymentNum = Number(prepaymentAmount) || 0;
+      const hasPrepayment =
+        isPaymentKindRelevant && paymentKind === "credit" && prepaymentNum > 0;
 
       // Формируем данные для создания документа через новый API
       const documentData = {
         doc_type: docType,
         ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
+        ...(hasPrepayment && {
+          prepayment_amount: String(prepaymentNum.toFixed(2)),
+        }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
@@ -1232,6 +1272,7 @@ const CreateSaleDocument = () => {
       setClientId("");
       setWarehouseTo("");
       setDocumentDiscount("");
+      setPrepaymentAmount("");
       setComment("");
       setDocumentSearch("");
 
@@ -1272,25 +1313,30 @@ const CreateSaleDocument = () => {
       const subtotalForDoc = cartItems.reduce(
         (sum, item) =>
           sum +
-          (Number(item.price || item.unit_price) || 0) * (Number(item.quantity) || 0),
+          (Number(item.price || item.unit_price) || 0) *
+            (Number(item.quantity) || 0),
         0
       );
-      const itemsDiscountSum = cartItems.reduce(
-        (sum, item) => {
-          const p = Number(item.price || item.unit_price) || 0;
-          const q = Number(item.quantity) || 0;
-          const d = Number(item.discount_percent || item.discount || 0);
-          return sum + (p * q * d) / 100;
-        },
-        0
-      );
+      const itemsDiscountSum = cartItems.reduce((sum, item) => {
+        const p = Number(item.price || item.unit_price) || 0;
+        const q = Number(item.quantity) || 0;
+        const d = Number(item.discount_percent || item.discount || 0);
+        return sum + (p * q * d) / 100;
+      }, 0);
       const subtotalAfterItems = subtotalForDoc - itemsDiscountSum;
       const documentDiscountAmount =
         (subtotalAfterItems * discountPercentNum) / 100;
 
+      const prepaymentNum = Number(prepaymentAmount) || 0;
+      const hasPrepayment =
+        isPaymentKindRelevant && paymentKind === "credit" && prepaymentNum > 0;
+
       const documentData = {
         doc_type: docType,
         ...(isPaymentKindRelevant && { payment_kind: paymentKind }),
+        ...(hasPrepayment && {
+          prepayment_amount: String(prepaymentNum.toFixed(2)),
+        }),
         warehouse_from: warehouse,
         ...(isWarehouseToRequired && { warehouse_to: warehouseTo }),
         ...(isCounterpartyRequired && clientId && { counterparty: clientId }),
@@ -1358,35 +1404,35 @@ const CreateSaleDocument = () => {
 
       const items = Array.isArray(doc.items)
         ? doc.items.map((item) => {
-          const price = Number(item.price || 0);
-          const qty = Number(item.qty || 0);
-          const lineTotal = price * qty;
-          return {
-            id: item.id,
-            name:
-              item.product_name ??
-              item.product?.name ??
-              item.name ??
-              item.product?.title ??
-              "Товар",
-            qty: String(qty),
-            unit_price: String(price.toFixed(2)),
-            total: String(
-              Number(item.line_total ?? item.total ?? lineTotal).toFixed(2)
-            ),
-            unit: item.product?.unit ?? item.unit ?? "ШТ",
-            article:
-              String(
-                item.product?.article ??
-                item.article ??
-                item.product_article ??
-                ""
-              ).trim() || "",
-            discount_percent: Number(item.discount_percent || 0),
-            discount_amount: Number(item.discount_amount || 0),
-            price_before_discount: String(price.toFixed(2)),
-          };
-        })
+            const price = Number(item.price || 0);
+            const qty = Number(item.qty || 0);
+            const lineTotal = price * qty;
+            return {
+              id: item.id,
+              name:
+                item.product_name ??
+                item.product?.name ??
+                item.name ??
+                item.product?.title ??
+                "Товар",
+              qty: String(qty),
+              unit_price: String(price.toFixed(2)),
+              total: String(
+                Number(item.line_total ?? item.total ?? lineTotal).toFixed(2)
+              ),
+              unit: item.product?.unit ?? item.unit ?? "ШТ",
+              article:
+                String(
+                  item.product?.article ??
+                    item.article ??
+                    item.product_article ??
+                    ""
+                ).trim() || "",
+              discount_percent: Number(item.discount_percent || 0),
+              discount_amount: Number(item.discount_amount || 0),
+              price_before_discount: String(price.toFixed(2)),
+            };
+          })
         : [];
 
       const subtotal = items.reduce(
@@ -1399,14 +1445,13 @@ const CreateSaleDocument = () => {
           (Number(item.unit_price) *
             Number(item.qty) *
             Number(item.discount_percent || 0)) /
-          100,
+            100,
         0
       );
       const totalDiscount = itemsDiscountTotal + docDiscountAmount;
       const total = Number(doc.total) || subtotal - totalDiscount;
 
-      const docNumber =
-        doc.number || documentId.substring(0, 8) || "00001";
+      const docNumber = doc.number || documentId.substring(0, 8) || "00001";
       const currentDate = doc.date
         ? new Date(doc.date)
         : new Date(documentDateValue || undefined);
@@ -1455,18 +1500,18 @@ const CreateSaleDocument = () => {
           },
           buyer: selectedCounterparty
             ? {
-              id: selectedCounterparty.id,
-              name: selectedCounterparty.name || buyerName || "",
-              inn: selectedCounterparty.inn || "",
-              okpo: selectedCounterparty.okpo || "",
-              score: selectedCounterparty.score || "",
-              bik: selectedCounterparty.bik || "",
-              address: selectedCounterparty.address || "",
-              phone: selectedCounterparty.phone || null,
-              email: selectedCounterparty.email || null,
-            }
+                id: selectedCounterparty.id,
+                name: selectedCounterparty.name || buyerName || "",
+                inn: selectedCounterparty.inn || "",
+                okpo: selectedCounterparty.okpo || "",
+                score: selectedCounterparty.score || "",
+                bik: selectedCounterparty.bik || "",
+                address: selectedCounterparty.address || "",
+                phone: selectedCounterparty.phone || null,
+                email: selectedCounterparty.email || null,
+              }
             : buyerName
-              ? {
+            ? {
                 id: "",
                 name: buyerName,
                 inn: "",
@@ -1477,7 +1522,7 @@ const CreateSaleDocument = () => {
                 phone: null,
                 email: null,
               }
-              : null,
+            : null,
           items,
           totals: {
             subtotal: String(subtotal.toFixed(2)),
@@ -1517,12 +1562,12 @@ const CreateSaleDocument = () => {
           },
           client: selectedCounterparty
             ? {
-              id: selectedCounterparty.id,
-              full_name: selectedCounterparty.name || buyerName || "",
-            }
+                id: selectedCounterparty.id,
+                full_name: selectedCounterparty.name || buyerName || "",
+              }
             : buyerName
-              ? { id: "", full_name: buyerName }
-              : null,
+            ? { id: "", full_name: buyerName }
+            : null,
           items,
           totals: {
             subtotal: String(subtotal.toFixed(2)),
@@ -1554,6 +1599,7 @@ const CreateSaleDocument = () => {
       setSelectedProductIds(new Set());
       setClientId("");
       setDocumentDiscount("");
+      setPrepaymentAmount("");
       setComment("");
       setDocumentSearch("");
 
@@ -1564,8 +1610,8 @@ const CreateSaleDocument = () => {
       const errorMessage =
         error?.response?.data || error?.payload || error?.error
           ? formatApiError(
-            error?.response?.data || error?.payload || error?.error
-          )
+              error?.response?.data || error?.payload || error?.error
+            )
           : error?.message || "Не удалось сгенерировать PDF";
       alert("Ошибка: " + errorMessage);
     }
@@ -1615,8 +1661,9 @@ const CreateSaleDocument = () => {
                 return (
                   <div className="create-sale-document__group-node">
                     <div
-                      className={`create-sale-document__group-item ${isExpanded ? "is-open" : ""
-                        }`}
+                      className={`create-sale-document__group-item ${
+                        isExpanded ? "is-open" : ""
+                      }`}
                       role="button"
                       tabIndex={0}
                       onClick={() => {
@@ -1668,48 +1715,53 @@ const CreateSaleDocument = () => {
                             <div className="create-sale-document__group-products-empty">
                               Не удалось загрузить товары
                             </div>
-                          ) : getUngroupedProducts(entry?.items).length === 0 ? (
+                          ) : getUngroupedProducts(entry?.items).length ===
+                            0 ? (
                             <div className="create-sale-document__group-products-empty">
                               Нет товаров
                             </div>
                           ) : (
-                            getUngroupedProducts(entry?.items).map((product) => {
-                              const isSelected = selectedProductIds.has(
-                                String(product.id)
-                              );
-                              const isInCart = cartItems.some(
-                                (item) =>
-                                  String(item.productId) === String(product.id)
-                              );
-                              return (
-                                <div
-                                  key={product.id}
-                                  className={`create-sale-document__group-product-item ${isSelected || isInCart ? "active" : ""
+                            getUngroupedProducts(entry?.items).map(
+                              (product) => {
+                                const isSelected = selectedProductIds.has(
+                                  String(product.id)
+                                );
+                                const isInCart = cartItems.some(
+                                  (item) =>
+                                    String(item.productId) ===
+                                    String(product.id)
+                                );
+                                return (
+                                  <div
+                                    key={product.id}
+                                    className={`create-sale-document__group-product-item ${
+                                      isSelected || isInCart ? "active" : ""
                                     }`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddProduct(product);
-                                  }}
-                                >
-                                  <div className="create-sale-document__group-product-main">
-                                    <div className="create-sale-document__group-product-name">
-                                      {product.name}
-                                    </div>
-                                    <div className="create-sale-document__group-product-meta">
-                                      <span className="create-sale-document__group-product-price">
-                                        {formatPrice(
-                                          getProductPriceForDocument(product)
-                                        )}{" "}
-                                        сом
-                                      </span>
-                                      <span className="create-sale-document__group-product-stock">
-                                        {product.quantity ?? 0}
-                                      </span>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddProduct(product);
+                                    }}
+                                  >
+                                    <div className="create-sale-document__group-product-main">
+                                      <div className="create-sale-document__group-product-name">
+                                        {product.name}
+                                      </div>
+                                      <div className="create-sale-document__group-product-meta">
+                                        <span className="create-sale-document__group-product-price">
+                                          {formatPrice(
+                                            getProductPriceForDocument(product)
+                                          )}{" "}
+                                          сом
+                                        </span>
+                                        <span className="create-sale-document__group-product-stock">
+                                          {product.quantity ?? 0}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })
+                                );
+                              }
+                            )
                           )}
                         </div>
                       </div>
@@ -1720,7 +1772,9 @@ const CreateSaleDocument = () => {
             </div>
 
             {groupsLoading ? (
-              <div className="create-sale-document__groups-empty">Загрузка…</div>
+              <div className="create-sale-document__groups-empty">
+                Загрузка…
+              </div>
             ) : groupsError ? (
               <div className="create-sale-document__groups-empty">
                 Не удалось загрузить группы
@@ -1743,7 +1797,6 @@ const CreateSaleDocument = () => {
             <Plus size={18} />
             Новый товар
           </button> */}
-
         </div>
 
         {/* Основная область */}
@@ -1790,7 +1843,9 @@ const CreateSaleDocument = () => {
                       <Check size={14} strokeWidth={2.5} />
                     </span>
                   </span>
-                  <span className="create-sale-document__toggle-label">Документ проведён</span>
+                  <span className="create-sale-document__toggle-label">
+                    Документ проведён
+                  </span>
                 </label>
                 {isPaymentKindRelevant && (
                   <div className="create-sale-document__payment-kind create-sale-document__payment-kind--header">
@@ -1800,7 +1855,10 @@ const CreateSaleDocument = () => {
                         name="payment_kind"
                         value="cash"
                         checked={paymentKind === "cash"}
-                        onChange={() => setPaymentKind("cash")}
+                        onChange={() => {
+                          setPaymentKind("cash");
+                          setPrepaymentAmount("");
+                        }}
                       />
                       <span>Сразу</span>
                     </label>
@@ -1810,10 +1868,27 @@ const CreateSaleDocument = () => {
                         name="payment_kind"
                         value="credit"
                         checked={paymentKind === "credit"}
-                        onChange={() => setPaymentKind("credit")}
+                        onChange={() => setShowPrepaymentModal(true)}
                       />
                       <span>В долг</span>
                     </label>
+                    {paymentKind === "credit" && (
+                      <div className="create-sale-document__prepayment-badge">
+                        <span className="create-sale-document__prepayment-badge-label">
+                          Предоплата:{" "}
+                          {prepaymentAmount
+                            ? `${formatPrice(Number(prepaymentAmount) || 0)} сом`
+                            : "0 сом"}
+                        </span>
+                        <button
+                          type="button"
+                          className="create-sale-document__prepayment-badge-btn"
+                          onClick={() => setShowPrepaymentModal(true)}
+                        >
+                          Изменить
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1877,8 +1952,8 @@ const CreateSaleDocument = () => {
                     options={
                       isWarehouseToRequired && warehouseTo
                         ? warehouseOptions.filter(
-                          (o) => String(o.value) !== String(warehouseTo)
-                        )
+                            (o) => String(o.value) !== String(warehouseTo)
+                          )
                         : warehouseOptions
                     }
                     placeholder="Выберите склад"
@@ -1909,13 +1984,16 @@ const CreateSaleDocument = () => {
                         value={agentId}
                         onChange={(v) => setAgentId(String(v || ""))}
                         options={[
-                          { value: "", label: "Все агенты", searchText: "Все агенты" },
+                          {
+                            value: "",
+                            label: "Все агенты",
+                            searchText: "Все агенты",
+                          },
                           ...agentOptions,
                         ]}
                         placeholder="Выберите агента (необязательно)"
                         emptyText="Агенты не найдены"
                       />
-
                     </div>
                   </div>
                   <div className="create-sale-document__field create-sale-document__field--with-icon">
@@ -1939,7 +2017,6 @@ const CreateSaleDocument = () => {
                     </div>
                   </div>
                 </>
-
               )}
             </div>
 
@@ -1957,7 +2034,9 @@ const CreateSaleDocument = () => {
             </div>
             {docType === "INVENTORY" && (
               <p className="create-sale-document__inventory-hint">
-                Для инвентаризации укажите <strong>фактический остаток</strong> по каждой позиции; при проведении будет создано движение на разницу с текущим остатком.
+                Для инвентаризации укажите <strong>фактический остаток</strong>{" "}
+                по каждой позиции; при проведении будет создано движение на
+                разницу с текущим остатком.
               </p>
             )}
             <div className="create-sale-document__table-wrapper">
@@ -1967,7 +2046,9 @@ const CreateSaleDocument = () => {
                     <th>#</th>
                     <th>НАИМЕНОВАНИЕ</th>
                     <th>ЕД. ИЗМ.</th>
-                    <th>{docType === "INVENTORY" ? "ФАКТ. ОСТАТОК" : "КОЛ-ВО"}</th>
+                    <th>
+                      {docType === "INVENTORY" ? "ФАКТ. ОСТАТОК" : "КОЛ-ВО"}
+                    </th>
                     <th>ЦЕНА</th>
                     <th>СКИДКА %</th>
                     <th>СУММА</th>
@@ -2013,15 +2094,15 @@ const CreateSaleDocument = () => {
                               className="create-sale-document__qty-input"
                               title={
                                 isStockLimitRequired &&
-                                  item.stock != null &&
-                                  item.stock > 0
+                                item.stock != null &&
+                                item.stock > 0
                                   ? `Остаток на складе: ${item.stock}`
                                   : undefined
                               }
                               placeholder={
                                 isStockLimitRequired &&
-                                  item.stock != null &&
-                                  item.stock > 0
+                                item.stock != null &&
+                                item.stock > 0
                                   ? `макс. ${item.stock}`
                                   : undefined
                               }
@@ -2147,19 +2228,116 @@ const CreateSaleDocument = () => {
                   <span>Итого:</span>
                   <span>{formatPrice(totals.displayTotal)} сом</span>
                 </div>
+                {isPaymentKindRelevant && paymentKind === "credit" && (
+                  <div className="create-sale-document__summary-row">
+                    <span>Предоплата:</span>
+                    <span>{formatPrice(totals.prepayment)} сом</span>
+                  </div>
+                )}
                 <div className="create-sale-document__summary-row">
                   <span>Оплачено:</span>
                   <span>{formatPrice(totals.paid)} сом</span>
                 </div>
                 <div className="create-sale-document__summary-row create-sale-document__summary-row--due">
                   <span>К оплате:</span>
-                  <span>{formatPrice(totals.displayTotal - totals.paid)} сом</span>
+                  <span>
+                    {formatPrice(totals.displayTotal - totals.paid)} сом
+                  </span>
                 </div>
               </aside>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Модальное окно предоплаты (при выборе «В долг») */}
+      {showPrepaymentModal && (
+        <div
+          className="create-sale-document__prepayment-overlay"
+          onClick={() => setShowPrepaymentModal(false)}
+        >
+          <div
+            className="create-sale-document__prepayment-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="create-sale-document__prepayment-modal-header">
+              <h2 className="create-sale-document__prepayment-modal-title">
+                Предоплата по документу
+              </h2>
+              <button
+                type="button"
+                className="create-sale-document__prepayment-modal-close"
+                onClick={() => setShowPrepaymentModal(false)}
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="create-sale-document__prepayment-modal-content">
+              <p className="create-sale-document__prepayment-modal-hint">
+                Укажите сумму предоплаты. При проведении документа будет создан приход денег на эту сумму.
+              </p>
+              <label className="create-sale-document__prepayment-modal-label">
+                Сумма предоплаты, сом
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                className="create-sale-document__prepayment-modal-input"
+                placeholder="0"
+                value={modalPrepaymentValue}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") {
+                    setModalPrepaymentValue("");
+                  } else {
+                    const num = Number(v.replace(",", "."));
+                    if (!isNaN(num) && num >= 0) setModalPrepaymentValue(v);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const num = Number(
+                      String(modalPrepaymentValue).replace(",", ".")
+                    );
+                    if (!isNaN(num) && num >= 0) {
+                      setPrepaymentAmount(num.toFixed(2));
+                      setPaymentKind("credit");
+                      setShowPrepaymentModal(false);
+                    }
+                  }
+                }}
+              />
+            </div>
+            <div className="create-sale-document__prepayment-modal-actions">
+              <button
+                type="button"
+                className="create-sale-document__prepayment-modal-cancel"
+                onClick={() => setShowPrepaymentModal(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="create-sale-document__prepayment-modal-save"
+                onClick={() => {
+                  const num = Number(
+                    String(modalPrepaymentValue).replace(",", ".")
+                  );
+                  if (!isNaN(num) && num >= 0) {
+                    setPrepaymentAmount(num.toFixed(2));
+                    setPaymentKind("credit");
+                  }
+                  setShowPrepaymentModal(false);
+                }}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
