@@ -15,6 +15,7 @@ import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCom
 
 import { ClientForm, ClientCard, ConfirmDeleteModal } from "./components/ClientsModals";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ===== helpers ===== */
 const fmtMoney = (v) =>
@@ -231,8 +232,8 @@ const CafeClients = () => {
 
       hydrateStats(augmented);
     } catch (e) {
-      console.error(e);
-      setErr("Не удалось загрузить гостей");
+      const errorMessage = validateResErrors(e, "Ошибка загрузки гостей");
+      setErr(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -345,8 +346,8 @@ const CafeClients = () => {
       setConfirmId(null);
       await load();
     } catch (e) {
-      console.error(e);
-      setErr("Ошибка удаления гостя");
+      const errorMessage = validateResErrors(e, "Ошибка удаления гостя");
+      setErr(errorMessage);
     } finally {
       setConfirmBusy(false);
     }

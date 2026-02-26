@@ -5,6 +5,8 @@ import api from "../../../../api";
 import "./stock.scss";
 import { StockItemModal, StockMoveModal, StockDeleteModal } from "./components/StockModals";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -29,6 +31,7 @@ const sanitizeDecimalInput = (value) => {
 };
 
 const Stock = () => {
+  const alert = useAlert();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -62,7 +65,8 @@ const Stock = () => {
         const rStock = await api.get("/cafe/warehouse/");
         setItems(listFrom(rStock));
       } catch (err) {
-        // Ошибка загрузки склада
+        const errorMessage = validateResErrors(err, "Ошибка загрузки склада");
+        alert(errorMessage, true);
       } finally {
         setLoading(false);
       }
@@ -79,7 +83,9 @@ const Stock = () => {
         setCashboxes(list);
         const firstKey = String(list?.[0]?.id || list?.[0]?.uuid || "");
         if (firstKey) setCashboxId(firstKey);
-      } catch {
+      } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка загрузки касс");
+        alert(errorMessage, true);
         setCashboxes([]);
       }
     };
@@ -199,7 +205,8 @@ const Stock = () => {
         await postCashflowDelta({ title, deltaAmount: deltaTotal });
       }
     } catch (err) {
-      // Ошибка сохранения товара
+      const errorMessage = validateResErrors(err, "Ошибка сохранения товара");
+      alert(errorMessage, true);
     }
   };
 
@@ -226,7 +233,8 @@ const Stock = () => {
 
       setDeleteItem(null);
     } catch (err) {
-      // Ошибка удаления товара
+      const errorMessage = validateResErrors(err, "Ошибка удаления товара");
+      alert(errorMessage, true);
     }
   };
 
@@ -276,7 +284,8 @@ const Stock = () => {
         }).catch(() => { });
       }
     } catch (err) {
-      // Ошибка применения движения
+      const errorMessage = validateResErrors(err, "Ошибка применения движения");
+      alert(errorMessage, true);
     }
   };
 

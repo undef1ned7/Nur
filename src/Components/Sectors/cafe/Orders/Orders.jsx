@@ -325,7 +325,8 @@ const Orders = () => {
       const r = await api.get("/cafe/kitchens/");
       setKitchens(listFrom(r) || []);
     } catch (e) {
-      console.error("Ошибка загрузки кухонь:", e);
+      const errorMessage = validateResErrors(err, "Ошибка при загрузке кухонь");
+      alert(errorMessage, true);
       setKitchens([]);
     }
   };
@@ -356,7 +357,8 @@ const Orders = () => {
         });
       }
     } catch (err) {
-      console.error("Ошибка загрузки меню:", err);
+      const errorMessage = validateResErrors(err, "Ошибка при загрузке меню");
+      alert(errorMessage, true);
     } finally {
       setMenuLoading(false);
     }
@@ -397,7 +399,8 @@ const Orders = () => {
 
       setMenuCurrentPage(newPage);
     } catch (err) {
-      console.error("Ошибка загрузки меню:", err);
+      const errorMessage = validateResErrors(err, "Ошибка загрузке меню");
+      alert(errorMessage, true);
     } finally {
       setMenuLoading(false);
     }
@@ -475,7 +478,8 @@ const Orders = () => {
       try {
         await Promise.all([fetchEmployees(), fetchKitchens(), fetchCashboxes()]);
       } catch (e) {
-        console.error("Ошибка загрузки:", e);
+        const errorMessage = validateResErrors(e, "Ошибка загрузки");
+        alert(errorMessage, true);
       }
     })();
   }, []);
@@ -485,7 +489,8 @@ const Orders = () => {
         await fetchTables();
         setForm(prev => ({ ...prev, table: '' }))
       } catch (e) {
-        console.error("Ошибка загрузки:", e);
+        const errorMessage = validateResErrors(e, "Ошибка загрузки");
+        alert(errorMessage, true);
       }
     })();
   }, [socketOrders?.orders])
@@ -522,12 +527,13 @@ const Orders = () => {
       try {
         await fetchOrders();
       } catch (e) {
-        console.error("Ошибка загрузки:", e);
+        const errorMessage = validateResErrors(e, "Ошибка загрузки");
+        alert(errorMessage, true);
       } finally {
         setLoading(false);
       }
-    })();
-  }, [fetchOrders])
+    })(); 
+  }, [fetchOrders]) 
 
   useEffect(() => {
     const handler = () => fetchOrders();
@@ -718,7 +724,8 @@ const Orders = () => {
           localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
         } catch { }
       } catch (e) {
-        console.error("Receipt print error:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при печати чека");
+        alert(errorMessage, true);
       } finally {
         setPrintingId(null);
         releaseReceiptPrintLock(order.id);
@@ -907,7 +914,8 @@ const Orders = () => {
         const data = await getAllClients();
         if (mounted) setClients(Array.isArray(data) ? data : []);
       } catch (e) {
-        console.error("Ошибка загрузки клиентов:", e);
+        const errorMessage = validateResErrors(e, "Ошибка загрузки клиентов");
+        alert(errorMessage, true);
         if (mounted) setClientsErr("Не удалось загрузить клиентов");
       } finally {
         if (mounted) setClientsLoading(false);
@@ -1099,6 +1107,8 @@ const Orders = () => {
 
       await fetchOrders();
     } catch (err) {
+      const errorMessage = validateResErrors(err, "Ошибка сохранения заказа");
+      alert(errorMessage, true);
       // Ошибка сохранения заказа
     } finally {
       setSaving(false);
@@ -1132,7 +1142,8 @@ const Orders = () => {
     try {
       await api.patch(`/cafe/tables/${tableId}/`, { status: "free" });
     } catch (e) {
-      console.error("Не удалось освободить стол:", e);
+      const errorMessage = validateResErrors(e, "Не удалось освободить стол");
+      alert(errorMessage, true);
     }
   };
 
@@ -1191,8 +1202,7 @@ const Orders = () => {
       // успех — снимаем guard
       localStorage.removeItem(guardKey);
     } catch (e) {
-      logger.error("Ошибка оплаты (delete order):", e);
-      const errorMessage = validateResErrors(e);
+      const errorMessage = validateResErrors(e, "Ошибка оплаты заказа");
       alert(errorMessage, true);
       // Ошибка оплаты заказa
     } finally {

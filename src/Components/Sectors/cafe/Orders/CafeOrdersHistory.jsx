@@ -24,6 +24,8 @@ import { useCafeWebSocketManager } from "../../../../hooks/useCafeWebSocket";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import { useOutletContext } from "react-router-dom";
 import DataContainer from "../../../common/DataContainer/DataContainer";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ==== helpers ==== */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -62,6 +64,7 @@ const statusFilterOptions =
    Orders
    ========================================================= */
 const CafeOrderHistory = () => {
+  const alert = useAlert();
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const menuCacheRef = useRef(new Map());
@@ -177,14 +180,16 @@ const CafeOrderHistory = () => {
     try {
       attachUsbListenersOnce();
     } catch (e) {
-      console.error("Print init error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка загрузки");
+      alert(errorMessage, true);
     }
 
     (async () => {
       try {
         await Promise.all([fetchTables(), fetchEmployees(), fetchMenu()]);
-      } catch (e) {
-        console.error("Ошибка загрузки:", e);
+        } catch (e) {
+          const errorMessage = validateResErrors(e, "Ошибка загрузки");
+          alert(errorMessage, true);
       } finally {
         setLoading(false);
       }
@@ -207,7 +212,8 @@ const CafeOrderHistory = () => {
         }
         await fetchOrders(params);
       } catch (e) {
-        console.error("Ошибка загрузки:", e);
+        const errorMessage = validateResErrors(e, "Ошибка загрузки истории заказов");
+        alert(errorMessage, true);
       } finally {
         setLoading(false);
       }
@@ -332,7 +338,8 @@ const CafeOrderHistory = () => {
           localStorage.setItem(`cafe_receipt_printed_${order.id}`, "true");
         } catch { }
       } catch (e) {
-        console.error("Receipt print error:", e);
+        const errorMessage = validateResErrors(e, "Ошибка печати чека");
+        alert(errorMessage, true);
       } finally {
         setPrintingId(null);
       }

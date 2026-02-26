@@ -13,6 +13,8 @@ import {
 import api from "../../../../api";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 import "./CafeInventory.scss";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* helpers */
 const listFrom = (res) => res?.data?.results || res?.data || [];
@@ -42,6 +44,7 @@ const formatDate = (dateStr) => {
 };
 
 const CafeInventory = () => {
+  const alert = useAlert();
   const [activeTab, setActiveTab] = useState("equipment"); // "equipment", "sessions" или "stock-check"
   const [equipment, setEquipment] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -120,6 +123,8 @@ const CafeInventory = () => {
       setWarehouseItems(listFrom(warehouseRes));
       setStockCheckSessions(listFrom(stockCheckRes));
     } catch (err) {
+      const errorMessage = validateResErrors(err, "Ошибка загрузки данных");
+      alert(errorMessage, true);
       // Ошибка загрузки данных
     } finally {
       setLoading(false);
@@ -233,7 +238,8 @@ const CafeInventory = () => {
       }
       setModalOpen(false);
     } catch (err) {
-      // Ошибка сохранения оборудования
+      const errorMessage = validateResErrors(err, "Ошибка сохранения оборудования");
+      alert(errorMessage, true);
     }
   };
 
@@ -257,7 +263,8 @@ const CafeInventory = () => {
       setEquipment((prev) => prev.filter((e) => e.id !== deleteId));
       closeDeleteConfirm();
     } catch (err) {
-      // Ошибка удаления
+      const errorMessage = validateResErrors(err, "Ошибка удаления оборудования");
+      alert(errorMessage, true);
     } finally {
       setDeleteBusy(false);
     }
@@ -327,7 +334,8 @@ const CafeInventory = () => {
       setSessionModalOpen(false);
       fetchAll();
     } catch (err) {
-      // Ошибка создания акта
+      const errorMessage = validateResErrors(err, "Ошибка создания акта");
+      alert(errorMessage, true);
     }
   };
 
@@ -339,7 +347,8 @@ const CafeInventory = () => {
       setViewingSession(res.data);
       setViewSessionModalOpen(true);
     } catch (err) {
-      // Ошибка загрузки акта
+      const errorMessage = validateResErrors(err, "Ошибка загрузки акта");
+      alert(errorMessage, true);
     }
   };
 
@@ -366,7 +375,8 @@ const CafeInventory = () => {
       setViewSessionModalOpen(false);
       closeConfirmSession();
     } catch (err) {
-      // Ошибка подтверждения акта
+      const errorMessage = validateResErrors(err, "Ошибка подтверждения акта");
+      alert(errorMessage, true);
     } finally {
       setConfirmSessionBusy(false);
     }
@@ -446,7 +456,8 @@ const CafeInventory = () => {
       setStockCheckModalOpen(false);
       await fetchAll(); // Обновляем список продуктов
     } catch (err) {
-      // Ошибка создания акта сверки
+      const errorMessage = validateResErrors(err, "Ошибка создания акта сверки");
+      alert(errorMessage, true);
     }
   };
 
@@ -456,7 +467,8 @@ const CafeInventory = () => {
       setViewingStockCheck(res.data);
       setViewStockCheckModalOpen(true);
     } catch (err) {
-      // Ошибка загрузки акта
+      const errorMessage = validateResErrors(err, "Ошибка загрузки акта");
+      alert(errorMessage, true);
     }
   };
 
@@ -481,7 +493,8 @@ const CafeInventory = () => {
       setViewStockCheckModalOpen(false);
       closeConfirmStockCheck();
     } catch (err) {
-      // Ошибка подтверждения акта
+      const errorMessage = validateResErrors(err, "Ошибка подтверждения акта");
+      alert(errorMessage, true);
     } finally {
       setConfirmStockCheckBusy(false);
     }

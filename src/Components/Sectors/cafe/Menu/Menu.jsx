@@ -174,6 +174,8 @@ const Menu = () => {
       const res = await api.get(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
       return res?.data || null;
     } catch (err) {
+      const errorMessage = validateResErrors(err, "Ошибка при загрузке блюда");
+      alert(errorMessage, true);
       return null;
     }
   }, []);
@@ -196,6 +198,8 @@ const Menu = () => {
       try {
         await fetchKitchens();
       } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка при загрузке кухонь");
+        alert(errorMessage, true);
         // Ошибка загрузки кухонь - продолжаем работу
       }
     })();
@@ -207,6 +211,8 @@ const Menu = () => {
       try {
         await fetchWarehouse();
       } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка при загрузке склада");
+        alert(errorMessage, true);
         // Ошибка загрузки склада - продолжаем работу
       }
     })();
@@ -519,15 +525,8 @@ const Menu = () => {
           await api.delete(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
           setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
         } catch (err) {
-          console.log(err);
-          if (err.status === 404) {
-            alert('Не удалось найти такую позицию!', true)
-          } else if (rr?.response?.data?.detail) {
-            alert(err?.response?.data?.detail, true)
-          } else {
-            alert(
-              'Произошла ошибка при удалении позиции!', true)
-          }
+          const errorMessage = validateResErrors(err, "Ошибка при удалении блюда");
+          alert(errorMessage, true);
         }
       }
     })
@@ -541,14 +540,8 @@ const Menu = () => {
           await api.delete(`/cafe/categories/${encodeURIComponent(String(id))}/`);
           setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
         } catch (err) {
-          if (err.status === 404) {
-            alert('Не удалось найти такую категорию!', true)
-          } else if (err?.response?.data?.detail && err.status < 500) {
-            alert(err?.response?.data?.detail, true)
-          } else {
-            alert(
-              'Произошла ошибка при удалении категории!', true)
-          }
+          const errorMessage = validateResErrors(err, "Ошибка при удалении категории");
+          alert(errorMessage, true);
         }
       }
     })
@@ -615,7 +608,8 @@ const Menu = () => {
       }
       setCatModalOpen(false);
     } catch (err) {
-      // Ошибка сохранения категории
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении категории");
+      alert(errorMessage, true);
     }
   };
 
