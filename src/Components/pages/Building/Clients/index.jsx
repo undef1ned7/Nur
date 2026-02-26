@@ -1,7 +1,11 @@
-import React from 'react'
+import React from "react";
+import PagePlaceholder from "../shared/PagePlaceholder";
 
 export default function BuildingClients() {
   return (
-    <div>BuildingClients</div>
-  )
+    <PagePlaceholder
+      title="Клиенты строительства"
+      subtitle="Раздел для работы с клиентской базой и статусами взаимодействий."
+    />
+  );
 }

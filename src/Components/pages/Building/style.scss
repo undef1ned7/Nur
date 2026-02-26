@@ -1,3 +1,96 @@
 .building-layout {
-    border-top: 1px solid $building-primary;
+  border-top: 1px solid $building-primary;
+  padding: 16px 0;
+}
+
+@import "./shared/shared.scss";
+
+.building-layout__gate {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0 28px;
+}
+
+.building-layout__gateCard {
+  width: min(560px, 100%);
+  background: #fff;
+  border: 1px solid rgba($building-primary, 0.12);
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(2, 8, 23, 0.08);
+  padding: 18px 18px 16px;
+}
+
+.building-layout__gateTitle {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #06283d;
+  margin-bottom: 6px;
+}
+
+.building-layout__gateText {
+  font-size: 13px;
+  color: rgba(11, 42, 60, 0.72);
+  line-height: 1.45;
+  margin-bottom: 14px;
+}
+
+.building-layout__gateField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.building-layout__gateLabel {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.building-layout__gateSelect {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.building-layout__gateSelect:focus {
+  border-color: $building-primary;
+  box-shadow: 0 0 0 3px rgba(15, 76, 117, 0.15);
+}
+
+.building-layout__gateActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.building-layout__btn {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.building-layout__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.building-layout__btn--primary {
+  background: $building-primary;
+  color: #fff;
+  border-color: $building-primary;
+}
+
+.building-layout__btn--primary:hover:enabled {
+  background: $building-primary-dark;
+  border-color: $building-primary-dark;
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useLocation } from "react-router-dom";
 import { Building2, MapPin, FileText, CheckCircle2, XCircle } from "lucide-react";
 import { fetchBuildingProjects } from "../../../../store/creators/building/projectsCreators";
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
@@ -13,6 +14,7 @@ export default function BuildingProjects() {
   const [openEdit, setOpenEdit] = useState(false);
   const [activeProject, setActiveProject] = useState(null);
   const dispatch = useDispatch();
+  const location = useLocation();
   const { items, raw, loading, error } = useBuildingProjects();
 
   const list = useMemo(() => {
@@ -24,6 +26,10 @@ export default function BuildingProjects() {
     dispatch(fetchBuildingProjects());
   }, [dispatch]);
 
+  useEffect(() => {
+    if (location?.state?.openCreate) setOpenCreate(true);
+  }, [location?.state]);
+
   const handleCreated = () => {
     // после успешного создания — обновим список
     dispatch(fetchBuildingProjects());
@@ -32,7 +38,7 @@ export default function BuildingProjects() {
   return (
     <div className="building-projects">
       <div className="building-projects__header">
-        <div className="building-projects__title">Проекты</div>
+        <div className="building-projects__title">Жилые комплексы</div>
         <button
           type="button"
           className="building-btn building-btn--primary"
