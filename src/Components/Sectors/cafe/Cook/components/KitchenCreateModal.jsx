@@ -10,6 +10,8 @@ import {
   formatPrinterBinding,
 } from "../../Orders/OrdersPrintService";
 import "./KitchenCreateModal.scss";
+import { useAlert } from "../../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
 
 const safeName = (p) => p?.name || "USB Printer";
 const shortKey = (k) => String(k || "").split(":").slice(0, 2).join(":");
@@ -32,6 +34,7 @@ const writeKitchenPrinterMap = (obj) => {
 };
 
 const KitchenCreateModal = ({ open, onClose, onCreated }) => {
+  const alert = useAlert();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [printerDevice, setPrinterDevice] = useState('usb');
@@ -61,7 +64,8 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       setActiveKey(a);
       setSelectedKey((prev) => prev || a);
     } catch (e) {
-      console.error("KitchenCreateModal refresh error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка обновления списка принтеров");
+      alert(errorMessage, true);
     } finally {
       setLoading(false);
     }
@@ -80,7 +84,8 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       await choosePrinterByDialog();
       await refresh();
     } catch (e) {
-      console.error("KitchenCreateModal choose printer error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка выбора принтера");
+      alert(errorMessage, true);
     } finally {
       setLoading(false);
     }
@@ -94,7 +99,8 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       const a = getActivePrinterKey();
       setActiveKey(a);
     } catch (e) {
-      console.error("KitchenCreateModal set active error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка установки активного принтера");
+      alert(errorMessage, true);
     } finally {
       setLoading(false);
     }
@@ -159,7 +165,8 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       onCreated?.(created);
       onClose?.();
     } catch (e) {
-      console.error("Kitchen create error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка создания кухни");
+      alert(errorMessage, true);
     } finally {
       setSaving(false);
     }

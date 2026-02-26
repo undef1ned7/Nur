@@ -9,7 +9,7 @@ import React, {
 import { FaCheck, FaPencilAlt, FaPrint, FaSyncAlt, FaTrash, FaUsb, FaWifi } from "react-icons/fa";
 import { useDispatch, useSelector } from "react-redux";
 import api from "../../../../api";
-import { useConfirm } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import {
   fetchKitchenTasksAsync,
   claimKitchenTaskAsync,
@@ -256,6 +256,7 @@ const stLabels = {
 };
 
 const Cook = () => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { tasks, loading, error, updatingStatus } = useSelector(
     (state) => state.cafeOrders
@@ -439,6 +440,8 @@ const Cook = () => {
     try {
       await refetchTask();
     } catch (err) {
+      const errorMessage = validateResErrors(err, "Ошибка загрузки истории заказов");
+      alert(errorMessage, true);
       setHistoryOrders([]);
     } finally {
       setHistoryLoading(false);
@@ -449,25 +452,26 @@ const Cook = () => {
     refetch();
   }, [refetch]);
 
-  const refetchKitchens = useCallback(() => {
+  const refetchKitchens = useCallback(async () => {
     if (activeTab !== "kitchens") return;
     setKitchensLoading(true);
-    api
-      .get("/cafe/kitchens/")
-      .then((res) => setKitchensList(listFrom(res)))
-      .catch(() => setKitchensList([]))
-      .finally(() => setKitchensLoading(false));
+    try {
+      const res = await api.get("/cafe/kitchens/");
+      setKitchensList(listFrom(res));
+    } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка загрузки кухонь");
+      alert(errorMessage, true);
+      setKitchensList([]);
+    } finally {
+      setKitchensLoading(false);
+    }
   }, [activeTab]);
 
-  useEffect(() => {
-    if (activeTab !== "kitchens") return;
-    setKitchensLoading(true);
-    api
-      .get("/cafe/kitchens/")
-      .then((res) => setKitchensList(listFrom(res)))
-      .catch(() => setKitchensList([]))
-      .finally(() => setKitchensLoading(false));
-  }, [activeTab]);
+  useEffect(
+    () => {
+      if (activeTab !== "kitchens") return;
+      refetchKitchens();
+    }, [activeTab]);
 
   useEffect(() => {
     if (editingKitchen) {
@@ -647,65 +651,6 @@ const Cook = () => {
     };
   }, [tasks, getMenuWithIngredients]);
 
-  const buildNeedForTask = useCallback(
-    async (task) => {
-      let menuId = extractMenuIdFromTask(task);
-
-      if (!menuId && task?.id) {
-        const detail = await tryFetchTaskDetail(task.id);
-        if (detail) menuId = extractMenuIdFromTask(detail);
-      }
-
-      if (!menuId)
-        throw new Error("У блюда не найден ID для списания со склада.");
-
-      let full = null;
-      try {
-        full = await getMenuWithIngredients(menuId);
-      } catch (e) {
-        const status = e?.response?.status;
-        if (status === 404)
-          throw new Error(
-            "Блюдо не найдено в меню. Обратитесь к администратору."
-          );
-        throw new Error(
-          "Не удалось получить данные блюда. Попробуйте ещё раз."
-        );
-      }
-
-      if (!full)
-        throw new Error(
-          "Не удалось получить данные блюда. Попробуйте ещё раз."
-        );
-
-      const recipeRows = extractRecipeRows(full);
-      if (!recipeRows.length)
-        throw new Error(
-          "У блюда не настроены ингредиенты. Обратитесь к администратору."
-        );
-
-      const portions = extractPortionsFromTask(task);
-      const need = new Map();
-
-      for (const row of recipeRows) {
-        const pid = extractRecipeProductId(row);
-        if (!pid) continue;
-
-        const perPortion = toNum(extractRecipeAmount(row));
-        const add = perPortion * portions;
-
-        const k = String(pid);
-        need.set(k, (need.get(k) || 0) + add);
-      }
-
-      if (!need.size)
-        throw new Error(
-          "У блюда не настроены ингредиенты. Обратитесь к администратору."
-        );
-      return need;
-    },
-    [getMenuWithIngredients]
-  );
 
   const updateWarehouseItem = useCallback(async (item, nextRem) => {
     if (!item?.id) throw new Error("Позиция склада без ID.");
@@ -795,48 +740,6 @@ const Cook = () => {
     [updateWarehouseItem]
   );
 
-  // const groups = useMemo(() => {
-  //   const uniqueList = new Set(tasks.map(el => el.order + '/' + el.menu_item));
-  //   const result = [];
-  //   uniqueList.forEach(el => {
-  //     const [order, menu_item] = el.split('/');
-  //     const orderObj = {};
-  //     const filteredItems = tasks.filter(el => el.order == order && menu_item == el.menu_item);
-  //     const template = filteredItems[0]
-  //     if (!template) return;
-  //     result.push({
-  //       ...template,
-  //       quantity: filteredItems.length
-  //     })
-  //   })
-  //   return result
-  // }, [tasks]);
-
-  // useEffect(() => {
-  //   if (!groups?.length) return;
-  //   setCollapsed((prev) => {
-  //     const next = { ...prev };
-  //     for (const g of groups) if (next[g.key] === undefined) next[g.key] = true;
-  //     return next;
-  //   });
-  // }, [groups]);
-
-  // const toggleGroup = useCallback((key) => {
-  //   setCollapsed((p) => ({ ...p, [key]: !p[key] }));
-  // }, []);
-  const buildPrintPayload = useCallback((order) => {
-    const t = order.table_number;
-    const dt = formatReceiptDate(
-      order?.created_at || order?.date || order?.created
-    );
-    const isTakeaway = t === null || t === undefined || t === "";
-    return {
-      company: localStorage.getItem("company_name") || "КУХНЯ",
-      doc_no: isTakeaway ? TAKEAWAY_LABEL : `СТОЛ ${t ?? "—"}`,
-      created_at: dt,
-      menu_title: order.menu_item_title,
-    };
-  }, []);
   const handleClaimOne = useCallback(
     async (group, e) => {
       if (e?.preventDefault) e.preventDefault();
@@ -986,19 +889,7 @@ const Cook = () => {
     }
   };
 
-  const onSetActive = async () => {
-    if (!selectedKey) return;
-    setLoading(true);
-    try {
-      await setActivePrinterByKey(selectedKey);
-      const a = getActivePrinterKey();
-      setActiveKey(a);
-    } catch (e) {
-      console.error("KitchenCreateModal set active error:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+ 
   return (
     <section className="cafeCook">
       <CookHeader

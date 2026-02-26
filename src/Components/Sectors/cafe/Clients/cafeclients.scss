@@ -138,10 +138,21 @@ html {
     font-weight: 500;
     cursor: pointer;
     transition: 0.2s;
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     background: #fff;
     color: var(--text);
     white-space: nowrap;
+
+    &:hover {
+      background: #f9fafb;
+      border-color: #cbd5e1;
+    }
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
 
     &:active {
       transform: translateY(1px);
@@ -150,6 +161,7 @@ html {
     &--primary {
       background: var(--primary);
       color: #111;
+      border-color: var(--primary-dark);
 
       &:hover {
         background: var(--primary-dark);
@@ -204,6 +216,13 @@ html {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
+  }
+
+  /* Кнопки действий в списках — компактнее */
+  &__rowActions .cafeclients__btn {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 9px;
   }
 
   &__rowClickable {

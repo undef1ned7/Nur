@@ -1,10 +1,12 @@
 // src/.../TablesZones.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { FaSearch, FaTimes, FaEdit, FaTrash } from "react-icons/fa";
+import { useAlert } from "../../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
 
 const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, createPing }) => {
   const [query, setQuery] = useState("");
-
+  const alert = useAlert();
   const [zoneModalOpen, setZoneModalOpen] = useState(false);
   const [zoneSaving, setZoneSaving] = useState(false);
   const [zoneEditId, setZoneEditId] = useState(null);
@@ -66,6 +68,9 @@ const TablesZones = ({ zones, tables, createZone, updateZone, openConfirm, creat
         const ok = await createZone(title);
         if (ok) closeModal();
       }
+    } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка создания/обновления зоны");
+      alert(errorMessage, true);
     } finally {
       setZoneSaving(false);
     }
