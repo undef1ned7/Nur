@@ -1,7 +1,11 @@
-import React from 'react'
+import React from "react";
+import PagePlaceholder from "../shared/PagePlaceholder";
 
 export default function BuildingTreaty() {
   return (
-    <div>BuildingTreaty</div>
-  )
-} 
+    <PagePlaceholder
+      title="Договоры"
+      subtitle="База договоров с подрядчиками и контрагентами строительства."
+    />
+  );
+}

@@ -1,7 +1,11 @@
-import React from 'react'
+import React from "react";
+import PagePlaceholder from "../shared/PagePlaceholder";
 
 export default function BuildingDepartment() {
   return (
-    <div>BuildingDepartment</div>
-  )
+    <PagePlaceholder
+      title="Отдел строительства"
+      subtitle="Организация сотрудников отдела, ролей и операционной нагрузки."
+    />
+  );
 }

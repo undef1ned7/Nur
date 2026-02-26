@@ -98,6 +98,7 @@ const pageTitles = {
   "/crm/documents": "Документы",
   // ВНИМАНИЕ: один и тот же путь для WhatsApp и Telegram
   "/crm/": "Каналы",
+  "/crm/building/projects": "Жилые комплексы",
 };
 
 const Header = ({ toggleSidebar, isSidebarOpen }) => {
@@ -113,6 +114,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
     items: buildingProjects,
     selectedProjectId,
     loading: buildingProjectsLoading,
+    loaded: buildingProjectsLoaded,
   } = useBuildingProjects();
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -176,9 +178,16 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   useEffect(() => {
     if (!isBuildingRoute) return;
     if (buildingProjectsLoading) return;
+    if (buildingProjectsLoaded) return;
     if (Array.isArray(buildingProjects) && buildingProjects.length > 0) return;
     dispatch(fetchBuildingProjects());
-  }, [dispatch, isBuildingRoute, buildingProjects, buildingProjectsLoading]);
+  }, [
+    dispatch,
+    isBuildingRoute,
+    buildingProjects,
+    buildingProjectsLoading,
+    buildingProjectsLoaded,
+  ]);
 
   const handleProjectChange = (e) => {
     const v = e.target.value;
@@ -208,7 +217,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                 {buildingProjectsLoading ? "Загрузка..." : "Выберите проект"}
               </option>
               {projectsList.map((p, idx) => {
-                const id = p?.id ?? p?.uuid ?? String(idx);
+                const id = String(p?.id ?? p?.uuid ?? idx);
                 return (
                   <option key={id} value={id}>
                     {p?.name || "—"}
@@ -307,8 +316,8 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
               {!buildingProjectsLoading &&
                 projectsList.map((p, idx) => {
-                  const id = p?.id ?? p?.uuid ?? String(idx);
-                  const active = String(selectedProjectId ?? "") === String(id);
+                  const id = String(p?.id ?? p?.uuid ?? idx);
+                  const active = String(selectedProjectId ?? "") === id;
                   return (
                     <button
                       key={id}

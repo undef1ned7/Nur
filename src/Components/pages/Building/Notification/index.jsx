@@ -1,7 +1,11 @@
-import React from 'react'
+import React from "react";
+import PagePlaceholder from "../shared/PagePlaceholder";
 
 export default function BuildingNotification() {
   return (
-    <div>BuildingNotification</div>
-  )
+    <PagePlaceholder
+      title="Уведомления"
+      subtitle="Настройка уведомлений по закупкам, кассовым решениям и складским событиям."
+    />
+  );
 }

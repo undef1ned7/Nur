@@ -18,6 +18,7 @@ const initialState = {
   items: [],
   raw: null,
   loading: false,
+  loaded: false,
   creating: false,
   updating: false,
   deletingIds: {},
@@ -25,12 +26,21 @@ const initialState = {
   error: null,
 };
 
+const LS_SELECTED_PROJECT_ID_KEY = "buildingSelectedProjectId";
+
 const buildingProjectsSlice = createSlice({
   name: "buildingProjects",
   initialState,
   reducers: {
     setSelectedBuildingProjectId: (state, action) => {
-      state.selectedProjectId = action.payload || null;
+      const next = action.payload == null || action.payload === "" ? null : String(action.payload);
+      state.selectedProjectId = next;
+      try {
+        if (next) localStorage.setItem(LS_SELECTED_PROJECT_ID_KEY, next);
+        else localStorage.removeItem(LS_SELECTED_PROJECT_ID_KEY);
+      } catch (e) {
+        // ignore localStorage errors
+      }
     },
     resetBuildingProjectsError: (state) => {
       state.error = null;
@@ -39,26 +49,50 @@ const buildingProjectsSlice = createSlice({
       state.items = [];
       state.raw = null;
       state.loading = false;
+      state.loaded = false;
       state.creating = false;
       state.updating = false;
       state.deletingIds = {};
       state.selectedProjectId = null;
       state.error = null;
+      try {
+        localStorage.removeItem(LS_SELECTED_PROJECT_ID_KEY);
+      } catch (e) {
+        // ignore localStorage errors
+      }
     },
   },
   extraReducers: (builder) => {
     builder
       .addCase(fetchBuildingProjects.pending, (state) => {
         state.loading = true;
+        state.loaded = false;
         state.error = null;
       })
       .addCase(fetchBuildingProjects.fulfilled, (state, { payload }) => {
         state.raw = payload ?? null;
         state.items = listFrom(payload);
+        // Подтягиваем выбранный проект из localStorage после загрузки списка
+        const items = Array.isArray(state.items) ? state.items : [];
+        const exists = (id) =>
+          items.some((x) => String(x?.id ?? x?.uuid) === String(id));
+        if (state.selectedProjectId != null && !exists(state.selectedProjectId)) {
+          state.selectedProjectId = null;
+        }
+        if (state.selectedProjectId == null) {
+          try {
+            const stored = localStorage.getItem(LS_SELECTED_PROJECT_ID_KEY);
+            if (stored && exists(stored)) state.selectedProjectId = String(stored);
+          } catch (e) {
+            // ignore localStorage errors
+          }
+        }
         state.loading = false;
+        state.loaded = true;
       })
       .addCase(fetchBuildingProjects.rejected, (state, action) => {
         state.loading = false;
+        state.loaded = true;
         state.error = action.payload ?? action.error?.message;
       })
       .addCase(createBuildingProject.pending, (state) => {
@@ -81,6 +115,19 @@ const buildingProjectsSlice = createSlice({
       })
       .addCase(updateBuildingProject.fulfilled, (state, { payload }) => {
         state.updating = false;
+        // Сохраняем выбранный проект в localStorage, если он в items
+        if (payload) {
+          const pid = payload?.id ?? payload?.uuid;
+          const exists = state.items.some((x) => String(x?.id ?? x?.uuid) === String(pid));
+          if (exists) {
+            state.selectedProjectId = String(pid);
+            try {
+              localStorage.setItem(LS_SELECTED_PROJECT_ID_KEY, String(pid));
+            } catch (e) {
+              // ignore localStorage errors
+            }
+          }
+        }
         if (!payload) return;
         const pid = payload?.id ?? payload?.uuid;
         if (pid == null) return;

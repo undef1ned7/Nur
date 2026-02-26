@@ -1,7 +1,11 @@
-import React from 'react'
+import React from "react";
+import PagePlaceholder from "../shared/PagePlaceholder";
 
 export default function BuildingAnalytics() {
   return (
-    <div>BuildingAnalytics</div>
-  )
+    <PagePlaceholder
+      title="Аналитика строительства"
+      subtitle="Сводные показатели по закупкам, кассе и складу для выбранного проекта."
+    />
+  );
 }

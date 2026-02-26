@@ -176,14 +176,22 @@ import SellCashierPage from "../Components/pages/Sell/Cashier/SellCashierPage";
 
 
 
-import BuildingLayout,
-{
+import BuildingLayout, {
   BuildingAnalytics,
   BuildingCashRegister,
   BuildingClients,
   BuildingDepartment,
   BuildingEmployess,
-  BuildingNotification, BuildingProcurement, BuildingProjects, BuildingSalary, BuildingSell, BuildingStock, BuildingTreaty
+  BuildingNotification,
+  BuildingProcurement,
+  BuildingProjects,
+  BuildingSalary,
+  BuildingSell,
+  BuildingStock,
+  BuildingTreaty,
+  BuildingProcurementDetail,
+  BuildingStockDetail,
+  BuildingStockTransferDetail,
 } from "../Components/pages/Building";
 
 /**
@@ -464,10 +472,16 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("employess", BuildingEmployess),
       createProtectedRoute("notification", BuildingNotification),
       createProtectedRoute("procurement", BuildingProcurement),
+      createProtectedRoute("procurement/:id", BuildingProcurementDetail),
       createProtectedRoute("projects", BuildingProjects),
       createProtectedRoute("salary", BuildingSalary),
       createProtectedRoute("sell", BuildingSell),
       createProtectedRoute("stock", BuildingStock),
+      createProtectedRoute("stock/:id", BuildingStockDetail),
+      createProtectedRoute(
+        "stock/:warehouseId/transfer/:id",
+        BuildingStockTransferDetail
+      ),
       createProtectedRoute("treaty", BuildingTreaty),
     ]}
 
