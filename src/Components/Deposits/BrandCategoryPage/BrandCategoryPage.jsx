@@ -163,6 +163,8 @@ export default function BrandCategoryPage() {
     };
     dispatch(fetchBrandsAsync(params));
   }, [dispatch, debouncedSearchBrand]);
+
+
   const refreshCategories = useCallback(() => {
     const params = {
       search: debouncedSearchCat,
@@ -171,19 +173,8 @@ export default function BrandCategoryPage() {
   }, [dispatch, debouncedSearchCat]);
   /* fetch */
 
-  useEffect(() => {
-    if (!modalCfg) {
-      refreshCategories();
-    }
-    if (modalCfg?.type === "brand") {
-      refreshBrands();
-    }
-  }, [debouncedSearchBrand, modalCfg]);
-  useEffect(() => {
-    if (modalCfg?.type === "category") {
-      refreshCategories();
-    }
-  }, [debouncedSearchCat, modalCfg]);
+
+
 
   /* helpers */
 
@@ -242,6 +233,17 @@ export default function BrandCategoryPage() {
     });
   };
   const [activeTab, setActiveTab] = useState(1);
+  useEffect(() => {
+    if (activeTab === 0) {
+      refreshBrands();
+    }
+  }, [debouncedSearchBrand, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 1) {
+      refreshCategories();
+    }
+  }, [debouncedSearchCat, activeTab]);
 
   const tabs = [
     {
