@@ -36,6 +36,8 @@ import buildingStockReducer from "./slices/building/stockSlice";
 import buildingWorkflowEventsReducer from "./slices/building/workflowEventsSlice";
 import buildingWarehousesReducer from "./slices/building/warehousesSlice";
 import buildingWorkEntriesReducer from "./slices/building/workEntriesSlice";
+import buildingClientsReducer from "./slices/building/clientsSlice";
+import buildingTreatiesReducer from "./slices/building/treatiesSlice";
 // import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
@@ -77,6 +79,8 @@ const store = configureStore({
     buildingWorkflowEvents: buildingWorkflowEventsReducer,
     buildingWarehouses: buildingWarehousesReducer,
     buildingWorkEntries: buildingWorkEntriesReducer,
+    buildingClients: buildingClientsReducer,
+    buildingTreaties: buildingTreatiesReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
