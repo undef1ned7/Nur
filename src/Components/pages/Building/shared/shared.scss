@@ -312,6 +312,34 @@
   color: rgba(11, 35, 68, 0.7);
 }
 
+.building-page--clients .building-page__header,
+.building-page--treaties .building-page__header {
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+.building-page--clients .building-btn.building-btn--primary,
+.building-page--treaties .building-btn.building-btn--primary {
+  @media (max-width: 640px) {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .building-page--clients .building-table th,
+  .building-page--clients .building-table td,
+  .building-page--treaties .building-table th,
+  .building-page--treaties .building-table td {
+    padding: 6px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+}
+
 .building-actionsMenu {
   position: relative;
   display: inline-block;

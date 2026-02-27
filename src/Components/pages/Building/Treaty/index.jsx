@@ -354,7 +354,7 @@ export default function BuildingTreaty() {
   };
 
   return (
-    <div className="building-page">
+    <div className="building-page building-page--treaties">
       <div className="building-page__header">
         <div>
           <h1 className="building-page__title">Договоры строительства</h1>
