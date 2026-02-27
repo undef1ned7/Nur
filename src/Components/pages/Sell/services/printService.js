@@ -215,6 +215,7 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
   // компактная подача + рез
   const feedAndCut = new Uint8Array([0x1b, 0x64, 0x01, 0x1d, 0x56, 0x00]);
 
+  
   const total = new Uint8Array(
     init.length +
     alignLeft.length +
@@ -524,7 +525,7 @@ export async function checkPrinterConnection() {
     console.log("[PrintService] checkPrinterConnection ->", {
       hasState: !!state,
       hasDevice: !!usbState.dev,
-      connected,bui
+      connected,
     });
     return connected;
   } catch (err) {
