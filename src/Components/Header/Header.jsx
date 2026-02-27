@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  Bell,
-  Menu,
-  ShoppingCart,
-  Building2,
-  Check,
-  X,
-} from "lucide-react";
+import { Bell, Menu, ShoppingCart, Building2, Check, X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
 import { fetchBuildingProjects } from "../../store/creators/building/projectsCreators";
 import {
@@ -104,6 +97,7 @@ const pageTitles = {
 const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const title = pageTitles[location.pathname] || "NurCRM";
   const dispatch = useDispatch();
 
@@ -168,7 +162,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
   const usernameToDisplay = userProfile
     ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() ||
-    userProfile.email
+      userProfile.email
     : "Гость";
 
   const isBuildingRoute = useMemo(() => {
@@ -192,7 +186,47 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const handleProjectChange = (e) => {
     const v = e.target.value;
     dispatch(setSelectedBuildingProjectId(v || null));
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (v) next.set("residential_complex", v);
+        else next.delete("residential_complex");
+        return next;
+      },
+      { replace: true },
+    );
   };
+
+  // Синхронизация URL ?residential_complex= с Redux при загрузке/переходе по ссылке
+  useEffect(() => {
+    if (!isBuildingRoute) return;
+    const fromUrl = searchParams.get("residential_complex");
+    if (fromUrl && String(selectedProjectId ?? "") !== fromUrl) {
+      dispatch(setSelectedBuildingProjectId(fromUrl));
+    }
+  }, [isBuildingRoute, searchParams, dispatch]);
+
+  // При первой загрузке списка проектов: если в Redux есть выбранный проект, но в URL нет — добавить в URL
+  useEffect(() => {
+    if (!isBuildingRoute || !buildingProjectsLoaded) return;
+    const fromUrl = searchParams.get("residential_complex");
+    if (selectedProjectId && !fromUrl) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("residential_complex", selectedProjectId);
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [
+    isBuildingRoute,
+    buildingProjectsLoaded,
+    selectedProjectId,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const projectsList = Array.isArray(buildingProjects) ? buildingProjects : [];
 
@@ -292,7 +326,10 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
           role="dialog"
           aria-modal="true"
         >
-          <div className="header__projectDrawer" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="header__projectDrawer"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="header__projectDrawerHeader">
               <div className="header__projectDrawerTitle">Проекты</div>
               <button
@@ -328,6 +365,14 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
                       }
                       onClick={() => {
                         dispatch(setSelectedBuildingProjectId(id));
+                        setSearchParams(
+                          (prev) => {
+                            const next = new URLSearchParams(prev);
+                            next.set("residential_complex", id);
+                            return next;
+                          },
+                          { replace: true },
+                        );
                         setShowProjectDrawer(false);
                       }}
                     >
