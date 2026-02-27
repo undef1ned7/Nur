@@ -189,6 +189,8 @@ import BuildingLayout, {
   BuildingProcurementDetail,
   BuildingStockDetail,
   BuildingStockTransferDetail,
+  BuildingWorkProcess,
+  BuildingWorkProcessDetail,
 } from "../Components/pages/Building";
 
 /**
@@ -465,6 +467,8 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("department", BuildingDepartment),
       createProtectedRoute("employess", BuildingEmployess),
       createProtectedRoute("notification", BuildingNotification),
+      createProtectedRoute("work", BuildingWorkProcess),
+      createProtectedRoute("work/:id", BuildingWorkProcessDetail),
       createProtectedRoute("procurement", BuildingProcurement),
       createProtectedRoute("procurement/:id", BuildingProcurementDetail),
       createProtectedRoute("projects", BuildingProjects),

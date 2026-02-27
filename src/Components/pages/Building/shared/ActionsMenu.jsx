@@ -7,7 +7,10 @@ export default function BuildingActionsMenu({ actions = [] }) {
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  const handleToggle = () => {
+  const handleToggle = (e) => {
+    if (e && typeof e.stopPropagation === "function") {
+      e.stopPropagation();
+    }
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       positionRef.current = { top: rect.bottom + 4, left: rect.right };

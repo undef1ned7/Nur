@@ -241,14 +241,14 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
       <div className="header__right">
         {isBuildingRoute && (
           <div className="header__project">
-            <div className="header__project-label">Проект</div>
+            <div className="header__project-label">ЖК</div>
             <select
               className="header__project-select"
               value={selectedProjectId ?? ""}
               onChange={handleProjectChange}
             >
               <option value="" disabled>
-                {buildingProjectsLoading ? "Загрузка..." : "Выберите проект"}
+                {buildingProjectsLoading ? "Загрузка..." : "Выберите ЖК"}
               </option>
               {projectsList.map((p, idx) => {
                 const id = String(p?.id ?? p?.uuid ?? idx);

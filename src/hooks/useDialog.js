@@ -3,16 +3,18 @@ import { useModal } from "../context/modal";
 
 const useAlert = () => {
     const { openAlert } = useModal();
+  
     const confirm = (message, callback, isError,) => {
         if (typeof callback === 'boolean') {
             isError = callback;
             callback = () => null;
         }
-        openAlert({
+        const close = openAlert({
             isError: Boolean(isError),
             message,
             onConfirm: (result) => callback?.(result),
         });
+       return close;
     };
     return confirm;
 };
@@ -32,7 +34,7 @@ const useErrorModal = () => {
 const useConfirm = () => {
     const { openModal } = useModal();
 
-    const confirm =  (message, callback) => {
+    const confirm = (message, callback) => {
         openModal({
             message,
             onConfirm: (result) => callback(result),
