@@ -1,687 +1,746 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, MoreVertical, X } from "lucide-react";
-import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
-import "./treaty.scss";
+import { useDispatch } from "react-redux";
+import Modal from "@/Components/common/Modal/Modal";
+import { useAlert, useConfirm } from "@/hooks/useDialog";
+import {
+  fetchBuildingTreaties,
+  createBuildingTreaty,
+  updateBuildingTreaty,
+  deleteBuildingTreaty,
+  createBuildingTreatyInErp,
+  createBuildingTreatyFile,
+} from "../../../../store/creators/building/treatiesCreators";
+import { fetchBuildingClients } from "../../../../store/creators/building/clientsCreators";
+import { useBuildingTreaties } from "../../../../store/slices/building/treatiesSlice";
+import { useBuildingClients } from "../../../../store/slices/building/clientsSlice";
+import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
+import BuildingActionsMenu from "../shared/ActionsMenu";
 
-const API_BASE = "https://app.nurcrm.kg/api/building";
-
-const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-async function httpJson(url, options = {}) {
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(),
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
-
-  const text = await res.text();
-  const ct = res.headers.get("content-type") || "";
-  let data = null;
-  if (text) {
-    if (ct.includes("application/json")) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { raw: text };
-      }
-    } else {
-      data = { raw: text };
-    }
-  }
-
-  if (!res.ok) {
-    const msg =
-      (data && (data.detail || data.message)) ||
-      res.statusText ||
-      "Request failed";
-    const err = new Error(msg);
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-}
-
-const buildUrl = (endpoint, params = {}) => {
-  const qs = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== "" && v !== undefined && v !== null) {
-      qs.append(k, v);
-    }
-  });
-  const query = qs.toString();
-  return `${API_BASE}${endpoint}${query ? `?${query}` : ""}`;
-};
-
-const listFrom = (data) =>
-  data && (data.results || data) && Array.isArray(data.results || data)
-    ? data.results || data
-    : [];
-
-const statusLabels = {
+const STATUS_LABELS = {
   draft: "Черновик",
   active: "Активен",
   cancelled: "Отменён",
   completed: "Завершён",
 };
 
-const erpStatusLabels = {
+const ERP_LABELS = {
   not_configured: "ERP не настроена",
   pending: "Ожидает",
   success: "Создано в ERP",
   error: "Ошибка ERP",
 };
 
-function TreatyForm({ value, onChange, clientsOptions, complexesOptions }) {
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    onChange((prev) => ({ ...prev, [name]: value }));
-  };
-
-  return (
-    <>
-      <div className="treaty-modal__row">
-        <div className="treaty-modal__field">
-          <label>
-            ЖК <span className="treaty-modal__req">*</span>
-          </label>
-          <select
-            name="residential_complex"
-            className="treaty-modal__input"
-            value={value.residential_complex}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Выберите ЖК</option>
-            {complexesOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="treaty-modal__field">
-          <label>
-            Клиент <span className="treaty-modal__req">*</span>
-          </label>
-          <select
-            name="client"
-            className="treaty-modal__input"
-            value={value.client}
-            onChange={handleChange}
-            required
-          >
-            <option value="">Выберите клиента</option>
-            {clientsOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="treaty-modal__row">
-        <div className="treaty-modal__field">
-          <label>Номер договора</label>
-          <input
-            name="number"
-            className="treaty-modal__input"
-            value={value.number}
-            onChange={handleChange}
-            placeholder="ДГ-001"
-          />
-        </div>
-        <div className="treaty-modal__field">
-          <label>
-            Наименование <span className="treaty-modal__req">*</span>
-          </label>
-          <input
-            name="title"
-            className="treaty-modal__input"
-            value={value.title}
-            onChange={handleChange}
-            placeholder="Договор подряда"
-            required
-          />
-        </div>
-      </div>
-
-      <div className="treaty-modal__section">
-        <label>Описание</label>
-        <textarea
-          name="description"
-          className="treaty-modal__input treaty-modal__textarea"
-          value={value.description}
-          onChange={handleChange}
-          placeholder="Условия договора..."
-          rows={3}
-        />
-      </div>
-
-      <div className="treaty-modal__row">
-        <div className="treaty-modal__field">
-          <label>Сумма</label>
-          <input
-            type="number"
-            name="amount"
-            className="treaty-modal__input"
-            value={value.amount}
-            onChange={handleChange}
-            min="0"
-            step="0.01"
-            placeholder="150000.00"
-          />
-        </div>
-        <div className="treaty-modal__field">
-          <label>Статус</label>
-          <select
-            name="status"
-            className="treaty-modal__input"
-            value={value.status}
-            onChange={handleChange}
-          >
-            <option value="draft">Черновик</option>
-            <option value="active">Активен</option>
-            <option value="completed">Завершён</option>
-            <option value="cancelled">Отменён</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="treaty-modal__section treaty-modal__checkbox-row">
-        <label className="treaty-modal__checkbox-label">
-          <input
-            type="checkbox"
-            checked={value.auto_create_in_erp}
-            onChange={(e) =>
-              onChange((prev) => ({
-                ...prev,
-                auto_create_in_erp: e.target.checked,
-              }))
-            }
-          />
-          Создавать договор в ERP автоматически
-        </label>
-      </div>
-    </>
-  );
-}
-
-function CreateTreatyModal({
-  onClose,
-  onCreated,
-  clientsOptions,
-  complexesOptions,
-}) {
-  const [form, setForm] = useState({
-    residential_complex: "",
-    client: "",
-    number: "",
-    title: "",
-    description: "",
-    amount: "",
-    status: "draft",
-    auto_create_in_erp: false,
-  });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.residential_complex || !form.client || !form.title.trim()) {
-      alert("Заполните ЖК, клиента и наименование договора");
-      return;
-    }
-    try {
-      setBusy(true);
-      setError("");
-      const payload = {
-        ...form,
-        amount: form.amount ? String(form.amount) : undefined,
-      };
-      const data = await httpJson(`${API_BASE}/treaties/`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      onCreated?.(data);
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError(
-        err?.data ? JSON.stringify(err.data) : err?.message || "Ошибка создания"
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="treaty__modalOverlay">
-      <div className="treaty-modal">
-        <div className="treaty-modal__header">
-          <h3 className="treaty-modal__title">Новый договор</h3>
-          <button
-            type="button"
-            className="treaty-modal__iconBtn"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        {error && <div className="treaty-modal__error">{error}</div>}
-        <form className="treaty-modal__form" onSubmit={handleSubmit}>
-          <TreatyForm
-            value={form}
-            onChange={setForm}
-            clientsOptions={clientsOptions}
-            complexesOptions={complexesOptions}
-          />
-          <div className="treaty-modal__footer">
-            <button
-              type="button"
-              className="treaty-modal__btn"
-              onClick={onClose}
-              disabled={busy}
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="treaty-modal__btn treaty-modal__btn--primary"
-              disabled={busy}
-            >
-              {busy ? "Создание..." : "Создать"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function EditTreatyModal({
-  treaty,
-  onClose,
-  onUpdated,
-  clientsOptions,
-  complexesOptions,
-}) {
-  const [form, setForm] = useState({
-    residential_complex: treaty.residential_complex || "",
-    client: treaty.client || "",
-    number: treaty.number || "",
-    title: treaty.title || "",
-    description: treaty.description || "",
-    amount: treaty.amount || "",
-    status: treaty.status || "draft",
-    auto_create_in_erp: treaty.auto_create_in_erp ?? false,
-  });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.residential_complex || !form.client || !form.title.trim()) {
-      alert("Заполните ЖК, клиента и наименование договора");
-      return;
-    }
-    try {
-      setBusy(true);
-      setError("");
-      const payload = {
-        ...form,
-        amount: form.amount ? String(form.amount) : undefined,
-      };
-      const data = await httpJson(`${API_BASE}/treaties/${treaty.id}/`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-      onUpdated?.(data);
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError(
-        err?.data ? JSON.stringify(err.data) : err?.message || "Ошибка сохранения"
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="treaty__modalOverlay">
-      <div className="treaty-modal">
-        <div className="treaty-modal__header">
-          <h3 className="treaty-modal__title">Редактирование договора</h3>
-          <button
-            type="button"
-            className="treaty-modal__iconBtn"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        {error && <div className="treaty-modal__error">{error}</div>}
-        <form className="treaty-modal__form" onSubmit={handleSubmit}>
-          <TreatyForm
-            value={form}
-            onChange={setForm}
-            clientsOptions={clientsOptions}
-            complexesOptions={complexesOptions}
-          />
-          <div className="treaty-modal__footer">
-            <button
-              type="button"
-              className="treaty-modal__btn"
-              onClick={onClose}
-              disabled={busy}
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="treaty-modal__btn treaty-modal__btn--primary"
-              disabled={busy}
-            >
-              {busy ? "Сохранение..." : "Сохранить"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+const FORM_INITIAL = {
+  residential_complex: "",
+  client: "",
+  number: "",
+  title: "",
+  description: "",
+  amount: "",
+  status: "draft",
+  auto_create_in_erp: false,
+};
 
 export default function BuildingTreaty() {
-  const { selectedProjectId } = useBuildingProjects();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const dispatch = useDispatch();
+  const alert = useAlert();
+  const confirm = useConfirm();
+  const { selectedProjectId, items: projects } = useBuildingProjects();
+  const { list: clientsList } = useBuildingClients();
+  const {
+    list,
+    loading,
+    error,
+    creating,
+    updatingId,
+    createError,
+    updatingError,
+    erpCreatingId,
+    erpError,
+    deletingId,
+  } = useBuildingTreaties();
 
-  const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [erpFilter, setErpFilter] = useState("");
+  const [openModal, setOpenModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(FORM_INITIAL);
+  const [formError, setFormError] = useState(null);
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editTreaty, setEditTreaty] = useState(null);
+  const [fileModalTreaty, setFileModalTreaty] = useState(null);
+  const [fileForm, setFileForm] = useState({ file: null, title: "" });
+  const [fileUploadError, setFileUploadError] = useState(null);
+  const [fileUploading, setFileUploading] = useState(false);
 
-  const [clientsOptions, setClientsOptions] = useState([]);
-  const [complexesOptions, setComplexesOptions] = useState([]);
+  const [createAttachment, setCreateAttachment] = useState({
+    file: null,
+    title: "",
+  });
 
-  const fetchTreaties = async (params = {}) => {
-    if (!selectedProjectId) return;
-    setLoading(true);
-    setError("");
-    try {
-      const url = buildUrl("/treaties/", {
-        ...params,
-        residential_complex: selectedProjectId,
-      });
-      const data = await httpJson(url);
-      setRows(listFrom(data));
-    } catch (err) {
-      console.error(err);
-      setError(
-        err?.data ? JSON.stringify(err.data) : err?.message || "Ошибка загрузки"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  const selectedProjectName = useMemo(() => {
+    if (!selectedProjectId) return "—";
+    const listProjects = Array.isArray(projects) ? projects : [];
+    const found = listProjects.find(
+      (p) => String(p?.id ?? p?.uuid) === String(selectedProjectId),
+    );
+    return found?.name || "—";
+  }, [selectedProjectId, projects]);
 
-  const fetchClients = async () => {
-    try {
-      const data = await httpJson(`${API_BASE}/clients/`);
-      setClientsOptions(listFrom(data));
-    } catch (e) {
-      console.error(e);
-      setClientsOptions([]);
-    }
-  };
+  const complexesOptions = useMemo(
+    () => (Array.isArray(projects) ? projects : []),
+    [projects],
+  );
+  const clientsOptions = useMemo(
+    () => (Array.isArray(clientsList) ? clientsList : []),
+    [clientsList],
+  );
 
-  const fetchComplexes = async () => {
-    try {
-      const data = await httpJson(`${API_BASE}/objects/`);
-      setComplexesOptions(listFrom(data));
-    } catch (e) {
-      console.error(e);
-      setComplexesOptions([]);
-    }
-  };
-
-  useEffect(() => {
-    if (!selectedProjectId) return;
-    fetchTreaties();
-    fetchClients();
-    fetchComplexes();
-  }, [selectedProjectId]);
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedProjectId) return;
-    fetchTreaties({
+  const fetchParams = useMemo(
+    () => ({
+      residential_complex: selectedProjectId || undefined,
       search: search.trim() || undefined,
       status: statusFilter || undefined,
       erp_sync_status: erpFilter || undefined,
-    });
-  };
+    }),
+    [selectedProjectId, search, statusFilter, erpFilter],
+  );
 
-  const effectiveRows = useMemo(() => {
-    if (!search && !statusFilter && !erpFilter) return rows;
-    return rows.filter((t) => {
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    dispatch(fetchBuildingTreaties(fetchParams));
+  }, [
+    dispatch,
+    selectedProjectId,
+    fetchParams.search,
+    fetchParams.status,
+    fetchParams.erp_sync_status,
+  ]);
+
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    dispatch(fetchBuildingClients({ residential_complex: selectedProjectId }));
+  }, [dispatch, selectedProjectId]);
+
+  const effectiveList = useMemo(() => {
+    const arr = Array.isArray(list) ? list : [];
+    if (!search.trim() && !statusFilter && !erpFilter) return arr;
+    return arr.filter((t) => {
       if (statusFilter && t.status !== statusFilter) return false;
       if (erpFilter && t.erp_sync_status !== erpFilter) return false;
       if (!search.trim()) return true;
-      const hay = `${t.number || ""} ${t.title || ""} ${
-        t.description || ""
-      } ${t.client_name || ""} ${t.residential_complex_name || ""}`
+      const hay = `${t.number || ""} ${t.title || ""} ${t.description || ""} ${
+        t.client_name || ""
+      } ${t.residential_complex_name || ""}`
         .toLowerCase()
         .trim();
       return hay.includes(search.toLowerCase().trim());
     });
-  }, [rows, search, statusFilter, erpFilter]);
+  }, [list, search, statusFilter, erpFilter]);
 
-  const onCreated = (treaty) => {
-    setRows((prev) => [treaty, ...prev]);
+  const openCreate = () => {
+    if (!selectedProjectId) {
+      alert("Сначала выберите жилой комплекс в шапке раздела", true);
+      return;
+    }
+    setEditing(null);
+    setForm({
+      ...FORM_INITIAL,
+      residential_complex: selectedProjectId,
+    });
+    setCreateAttachment({ file: null, title: "" });
+    setFormError(null);
+    setOpenModal(true);
   };
 
-  const onUpdated = (updated) => {
-    setRows((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  const openEdit = (treaty) => {
+    setEditing(treaty);
+    setForm({
+      residential_complex: treaty?.residential_complex || "",
+      client: treaty?.client || "",
+      number: treaty?.number || "",
+      title: treaty?.title || "",
+      description: treaty?.description || "",
+      amount: treaty?.amount || "",
+      status: treaty?.status || "draft",
+      auto_create_in_erp: treaty?.auto_create_in_erp ?? false,
+    });
+    setFormError(null);
+    setOpenModal(true);
   };
 
-  const handleErpCreate = async (treaty) => {
-    if (!window.confirm("Отправить договор на создание в ERP?")) return;
+  const closeModal = () => {
+    setOpenModal(false);
+    setEditing(null);
+    setForm(FORM_INITIAL);
+    setCreateAttachment({ file: null, title: "" });
+    setFormError(null);
+  };
+
+  const handleFormChange = (key) => (e) => {
+    const value =
+      key === "auto_create_in_erp" ? e.target.checked : e.target.value;
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProjectId) {
+      alert("Сначала выберите жилой комплекс в шапке раздела", true);
+      return;
+    }
+    if (
+      !form.residential_complex ||
+      !form.client ||
+      !String(form.title || "").trim()
+    ) {
+      setFormError("Заполните ЖК, клиента и наименование договора");
+      return;
+    }
+
+    const payload = {
+      ...form,
+      amount: form.amount ? String(form.amount) : undefined,
+    };
+
     try {
-      await httpJson(`${API_BASE}/treaties/${treaty.id}/erp/create/`, {
-        method: "POST",
-      });
-      fetchTreaties();
-    } catch (e) {
-      console.error(e);
-      alert(
-        e?.data
-          ? JSON.stringify(e.data)
-          : e?.message || "Не удалось отправить договор в ERP"
-      );
+      let res;
+      if (editing) {
+        const id = editing?.id ?? editing?.uuid;
+        if (!id) return;
+        res = await dispatch(updateBuildingTreaty({ id, data: payload }));
+      } else {
+        res = await dispatch(createBuildingTreaty(payload));
+      }
+      if (res.meta.requestStatus === "fulfilled") {
+        const newTreaty = res.payload;
+        const newId = newTreaty?.id ?? newTreaty?.uuid;
+        if (!editing && createAttachment.file && newId) {
+          const fileRes = await dispatch(
+            createBuildingTreatyFile({
+              treatyId: newId,
+              file: createAttachment.file,
+              title: createAttachment.title || undefined,
+            }),
+          );
+          if (fileRes.meta.requestStatus === "fulfilled") {
+            alert("Договор создан, файл прикреплён");
+          } else {
+            alert("Договор создан. Не удалось прикрепить файл.", true);
+          }
+        } else {
+          alert(editing ? "Договор обновлён" : "Договор создан");
+        }
+        closeModal();
+        dispatch(fetchBuildingTreaties(fetchParams));
+      } else {
+        setFormError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось сохранить договор",
+          ),
+        );
+      }
+    } catch (err) {
+      setFormError(validateResErrors(err, "Не удалось сохранить договор"));
     }
   };
 
+  const handleErpCreate = (treaty) => {
+    const id = treaty?.id ?? treaty?.uuid;
+    if (!id) return;
+    confirm("Отправить договор на создание в ERP?", async (ok) => {
+      if (!ok) return;
+      try {
+        const res = await dispatch(createBuildingTreatyInErp(id));
+        if (res.meta.requestStatus === "fulfilled") {
+          alert("Договор отправлен в ERP");
+          dispatch(fetchBuildingTreaties(fetchParams));
+        } else {
+          alert(
+            validateResErrors(
+              res.payload || res.error,
+              "Не удалось отправить договор в ERP",
+            ),
+            true,
+          );
+        }
+      } catch (e) {
+        alert(validateResErrors(e, "Не удалось отправить договор в ERP"), true);
+      }
+    });
+  };
+
+  const openFileModal = (treaty) => {
+    setFileModalTreaty(treaty);
+    setFileForm({ file: null, title: "" });
+    setFileUploadError(null);
+  };
+
+  const closeFileModal = () => {
+    setFileModalTreaty(null);
+    setFileForm({ file: null, title: "" });
+    setFileUploadError(null);
+  };
+
+  const handleFileSubmit = async (e) => {
+    e.preventDefault();
+    if (!fileModalTreaty) return;
+    const id = fileModalTreaty?.id ?? fileModalTreaty?.uuid;
+    if (!id || !fileForm.file) {
+      setFileUploadError("Выберите файл");
+      return;
+    }
+    setFileUploadError(null);
+    setFileUploading(true);
+    try {
+      const res = await dispatch(
+        createBuildingTreatyFile({
+          treatyId: id,
+          file: fileForm.file,
+          title: fileForm.title || undefined,
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Файл прикреплён");
+        closeFileModal();
+      } else {
+        setFileUploadError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось загрузить файл",
+          ),
+        );
+      }
+    } catch (err) {
+      setFileUploadError(validateResErrors(err, "Не удалось загрузить файл"));
+    } finally {
+      setFileUploading(false);
+    }
+  };
+
+  const handleDelete = (treaty) => {
+    const id = treaty?.id ?? treaty?.uuid;
+    if (!id) return;
+    confirm(
+      `Удалить договор «${treaty?.title || treaty?.number || "договор"}»?`,
+      async (ok) => {
+        if (!ok) return;
+        try {
+          const res = await dispatch(deleteBuildingTreaty(id));
+          if (res.meta.requestStatus === "fulfilled") {
+            alert("Договор удалён");
+            dispatch(fetchBuildingTreaties(fetchParams));
+          } else {
+            alert(
+              validateResErrors(
+                res.payload || res.error,
+                "Не удалось удалить договор",
+              ),
+              true,
+            );
+          }
+        } catch (err) {
+          alert(validateResErrors(err, "Не удалось удалить договор"), true);
+        }
+      },
+    );
+  };
+
   return (
-    <div className="building-treaty">
-      <div className="building-treaty__header">
+    <div className="building-page">
+      <div className="building-page__header">
         <div>
-          <h1 className="building-treaty__title">Договоры строительства</h1>
-          <p className="building-treaty__subtitle">
-            Реестр договоров по объектам строительства с фильтрами и ERP-синхронизацией.
+          <h1 className="building-page__title">Договоры строительства</h1>
+          <p className="building-page__subtitle">
+            ЖК: <b>{selectedProjectName}</b>. Реестр договоров с фильтрами и
+            ERP-синхронизацией.
           </p>
         </div>
         <button
-          className="building-treaty__add"
-          onClick={() => setCreateOpen(true)}
+          type="button"
+          className="building-btn building-btn--primary"
+          disabled={!selectedProjectId}
+          onClick={openCreate}
         >
-          <Plus size={16} /> <span>Новый договор</span>
+          Новый договор
         </button>
       </div>
 
-      <form
-        className="building-treaty__filters"
-        onSubmit={handleSearchSubmit}
-      >
-        <input
-          className="building-treaty__search"
-          placeholder="Поиск по номеру, названию, описанию, клиенту, ЖК"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-
-        <select
-          className="building-treaty__select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">Статус: все</option>
-          <option value="draft">Черновики</option>
-          <option value="active">Активные</option>
-          <option value="completed">Завершённые</option>
-          <option value="cancelled">Отменённые</option>
-        </select>
-
-        <select
-          className="building-treaty__select"
-          value={erpFilter}
-          onChange={(e) => setErpFilter(e.target.value)}
-        >
-          <option value="">ERP: все</option>
-          <option value="not_configured">ERP не настроена</option>
-          <option value="pending">Ожидает</option>
-          <option value="success">Создано</option>
-          <option value="error">Ошибка</option>
-        </select>
-
-        <button
-          type="submit"
-          className="building-treaty__btn building-treaty__btn--primary"
-        >
-          Применить
-        </button>
-        <button
-          type="button"
-          className="building-treaty__btn"
-          onClick={() => {
-            setSearch("");
-            setStatusFilter("");
-            setErpFilter("");
-            fetchTreaties();
-          }}
-        >
-          Сбросить
-        </button>
-      </form>
-
-      {error && (
-        <div className="building-treaty__alert building-treaty__alert--error">
-          {error}
+      <div className="building-page__card">
+        <div className="building-page__filters building-page__filters--3">
+          <input
+            className="building-page__input"
+            value={search}
+            placeholder="Поиск по номеру, названию, описанию, клиенту, ЖК"
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="building-page__select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">Статус: все</option>
+            {Object.entries(STATUS_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="building-page__select"
+            value={erpFilter}
+            onChange={(e) => setErpFilter(e.target.value)}
+          >
+            <option value="">ERP: все</option>
+            {Object.entries(ERP_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+        {error && (
+          <div className="building-page__error">
+            {String(validateResErrors(error, "Не удалось загрузить договоры"))}
+          </div>
+        )}
+        {erpError && (
+          <div className="building-page__error">
+            ERP: {String(validateResErrors(erpError, "Ошибка ERP"))}
+          </div>
+        )}
+      </div>
 
-      {loading ? (
-        <div className="building-treaty__status">Загрузка...</div>
-      ) : effectiveRows.length === 0 ? (
-        <div className="building-treaty__status">Договоры не найдены.</div>
-      ) : (
-        <div className="table-wrapper">
-          <table className="sklad__table">
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" />
-                </th>
-                <th></th>
-                <th>№</th>
-                <th>Номер</th>
-                <th>Название</th>
-                <th>ЖК</th>
-                <th>Клиент</th>
-                <th>Сумма</th>
-                <th>Статус</th>
-                <th>ERP</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {effectiveRows.map((t, idx) => (
-                <tr key={t.id || idx}>
-                  <td>
-                    <input type="checkbox" />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="building-treaty__iconBtn"
-                      onClick={() => setEditTreaty(t)}
-                      title="Редактировать"
-                    >
-                      <MoreVertical size={16} />
-                    </button>
-                  </td>
-                  <td>{idx + 1}</td>
-                  <td>{t.number || "—"}</td>
-                  <td>{t.title || "—"}</td>
-                  <td>{t.residential_complex_name || t.residential_complex || "—"}</td>
-                  <td>{t.client_name || t.client || "—"}</td>
-                  <td>{t.amount || "—"}</td>
-                  <td>{statusLabels[t.status] || t.status || "—"}</td>
-                  <td>
-                    <span
-                      className={`building-treaty__erp building-treaty__erp--${
-                        t.erp_sync_status || "none"
-                      }`}
-                    >
-                      {erpStatusLabels[t.erp_sync_status] || "—"}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="building-treaty__smallBtn"
-                      onClick={() => handleErpCreate(t)}
-                    >
-                      В ERP
-                    </button>
-                  </td>
+      <div className="building-page__card">
+        {(!selectedProjectId || loading) && (
+          <div className="building-page__muted">
+            {!selectedProjectId
+              ? "Выберите жилой комплекс в шапке раздела."
+              : "Загрузка..."}
+          </div>
+        )}
+        {selectedProjectId && !loading && effectiveList.length === 0 && (
+          <div className="building-page__muted">Договоров пока нет.</div>
+        )}
+        {selectedProjectId && !loading && effectiveList.length > 0 && (
+          <div className="building-table building-table--shadow">
+            <table>
+              <thead>
+                <tr>
+                  <th>Номер</th>
+                  <th>Название</th>
+                  <th>ЖК</th>
+                  <th>Клиент</th>
+                  <th>Сумма</th>
+                  <th>Статус</th>
+                  <th>ERP</th>
+                  <th style={{ width: 80 }}>Действия</th>
                 </tr>
+              </thead>
+              <tbody>
+                {effectiveList.map((t) => {
+                  const id = t?.id ?? t?.uuid;
+                  const erpBusy = id != null && erpCreatingId === id;
+                  const busyUpdate = id != null && updatingId === id;
+                  const busyDelete = id != null && deletingId === id;
+                  const busy = erpBusy || busyUpdate || busyDelete;
+                  const erpStatus = t?.erp_sync_status || "none";
+                  return (
+                    <tr key={id}>
+                      <td>{t?.number || "—"}</td>
+                      <td>{t?.title || "—"}</td>
+                      <td>
+                        {t?.residential_complex_name ||
+                          t?.residential_complex ||
+                          "—"}
+                      </td>
+                      <td>{t?.client_name || t?.client || "—"}</td>
+                      <td>{t?.amount ?? "—"}</td>
+                      <td>
+                        <span className="building-page__status">
+                          {STATUS_LABELS[t?.status] || t?.status || "—"}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`building-page__status ${
+                            erpStatus === "success"
+                              ? "is-success"
+                              : erpStatus === "error"
+                                ? "is-danger"
+                                : erpStatus === "pending"
+                                  ? "is-warning"
+                                  : ""
+                          }`}
+                        >
+                          {ERP_LABELS[t?.erp_sync_status] || "—"}
+                        </span>
+                      </td>
+                      <td>
+                        <BuildingActionsMenu
+                          actions={[
+                            {
+                              label: "Изменить",
+                              onClick: () => openEdit(t),
+                              disabled: busy,
+                            },
+                            {
+                              label: "Прикрепить файл",
+                              onClick: () => openFileModal(t),
+                              disabled: busy,
+                            },
+                            {
+                              label: "В ERP",
+                              onClick: () => handleErpCreate(t),
+                              disabled: busy || erpBusy,
+                            },
+                            {
+                              label: "Удалить",
+                              onClick: () => handleDelete(t),
+                              disabled: busy,
+                              danger: true,
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {(createError || updatingError) && (
+          <div className="building-page__error" style={{ marginTop: 8 }}>
+            {String(
+              validateResErrors(
+                createError || updatingError,
+                "Ошибка при сохранении договора",
+              ),
+            )}
+          </div>
+        )}
+      </div>
+
+      <Modal
+        open={openModal}
+        onClose={closeModal}
+        title={editing ? "Изменить договор" : "Новый договор"}
+      >
+        <form className="building-page" onSubmit={handleSubmit}>
+          <label>
+            <div className="building-page__label">ЖК *</div>
+            <select
+              className="building-page__select"
+              value={form.residential_complex}
+              onChange={handleFormChange("residential_complex")}
+              required
+            >
+              <option value="">Выберите ЖК</option>
+              {complexesOptions.map((c) => (
+                <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                  {c.name || "—"}
+                </option>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </select>
+          </label>
+          <label>
+            <div className="building-page__label">Клиент *</div>
+            <select
+              className="building-page__select"
+              value={form.client}
+              onChange={handleFormChange("client")}
+              required
+            >
+              <option value="">Выберите клиента</option>
+              {clientsOptions.map((c) => (
+                <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                  {c.name || "—"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <div className="building-page__label">Номер договора</div>
+            <input
+              className="building-page__input"
+              value={form.number}
+              onChange={handleFormChange("number")}
+              placeholder="ДГ-001"
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Наименование *</div>
+            <input
+              className="building-page__input"
+              value={form.title}
+              onChange={handleFormChange("title")}
+              placeholder="Договор подряда"
+              required
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Описание</div>
+            <textarea
+              className="building-page__textarea"
+              rows={3}
+              value={form.description}
+              onChange={handleFormChange("description")}
+              placeholder="Условия договора..."
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Сумма</div>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="building-page__input"
+              value={form.amount}
+              onChange={handleFormChange("amount")}
+              placeholder="150000.00"
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Статус</div>
+            <select
+              className="building-page__select"
+              value={form.status}
+              onChange={handleFormChange("status")}
+            >
+              {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.auto_create_in_erp}
+              onChange={handleFormChange("auto_create_in_erp")}
+            />
+            <span className="building-page__label">
+              Создавать договор в ERP автоматически
+            </span>
+          </label>
+          {!editing && (
+            <>
+              <div className="building-page__label" style={{ marginTop: 8 }}>
+                Прикрепить файл (необязательно)
+              </div>
+              <label>
+                <div className="building-page__label">Файл</div>
+                <input
+                  type="file"
+                  className="building-page__input"
+                  onChange={(e) =>
+                    setCreateAttachment((prev) => ({
+                      ...prev,
+                      file: e.target.files?.[0] ?? null,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                <div className="building-page__label">Название файла</div>
+                <input
+                  type="text"
+                  className="building-page__input"
+                  value={createAttachment.title}
+                  onChange={(e) =>
+                    setCreateAttachment((prev) => ({
+                      ...prev,
+                      title: e.target.value,
+                    }))
+                  }
+                  placeholder="Например: Скан договора"
+                />
+              </label>
+            </>
+          )}
+          {formError && (
+            <div className="building-page__error">{String(formError)}</div>
+          )}
+          <div className="building-page__actions">
+            <button
+              type="button"
+              className="building-btn"
+              onClick={closeModal}
+              disabled={creating}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="building-btn building-btn--primary"
+              disabled={creating}
+            >
+              {creating ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
-      {createOpen && (
-        <CreateTreatyModal
-          onClose={() => setCreateOpen(false)}
-          onCreated={onCreated}
-          clientsOptions={clientsOptions}
-          complexesOptions={complexesOptions}
-        />
-      )}
-
-      {editTreaty && (
-        <EditTreatyModal
-          treaty={editTreaty}
-          onClose={() => setEditTreaty(null)}
-          onUpdated={onUpdated}
-          clientsOptions={clientsOptions}
-          complexesOptions={complexesOptions}
-        />
-      )}
+      <Modal
+        open={Boolean(fileModalTreaty)}
+        onClose={closeFileModal}
+        title="Прикрепить файл к договору"
+      >
+        <form className="building-page" onSubmit={handleFileSubmit}>
+          <label>
+            <div className="building-page__label">Файл *</div>
+            <input
+              type="file"
+              className="building-page__input"
+              onChange={(e) =>
+                setFileForm((prev) => ({
+                  ...prev,
+                  file: e.target.files?.[0] ?? null,
+                }))
+              }
+              required
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Название (необязательно)</div>
+            <input
+              type="text"
+              className="building-page__input"
+              value={fileForm.title}
+              onChange={(e) =>
+                setFileForm((prev) => ({ ...prev, title: e.target.value }))
+              }
+              placeholder="Например: Скан договора"
+            />
+          </label>
+          {fileUploadError && (
+            <div className="building-page__error">
+              {String(fileUploadError)}
+            </div>
+          )}
+          <div className="building-page__actions">
+            <button
+              type="button"
+              className="building-btn"
+              onClick={closeFileModal}
+              disabled={fileUploading}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="building-btn building-btn--primary"
+              disabled={fileUploading || !fileForm.file}
+            >
+              {fileUploading ? "Загрузка..." : "Прикрепить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

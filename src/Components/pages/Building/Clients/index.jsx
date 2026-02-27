@@ -1,499 +1,420 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, MoreVertical, X } from "lucide-react";
-import "./clients.scss";
+import { useDispatch } from "react-redux";
+import Modal from "@/Components/common/Modal/Modal";
+import { useAlert, useConfirm } from "@/hooks/useDialog";
+import {
+  fetchBuildingClients,
+  createBuildingClient,
+  updateBuildingClient,
+  deleteBuildingClient,
+} from "../../../../store/creators/building/clientsCreators";
+import { useBuildingClients } from "../../../../store/slices/building/clientsSlice";
+import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
+import BuildingActionsMenu from "../shared/ActionsMenu";
 
-const API_BASE = "https://app.nurcrm.kg/api/building";
-
-const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem("accessToken") || localStorage.getItem("token") || "";
-  return token ? { Authorization: `Bearer ${token}` } : {};
+const FORM_INITIAL = {
+  name: "",
+  phone: "",
+  email: "",
+  inn: "",
+  address: "",
+  notes: "",
+  is_active: true,
 };
-
-async function httpJson(url, options = {}) {
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders(),
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
-
-  const text = await res.text();
-  const ct = res.headers.get("content-type") || "";
-  let data = null;
-  if (text) {
-    if (ct.includes("application/json")) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { raw: text };
-      }
-    } else {
-      data = { raw: text };
-    }
-  }
-
-  if (!res.ok) {
-    const msg =
-      (data && (data.detail || data.message)) ||
-      res.statusText ||
-      "Request failed";
-    const err = new Error(msg);
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
-}
-
-const buildUrl = (endpoint, params = {}) => {
-  const qs = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== "" && v !== undefined && v !== null) {
-      qs.append(k, v);
-    }
-  });
-  const query = qs.toString();
-  return `${API_BASE}${endpoint}${query ? `?${query}` : ""}`;
-};
-
-const listFrom = (data) =>
-  data && (data.results || data) && Array.isArray(data.results || data)
-    ? data.results || data
-    : [];
-
-function ClientForm({ value, onChange }) {
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    onChange((prev) => ({ ...prev, [name]: value }));
-  };
-
-  return (
-    <>
-      <div className="clients-modal__section">
-        <label>
-          Имя / название <span className="clients-modal__req">*</span>
-        </label>
-        <input
-          className="clients-modal__input"
-          name="name"
-          value={value.name}
-          onChange={handleChange}
-          placeholder="ОсОО Ромашка"
-          required
-        />
-      </div>
-      <div className="clients-modal__section">
-        <label>Телефон</label>
-        <input
-          className="clients-modal__input"
-          name="phone"
-          value={value.phone}
-          onChange={handleChange}
-          placeholder="+996700000000"
-        />
-      </div>
-      <div className="clients-modal__section">
-        <label>Email</label>
-        <input
-          className="clients-modal__input"
-          name="email"
-          type="email"
-          value={value.email}
-          onChange={handleChange}
-          placeholder="info@example.com"
-        />
-      </div>
-      <div className="clients-modal__section">
-        <label>ИНН</label>
-        <input
-          className="clients-modal__input"
-          name="inn"
-          value={value.inn}
-          onChange={handleChange}
-          placeholder="123456789"
-        />
-      </div>
-      <div className="clients-modal__section">
-        <label>Адрес</label>
-        <input
-          className="clients-modal__input"
-          name="address"
-          value={value.address}
-          onChange={handleChange}
-          placeholder="г. Бишкек, ..."
-        />
-      </div>
-      <div className="clients-modal__section">
-        <label>Заметки</label>
-        <textarea
-          className="clients-modal__input clients-modal__textarea"
-          name="notes"
-          value={value.notes}
-          onChange={handleChange}
-          placeholder="Постоянный клиент"
-          rows={3}
-        />
-      </div>
-      <div className="clients-modal__section clients-modal__checkbox-row">
-        <label className="clients-modal__checkbox-label">
-          <input
-            type="checkbox"
-            checked={value.is_active}
-            onChange={(e) =>
-              onChange((prev) => ({ ...prev, is_active: e.target.checked }))
-            }
-          />
-          Активный клиент
-        </label>
-      </div>
-    </>
-  );
-}
-
-function CreateClientModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    inn: "",
-    address: "",
-    notes: "",
-    is_active: true,
-  });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) {
-      alert("Имя/название клиента обязательно");
-      return;
-    }
-    try {
-      setBusy(true);
-      setError("");
-      const data = await httpJson(`${API_BASE}/clients/`, {
-        method: "POST",
-        body: JSON.stringify(form),
-      });
-      onCreated?.(data);
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError(
-        err?.data ? JSON.stringify(err.data) : err?.message || "Ошибка создания"
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="clients__modalOverlay">
-      <div className="clients-modal">
-        <div className="clients-modal__header">
-          <h3 className="clients-modal__title">Новый клиент (строительство)</h3>
-          <button
-            type="button"
-            className="clients-modal__iconBtn"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        {error && <div className="clients-modal__error">{error}</div>}
-        <form className="clients-modal__form" onSubmit={handleSubmit}>
-          <ClientForm value={form} onChange={setForm} />
-          <div className="clients-modal__footer">
-            <button
-              type="button"
-              className="clients-modal__btn"
-              onClick={onClose}
-              disabled={busy}
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="clients-modal__btn clients-modal__btn--primary"
-              disabled={busy}
-            >
-              {busy ? "Создание..." : "Создать"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function EditClientModal({ client, onClose, onUpdated }) {
-  const [form, setForm] = useState({
-    name: client.name || "",
-    phone: client.phone || "",
-    email: client.email || "",
-    inn: client.inn || "",
-    address: client.address || "",
-    notes: client.notes || "",
-    is_active: client.is_active ?? true,
-  });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) {
-      alert("Имя/название клиента обязательно");
-      return;
-    }
-    try {
-      setBusy(true);
-      setError("");
-      const data = await httpJson(`${API_BASE}/clients/${client.id}/`, {
-        method: "PATCH",
-        body: JSON.stringify(form),
-      });
-      onUpdated?.(data);
-      onClose();
-    } catch (err) {
-      console.error(err);
-      setError(
-        err?.data ? JSON.stringify(err.data) : err?.message || "Ошибка сохранения"
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="clients__modalOverlay">
-      <div className="clients-modal">
-        <div className="clients-modal__header">
-          <h3 className="clients-modal__title">Редактирование клиента</h3>
-          <button
-            type="button"
-            className="clients-modal__iconBtn"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        {error && <div className="clients-modal__error">{error}</div>}
-        <form className="clients-modal__form" onSubmit={handleSubmit}>
-          <ClientForm value={form} onChange={setForm} />
-          <div className="clients-modal__footer">
-            <button
-              type="button"
-              className="clients-modal__btn"
-              onClick={onClose}
-              disabled={busy}
-            >
-              Отмена
-            </button>
-            <button
-              type="submit"
-              className="clients-modal__btn clients-modal__btn--primary"
-              disabled={busy}
-            >
-              {busy ? "Сохранение..." : "Сохранить"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 export default function BuildingClients() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const dispatch = useDispatch();
+  const alert = useAlert();
+  const confirm = useConfirm();
+  const { selectedProjectId, items: projects } = useBuildingProjects();
+  const {
+    list,
+    loading,
+    error,
+    creating,
+    updatingId,
+    createError,
+    updatingError,
+    deletingId,
+  } = useBuildingClients();
+
   const [search, setSearch] = useState("");
   const [onlyActive, setOnlyActive] = useState(true);
+  const [openModal, setOpenModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(FORM_INITIAL);
+  const [formError, setFormError] = useState(null);
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editClient, setEditClient] = useState(null);
+  const selectedProjectName = useMemo(() => {
+    if (!selectedProjectId) return "—";
+    const listProjects = Array.isArray(projects) ? projects : [];
+    const found = listProjects.find(
+      (p) => String(p?.id ?? p?.uuid) === String(selectedProjectId),
+    );
+    return found?.name || "—";
+  }, [selectedProjectId, projects]);
 
-  const loadClients = async (params = {}) => {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    dispatch(
+      fetchBuildingClients({
+        residential_complex: selectedProjectId,
+        search: search.trim() || undefined,
+        is_active: onlyActive ? true : undefined,
+      }),
+    );
+  }, [dispatch, selectedProjectId, search, onlyActive]);
+
+  const openCreate = () => {
+    if (!selectedProjectId) {
+      alert("Сначала выберите жилой комплекс в шапке раздела", true);
+      return;
+    }
+    setEditing(null);
+    setForm(FORM_INITIAL);
+    setFormError(null);
+    setOpenModal(true);
+  };
+
+  const openEdit = (client) => {
+    setEditing(client);
+    setForm({
+      name: client?.name || "",
+      phone: client?.phone || "",
+      email: client?.email || "",
+      inn: client?.inn || "",
+      address: client?.address || "",
+      notes: client?.notes || "",
+      is_active: client?.is_active ?? true,
+    });
+    setFormError(null);
+    setOpenModal(true);
+  };
+
+  const closeModal = () => {
+    setOpenModal(false);
+    setEditing(null);
+    setForm(FORM_INITIAL);
+    setFormError(null);
+  };
+
+  const handleFormChange = (key) => (e) => {
+    const value = key === "is_active" ? e.target.checked : e.target.value;
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedProjectId) {
+      alert("Сначала выберите жилой комплекс в шапке раздела", true);
+      return;
+    }
+    if (!String(form.name || "").trim()) {
+      setFormError("Имя / название обязательно");
+      return;
+    }
+
     try {
-      const url = buildUrl("/clients/", params);
-      const data = await httpJson(url);
-      setRows(listFrom(data));
+      let res;
+      if (editing) {
+        const id = editing?.id ?? editing?.uuid;
+        if (!id) return;
+        res = await dispatch(updateBuildingClient({ id, data: form }));
+      } else {
+        res = await dispatch(createBuildingClient(form));
+      }
+      if (res.meta.requestStatus === "fulfilled") {
+        alert(editing ? "Клиент обновлён" : "Клиент создан");
+        closeModal();
+        dispatch(
+          fetchBuildingClients({
+            residential_complex: selectedProjectId,
+            search: search.trim() || undefined,
+            is_active: onlyActive ? true : undefined,
+          }),
+        );
+      } else {
+        setFormError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось сохранить клиента",
+          ),
+        );
+      }
     } catch (err) {
-      console.error(err);
-      setError(
-        err?.data ? JSON.stringify(err.data) : err?.message || "Ошибка загрузки"
-      );
-    } finally {
-      setLoading(false);
+      setFormError(validateResErrors(err, "Не удалось сохранить клиента"));
     }
   };
 
-  useEffect(() => {
-    loadClients({ is_active: true });
-  }, []);
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    loadClients({
-      search: search.trim() || undefined,
-      is_active: onlyActive ? true : undefined,
+  const handleDelete = (client) => {
+    const id = client?.id ?? client?.uuid;
+    if (!id) return;
+    confirm(`Удалить клиента «${client?.name || "без имени"}»?`, async (ok) => {
+      if (!ok) return;
+      try {
+        const res = await dispatch(deleteBuildingClient(id));
+        if (res.meta.requestStatus === "fulfilled") {
+          alert("Клиент удалён");
+          dispatch(
+            fetchBuildingClients({
+              residential_complex: selectedProjectId,
+              search: search.trim() || undefined,
+              is_active: onlyActive ? true : undefined,
+            }),
+          );
+        } else {
+          alert(
+            validateResErrors(
+              res.payload || res.error,
+              "Не удалось удалить клиента",
+            ),
+            true,
+          );
+        }
+      } catch (err) {
+        alert(validateResErrors(err, "Не удалось удалить клиента"), true);
+      }
     });
   };
 
-  const effectiveRows = useMemo(() => {
-    if (!search && !onlyActive) return rows;
-    return rows.filter((c) => {
+  const effectiveList = useMemo(() => {
+    const arr = Array.isArray(list) ? list : [];
+    if (!search.trim() && onlyActive) return arr;
+    return arr.filter((c) => {
       if (onlyActive && !c.is_active) return false;
       if (!search.trim()) return true;
-      const hay = `${c.name || ""} ${c.phone || ""} ${c.email || ""} ${
-        c.inn || ""
-      }`
-        .toLowerCase()
-        .trim();
+      const hay =
+        `${c.name || ""} ${c.phone || ""} ${c.email || ""} ${c.inn || ""}`
+          .toLowerCase()
+          .trim();
       return hay.includes(search.toLowerCase().trim());
     });
-  }, [rows, search, onlyActive]);
-
-  const onCreated = (client) => {
-    setRows((prev) => [client, ...prev]);
-  };
-
-  const onUpdated = (updated) => {
-    setRows((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-  };
+  }, [list, search, onlyActive]);
 
   return (
-    <div className="building-clients">
-      <div className="building-clients__header">
+    <div className="building-page">
+      <div className="building-page__header">
         <div>
-          <h1 className="building-clients__title">Клиенты строительства</h1>
-          <p className="building-clients__subtitle">
-            Список клиентов по объектам строительства с быстрым поиском и
-            фильтрами.
+          <h1 className="building-page__title">Клиенты строительства</h1>
+          <p className="building-page__subtitle">
+            ЖК: <b>{selectedProjectName}</b>. Список клиентов по объекту с
+            поиском и фильтрами.
           </p>
         </div>
         <button
-          className="building-clients__add"
-          onClick={() => setCreateOpen(true)}
+          type="button"
+          className="building-btn building-btn--primary"
+          disabled={!selectedProjectId}
+          onClick={openCreate}
         >
-          <Plus size={16} /> <span>Добавить клиента</span>
+          Добавить клиента
         </button>
       </div>
 
-      <div className="building-clients__toolbar">
-        <form
-          className="building-clients__searchForm"
-          onSubmit={handleSearchSubmit}
-        >
+      <div className="building-page__card">
+        <div className="building-page__filters">
           <input
-            className="building-clients__search"
-            placeholder="Поиск по имени, телефону, email, ИНН"
+            className="building-page__input"
             value={search}
+            placeholder="Поиск по имени, телефону, email, ИНН"
             onChange={(e) => setSearch(e.target.value)}
           />
-          <button
-            type="submit"
-            className="building-clients__btn building-clients__btn--primary"
+          <label
+            className="building-page__muted"
+            style={{ display: "flex", alignItems: "center", gap: 8 }}
           >
-            Найти
-          </button>
-          <button
-            type="button"
-            className="building-clients__btn"
-            onClick={() => {
-              setSearch("");
-              setOnlyActive(true);
-              loadClients({ is_active: true });
-            }}
-          >
-            Сбросить
-          </button>
-        </form>
-
-        <label className="building-clients__toggle">
-          <input
-            type="checkbox"
-            checked={onlyActive}
-            onChange={(e) => setOnlyActive(e.target.checked)}
-          />
-          Только активные
-        </label>
+            <input
+              type="checkbox"
+              checked={onlyActive}
+              onChange={(e) => setOnlyActive(e.target.checked)}
+            />
+            Только активные
+          </label>
+        </div>
+        {error && (
+          <div className="building-page__error">
+            {String(validateResErrors(error, "Не удалось загрузить клиентов"))}
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div className="building-clients__alert building-clients__alert--error">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="building-clients__status">Загрузка...</div>
-      ) : effectiveRows.length === 0 ? (
-        <div className="building-clients__status">Клиенты не найдены.</div>
-      ) : (
-        <div className="table-wrapper">
-          <table className="sklad__table">
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" />
-                </th>
-                <th></th>
-                <th>№</th>
-                <th>Имя / название</th>
-                <th>Телефон</th>
-                <th>Email</th>
-                <th>ИНН</th>
-                <th>Адрес</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {effectiveRows.map((c, idx) => (
-                <tr key={c.id || idx}>
-                  <td>
-                    <input type="checkbox" />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="building-clients__iconBtn"
-                      onClick={() => setEditClient(c)}
-                      title="Редактировать"
-                    >
-                      <MoreVertical size={16} />
-                    </button>
-                  </td>
-                  <td>{idx + 1}</td>
-                  <td>{c.name || "—"}</td>
-                  <td>{c.phone || "—"}</td>
-                  <td>{c.email || "—"}</td>
-                  <td>{c.inn || "—"}</td>
-                  <td>{c.address || "—"}</td>
-                  <td>{c.is_active ? "Активен" : "Отключён"}</td>
+      <div className="building-page__card">
+        {(!selectedProjectId || loading) && (
+          <div className="building-page__muted">
+            {!selectedProjectId
+              ? "Выберите жилой комплекс в шапке раздела."
+              : "Загрузка..."}
+          </div>
+        )}
+        {selectedProjectId && !loading && effectiveList.length === 0 && (
+          <div className="building-page__muted">Клиентов пока нет.</div>
+        )}
+        {selectedProjectId && !loading && effectiveList.length > 0 && (
+          <div className="building-table building-table--shadow">
+            <table>
+              <thead>
+                <tr>
+                  <th>Имя / название</th>
+                  <th>Телефон</th>
+                  <th>Email</th>
+                  <th>ИНН</th>
+                  <th>Адрес</th>
+                  <th>Статус</th>
+                  <th style={{ width: 80 }}>Действия</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {effectiveList.map((c) => {
+                  const id = c?.id ?? c?.uuid;
+                  const busyDelete = id != null && deletingId === id;
+                  const busyUpdate = id != null && updatingId === id;
+                  const busy = busyDelete || busyUpdate;
+                  return (
+                    <tr key={id}>
+                      <td>{c?.name || "—"}</td>
+                      <td>{c?.phone || "—"}</td>
+                      <td>{c?.email || "—"}</td>
+                      <td>{c?.inn || "—"}</td>
+                      <td>{c?.address || "—"}</td>
+                      <td>
+                        {c?.is_active ? (
+                          <span className="building-page__status">Активен</span>
+                        ) : (
+                          <span className="building-page__status is-danger">
+                            Отключён
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <BuildingActionsMenu
+                          actions={[
+                            {
+                              label: "Изменить",
+                              onClick: () => openEdit(c),
+                              disabled: busy,
+                            },
+                            {
+                              label: "Удалить",
+                              onClick: () => handleDelete(c),
+                              disabled: busy,
+                              danger: true,
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {(createError || updatingError) && (
+          <div className="building-page__error" style={{ marginTop: 8 }}>
+            {String(
+              validateResErrors(
+                createError || updatingError,
+                "Ошибка при сохранении клиента",
+              ),
+            )}
+          </div>
+        )}
+      </div>
 
-      {createOpen && (
-        <CreateClientModal onClose={() => setCreateOpen(false)} onCreated={onCreated} />
-      )}
-      {editClient && (
-        <EditClientModal
-          client={editClient}
-          onClose={() => setEditClient(null)}
-          onUpdated={onUpdated}
-        />
-      )}
+      <Modal
+        open={openModal}
+        onClose={closeModal}
+        title={editing ? "Изменить клиента" : "Добавить клиента"}
+      >
+        <form className="building-page" onSubmit={handleSubmit}>
+          <label>
+            <div className="building-page__label">Имя / название *</div>
+            <input
+              className="building-page__input"
+              value={form.name}
+              onChange={handleFormChange("name")}
+              placeholder="ОсОО Ромашка"
+              required
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Телефон</div>
+            <input
+              className="building-page__input"
+              value={form.phone}
+              onChange={handleFormChange("phone")}
+              placeholder="+996700000000"
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Email</div>
+            <input
+              type="email"
+              className="building-page__input"
+              value={form.email}
+              onChange={handleFormChange("email")}
+              placeholder="info@example.com"
+            />
+          </label>
+          <label>
+            <div className="building-page__label">ИНН</div>
+            <input
+              className="building-page__input"
+              value={form.inn}
+              onChange={handleFormChange("inn")}
+              placeholder="123456789"
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Адрес</div>
+            <input
+              className="building-page__input"
+              value={form.address}
+              onChange={handleFormChange("address")}
+              placeholder="г. Бишкек, ..."
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Заметки</div>
+            <textarea
+              className="building-page__textarea"
+              rows={3}
+              value={form.notes}
+              onChange={handleFormChange("notes")}
+              placeholder="Постоянный клиент"
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.is_active}
+              onChange={handleFormChange("is_active")}
+            />
+            <span className="building-page__label">Активный клиент</span>
+          </label>
+          {formError && (
+            <div className="building-page__error">{String(formError)}</div>
+          )}
+          <div className="building-page__actions">
+            <button
+              type="button"
+              className="building-btn"
+              onClick={closeModal}
+              disabled={creating}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="building-btn building-btn--primary"
+              disabled={creating}
+            >
+              {creating ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
