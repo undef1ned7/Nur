@@ -173,9 +173,6 @@ import SellMainStart from "../Components/pages/Sell/SellMainStart";
 import CafeLayout from "../Components/Sectors/cafe/CafeLayout";
 import SellCashierPage from "../Components/pages/Sell/Cashier/SellCashierPage";
 
-
-
-
 import BuildingLayout, {
   BuildingAnalytics,
   BuildingCashRegister,
@@ -321,8 +318,6 @@ const createProtectedRoute = (path, Component, props) => (
  *    }
  */
 
-
-
 const WarehouseAnalyticsRoute = () => {
   const { profile } = useUser();
   const [searchParams] = useSearchParams();
@@ -414,9 +409,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-      createProtectedRoute("kassa/*", Kassa),
-      createProtectedRoute("kassa/:id", KassaDet),
-    ]
+        createProtectedRoute("kassa/*", Kassa),
+        createProtectedRoute("kassa/:id", KassaDet),
+      ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
@@ -462,7 +457,6 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("market/documents/create", CreateSaleDocument),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
-
   <Route element={<BuildingLayout />} path="building">
     {[
       createProtectedRoute("analytics", BuildingAnalytics),
@@ -480,11 +474,10 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("stock/:id", BuildingStockDetail),
       createProtectedRoute(
         "stock/:warehouseId/transfer/:id",
-        BuildingStockTransferDetail
+        BuildingStockTransferDetail,
       ),
       createProtectedRoute("treaty", BuildingTreaty),
     ]}
-
   </Route>,
   // Cafe routes
   <Route key="cafe" element={<CafeLayout />} path="cafe">
@@ -569,7 +562,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/stocks/add-product", AddWarehouseProductPage),
   createProtectedRoute(
     "warehouse/stocks/add-product/:id",
-    AddWarehouseProductPage
+    AddWarehouseProductPage,
   ),
   <Route
     key="warehouse/kassa"
@@ -595,7 +588,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("production/warehouse", ProductionWarehouse),
   createProtectedRoute(
     "production/warehouse/:id",
-    ProductionWarehouseProductDetail
+    ProductionWarehouseProductDetail,
   ),
   createProtectedRoute("production/analytics", ProductionAnalytics),
   createProtectedRoute("production/agents/:agentId/analytics", AgentAnalytics),
