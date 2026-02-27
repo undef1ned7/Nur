@@ -195,6 +195,13 @@ export const MENU_CONFIG = {
         permission: "can_view_building_treaty",
         implemented: true,
       },
+      {
+        label: "Процесс работ",
+        to: "/crm/building/work",
+        icon: menuIcons.clipboard,
+        permission: "can_view_building_work_process",
+        implemented: true,
+      },
     ],
 
     // Барбершоп

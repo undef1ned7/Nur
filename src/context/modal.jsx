@@ -35,6 +35,9 @@ export const ModalProvider = ({ children }) => {
 
     // Открыть Alert Modal
     const openAlert = useCallback(({ isError = false, message, onConfirm }) => {
+        const closeAlert = () => {
+            setAlertModal((prev) => ({ ...prev, isOpen: false }));
+        };
         setAlertModal({
             isError,
             isOpen: true,
@@ -44,6 +47,7 @@ export const ModalProvider = ({ children }) => {
                 setAlertModal((prev) => ({ ...prev, isOpen: false }));
             },
         });
+        return closeAlert;
     }, []);
 
 

@@ -14,24 +14,27 @@ import BuildingStock from "./Stock";
 import BuildingStockDetail from "./Stock/Detail";
 import BuildingStockTransferDetail from "./Stock/TransferDetail";
 import BuildingTreaty from "./Treaty";
-
-
+import BuildingWorkProcess from "./Work";
+import BuildingWorkProcessDetail from "./Work/Detail";
 
 export {
-    BuildingAnalytics,
-    BuildingCashRegister,
-    BuildingClients,
-    BuildingDepartment,
-    BuildingEmployess,
-    BuildingNotification,
-    BuildingProcurement,
-    BuildingProcurementDetail,
-    BuildingProjects,
-    BuildingSalary,
-    BuildingSell,
-    BuildingStock,
-    BuildingStockDetail,
-    BuildingStockTransferDetail,
-    BuildingTreaty,
-}
+  BuildingAnalytics,
+  BuildingCashRegister,
+  BuildingClients,
+  BuildingDepartment,
+  BuildingEmployess,
+  BuildingNotification,
+  BuildingProcurement,
+  BuildingProcurementDetail,
+  BuildingProjects,
+  BuildingSalary,
+  BuildingSell,
+  BuildingStock,
+  BuildingStockDetail,
+  BuildingStockTransferDetail,
+  BuildingTreaty,
+  BuildingWorkProcess,
+  BuildingWorkProcessDetail,
+};
+
 export default BuildingLayout;
