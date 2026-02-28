@@ -85,7 +85,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
     if (!q) return "Введите количество";
     if (q <= 0) return "Количество должно быть больше 0";
     if (!Number.isInteger(q)) return "Количество должно быть целым числом";
-    if (!pp || pp <= 0) return "Введите корректную закупочную цену";
+    if (pp < 0) return "Введите корректную закупочную цену";
     if (!rp || rp <= 0) return "Введите корректную розничную цену";
     // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
     // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
@@ -128,20 +128,22 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
         })
       ).unwrap();
 
-      // списываем расход из кассы (закупка по себестоимости)
-      await dispatch(
-        addCashFlows({
-          cashbox: selectCashBox,
-          type: "expense",
-          name: `Закупка товара: ${itemName}`,
-          amount: expense,
-          status:
-            company?.subscription_plan?.name === "Старт"
-              ? "approved"
-              : "pending",
-          // description: `Закупка ${q} шт. × ${pp} = ${expense}`,
-        })
-      ).unwrap();
+      // списываем расход из кассы (закупка по себестоимости) только если сумма > 0
+      if (expense > 0) {
+        await dispatch(
+          addCashFlows({
+            cashbox: selectCashBox,
+            type: "expense",
+            name: `Закупка товара: ${itemName}`,
+            amount: expense,
+            status:
+              company?.subscription_plan?.name === "Старт"
+                ? "approved"
+                : "pending",
+            // description: `Закупка ${q} шт. × ${pp} = ${expense}`,
+          })
+        ).unwrap();
+      }
       alert('Товар добавлен', () => {
         onChanged?.();
         onClose?.();
