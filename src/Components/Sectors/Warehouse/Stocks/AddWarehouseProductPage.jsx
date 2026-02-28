@@ -309,6 +309,29 @@ const AddWarehouseProductPage = () => {
     };
   }, [selectedWarehouse, isEditMode]);
 
+  // Навигация «назад»: если открыли из создания документа — возврат в документ, иначе в склад
+  const getBackNavigation = () => {
+    if (location.state?.returnTo === "create-document") {
+      const docType = location.state.docType || "SALE";
+      return {
+        path: `/crm/warehouse/documents/create?doc_type=${docType}`,
+        state: { docType },
+      };
+    }
+    if (selectedWarehouse) {
+      return {
+        path: `/crm/warehouse/stocks/${selectedWarehouse}`,
+        state: {},
+      };
+    }
+    return { path: "/crm/warehouse/stocks", state: {} };
+  };
+
+  const handleBackNavigation = () => {
+    const { path, state } = getBackNavigation();
+    navigate(path, { state });
+  };
+
   const groupOptions = useMemo(() => {
     const groups = Array.isArray(warehouseGroups) ? warehouseGroups : [];
     const byParent = new Map();
@@ -1057,11 +1080,8 @@ const AddWarehouseProductPage = () => {
         "Успех"
       );
       setTimeout(() => {
-        if (selectedWarehouse) {
-          navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
-        } else {
-          navigate("/crm/warehouse/stocks");
-        }
+        const { path, state } = getBackNavigation();
+        navigate(path, { state });
       }, 1500);
     } catch (err) {
       console.error("Failed to create product:", err);
@@ -1356,16 +1376,12 @@ const AddWarehouseProductPage = () => {
         <div className="add-product-page__header">
           <button
             className="add-product-page__back"
-            onClick={() => {
-              if (selectedWarehouse) {
-                navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
-              } else {
-                navigate("/crm/warehouse/stocks");
-              }
-            }}
+            onClick={handleBackNavigation}
           >
             <ArrowLeft size={20} />
-            Вернуться к складу
+            {location.state?.returnTo === "create-document"
+              ? "Вернуться к документу"
+              : "Вернуться к складу"}
           </button>
           <div className="add-product-page__title-section flex-col-reverse md:flex-row">
             <div className="add-product-page__icon h-[40px] md:h-[64px] md:w-[64px] w-full">
@@ -1437,11 +1453,8 @@ const AddWarehouseProductPage = () => {
                 selectCashBox={selectCashBox}
                 cashBoxes={cashBoxes}
                 onClose={() => {
-                  if (selectedWarehouse) {
-                    navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
-                  } else {
-                    navigate("/crm/warehouse/stocks");
-                  }
+                  const { path, state } = getBackNavigation();
+                  navigate(path, { state });
                 }}
                 onShowSuccessAlert={(productName) => {
                   showAlert(
@@ -1450,11 +1463,8 @@ const AddWarehouseProductPage = () => {
                     "Успех"
                   );
                   setTimeout(() => {
-                    if (selectedWarehouse) {
-                      navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
-                    } else {
-                      navigate("/crm/warehouse/stocks");
-                    }
+                    const { path, state } = getBackNavigation();
+                    navigate(path, { state });
                   }, 1500);
                 }}
                 onShowErrorAlert={(errorMsg) => {
@@ -1480,6 +1490,7 @@ const AddWarehouseProductPage = () => {
               handleSubmit={handleSubmit}
               creating={creating || updating}
               navigate={navigate}
+              onCancel={handleBackNavigation}
               generateBarcode={generateBarcode}
               handleKitSearch={handleKitSearch}
               kitSearchResults={kitSearchResults}
@@ -2123,13 +2134,7 @@ const AddWarehouseProductPage = () => {
                 <div className="add-product-page__actions">
                   <button
                     className="add-product-page__cancel-btn"
-                    onClick={() => {
-                      if (selectedWarehouse) {
-                        navigate(`/crm/warehouse/stocks/${selectedWarehouse}`);
-                      } else {
-                        navigate("/crm/warehouse/stocks");
-                      }
-                    }}
+                    onClick={handleBackNavigation}
                     disabled={creating}
                   >
                     Отмена
@@ -2167,6 +2172,7 @@ const MarketProductForm = ({
   handleSubmit,
   creating,
   navigate,
+  onCancel,
   generateBarcode,
   handleKitSearch,
   kitSearchResults,
@@ -3689,7 +3695,7 @@ const MarketProductForm = ({
       <div className="market-product-form__actions">
         <button
           className="market-product-form__cancel-btn"
-          onClick={() => navigate("/crm/sklad")}
+          onClick={onCancel}
           disabled={creating}
         >
           Отмена

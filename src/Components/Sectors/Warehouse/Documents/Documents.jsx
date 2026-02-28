@@ -369,6 +369,11 @@ const Documents = () => {
     });
   };
 
+  // Редактирование черновика: переход на страницу редактирования по id документа
+  const handleEditDraft = (item) => {
+    navigate(`/crm/warehouse/documents/edit/${item.id}`);
+  };
+
   const handleEditFromPreview = (receiptData) => {
     setPreviewReceiptId(null);
     setPreviewInvoiceId(null);
@@ -920,13 +925,15 @@ const Documents = () => {
                               >
                                 <Eye size={18} />
                               </button>
-                              {/* <button
-                            className="documents__action-btn"
-                            onClick={() => handleEdit(item)}
-                            title="Редактировать"
-                          >
-                            <Pencil size={18} />
-                          </button> */}
+                              {item.rawStatus === "DRAFT" && (
+                                <button
+                                  className="documents__action-btn"
+                                  onClick={() => handleEditDraft(item)}
+                                  title="Редактировать черновик"
+                                >
+                                  <Pencil size={18} />
+                                </button>
+                              )}
                               <button
                                 className="documents__action-btn"
                                 onClick={() => handlePrint(item)}
@@ -1022,13 +1029,15 @@ const Documents = () => {
                               >
                                 <Eye size={18} />
                               </button>
-                              {/* <button
-                            className="documents__action-btn"
-                            onClick={() => handleEdit(item)}
-                            title="Редактировать"
-                          >
-                            <Pencil size={18} />
-                          </button> */}
+                              {item.rawStatus === "DRAFT" && (
+                                <button
+                                  className="documents__action-btn"
+                                  onClick={() => handleEditDraft(item)}
+                                  title="Редактировать черновик"
+                                >
+                                  <Pencil size={18} />
+                                </button>
+                              )}
                               <button
                                 className="documents__action-btn"
                                 onClick={() => handlePrint(item)}
@@ -1176,6 +1185,15 @@ const Documents = () => {
                     >
                       <Eye size={18} />
                     </button>
+                    {item.rawStatus === "DRAFT" && (
+                      <button
+                        className="documents__action-btn"
+                        onClick={() => handleEditDraft(item)}
+                        title="Редактировать черновик"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                    )}
                     <button
                       className="documents__action-btn"
                       onClick={() => handlePrint(item)}

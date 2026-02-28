@@ -13,6 +13,16 @@ $due-red: #dc2626;
   &__container {
     display: flex;
     height: 100%;
+
+    &--loading {
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  &__draft-loading {
+    font-size: 16px;
+    color: #64748b;
   }
 
   &__sidebar {
@@ -420,7 +430,27 @@ $due-red: #dc2626;
   &__header-left {
     display: flex;
     flex-direction: column;
+    gap: 8px;
     gap: 12px;
+  }
+
+  &__back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 14px;
+    color: #475569;
+    background: transparent;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    align-self: flex-start;
+    transition: background 0.15s, color 0.15s;
+    &:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
   }
 
   &__header-titles {

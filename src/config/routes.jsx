@@ -547,6 +547,11 @@ export const crmRoutes = (profile) => [
       element={<CreateWarehouseDocument />}
     />
     <Route
+      key="warehouse/documents-edit"
+      path="edit/:id"
+      element={<CreateWarehouseDocument />}
+    />
+    <Route
       key="warehouse/documents-type"
       path=":docType"
       element={<WarehouseDocuments />}

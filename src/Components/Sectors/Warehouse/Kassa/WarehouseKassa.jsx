@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Search, Plus, X, Inbox, Check } from "lucide-react";
+import {
+  Search,
+  Plus,
+  X,
+  Inbox,
+  Check,
+  Filter,
+  User,
+  Users,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import warehouseAPI from "../../../../api/warehouse";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import "../../../Deposits/Kassa/kassa.scss";
@@ -14,7 +26,7 @@ const money = (v) =>
   (Number(v) || 0).toLocaleString("ru-RU", { minimumFractionDigits: 0 }) + " с";
 const fmtDate = (v) => (v ? new Date(v).toLocaleDateString("ru-RU") : "—");
 const statusLabel = (s) =>
-  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+  s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
 
 /* ──────────────────────────────── Запросы кассы (inbox) ──────────────────────────────── */
 const CashRequestsInbox = () => {
@@ -197,7 +209,7 @@ const CashRegisterList = () => {
               expenses_total: "0.00",
             };
           }
-        })
+        }),
       );
       setTotalsById(next);
     } catch (e) {
@@ -221,8 +233,8 @@ const CashRegisterList = () => {
       [r.name, r.location].some((x) =>
         String(x || "")
           .toLowerCase()
-          .includes(t)
-      )
+          .includes(t),
+      ),
     );
   }, [rows, q]);
 
@@ -362,18 +374,18 @@ const CashRegisterList = () => {
                           <td>{totals ? money(totals.receipts_total) : "—"}</td>
                           <td>{totals ? money(totals.expenses_total) : "—"}</td>
                           <td>
-                          <button
-                            className="kassa__btn kassa__btn--secondary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`${BASE}/${r.id}`);
-                            }}
-                          >
-                            Открыть
-                          </button>
-                        </td>
-                      </tr>
-                    );
+                            <button
+                              className="kassa__btn kassa__btn--secondary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`${BASE}/${r.id}`);
+                              }}
+                            >
+                              Открыть
+                            </button>
+                          </td>
+                        </tr>
+                      );
                     })
                   ) : (
                     <tr>
@@ -462,6 +474,12 @@ const CashRegisterDetail = () => {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [counterparties, setCounterparties] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [agentsList, setAgentsList] = useState([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [agentFilterId, setAgentFilterId] = useState("");
+  const [counterpartyFilterId, setCounterpartyFilterId] = useState("");
+  const PAGE_SIZE = 100;
+  const [currentPage, setCurrentPage] = useState(1);
   const [form, setForm] = useState({
     counterparty: "",
     payment_category: "",
@@ -505,22 +523,103 @@ const CashRegisterDetail = () => {
     })();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    setAgentsLoading(true);
+    warehouseAPI
+      .getOwnerAnalytics({ period: "month" })
+      .then((data) => {
+        if (cancelled) return;
+        const top = data?.top_agents || {};
+        const bySales = top.by_sales || [];
+        const byReceived = top.by_received || [];
+        const map = new Map();
+        [...bySales, ...byReceived].forEach((a) => {
+          const agentId = a.agent_id;
+          if (agentId && !map.has(agentId)) {
+            map.set(agentId, a.agent_name || agentId);
+          }
+        });
+        setAgentsList(
+          Array.from(map.entries()).map(([agentId, name]) => ({
+            id: agentId,
+            name,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setAgentsList([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAgentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const receipts = operations?.receipts ?? [];
   const expenses = operations?.expenses ?? [];
   const allDocs = useMemo(
     () =>
       [...receipts, ...expenses].sort(
         (a, b) =>
-          new Date(b.date || b.created_at) - new Date(a.date || a.created_at)
+          new Date(b.date || b.created_at) - new Date(a.date || a.created_at),
       ),
-    [receipts, expenses]
+    [receipts, expenses],
   );
 
+  const counterpartiesByAgent = useMemo(() => {
+    if (!agentFilterId) return counterparties;
+    const byAgent = counterparties.filter(
+      (c) => String(c.agent ?? c.agent_id ?? "") === String(agentFilterId),
+    );
+    return byAgent.length > 0 ? byAgent : counterparties;
+  }, [counterparties, agentFilterId]);
+
   const filtered = useMemo(() => {
-    if (activeTab === "all") return allDocs;
-    if (activeTab === "receipt") return receipts;
-    return expenses;
-  }, [activeTab, allDocs, receipts, expenses]);
+    let list =
+      activeTab === "all"
+        ? allDocs
+        : activeTab === "receipt"
+          ? receipts
+          : expenses;
+    if (agentFilterId) {
+      list = list.filter(
+        (row) =>
+          String(row.agent ?? row.agent_id ?? "") === String(agentFilterId),
+      );
+    }
+    if (counterpartyFilterId) {
+      list = list.filter(
+        (row) =>
+          String(row.counterparty ?? row.counterparty_id ?? "") ===
+          String(counterpartyFilterId),
+      );
+    }
+    return list;
+  }, [
+    activeTab,
+    allDocs,
+    receipts,
+    expenses,
+    agentFilterId,
+    counterpartyFilterId,
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, agentFilterId, counterpartyFilterId]);
+
+  const fromItem =
+    filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const toItem = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   const openReceiptModal = () => {
     setForm({
@@ -575,7 +674,7 @@ const CashRegisterDetail = () => {
       setCreateError(
         err?.detail ||
           err?.message ||
-          (typeof err === "string" ? err : "Ошибка создания")
+          (typeof err === "string" ? err : "Ошибка создания"),
       );
     } finally {
       setCreating(false);
@@ -664,9 +763,78 @@ const CashRegisterDetail = () => {
 
       {error && <div className="kassa__alert kassa__alert--error">{error}</div>}
 
-      <div className="kassa-search-section">
-        <div className="kassa-search__meta">
-          <span className="kassa-search__info">Записей: {filtered.length}</span>
+      <div className="warehouse-kassa__filters-wrap">
+        <div className="warehouse-kassa__filters">
+          <div className="warehouse-kassa__filters-head">
+            <Filter size={18} className="warehouse-kassa__filters-icon" />
+            <span className="warehouse-kassa__filters-title">Фильтры</span>
+            {(agentFilterId || counterpartyFilterId) && (
+              <button
+                type="button"
+                className="warehouse-kassa__filters-reset"
+                onClick={() => {
+                  setAgentFilterId("");
+                  setCounterpartyFilterId("");
+                }}
+                title="Сбросить фильтры"
+              >
+                <RotateCcw size={14} />
+                Сбросить
+              </button>
+            )}
+          </div>
+          <div className="warehouse-kassa__filter-row">
+            <div className="warehouse-kassa__filter-group">
+              <label className="warehouse-kassa__filter-label">
+                <User size={14} />
+                Агент
+              </label>
+              <select
+                className="warehouse-kassa__filter-select"
+                value={agentFilterId}
+                onChange={(e) => {
+                  setAgentFilterId(e.target.value);
+                  setCounterpartyFilterId("");
+                }}
+                disabled={agentsLoading}
+                title="Фильтр по агенту"
+              >
+                <option value="">Все агенты</option>
+                {agentsList.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="warehouse-kassa__filter-group">
+              <label className="warehouse-kassa__filter-label">
+                <Users size={14} />
+                Контрагент
+              </label>
+              <select
+                className="warehouse-kassa__filter-select"
+                value={counterpartyFilterId}
+                onChange={(e) => setCounterpartyFilterId(e.target.value)}
+                title="Фильтр по контрагенту"
+              >
+                <option value="">Все контрагенты</option>
+                {counterpartiesByAgent.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name ?? c.full_name ?? c.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="warehouse-kassa__filters-count">
+              <span className="warehouse-kassa__filters-count-value">
+                {filtered.length}
+              </span>
+              <span className="warehouse-kassa__filters-count-label">
+                записей
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -680,36 +848,72 @@ const CashRegisterDetail = () => {
             Нет операций
           </div>
         ) : (
-          <div className="kassa-table-scroll">
-            <table className="kassa-table">
-              <thead>
-                <tr>
-                  <th>Тип</th>
-                  <th>Номер</th>
-                  <th>Дата</th>
-                  <th>Контрагент</th>
-                  <th>Категория</th>
-                  <th>Сумма</th>
-                  <th>Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      {row.doc_type === "MONEY_RECEIPT" ? "Приход" : "Расход"}
-                    </td>
-                    <td>{row.number ?? "—"}</td>
-                    <td>{fmtDate(row.date || row.created_at)}</td>
-                    <td>{row.counterparty_display_name ?? "—"}</td>
-                    <td>{row.payment_category_title ?? "—"}</td>
-                    <td>{money(row.amount)}</td>
-                    <td>{statusLabel(row.status)}</td>
+          <>
+            <div className="kassa-table-scroll">
+              <table className="kassa-table">
+                <thead>
+                  <tr>
+                    <th>Тип</th>
+                    <th>Номер</th>
+                    <th>Дата</th>
+                    <th>Контрагент</th>
+                    <th>Категория</th>
+                    <th>Сумма</th>
+                    <th>Статус</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paginatedList.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        {row.doc_type === "MONEY_RECEIPT" ? "Приход" : "Расход"}
+                      </td>
+                      <td>{row.number ?? "—"}</td>
+                      <td>{fmtDate(row.date || row.created_at)}</td>
+                      <td>{row.counterparty_display_name ?? "—"}</td>
+                      <td>{row.payment_category_title ?? "—"}</td>
+                      <td>{money(row.amount)}</td>
+                      <td>{statusLabel(row.status)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {filtered.length > PAGE_SIZE && (
+              <div className="warehouse-kassa__pagination">
+                <span className="warehouse-kassa__pagination-info">
+                  Записи {fromItem}–{toItem} из {filtered.length}
+                </span>
+                <div className="warehouse-kassa__pagination-controls">
+                  <button
+                    type="button"
+                    className="warehouse-kassa__pagination-btn"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    aria-label="Предыдущая страница"
+                  >
+                    <ChevronLeft size={18} />
+                    Назад
+                  </button>
+                  <span className="warehouse-kassa__pagination-page">
+                    Страница {currentPage} из {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="warehouse-kassa__pagination-btn"
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={currentPage >= totalPages}
+                    aria-label="Следующая страница"
+                  >
+                    Вперёд
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
