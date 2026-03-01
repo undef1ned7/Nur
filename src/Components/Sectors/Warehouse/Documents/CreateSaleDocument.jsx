@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams, useParams } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -15,6 +15,7 @@ import {
   User,
   Folder,
   FolderOpen,
+  ArrowLeft,
 } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import ReceiptPdfDocument from "./components/ReceiptPdfDocument";
@@ -23,6 +24,8 @@ import {
   fetchWarehouseCounterparties,
   fetchWarehouses,
   postWarehouseDocument,
+  getWarehouseDocumentById,
+  updateWarehouseDocument,
 } from "../../../../store/creators/warehouseThunk";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
 import warehouseAPI from "../../../../api/warehouse";
@@ -61,7 +64,7 @@ const SearchSelect = ({
   const selected = useMemo(() => {
     const v = value == null ? "" : String(value);
     return (Array.isArray(options) ? options : []).find(
-      (o) => String(o.value) === v
+      (o) => String(o.value) === v,
     );
   }, [options, value]);
 
@@ -142,6 +145,7 @@ const CreateSaleDocument = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const params = useParams();
   const { company, profile: userProfile } = useUser();
   const { list: cashBoxes } = useCash();
   const { list: counterparties } = useCounterparty();
@@ -152,9 +156,9 @@ const CreateSaleDocument = () => {
     urlDocType && VALID_DOC_TYPES.includes(urlDocType)
       ? urlDocType
       : location.state?.docType &&
-        VALID_DOC_TYPES.includes(location.state.docType)
-      ? location.state.docType
-      : "SALE";
+          VALID_DOC_TYPES.includes(location.state.docType)
+        ? location.state.docType
+        : "SALE";
 
   const [productSearch, setProductSearch] = useState("");
   const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
@@ -179,7 +183,7 @@ const CreateSaleDocument = () => {
   const [isDocumentPosted, setIsDocumentPosted] = useState(false);
   const [isOrder, setIsOrder] = useState(false);
   const [documentDateValue, setDocumentDateValue] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
   const [showSavePrintMenu, setShowSavePrintMenu] = useState(false);
   const dateInputRef = useRef(null);
@@ -189,10 +193,15 @@ const CreateSaleDocument = () => {
   const [prepaymentAmount, setPrepaymentAmount] = useState(""); // предоплата по долгу (только при payment_kind=credit)
   const [showPrepaymentModal, setShowPrepaymentModal] = useState(false);
   const [modalPrepaymentValue, setModalPrepaymentValue] = useState("");
+  const [showExitModal, setShowExitModal] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [documentId] = useState(
-    () => `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    () => `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   );
+  // id из URL (маршрут edit/:id) или из query/state для обратной совместимости
+  const editDocumentId =
+    params.id || searchParams.get("edit_id") || location.state?.editDocumentId || null;
+  const [loadingDraft, setLoadingDraft] = useState(!!editDocumentId);
 
   const debounceTimerRef = useRef(null);
   const warehouseRef = useRef(warehouse);
@@ -221,7 +230,7 @@ const CreateSaleDocument = () => {
   };
 
   const displayDate = formatDisplayDate(
-    documentDateValue ? new Date(documentDateValue).toISOString() : null
+    documentDateValue ? new Date(documentDateValue).toISOString() : null,
   );
 
   // Синхронизируем тип документа в URL, чтобы в сайдбаре подсвечивался текущий тип
@@ -302,7 +311,7 @@ const CreateSaleDocument = () => {
       arr.sort((a, b) =>
         String(a?.name || "").localeCompare(String(b?.name || ""), "ru", {
           sensitivity: "base",
-        })
+        }),
       );
       map.set(k, arr);
     }
@@ -506,10 +515,10 @@ const CreateSaleDocument = () => {
                 ) : (
                   (cached?.items || []).map((product) => {
                     const isSelected = selectedProductIds.has(
-                      String(product.id)
+                      String(product.id),
                     );
                     const isInCart = cartItems.some(
-                      (item) => String(item.productId) === String(product.id)
+                      (item) => String(item.productId) === String(product.id),
                     );
                     return (
                       <div
@@ -583,18 +592,141 @@ const CreateSaleDocument = () => {
     dispatch(getEmployees());
   }, [dispatch]);
 
-  // Автоматически выбираем первый склад по умолчанию
+  // Автоматически выбираем первый склад по умолчанию (не при редактировании черновика)
   useEffect(() => {
-    // Если склад уже выбран, не меняем его
+    if (editDocumentId) return;
     if (warehouse) return;
 
-    // Сначала пробуем выбрать из warehouses
     if (warehouses.length > 0) {
       const firstWarehouse = warehouses[0];
       setWarehouse(firstWarehouse.id || firstWarehouse.uuid || "");
-      return;
     }
-  }, [warehouses, warehouse]);
+  }, [warehouses, warehouse, editDocumentId]);
+
+  // Загрузка черновика для редактирования
+  useEffect(() => {
+    if (!editDocumentId) return;
+
+    let cancelled = false;
+    const loadDraft = async () => {
+      setLoadingDraft(true);
+      try {
+        const result = await dispatch(getWarehouseDocumentById(editDocumentId));
+        if (cancelled) return;
+        if (!getWarehouseDocumentById.fulfilled.match(result)) {
+          setLoadingDraft(false);
+          alert("Не удалось загрузить документ");
+          navigate("/crm/warehouse/documents");
+          return;
+        }
+        const doc = result.payload;
+        if (!doc || typeof doc !== "object") {
+          setLoadingDraft(false);
+          alert("Не удалось загрузить документ");
+          navigate("/crm/warehouse/documents");
+          return;
+        }
+        // API может вернуть warehouse_from/counterparty как строку (UUID) или объект
+        const whFrom =
+          typeof doc.warehouse_from === "object" && doc.warehouse_from != null
+            ? doc.warehouse_from?.id ?? doc.warehouse_from?.uuid ?? ""
+            : String(doc.warehouse_from ?? "");
+        const whTo =
+          typeof doc.warehouse_to === "object" && doc.warehouse_to != null
+            ? doc.warehouse_to?.id ?? doc.warehouse_to?.uuid ?? ""
+            : String(doc.warehouse_to ?? "");
+        const cpId =
+          typeof doc.counterparty === "object" && doc.counterparty != null
+            ? doc.counterparty?.id ?? doc.counterparty?.uuid ?? ""
+            : String(doc.counterparty ?? "");
+        setWarehouse(whFrom);
+        setWarehouseTo(whTo);
+        setClientId(cpId);
+        setDocType(doc.doc_type || "SALE");
+        setComment(doc.comment || "");
+        setDocumentDiscount(
+          doc.discount_percent != null && doc.discount_percent !== ""
+            ? String(doc.discount_percent)
+            : "",
+        );
+        setPaymentKind(doc.payment_kind || "cash");
+        setPrepaymentAmount(
+          doc.prepayment_amount != null && doc.prepayment_amount !== ""
+            ? String(doc.prepayment_amount)
+            : "",
+        );
+        if (doc.date) {
+          const d =
+            typeof doc.date === "string" && doc.date.includes("T")
+              ? doc.date.split("T")[0]
+              : doc.date;
+          setDocumentDateValue(d);
+        } else if (doc.created_at) {
+          const d =
+            typeof doc.created_at === "string" && doc.created_at.includes("T")
+              ? doc.created_at.split("T")[0]
+              : doc.created_at;
+          setDocumentDateValue(d);
+        }
+        const items = Array.isArray(doc.items)
+          ? doc.items.map((it, idx) => {
+              // product в API может быть строкой (UUID) или объектом
+              const productId =
+                typeof it.product === "object" && it.product != null
+                  ? it.product?.id ?? it.product?.uuid ?? ""
+                  : String(it.product ?? it.product_id ?? "");
+              const productName =
+                it.product_name ??
+                (typeof it.product === "object" ? it.product?.name : null) ??
+                it.name ??
+                "Товар";
+              const price = Number(it.price ?? it.unit_price ?? 0);
+              const qty = Number(it.qty ?? it.quantity ?? 1);
+              const discountPct = Number(
+                it.discount_percent ?? it.discount ?? 0,
+              );
+              const unit =
+                typeof it.product === "object" && it.product != null
+                  ? it.product?.unit ?? it.unit
+                  : it.unit;
+              const article =
+                typeof it.product === "object" && it.product != null
+                  ? it.product?.article ?? it.article ?? it.product_article
+                  : it.article ?? it.product_article ?? "";
+              return {
+                id: it.id || `item-${Date.now()}-${idx}`,
+                productId: productId,
+                productName,
+                name: productName,
+                price,
+                unit_price: price,
+                quantity: qty,
+                stock: it.stock ?? 0,
+                unit: unit && String(unit).trim() ? String(unit) : "шт",
+                discount: discountPct,
+                discount_percent: discountPct,
+                article: article ? String(article) : "",
+              };
+            })
+          : [];
+        setCartItems(items);
+        if (!cancelled) setLoadingDraft(false);
+      } catch (e) {
+        if (!cancelled) {
+          setLoadingDraft(false);
+          alert("Ошибка загрузки документа: " + (e?.message || "Неизвестная ошибка"));
+          navigate("/crm/warehouse/documents");
+        }
+      } finally {
+        setLoadingDraft(false);
+      }
+    };
+    loadDraft();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- только при смене editDocumentId; alert/navigate стабильны по смыслу
+  }, [editDocumentId]);
 
   // Цена для подстановки в позицию: при покупке — закупочная, при продаже — цена продажи
   const getProductPriceForDocument = (product) => {
@@ -602,19 +734,20 @@ const CreateSaleDocument = () => {
     const isPurchase = docType === "PURCHASE" || docType === "PURCHASE_RETURN";
     return Number(
       isPurchase
-        ? product.purchase_price ?? product.price ?? 0
-        : product.price ?? 0
+        ? (product.purchase_price ?? product.price ?? 0)
+        : (product.price ?? 0),
     );
   };
 
   // Ограничение по остатку только для операций отгрузки (продажа, возврат поставщику, списание, перемещение).
   const isStockLimitRequired = useMemo(() => {
     return ["SALE", "PURCHASE_RETURN", "WRITE_OFF", "TRANSFER"].includes(
-      docType
+      docType,
     );
   }, [docType]);
 
   // При смене склада удаляем из корзины товары, которых нет на новом складе
+  // При редактировании черновика (editDocumentId) позиции не удаляем — только обновляем остатки
   useEffect(() => {
     if (!warehouse || !cartItems.length) return;
 
@@ -622,7 +755,7 @@ const CreateSaleDocument = () => {
     (async () => {
       try {
         const result = await dispatch(
-          fetchProductsAsync({ warehouse, page_size: 1000 })
+          fetchProductsAsync({ warehouse, page_size: 1000 }),
         );
         if (cancelled) return;
         if (fetchProductsAsync.fulfilled.match(result)) {
@@ -630,17 +763,23 @@ const CreateSaleDocument = () => {
             result.payload?.results ||
             (Array.isArray(result.payload) ? result.payload : []);
           const productById = new Map(
-            list.map((p) => [String(p.id), { id: p.id, quantity: p.quantity }])
+            list.map((p) => [String(p.id), { id: p.id, quantity: p.quantity }]),
           );
           setCartItems((prev) => {
-            const filtered = prev.filter((item) =>
-              productById.has(String(item.productId ?? item.product_id))
-            );
+            const isEditDraft = !!editDocumentId;
+            const filtered = isEditDraft
+              ? prev
+              : prev.filter((item) =>
+                  productById.has(String(item.productId ?? item.product_id)),
+                );
             return filtered.map((item) => {
               const p = productById.get(
-                String(item.productId ?? item.product_id)
+                String(item.productId ?? item.product_id),
               );
-              const stock = Number(p?.quantity ?? 0);
+              const stock =
+                p != null
+                  ? Number(p?.quantity ?? 0)
+                  : Number(item.stock ?? 0);
               const qty = Number(item.quantity ?? 0);
               const capByStock =
                 isStockLimitRequired && stock > 0 && qty > stock;
@@ -659,7 +798,7 @@ const CreateSaleDocument = () => {
     return () => {
       cancelled = true;
     };
-  }, [warehouse, isStockLimitRequired]);
+  }, [warehouse, isStockLimitRequired, editDocumentId]);
 
   // Синхронизация выбранных товаров с товарами в корзине
   useEffect(() => {
@@ -714,7 +853,7 @@ const CreateSaleDocument = () => {
   const agents = useMemo(() => {
     const list = Array.isArray(employees) ? employees : [];
     const baseAgents = list.filter((e) => {
-      const role = 
+      const role =
         e?.role_display ??
         e?.role_name ??
         e?.role ??
@@ -727,16 +866,16 @@ const CreateSaleDocument = () => {
     const filteredAgents = isAgentFilterRelevant
       ? baseAgents.filter((e) =>
           filteredCounterparties.some(
-            (c) => getCounterpartyAgentId(c) === String(e?.id ?? "")
-          )
+            (c) => getCounterpartyAgentId(c) === String(e?.id ?? ""),
+          ),
         )
       : baseAgents;
 
     return filteredAgents.sort((a, b) =>
       String(a?.full_name || a?.name || a?.email || "").localeCompare(
         String(b?.full_name || b?.name || b?.email || ""),
-        "ru"
-      )
+        "ru",
+      ),
     );
   }, [employees, filteredCounterparties, isAgentFilterRelevant]);
 
@@ -744,8 +883,7 @@ const CreateSaleDocument = () => {
     const list = Array.isArray(filteredCounterparties)
       ? filteredCounterparties
       : [];
-    const agentKey =
-      isAgentFilterRelevant && agentId ? String(agentId) : "";
+    const agentKey = isAgentFilterRelevant && agentId ? String(agentId) : "";
     const filtered =
       agentKey.trim() === ""
         ? list
@@ -754,7 +892,7 @@ const CreateSaleDocument = () => {
     return filtered
       .slice()
       .sort((a, b) =>
-        String(a?.name || "").localeCompare(String(b?.name || ""), "ru")
+        String(a?.name || "").localeCompare(String(b?.name || ""), "ru"),
       )
       .map((cp) => ({
         value: cp.id,
@@ -781,8 +919,8 @@ const CreateSaleDocument = () => {
       .sort((a, b) =>
         String(a?.name || a?.title || "").localeCompare(
           String(b?.name || b?.title || ""),
-          "ru"
-        )
+          "ru",
+        ),
       )
       .map((wh) => ({
         value: wh.id || wh.uuid,
@@ -800,8 +938,8 @@ const CreateSaleDocument = () => {
       .sort((a, b) =>
         String(a?.name || a?.title || "").localeCompare(
           String(b?.name || b?.title || ""),
-          "ru"
-        )
+          "ru",
+        ),
       )
       .map((wh) => ({
         value: wh.id || wh.uuid,
@@ -813,25 +951,26 @@ const CreateSaleDocument = () => {
   }, [warehouses, warehouse]);
 
   // Если при выборе агента текущий контрагент не подходит — сбрасываем контрагента
+  // При редактировании черновика не сбрасываем — контрагент уже из документа
   useEffect(() => {
-    if (!clientId) return;
+    if (editDocumentId || !clientId) return;
     const exists = counterpartyOptions.some(
-      (o) => String(o.value) === String(clientId)
+      (o) => String(o.value) === String(clientId),
     );
     if (!exists) setClientId("");
-  }, [agentId, counterpartyOptions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agentId, counterpartyOptions, editDocumentId, clientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Определяем, требуется ли контрагент для текущего типа документа
   const isCounterpartyRequired = useMemo(() => {
     return ["SALE", "SALE_RETURN", "PURCHASE", "PURCHASE_RETURN"].includes(
-      docType
+      docType,
     );
   }, [docType]);
 
   // payment_kind (оплата сразу / в долг) только для SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN
   const isPaymentKindRelevant = useMemo(() => {
     return ["SALE", "PURCHASE", "SALE_RETURN", "PURCHASE_RETURN"].includes(
-      docType
+      docType,
     );
   }, [docType]);
 
@@ -858,7 +997,7 @@ const CreateSaleDocument = () => {
         sum +
         (Number(item.price || item.unit_price) || 0) *
           (Number(item.quantity) || 0),
-      0
+      0,
     );
 
     // Скидка по позициям (сумма всех скидок на товары)
@@ -866,7 +1005,7 @@ const CreateSaleDocument = () => {
       const itemPrice = Number(item.price || item.unit_price || 0);
       const itemQty = Number(item.quantity || 0);
       const itemDiscountPercent = Number(
-        item.discount_percent || item.discount || 0
+        item.discount_percent || item.discount || 0,
       );
       return sum + (itemPrice * itemQty * itemDiscountPercent) / 100;
     }, 0);
@@ -936,7 +1075,7 @@ const CreateSaleDocument = () => {
 
       // Проверяем, есть ли уже этот товар в корзине
       const existingItemIndex = cartItems.findIndex(
-        (item) => String(item.productId) === String(product.id)
+        (item) => String(item.productId) === String(product.id),
       );
 
       const stock = Number(product.quantity ?? 0);
@@ -1005,7 +1144,7 @@ const CreateSaleDocument = () => {
       finalQty = maxQty;
     }
     setCartItems((prev) =>
-      prev.map((i) => (i.id === itemId ? { ...i, quantity: finalQty } : i))
+      prev.map((i) => (i.id === itemId ? { ...i, quantity: finalQty } : i)),
     );
   };
 
@@ -1020,8 +1159,8 @@ const CreateSaleDocument = () => {
     if (isNaN(num) || num < 0) return;
     setCartItems((prev) =>
       prev.map((item) =>
-        item.id === itemId ? { ...item, price: num, unit_price: num } : item
-      )
+        item.id === itemId ? { ...item, price: num, unit_price: num } : item,
+      ),
     );
   };
 
@@ -1032,8 +1171,8 @@ const CreateSaleDocument = () => {
       prev.map((item) =>
         item.id === itemId
           ? { ...item, discount_percent: num, discount: num }
-          : item
-      )
+          : item,
+      ),
     );
   };
 
@@ -1063,7 +1202,7 @@ const CreateSaleDocument = () => {
 
       // Проверка discount_percent в диапазоне 0-100
       const discountPercent = Number(
-        item.discount_percent || item.discount || 0
+        item.discount_percent || item.discount || 0,
       );
       if (discountPercent < 0 || discountPercent > 100) {
         return {
@@ -1178,7 +1317,7 @@ const CreateSaleDocument = () => {
           sum +
           (Number(item.price || item.unit_price) || 0) *
             (Number(item.quantity) || 0),
-        0
+        0,
       );
       const itemsDiscountSum = cartItems.reduce((sum, item) => {
         const p = Number(item.price || item.unit_price) || 0;
@@ -1217,7 +1356,7 @@ const CreateSaleDocument = () => {
           const price = Number(item.price || item.unit_price || 0);
           const itemDiscPct = Math.max(
             0,
-            Math.min(100, Number(item.discount_percent || item.discount || 0))
+            Math.min(100, Number(item.discount_percent || item.discount || 0)),
           );
           const itemDiscAmount = (price * finalQty * itemDiscPct) / 100;
           const lineTotal = price * finalQty - itemDiscAmount;
@@ -1233,10 +1372,21 @@ const CreateSaleDocument = () => {
         }),
       };
 
-      // Используем типовой эндпоинт для соответствующего doc_type
       let createdDocument;
       try {
-        createdDocument = await createDocumentByType(documentData);
+        if (editDocumentId) {
+          const result = await dispatch(
+            updateWarehouseDocument({ id: editDocumentId, documentData }),
+          );
+          if (!updateWarehouseDocument.fulfilled.match(result)) {
+            const errData = result.payload || result.error;
+            alert("Ошибка: " + formatApiError(errData));
+            return;
+          }
+          createdDocument = result.payload;
+        } else {
+          createdDocument = await createDocumentByType(documentData);
+        }
       } catch (err) {
         const errData = err?.response?.data || err;
         const errorMessage = formatApiError(errData);
@@ -1250,12 +1400,15 @@ const CreateSaleDocument = () => {
           postWarehouseDocument({
             id: createdDocument.id,
             allowNegative: false,
-          })
+          }),
         );
         if (!postWarehouseDocument.fulfilled.match(postResult)) {
           const postError = postResult.payload || postResult.error;
           alert(
-            "Документ создан, но не проведен: " + formatApiError(postError)
+            "Документ " +
+              (editDocumentId ? "обновлен" : "создан") +
+              ", но не проведен: " +
+              formatApiError(postError),
           );
           navigate("/crm/warehouse/documents");
           return;
@@ -1263,7 +1416,9 @@ const CreateSaleDocument = () => {
       }
 
       alert(
-        "Документ успешно сохранен" + (isDocumentPosted ? " и проведен" : "")
+        "Документ успешно " +
+          (editDocumentId ? "обновлен" : "сохранен") +
+          (isDocumentPosted ? " и проведен" : ""),
       );
 
       // Очищаем локальное состояние
@@ -1315,7 +1470,7 @@ const CreateSaleDocument = () => {
           sum +
           (Number(item.price || item.unit_price) || 0) *
             (Number(item.quantity) || 0),
-        0
+        0,
       );
       const itemsDiscountSum = cartItems.reduce((sum, item) => {
         const p = Number(item.price || item.unit_price) || 0;
@@ -1352,7 +1507,7 @@ const CreateSaleDocument = () => {
           const price = Number(item.price || item.unit_price || 0);
           const itemDiscPct = Math.max(
             0,
-            Math.min(100, Number(item.discount_percent || item.discount || 0))
+            Math.min(100, Number(item.discount_percent || item.discount || 0)),
           );
           const itemDiscAmount = (price * finalQty * itemDiscPct) / 100;
           const lineTotal = price * finalQty - itemDiscAmount;
@@ -1385,12 +1540,12 @@ const CreateSaleDocument = () => {
           postWarehouseDocument({
             id: createdDocument.id,
             allowNegative: false,
-          })
+          }),
         );
         if (!postWarehouseDocument.fulfilled.match(postResult)) {
           const postError = postResult.payload || postResult.error;
           alert(
-            "Документ создан, но не проведен: " + formatApiError(postError)
+            "Документ создан, но не проведен: " + formatApiError(postError),
           );
           navigate("/crm/warehouse/documents");
           return;
@@ -1418,7 +1573,7 @@ const CreateSaleDocument = () => {
               qty: String(qty),
               unit_price: String(price.toFixed(2)),
               total: String(
-                Number(item.line_total ?? item.total ?? lineTotal).toFixed(2)
+                Number(item.line_total ?? item.total ?? lineTotal).toFixed(2),
               ),
               unit: item.product?.unit ?? item.unit ?? "ШТ",
               article:
@@ -1426,7 +1581,7 @@ const CreateSaleDocument = () => {
                   item.product?.article ??
                     item.article ??
                     item.product_article ??
-                    ""
+                    "",
                 ).trim() || "",
               discount_percent: Number(item.discount_percent || 0),
               discount_amount: Number(item.discount_amount || 0),
@@ -1437,7 +1592,7 @@ const CreateSaleDocument = () => {
 
       const subtotal = items.reduce(
         (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
-        0
+        0,
       );
       const itemsDiscountTotal = items.reduce(
         (sum, item) =>
@@ -1446,7 +1601,7 @@ const CreateSaleDocument = () => {
             Number(item.qty) *
             Number(item.discount_percent || 0)) /
             100,
-        0
+        0,
       );
       const totalDiscount = itemsDiscountTotal + docDiscountAmount;
       const total = Number(doc.total) || subtotal - totalDiscount;
@@ -1466,7 +1621,7 @@ const CreateSaleDocument = () => {
           : null) ??
         null;
       const selectedCounterparty = filteredCounterparties.find(
-        (c) => c.id === (doc.counterparty || clientId)
+        (c) => c.id === (doc.counterparty || clientId),
       );
       const buyerName =
         doc.counterparty_display_name ?? selectedCounterparty?.name ?? "";
@@ -1511,18 +1666,18 @@ const CreateSaleDocument = () => {
                 email: selectedCounterparty.email || null,
               }
             : buyerName
-            ? {
-                id: "",
-                name: buyerName,
-                inn: "",
-                okpo: "",
-                score: "",
-                bik: "",
-                address: "",
-                phone: null,
-                email: null,
-              }
-            : null,
+              ? {
+                  id: "",
+                  name: buyerName,
+                  inn: "",
+                  okpo: "",
+                  score: "",
+                  bik: "",
+                  address: "",
+                  phone: null,
+                  email: null,
+                }
+              : null,
           items,
           totals: {
             subtotal: String(subtotal.toFixed(2)),
@@ -1536,7 +1691,7 @@ const CreateSaleDocument = () => {
 
         // Генерируем PDF накладной
         const blob = await pdf(
-          <InvoicePdfDocument data={invoiceData} />
+          <InvoicePdfDocument data={invoiceData} />,
         ).toBlob();
         downloadBlob(blob, `invoice_${docNumber}.pdf`);
       } else if (printType === "receipt") {
@@ -1566,8 +1721,8 @@ const CreateSaleDocument = () => {
                 full_name: selectedCounterparty.name || buyerName || "",
               }
             : buyerName
-            ? { id: "", full_name: buyerName }
-            : null,
+              ? { id: "", full_name: buyerName }
+              : null,
           items,
           totals: {
             subtotal: String(subtotal.toFixed(2)),
@@ -1587,7 +1742,7 @@ const CreateSaleDocument = () => {
 
         // Генерируем PDF чека
         const blob = await pdf(
-          <ReceiptPdfDocument data={receiptData} />
+          <ReceiptPdfDocument data={receiptData} />,
         ).toBlob();
         downloadBlob(blob, `receipt_${docNumber}.pdf`);
       }
@@ -1610,7 +1765,7 @@ const CreateSaleDocument = () => {
       const errorMessage =
         error?.response?.data || error?.payload || error?.error
           ? formatApiError(
-              error?.response?.data || error?.payload || error?.error
+              error?.response?.data || error?.payload || error?.error,
             )
           : error?.message || "Не удалось сгенерировать PDF";
       alert("Ошибка: " + errorMessage);
@@ -1623,6 +1778,18 @@ const CreateSaleDocument = () => {
       maximumFractionDigits: 2,
     });
   };
+
+  if (loadingDraft) {
+    return (
+      <div className="create-sale-document">
+        <div className="create-sale-document__container create-sale-document__container--loading">
+          <div className="create-sale-document__draft-loading">
+            Загрузка документа...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="create-sale-document">
@@ -1724,12 +1891,12 @@ const CreateSaleDocument = () => {
                             getUngroupedProducts(entry?.items).map(
                               (product) => {
                                 const isSelected = selectedProductIds.has(
-                                  String(product.id)
+                                  String(product.id),
                                 );
                                 const isInCart = cartItems.some(
                                   (item) =>
                                     String(item.productId) ===
-                                    String(product.id)
+                                    String(product.id),
                                 );
                                 return (
                                   <div
@@ -1749,7 +1916,7 @@ const CreateSaleDocument = () => {
                                       <div className="create-sale-document__group-product-meta">
                                         <span className="create-sale-document__group-product-price">
                                           {formatPrice(
-                                            getProductPriceForDocument(product)
+                                            getProductPriceForDocument(product),
                                           )}{" "}
                                           сом
                                         </span>
@@ -1760,7 +1927,7 @@ const CreateSaleDocument = () => {
                                     </div>
                                   </div>
                                 );
-                              }
+                              },
                             )
                           )}
                         </div>
@@ -1790,19 +1957,46 @@ const CreateSaleDocument = () => {
             )}
           </div>
 
-          {/* <button
+          <button
             type="button"
             className="create-sale-document__create-product-btn"
+            onClick={() =>
+              navigate(
+                `/crm/warehouse/stocks/add-product${warehouse ? `?warehouse_id=${warehouse}` : ""}`,
+                {
+                  state: {
+                    returnTo: "create-document",
+                    docType,
+                    warehouse: warehouse || undefined,
+                  },
+                },
+              )
+            }
           >
             <Plus size={18} />
-            Новый товар
-          </button> */}
+            Создать товар
+          </button>
         </div>
 
         {/* Основная область */}
         <div className="create-sale-document__main">
           <div className="create-sale-document__header">
             <div className="create-sale-document__header-left">
+              <button
+                type="button"
+                className="create-sale-document__back-btn"
+                onClick={() => {
+                  if (cartItems.length === 0) {
+                    navigate("/crm/warehouse/documents");
+                  } else {
+                    setShowExitModal(true);
+                  }
+                }}
+                aria-label="Назад к списку документов"
+              >
+                <ArrowLeft size={20} />
+                Назад
+              </button>
               <div className="create-sale-document__header-titles">
                 <h1 className="create-sale-document__doc-title">
                   {docType === "SALE" && "Продажа"}
@@ -1952,7 +2146,7 @@ const CreateSaleDocument = () => {
                     options={
                       isWarehouseToRequired && warehouseTo
                         ? warehouseOptions.filter(
-                            (o) => String(o.value) !== String(warehouseTo)
+                            (o) => String(o.value) !== String(warehouseTo),
                           )
                         : warehouseOptions
                     }
@@ -2069,11 +2263,11 @@ const CreateSaleDocument = () => {
                     filteredDocumentItems.map((item, index) => {
                       const itemName = item.productName || item.name || "Товар";
                       const itemPrice = Number(
-                        item.price || item.unit_price || 0
+                        item.price || item.unit_price || 0,
                       );
                       const itemQuantity = Number(item.quantity);
                       const itemDiscount = Number(
-                        item.discount_percent ?? item.discount ?? 0
+                        item.discount_percent ?? item.discount ?? 0,
                       );
                       const itemTotal =
                         itemPrice * itemQuantity * (1 - itemDiscount / 100);
@@ -2174,7 +2368,7 @@ const CreateSaleDocument = () => {
                   <span>
                     {cartItems.reduce(
                       (acc, it) => acc + Number(it.quantity || 0),
-                      0
+                      0,
                     )}{" "}
                     шт
                   </span>
@@ -2250,6 +2444,61 @@ const CreateSaleDocument = () => {
         </div>
       </div>
 
+      {/* Модальное окно при выходе с несохранёнными товарами */}
+      {showExitModal && (
+        <div
+          className="create-sale-document__prepayment-overlay"
+          onClick={() => setShowExitModal(false)}
+        >
+          <div
+            className="create-sale-document__prepayment-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="create-sale-document__prepayment-modal-header">
+              <h2 className="create-sale-document__prepayment-modal-title">
+                В документе есть добавленные товары
+              </h2>
+              <button
+                type="button"
+                className="create-sale-document__prepayment-modal-close"
+                onClick={() => setShowExitModal(false)}
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="create-sale-document__prepayment-modal-content">
+              <p className="create-sale-document__prepayment-modal-hint">
+                Выберите: выйти без сохранения или сохранить документ как
+                черновик и выйти.
+              </p>
+            </div>
+            <div className="create-sale-document__prepayment-modal-actions">
+              <button
+                type="button"
+                className="create-sale-document__prepayment-modal-cancel"
+                onClick={() => {
+                  setShowExitModal(false);
+                  navigate("/crm/warehouse/documents");
+                }}
+              >
+                Выйти без сохранения
+              </button>
+              <button
+                type="button"
+                className="create-sale-document__prepayment-modal-save"
+                onClick={() => {
+                  setShowExitModal(false);
+                  handleSave();
+                }}
+              >
+                Сохранить как черновик
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Модальное окно предоплаты (при выборе «В долг») */}
       {showPrepaymentModal && (
         <div
@@ -2275,7 +2524,8 @@ const CreateSaleDocument = () => {
             </div>
             <div className="create-sale-document__prepayment-modal-content">
               <p className="create-sale-document__prepayment-modal-hint">
-                Укажите сумму предоплаты. При проведении документа будет создан приход денег на эту сумму.
+                Укажите сумму предоплаты. При проведении документа будет создан
+                приход денег на эту сумму.
               </p>
               <label className="create-sale-document__prepayment-modal-label">
                 Сумма предоплаты, сом
@@ -2299,7 +2549,7 @@ const CreateSaleDocument = () => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     const num = Number(
-                      String(modalPrepaymentValue).replace(",", ".")
+                      String(modalPrepaymentValue).replace(",", "."),
                     );
                     if (!isNaN(num) && num >= 0) {
                       setPrepaymentAmount(num.toFixed(2));
@@ -2323,7 +2573,7 @@ const CreateSaleDocument = () => {
                 className="create-sale-document__prepayment-modal-save"
                 onClick={() => {
                   const num = Number(
-                    String(modalPrepaymentValue).replace(",", ".")
+                    String(modalPrepaymentValue).replace(",", "."),
                   );
                   if (!isNaN(num) && num >= 0) {
                     setPrepaymentAmount(num.toFixed(2));

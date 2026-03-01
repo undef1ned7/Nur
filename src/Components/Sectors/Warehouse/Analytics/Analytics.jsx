@@ -1,69 +1,51 @@
 /**
  * Аналитика владельца/админа склада.
  *
- * Ожидаемый ответ API (getOwnerAnalytics):
+ * Ожидаемый ответ API (getOwnerAnalytics / getAgentMeAnalytics / getOwnerAgentAnalytics):
  *
- * GET /api/warehouse/owner/analytics/?period=month&date=2026-02-05
+ * GET /api/warehouse/owner/analytics/?period=custom&date_from=2026-01-01&date_to=2026-02-28
  *
  * {
- *   "period": "month",
- *   "date_from": "2026-01-07",
- *   "date_to": "2026-02-05",
+ *   "period": "custom",
+ *   "date_from": "2026-01-01",
+ *   "date_to": "2026-02-28",
  *   "summary": {
- *     "requests_approved": 8,
- *     "items_approved": "20.000",
- *     "sales_count": 0,
+ *     "requests_approved": 10,
+ *     "items_approved": "31.000",
+ *     "sales_count": 1,
  *     "sales_amount": "0.00",
- *     "on_hand_qty": "20.000",
- *     "on_hand_amount": "3709.08000"
+ *     "on_hand_qty": "26.000",
+ *     "on_hand_amount": "4707.080000"
  *   },
  *   "charts": {
- *     "sales_by_date": []
+ *     "sales_by_date": [
+ *       { "date": "2026-02-20", "sales_count": 1, "sales_amount": "0.00" }
+ *     ]
  *   },
  *   "top_agents": {
- *     "by_sales": [],
+ *     "by_sales": [
+ *       { "agent_id": "...", "agent_name": "...", "sales_count": 1, "sales_amount": "0.00" }
+ *     ],
  *     "by_received": [
- *       {
- *         "agent_id": "4478407d-660b-4683-a0af-ceb15c25b507",
- *         "agent_name": "agentt agentt",
- *         "items_approved": "16.000"
- *       },
- *       {
- *         "agent_id": "062ca63c-0fe5-4070-ab01-a9ef554fce1e",
- *         "agent_name": "agent agent",
- *         "items_approved": "2.000"
- *       },
- *       {
- *         "agent_id": "fab742f8-66ca-48fa-b318-9ac8a48fceab",
- *         "agent_name": "warehouse warehouse",
- *         "items_approved": "2.000"
- *       }
+ *       { "agent_id": "...", "agent_name": "...", "items_approved": "16.000" }
  *     ]
  *   },
  *   "details": {
  *     "warehouses": [
  *       {
- *         "warehouse_id": "8f5d5f2c-6de6-4e2b-9747-273bc5aa3a19",
- *         "warehouse_name": "new склад",
+ *         "warehouse_id": "...",
+ *         "warehouse_name": "...",
  *         "carts_approved": 5,
  *         "items_approved": "8.000",
  *         "sales_count": 0,
  *         "sales_amount": "0.00",
  *         "on_hand_qty": "8.000",
- *         "on_hand_amount": "589.08000"
- *       },
- *       {
- *         "warehouse_id": "4cf95f0e-e72e-4621-8c4c-e5c88bafb09e",
- *         "warehouse_name": "JAY",
- *         "carts_approved": 3,
- *         "items_approved": "12.000",
- *         "sales_count": 0,
- *         "sales_amount": "0.00",
- *         "on_hand_qty": "12.000",
- *         "on_hand_amount": "3120.00000"
+ *         "on_hand_amount": "987.080000"
  *       }
  *     ],
- *     "sales_by_product": []
+ *     "sales_by_product": [
+ *       { "product_id": "...", "product_name": "...", "qty": "5.000", "amount": "0.00000" }
+ *     ]
  *   }
  * }
  */
@@ -78,10 +60,7 @@ import {
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
-  ComposedChart,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -112,19 +91,6 @@ const formatNum = (v) => {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   }).format(n);
-};
-
-const formatDate = (s) => {
-  if (!s) return "—";
-  try {
-    return new Date(s).toLocaleDateString("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return String(s);
-  }
 };
 
 const formatShortDate = (s) => {
@@ -368,18 +334,15 @@ const WarehouseAnalytics = () => {
   const salesByDate = Array.isArray(charts?.sales_by_date)
     ? charts.sales_by_date
     : [];
-  const requestsByDate = Array.isArray(charts?.requests_by_date)
-    ? charts.requests_by_date
-    : [];
-  const issuanceByDate = Array.isArray(charts?.issuance_by_date)
-    ? charts.issuance_by_date
-    : [];
   const bySales = Array.isArray(topAgents?.by_sales) ? topAgents.by_sales : [];
   const byReceived = Array.isArray(topAgents?.by_received)
     ? topAgents.by_received
     : [];
   const warehouses = Array.isArray(details?.warehouses)
     ? details.warehouses
+    : [];
+  const salesByProduct = Array.isArray(details?.sales_by_product)
+    ? details.sales_by_product
     : [];
 
   const totalSalesAmount = bySales.reduce(
@@ -409,12 +372,9 @@ const WarehouseAnalytics = () => {
       share,
     ];
   });
-  const byReceivedRows = byReceived.map((a, i) => {
+  const byReceivedRows = byReceived.map((a) => {
     const items = Number(
       a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0
-    );
-    const requests = formatNum(
-      a.carts_approved ?? a.requests_count ?? a.requests ?? a.count ?? 0
     );
     const share =
       totalReceivedItems > 0
@@ -423,7 +383,6 @@ const WarehouseAnalytics = () => {
     return [
       a.agent_name || a.name || a.agent_display || a.id || "—",
       `${formatNum(items)} шт`,
-      requests,
       share,
     ];
   });
@@ -434,17 +393,6 @@ const WarehouseAnalytics = () => {
     count: Number(d.count ?? d.sales_count ?? 0),
   }));
 
-  const requestsChartData = requestsByDate.map((d) => ({
-    date: d.date ? formatShortDate(d.date) : d.label || "—",
-    approved: Number(d.approved ?? d.approved_count ?? 0),
-    rejected: Number(d.rejected ?? d.rejected_count ?? 0),
-  }));
-
-  const issuanceChartData = issuanceByDate.map((d) => ({
-    date: d.date ? formatShortDate(d.date) : d.label || "—",
-    items: Number(d.items ?? d.count ?? d.qty ?? 0),
-  }));
-
   const requestsApproved = Number(summary.requests_approved ?? 0);
   const itemsApproved = Number(summary.items_approved ?? 0);
   const salesCount = Number(summary.sales_count ?? 0);
@@ -452,48 +400,7 @@ const WarehouseAnalytics = () => {
   const onHandQty = Number(summary.on_hand_qty ?? 0);
   const onHandAmount = Number(summary.on_hand_amount ?? 0);
 
-  // Агент: заявки по статусам, выданные товары, продажи/возвраты/списания, остатки (поля API: write_off_*)
-  const requestsSubmitted = Number(summary.requests_submitted ?? 0);
-  const requestsRejected = Number(summary.requests_rejected ?? 0);
-  const issuedItemsCount = Number(
-    summary.issued_items_count ?? summary.items_approved ?? 0
-  );
-  const returnsCount = Number(summary.returns_count ?? 0);
-  const returnsAmount = Number(summary.returns_amount ?? 0);
-  const writeoffsCount = Number(
-    summary.write_off_count ?? summary.writeoffs_count ?? 0
-  );
-  const writeoffsAmount = Number(
-    summary.write_off_amount ?? summary.writeoffs_amount ?? 0
-  );
-
   const isAgentView = !isOwnerOrAdmin && !agentId;
-  const agentRequests = Array.isArray(data?.requests) ? data.requests : [];
-  const agentIssuedProducts = Array.isArray(data?.issued_products)
-    ? data.issued_products
-    : [];
-  const agentSalesReturnsWriteoffs = Array.isArray(data?.sales_returns_writeoffs)
-    ? data.sales_returns_writeoffs
-    : [];
-  const agentOnHand = Array.isArray(data?.on_hand) ? data.on_hand : [];
-
-  // API агента: requests_by_date с carts_approved, items_approved (без submitted/rejected по датам)
-  const requestsChartDataAgent = requestsByDate.map((d) => ({
-    date: d.date ? formatShortDate(d.date) : d.label || "—",
-    approved: Number(
-      d.carts_approved ?? d.approved ?? d.approved_count ?? 0
-    ),
-    items: Number(d.items_approved ?? d.items ?? d.items_count ?? 0),
-  }));
-
-  // Выданные товары по датам: у агента нет issuance_by_date — берём из requests_by_date (items_approved)
-  const issuanceChartDataAgent =
-    issuanceChartData.length > 0
-      ? issuanceChartData
-      : requestsByDate.map((d) => ({
-          date: d.date ? formatShortDate(d.date) : d.label || "—",
-          items: Number(d.items_approved ?? d.items ?? d.qty ?? 0),
-        }));
 
   return (
     <div className="warehouse-analytics">
@@ -563,61 +470,30 @@ const WarehouseAnalytics = () => {
       ) : data ? (
         <>
           <div className="warehouse-analytics__kpis">
-            {isAgentView ? (
-              <>
-                <KpiCard
-                  label="Заявки"
-                  value={`${formatNum(requestsSubmitted)} / ${formatNum(requestsApproved)} / ${formatNum(requestsRejected)}`}
-                  description="Отправлено / Одобрено / Отклонено"
-                  icon={Check}
-                />
-                <KpiCard
-                  label="Выданные товары"
-                  value={formatNum(issuedItemsCount)}
-                  description="Позиций выдано за период"
-                  icon={Package}
-                />
-                <KpiCard
-                  label="Продажи / Возвраты / Списания"
-                  value={`${formatNum(salesAmount)} / ${formatNum(returnsAmount)} / ${formatNum(writeoffsAmount)} сом`}
-                  description={`${formatNum(salesCount)} продаж, ${formatNum(returnsCount)} возвратов, ${formatNum(writeoffsCount)} списаний`}
-                  icon={ShoppingCart}
-                />
-                <KpiCard
-                  label="Остатки на руках"
-                  value={`${formatNum(onHandAmount)} сом`}
-                  description={`${formatNum(onHandQty)} шт`}
-                  icon={Package}
-                />
-              </>
-            ) : (
-              <>
-                <KpiCard
-                  label="Одобрено заявок"
-                  value={formatNum(requestsApproved)}
-                  description="За период"
-                  icon={Check}
-                />
-                <KpiCard
-                  label="Одобрено позиций"
-                  value={formatNum(itemsApproved)}
-                  description="Товаров выдано"
-                  icon={Package}
-                />
-                <KpiCard
-                  label="Продажи агентов"
-                  value={`${formatNum(salesAmount)} сом`}
-                  description={`${formatNum(salesCount)} продаж`}
-                  icon={ShoppingCart}
-                />
-                <KpiCard
-                  label="Остатки на руках"
-                  value={`${formatNum(onHandAmount)} сом`}
-                  description={`${formatNum(onHandQty)} шт`}
-                  icon={Package}
-                />
-              </>
-            )}
+            <KpiCard
+              label="Одобрено заявок"
+              value={formatNum(requestsApproved)}
+              description="За период"
+              icon={Check}
+            />
+            <KpiCard
+              label="Одобрено позиций"
+              value={formatNum(itemsApproved)}
+              description="Товаров выдано"
+              icon={Package}
+            />
+            <KpiCard
+              label={isAgentView ? "Продажи" : "Продажи агентов"}
+              value={`${formatNum(salesAmount)} сом`}
+              description={`${formatNum(salesCount)} продаж`}
+              icon={ShoppingCart}
+            />
+            <KpiCard
+              label="Остатки на руках"
+              value={`${formatNum(onHandAmount)} сом`}
+              description={`${formatNum(onHandQty)} шт`}
+              icon={Package}
+            />
           </div>
 
           <div className="warehouse-analytics__chartsRow">
@@ -629,90 +505,29 @@ const WarehouseAnalytics = () => {
                 {salesChartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={280}>
                     <AreaChart
-                        data={salesChartData}
-                        margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
-                      >
-                        <defs>
-                          <linearGradient
-                            id="warehouseAnalyticsAreaFill"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="var(--wa-primary)"
-                              stopOpacity={0.4}
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="var(--wa-primary)"
-                              stopOpacity={0}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="var(--wa-border)"
-                        />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fontSize: 11 }}
-                          tickFormatter={(v) =>
-                            v && v.length > 6 ? v.slice(0, 6) : v
-                          }
-                        />
-                        <YAxis
-                          tick={{ fontSize: 11 }}
-                          tickFormatter={(v) => formatNum(v)}
-                        />
-                        <Tooltip
-                          formatter={(value) => [formatNum(value), "Продажи (сом)"]}
-                          labelFormatter={(l) => `Дата: ${l}`}
-                        />
-                        <Legend
-                          formatter={() => "Продажи (сом)"}
-                          iconType="circle"
-                          iconSize={8}
-                          wrapperStyle={{ fontSize: 12 }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="sum"
-                          stroke="var(--wa-primary)"
-                          strokeWidth={2}
-                          fill="url(#warehouseAnalyticsAreaFill)"
-                        />
-                      </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="warehouse-analytics__chartWrap--empty">
-                    Нет данных за период.
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="warehouse-analytics__card warehouse-analytics__card--chart">
-              <div className="warehouse-analytics__cardTitle">
-                {isAgentView
-                  ? "Динамика заявок (одобрено заявок / одобрено позиций)"
-                  : "Динамика заявок"}
-              </div>
-              <div className="warehouse-analytics__chartWrap">
-                {(isAgentView
-                  ? requestsChartDataAgent
-                  : requestsChartData
-                ).length > 0 ? (
-                  <ResponsiveContainer width="100%" height={280}>
-                    <ComposedChart
-                      data={
-                        isAgentView
-                          ? requestsChartDataAgent
-                          : requestsChartData
-                      }
+                      data={salesChartData}
                       margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
                     >
+                      <defs>
+                        <linearGradient
+                          id="warehouseAnalyticsAreaFill"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="var(--wa-primary)"
+                            stopOpacity={0.4}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="var(--wa-primary)"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid
                         strokeDasharray="3 3"
                         stroke="var(--wa-border)"
@@ -724,76 +539,28 @@ const WarehouseAnalytics = () => {
                           v && v.length > 6 ? v.slice(0, 6) : v
                         }
                       />
-                      <YAxis tick={{ fontSize: 11 }} />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => formatNum(v)}
+                      />
                       <Tooltip
-                        formatter={(value, name) => [
-                          formatNum(value),
-                          isAgentView
-                            ? name === "approved"
-                              ? "Одобрено заявок"
-                              : name === "items"
-                                ? "Одобрено позиций"
-                                : name
-                            : name === "approved"
-                              ? "Одобрено"
-                              : name === "rejected"
-                                ? "Отклонено"
-                                : name,
-                        ]}
+                        formatter={(value) => [formatNum(value), "Продажи (сом)"]}
                         labelFormatter={(l) => `Дата: ${l}`}
                       />
                       <Legend
-                        formatter={(v) =>
-                          isAgentView
-                            ? v === "approved"
-                              ? "Одобрено заявок"
-                              : v === "items"
-                                ? "Одобрено позиций"
-                                : v
-                            : v === "approved"
-                              ? "Одобрено"
-                              : v === "rejected"
-                                ? "Отклонено"
-                                : v
-                        }
+                        formatter={() => "Продажи (сом)"}
+                        iconType="circle"
+                        iconSize={8}
                         wrapperStyle={{ fontSize: 12 }}
                       />
-                      {isAgentView ? (
-                        <>
-                          <Bar
-                            dataKey="approved"
-                            stackId="a"
-                            fill="var(--wa-primary)"
-                            radius={[0, 0, 0, 0]}
-                            name="approved"
-                          />
-                          <Bar
-                            dataKey="items"
-                            stackId="a"
-                            fill="#94a3b8"
-                            radius={[0, 0, 0, 0]}
-                            name="items"
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <Bar
-                            dataKey="approved"
-                            stackId="a"
-                            fill="var(--wa-primary)"
-                            radius={[0, 0, 0, 0]}
-                            name="approved"
-                          />
-                          <Bar
-                            dataKey="rejected"
-                            stackId="a"
-                            fill="var(--wa-rejected)"
-                            radius={[0, 0, 0, 0]}
-                            name="rejected"
-                          />
-                        </>
-                      )}
-                    </ComposedChart>
+                      <Area
+                        type="monotone"
+                        dataKey="sum"
+                        stroke="var(--wa-primary)"
+                        strokeWidth={2}
+                        fill="url(#warehouseAnalyticsAreaFill)"
+                      />
+                    </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="warehouse-analytics__chartWrap--empty">
@@ -801,54 +568,6 @@ const WarehouseAnalytics = () => {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-
-          <div className="warehouse-analytics__card warehouse-analytics__card--chart">
-            <div className="warehouse-analytics__cardTitle">
-              {isAgentView ? "Выданные мне товары" : "Выдача товаров агентам"}
-            </div>
-            <div className="warehouse-analytics__chartWrap">
-              {(isAgentView ? issuanceChartDataAgent : issuanceChartData).length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart
-                    data={isAgentView ? issuanceChartDataAgent : issuanceChartData}
-                    margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--wa-border)"
-                    />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(v) =>
-                        v && v.length > 6 ? v.slice(0, 6) : v
-                      }
-                    />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      formatter={(value) => [formatNum(value), "Позиций выдано"]}
-                      labelFormatter={(l) => `Дата: ${l}`}
-                    />
-                    <Legend
-                      formatter={() => "Позиций выдано"}
-                      iconType="square"
-                      iconSize={10}
-                      wrapperStyle={{ fontSize: 12 }}
-                    />
-                    <Bar
-                      dataKey="items"
-                      fill="var(--wa-primary)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="warehouse-analytics__chartWrap--empty">
-                  Нет данных за период.
-                </div>
-              )}
             </div>
           </div>
 
@@ -888,10 +607,10 @@ const WarehouseAnalytics = () => {
                   <div className="warehouse-analytics__card warehouse-analytics__accCard">
                     {byReceivedRows.length > 0 ? (
                       <PaginatedTable
-                        head={["Агент", "Позиций", "Заявок", "Доля"]}
+                        head={["Агент", "Позиций", "Доля"]}
                         rows={byReceivedRows}
-                        colTemplate="1fr 100px 80px 70px"
-                        numeric={[1, 2, 3]}
+                        colTemplate="1fr 100px 70px"
+                        numeric={[1, 2]}
                       />
                     ) : (
                       <div className="warehouse-analytics-table__empty">
@@ -939,93 +658,41 @@ const WarehouseAnalytics = () => {
                     )}
                   </div>
                 </AccordionItem>
+
+                <AccordionItem
+                  id="wa-sales-by-product"
+                  title="Продажи по товарам"
+                  icon={ShoppingCart}
+                  badge={salesByProduct.length ? `${salesByProduct.length}` : "0"}
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {salesByProduct.length > 0 ? (
+                      <PaginatedTable
+                        head={["Товар", "Кол-во", "Сумма, сом"]}
+                        rows={salesByProduct.map((p) => [
+                          p.product_name ?? p.name ?? "—",
+                          formatNum(p.qty ?? p.quantity ?? 0),
+                          formatNum(p.amount ?? 0),
+                        ])}
+                        colTemplate="1fr 100px 120px"
+                        numeric={[1, 2]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет продаж по товарам за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
               </div>
             </>
-          )}
-
-          {isAgentView && (
-            <div className="warehouse-analytics__agentTables">
-              <div className="warehouse-analytics__card">
-                <div className="warehouse-analytics__cardTitle">Заявки (отправлено / одобрено / отклонено)</div>
-                {agentRequests.length > 0 ? (
-                  <PaginatedTable
-                    head={["№", "Дата", "Статус", "Примечание"]}
-                    rows={agentRequests.map((r, i) => [
-                      r.number ?? r.id ?? i + 1,
-                      formatDate(r.date ?? r.submitted_at ?? r.updated_date),
-                      r.status === "submitted" ? "Отправлено" : r.status === "approved" ? "Одобрено" : r.status === "rejected" ? "Отклонено" : String(r.status ?? "—"),
-                      r.note ?? "—",
-                    ])}
-                    colTemplate="80px 1fr 120px 1fr"
-                    numeric={[0]}
-                  />
-                ) : (
-                  <div className="warehouse-analytics-table__empty">Нет заявок за период.</div>
-                )}
-              </div>
-              <div className="warehouse-analytics__card">
-                <div className="warehouse-analytics__cardTitle">Выданные товары</div>
-                {agentIssuedProducts.length > 0 ? (
-                  <PaginatedTable
-                    head={["Товар", "Кол-во", "Ед.", "Дата"]}
-                    rows={agentIssuedProducts.map((r) => [
-                      r.product_name ?? r.name ?? r.product ?? "—",
-                      formatNum(r.qty ?? r.quantity ?? r.count),
-                      r.unit ?? "—",
-                      formatDate(r.date ?? r.issued_at ?? r.created_at),
-                    ])}
-                    colTemplate="1fr 80px 60px 100px"
-                    numeric={[1]}
-                  />
-                ) : (
-                  <div className="warehouse-analytics-table__empty">Нет выданных товаров за период.</div>
-                )}
-              </div>
-              <div className="warehouse-analytics__card">
-                <div className="warehouse-analytics__cardTitle">Продажи / Возвраты / Списания</div>
-                {agentSalesReturnsWriteoffs.length > 0 ? (
-                  <PaginatedTable
-                    head={["Тип", "Дата", "Сумма", "Кол-во"]}
-                    rows={agentSalesReturnsWriteoffs.map((r) => [
-                      r.type === "sale" ? "Продажа" : r.type === "return" ? "Возврат" : r.type === "writeoff" ? "Списание" : String(r.type ?? "—"),
-                      formatDate(r.date ?? r.created_at),
-                      `${formatNum(r.amount ?? r.sum ?? 0)} сом`,
-                      formatNum(r.count ?? r.qty ?? r.quantity),
-                    ])}
-                    colTemplate="100px 100px 120px 80px"
-                    numeric={[2, 3]}
-                  />
-                ) : (
-                  <div className="warehouse-analytics-table__empty">Нет операций за период.</div>
-                )}
-              </div>
-              <div className="warehouse-analytics__card">
-                <div className="warehouse-analytics__cardTitle">Остатки на руках</div>
-                {agentOnHand.length > 0 ? (
-                  <PaginatedTable
-                    head={["Товар", "Кол-во", "Ед.", "Сумма"]}
-                    rows={agentOnHand.map((r) => [
-                      r.product_name ?? r.name ?? r.product ?? "—",
-                      formatNum(r.qty ?? r.quantity ?? r.count),
-                      r.unit ?? "—",
-                      `${formatNum(r.amount ?? r.sum ?? 0)} сом`,
-                    ])}
-                    colTemplate="1fr 80px 60px 100px"
-                    numeric={[1, 3]}
-                  />
-                ) : (
-                  <div className="warehouse-analytics-table__empty">Нет остатков на руках.</div>
-                )}
-              </div>
-            </div>
           )}
 
           {!isOwnerOrAdmin &&
             !isAgentView &&
             Object.keys(summary).length === 0 &&
-            !salesChartData.length &&
-            !requestsChartData.length &&
-            !issuanceChartData.length && (
+            !salesChartData.length && (
               <div className="warehouse-analytics__card">
                 <div className="warehouse-analytics-table__empty">
                   Нет данных за выбранный период.
