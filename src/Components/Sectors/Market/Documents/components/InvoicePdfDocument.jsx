@@ -336,26 +336,6 @@ export default function InvoicePdfDocument({ data }) {
   const tax = Number(totals.tax_total || 0);
   const total = Number(totals.total || 0);
 
-  // Скидка на уровне документа (может быть в процентах или абсолютном значении)
-  const documentDiscount = Number(
-    doc.order_discount_total ??
-      doc.discount_total ??
-      doc.discount_percent ??
-      data.order_discount_total ??
-      0
-  );
-
-  // Вычисляем процент скидки документа, если он не указан напрямую
-  let documentDiscountPercent = 0;
-  if (documentDiscount > 0 && subtotal > 0) {
-    // Если скидка больше 100, считаем её абсолютным значением
-    if (documentDiscount > 100) {
-      documentDiscountPercent = (documentDiscount / subtotal) * 100;
-    } else {
-      documentDiscountPercent = documentDiscount;
-    }
-  }
-
   // Поддержка обоих форматов: unit_price (API) и price (если где-то уже нормализовали)
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
@@ -363,47 +343,18 @@ export default function InvoicePdfDocument({ data }) {
         const unit = Number(it.unit_price ?? it.price ?? 0);
         const total = Number(it.total ?? qty * unit);
 
-        // Скидка на уровне товара (если есть) - используем discount_percent в процентах
-        const itemDiscountPercent = Number(it.discount_percent ?? 0);
+        // Скидка только по товару (процент 0–100)
+        const itemDiscountPercent = Number(it.discount_percent ?? it.discount ?? 0);
 
-        // Цена без скидки товара (если есть original_price или price_before_discount)
+        // Базовая цена без скидки — берём явное поле, иначе текущую цену
         let priceNoDiscount = Number(
           it.original_price ??
             it.price_before_discount ??
             it.price_without_discount ??
-            0
+            unit
         );
-
-        // Если цена без скидки не указана, вычисляем её из текущей цены и скидок
-        if (priceNoDiscount === 0 || priceNoDiscount === unit) {
-          // Если есть скидка на товар, вычисляем цену без скидки товара
-          if (itemDiscountPercent > 0) {
-            priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
-          } else if (documentDiscountPercent > 0) {
-            // Если есть скидка на документ, вычисляем цену без скидки документа
-            priceNoDiscount = unit / (1 - documentDiscountPercent / 100);
-          } else {
-            // Если скидок нет, цена без скидки = текущая цена
-            priceNoDiscount = unit;
-          }
-        }
-
-        // Общая скидка для товара (скидка товара + скидка документа)
-        let finalDiscountPercent = itemDiscountPercent;
-        if (documentDiscountPercent > 0 && itemDiscountPercent === 0) {
-          // Если есть только скидка документа, используем её
-          finalDiscountPercent = documentDiscountPercent;
-        } else if (documentDiscountPercent > 0 && itemDiscountPercent > 0) {
-          // Если есть обе скидки, вычисляем общую эффективную скидку
-          const itemPriceBeforeDiscount = priceNoDiscount;
-          const itemPriceAfterItemDiscount =
-            itemPriceBeforeDiscount * (1 - itemDiscountPercent / 100);
-          const itemPriceAfterDocumentDiscount =
-            itemPriceAfterItemDiscount * (1 - documentDiscountPercent / 100);
-          finalDiscountPercent =
-            ((itemPriceBeforeDiscount - itemPriceAfterDocumentDiscount) /
-              itemPriceBeforeDiscount) *
-            100;
+        if (!priceNoDiscount) {
+          priceNoDiscount = unit;
         }
 
         return {
@@ -412,7 +363,8 @@ export default function InvoicePdfDocument({ data }) {
           qty,
           unit_price: unit,
           price_no_discount: priceNoDiscount,
-          discount: finalDiscountPercent,
+            // В колонке «Скидка» отображаем только скидку по позиции.
+            discount: itemDiscountPercent,
           total,
           unit: it.unit || "ШТ",
           article: it.article || "",
