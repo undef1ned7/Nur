@@ -24,7 +24,9 @@
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     cursor: pointer;
-    transition: background 0.2s, color 0.2s;
+    transition:
+      background 0.2s,
+      color 0.2s;
 
     &:hover {
       background: #e5e7eb;
@@ -172,6 +174,40 @@
     margin-top: 4px;
   }
 
+  &__pay-debt-wrap {
+    margin-top: 8px;
+  }
+
+  &__pay-debt-btn {
+    display: inline-block;
+    margin-top: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #000;
+    background: #f7d74f;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover:not(:disabled) {
+      background: #d4b800;
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+  }
+
+  &__pay-debt-error {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #dc2626;
+  }
+
   &__reconciliation-pdf {
     font-size: 13px;
     color: #2563eb;
@@ -267,7 +303,10 @@
     border: none;
     border-bottom: 2px solid transparent;
     cursor: pointer;
-    transition: color 0.2s, background 0.2s, border-color 0.2s;
+    transition:
+      color 0.2s,
+      background 0.2s,
+      border-color 0.2s;
 
     &:hover {
       color: var(--text, #111827);

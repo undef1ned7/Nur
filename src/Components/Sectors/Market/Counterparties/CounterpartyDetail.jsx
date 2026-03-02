@@ -89,7 +89,7 @@ const CounterpartyDetail = () => {
   const { profile } = useUser() || {};
   const current = useSelector((state) => state.counterparty.current);
   const loadingCurrent = useSelector(
-    (state) => state.counterparty.loadingCurrent
+    (state) => state.counterparty.loadingCurrent,
   );
   const company = useSelector((state) => state.user.company);
 
@@ -108,10 +108,13 @@ const CounterpartyDetail = () => {
     return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
   });
   const [reconciliationEnd, setReconciliationEnd] = useState(() =>
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10),
   );
   const [warehouses, setWarehouses] = useState([]);
   const [paymentCategories, setPaymentCategories] = useState([]);
+  const [cashRegisters, setCashRegisters] = useState([]);
+  const [payDebtLoading, setPayDebtLoading] = useState(false);
+  const [payDebtError, setPayDebtError] = useState("");
 
   const [docTypeFilter, setDocTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -145,17 +148,22 @@ const CounterpartyDetail = () => {
     const loadOptions = async () => {
       try {
         const branchParams = getBranchParams();
-        const [whData, catData] = await Promise.all([
+        const [whData, catData, cashData] = await Promise.all([
           warehouseAPI.listWarehouses(branchParams),
           warehouseAPI.listMoneyCategories(branchParams),
+          warehouseAPI.listCashRegisters(branchParams),
         ]);
         setWarehouses(whData?.results ?? (Array.isArray(whData) ? whData : []));
         setPaymentCategories(
-          catData?.results ?? (Array.isArray(catData) ? catData : [])
+          catData?.results ?? (Array.isArray(catData) ? catData : []),
+        );
+        setCashRegisters(
+          cashData?.results ?? (Array.isArray(cashData) ? cashData : []),
         );
       } catch {
         setWarehouses([]);
         setPaymentCategories([]);
+        setCashRegisters([]);
       }
     };
     loadOptions();
@@ -175,7 +183,7 @@ const CounterpartyDetail = () => {
       if (searchDebounced) params.search = searchDebounced;
       const data = await warehouseAPI.getCounterpartyMoneyOperations(
         id,
-        params
+        params,
       );
       if (data?.operations != null && Array.isArray(data.operations)) {
         const moneyPage =
@@ -239,7 +247,7 @@ const CounterpartyDetail = () => {
             currency: "KGS",
             counterpartyName: name,
           }}
-        />
+        />,
       ).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -267,23 +275,27 @@ const CounterpartyDetail = () => {
   const moneyRows = Array.isArray(moneyPage.results) ? moneyPage.results : [];
 
   const sortedAllRows = useMemo(
-    () => [...operationRows].sort((a, b) => getRowDateValue(b) - getRowDateValue(a)),
-    [operationRows]
+    () =>
+      [...operationRows].sort(
+        (a, b) => getRowDateValue(b) - getRowDateValue(a),
+      ),
+    [operationRows],
   );
   const sortedMoneyRows = useMemo(
-    () => [...moneyRows].sort((a, b) => getRowDateValue(b) - getRowDateValue(a)),
-    [moneyRows]
+    () =>
+      [...moneyRows].sort((a, b) => getRowDateValue(b) - getRowDateValue(a)),
+    [moneyRows],
   );
   const sortedDebtRows = useMemo(
     () =>
       [...debtOperationsList].sort(
-        (a, b) => getRowDateValue(b) - getRowDateValue(a)
+        (a, b) => getRowDateValue(b) - getRowDateValue(a),
       ),
-    [debtOperationsList]
+    [debtOperationsList],
   );
 
   const hasUnifiedOperations = sortedAllRows.some(
-    (r) => r.source != null || r.debt_delta != null
+    (r) => r.source != null || r.debt_delta != null,
   );
 
   // Сводка по операциям: сальдо (приходы − расходы), переводы (оборот), долговые операции (API 5.3)
@@ -303,7 +315,7 @@ const CounterpartyDetail = () => {
     // Остаток долга = сумма debt_delta по всем operations (продажи в долг дают +, оплаты −).
     const debtDeltaSum = list.reduce(
       (acc, row) => acc + (Number(row.debt_delta) || 0),
-      0
+      0,
     );
     return {
       balance: sumReceipt - sumExpense,
@@ -313,12 +325,66 @@ const CounterpartyDetail = () => {
     };
   }, [sortedAllRows, debtOperationsList]);
 
+  /** Оплатить весь долг: приход (должник нам платит) или расход (мы платим). */
+  const payFullDebt = useCallback(async () => {
+    if (!id) return;
+    const debtBalance = summary.debtBalance;
+    if (debtBalance === 0) return;
+    const amount = Math.abs(debtBalance);
+    const firstCash = cashRegisters[0]?.id ?? cashRegisters[0]?.uuid;
+    const firstCategory =
+      paymentCategories[0]?.id ?? paymentCategories[0]?.uuid;
+    if (!firstCash || !firstCategory) {
+      setPayDebtError(
+        !firstCash
+          ? "Нет доступных касс. Добавьте кассу в настройках."
+          : "Нет категорий платежей. Добавьте категорию в настройках.",
+      );
+      return;
+    }
+    setPayDebtError("");
+    const isReceipt = debtBalance > 0;
+    const actionText = isReceipt
+      ? `Создать приход на ${amount.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} с (контрагент погашает долг)?`
+      : `Создать расход на ${amount.toLocaleString("ru-RU", { minimumFractionDigits: 2 })} с (погашение долга контрагенту)?`;
+    if (!window.confirm(actionText)) return;
+    setPayDebtLoading(true);
+    try {
+      const created = await warehouseAPI.createMoneyDocument({
+        doc_type: isReceipt ? "MONEY_RECEIPT" : "MONEY_EXPENSE",
+        cash_register: firstCash,
+        counterparty: id,
+        payment_category: firstCategory,
+        amount,
+        comment: "Погашение долга",
+      });
+      if (created?.id) {
+        await warehouseAPI.postMoneyDocument(created.id);
+      }
+      await loadOperations();
+    } catch (e) {
+      const msg =
+        e?.message ||
+        e?.detail ||
+        (typeof e === "string" ? e : "Не удалось создать документ");
+      setPayDebtError(msg);
+    } finally {
+      setPayDebtLoading(false);
+    }
+  }, [
+    id,
+    summary.debtBalance,
+    cashRegisters,
+    paymentCategories,
+    loadOperations,
+  ]);
+
   const docTypeLabel = (docType) =>
     docType === "MONEY_RECEIPT"
       ? "Приход"
       : docType === "MONEY_EXPENSE"
-      ? "Расход"
-      : docType ?? "—";
+        ? "Расход"
+        : (docType ?? "—");
   const sourceLabel = (row) => {
     if (row.source != null)
       return row.source === "money"
@@ -339,7 +405,7 @@ const CounterpartyDetail = () => {
     return n > 0 ? `+${formatted}` : `−${formatted}`;
   };
   const statusLabel = (s) =>
-    s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : s ?? "—";
+    s === "POSTED" ? "Проведён" : s === "DRAFT" ? "Черновик" : (s ?? "—");
 
   const renderRowsContent = (rows, { showSource, showDebtDelta }) => {
     if (!rows || rows.length === 0) {
@@ -367,11 +433,13 @@ const CounterpartyDetail = () => {
             <tbody>
               {rows.map((row, idx) => (
                 <tr key={getRowKey(row, idx)}>
-                  <td>{showSource ? sourceLabel(row) : docTypeLabel(row.doc_type)}</td>
+                  <td>
+                    {showSource ? sourceLabel(row) : docTypeLabel(row.doc_type)}
+                  </td>
                   <td>{row.number ?? row.document?.number ?? "—"}</td>
                   <td>
                     {fmtDateTime(
-                      row.date ?? row.created_at ?? row.document?.date
+                      row.date ?? row.created_at ?? row.document?.date,
                     )}
                   </td>
                   <td>{fmtMoney(row.amount)}</td>
@@ -436,13 +504,17 @@ const CounterpartyDetail = () => {
                 </div>
               )}
               <div className="counterparty-detail-page__card-row">
-                <span className="counterparty-detail-page__card-label">Дата</span>
+                <span className="counterparty-detail-page__card-label">
+                  Дата
+                </span>
                 <span className="counterparty-detail-page__card-value">
                   {fmtDate(row.date ?? row.created_at ?? row.document?.date)}
                 </span>
               </div>
               <div className="counterparty-detail-page__card-row">
-                <span className="counterparty-detail-page__card-label">Сумма</span>
+                <span className="counterparty-detail-page__card-label">
+                  Сумма
+                </span>
                 <span className="counterparty-detail-page__card-value counterparty-detail-page__card-value--amount">
                   {fmtMoney(row.amount)}
                 </span>
@@ -563,8 +635,8 @@ const CounterpartyDetail = () => {
                   {summary.debtBalance > 0
                     ? "Контрагент должен вам"
                     : summary.debtBalance < 0
-                    ? "Вы должны контрагенту"
-                    : "Долг закрыт"}
+                      ? "Вы должны контрагенту"
+                      : "Долг закрыт"}
                 </span>
                 <span className="counterparty-detail-page__summary-hint">
                   {summary.debtOperationsCount} кредитных документов
@@ -572,41 +644,60 @@ const CounterpartyDetail = () => {
               </div>
             </div>
 
-            <div className="counterparty-detail-page__reconciliation-block">
-              <label className="counterparty-detail-page__reconciliation-label">
-                <span className="counterparty-detail-page__reconciliation-label-text">
-                  Дата с
-                </span>
-                <input
-                  type="date"
-                  value={reconciliationStart}
-                  onChange={(e) => setReconciliationStart(e.target.value)}
-                  className="counterparty-detail-page__reconciliation-date"
-                  aria-label="Начало периода акта сверки"
-                />
-              </label>
-              <label className="counterparty-detail-page__reconciliation-label">
-                <span className="counterparty-detail-page__reconciliation-label-text">
-                  Дата по
-                </span>
-                <input
-                  type="date"
-                  value={reconciliationEnd}
-                  onChange={(e) => setReconciliationEnd(e.target.value)}
-                  className="counterparty-detail-page__reconciliation-date"
-                  aria-label="Конец периода акта сверки"
-                />
-              </label>
-              <button
-                type="button"
-                className="counterparty-detail-page__reconciliation-pdf"
-                onClick={downloadReconciliationPdf}
-                disabled={reconciliationPdfLoading}
-              >
-                {reconciliationPdfLoading
-                  ? "Формирование…"
-                  : "Скачать акт сверки (PDF)"}
-              </button>
+            <div className="counterparty-detail-page__reconciliation-block flex justify-between">
+              <div className="flex gap-2">
+                <label className="counterparty-detail-page__reconciliation-label">
+                  <span className="counterparty-detail-page__reconciliation-label-text">
+                    Дата с
+                  </span>
+                  <input
+                    type="date"
+                    value={reconciliationStart}
+                    onChange={(e) => setReconciliationStart(e.target.value)}
+                    className="counterparty-detail-page__reconciliation-date"
+                    aria-label="Начало периода акта сверки"
+                  />
+                </label>
+                <label className="counterparty-detail-page__reconciliation-label">
+                  <span className="counterparty-detail-page__reconciliation-label-text">
+                    Дата по
+                  </span>
+                  <input
+                    type="date"
+                    value={reconciliationEnd}
+                    onChange={(e) => setReconciliationEnd(e.target.value)}
+                    className="counterparty-detail-page__reconciliation-date"
+                    aria-label="Конец периода акта сверки"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="counterparty-detail-page__reconciliation-pdf"
+                  onClick={downloadReconciliationPdf}
+                  disabled={reconciliationPdfLoading}
+                >
+                  {reconciliationPdfLoading
+                    ? "Формирование…"
+                    : "Скачать акт сверки (PDF)"}
+                </button>
+              </div>
+              {summary.debtBalance !== 0 && (
+                <div className="counterparty-detail-page__pay-debt-wrap">
+                  <button
+                    type="button"
+                    className="counterparty-detail-page__pay-debt-btn"
+                    onClick={payFullDebt}
+                    disabled={payDebtLoading}
+                  >
+                    {payDebtLoading ? "Создание…" : "Оплатить весь долг"}
+                  </button>
+                  {payDebtError && (
+                    <span className="counterparty-detail-page__pay-debt-error">
+                      {payDebtError}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="counterparty-detail-page__operations-toolbar">
