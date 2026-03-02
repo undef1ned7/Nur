@@ -226,6 +226,22 @@ $due-red: #dc2626;
     line-height: 1.2;
   }
 
+  &__fullname-popover {
+    z-index: 10000;
+    max-width: 320px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
+  }
+
   &__group-product-meta {
     display: inline-flex;
     align-items: center;

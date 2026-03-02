@@ -401,68 +401,39 @@ export default function InvoicePdfDocument({ data }) {
     }
   }
 
-  // Поддержка обоих форматов: unit_price (API) и price (если где-то уже нормализовали)
+  // Как в форме: сумма по строке = кол-во × цена − скидка по товару (только % по позиции).
+  // Скидка документа в строку не входит, выводится отдельно в итогах.
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
-      const qty = Number(it.qty || it.quantity || 0);
-      const unit = Number(it.unit_price ?? it.price ?? 0);
-      const total = Number(it.total ?? qty * unit);
+        const qty = Number(it.qty || it.quantity || 0);
+        const unit = Number(it.unit_price ?? it.price ?? 0);
+        const itemDiscountPercent = Number(it.discount_percent ?? it.discount ?? 0);
+        // Сумма по строке только с учётом скидки товара: (кол-во × цена) × (1 − скидка%/100)
+        const subtotalRow = qty * unit;
+        const total = subtotalRow * (1 - itemDiscountPercent / 100);
 
-      // Скидка на уровне товара (если есть) - используем discount_percent в процентах
-      const itemDiscountPercent = Number(it.discount_percent ?? 0);
-
-      // Цена без скидки товара (если есть original_price или price_before_discount)
-      let priceNoDiscount = Number(
-        it.original_price ??
-        it.price_before_discount ??
-        it.price_without_discount ??
-        0
-      );
-
-      // Если цена без скидки не указана, вычисляем её из текущей цены и скидок
-      if (priceNoDiscount === 0 || priceNoDiscount === unit) {
-        // Если есть скидка на товар, вычисляем цену без скидки товара
-        if (itemDiscountPercent > 0) {
-          priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
-        } else if (documentDiscountPercent > 0) {
-          // Если есть скидка на документ, вычисляем цену без скидки документа
-          priceNoDiscount = unit / (1 - documentDiscountPercent / 100);
-        } else {
-          // Если скидок нет, цена без скидки = текущая цена
+        let priceNoDiscount = Number(
+          it.original_price ??
+            it.price_before_discount ??
+            it.price_without_discount ??
+            unit
+        );
+        if (!priceNoDiscount) {
           priceNoDiscount = unit;
         }
-      }
 
-      // Общая скидка для товара (скидка товара + скидка документа)
-      let finalDiscountPercent = itemDiscountPercent;
-      if (documentDiscountPercent > 0 && itemDiscountPercent === 0) {
-        // Если есть только скидка документа, используем её
-        finalDiscountPercent = documentDiscountPercent;
-      } else if (documentDiscountPercent > 0 && itemDiscountPercent > 0) {
-        // Если есть обе скидки, вычисляем общую эффективную скидку
-        const itemPriceBeforeDiscount = priceNoDiscount;
-        const itemPriceAfterItemDiscount =
-          itemPriceBeforeDiscount * (1 - itemDiscountPercent / 100);
-        const itemPriceAfterDocumentDiscount =
-          itemPriceAfterItemDiscount * (1 - documentDiscountPercent / 100);
-        finalDiscountPercent =
-          ((itemPriceBeforeDiscount - itemPriceAfterDocumentDiscount) /
-            itemPriceBeforeDiscount) *
-          100;
-      }
-
-      return {
-        id: it.id,
-        name: it.name || it.product_name || "Товар",
-        qty,
-        unit_price: unit,
-        price_no_discount: priceNoDiscount,
-        discount: finalDiscountPercent,
-        total,
-        unit: it.unit || "ШТ",
-        article: it.article || "",
-      };
-    })
+        return {
+          id: it.id,
+          name: it.name || it.product_name || "Товар",
+          qty,
+          unit_price: unit,
+          price_no_discount: priceNoDiscount,
+          discount: itemDiscountPercent,
+          total,
+          unit: it.unit || "ШТ",
+          article: it.article || "",
+        };
+      })
     : [];
 
   const invoiceNumber = doc.number || "";
@@ -825,7 +796,7 @@ export default function InvoicePdfDocument({ data }) {
               )}
               <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
                 <Text style={{ textAlign: "right", fontWeight: "bold" }}>
-                  {n2(total)}
+                  {n2(items.reduce((sum, it) => sum + Number(it.total || 0), 0))}
                 </Text>
               </View>
             </View>
@@ -836,12 +807,27 @@ export default function InvoicePdfDocument({ data }) {
         {showPriceColumns && (
           <>
             <View style={s.totalsSection}>
-              {discountTotal > 0 && (
-                <View style={s.totalRow}>
-                  <Text style={s.totalLabel}>Скидка:</Text>
-                  <Text style={s.totalValue}>{n2(discountTotal)}</Text>
-                </View>
-              )}
+              {(() => {
+                // Скидка документа в деньгах и процентах — показываем отдельно, как в форме
+                const documentDiscountAmount = Number(
+                  doc.discount_amount ?? doc.discount_total ?? 0
+                );
+
+                if (documentDiscountAmount > 0 || documentDiscountPercent > 0) {
+                  return (
+                    <View style={s.totalRow}>
+                      <Text style={s.totalLabel}>Скидка документа:</Text>
+                      <Text style={s.totalValue}>
+                        {n2(documentDiscountAmount)}{" "}
+                        {documentDiscountPercent > 0
+                          ? `(${n2(documentDiscountPercent)}%)`
+                          : ""}
+                      </Text>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
               <View style={[s.totalRow, s.totalBold]}>
                 <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
                 <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>

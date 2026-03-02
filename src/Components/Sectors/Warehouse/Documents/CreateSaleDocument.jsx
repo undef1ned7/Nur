@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useLocation, useSearchParams, useParams } from "react-router-dom";
+import {
+  useNavigate,
+  useLocation,
+  useSearchParams,
+  useParams,
+} from "react-router-dom";
 import {
   Search,
   Plus,
@@ -47,6 +52,66 @@ const VALID_DOC_TYPES = [
   "WRITE_OFF",
   "TRANSFER",
 ];
+
+// Маленькая модалка с полным текстом при наведении
+const FullNamePopover = ({ fullText, children, className = "" }) => {
+  const [show, setShow] = useState(false);
+  const wrapperRef = useRef(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  const updatePosition = () => {
+    if (wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+    }
+  };
+
+  const handleMouseEnter = () => {
+    updatePosition();
+    setShow(true);
+  };
+
+  const handleMouseLeave = () => {
+    setShow(false);
+  };
+
+  if (!fullText || String(fullText).trim() === "") {
+    return <span className={className}>{children}</span>;
+  }
+
+  return (
+    <>
+      <span
+        ref={wrapperRef}
+        className={className}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {children}
+      </span>
+      {show && (
+        <div
+          className="create-sale-document__fullname-popover"
+          style={{
+            position: "fixed",
+            top: position.top - 4,
+            left: position.left,
+            transform: "translateY(-100%)",
+          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {fullText}
+        </div>
+      )}
+    </>
+  );
+};
 
 const SearchSelect = ({
   value,
@@ -200,7 +265,10 @@ const CreateSaleDocument = () => {
   );
   // id из URL (маршрут edit/:id) или из query/state для обратной совместимости
   const editDocumentId =
-    params.id || searchParams.get("edit_id") || location.state?.editDocumentId || null;
+    params.id ||
+    searchParams.get("edit_id") ||
+    location.state?.editDocumentId ||
+    null;
   const [loadingDraft, setLoadingDraft] = useState(!!editDocumentId);
 
   const debounceTimerRef = useRef(null);
@@ -532,9 +600,12 @@ const CreateSaleDocument = () => {
                         }}
                       >
                         <div className="create-sale-document__group-product-main">
-                          <div className="create-sale-document__group-product-name">
+                          <FullNamePopover
+                            fullText={product.name}
+                            className="create-sale-document__group-product-name"
+                          >
                             {product.name}
-                          </div>
+                          </FullNamePopover>
                           <div className="create-sale-document__group-product-meta">
                             <span className="create-sale-document__group-product-price">
                               {formatPrice(getProductPriceForDocument(product))}{" "}
@@ -629,15 +700,15 @@ const CreateSaleDocument = () => {
         // API может вернуть warehouse_from/counterparty как строку (UUID) или объект
         const whFrom =
           typeof doc.warehouse_from === "object" && doc.warehouse_from != null
-            ? doc.warehouse_from?.id ?? doc.warehouse_from?.uuid ?? ""
+            ? (doc.warehouse_from?.id ?? doc.warehouse_from?.uuid ?? "")
             : String(doc.warehouse_from ?? "");
         const whTo =
           typeof doc.warehouse_to === "object" && doc.warehouse_to != null
-            ? doc.warehouse_to?.id ?? doc.warehouse_to?.uuid ?? ""
+            ? (doc.warehouse_to?.id ?? doc.warehouse_to?.uuid ?? "")
             : String(doc.warehouse_to ?? "");
         const cpId =
           typeof doc.counterparty === "object" && doc.counterparty != null
-            ? doc.counterparty?.id ?? doc.counterparty?.uuid ?? ""
+            ? (doc.counterparty?.id ?? doc.counterparty?.uuid ?? "")
             : String(doc.counterparty ?? "");
         setWarehouse(whFrom);
         setWarehouseTo(whTo);
@@ -673,7 +744,7 @@ const CreateSaleDocument = () => {
               // product в API может быть строкой (UUID) или объектом
               const productId =
                 typeof it.product === "object" && it.product != null
-                  ? it.product?.id ?? it.product?.uuid ?? ""
+                  ? (it.product?.id ?? it.product?.uuid ?? "")
                   : String(it.product ?? it.product_id ?? "");
               const productName =
                 it.product_name ??
@@ -687,12 +758,12 @@ const CreateSaleDocument = () => {
               );
               const unit =
                 typeof it.product === "object" && it.product != null
-                  ? it.product?.unit ?? it.unit
+                  ? (it.product?.unit ?? it.unit)
                   : it.unit;
               const article =
                 typeof it.product === "object" && it.product != null
-                  ? it.product?.article ?? it.article ?? it.product_article
-                  : it.article ?? it.product_article ?? "";
+                  ? (it.product?.article ?? it.article ?? it.product_article)
+                  : (it.article ?? it.product_article ?? "");
               return {
                 id: it.id || `item-${Date.now()}-${idx}`,
                 productId: productId,
@@ -714,7 +785,10 @@ const CreateSaleDocument = () => {
       } catch (e) {
         if (!cancelled) {
           setLoadingDraft(false);
-          alert("Ошибка загрузки документа: " + (e?.message || "Неизвестная ошибка"));
+          alert(
+            "Ошибка загрузки документа: " +
+              (e?.message || "Неизвестная ошибка"),
+          );
           navigate("/crm/warehouse/documents");
         }
       } finally {
@@ -777,9 +851,7 @@ const CreateSaleDocument = () => {
                 String(item.productId ?? item.product_id),
               );
               const stock =
-                p != null
-                  ? Number(p?.quantity ?? 0)
-                  : Number(item.stock ?? 0);
+                p != null ? Number(p?.quantity ?? 0) : Number(item.stock ?? 0);
               const qty = Number(item.quantity ?? 0);
               const capByStock =
                 isStockLimitRequired && stock > 0 && qty > stock;
@@ -1910,9 +1982,12 @@ const CreateSaleDocument = () => {
                                     }}
                                   >
                                     <div className="create-sale-document__group-product-main">
-                                      <div className="create-sale-document__group-product-name">
+                                      <FullNamePopover
+                                        fullText={product.name}
+                                        className="create-sale-document__group-product-name"
+                                      >
                                         {product.name}
-                                      </div>
+                                      </FullNamePopover>
                                       <div className="create-sale-document__group-product-meta">
                                         <span className="create-sale-document__group-product-price">
                                           {formatPrice(
@@ -2275,7 +2350,7 @@ const CreateSaleDocument = () => {
                       return (
                         <tr key={item.id || index}>
                           <td>{index + 1}</td>
-                          <td>{itemName}</td>
+                          <td title={itemName}>{itemName}</td>
                           <td>{(item.unit || "шт").toUpperCase()}</td>
                           <td>
                             <input
