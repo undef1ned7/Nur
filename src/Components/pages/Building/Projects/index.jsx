@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Building2, MapPin, FileText, CheckCircle2, XCircle } from "lucide-react";
 import { fetchBuildingProjects } from "../../../../store/creators/building/projectsCreators";
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
@@ -14,6 +14,7 @@ export default function BuildingProjects() {
   const [openEdit, setOpenEdit] = useState(false);
   const [activeProject, setActiveProject] = useState(null);
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const location = useLocation();
   const { items, raw, loading, error } = useBuildingProjects();
 
@@ -67,13 +68,17 @@ export default function BuildingProjects() {
               role="button"
               tabIndex={0}
               onClick={() => {
-                setActiveProject(p);
-                setOpenEdit(true);
+                const pid = p?.id ?? p?.uuid;
+                if (pid) {
+                  navigate(`/crm/building/projects/${pid}`);
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
-                  setActiveProject(p);
-                  setOpenEdit(true);
+                  const pid = p?.id ?? p?.uuid;
+                  if (pid) {
+                    navigate(`/crm/building/projects/${pid}`);
+                  }
                 }
               }}
             >
@@ -116,6 +121,19 @@ export default function BuildingProjects() {
                   <div className="building-projects__desc">{p.description}</div>
                 </div>
               )}
+              <div className="building-projects__row" style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="building-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveProject(p);
+                    setOpenEdit(true);
+                  }}
+                >
+                  Редактировать
+                </button>
+              </div>
             </div>
           ))}
         </div>

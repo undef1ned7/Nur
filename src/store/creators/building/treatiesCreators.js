@@ -15,6 +15,18 @@ export const fetchBuildingTreaties = createAsyncThunk(
   }
 );
 
+export const fetchBuildingTreatyById = createAsyncThunk(
+  "buildingTreaties/fetchOne",
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`${BASE}/${id}/`);
+      return data;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  }
+);
+
 export const createBuildingTreaty = createAsyncThunk(
   "buildingTreaties/create",
   async (payload, { rejectWithValue }) => {
@@ -78,7 +90,9 @@ export const createBuildingTreatyFile = createAsyncThunk(
       if (title != null && String(title).trim() !== "") {
         formData.append("title", String(title).trim());
       }
-      const { data } = await api.post(`${BASE}/${treatyId}/files/`, formData);
+      const { data } = await api.post(`${BASE}/${treatyId}/files/`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       return data ?? { treatyId };
     } catch (err) {
       return rejectWithValue(err?.response?.data || err?.message || err);

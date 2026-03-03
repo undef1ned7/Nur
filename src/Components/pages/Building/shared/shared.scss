@@ -312,6 +312,40 @@
   color: rgba(11, 35, 68, 0.7);
 }
 
+.building-project-floors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.building-project-floors__item {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 35, 68, 0.14);
+  background: rgba(11, 35, 68, 0.02);
+  cursor: pointer;
+  min-width: 160px;
+}
+
+.building-project-floors__item--active {
+  border-color: $building-primary;
+  background: rgba($building-primary, 0.12);
+}
+
+.building-project-floors__floor {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.building-project-floors__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: rgba(11, 35, 68, 0.8);
+}
+
 .building-page--clients .building-page__header,
 .building-page--treaties .building-page__header {
   @media (max-width: 640px) {

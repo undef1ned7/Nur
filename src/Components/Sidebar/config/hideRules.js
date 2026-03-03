@@ -142,7 +142,6 @@ export const HIDE_RULES = [
         '/crm/branch',
         '/crm/additional-services',
         '/crm/clients',
-        '/crm/employ',
       ],
     },
   },

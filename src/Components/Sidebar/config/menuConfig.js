@@ -140,14 +140,7 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
-        label: "Сотрудники",
-        to: "/crm/building/employess",
-        icon: menuIcons.user,
-        permission: "can_view_building_employess",
-        implemented: true,
-      },
-      {
-        label: "Уведомления",
+        label: "Напоминания",
         to: "/crm/building/notification",
         icon: menuIcons.bell,
         permission: "can_view_building_notification",
@@ -161,10 +154,17 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
-        label: "Проекты",
+        label: "ЖК",
         to: "/crm/building/projects",
         icon: menuIcons.listCheck,
         permission: "can_view_building_projects",
+        implemented: true,
+      },
+      {
+        label: "Проекты",
+        to: "/crm/building/drawings",
+        icon: menuIcons.fileText,
+        permission: "can_view_building_treaty",
         implemented: true,
       },
       {

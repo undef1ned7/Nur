@@ -36,8 +36,12 @@ import buildingStockReducer from "./slices/building/stockSlice";
 import buildingWorkflowEventsReducer from "./slices/building/workflowEventsSlice";
 import buildingWarehousesReducer from "./slices/building/warehousesSlice";
 import buildingWorkEntriesReducer from "./slices/building/workEntriesSlice";
+import buildingApartmentsReducer from "./slices/building/apartmentsSlice";
+import buildingDrawingsReducer from "./slices/building/drawingsSlice";
 import buildingClientsReducer from "./slices/building/clientsSlice";
 import buildingTreatiesReducer from "./slices/building/treatiesSlice";
+import buildingTasksReducer from "./slices/building/tasksSlice";
+import buildingSalaryReducer from "./slices/building/salarySlice";
 // import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
@@ -79,8 +83,12 @@ const store = configureStore({
     buildingWorkflowEvents: buildingWorkflowEventsReducer,
     buildingWarehouses: buildingWarehousesReducer,
     buildingWorkEntries: buildingWorkEntriesReducer,
+    buildingApartments: buildingApartmentsReducer,
+    buildingDrawings: buildingDrawingsReducer,
     buildingClients: buildingClientsReducer,
     buildingTreaties: buildingTreatiesReducer,
+    buildingTasks: buildingTasksReducer,
+    buildingSalary: buildingSalaryReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
