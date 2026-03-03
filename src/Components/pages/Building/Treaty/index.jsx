@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import {
@@ -14,14 +15,26 @@ import { fetchBuildingClients } from "../../../../store/creators/building/client
 import { useBuildingTreaties } from "../../../../store/slices/building/treatiesSlice";
 import { useBuildingClients } from "../../../../store/slices/building/clientsSlice";
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
+import { useBuildingApartments } from "../../../../store/slices/building/apartmentsSlice";
+import { fetchBuildingApartments } from "../../../../store/creators/building/apartmentsCreators";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import BuildingActionsMenu from "../shared/ActionsMenu";
 
 const STATUS_LABELS = {
   draft: "Черновик",
   active: "Активен",
+  signed: "Подписан",
   cancelled: "Отменён",
-  completed: "Завершён",
+};
+
+const OPERATION_TYPE_LABELS = {
+  sale: "Продажа",
+  booking: "Бронь",
+};
+
+const PAYMENT_TYPE_LABELS = {
+  full: "Полная оплата",
+  installment: "Рассрочка",
 };
 
 const ERP_LABELS = {
@@ -38,16 +51,23 @@ const FORM_INITIAL = {
   title: "",
   description: "",
   amount: "",
+  operation_type: "sale",
+  payment_type: "full",
+  apartment: "",
+  down_payment: "",
+  payment_terms: "",
   status: "draft",
   auto_create_in_erp: false,
 };
 
 export default function BuildingTreaty() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const alert = useAlert();
   const confirm = useConfirm();
   const { selectedProjectId, items: projects } = useBuildingProjects();
   const { list: clientsList } = useBuildingClients();
+  const { list: apartmentsList } = useBuildingApartments();
   const {
     list,
     loading,
@@ -64,6 +84,8 @@ export default function BuildingTreaty() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [erpFilter, setErpFilter] = useState("");
+  const [operationFilter, setOperationFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(FORM_INITIAL);
@@ -78,6 +100,8 @@ export default function BuildingTreaty() {
     file: null,
     title: "",
   });
+
+  const [installments, setInstallments] = useState([]);
 
   const selectedProjectName = useMemo(() => {
     if (!selectedProjectId) return "—";
@@ -97,14 +121,26 @@ export default function BuildingTreaty() {
     [clientsList],
   );
 
+  const apartmentsOptions = useMemo(
+    () =>
+      (Array.isArray(apartmentsList) ? apartmentsList : []).filter(
+        (a) =>
+          !selectedProjectId ||
+          String(a?.residential_complex) === String(selectedProjectId),
+      ),
+    [apartmentsList, selectedProjectId],
+  );
+
   const fetchParams = useMemo(
     () => ({
       residential_complex: selectedProjectId || undefined,
       search: search.trim() || undefined,
       status: statusFilter || undefined,
       erp_sync_status: erpFilter || undefined,
+      operation_type: operationFilter || undefined,
+      payment_type: paymentFilter || undefined,
     }),
-    [selectedProjectId, search, statusFilter, erpFilter],
+    [selectedProjectId, search, statusFilter, erpFilter, operationFilter, paymentFilter],
   );
 
   useEffect(() => {
@@ -116,6 +152,8 @@ export default function BuildingTreaty() {
     fetchParams.search,
     fetchParams.status,
     fetchParams.erp_sync_status,
+    fetchParams.operation_type,
+    fetchParams.payment_type,
   ]);
 
   useEffect(() => {
@@ -123,12 +161,33 @@ export default function BuildingTreaty() {
     dispatch(fetchBuildingClients({ residential_complex: selectedProjectId }));
   }, [dispatch, selectedProjectId]);
 
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    dispatch(
+      fetchBuildingApartments({
+        residential_complex: selectedProjectId,
+        status: "available",
+        page: 1,
+        page_size: 500,
+      }),
+    );
+  }, [dispatch, selectedProjectId]);
+
   const effectiveList = useMemo(() => {
     const arr = Array.isArray(list) ? list : [];
-    if (!search.trim() && !statusFilter && !erpFilter) return arr;
+    if (
+      !search.trim() &&
+      !statusFilter &&
+      !erpFilter &&
+      !operationFilter &&
+      !paymentFilter
+    )
+      return arr;
     return arr.filter((t) => {
       if (statusFilter && t.status !== statusFilter) return false;
       if (erpFilter && t.erp_sync_status !== erpFilter) return false;
+      if (operationFilter && t.operation_type !== operationFilter) return false;
+      if (paymentFilter && t.payment_type !== paymentFilter) return false;
       if (!search.trim()) return true;
       const hay = `${t.number || ""} ${t.title || ""} ${t.description || ""} ${
         t.client_name || ""
@@ -137,37 +196,20 @@ export default function BuildingTreaty() {
         .trim();
       return hay.includes(search.toLowerCase().trim());
     });
-  }, [list, search, statusFilter, erpFilter]);
+  }, [list, search, statusFilter, erpFilter, operationFilter, paymentFilter]);
 
   const openCreate = () => {
     if (!selectedProjectId) {
       alert("Сначала выберите жилой комплекс в шапке раздела", true);
       return;
     }
-    setEditing(null);
-    setForm({
-      ...FORM_INITIAL,
-      residential_complex: selectedProjectId,
-    });
-    setCreateAttachment({ file: null, title: "" });
-    setFormError(null);
-    setOpenModal(true);
+    navigate("/crm/building/treaty/new");
   };
 
   const openEdit = (treaty) => {
-    setEditing(treaty);
-    setForm({
-      residential_complex: treaty?.residential_complex || "",
-      client: treaty?.client || "",
-      number: treaty?.number || "",
-      title: treaty?.title || "",
-      description: treaty?.description || "",
-      amount: treaty?.amount || "",
-      status: treaty?.status || "draft",
-      auto_create_in_erp: treaty?.auto_create_in_erp ?? false,
-    });
-    setFormError(null);
-    setOpenModal(true);
+    const id = treaty?.id ?? treaty?.uuid;
+    if (!id) return;
+    navigate(`/crm/building/treaty/${id}`);
   };
 
   const closeModal = () => {
@@ -175,6 +217,7 @@ export default function BuildingTreaty() {
     setEditing(null);
     setForm(FORM_INITIAL);
     setCreateAttachment({ file: null, title: "" });
+    setInstallments([]);
     setFormError(null);
   };
 
@@ -182,6 +225,39 @@ export default function BuildingTreaty() {
     const value =
       key === "auto_create_in_erp" ? e.target.checked : e.target.value;
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleInstallmentChange = (index, key) => (e) => {
+    const value = e.target.value;
+    setInstallments((prev) =>
+      prev.map((row, i) =>
+        i === index
+          ? {
+              ...row,
+              [key]: value,
+            }
+          : row,
+      ),
+    );
+  };
+
+  const addInstallmentRow = () => {
+    setInstallments((prev) => [
+      ...prev,
+      {
+        order: prev.length + 1,
+        due_date: "",
+        amount: "",
+      },
+    ]);
+  };
+
+  const removeInstallmentRow = (index) => {
+    setInstallments((prev) =>
+      prev
+        .filter((_, i) => i !== index)
+        .map((row, i) => ({ ...row, order: i + 1 })),
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -199,9 +275,59 @@ export default function BuildingTreaty() {
       return;
     }
 
+    if (
+      (form.operation_type === "sale" || form.operation_type === "booking") &&
+      !form.apartment
+    ) {
+      setFormError("Выберите квартиру для продажи/брони");
+      return;
+    }
+
+    let installmentsPayload = undefined;
+    if (form.payment_type === "installment") {
+      const cleaned = installments
+        .map((row, idx) => ({
+          order: row.order ?? idx + 1,
+          due_date: row.due_date || "",
+          amount: row.amount || "",
+        }))
+        .filter((row) => row.due_date && row.amount);
+
+      if (cleaned.length === 0) {
+        setFormError("Добавьте хотя бы один платёж рассрочки");
+        return;
+      }
+
+      const amountTotal = Number(form.amount || 0);
+      const down = Number(form.down_payment || 0);
+      const insSum = cleaned.reduce(
+        (acc, row) => acc + Number(row.amount || 0),
+        0,
+      );
+
+      if (
+        Number.isFinite(amountTotal) &&
+        (down + insSum).toFixed(2) !== amountTotal.toFixed(2)
+      ) {
+        setFormError(
+          "Сумма первоначального взноса и рассрочки должна быть равна сумме договора",
+        );
+        return;
+      }
+
+      installmentsPayload = cleaned.map((row) => ({
+        order: row.order,
+        due_date: row.due_date,
+        amount: String(row.amount),
+      }));
+    }
+
     const payload = {
       ...form,
       amount: form.amount ? String(form.amount) : undefined,
+      down_payment: form.down_payment ? String(form.down_payment) : undefined,
+      installments:
+        form.payment_type === "installment" ? installmentsPayload : undefined,
     };
 
     try {
@@ -401,6 +527,32 @@ export default function BuildingTreaty() {
             ))}
           </select>
         </div>
+        <div className="building-page__filters" style={{ marginTop: 8 }}>
+          <select
+            className="building-page__select"
+            value={operationFilter}
+            onChange={(e) => setOperationFilter(e.target.value)}
+          >
+            <option value="">Тип операции: все</option>
+            {Object.entries(OPERATION_TYPE_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="building-page__select"
+            value={paymentFilter}
+            onChange={(e) => setPaymentFilter(e.target.value)}
+          >
+            <option value="">Тип оплаты: все</option>
+            {Object.entries(PAYMENT_TYPE_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
         {error && (
           <div className="building-page__error">
             {String(validateResErrors(error, "Не удалось загрузить договоры"))}
@@ -433,6 +585,9 @@ export default function BuildingTreaty() {
                   <th>Название</th>
                   <th>ЖК</th>
                   <th>Клиент</th>
+                  <th>Квартира</th>
+                  <th>Тип операции</th>
+                  <th>Тип оплаты</th>
                   <th>Сумма</th>
                   <th>Статус</th>
                   <th>ERP</th>
@@ -448,7 +603,11 @@ export default function BuildingTreaty() {
                   const busy = erpBusy || busyUpdate || busyDelete;
                   const erpStatus = t?.erp_sync_status || "none";
                   return (
-                    <tr key={id}>
+                    <tr
+                      key={id}
+                      onClick={() => id && navigate(`/crm/building/treaty/${id}`)}
+                      style={{ cursor: "pointer" }}
+                    >
                       <td>{t?.number || "—"}</td>
                       <td>{t?.title || "—"}</td>
                       <td>
@@ -457,6 +616,23 @@ export default function BuildingTreaty() {
                           "—"}
                       </td>
                       <td>{t?.client_name || t?.client || "—"}</td>
+                      <td>
+                        {t?.apartment_number ||
+                          (t?.apartment_floor != null
+                            ? `Этаж ${t.apartment_floor}`
+                            : t?.apartment) ||
+                          "—"}
+                      </td>
+                      <td>
+                        {OPERATION_TYPE_LABELS[t?.operation_type] ||
+                          t?.operation_type ||
+                          "—"}
+                      </td>
+                      <td>
+                        {PAYMENT_TYPE_LABELS[t?.payment_type] ||
+                          t?.payment_type ||
+                          "—"}
+                      </td>
                       <td>{t?.amount ?? "—"}</td>
                       <td>
                         <span className="building-page__status">
@@ -592,6 +768,50 @@ export default function BuildingTreaty() {
             />
           </label>
           <label>
+            <div className="building-page__label">Квартира</div>
+            <select
+              className="building-page__select"
+              value={form.apartment}
+              onChange={handleFormChange("apartment")}
+            >
+              <option value="">Без выбора квартиры</option>
+              {apartmentsOptions.map((a) => (
+                <option key={a.id ?? a.uuid} value={a.id ?? a.uuid}>
+                  {a.number || "Квартира"}
+                  {a.floor != null ? `, этаж ${a.floor}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <div className="building-page__label">Тип операции</div>
+            <select
+              className="building-page__select"
+              value={form.operation_type}
+              onChange={handleFormChange("operation_type")}
+            >
+              {Object.entries(OPERATION_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <div className="building-page__label">Тип оплаты</div>
+            <select
+              className="building-page__select"
+              value={form.payment_type}
+              onChange={handleFormChange("payment_type")}
+            >
+              {Object.entries(PAYMENT_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             <div className="building-page__label">Сумма</div>
             <input
               type="number"
@@ -603,6 +823,92 @@ export default function BuildingTreaty() {
               placeholder="150000.00"
             />
           </label>
+          <label>
+            <div className="building-page__label">Первоначальный взнос</div>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="building-page__input"
+              value={form.down_payment}
+              onChange={handleFormChange("down_payment")}
+              placeholder="30000.00"
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Условия оплаты</div>
+            <textarea
+              className="building-page__textarea"
+              rows={2}
+              value={form.payment_terms}
+              onChange={handleFormChange("payment_terms")}
+              placeholder="Рассрочка на 12 месяцев..."
+            />
+          </label>
+          {form.payment_type === "installment" && (
+            <div>
+              <div className="building-page__label" style={{ marginTop: 8 }}>
+                График рассрочки
+              </div>
+              <div className="building-table building-table--shadow">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Дата платежа</th>
+                      <th>Сумма</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {installments.map((row, idx) => (
+                      <tr key={idx}>
+                        <td>{row.order ?? idx + 1}</td>
+                        <td>
+                          <input
+                            type="date"
+                            className="building-page__input"
+                            value={row.due_date}
+                            onChange={handleInstallmentChange(idx, "due_date")}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="building-page__input"
+                            value={row.amount}
+                            onChange={handleInstallmentChange(idx, "amount")}
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="building-btn building-btn--danger"
+                            onClick={() => removeInstallmentRow(idx)}
+                          >
+                            Удалить
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td colSpan={4}>
+                        <button
+                          type="button"
+                          className="building-btn"
+                          onClick={addInstallmentRow}
+                        >
+                          Добавить платёж
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           <label>
             <div className="building-page__label">Статус</div>
             <select

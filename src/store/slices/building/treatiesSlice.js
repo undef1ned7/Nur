@@ -3,10 +3,12 @@ import { useSelector } from "react-redux";
 import { applyPagination } from "../../pagination";
 import {
   fetchBuildingTreaties,
+  fetchBuildingTreatyById,
   createBuildingTreaty,
   updateBuildingTreaty,
   deleteBuildingTreaty,
   createBuildingTreatyInErp,
+  createBuildingTreatyFile,
 } from "../../creators/building/treatiesCreators";
 
 const initialState = {
@@ -24,6 +26,10 @@ const initialState = {
   deletingId: null,
   erpCreatingId: null,
   erpError: null,
+  current: null,
+  currentLoading: false,
+  currentLoaded: false,
+  currentError: null,
 };
 
 const upsertById = (list, payload) => {
@@ -66,6 +72,25 @@ const buildingTreatiesSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(fetchBuildingTreatyById.pending, (state) => {
+        state.currentLoading = true;
+        state.currentLoaded = false;
+        state.currentError = null;
+      })
+      .addCase(fetchBuildingTreatyById.fulfilled, (state, action) => {
+        state.currentLoading = false;
+        state.currentLoaded = true;
+        state.currentError = null;
+        state.current = action.payload || null;
+        if (action.payload) {
+          state.list = upsertById(state.list || [], action.payload);
+        }
+      })
+      .addCase(fetchBuildingTreatyById.rejected, (state, action) => {
+        state.currentLoading = false;
+        state.currentLoaded = true;
+        state.currentError = action.payload ?? action.error?.message;
+      })
       .addCase(fetchBuildingTreaties.pending, (state) => {
         state.loading = true;
         state.loaded = false;
@@ -90,6 +115,7 @@ const buildingTreatiesSlice = createSlice({
         if (action.payload) {
           state.list = [action.payload, ...(state.list || [])];
           state.count = (state.count || 0) + 1;
+          state.current = action.payload;
         }
       })
       .addCase(createBuildingTreaty.rejected, (state, action) => {
@@ -104,6 +130,13 @@ const buildingTreatiesSlice = createSlice({
         state.updatingId = null;
         if (action.payload) {
           state.list = upsertById(state.list || [], action.payload);
+          const id = action.payload?.id ?? action.payload?.uuid;
+          if (
+            state.current &&
+            String(state.current.id ?? state.current.uuid) === String(id)
+          ) {
+            state.current = action.payload;
+          }
         }
       })
       .addCase(updateBuildingTreaty.rejected, (state, action) => {
@@ -132,13 +165,45 @@ const buildingTreatiesSlice = createSlice({
       })
       .addCase(createBuildingTreatyInErp.fulfilled, (state, action) => {
         state.erpCreatingId = null;
-        if (action.payload && typeof action.payload === "object" && action.payload.id) {
+        if (
+          action.payload &&
+          typeof action.payload === "object" &&
+          (action.payload.id || action.payload.uuid)
+        ) {
           state.list = upsertById(state.list || [], action.payload);
+          const id = action.payload.id ?? action.payload.uuid;
+          if (
+            state.current &&
+            String(state.current.id ?? state.current.uuid) === String(id)
+          ) {
+            state.current = action.payload;
+          }
         }
       })
       .addCase(createBuildingTreatyInErp.rejected, (state, action) => {
         state.erpCreatingId = null;
         state.erpError = action.payload ?? action.error?.message;
+      })
+      .addCase(createBuildingTreatyFile.fulfilled, (state, action) => {
+        // API может вернуть обновленный договор или список файлов
+        if (!action.payload) return;
+        if (Array.isArray(action.payload.files)) {
+          if (state.current) {
+            state.current = {
+              ...state.current,
+              files: action.payload.files,
+            };
+          }
+        } else if (action.payload.id || action.payload.uuid) {
+          state.list = upsertById(state.list || [], action.payload);
+          const id = action.payload.id ?? action.payload.uuid;
+          if (
+            state.current &&
+            String(state.current.id ?? state.current.uuid) === String(id)
+          ) {
+            state.current = action.payload;
+          }
+        }
       });
   },
 });
