@@ -88,6 +88,19 @@ export default function CreateSaleFromCartModal({
     }
   }, [open, cart?.id, cart?.items]);
 
+  // Автовыбор контрагента по агенту заявки (cart.agent === counterparty.agent)
+  useEffect(() => {
+    if (!open || !cart?.agent || counterparties.length === 0) return;
+    const found = counterparties.find(
+      (c) => c?.agent != null && String(c.agent) === String(cart.agent),
+    );
+    if (found) {
+      setForm((prev) =>
+        prev.counterparty === "" ? { ...prev, counterparty: found.id } : prev,
+      );
+    }
+  }, [open, cart?.agent, counterparties]);
+
   const loadCounterparties = async () => {
     setCounterpartiesLoading(true);
     try {
@@ -154,6 +167,14 @@ export default function CreateSaleFromCartModal({
   };
 
   if (!open) return null;
+
+  // Контрагент зафиксирован по агенту заявки — поле не редактируется
+  const counterpartyLockedByAgent =
+    Boolean(cart?.agent) &&
+    counterparties.some(
+      (c) =>
+        c?.agent != null && String(c.agent) === String(cart.agent),
+    );
 
   return (
     <div className="reconciliation-modal-overlay" onClick={onClose}>
@@ -275,7 +296,7 @@ export default function CreateSaleFromCartModal({
                 onChange={(e) =>
                   setForm((prev) => ({ ...prev, counterparty: e.target.value }))
                 }
-                disabled={counterpartiesLoading}
+                disabled={counterpartiesLoading || counterpartyLockedByAgent}
               >
                 <option value="">Выберите контрагента</option>
                 {counterparties.map((c) => (

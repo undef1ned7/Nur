@@ -404,6 +404,16 @@ const CreateSaleDocument = () => {
     });
   };
 
+  // Сортировка товаров по дате (новые сверху)
+  const sortProductsByDate = (list) => {
+    const arr = Array.isArray(list) ? list : [];
+    return [...arr].sort((a, b) => {
+      const dateA = a?.updated_at || a?.created_at || 0;
+      const dateB = b?.updated_at || b?.created_at || 0;
+      return new Date(dateB) - new Date(dateA);
+    });
+  };
+
   const toggleGroupExpand = (groupKey) => {
     const key = String(groupKey);
     setExpandedGroupIds((prev) => {
@@ -584,7 +594,7 @@ const CreateSaleDocument = () => {
                     Нет товаров
                   </div>
                 ) : (
-                  (cached?.items || []).map((product) => {
+                  sortProductsByDate(cached?.items || []).map((product) => {
                     const isSelected = selectedProductIds.has(
                       String(product.id),
                     );
@@ -780,6 +790,8 @@ const CreateSaleDocument = () => {
                 discount: discountPct,
                 discount_percent: discountPct,
                 article: article ? String(article) : "",
+                addedAt: it.created_at || new Date().toISOString(),
+                created_at: it.created_at,
               };
             })
           : [];
@@ -1054,13 +1066,18 @@ const CreateSaleDocument = () => {
     return docType === "TRANSFER";
   }, [docType]);
 
-  // Фильтрация товаров в документе
+  // Фильтрация и сортировка товаров в документе по дате (новые сверху)
   const filteredDocumentItems = useMemo(() => {
     if (!cartItems || cartItems.length === 0) return [];
     const search = documentSearch.toLowerCase();
-    return cartItems.filter((item) => {
+    const filtered = cartItems.filter((item) => {
       const name = item.productName || item.name || "";
       return name.toLowerCase().includes(search);
+    });
+    return [...filtered].sort((a, b) => {
+      const dateA = a.addedAt || a.created_at || 0;
+      const dateB = b.addedAt || b.created_at || 0;
+      return new Date(dateB) - new Date(dateA);
     });
   }, [cartItems, documentSearch]);
 
@@ -1191,6 +1208,7 @@ const CreateSaleDocument = () => {
           discount: 0,
           discount_percent: 0,
           article: product.article || "",
+          addedAt: new Date().toISOString(),
         };
         setCartItems((prev) => [...prev, newItem]);
       }
@@ -1978,7 +1996,9 @@ const CreateSaleDocument = () => {
                               Нет товаров
                             </div>
                           ) : (
-                            getUngroupedProducts(entry?.items).map(
+                            sortProductsByDate(
+                              getUngroupedProducts(entry?.items),
+                            ).map(
                               (product) => {
                                 const isSelected = selectedProductIds.has(
                                   String(product.id),

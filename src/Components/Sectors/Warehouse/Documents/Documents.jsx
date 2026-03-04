@@ -1743,7 +1743,7 @@ const Documents = () => {
                       ) : (
                         <button
                           type="button"
-                          className="documents__action-btn documents__action-btn--create-sale"
+                          className="documents__action-btn documents__action-btn--create-sale !w-auto !h-auto !py-1"
                           onClick={() => setCreateSaleModalCart(cart)}
                           title="Создать продажу по заявке"
                         >

@@ -221,6 +221,13 @@
     border-radius: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     overflow: hidden;
+    position: relative;
+
+    @media (max-width: 900px) {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 10px;
+    }
   }
 
   &__table {
@@ -381,6 +388,16 @@
     padding: 48px;
     color: #9ca3af;
     font-size: 14px;
+
+    @media (max-width: 768px) {
+      padding: 32px 16px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 480px) {
+      padding: 24px 12px;
+      font-size: 12px;
+    }
   }
 
   /* Карточки */
@@ -530,8 +547,19 @@
     order: 1;
   }
 
-  .documents__header-actions {
+  .documents__agent-filter {
     order: 2;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .documents__agent-filter-select {
+    min-width: 140px;
+    max-width: 200px;
+  }
+
+  .documents__header-actions {
+    order: 3;
     flex-wrap: wrap;
     width: 100%;
   }
@@ -575,6 +603,17 @@
 
   .documents__tabs-row {
     gap: 12px;
+  }
+
+  .documents__tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+  }
+
+  .documents__tab {
+    flex: 0 0 auto;
   }
 
   .documents__cards {
@@ -626,17 +665,31 @@
 
   .documents__search-icon {
     left: 10px;
-    size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  .documents__agent-filter {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .documents__agent-filter-select {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
   }
 
   .documents__header-actions {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     width: 100%;
   }
 
   .documents__create-btn,
   .documents__filter-btn {
-    width: 100%;
+    flex: 1 1 calc(50% - 6px);
+    min-width: 140px;
     justify-content: center;
     padding: 10px 16px;
   }
@@ -692,13 +745,39 @@
     padding: 10px;
   }
 
+  .documents__header {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  .documents__agent-filter-label {
+    font-size: 13px;
+  }
+
+  .documents__agent-filter-select {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
   .documents__tabs-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
+  }
+
+  .documents__tabs {
+    width: 100%;
+    margin: 0;
   }
 
   .documents__view-toggle {
     align-self: flex-end;
+  }
+
+  .documents__create-btn,
+  .documents__filter-btn {
+    flex: 1 1 100%;
+    min-width: 0;
   }
 
   .documents__cards {
@@ -713,11 +792,13 @@
 
   .documents__card-actions {
     padding: 10px 14px;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
-  .documents__header {
-    padding: 10px;
-    border-radius: 8px;
+  .documents__card-actions .documents__action-btn {
+    width: 32px;
+    height: 32px;
   }
 
   .documents__search-input {
@@ -726,7 +807,8 @@
   }
 
   .documents__search-icon {
-    size: 16px;
+    width: 16px;
+    height: 16px;
   }
 
   .documents__create-btn,

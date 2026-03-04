@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, LayoutGrid, List } from "lucide-react";
+import { ArrowLeft, LayoutGrid, List, X, Check, Save } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useDispatch, useSelector } from "react-redux";
@@ -10,6 +10,7 @@ import { useUser } from "../../../../store/slices/userSlice";
 import { getAgentDisplay } from "./utils";
 import ReconciliationPdfDocument from "../../Warehouse/Documents/components/ReconciliationPdfDocument";
 import "./CounterpartyDetail.scss";
+import "../../Warehouse/Money/MoneyDocumentsPage.scss";
 
 const fmtMoney = (v) =>
   (Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 0 }) +
@@ -115,6 +116,15 @@ const CounterpartyDetail = () => {
   const [cashRegisters, setCashRegisters] = useState([]);
   const [payDebtLoading, setPayDebtLoading] = useState(false);
   const [payDebtError, setPayDebtError] = useState("");
+  const [showPayDebtModal, setShowPayDebtModal] = useState(false);
+  const [payDebtForm, setPayDebtForm] = useState({
+    cash_register: "",
+    payment_category: "",
+    amount: "",
+    comment: "",
+  });
+  const [payDebtCreateAsPosted, setPayDebtCreateAsPosted] = useState(false);
+  const [payDebtSubmitting, setPayDebtSubmitting] = useState(false);
 
   const [docTypeFilter, setDocTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -325,7 +335,24 @@ const CounterpartyDetail = () => {
     };
   }, [sortedAllRows, debtOperationsList]);
 
-  /** Оплатить весь долг: приход (должник нам платит) или расход (мы платим). */
+  const openPayDebtModal = useCallback(() => {
+    const debtBalance = summary.debtBalance;
+    const amount = Math.abs(debtBalance);
+    const firstCash = cashRegisters[0]?.id ?? cashRegisters[0]?.uuid ?? "";
+    const firstCategory =
+      paymentCategories[0]?.id ?? paymentCategories[0]?.uuid ?? "";
+    setPayDebtForm({
+      cash_register: firstCash,
+      payment_category: firstCategory,
+      amount: amount > 0 ? String(amount) : "",
+      comment: "Погашение долга",
+    });
+    setPayDebtCreateAsPosted(false);
+    setPayDebtError("");
+    setShowPayDebtModal(true);
+  }, [summary.debtBalance, cashRegisters, paymentCategories]);
+
+  /** Оплатить весь долг одной кнопкой: приход или расход на полную сумму с подтверждением. */
   const payFullDebt = useCallback(async () => {
     if (!id) return;
     const debtBalance = summary.debtBalance;
@@ -378,6 +405,75 @@ const CounterpartyDetail = () => {
     paymentCategories,
     loadOperations,
   ]);
+
+  const closePayDebtModal = useCallback(() => {
+    setShowPayDebtModal(false);
+    setPayDebtForm({
+      cash_register: "",
+      payment_category: "",
+      amount: "",
+      comment: "",
+    });
+    setPayDebtError("");
+  }, []);
+
+  const handlePayDebtFormChange = useCallback((field, value) => {
+    setPayDebtForm((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handlePayDebtSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!id) return;
+      setPayDebtError("");
+      const cash_register = payDebtForm.cash_register?.trim();
+      const payment_category = payDebtForm.payment_category?.trim();
+      const amountStr = String(payDebtForm.amount ?? "").trim().replace(/\s/g, "").replace(",", ".");
+      if (!cash_register || !payment_category || !amountStr) {
+        setPayDebtError("Заполните кассу, категорию и сумму");
+        return;
+      }
+      const amountNum = Number(amountStr);
+      if (Number.isNaN(amountNum) || amountNum <= 0) {
+        setPayDebtError("Укажите корректную сумму");
+        return;
+      }
+      const debtBalance = summary.debtBalance;
+      const isReceipt = debtBalance > 0;
+      setPayDebtSubmitting(true);
+      try {
+        const created = await warehouseAPI.createMoneyDocument({
+          doc_type: isReceipt ? "MONEY_RECEIPT" : "MONEY_EXPENSE",
+          cash_register,
+          counterparty: id,
+          payment_category,
+          amount: amountNum,
+          comment: payDebtForm.comment?.trim() || "",
+        });
+        if (payDebtCreateAsPosted && created?.id) {
+          await warehouseAPI.postMoneyDocument(created.id);
+        }
+        closePayDebtModal();
+        await loadOperations();
+      } catch (err) {
+        const msg =
+          err?.message ||
+          err?.detail ||
+          (typeof err === "string" ? err : "Не удалось создать документ");
+        setPayDebtError(msg);
+      } finally {
+        setPayDebtSubmitting(false);
+      }
+    },
+    [
+      id,
+      payDebtForm,
+      payDebtCreateAsPosted,
+      summary.debtBalance,
+      loadOperations,
+      closePayDebtModal,
+    ],
+  );
 
   const docTypeLabel = (docType) =>
     docType === "MONEY_RECEIPT"
@@ -686,12 +782,19 @@ const CounterpartyDetail = () => {
                   <button
                     type="button"
                     className="counterparty-detail-page__pay-debt-btn"
+                    onClick={openPayDebtModal}
+                  >
+                    Оплатить долг
+                  </button>
+                  <button
+                    type="button"
+                    className="counterparty-detail-page__pay-debt-btn counterparty-detail-page__pay-debt-btn--full"
                     onClick={payFullDebt}
                     disabled={payDebtLoading}
                   >
                     {payDebtLoading ? "Создание…" : "Оплатить весь долг"}
                   </button>
-                  {payDebtError && (
+                  {payDebtError && !showPayDebtModal && (
                     <span className="counterparty-detail-page__pay-debt-error">
                       {payDebtError}
                     </span>
@@ -837,6 +940,167 @@ const CounterpartyDetail = () => {
                     showDebtDelta: true,
                   })}
                 </AccordionSection>
+              </div>
+            )}
+
+            {showPayDebtModal && (
+              <div
+                className="money-documents-page__modal-overlay"
+                onClick={closePayDebtModal}
+                role="presentation"
+              >
+                <div
+                  className="money-documents-page__modal money-documents-page__modal--operation"
+                  onClick={(e) => e.stopPropagation()}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="pay-debt-modal-title"
+                >
+                  <div className="money-documents-page__modal-header money-documents-page__modal-header--operation">
+                    <h2
+                      id="pay-debt-modal-title"
+                      className="money-documents-page__modal-title money-documents-page__modal-title--operation"
+                    >
+                      {summary.debtBalance > 0 ? "Приход (оплата долга)" : "Расход (оплата долга)"}
+                    </h2>
+                    <button
+                      type="button"
+                      className="money-documents-page__modal-close money-documents-page__modal-close--round"
+                      onClick={closePayDebtModal}
+                      aria-label="Закрыть"
+                    >
+                      <X size={20} strokeWidth={2} />
+                    </button>
+                  </div>
+                  <div className="money-documents-page__modal-status">
+                    <div className="money-documents-page__modal-status-left">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={payDebtCreateAsPosted}
+                        aria-label={payDebtCreateAsPosted ? "Документ проведён" : "Черновик"}
+                        className={`money-documents-page__status-toggle ${
+                          payDebtCreateAsPosted
+                            ? "money-documents-page__status-toggle--on"
+                            : ""
+                        }`}
+                        onClick={() => setPayDebtCreateAsPosted((v) => !v)}
+                      >
+                        <span className="money-documents-page__status-toggle-slider">
+                          {payDebtCreateAsPosted && <Check size={14} strokeWidth={3} />}
+                        </span>
+                      </button>
+                      <span className="money-documents-page__modal-status-text">
+                        {payDebtCreateAsPosted ? "Документ проведён" : "Черновик"}
+                      </span>
+                    </div>
+                    <span className="money-documents-page__modal-status-date">
+                      {new Date().toLocaleDateString("ru-RU", {
+                        day: "numeric",
+                        month: "long",
+                      })}
+                      ,{" "}
+                      {new Date().toLocaleTimeString("ru-RU", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  <form
+                    className="money-documents-page__form"
+                    onSubmit={handlePayDebtSubmit}
+                  >
+                    {payDebtError && (
+                      <div className="money-documents-page__form-error">
+                        {payDebtError}
+                      </div>
+                    )}
+                    <div className="money-documents-page__field">
+                      <label htmlFor="pay-debt-cash-register">Касса *</label>
+                      <select
+                        id="pay-debt-cash-register"
+                        value={payDebtForm.cash_register}
+                        onChange={(e) =>
+                          handlePayDebtFormChange("cash_register", e.target.value)
+                        }
+                        required
+                      >
+                        <option value="">выберите</option>
+                        {cashRegisters.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name ?? c.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="money-documents-page__field">
+                      <label>Контрагент</label>
+                      <div className="counterparty-detail-page__modal-counterparty">
+                        {name}
+                      </div>
+                    </div>
+                    <div className="money-documents-page__field">
+                      <label htmlFor="pay-debt-category">Категория платежа *</label>
+                      <select
+                        id="pay-debt-category"
+                        value={payDebtForm.payment_category}
+                        onChange={(e) =>
+                          handlePayDebtFormChange("payment_category", e.target.value)
+                        }
+                        required
+                      >
+                        <option value="">введите</option>
+                        {paymentCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.title ?? cat.name ?? cat.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="money-documents-page__field">
+                      <label htmlFor="pay-debt-amount">Сумма, сом *</label>
+                      <div className="money-documents-page__amount-wrap">
+                        <span className="money-documents-page__amount-prefix">
+                          сом
+                        </span>
+                        <input
+                          id="pay-debt-amount"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={payDebtForm.amount}
+                          onChange={(e) =>
+                            handlePayDebtFormChange("amount", e.target.value)
+                          }
+                          required
+                          className="money-documents-page__amount-input"
+                        />
+                      </div>
+                    </div>
+                    <div className="money-documents-page__field">
+                      <label htmlFor="pay-debt-comment">Комментарий</label>
+                      <textarea
+                        id="pay-debt-comment"
+                        rows={3}
+                        placeholder="Добавьте комментарий..."
+                        value={payDebtForm.comment}
+                        onChange={(e) =>
+                          handlePayDebtFormChange("comment", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="money-documents-page__modal-actions money-documents-page__modal-actions--operation">
+                      <button
+                        type="submit"
+                        className="money-documents-page__btn-save"
+                        disabled={payDebtSubmitting}
+                      >
+                        <Save size={20} />
+                        {payDebtSubmitting ? "Сохранение…" : "Сохранить"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             )}
           </>
