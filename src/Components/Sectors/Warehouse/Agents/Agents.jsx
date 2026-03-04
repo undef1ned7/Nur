@@ -15,6 +15,7 @@ import {
   listOwnerAgentsProducts,
   listProducts,
   listWarehouses,
+  listWarehouseProducts,
   patchAgentCart,
   patchAgentCartItem,
   rejectAgentCart,
@@ -76,7 +77,7 @@ const statusClass = (status) => {
   }
 };
 
-const ProductAutocomplete = ({ onPick, disabled }) => {
+const ProductAutocomplete = ({ onPick, disabled, warehouseId }) => {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState([]);
@@ -91,11 +92,29 @@ const ProductAutocomplete = ({ onPick, disabled }) => {
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const data = await listProducts({
-          search: query.trim(),
-          page_size: 10,
-        });
-        setOptions(normalizeList(data));
+        let data;
+        if (warehouseId) {
+          data = await listWarehouseProducts(warehouseId, {
+            search: query.trim(),
+            page_size: 10,
+          });
+        } else {
+          data = await listProducts({
+            search: query.trim(),
+            page_size: 10,
+          });
+        }
+        const list = normalizeList(data);
+        // API: { results: [ { id, name, article, barcode, unit, quantity: "20.000" }, ... ] }
+        setOptions(
+          list.map((row) => ({
+            id: row.id,
+            name: row.name,
+            article: row.article,
+            unit: row.unit,
+            quantity: row.quantity,
+          })),
+        );
       } catch (e) {
         console.error(e);
         setOptions([]);
@@ -106,7 +125,7 @@ const ProductAutocomplete = ({ onPick, disabled }) => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [query, disabled]);
+  }, [query, disabled, warehouseId]);
 
   return (
     <div className="agents-product-autocomplete">
@@ -127,24 +146,34 @@ const ProductAutocomplete = ({ onPick, disabled }) => {
         <div className="agents-hint">Ничего не найдено</div>
       ) : (
         <div className="agents-options">
-          {options.map((p) => (
-            <button
-              type="button"
-              key={p.id}
-              className="agents-option"
-              onClick={() => {
-                onPick?.(p);
-                setQuery("");
-                setOptions([]);
-              }}
-            >
-              <div className="agents-option__name">{p.name || "—"}</div>
-              <div className="agents-option__meta">
-                {p.article ? `арт. ${p.article}` : ""}{" "}
-                {p.unit ? `• ${p.unit}` : ""}
-              </div>
-            </button>
-          ))}
+          {options.map((p) => {
+            const qty = p.quantity != null ? Number(p.quantity) : null;
+            const isOutOfStock = qty !== null && qty <= 0;
+            return (
+              <button
+                type="button"
+                key={p.id}
+                className={`agents-option ${isOutOfStock ? "agents-option--out-of-stock" : ""}`}
+                onClick={() => {
+                  onPick?.(p);
+                  setQuery("");
+                  setOptions([]);
+                }}
+              >
+                <div className="agents-option__name">{p.name || "—"}</div>
+                <div className="agents-option__meta">
+                  {p.article ? `арт. ${p.article}` : ""}{" "}
+                  {p.unit ? `• ${p.unit}` : ""}
+                  {qty !== null ? ` • На складе: ${qty}` : ""}
+                </div>
+                {isOutOfStock && (
+                  <div className="agents-option__stock agents-option__stock--zero">
+                    Нет в наличии
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -193,7 +222,7 @@ const AgentCartModal = ({
         itList.reduce((acc, it) => {
           acc[it.id] = it.quantity_requested ?? "";
           return acc;
-        }, {})
+        }, {}),
       );
     } catch (e) {
       console.error(e);
@@ -374,6 +403,36 @@ const AgentCartModal = ({
     setBusy(true);
     setError("");
     try {
+      const warehouseId = cart?.warehouse || form.warehouse;
+      if (warehouseId && items.length > 0) {
+        const whData = await listWarehouseProducts(warehouseId, {
+          page_size: 1000,
+        });
+        const whList = normalizeList(whData);
+        // API: { results: [ { id, name, article, unit, quantity: "20.000" }, ... ] }
+        const stockByProduct = whList.reduce((acc, row) => {
+          if (row.id != null) {
+            acc[String(row.id)] = Number(row.quantity ?? 0);
+          }
+          return acc;
+        }, {});
+        const hasZero = items.some((it) => {
+          const productId =
+            typeof it.product === "string"
+              ? it.product
+              : (it.product?.id ?? it.product);
+          const qty =
+            productId != null ? stockByProduct[String(productId)] : undefined;
+          return qty === undefined || qty === null || Number(qty) <= 0;
+        });
+        if (hasZero) {
+          setError(
+            "Нельзя отправить заявку: у одного или нескольких товаров нулевой остаток на складе",
+          );
+          setBusy(false);
+          return;
+        }
+      }
       const res = await submitAgentCart(cartId);
       setCart(res);
       onChanged?.();
@@ -655,6 +714,7 @@ const AgentCartModal = ({
                     <div className="agent-cart-modal__add-search">
                       <ProductAutocomplete
                         disabled={!canEditItems || busy}
+                        warehouseId={form.warehouse || cart?.warehouse}
                         onPick={(p) =>
                           setNewItem((s) => ({ ...s, product: p }))
                         }
@@ -906,7 +966,7 @@ const Agents = () => {
         acc[w.id] = w;
         return acc;
       }, {}),
-    [warehouses]
+    [warehouses],
   );
 
   // carts list
@@ -935,8 +995,8 @@ const Agents = () => {
         activeTab === "requests"
           ? "submitted"
           : activeTab === "history"
-          ? ""
-          : statusFilter;
+            ? ""
+            : statusFilter;
       if (effectiveStatus) params.status = effectiveStatus;
       if (search.trim()) params.search = search.trim();
       const data = await listAgentCarts(params);
@@ -1006,7 +1066,7 @@ const Agents = () => {
       list = list.filter((c) =>
         String(c.note || "")
           .toLowerCase()
-          .includes(q)
+          .includes(q),
       );
     }
     if (statusFilter) {
@@ -1022,14 +1082,14 @@ const Agents = () => {
   // Для владельца: история разделена на одобренные и отклонённые
   const historyCarts = useMemo(() => {
     let list = normalizeList(carts).filter(
-      (c) => c.status === "approved" || c.status === "rejected"
+      (c) => c.status === "approved" || c.status === "rejected",
     );
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((c) =>
         String(c.note || "")
           .toLowerCase()
-          .includes(q)
+          .includes(q),
       );
     }
     return list.sort((a, b) => {
@@ -1041,11 +1101,11 @@ const Agents = () => {
 
   const approvedCarts = useMemo(
     () => historyCarts.filter((c) => c.status === "approved"),
-    [historyCarts]
+    [historyCarts],
   );
   const rejectedCarts = useMemo(
     () => historyCarts.filter((c) => c.status === "rejected"),
-    [historyCarts]
+    [historyCarts],
   );
 
   const historyCartsToShow =
@@ -1053,7 +1113,7 @@ const Agents = () => {
   const cartsToShow = filteredCarts;
   const requestsToShow = useMemo(
     () => normalizeList(carts).filter((c) => c.status === "submitted"),
-    [carts]
+    [carts],
   );
 
   const handleApprove = async (cartId) => {
@@ -1214,8 +1274,8 @@ const Agents = () => {
                         : "Отклонённые"
                     }: ${historyCartsToShow.length}`
                   : activeTab === "requests"
-                  ? `Запросы: ${requestsToShow.length}`
-                  : `Всего: ${cartsToShow.length}`}
+                    ? `Запросы: ${requestsToShow.length}`
+                    : `Всего: ${cartsToShow.length}`}
               </span>
 
               <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
@@ -1654,7 +1714,7 @@ const Agents = () => {
                               <td>
                                 <span
                                   className={`agents-badge ${statusClass(
-                                    c.status
+                                    c.status,
                                   )}`}
                                 >
                                   {statusLabel(c.status)}

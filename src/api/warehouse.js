@@ -1489,6 +1489,29 @@ export const rejectAgentCart = async (id) => {
   }
 };
 
+/**
+ * Создать документ продажи по одобренной заявке агента
+ * POST /api/warehouse/agent-carts/{id}/create-sale/
+ * @param {string} cartId - UUID заявки
+ * @param {Object} payload - counterparty, post?, payment_kind?, prepayment_amount?, discount_percent?, discount_amount?, comment?
+ * @returns {Promise<Object>} - созданный документ (Document)
+ */
+export const createSaleFromCart = async (cartId, payload = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/agent-carts/${cartId}/create-sale/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Sale From Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== АГЕНТЫ: ПОЗИЦИИ ЗАЯВКИ (ITEMS) ====================
 
 /**
@@ -2393,6 +2416,7 @@ export default {
   submitAgentCart,
   approveAgentCart,
   rejectAgentCart,
+  createSaleFromCart,
   listAgentCartItems,
   createAgentCartItem,
   getAgentCartItemById,

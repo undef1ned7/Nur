@@ -362,6 +362,18 @@
         color: #92400e;
       }
     }
+
+    &--create-sale {
+      gap: 6px;
+      padding-left: 10px;
+      padding-right: 10px;
+      background: #059669;
+      color: #fff;
+      &:hover {
+        background: #047857;
+        color: #fff;
+      }
+    }
   }
 
   &__empty {

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import {
   Search,
   Filter,
@@ -27,6 +33,7 @@ import {
   cashApproveWarehouseDocument,
   cashRejectWarehouseDocument,
   getWarehouseDocumentById,
+  createSaleFromAgentCartAsync,
 } from "../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../store/slices/userSlice";
 import {
@@ -34,6 +41,7 @@ import {
   checkPrinterConnection,
 } from "../../../pages/Sell/services/printService";
 import ReconciliationModal from "./components/ReconciliationModal";
+import CreateSaleFromCartModal from "./components/CreateSaleFromCartModal";
 import ReceiptPreviewModal from "./components/ReceiptPreviewModal";
 import ReceiptEditModal from "./components/ReceiptEditModal";
 import InvoicePreviewModal from "./components/InvoicePreviewModal";
@@ -41,7 +49,7 @@ import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import DataContainer from "../../../common/DataContainer/DataContainer";
-import { getOwnerAnalytics } from "../../../../api/warehouse";
+import warehouseAPI, { getOwnerAnalytics } from "../../../../api/warehouse";
 
 // Маппинг URL-параметра (path) в значение doc_type для API
 const DOC_TYPE_FROM_PARAM = {
@@ -97,6 +105,13 @@ const Documents = () => {
   const [agentsList, setAgentsList] = useState([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
 
+  // Продажи по заявкам (одобренные заявки агентов, только для SALE)
+  const [agentSalesCarts, setAgentSalesCarts] = useState([]);
+  const [agentSalesLoading, setAgentSalesLoading] = useState(false);
+  const [agentSalesError, setAgentSalesError] = useState("");
+  const [agentSaleDocumentById, setAgentSaleDocumentById] = useState({});
+  const [createSaleModalCart, setCreateSaleModalCart] = useState(null);
+
   // Debounce для поиска
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -136,7 +151,9 @@ const Documents = () => {
             map.set(id, a.agent_name || id);
           }
         });
-        setAgentsList(Array.from(map.entries()).map(([id, name]) => ({ id, name })));
+        setAgentsList(
+          Array.from(map.entries()).map(([id, name]) => ({ id, name })),
+        );
       })
       .catch(() => {
         if (!cancelled) setAgentsList([]);
@@ -148,6 +165,65 @@ const Documents = () => {
       cancelled = true;
     };
   }, [showAgentFilter]);
+
+  // Загрузка продаж по заявкам (все одобренные заявки агентов)
+  const loadAgentSalesCarts = useCallback(async () => {
+    if (docType !== "SALE") return;
+    setAgentSalesLoading(true);
+    setAgentSalesError("");
+    try {
+      const data = await warehouseAPI.listAgentCarts({
+        status: "approved",
+        page_size: 200,
+      });
+      const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+          ? data
+          : [];
+      setAgentSalesCarts(list);
+    } catch (e) {
+      console.error("Ошибка загрузки продаж по заявкам:", e);
+      setAgentSalesCarts([]);
+      setAgentSalesError(
+        e?.detail || e?.message || "Не удалось загрузить продажи по заявкам",
+      );
+    } finally {
+      setAgentSalesLoading(false);
+    }
+  }, [docType]);
+
+  useEffect(() => {
+    if (activeTab === "agent_sales" && docType === "SALE") {
+      loadAgentSalesCarts();
+    }
+  }, [activeTab, docType, loadAgentSalesCarts]);
+
+  // Кэш «уже запрошены» для подгрузки документов заявок (избегаем дублей и лишних зависимостей)
+  const agentSaleDocRequestedRef = useRef({});
+  // Подгрузка документов для заявок, у которых уже есть sale_document (для статуса и кнопок)
+  useEffect(() => {
+    if (activeTab !== "agent_sales" || agentSalesCarts.length === 0) return;
+    const ids = agentSalesCarts
+      .filter((c) => c.sale_document)
+      .map((c) => c.sale_document);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    ids.forEach((docId) => {
+      if (agentSaleDocRequestedRef.current[docId]) return;
+      agentSaleDocRequestedRef.current[docId] = true;
+      warehouseAPI
+        .getDocumentById(docId)
+        .then((doc) => {
+          if (!cancelled)
+            setAgentSaleDocumentById((prev) => ({ ...prev, [docId]: doc }));
+        })
+        .catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, agentSalesCarts]);
 
   // Функция для генерации порядкового номера чека/накладной
   // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
@@ -168,7 +244,7 @@ const Documents = () => {
         sum +
         (Number(item.price ?? item.unit_price ?? 0) || 0) *
           (Number(item.qty ?? item.quantity ?? 0) || 0),
-      0
+      0,
     );
     const itemsDiscountTotal = items.reduce(
       (sum, item) =>
@@ -177,7 +253,7 @@ const Documents = () => {
           (Number(item.qty ?? item.quantity ?? 0) || 0) *
           (Number(item.discount_percent ?? 0) || 0)) /
           100,
-      0
+      0,
     );
     const docDiscountAmount = Number(doc.discount_amount ?? 0) || 0;
     const totalDiscount = itemsDiscountTotal + docDiscountAmount;
@@ -215,7 +291,7 @@ const Documents = () => {
     const list = documents || [];
     if (docType !== "SALE" || !agentFilterId) return list;
     return list.filter(
-      (doc) => String(doc.agent || "") === String(agentFilterId)
+      (doc) => String(doc.agent || "") === String(agentFilterId),
     );
   }, [documents, docType, agentFilterId]);
 
@@ -397,19 +473,29 @@ const Documents = () => {
     }
   };
 
-  // Проведение документа
-  const handlePost = async (item) => {
+  // Обновить документ в локальном кэше (для продаж по заявкам)
+  const refetchAgentSaleDoc = useCallback((docId) => {
+    warehouseAPI
+      .getDocumentById(docId)
+      .then((doc) =>
+        setAgentSaleDocumentById((prev) => ({ ...prev, [docId]: doc })),
+      )
+      .catch(() => {});
+  }, []);
+
+  // Проведение документа (options.onSuccess — для обновления UI продаж по заявкам)
+  const handlePost = async (item, options) => {
     if (!item?.id) return;
     confirm(`Провести документ ${item.number}?`, async (ok) => {
       if (!ok) return;
       try {
         const result = await dispatch(
-          postWarehouseDocument({ id: item.id, allowNegative: false })
+          postWarehouseDocument({ id: item.id, allowNegative: false }),
         );
         if (postWarehouseDocument.fulfilled.match(result)) {
           alert("Документ успешно проведен");
-          // Перезагружаем список документов
           handleSaved();
+          options?.onSuccess?.();
         } else {
           const error = result.payload || result.error;
           const errorMessage =
@@ -422,14 +508,14 @@ const Documents = () => {
         console.error("Ошибка при проведении документа:", error);
         alert(
           "Ошибка: " + (error?.message || "Не удалось провести документ"),
-          true
+          true,
         );
       }
     });
   };
 
   // Отмена проведения документа (DRAFT или CASH_PENDING → откат склада, документ в DRAFT)
-  const handleUnpost = async (item) => {
+  const handleUnpost = async (item, options) => {
     if (!item?.id) return;
 
     confirm(`Отменить проведение документа ${item.number}?`, async (ok) => {
@@ -439,6 +525,7 @@ const Documents = () => {
         if (unpostWarehouseDocument.fulfilled.match(result)) {
           alert("Проведение документа отменено");
           handleSaved();
+          options?.onSuccess?.();
         } else {
           const error = result.payload || result.error;
           const errorMessage =
@@ -450,24 +537,25 @@ const Documents = () => {
         alert(
           "Ошибка: " +
             (error?.message || "Не удалось отменить проведение документа"),
-          true
+          true,
         );
       }
     });
   };
 
   // Подтвердить кассой (CASH_PENDING → POSTED, при payment_kind=cash создаётся денежный документ)
-  const handleCashApprove = async (item) => {
+  const handleCashApprove = async (item, options) => {
     if (!item?.id) return;
     confirm(`Подтвердить документ ${item.number} в кассе?`, async (ok) => {
       if (!ok) return;
       try {
         const result = await dispatch(
-          cashApproveWarehouseDocument({ id: item.id })
+          cashApproveWarehouseDocument({ id: item.id }),
         );
         if (cashApproveWarehouseDocument.fulfilled.match(result)) {
           alert("Документ подтверждён кассой");
           handleSaved();
+          options?.onSuccess?.();
         } else {
           const error = result.payload || result.error;
           const errorMessage =
@@ -484,7 +572,7 @@ const Documents = () => {
   };
 
   // Отклонить кассой (склад откатывается, документ → REJECTED)
-  const handleCashReject = async (item) => {
+  const handleCashReject = async (item, options) => {
     if (!item?.id) return;
     confirm(
       `Отклонить документ ${item.number}? Склад будет откатан.`,
@@ -492,11 +580,12 @@ const Documents = () => {
         if (!ok) return;
         try {
           const result = await dispatch(
-            cashRejectWarehouseDocument({ id: item.id })
+            cashRejectWarehouseDocument({ id: item.id }),
           );
           if (cashRejectWarehouseDocument.fulfilled.match(result)) {
             alert("Документ отклонён");
             handleSaved();
+            options?.onSuccess?.();
           } else {
             const error = result.payload || result.error;
             const errorMessage =
@@ -507,7 +596,7 @@ const Documents = () => {
           console.error("Ошибка при отклонении:", error);
           alert("Ошибка: " + (error?.message || "Не удалось отклонить"), true);
         }
-      }
+      },
     );
   };
 
@@ -585,7 +674,7 @@ const Documents = () => {
                       item.product?.article ??
                         item.article ??
                         item.product_article ??
-                        ""
+                        "",
                     ).trim() || "",
                   discount_percent: Number(item.discount_percent || 0),
                   discount_amount: Number(item.discount_amount || 0),
@@ -595,7 +684,7 @@ const Documents = () => {
             : [];
           const subtotal = items.reduce(
             (sum, item) => sum + Number(item.unit_price) * Number(item.qty),
-            0
+            0,
           );
           const itemsDiscountTotal = items.reduce(
             (sum, item) =>
@@ -604,7 +693,7 @@ const Documents = () => {
                 Number(item.qty) *
                 Number(item.discount_percent || 0)) /
                 100,
-            0
+            0,
           );
           const totalDiscount = itemsDiscountTotal + docDiscountAmount;
           const total = Number(doc.total) || subtotal - totalDiscount;
@@ -646,7 +735,7 @@ const Documents = () => {
 
           // Генерируем PDF из JSON используя InvoicePdfDocument
           const blob = await pdf(
-            <InvoicePdfDocument data={invoiceData} />
+            <InvoicePdfDocument data={invoiceData} />,
           ).toBlob();
 
           const fileName = `invoice_${
@@ -672,7 +761,7 @@ const Documents = () => {
         if (!isPrinterConnected) {
           alert(
             "Принтер не подключен. Пожалуйста, подключите принтер перед печатью.",
-            true
+            true,
           );
           return;
         }
@@ -693,7 +782,7 @@ const Documents = () => {
               total: parseFloat(documentData.totals?.total || 0),
               subtotal: parseFloat(documentData.totals?.subtotal || 0),
               discount_total: parseFloat(
-                documentData.totals?.discount_total || 0
+                documentData.totals?.discount_total || 0,
               ),
               company: documentData.company?.name || "",
               payment: documentData.payment || {},
@@ -710,7 +799,7 @@ const Documents = () => {
       console.error("Ошибка при печати:", printError);
       alert(
         "Ошибка при печати: " +
-          (printError.message || "Неизвестная ошибка", true)
+          (printError.message || "Неизвестная ошибка", true),
       );
     }
   };
@@ -807,6 +896,16 @@ const Documents = () => {
           >
             Накладные
           </button>
+          {docType === "SALE" && (
+            <button
+              className={`documents__tab ${
+                activeTab === "agent_sales" ? "documents__tab--active" : ""
+              }`}
+              onClick={() => setActiveTab("agent_sales")}
+            >
+              Продажи по заявкам
+            </button>
+          )}
         </div>
         <div className="documents__view-toggle">
           <button
@@ -833,7 +932,7 @@ const Documents = () => {
       </div>
       <DataContainer>
         {/* Table */}
-        {viewMode === "table" && (
+        {viewMode === "table" && activeTab !== "agent_sales" && (
           <div className="documents__table-wrapper">
             <table className="documents__table">
               <thead>
@@ -1104,8 +1203,219 @@ const Documents = () => {
           </div>
         )}
 
+        {/* Таблица продаж по заявкам (одобренные заявки агентов) */}
+        {viewMode === "table" && activeTab === "agent_sales" && (
+          <div className="documents__table-wrapper">
+            <table className="documents__table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Агент</th>
+                  <th>Склад</th>
+                  <th>Позиций</th>
+                  <th>Номер продажи</th>
+                  <th>Статус заявки</th>
+                  <th>Статус документа</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agentSalesLoading ? (
+                  <tr>
+                    <td colSpan={8} className="documents__empty">
+                      Загрузка...
+                    </td>
+                  </tr>
+                ) : agentSalesError ? (
+                  <tr>
+                    <td colSpan={8} className="documents__empty">
+                      {agentSalesError}
+                    </td>
+                  </tr>
+                ) : agentSalesCarts.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="documents__empty">
+                      Одобренных заявок нет
+                    </td>
+                  </tr>
+                ) : (
+                  agentSalesCarts.map((cart, index) => {
+                    const doc = cart.sale_document
+                      ? agentSaleDocumentById[cart.sale_document]
+                      : null;
+                    const docStatusLabel = doc
+                      ? getStatusLabel(doc.status)
+                      : cart.sale_document
+                        ? "…"
+                        : "—";
+                    const docStatusType = doc ? getStatusType(doc.status) : "";
+                    const agentItem =
+                      (doc && {
+                        id: doc.id,
+                        number: doc.number || "",
+                        rawStatus: doc.status,
+                        document: doc,
+                      }) ||
+                      null;
+                    return (
+                      <tr key={cart.id}>
+                        <td>{index + 1}</td>
+                        <td>
+                          {cart.agent_name ||
+                            cart.agent_display ||
+                            (cart.agent
+                              ? `${String(cart.agent).slice(0, 8)}…`
+                              : "—")}
+                        </td>
+                        <td>
+                          {cart.warehouse_name ||
+                            (cart.warehouse
+                              ? `${String(cart.warehouse).slice(0, 8)}…`
+                              : "—")}
+                        </td>
+                        <td>
+                          {cart.items_count ??
+                            (Array.isArray(cart.items)
+                              ? cart.items.length
+                              : null) ??
+                            "—"}
+                        </td>
+                        <td>{cart.sale_document_number || "—"}</td>
+                        <td>
+                          {cart.status === "approved"
+                            ? "Одобрена"
+                            : cart.status === "draft"
+                              ? "Черновик"
+                              : cart.status === "submitted"
+                                ? "Отправлена"
+                                : cart.status === "rejected"
+                                  ? "Отклонена"
+                                  : cart.status || "—"}
+                        </td>
+                        <td>
+                          {docStatusLabel !== "—" && (
+                            <span
+                              className={`documents__status documents__status--${docStatusType}`}
+                            >
+                              {docStatusLabel}
+                            </span>
+                          )}
+                          {docStatusLabel === "—" && "—"}
+                        </td>
+                        <td>
+                          <div className="documents__actions">
+                            {cart.sale_document ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="documents__action-btn"
+                                  onClick={() =>
+                                    navigate(
+                                      `/crm/warehouse/documents/edit/${cart.sale_document}`,
+                                    )
+                                  }
+                                  title="Открыть документ"
+                                >
+                                  <Eye size={18} />
+                                </button>
+                                {agentItem?.rawStatus === "DRAFT" && (
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn"
+                                    onClick={() =>
+                                      handlePost(agentItem, {
+                                        onSuccess: () =>
+                                          refetchAgentSaleDoc(agentItem.id),
+                                      })
+                                    }
+                                    title="Провести"
+                                  >
+                                    <Check size={18} />
+                                  </button>
+                                )}
+                                {agentItem?.rawStatus === "CASH_PENDING" && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="documents__action-btn documents__action-btn--approve"
+                                      onClick={() =>
+                                        handleCashApprove(agentItem, {
+                                          onSuccess: () =>
+                                            refetchAgentSaleDoc(agentItem.id),
+                                        })
+                                      }
+                                      title="Подтвердить кассой"
+                                    >
+                                      <Check size={18} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="documents__action-btn documents__action-btn--reject"
+                                      onClick={() =>
+                                        handleCashReject(agentItem, {
+                                          onSuccess: () =>
+                                            refetchAgentSaleDoc(agentItem.id),
+                                        })
+                                      }
+                                      title="Отклонить"
+                                    >
+                                      <X size={18} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="documents__action-btn documents__action-btn--unpost"
+                                      onClick={() =>
+                                        handleUnpost(agentItem, {
+                                          onSuccess: () =>
+                                            refetchAgentSaleDoc(agentItem.id),
+                                        })
+                                      }
+                                      title="Отменить проведение"
+                                    >
+                                      <Undo2 size={18} />
+                                    </button>
+                                  </>
+                                )}
+                                {agentItem?.rawStatus === "POSTED" && (
+                                  <button
+                                    type="button"
+                                    className="documents__action-btn documents__action-btn--unpost"
+                                    onClick={() =>
+                                      handleUnpost(agentItem, {
+                                        onSuccess: () =>
+                                          refetchAgentSaleDoc(agentItem.id),
+                                      })
+                                    }
+                                    title="Отменить проведение"
+                                  >
+                                    <Undo2 size={18} />
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className="documents__action-btn documents__action-btn--create-sale !w-auto !h-auto !py-1"
+                                onClick={() => setCreateSaleModalCart(cart)}
+                                title="Создать продажу по заявке"
+                              >
+                                <Plus size={18} />
+                                Создать продажу
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Карточки */}
-        {viewMode === "cards" && (
+        {viewMode === "cards" && activeTab !== "agent_sales" && (
           <div className="documents__cards">
             {documentsLoading ? (
               <div className="documents__cards-empty">Загрузка...</div>
@@ -1254,10 +1564,204 @@ const Documents = () => {
             )}
           </div>
         )}
+
+        {viewMode === "cards" && activeTab === "agent_sales" && (
+          <div className="documents__cards">
+            {agentSalesLoading ? (
+              <div className="documents__cards-empty">Загрузка...</div>
+            ) : agentSalesError ? (
+              <div className="documents__cards-empty">{agentSalesError}</div>
+            ) : agentSalesCarts.length === 0 ? (
+              <div className="documents__cards-empty">
+                Одобренных заявок нет
+              </div>
+            ) : (
+              agentSalesCarts.map((cart, index) => {
+                const doc = cart.sale_document
+                  ? agentSaleDocumentById[cart.sale_document]
+                  : null;
+                const docStatusLabel = doc
+                  ? getStatusLabel(doc.status)
+                  : cart.sale_document
+                    ? "…"
+                    : "—";
+                const docStatusType = doc ? getStatusType(doc.status) : "";
+                const agentItem =
+                  (doc && {
+                    id: doc.id,
+                    number: doc.number || "",
+                    rawStatus: doc.status,
+                    document: doc,
+                  }) ||
+                  null;
+                return (
+                  <div key={cart.id} className="documents__card">
+                    <div className="documents__card-header">
+                      <span className="documents__card-number">
+                        Заявка #{index + 1}
+                      </span>
+                      <span
+                        className={
+                          docStatusType
+                            ? `documents__status documents__status--${docStatusType}`
+                            : "documents__status"
+                        }
+                      >
+                        {cart.sale_document_number || "—"}
+                      </span>
+                    </div>
+                    <div className="documents__card-body">
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">Агент</span>
+                        <span className="documents__card-value">
+                          {cart.agent_name ||
+                            cart.agent_display ||
+                            (cart.agent
+                              ? `${String(cart.agent).slice(0, 8)}…`
+                              : "—")}
+                        </span>
+                      </div>
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">Склад</span>
+                        <span className="documents__card-value">
+                          {cart.warehouse_name ||
+                            (cart.warehouse
+                              ? `${String(cart.warehouse).slice(0, 8)}…`
+                              : "—")}
+                        </span>
+                      </div>
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">Позиций</span>
+                        <span className="documents__card-value">
+                          {cart.items_count ??
+                            (Array.isArray(cart.items)
+                              ? cart.items.length
+                              : null) ??
+                            "—"}
+                        </span>
+                      </div>
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">
+                          Статус документа
+                        </span>
+                        <span className="documents__card-value">
+                          {docStatusLabel}
+                        </span>
+                      </div>
+                      <div className="documents__card-row">
+                        <span className="documents__card-label">Одобрена</span>
+                        <span className="documents__card-value">
+                          {cart.approved_at
+                            ? new Date(cart.approved_at).toLocaleString("ru-RU")
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="documents__card-actions">
+                      {cart.sale_document ? (
+                        <>
+                          <button
+                            className="documents__action-btn"
+                            onClick={() =>
+                              navigate(
+                                `/crm/warehouse/documents/edit/${cart.sale_document}`,
+                              )
+                            }
+                            title="Открыть документ"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          {agentItem?.rawStatus === "DRAFT" && (
+                            <button
+                              className="documents__action-btn"
+                              onClick={() =>
+                                handlePost(agentItem, {
+                                  onSuccess: () =>
+                                    refetchAgentSaleDoc(agentItem.id),
+                                })
+                              }
+                              title="Провести"
+                            >
+                              <Check size={18} />
+                            </button>
+                          )}
+                          {agentItem?.rawStatus === "CASH_PENDING" && (
+                            <>
+                              <button
+                                className="documents__action-btn documents__action-btn--approve"
+                                onClick={() =>
+                                  handleCashApprove(agentItem, {
+                                    onSuccess: () =>
+                                      refetchAgentSaleDoc(agentItem.id),
+                                  })
+                                }
+                                title="Подтвердить кассой"
+                              >
+                                <Check size={18} />
+                              </button>
+                              <button
+                                className="documents__action-btn documents__action-btn--reject"
+                                onClick={() =>
+                                  handleCashReject(agentItem, {
+                                    onSuccess: () =>
+                                      refetchAgentSaleDoc(agentItem.id),
+                                  })
+                                }
+                                title="Отклонить"
+                              >
+                                <X size={18} />
+                              </button>
+                              <button
+                                className="documents__action-btn documents__action-btn--unpost"
+                                onClick={() =>
+                                  handleUnpost(agentItem, {
+                                    onSuccess: () =>
+                                      refetchAgentSaleDoc(agentItem.id),
+                                  })
+                                }
+                                title="Отменить проведение"
+                              >
+                                <Undo2 size={18} />
+                              </button>
+                            </>
+                          )}
+                          {agentItem?.rawStatus === "POSTED" && (
+                            <button
+                              className="documents__action-btn documents__action-btn--unpost"
+                              onClick={() =>
+                                handleUnpost(agentItem, {
+                                  onSuccess: () =>
+                                    refetchAgentSaleDoc(agentItem.id),
+                                })
+                              }
+                              title="Отменить проведение"
+                            >
+                              <Undo2 size={18} />
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="documents__action-btn documents__action-btn--create-sale"
+                          onClick={() => setCreateSaleModalCart(cart)}
+                          title="Создать продажу по заявке"
+                        >
+                          <Plus size={18} />
+                          Создать продажу
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
       </DataContainer>
 
       {/* Пагинация для чеков и накладных */}
-      {totalPages > 1 && (
+      {totalPages > 1 && activeTab !== "agent_sales" && (
         <div className="documents__pagination">
           <button
             type="button"
@@ -1291,6 +1795,19 @@ const Documents = () => {
       <ReconciliationModal
         open={showReconciliationModal}
         onClose={() => setShowReconciliationModal(false)}
+      />
+
+      <CreateSaleFromCartModal
+        open={!!createSaleModalCart}
+        onClose={() => setCreateSaleModalCart(null)}
+        cart={createSaleModalCart}
+        onSuccess={(doc) => {
+          setCreateSaleModalCart(null);
+          setAgentSaleDocumentById((prev) => ({ ...prev, [doc.id]: doc }));
+          loadAgentSalesCarts();
+          alert("Продажа создана");
+          navigate(`/crm/warehouse/documents/edit/${doc.id}`);
+        }}
       />
 
       {previewReceiptId && (
