@@ -260,6 +260,26 @@
   text-align: right;
 }
 
+.building-table tbody tr {
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.building-table tbody tr:hover {
+  background-color: rgba(11, 35, 68, 0.03);
+}
+
+@media (min-width: 821px) {
+  .building-table tbody tr[data-clickable="true"]:hover {
+    background-color: rgba(11, 35, 68, 0.04);
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+    cursor: pointer;
+  }
+}
+
 .building-table tfoot td {
   font-weight: 700;
   background: rgba(11, 35, 68, 0.02);
