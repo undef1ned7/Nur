@@ -116,23 +116,24 @@ export default function BuildingSalary() {
   const handleDeletePayroll = async (payroll) => {
     const id = payroll?.id ?? payroll?.uuid;
     if (!id) return;
-    const ok = await confirm(
-      "Удалить период начислений?",
-      "Вы уверены, что хотите удалить этот период начислений? Это действие нельзя отменить.",
+    confirm(
+      "Удалить период начислений? Это действие нельзя отменить.",
+      async (ok) => {
+        if (!ok) return;
+        const res = await dispatch(deleteBuildingPayroll(id));
+        if (res.meta.requestStatus === "fulfilled") {
+          alert("Период удалён");
+        } else {
+          alert(
+            validateResErrors(
+              res.payload || res.error,
+              "Не удалось удалить период",
+            ),
+            true,
+          );
+        }
+      },
     );
-    if (!ok) return;
-    const res = await dispatch(deleteBuildingPayroll(id));
-    if (res.meta.requestStatus === "fulfilled") {
-      alert("Период удалён");
-    } else {
-      alert(
-        validateResErrors(
-          res.payload || res.error,
-          "Не удалось удалить период",
-        ),
-        true,
-      );
-    }
   };
 
   return (
