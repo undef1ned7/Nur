@@ -1489,6 +1489,29 @@ export const rejectAgentCart = async (id) => {
   }
 };
 
+/**
+ * Создать документ продажи по одобренной заявке агента
+ * POST /api/warehouse/agent-carts/{id}/create-sale/
+ * @param {string} cartId - UUID заявки
+ * @param {Object} payload - counterparty, post?, payment_kind?, prepayment_amount?, discount_percent?, discount_amount?, comment?
+ * @returns {Promise<Object>} - созданный документ (Document)
+ */
+export const createSaleFromCart = async (cartId, payload = {}) => {
+  try {
+    const response = await api.post(
+      `warehouse/agent-carts/${cartId}/create-sale/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Sale From Cart Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
 // ==================== АГЕНТЫ: ПОЗИЦИИ ЗАЯВКИ (ITEMS) ====================
 
 /**
@@ -1681,6 +1704,151 @@ export const listMyAgentProducts = async (params = {}) => {
   } catch (error) {
     if (error.response) {
       console.error("List My Agent Products Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+// ==================== АГЕНТЫ: КОМПАНИИ И ЗАЯВКИ В КОМПАНИЮ ====================
+
+/**
+ * Поиск компаний, в которые можно подать заявку как агент
+ * GET /api/warehouse/agents/companies/search/
+ * @param {Object} params - search (подстрока названия), page?
+ */
+export const searchAgentCompanies = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/agents/companies/search/", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Search Agent Companies Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Список заявок агента в компании / заявок агентов во владение компании
+ * GET /api/warehouse/agents/company-requests/
+ * @param {Object} params - status?
+ */
+export const listCompanyAgentRequests = async (params = {}) => {
+  try {
+    const response = await api.get("warehouse/agents/company-requests/", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("List Company Agent Requests Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Отправить заявку в компанию (стать агентом)
+ * POST /api/warehouse/agents/company-requests/
+ * @param {Object} payload - { company, note? }
+ */
+export const createCompanyAgentRequest = async (payload) => {
+  try {
+    const response = await api.post(
+      "warehouse/agents/company-requests/",
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Company Agent Request Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Принять заявку агента в компанию
+ * POST /api/warehouse/agents/company-requests/{id}/accept/
+ */
+export const acceptCompanyAgentRequest = async (id) => {
+  try {
+    const response = await api.post(
+      `warehouse/agents/company-requests/${id}/accept/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Accept Company Agent Request Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Отклонить заявку агента в компанию
+ * POST /api/warehouse/agents/company-requests/{id}/reject/
+ */
+export const rejectCompanyAgentRequest = async (id) => {
+  try {
+    const response = await api.post(
+      `warehouse/agents/company-requests/${id}/reject/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Reject Company Agent Request Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Отстранить активного агента от компании
+ * POST /api/warehouse/agents/company-requests/{id}/remove/
+ */
+export const removeCompanyAgent = async (id) => {
+  try {
+    const response = await api.post(
+      `warehouse/agents/company-requests/${id}/remove/`
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Remove Company Agent Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Включить/изменить/выключить общий доступ к складу для агента
+ * PATCH /api/warehouse/agents/company-requests/{id}/common-access/
+ * @param {string} id - UUID записи CompanyWarehouseAgent
+ * @param {Object} payload - { common_access_enabled: bool, common_warehouse?: uuid|null }
+ */
+export const patchCompanyAgentCommonAccess = async (id, payload) => {
+  try {
+    const response = await api.patch(
+      `warehouse/agents/company-requests/${id}/common-access/`,
+      payload
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error(
+        "Patch Company Agent Common Access Error:",
+        error.response.data
+      );
       return Promise.reject(error.response.data);
     }
     return Promise.reject(error);
@@ -2393,6 +2561,7 @@ export default {
   submitAgentCart,
   approveAgentCart,
   rejectAgentCart,
+  createSaleFromCart,
   listAgentCartItems,
   createAgentCartItem,
   getAgentCartItemById,
@@ -2446,4 +2615,12 @@ export default {
   createWarehouseGroup,
   updateWarehouseGroup,
   deleteWarehouseGroup,
+  // Агенты: компании и заявки в компанию
+  searchAgentCompanies,
+  listCompanyAgentRequests,
+  createCompanyAgentRequest,
+  acceptCompanyAgentRequest,
+  rejectCompanyAgentRequest,
+  removeCompanyAgent,
+  patchCompanyAgentCommonAccess,
 };

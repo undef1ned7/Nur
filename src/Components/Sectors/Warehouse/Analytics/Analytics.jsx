@@ -45,7 +45,23 @@
  *     ],
  *     "sales_by_product": [
  *       { "product_id": "...", "product_name": "...", "qty": "5.000", "amount": "0.00000" }
- *     ]
+ *     ],
+ *     "sales_by_group": [
+ *       {
+ *         "group_id": null,
+ *         "group_name": "Без группы",
+ *         "docs_count": 1,
+ *         "qty": "2.000",
+ *         "amount": "2900.04"
+ *       }
+ *     ],
+ *     "top_sales_group": {
+ *       "group_id": null,
+ *       "group_name": "Без группы",
+ *       "docs_count": 1,
+ *       "qty": "2.000",
+ *       "amount": "2900.04"
+ *     }
  *   }
  * }
  */
@@ -272,23 +288,20 @@ const WarehouseAnalytics = () => {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const { profile } = useUser();
-  const isOwnerOrAdmin =
-    profile?.role === "owner" || profile?.role === "admin";
+  const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
 
   const agentId = searchParams.get("agent_id") || null;
   const agentName = location.state?.agentName || null;
 
   const [period, setPeriod] = useState("month");
-  const [date, setDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
     return d.toISOString().slice(0, 10);
   });
   const [dateTo, setDateTo] = useState(() =>
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10),
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -344,18 +357,19 @@ const WarehouseAnalytics = () => {
   const salesByProduct = Array.isArray(details?.sales_by_product)
     ? details.sales_by_product
     : [];
+  const salesByGroup = Array.isArray(details?.sales_by_group)
+    ? details.sales_by_group
+    : [];
 
   const totalSalesAmount = bySales.reduce(
     (acc, a) => acc + Number(a.sales_amount ?? a.amount ?? 0),
-    0
+    0,
   );
   const totalReceivedItems = byReceived.reduce(
     (acc, a) =>
       acc +
-      Number(
-        a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0
-      ),
-    0
+      Number(a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0),
+    0,
   );
 
   const bySalesRows = bySales.map((a, i) => {
@@ -374,7 +388,7 @@ const WarehouseAnalytics = () => {
   });
   const byReceivedRows = byReceived.map((a) => {
     const items = Number(
-      a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0
+      a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0,
     );
     const share =
       totalReceivedItems > 0
@@ -423,7 +437,11 @@ const WarehouseAnalytics = () => {
             <RefreshCw size={18} />
             Обновить
           </button>
-          <div className="warehouse-analytics__seg" role="tablist" aria-label="Период">
+          <div
+            className="warehouse-analytics__seg"
+            role="tablist"
+            aria-label="Период"
+          >
             {PERIODS.map((p) => (
               <button
                 key={p.value}
@@ -483,15 +501,26 @@ const WarehouseAnalytics = () => {
               icon={Package}
             />
             <KpiCard
-              label={isAgentView ? "Продажи" : "Продажи агентов"}
-              value={`${formatNum(salesAmount)} сом`}
-              description={`${formatNum(salesCount)} продаж`}
+              label={
+                isAgentView ? "Количество моих продаж" : "Количество продаж агентов"
+              }
+              value={formatNum(salesCount)}
+              description="За период"
               icon={ShoppingCart}
             />
             <KpiCard
-              label="Остатки на руках"
+              label={isAgentView ? "Сумма моих продаж" : "Сумма продаж агентов"}
+              value={`${formatNum(salesAmount)} сом`}
+              icon={ShoppingCart}
+            />
+            <KpiCard
+              label="Остаток на руках, шт"
+              value={formatNum(onHandQty)}
+              icon={Package}
+            />
+            <KpiCard
+              label="Остаток на руках, сом"
               value={`${formatNum(onHandAmount)} сом`}
-              description={`${formatNum(onHandQty)} шт`}
               icon={Package}
             />
           </div>
@@ -544,7 +573,10 @@ const WarehouseAnalytics = () => {
                         tickFormatter={(v) => formatNum(v)}
                       />
                       <Tooltip
-                        formatter={(value) => [formatNum(value), "Продажи (сом)"]}
+                        formatter={(value) => [
+                          formatNum(value),
+                          "Продажи (сом)",
+                        ]}
                         labelFormatter={(l) => `Дата: ${l}`}
                       />
                       <Legend
@@ -601,7 +633,9 @@ const WarehouseAnalytics = () => {
                   id="wa-top-received"
                   title="Топ агентов по полученным товарам"
                   icon={Package}
-                  badge={byReceivedRows.length ? `${byReceivedRows.length}` : "0"}
+                  badge={
+                    byReceivedRows.length ? `${byReceivedRows.length}` : "0"
+                  }
                   defaultOpen={false}
                 >
                   <div className="warehouse-analytics__card warehouse-analytics__accCard">
@@ -641,7 +675,9 @@ const WarehouseAnalytics = () => {
                         ]}
                         rows={warehouses.map((w) => [
                           w.warehouse_name ?? w.name ?? "—",
-                          formatNum(w.carts_approved ?? w.requests_approved ?? 0),
+                          formatNum(
+                            w.carts_approved ?? w.requests_approved ?? 0,
+                          ),
                           formatNum(w.items_approved ?? 0),
                           formatNum(w.sales_count ?? 0),
                           `${formatNum(w.sales_amount ?? 0)} сом`,
@@ -663,7 +699,9 @@ const WarehouseAnalytics = () => {
                   id="wa-sales-by-product"
                   title="Продажи по товарам"
                   icon={ShoppingCart}
-                  badge={salesByProduct.length ? `${salesByProduct.length}` : "0"}
+                  badge={
+                    salesByProduct.length ? `${salesByProduct.length}` : "0"
+                  }
                   defaultOpen={false}
                 >
                   <div className="warehouse-analytics__card warehouse-analytics__accCard">
@@ -681,6 +719,34 @@ const WarehouseAnalytics = () => {
                     ) : (
                       <div className="warehouse-analytics-table__empty">
                         Нет продаж по товарам за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  id="wa-sales-by-group"
+                  title="Продажи по группам"
+                  icon={ShoppingCart}
+                  badge={salesByGroup.length ? `${salesByGroup.length}` : "0"}
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {salesByGroup.length > 0 ? (
+                      <PaginatedTable
+                        head={["Группа", "Документов", "Кол-во", "Сумма, сом"]}
+                        rows={salesByGroup.map((g) => [
+                          g.group_name ?? "Без группы",
+                          formatNum(g.docs_count ?? 0),
+                          formatNum(g.qty ?? 0),
+                          formatNum(g.amount ?? 0),
+                        ])}
+                        colTemplate="1fr 120px 120px 120px"
+                        numeric={[1, 2, 3]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет продаж по группам за период.
                       </div>
                     )}
                   </div>

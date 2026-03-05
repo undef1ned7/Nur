@@ -176,6 +176,10 @@
 
   &__pay-debt-wrap {
     margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   &__pay-debt-btn {
@@ -206,6 +210,15 @@
     margin-top: 6px;
     font-size: 12px;
     color: #dc2626;
+  }
+
+  &__modal-counterparty {
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--text, #111827);
+    background: #f3f4f6;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
   }
 
   &__reconciliation-pdf {

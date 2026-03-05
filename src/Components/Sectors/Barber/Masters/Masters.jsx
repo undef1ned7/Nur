@@ -140,8 +140,9 @@ const RoleSelect = ({
         aria-expanded={open}
       >
         <span
-          className={`barbermasters__selectValue ${value ? "" : "is-placeholder"
-            }`}
+          className={`barbermasters__selectValue ${
+            value ? "" : "is-placeholder"
+          }`}
         >
           {value ? labelByKey.get(value) || placeholder : placeholder}
         </span>
@@ -171,8 +172,9 @@ const RoleSelect = ({
                 <button
                   key={o.key}
                   type="button"
-                  className={`barbermasters__selectItem ${o.key === value ? "is-active" : ""
-                    }`}
+                  className={`barbermasters__selectItem ${
+                    o.key === value ? "is-active" : ""
+                  }`}
                   onClick={() => {
                     onChange(o.key);
                     setOpen(false);
@@ -262,7 +264,7 @@ const Masters = () => {
       await navigator.clipboard.writeText(text);
       setCopied(key);
       setTimeout(() => setCopied(null), 1500);
-    } catch { }
+    } catch {}
   };
 
   /* ========= Fetch ========= */
@@ -298,7 +300,7 @@ const Masters = () => {
         setError("");
         await Promise.all([fetchEmployees(), fetchRoles(), fetchBranches()]);
       } catch (err) {
-        const errorMessage = validateResErrors(err, "Ошибка загрузки данных. ")
+        const errorMessage = validateResErrors(err, "Ошибка загрузки данных. ");
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -339,7 +341,7 @@ const Masters = () => {
       ...roleOptions,
       { key: "NONE", label: "Без роли" },
     ],
-    [roleOptions]
+    [roleOptions],
   );
 
   // TODO: Remove client-side filtering - should be done on backend
@@ -364,7 +366,7 @@ const Masters = () => {
     return base.filter((e) =>
       [fullName(e), e.email, e.role_display, ruLabelSys(e.role)]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(t))
+        .some((v) => String(v).toLowerCase().includes(t)),
     );
   }, [employees, q, filterRole]);
 
@@ -389,7 +391,7 @@ const Masters = () => {
       }
     }
     const base = [...sys, ...dedup].sort((a, b) =>
-      a.name.localeCompare(b.name, "ru")
+      a.name.localeCompare(b.name, "ru"),
     );
     const t = q.trim().toLowerCase();
     if (!t) return base;
@@ -406,21 +408,21 @@ const Masters = () => {
   // Remove .slice() - backend should return only current page
   const totalPagesEmp = Math.max(
     1,
-    Math.ceil(filteredEmployees.length / PAGE_SIZE)
+    Math.ceil(filteredEmployees.length / PAGE_SIZE),
   );
   const totalPagesRole = Math.max(
     1,
-    Math.ceil(rolesForList.length / PAGE_SIZE)
+    Math.ceil(rolesForList.length / PAGE_SIZE),
   );
   const pageSafeEmp = Math.min(pageEmp, totalPagesEmp);
   const pageSafeRole = Math.min(pageRole, totalPagesRole);
   const empRows = filteredEmployees.slice(
     (pageSafeEmp - 1) * PAGE_SIZE,
-    pageSafeEmp * PAGE_SIZE
+    pageSafeEmp * PAGE_SIZE,
   );
   const roleRows = rolesForList.slice(
     (pageSafeRole - 1) * PAGE_SIZE,
-    pageSafeRole * PAGE_SIZE
+    pageSafeRole * PAGE_SIZE,
   );
 
   /* ========= Validation ========= */
@@ -445,7 +447,8 @@ const Masters = () => {
       alerts.push("Email указан неверно.");
     } else {
       const exists = employees.some(
-        (u) => normalizeEmail(u.email) === email && (!isEdit || u.id !== editId)
+        (u) =>
+          normalizeEmail(u.email) === email && (!isEdit || u.id !== editId),
       );
       if (exists) {
         errs.email = true;
@@ -483,7 +486,7 @@ const Masters = () => {
     if (sysCodeFromName(name))
       return setRoleCreateErr("Это имя занято системной ролью.");
     const dup = roles.some(
-      (r) => normalizeRoleName(r.name) === normalizeRoleName(name)
+      (r) => normalizeRoleName(r.name) === normalizeRoleName(name),
     );
     if (dup) return setRoleCreateErr("Роль с таким названием уже существует.");
 
@@ -519,7 +522,7 @@ const Masters = () => {
     const dup = roles.some(
       (r) =>
         r.id !== roleEditId &&
-        normalizeRoleName(r.name) === normalizeRoleName(name)
+        normalizeRoleName(r.name) === normalizeRoleName(name),
     );
     if (dup) return setRoleEditErr("Роль с таким названием уже существует.");
 
@@ -1018,6 +1021,11 @@ const Masters = () => {
             backendKey: "can_view_document",
           },
           { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
+          // {
+          //   value: "Контрагенты",
+          //   label: "Контрагенты",
+          //   backendKey: "can_view_clients",
+          // },
         ],
         Производство: [
           {
@@ -1062,7 +1070,7 @@ const Masters = () => {
       });
       return labelsArray;
     },
-    [company?.sector?.name]
+    [company?.sector?.name],
   );
 
   const openAccessModal = async (employee) => {
@@ -1078,7 +1086,7 @@ const Masters = () => {
     } catch (err) {
       console.error("Ошибка при открытии модального окна доступов:", err);
       setPageNotice(
-        pickApiError(err, "Не удалось загрузить доступы сотрудника.")
+        pickApiError(err, "Не удалось загрузить доступы сотрудника."),
       );
     }
   };
@@ -1090,7 +1098,7 @@ const Masters = () => {
     try {
       await api.patch(
         EMPLOYEE_ITEM_URL(accessModalEmployee.id),
-        newAccessesPayload
+        newAccessesPayload,
       );
       await fetchEmployees();
       setAccessModalOpen(false);
@@ -1098,7 +1106,7 @@ const Masters = () => {
       setAccessModalAccesses([]);
     } catch (err) {
       setPageNotice(
-        pickApiError(err, "Не удалось обновить доступы сотрудника.")
+        pickApiError(err, "Не удалось обновить доступы сотрудника."),
       );
     } finally {
       setEmpSaving(false);
@@ -1132,8 +1140,9 @@ const Masters = () => {
                 {gap && <li className="barbermasters__dots">…</li>}
                 <li>
                   <button
-                    className={`barbermasters__pageBtn ${n === page ? "is-active" : ""
-                      }`}
+                    className={`barbermasters__pageBtn ${
+                      n === page ? "is-active" : ""
+                    }`}
                     aria-current={n === page ? "page" : undefined}
                     onClick={() => onChange(n)}
                   >
@@ -1165,14 +1174,16 @@ const Masters = () => {
             {loading
               ? "Загрузка…"
               : tab === "roles"
-                ? `${rolesForList.length} ролей${rolesForList.length > PAGE_SIZE
-                  ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
-                  : ""
-                }`
-                : `${filteredEmployees.length} сотрудников${filteredEmployees.length > PAGE_SIZE
-                  ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
-                  : ""
-                }`}
+                ? `${rolesForList.length} ролей${
+                    rolesForList.length > PAGE_SIZE
+                      ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
+                      : ""
+                  }`
+                : `${filteredEmployees.length} сотрудников${
+                    filteredEmployees.length > PAGE_SIZE
+                      ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
+                      : ""
+                  }`}
           </span>
         </div>
 
@@ -1180,16 +1191,18 @@ const Masters = () => {
           <div className="barbermasters__tabs">
             <button
               type="button"
-              className={`barbermasters__btn barbermasters__btn--secondary ${tab === "roles" ? "is-active" : ""
-                }`}
+              className={`barbermasters__btn barbermasters__btn--secondary ${
+                tab === "roles" ? "is-active" : ""
+              }`}
               onClick={() => setTab("roles")}
             >
               Роли
             </button>
             <button
               type="button"
-              className={`barbermasters__btn barbermasters__btn--secondary ${tab === "masters" ? "is-active" : ""
-                }`}
+              className={`barbermasters__btn barbermasters__btn--secondary ${
+                tab === "masters" ? "is-active" : ""
+              }`}
               onClick={() => setTab("masters")}
             >
               Сотрудники
@@ -1374,7 +1387,7 @@ const Masters = () => {
                           onClick={() =>
                             navigate(
                               `/crm/warehouse/analytics?agent_id=${u.id}`,
-                              { state: { agentName: fullName(u) } }
+                              { state: { agentName: fullName(u) } },
                             )
                           }
                           title="Аналитика склада (агент)"

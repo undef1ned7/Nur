@@ -258,4 +258,23 @@ export const bulkDeleteWarehouseCounterparties = createAsyncThunk(
   }
 );
 
+// ==================== ПРОДАЖА ПО ЗАЯВКЕ АГЕНТА ====================
+
+/**
+ * Создать документ продажи по одобренной заявке агента
+ * POST /api/warehouse/agent-carts/{id}/create-sale/
+ * Возвращает созданный документ (Document).
+ */
+export const createSaleFromAgentCartAsync = createAsyncThunk(
+  "warehouse/createSaleFromAgentCart",
+  async ({ cartId, payload }, { rejectWithValue }) => {
+    try {
+      const document = await warehouseAPI.createSaleFromCart(cartId, payload);
+      return document;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
 
