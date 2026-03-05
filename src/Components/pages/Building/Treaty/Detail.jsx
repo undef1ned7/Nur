@@ -34,6 +34,30 @@ const PAYMENT_TYPE_LABELS = {
   installment: "Рассрочка",
 };
 
+const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+
+const getFileUrl = (file) => String(file?.file_url || file?.file || "" );
+
+const getFileExtension = (url) => {
+  if (!url) return "";
+  const clean = url.split("#")[0].split("?")[0];
+  const parts = clean.split(".");
+  if (parts.length < 2) return "";
+  return parts[parts.length - 1].toLowerCase();
+};
+
+const getFileTypeLabel = (ext) => {
+  if (!ext) return "FILE";
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext)) {
+    return "IMG";
+  }
+  if (["pdf"].includes(ext)) return "PDF";
+  if (["doc", "docx"].includes(ext)) return "DOC";
+  if (["xls", "xlsx", "csv"].includes(ext)) return "XLS";
+  if (["zip", "rar", "7z"].includes(ext)) return "ZIP";
+  return ext.toUpperCase().slice(0, 4);
+};
+
 const generateTreatyNumber = () => {
   let raw = "";
   try {
@@ -126,6 +150,10 @@ export default function BuildingTreatyDetail() {
     [apartmentsList, form.residential_complex, selectedProjectId],
   );
 
+  const isReadOnly =
+    !isNew &&
+    (current?.status === "signed" || current?.status === "cancelled");
+
   useEffect(() => {
     if (!isNew && id) {
       dispatch(fetchBuildingTreatyById(id));
@@ -194,6 +222,49 @@ export default function BuildingTreatyDetail() {
   const handleFormChange = (key) => (e) => {
     const value =
       key === "auto_create_in_erp" ? e.target.checked : e.target.value;
+
+    if (key === "status" && !isNew && current && value !== form.status) {
+      const fromLabel =
+        STATUS_LABELS[form.status] || form.status || "неизвестен";
+      const toLabel =
+        STATUS_LABELS[value] || value || "неизвестен";
+      confirm(
+        `Изменить статус договора c «${fromLabel}» на «${toLabel}»?`,
+        async (ok) => {
+          if (!ok) return;
+          const treatyId = current.id ?? current.uuid ?? id;
+          if (!treatyId) return;
+          try {
+            const payload = { status: value };
+            const res = await dispatch(
+              updateBuildingTreaty({ id: treatyId, data: payload }),
+            );
+            if (res.meta.requestStatus === "fulfilled") {
+              alert("Статус договора обновлён");
+              setForm((prev) => ({ ...prev, status: value }));
+            } else {
+              alert(
+                validateResErrors(
+                  res.payload || res.error,
+                  "Не удалось обновить статус договора",
+                ),
+                true,
+              );
+            }
+          } catch (err) {
+            alert(
+              validateResErrors(
+                err,
+                "Не удалось обновить статус договора",
+              ),
+              true,
+            );
+          }
+        },
+      );
+      return;
+    }
+
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === "payment_type" && value !== "installment") {
@@ -460,6 +531,24 @@ export default function BuildingTreatyDetail() {
           ← К списку договоров
         </button>
       </div>
+
+      {!isNew && isReadOnly && (
+        <div
+          className="building-page__card"
+          style={{ marginBottom: 12, borderLeft: "4px solid #f87171" }}
+        >
+          <div className="building-page__label" style={{ marginBottom: 4 }}>
+            Внимание
+          </div>
+          <div className="building-page__muted">
+            Этот договор имеет статус{" "}
+            <b>
+              {STATUS_LABELS[current?.status] || current?.status || "неизвестен"}
+            </b>
+            . Изменение данных недоступно.
+          </div>
+        </div>
+      )}
 
       {currentError && !isNew && (
         <div className="building-page__error" style={{ marginBottom: 12 }}>
@@ -777,24 +866,85 @@ export default function BuildingTreatyDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {files.map((f) => (
-                    <tr key={f.id ?? f.uuid ?? f.file}>
-                      <td>{f.title || "Файл"}</td>
-                      <td>
-                        {f.file_url || f.file ? (
-                          <a
-                            href={f.file_url || f.file}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Открыть
-                          </a>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {files.map((f) => {
+                    const key = f.id ?? f.uuid ?? f.file;
+                    const url = getFileUrl(f);
+                    const ext = getFileExtension(url);
+                    const isImage = IMAGE_EXTENSIONS.includes(ext);
+                    const iconLabel = getFileTypeLabel(ext);
+                    const title = f.title || "Файл";
+                    return (
+                      <tr key={key}>
+                        <td>{title}</td>
+                        <td>
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: "inline-block",
+                                textDecoration: "none",
+                                color: "inherit",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 72,
+                                  height: 72,
+                                  borderRadius: 4,
+                                  overflow: "hidden",
+                                  border: "1px solid #d9d9d9",
+                                  backgroundColor: isImage
+                                    ? "#f0f2f5"
+                                    : "#e5e7eb",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {isImage ? (
+                                  <img
+                                    src={url}
+                                    alt={title}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      color: "#111827",
+                                    }}
+                                  >
+                                    {iconLabel}
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  maxWidth: 140,
+                                  fontSize: 12,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {title}
+                              </div>
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

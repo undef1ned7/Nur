@@ -881,13 +881,73 @@ const Masters = () => {
         ],
         "Строительная компания": [
           {
-            value: "Процесс работы",
-            label: "Процесс работы",
+            value: "Аналитика",
+            label: "Аналитика",
+            backendKey: "can_view_building_analytics",
+          },
+          {
+            value: "Касса",
+            label: "Касса",
+            backendKey: "can_view_building_cash_register",
+          },
+          {
+            value: "Клиенты",
+            label: "Клиенты",
+            backendKey: "can_view_building_clients",
+          },
+          {
+            value: "Отделы",
+            label: "Отделы",
+            backendKey: "can_view_building_department",
+          },
+          {
+            value: "Сотрудники",
+            label: "Сотрудники",
+            backendKey: "can_view_building_employess",
+          },
+          {
+            value: "Напоминания",
+            label: "Напоминания",
+            backendKey: "can_view_building_notification",
+          },
+          {
+            value: "Закупки",
+            label: "Закупки",
+            backendKey: "can_view_building_procurement",
+          },
+          {
+            value: "ЖК",
+            label: "ЖК",
+            backendKey: "can_view_building_projects",
+          },
+          {
+            value: "Зарплата",
+            label: "Зарплата",
+            backendKey: "can_view_building_salary",
+          },
+          {
+            value: "Продажи",
+            label: "Продажи",
+            backendKey: "can_view_building_sell",
+          },
+          {
+            value: "Склад",
+            label: "Склад",
+            backendKey: "can_view_building_stock",
+          },
+          {
+            value: "Договора",
+            label: "Договора",
+            backendKey: "can_view_building_treaty",
+          },
+          {
+            value: "Процесс работ",
+            label: "Процесс работ",
             backendKey: "can_view_building_work_process",
           },
           {
-            value: "Квартиры",
-            label: "Квартиры",
+            value: "Квартиры/объекты",
+            label: "Квартиры/объекты",
             backendKey: "can_view_building_objects",
           },
         ],

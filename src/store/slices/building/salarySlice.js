@@ -11,6 +11,12 @@ import {
   approveBuildingPayroll,
   fetchBuildingPayrollLines,
   createBuildingPayrollLine,
+  fetchBuildingPayrollLineAdjustments,
+  createBuildingPayrollLineAdjustment,
+  deleteBuildingPayrollAdjustment,
+  fetchBuildingPayrollLinePayments,
+  createBuildingPayrollLinePayment,
+  fetchBuildingMySalaryLines,
 } from "../../creators/building/salaryCreators";
 
 const initialState = {
@@ -26,6 +32,15 @@ const initialState = {
   payrollsCreating: false,
 
   linesByPayrollId: {},
+
+  adjustmentsByLineId: {},
+  paymentsByLineId: {},
+
+  myLines: {
+    list: [],
+    loading: false,
+    error: null,
+  },
 };
 
 const ensureLinesBucket = (state, payrollId) => {
@@ -38,6 +53,30 @@ const ensureLinesBucket = (state, payrollId) => {
     };
   }
   return state.linesByPayrollId[key];
+};
+
+const ensureAdjustmentsBucket = (state, lineId) => {
+  const key = String(lineId);
+  if (!state.adjustmentsByLineId[key]) {
+    state.adjustmentsByLineId[key] = {
+      list: [],
+      loading: false,
+      error: null,
+    };
+  }
+  return state.adjustmentsByLineId[key];
+};
+
+const ensurePaymentsBucket = (state, lineId) => {
+  const key = String(lineId);
+  if (!state.paymentsByLineId[key]) {
+    state.paymentsByLineId[key] = {
+      list: [],
+      loading: false,
+      error: null,
+    };
+  }
+  return state.paymentsByLineId[key];
 };
 
 const upsertById = (list, payload) => {
@@ -181,6 +220,110 @@ const buildingSalarySlice = createSlice({
         if (!payrollId || !line) return;
         const bucket = ensureLinesBucket(state, payrollId);
         bucket.list = upsertById(bucket.list, line);
+      })
+
+      .addCase(
+        fetchBuildingPayrollLineAdjustments.pending,
+        (state, action) => {
+          const lineId = action.meta.arg;
+          const bucket = ensureAdjustmentsBucket(state, lineId);
+          bucket.loading = true;
+          bucket.error = null;
+        },
+      )
+      .addCase(
+        fetchBuildingPayrollLineAdjustments.fulfilled,
+        (state, action) => {
+          const lineId = action.payload?.lineId;
+          const bucket = ensureAdjustmentsBucket(state, lineId);
+          bucket.loading = false;
+          const data = action.payload?.data;
+          bucket.list = Array.isArray(data?.results) ? data.results : data || [];
+        },
+      )
+      .addCase(
+        fetchBuildingPayrollLineAdjustments.rejected,
+        (state, action) => {
+          const lineId = action.meta.arg;
+          const bucket = ensureAdjustmentsBucket(state, lineId);
+          bucket.loading = false;
+          bucket.error = action.payload ?? action.error?.message;
+        },
+      )
+      .addCase(
+        createBuildingPayrollLineAdjustment.fulfilled,
+        (state, action) => {
+          const lineId = action.payload?.lineId;
+          const adj = action.payload?.data;
+          if (!lineId || !adj) return;
+          const bucket = ensureAdjustmentsBucket(state, lineId);
+          bucket.list = upsertById(bucket.list, adj);
+        },
+      )
+      .addCase(deleteBuildingPayrollAdjustment.fulfilled, (state, action) => {
+        const adjId = action.payload;
+        if (!adjId) return;
+        Object.keys(state.adjustmentsByLineId || {}).forEach((key) => {
+          const bucket = state.adjustmentsByLineId[key];
+          if (bucket && Array.isArray(bucket.list)) {
+            bucket.list = bucket.list.filter(
+              (a) => String(a.id ?? a.uuid) !== String(adjId),
+            );
+          }
+        });
+      })
+
+      .addCase(
+        fetchBuildingPayrollLinePayments.pending,
+        (state, action) => {
+          const lineId = action.meta.arg;
+          const bucket = ensurePaymentsBucket(state, lineId);
+          bucket.loading = true;
+          bucket.error = null;
+        },
+      )
+      .addCase(
+        fetchBuildingPayrollLinePayments.fulfilled,
+        (state, action) => {
+          const lineId = action.payload?.lineId;
+          const bucket = ensurePaymentsBucket(state, lineId);
+          bucket.loading = false;
+          const data = action.payload?.data;
+          bucket.list = Array.isArray(data?.results) ? data.results : data || [];
+        },
+      )
+      .addCase(
+        fetchBuildingPayrollLinePayments.rejected,
+        (state, action) => {
+          const lineId = action.meta.arg;
+          const bucket = ensurePaymentsBucket(state, lineId);
+          bucket.loading = false;
+          bucket.error = action.payload ?? action.error?.message;
+        },
+      )
+      .addCase(
+        createBuildingPayrollLinePayment.fulfilled,
+        (state, action) => {
+          const lineId = action.payload?.lineId;
+          const payment = action.payload?.data;
+          if (!lineId || !payment) return;
+          const bucket = ensurePaymentsBucket(state, lineId);
+          bucket.list = upsertById(bucket.list, payment);
+        },
+      )
+
+      .addCase(fetchBuildingMySalaryLines.pending, (state) => {
+        state.myLines.loading = true;
+        state.myLines.error = null;
+      })
+      .addCase(fetchBuildingMySalaryLines.fulfilled, (state, action) => {
+        state.myLines.loading = false;
+        const data = action.payload;
+        state.myLines.list = Array.isArray(data?.results) ? data.results : data || [];
+      })
+      .addCase(fetchBuildingMySalaryLines.rejected, (state, action) => {
+        state.myLines.loading = false;
+        state.myLines.error = action.payload ?? action.error?.message;
       });
   },
 });

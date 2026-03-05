@@ -2,6 +2,7 @@ import BuildingLayout from "./BuildingLayout";
 import BuildingAnalytics from "./Analytics";
 import BuildingCashRegister from "./CashRegister";
 import BuildingClients from "./Clients";
+import BuildingClientDetail from "./Clients/Detail";
 import BuildingDepartment from "./Department";
 import BuildingNotification from "./Notification";
 import BuildingTaskDetail from "./Notification/Detail";
@@ -9,6 +10,10 @@ import BuildingProcurement from "./Procurement";
 import BuildingProcurementDetail from "./Procurement/Detail";
 import BuildingProjects from "./Projects";
 import BuildingSalary from "./Salary";
+import BuildingSalaryMyLines from "./Salary/MyLines";
+import BuildingSalaryEmployeeDetail from "./Salary/EmployeeDetail";
+import BuildingSalaryPayrollDetail from "./Salary/PayrollDetail";
+import BuildingSalaryLineDetail from "./Salary/LineDetail";
 import BuildingSell from "./Sell";
 import BuildingStock from "./Stock";
 import BuildingStockDetail from "./Stock/Detail";
@@ -24,6 +29,7 @@ export {
   BuildingAnalytics,
   BuildingCashRegister,
   BuildingClients,
+  BuildingClientDetail,
   BuildingDepartment,
   BuildingNotification,
   BuildingTaskDetail,
@@ -32,6 +38,10 @@ export {
   BuildingProjects,
   BuildingProjectDetail,
   BuildingSalary,
+  BuildingSalaryMyLines,
+  BuildingSalaryEmployeeDetail,
+  BuildingSalaryPayrollDetail,
+  BuildingSalaryLineDetail,
   BuildingSell,
   BuildingStock,
   BuildingStockDetail,

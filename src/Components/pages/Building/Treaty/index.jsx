@@ -488,7 +488,7 @@ export default function BuildingTreaty() {
           type="button"
           className="building-btn building-btn--primary"
           disabled={!selectedProjectId}
-          onClick={openCreate}
+          onClick={() => navigate("/crm/building/sell")}
         >
           Новый договор
         </button>
