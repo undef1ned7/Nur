@@ -34,6 +34,18 @@
     white-space: nowrap;
   }
 
+  .badge--pending {
+    background: #fef3c7;
+    color: #92400e;
+    border-color: #fde68a;
+  }
+
+  .badge--removed {
+    background: #e5e7eb;
+    color: #374151;
+    border-color: #d1d5db;
+  }
+
   .badge--draft {
     background: #f1f5f9;
     color: #334155;
@@ -190,7 +202,10 @@
     gap: 8px;
     text-align: left;
     cursor: pointer;
-    transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+    transition:
+      box-shadow 0.15s ease,
+      transform 0.15s ease,
+      border-color 0.15s ease;
 
     &:hover {
       border-color: #cbd5e1;
@@ -266,6 +281,54 @@
     border-radius: 16px;
     border: 1px dashed #e2e8f0;
     background: #f8fafc;
+  }
+
+  .agents-company-tab {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .agents-company-tab details {
+    cursor: pointer;
+  }
+
+  .agents-company-tab summary {
+    list-style: none;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #f9fafb;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .agents-company-tab summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .agents-company-tab details[open] summary {
+    background: #e5f3ff;
+    border-color: #bfdbfe;
+  }
+
+  .agents-company-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    padding: 18px 20px 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  }
+
+  .agents-company-card .agent-cart-modal__section-title {
+    margin-bottom: 6px;
+  }
+
+  .agents-company-subtitle {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #64748b;
   }
 }
 
@@ -354,7 +417,9 @@
     background: #fff;
     color: #475569;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition:
+      background 0.15s,
+      color 0.15s;
   }
 
   .agent-cart-modal__close:hover {
@@ -601,7 +666,9 @@
     font-weight: 600;
     border: none;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition:
+      background 0.15s,
+      transform 0.1s;
   }
 
   .agent-cart-modal__btn:disabled {
@@ -712,7 +779,9 @@
     background: #fff;
     color: #475569;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition:
+      background 0.15s,
+      color 0.15s;
   }
 
   .agent-cart-modal__btn-icon:hover:not(:disabled) {
@@ -819,4 +888,3 @@
     color: #64748b;
   }
 }
-

@@ -172,8 +172,7 @@ export default function CreateSaleFromCartModal({
   const counterpartyLockedByAgent =
     Boolean(cart?.agent) &&
     counterparties.some(
-      (c) =>
-        c?.agent != null && String(c.agent) === String(cart.agent),
+      (c) => c?.agent != null && String(c.agent) === String(cart.agent),
     );
 
   return (
@@ -214,14 +213,21 @@ export default function CreateSaleFromCartModal({
                   Позиции заявки
                   {!cartItemsLoading && cartItems.length > 0 && (
                     <span className="create-sale-cart-modal__items-count">
-                      {" "}({cartItems.length})
+                      {" "}
+                      ({cartItems.length})
                     </span>
                   )}
                 </span>
                 {itemsDropdownOpen ? (
-                  <ChevronUp size={20} className="create-sale-cart-modal__items-chevron" />
+                  <ChevronUp
+                    size={20}
+                    className="create-sale-cart-modal__items-chevron"
+                  />
                 ) : (
-                  <ChevronDown size={20} className="create-sale-cart-modal__items-chevron" />
+                  <ChevronDown
+                    size={20}
+                    className="create-sale-cart-modal__items-chevron"
+                  />
                 )}
               </button>
               {itemsDropdownOpen && (
@@ -267,7 +273,9 @@ export default function CreateSaleFromCartModal({
                               row.unit_price_requested;
                             const sum = row.line_total ?? row.total ?? row.sum;
                             const formatNum = (v) =>
-                              v != null && v !== "" ? Number(v).toFixed(2) : "—";
+                              v != null && v !== ""
+                                ? Number(v).toFixed(2)
+                                : "—";
                             return (
                               <tr key={row.id || idx}>
                                 <td>{idx + 1}</td>
@@ -321,7 +329,7 @@ export default function CreateSaleFromCartModal({
                       setForm((prev) => ({ ...prev, payment_kind: "cash" }))
                     }
                   />
-                  Сразу (cash)
+                  Сразу
                 </label>
                 <label
                   style={{ display: "flex", alignItems: "center", gap: 6 }}
@@ -334,7 +342,7 @@ export default function CreateSaleFromCartModal({
                       setForm((prev) => ({ ...prev, payment_kind: "credit" }))
                     }
                   />
-                  В долг (credit)
+                  В долг
                 </label>
               </div>
             </div>
