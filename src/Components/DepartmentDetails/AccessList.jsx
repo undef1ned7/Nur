@@ -678,6 +678,16 @@ const AccessList = ({
 
   // Доп. услуги (отдельная категория)
   const additionalServicesTypes = useMemo(() => {
+    // Для строительных секторов доп. услуги скрываем полностью
+    const sectorLower = (sectorName || "").toLowerCase();
+    if (
+      sectorLower.includes("строительная") ||
+      sectorLower.includes("ремонтные") ||
+      sectorLower.includes("архитектура")
+    ) {
+      return [];
+    }
+
     return availableAccessTypes.filter((type) => {
       // Проверяем, есть ли это в маппинге базовых доп. услуг
       if (additionalServicesMapping[type.backendKey]) {
@@ -696,7 +706,7 @@ const AccessList = ({
       );
       return inDynamicServices;
     });
-  }, [availableAccessTypes]);
+  }, [availableAccessTypes, sectorName]);
 
   // Фильтрация по поисковому запросу
   const filteredBasic = useMemo(() => {

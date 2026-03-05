@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import {
@@ -25,6 +26,7 @@ const FORM_INITIAL = {
 
 export default function BuildingClients() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const alert = useAlert();
   const confirm = useConfirm();
   const { selectedProjectId, items: projects } = useBuildingProjects();
@@ -271,13 +273,23 @@ export default function BuildingClients() {
                   const busyUpdate = id != null && updatingId === id;
                   const busy = busyDelete || busyUpdate;
                   return (
-                    <tr key={id}>
+                    <tr
+                      key={id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() =>
+                        id && navigate(`/crm/building/clients/${id}`)
+                      }
+                    >
                       <td>{c?.name || "—"}</td>
                       <td>{c?.phone || "—"}</td>
                       <td>{c?.email || "—"}</td>
                       <td>{c?.inn || "—"}</td>
                       <td>{c?.address || "—"}</td>
-                      <td>
+                      <td
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
                         {c?.is_active ? (
                           <span className="building-page__status">Активен</span>
                         ) : (

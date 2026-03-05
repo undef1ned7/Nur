@@ -4,6 +4,8 @@ import api from "../../../api";
 const EMPLOYEES_BASE = "/building/salary/employees";
 const PAYROLLS_BASE = "/building/salary/payrolls";
 const LINES_BASE = "/building/salary/payroll-lines";
+const ADJUSTMENTS_BASE = "/building/salary/payroll-adjustments";
+const MY_BASE = "/building/salary/my";
 
 export const fetchBuildingSalaryEmployees = createAsyncThunk(
   "buildingSalary/fetchEmployees",
@@ -113,6 +115,84 @@ export const createBuildingPayrollLine = createAsyncThunk(
         payload,
       );
       return { payrollId, data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
+export const fetchBuildingPayrollLineAdjustments = createAsyncThunk(
+  "buildingSalary/fetchPayrollLineAdjustments",
+  async (lineId, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`${LINES_BASE}/${lineId}/adjustments/`);
+      return { lineId, data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
+export const createBuildingPayrollLineAdjustment = createAsyncThunk(
+  "buildingSalary/createPayrollLineAdjustment",
+  async ({ lineId, payload }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `${LINES_BASE}/${lineId}/adjustments/`,
+        payload,
+      );
+      return { lineId, data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
+export const deleteBuildingPayrollAdjustment = createAsyncThunk(
+  "buildingSalary/deletePayrollAdjustment",
+  async (adjustmentId, { rejectWithValue }) => {
+    try {
+      await api.delete(`${ADJUSTMENTS_BASE}/${adjustmentId}/`);
+      return adjustmentId;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
+export const fetchBuildingPayrollLinePayments = createAsyncThunk(
+  "buildingSalary/fetchPayrollLinePayments",
+  async (lineId, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`${LINES_BASE}/${lineId}/payments/`);
+      return { lineId, data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
+export const createBuildingPayrollLinePayment = createAsyncThunk(
+  "buildingSalary/createPayrollLinePayment",
+  async ({ lineId, payload }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `${LINES_BASE}/${lineId}/payments/`,
+        payload,
+      );
+      return { lineId, data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
+export const fetchBuildingMySalaryLines = createAsyncThunk(
+  "buildingSalary/fetchMyLines",
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data } = await api.get(`${MY_BASE}/lines/`);
+      return data;
     } catch (err) {
       return rejectWithValue(err?.response?.data || err?.message || err);
     }

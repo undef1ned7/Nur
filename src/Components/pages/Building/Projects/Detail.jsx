@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import Modal from "@/Components/common/Modal/Modal";
 import { useDebouncedValue } from "@/hooks/useDebounce";
@@ -16,6 +16,7 @@ import {
   deleteBuildingApartment,
   fetchBuildingResidentialFloors,
 } from "@/store/creators/building/apartmentsCreators";
+import { updateBuildingProject } from "@/store/creators/building/projectsCreators";
 import { getPageCount, DEFAULT_PAGE_SIZE } from "../shared/api";
 import BuildingPagination from "../shared/Pagination";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -44,6 +45,7 @@ export default function BuildingProjectDetail() {
   const residentialId = id ? String(id) : null;
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const alert = useAlert();
   const confirm = useConfirm();
 
@@ -78,6 +80,12 @@ export default function BuildingProjectDetail() {
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState(null);
   const [addingMemberId, setAddingMemberId] = useState("");
+
+  const [cashboxes, setCashboxes] = useState([]);
+  const [cashboxesLoading, setCashboxesLoading] = useState(false);
+  const [cashboxesError, setCashboxesError] = useState(null);
+  const [salaryCashboxId, setSalaryCashboxId] = useState("");
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const totalPages = useMemo(
     () => getPageCount(count, DEFAULT_PAGE_SIZE),
@@ -119,6 +127,11 @@ export default function BuildingProjectDetail() {
   }, [dispatch, employees]);
 
   useEffect(() => {
+    if (!project) return;
+    setSalaryCashboxId(project.salary_cashbox ?? "");
+  }, [project]);
+
+  useEffect(() => {
     const loadMembers = async () => {
       if (!residentialId) return;
       setMembersLoading(true);
@@ -138,6 +151,30 @@ export default function BuildingProjectDetail() {
     };
     loadMembers();
   }, [residentialId]);
+
+  useEffect(() => {
+    const loadCashboxes = async () => {
+      setCashboxesLoading(true);
+      setCashboxesError(null);
+      try {
+        const { data } = await api.get("/construction/cashboxes/");
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+          ? data
+          : [];
+        setCashboxes(list);
+      } catch (err) {
+        setCashboxesError(
+          err?.response?.data || err?.message || "Не удалось загрузить кассы",
+        );
+      } finally {
+        setCashboxesLoading(false);
+      }
+    };
+
+    loadCashboxes();
+  }, []);
 
   useEffect(() => {
     if (!residentialId) return;
@@ -258,6 +295,46 @@ export default function BuildingProjectDetail() {
     }
   };
 
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    if (!residentialId) {
+      alert("Не удалось определить ЖК", true);
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      const res = await dispatch(
+        updateBuildingProject({
+          id: residentialId,
+          data: { salary_cashbox: salaryCashboxId || null },
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Настройки ЖК сохранены");
+        const from = searchParams.get("from");
+        const payrollId = searchParams.get("payrollId");
+        if (from === "salary-payroll" && payrollId) {
+          navigate(`/crm/building/salary/payroll/${payrollId}`);
+        }
+      } else {
+        alert(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось сохранить настройки ЖК",
+          ),
+          true,
+        );
+      }
+    } catch (err) {
+      alert(
+        validateResErrors(err, "Не удалось сохранить настройки ЖК"),
+        true,
+      );
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const handleDelete = (apartment) => {
     const aptId = apartment?.id ?? apartment?.uuid;
     if (!aptId) return;
@@ -340,6 +417,69 @@ export default function BuildingProjectDetail() {
               </div>
             </div>
           )}
+        </div>
+        <div style={{ minWidth: 320, marginLeft: 16 }}>
+          <div className="building-page__card">
+            <h3 className="building-page__cardTitle">Настройки ЖК</h3>
+            {cashboxesLoading && (
+              <div className="building-page__muted">Загрузка касс...</div>
+            )}
+            {cashboxesError && (
+              <div className="building-page__error">
+                {String(
+                  validateResErrors(
+                    cashboxesError,
+                    "Не удалось загрузить список касс",
+                  ),
+                )}
+              </div>
+            )}
+            {!cashboxesLoading && !cashboxesError && (
+              <form className="building-page" onSubmit={handleSaveSettings}>
+                <label>
+                  <div className="building-page__label">Касса для ЗП по ЖК</div>
+                  <select
+                    className="building-page__select"
+                    value={salaryCashboxId || ""}
+                    onChange={(e) => setSalaryCashboxId(e.target.value)}
+                  >
+                    <option value="">Не выбрана</option>
+                    {cashboxes.map((box) => {
+                      const bid = box.id ?? box.uuid;
+                      if (!bid) return null;
+                      const label =
+                        box.name ||
+                        box.title ||
+                        box.display ||
+                        box.label ||
+                        `Касса ${bid}`;
+                      return (
+                        <option key={bid} value={bid}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <div className="building-page__muted" style={{ marginTop: 4 }}>
+                    Из этой кассы будут выплачиваться ЗП сотрудникам, работающим
+                    на этом ЖК.
+                  </div>
+                </label>
+                <div
+                  className="building-page__actions"
+                  style={{ marginTop: 8 }}
+                >
+                  <button
+                    type="submit"
+                    className="building-btn building-btn--primary"
+                    disabled={savingSettings}
+                  >
+                    {savingSettings ? "Сохранение..." : "Сохранить"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
         <div className="building-page__actions">
           <button
