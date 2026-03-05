@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, LayoutGrid, List, X, Check, Save } from "lucide-react";
+import { ArrowLeft, LayoutGrid, List, X, Check, Save, Edit } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import warehouseAPI from "../../../../api/warehouse";
 import { useDispatch, useSelector } from "react-redux";
@@ -9,6 +9,7 @@ import { clearCurrentCounterparty } from "../../../../store/slices/counterpartyS
 import { useUser } from "../../../../store/slices/userSlice";
 import { getAgentDisplay } from "./utils";
 import ReconciliationPdfDocument from "../../Warehouse/Documents/components/ReconciliationPdfDocument";
+import EditCounterpartyModal from "./components/EditCounterpartyModal";
 import "./CounterpartyDetail.scss";
 import "../../Warehouse/Money/MoneyDocumentsPage.scss";
 
@@ -125,6 +126,7 @@ const CounterpartyDetail = () => {
   });
   const [payDebtCreateAsPosted, setPayDebtCreateAsPosted] = useState(false);
   const [payDebtSubmitting, setPayDebtSubmitting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const [docTypeFilter, setDocTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -135,6 +137,8 @@ const CounterpartyDetail = () => {
   const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
 
   const name = current?.name ?? "—";
+  const canEdit =
+    profile?.role === "owner" || profile?.role === "admin";
 
   const getBranchParams = useCallback(() => {
     const params = {};
@@ -673,6 +677,16 @@ const CounterpartyDetail = () => {
           <ArrowLeft size={20} /> Назад
         </button>
         <h1 className="counterparty-detail-page__title">Контрагент: {name}</h1>
+        {canEdit && current && (
+          <button
+            type="button"
+            className="counterparty-detail-page__edit-btn"
+            onClick={() => setShowEditModal(true)}
+          >
+            <Edit size={18} />
+            <span style={{ marginLeft: 6 }}>Редактировать</span>
+          </button>
+        )}
         {showAgentBlock(profile) &&
           (current?.agent || current?.agent_display) && (
             <p className="counterparty-detail-page__agent">
@@ -1106,6 +1120,13 @@ const CounterpartyDetail = () => {
           </>
         )}
       </div>
+
+      {showEditModal && current && (
+        <EditCounterpartyModal
+          counterparty={current}
+          onClose={() => setShowEditModal(false)}
+        />
+      )}
     </div>
   );
 };

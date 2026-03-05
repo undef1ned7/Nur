@@ -62,9 +62,11 @@ const BrandCategoryPage = () => {
           : tab === TABS.PAYMENT_CATEGORIES
             ? "/crm/warehouse/payment_categories"
             : "/crm/warehouse/categories";
-      navigate(`${basePath}${queryString ? `?${queryString}` : ""}`, { replace: true });
+      navigate(`${basePath}${queryString ? `?${queryString}` : ""}`, {
+        replace: true,
+      });
     },
-    [navigate, searchParams]
+    [navigate, searchParams],
   );
 
   // Redux state для брендов
@@ -92,10 +94,12 @@ const BrandCategoryPage = () => {
   const [editingBrand, setEditingBrand] = useState(null);
   const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  const [showCreatePaymentCategoryModal, setShowCreatePaymentCategoryModal] = useState(false);
+  const [showCreatePaymentCategoryModal, setShowCreatePaymentCategoryModal] =
+    useState(false);
   const [editingPaymentCategory, setEditingPaymentCategory] = useState(null);
   const [paymentCategories, setPaymentCategories] = useState([]);
-  const [loadingPaymentCategories, setLoadingPaymentCategories] = useState(false);
+  const [loadingPaymentCategories, setLoadingPaymentCategories] =
+    useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
@@ -103,7 +107,7 @@ const BrandCategoryPage = () => {
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
   const currentPageFromUrl = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
+    [searchParams],
   );
 
   // Параметры запроса
@@ -232,14 +236,14 @@ const BrandCategoryPage = () => {
         setShowCreateCategoryModal(true);
       }
     },
-    [activeTab]
+    [activeTab],
   );
 
   const handlePageChange = useCallback(
     (newPage) => {
       handlePageChangeBase(newPage, () => setSelectedRows(new Set()));
     },
-    [handlePageChangeBase, setSelectedRows]
+    [handlePageChangeBase, setSelectedRows],
   );
 
   const handleBulkDelete = useCallback(() => {
@@ -257,7 +261,7 @@ const BrandCategoryPage = () => {
             ids: Array.from(selectedRows),
             soft: true,
             require_all: false,
-          })
+          }),
         ).unwrap();
         dispatch(fetchWarehouseBrandsAsync(requestParams));
       } else {
@@ -266,17 +270,20 @@ const BrandCategoryPage = () => {
             ids: Array.from(selectedRows),
             soft: true,
             require_all: false,
-          })
+          }),
         ).unwrap();
         dispatch(fetchWarehouseCategoriesAsync(requestParams));
       }
 
       setSelectedRows(new Set());
     } catch (e) {
-      console.error(`Ошибка при удалении ${activeTab === TABS.BRANDS ? "брендов" : "категорий"}:`, e);
+      console.error(
+        `Ошибка при удалении ${activeTab === TABS.BRANDS ? "брендов" : "категорий"}:`,
+        e,
+      );
       alert(
         `Не удалось удалить ${activeTab === TABS.BRANDS ? "бренды" : "категории"}: ` +
-          (e?.message || e?.detail || "Неизвестная ошибка")
+          (e?.message || e?.detail || "Неизвестная ошибка"),
       );
     } finally {
       setBulkDeleting(false);
@@ -352,7 +359,8 @@ const BrandCategoryPage = () => {
 
   const getSubtitle = () => {
     if (activeTab === TABS.BRANDS) return "Управление брендами склада";
-    if (activeTab === TABS.PAYMENT_CATEGORIES) return "Управление категориями платежей (приход/расход)";
+    if (activeTab === TABS.PAYMENT_CATEGORIES)
+      return "Управление категориями платежей (приход/расход)";
     return "Управление категориями склада";
   };
 
@@ -368,7 +376,11 @@ const BrandCategoryPage = () => {
         <div className="warehouse-header__left">
           <div className="warehouse-header__icon">
             <div className="warehouse-header__icon-box">
-              {activeTab === TABS.BRANDS ? "🏷️" : activeTab === TABS.PAYMENT_CATEGORIES ? "💰" : "📁"}
+              {activeTab === TABS.BRANDS
+                ? "🏷️"
+                : activeTab === TABS.PAYMENT_CATEGORIES
+                  ? "💰"
+                  : "📁"}
             </div>
           </div>
           <div className="warehouse-header__title-section">
@@ -376,10 +388,7 @@ const BrandCategoryPage = () => {
             <p className="warehouse-header__subtitle">{getSubtitle()}</p>
           </div>
         </div>
-        <button
-          className="warehouse-header__create-btn"
-          onClick={handleCreate}
-        >
+        <button className="warehouse-header__create-btn" onClick={handleCreate}>
           <Plus size={16} />
           {getCreateButtonText()}
         </button>
@@ -468,15 +477,15 @@ const BrandCategoryPage = () => {
         )}
 
         {activeTab !== TABS.PAYMENT_CATEGORIES && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          count={currentData.count}
-          loading={currentData.loading}
-          hasNextPage={hasNextPage}
-          hasPrevPage={hasPrevPage}
-          onPageChange={handlePageChange}
-        />
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            count={currentData.count}
+            loading={currentData.loading}
+            hasNextPage={hasNextPage}
+            hasPrevPage={hasPrevPage}
+            onPageChange={handlePageChange}
+          />
         )}
       </div>
 
@@ -518,4 +527,3 @@ const BrandCategoryPage = () => {
 };
 
 export default BrandCategoryPage;
-
