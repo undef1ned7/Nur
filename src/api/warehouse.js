@@ -1856,6 +1856,27 @@ export const patchCompanyAgentCommonAccess = async (id, payload) => {
 };
 
 /**
+ * Владелец/админ напрямую назначает агента склада без заявки.
+ * POST /api/warehouse/agents/company-memberships/
+ * body: { user, common_access_enabled?, common_warehouse? }
+ */
+export const createCompanyMembership = async (payload) => {
+  try {
+    const response = await api.post(
+      "warehouse/agents/company-memberships/",
+      payload,
+    );
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      console.error("Create Company Membership Error:", error.response.data);
+      return Promise.reject(error.response.data);
+    }
+    return Promise.reject(error);
+  }
+};
+
+/**
  * Остатки у всех агентов (для owner/admin)
  * GET /api/warehouse/owner/agents/products/
  */
@@ -2623,4 +2644,5 @@ export default {
   rejectCompanyAgentRequest,
   removeCompanyAgent,
   patchCompanyAgentCommonAccess,
+  createCompanyMembership,
 };

@@ -29,14 +29,14 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
   const confirm = useConfirm();
   const dispatch = useDispatch();
   const { updating, updateError, deleting, deleteError } = useSelector(
-    (state) => state.employee
+    (state) => state.employee,
   );
 
   const [editedEmployee, setEditedEmployee] = useState(() => {
     const birthDate = employee.birth
       ? new Date(employee.birth.split(".").reverse().join("-"))
-        .toISOString()
-        .split("T")[0]
+          .toISOString()
+          .split("T")[0]
       : "";
     return {
       id: employee.id || "",
@@ -75,17 +75,17 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
 
     try {
       await dispatch(
-        updateEmployeeAsync({ employeeId: employee.id, updatedData: payload })
+        updateEmployeeAsync({ employeeId: employee.id, updatedData: payload }),
       ).unwrap();
       onClose();
       onSaveSuccess();
     } catch (err) {
       console.error("Failed to update employee:", err);
-      const errorMessage = validateResErrors(err, "Ошибка при обновлении сотрудника. ")
-      alert(
-        errorMessage,
-        true
+      const errorMessage = validateResErrors(
+        err,
+        "Ошибка при обновлении сотрудника. ",
       );
+      alert(errorMessage, true);
     }
   };
 
@@ -100,15 +100,15 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
             onDeleteConfirm();
           } catch (err) {
             console.error("Failed to delete employee:", err);
-            const errorMessage = validateResErrors(err, "Ошибка при удалении сотрудника. ")
-            alert(
-              errorMessage,
-              true
+            const errorMessage = validateResErrors(
+              err,
+              "Ошибка при удалении сотрудника. ",
             );
+            alert(errorMessage, true);
           }
         }
-      }
-    )
+      },
+    );
   };
 
   const availableDepts = ["Склад", "Маркетинг", "Продажи", "HR", "Бухгалтерия"];
@@ -120,7 +120,7 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
   ];
   // При редактировании нельзя назначить владельца (показываем владельца только если сотрудник уже владелец)
   const availableRoles = allRoles.filter(
-    (r) => r.value !== "owner" || editedEmployee.role === "owner"
+    (r) => r.value !== "owner" || editedEmployee.role === "owner",
   );
 
   return (
@@ -389,8 +389,9 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
     } catch (err) {
       console.error("Failed to create employee:", err);
       alert(
-        `Ошибка при добавлении сотрудника: ${err.message || JSON.stringify(err)
-        }`
+        `Ошибка при добавлении сотрудника: ${
+          err.message || JSON.stringify(err)
+        }`,
       );
     }
   };
@@ -730,15 +731,15 @@ export default function EmployeeTable() {
             Authorization: `Bearer ${AUTH_TOKEN}`,
           },
           body: JSON.stringify(newAccessesPayload),
-        }
+        },
       );
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
           errorData.detail ||
-          JSON.stringify(errorData) ||
-          "Не удалось обновить доступы сотрудника"
+            JSON.stringify(errorData) ||
+            "Не удалось обновить доступы сотрудника",
         );
       }
     } catch (err) {
@@ -834,7 +835,7 @@ export default function EmployeeTable() {
                     <td>{e.email}</td>
                     <td>
                       {profile?.owner?.role === "owner" ||
-                        profile?.owner?.role === "admin" ? (
+                      profile?.owner?.role === "admin" ? (
                         <AccessList
                           employeeAccesses={e.accesses}
                           onSaveAccesses={(newAccessesPayload) =>
@@ -854,10 +855,11 @@ export default function EmployeeTable() {
                     </td>
                     <td>
                       <span
-                        className={`employee__role ${e.role === "Маркетолог"
-                          ? "employee__role--red"
-                          : "employee__role--green"
-                          }`}
+                        className={`employee__role ${
+                          e.role === "Маркетолог"
+                            ? "employee__role--red"
+                            : "employee__role--green"
+                        }`}
                       >
                         {availableRoles.map((item) => {
                           return item.value === e.role ? item.label : false;

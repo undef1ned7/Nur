@@ -107,9 +107,12 @@
     &--primary {
       background: var(--primary);
       color: #111827;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 
-      &:hover {
+      &:hover:not(:disabled) {
         background: var(--primary-dark);
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+        transform: translateY(-1px);
       }
     }
 
@@ -117,9 +120,10 @@
       border: 1px solid #e5e7eb;
       background: #f9fafb;
 
-      &:hover {
+      &:hover:not(:disabled) {
         background: #f3f4f6;
         border-color: #d1d5db;
+        transform: translateY(-1px);
       }
     }
 
@@ -465,6 +469,72 @@
 
     &--invalid .barbermasters__input {
       border-color: #dc2626;
+    }
+  }
+
+  /* Модалка "Агент склада" */
+  &__employeeCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #f9fafb;
+  }
+
+  &__employeeAvatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: #111827;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  &__employeeInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__employeeName {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  &__employeeMeta {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  &__seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  &__segBtn {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+    &.is-active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: #111827;
     }
   }
 

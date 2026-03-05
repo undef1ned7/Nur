@@ -1355,11 +1355,12 @@ const AddWarehouseProductPage = () => {
       return sum + itemPrice * itemQuantity;
     }, 0);
     const calculatedPrice = Math.round(totalCost * 1000) / 1000;
-    handleMarketDataChange("purchasePrice", calculatedPrice.toString());
+    const formattedPrice = calculatedPrice.toFixed(3);
+    handleMarketDataChange("purchasePrice", formattedPrice);
     // Устанавливаем цену продажи равной сумме стоимостей товаров
     setNewItemData((prev) => ({
       ...prev,
-      price: calculatedPrice.toString(),
+      price: formattedPrice,
     }));
   };
 
@@ -2338,11 +2339,12 @@ const MarketProductForm = ({
           return sum + itemPrice * itemQuantity;
         }, 0);
         const calculatedPrice = Math.round(totalCost * 1000) / 1000;
+        const formattedPrice = calculatedPrice.toFixed(3);
 
         // Всегда автоматически обновляем цену продажи для комплекта
         setNewItemData((prev) => ({
           ...prev,
-          price: calculatedPrice.toString(),
+          price: formattedPrice,
         }));
       } else {
         // Если товаров нет, очищаем цену
@@ -2367,11 +2369,11 @@ const MarketProductForm = ({
 
       if (purchasePrice > 0 && markup >= 0) {
         const sellingPrice = purchasePrice * (1 + markup / 100);
-        const calculatedPrice = Math.round(sellingPrice * 1000) / 1000; // Округляем до 3 знаков
+        const formattedPrice = sellingPrice.toFixed(3); // Округляем и форматируем до 3 знаков
 
         setNewItemData((prev) => ({
           ...prev,
-          price: calculatedPrice.toString(),
+          price: formattedPrice,
         }));
       } else if (purchasePrice === 0 && markup === 0) {
         setNewItemData((prev) => ({
@@ -2411,8 +2413,8 @@ const MarketProductForm = ({
 
       if (purchasePrice > 0 && sellingPrice > 0) {
         const markupPercent = (sellingPrice / purchasePrice - 1) * 100;
-        const roundedMarkup = Math.round(markupPercent * 100) / 100;
-        handleMarketDataChange("markup", roundedMarkup.toString());
+        const formattedMarkup = markupPercent.toFixed(3);
+        handleMarketDataChange("markup", formattedMarkup);
       }
     }
   };

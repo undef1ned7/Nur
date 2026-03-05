@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { X, Edit, Copy, Trash2, ArrowLeftRight, Calendar, Tag, Globe, Box, FileText } from "lucide-react";
+import {
+  X,
+  Edit,
+  Copy,
+  Trash2,
+  ArrowLeftRight,
+  Calendar,
+  Tag,
+  Globe,
+  Box,
+  FileText,
+} from "lucide-react";
 import "../../Market/Warehouse/Warehouse.scss";
 import warehouseAPI from "../../../../api/warehouse";
 import noImage from "../../Market/Warehouse/components/placeholder.png";
@@ -55,7 +66,9 @@ const WarehouseProductDetail = () => {
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + imagesList.length) % imagesList.length);
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + imagesList.length) % imagesList.length,
+    );
   };
 
   const handleEdit = () => {
@@ -83,12 +96,14 @@ const WarehouseProductDetail = () => {
       setShowDeleteConfirm(false);
       alert(
         "Ошибка при удалении товара: " +
-          (error?.response?.data?.detail || error?.message || JSON.stringify(error))
+          (error?.response?.data?.detail ||
+            error?.message ||
+            JSON.stringify(error)),
       );
     }
   };
 
-  const formatPrice = (price) => parseFloat(price || 0).toFixed(2);
+  const formatPrice = (price) => parseFloat(price || 0).toFixed(3);
 
   const formatDate = (dateString) => {
     if (!dateString) return "—";
@@ -116,12 +131,16 @@ const WarehouseProductDetail = () => {
   };
 
   if (loading) return <div className="product-detail-loading">Загрузка...</div>;
-  if (!product) return <div className="product-detail-error">Товар не найден</div>;
+  if (!product)
+    return <div className="product-detail-error">Товар не найден</div>;
 
   return (
     <div className="product-detail">
       <div className="product-detail__header flex-wrap">
-        <button className="product-detail__close-btn" onClick={() => navigate(-1)}>
+        <button
+          className="product-detail__close-btn"
+          onClick={() => navigate(-1)}
+        >
           <X size={20} />
         </button>
 
@@ -130,7 +149,10 @@ const WarehouseProductDetail = () => {
           Редактировать
         </button>
 
-        <button className="product-detail__duplicate-btn" onClick={handleDuplicate}>
+        <button
+          className="product-detail__duplicate-btn"
+          onClick={handleDuplicate}
+        >
           <Copy size={16} />
           Дублировать товар
         </button>
@@ -144,7 +166,10 @@ const WarehouseProductDetail = () => {
           Переместить
         </button>
 
-        <button className="product-detail__delete-btn" onClick={() => setShowDeleteConfirm(true)}>
+        <button
+          className="product-detail__delete-btn"
+          onClick={() => setShowDeleteConfirm(true)}
+        >
           <Trash2 size={16} />
           Удалить
         </button>
@@ -157,7 +182,10 @@ const WarehouseProductDetail = () => {
               <>
                 <div className="product-detail__main-image ">
                   <img
-                    src={imagesList[currentImageIndex]?.image_url || imagesList[currentImageIndex]?.image}
+                    src={
+                      imagesList[currentImageIndex]?.image_url ||
+                      imagesList[currentImageIndex]?.image
+                    }
                     alt={product.name || "Товар"}
                     className="product-detail__image"
                   />
@@ -178,7 +206,9 @@ const WarehouseProductDetail = () => {
                     </>
                   )}
                   {imagesList[currentImageIndex]?.is_primary && (
-                    <div className="product-detail__image-primary-badge">Главное</div>
+                    <div className="product-detail__image-primary-badge">
+                      Главное
+                    </div>
                   )}
                 </div>
                 {imagesList.length > 1 && (
@@ -187,13 +217,20 @@ const WarehouseProductDetail = () => {
                       <div
                         key={image.id || index}
                         className={`product-detail__thumbnail ${
-                          index === currentImageIndex ? "product-detail__thumbnail--active" : ""
+                          index === currentImageIndex
+                            ? "product-detail__thumbnail--active"
+                            : ""
                         }`}
                         onClick={() => setCurrentImageIndex(index)}
                       >
-                        <img src={image.image_url || image.image} alt={`${product.name} ${index + 1}`} />
+                        <img
+                          src={image.image_url || image.image}
+                          alt={`${product.name} ${index + 1}`}
+                        />
                         {image.is_primary && (
-                          <div className="product-detail__thumbnail-badge">★</div>
+                          <div className="product-detail__thumbnail-badge">
+                            ★
+                          </div>
                         )}
                       </div>
                     ))}
@@ -217,15 +254,23 @@ const WarehouseProductDetail = () => {
             <div className="product-detail__details">
               <div className="product-detail__detail-item">
                 <span className="product-detail__detail-label">Штрих-код:</span>
-                <span className="product-detail__detail-value">{product.barcode || "—"}</span>
+                <span className="product-detail__detail-value">
+                  {product.barcode || "—"}
+                </span>
               </div>
               <div className="product-detail__detail-item">
                 <span className="product-detail__detail-label">Артикул:</span>
-                <span className="product-detail__detail-value">{product.article || "—"}</span>
+                <span className="product-detail__detail-value">
+                  {product.article || "—"}
+                </span>
               </div>
               <div className="product-detail__detail-item">
-                <span className="product-detail__detail-label">Код товара:</span>
-                <span className="product-detail__detail-value">{product.code || "—"}</span>
+                <span className="product-detail__detail-label">
+                  Код товара:
+                </span>
+                <span className="product-detail__detail-value">
+                  {product.code || "—"}
+                </span>
               </div>
             </div>
           </div>
@@ -248,7 +293,9 @@ const WarehouseProductDetail = () => {
                 <div className="product-detail__info-item">
                   <Calendar className="product-detail__info-icon" size={18} />
                   <span className="product-detail__info-label">Создан:</span>
-                  <span className="product-detail__info-value">{formatDate(product.created_at)}</span>
+                  <span className="product-detail__info-value">
+                    {formatDate(product.created_at)}
+                  </span>
                 </div>
                 <div className="product-detail__info-item">
                   <Tag className="product-detail__info-icon" size={18} />
@@ -260,24 +307,34 @@ const WarehouseProductDetail = () => {
                 <div className="product-detail__info-item">
                   <Globe className="product-detail__info-icon" size={18} />
                   <span className="product-detail__info-label">Страна:</span>
-                  <span className="product-detail__info-value">{product.country || "—"}</span>
+                  <span className="product-detail__info-value">
+                    {product.country || "—"}
+                  </span>
                 </div>
                 <div className="product-detail__info-item">
                   <Calendar className="product-detail__info-icon" size={18} />
-                  <span className="product-detail__info-label">Срок годности:</span>
+                  <span className="product-detail__info-label">
+                    Срок годности:
+                  </span>
                   <span className="product-detail__info-value">
-                    {product.expiration_date ? formatDate(product.expiration_date) : "—"}
+                    {product.expiration_date
+                      ? formatDate(product.expiration_date)
+                      : "—"}
                   </span>
                 </div>
                 <div className="product-detail__info-item">
                   <Box className="product-detail__info-icon" size={18} />
                   <span className="product-detail__info-label">Группа:</span>
-                  <span className="product-detail__info-value">{product.group || "Товары и услуги"}</span>
+                  <span className="product-detail__info-value">
+                    {product.group || "Товары и услуги"}
+                  </span>
                 </div>
                 <div className="product-detail__info-item">
                   <FileText className="product-detail__info-icon" size={18} />
                   <span className="product-detail__info-label">Описание:</span>
-                  <span className="product-detail__info-value">{product.description || "—"}</span>
+                  <span className="product-detail__info-value">
+                    {product.description || "—"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -326,5 +383,3 @@ const WarehouseProductDetail = () => {
 };
 
 export default WarehouseProductDetail;
-
-
