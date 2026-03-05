@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { X } from "lucide-react";
 import { createWarehouseCounterparty } from "../../../../../store/creators/warehouseThunk";
 import { useUser } from "../../../../../store/slices/userSlice";
+import { fetchEmployeesAsync } from "../../../../../store/creators/employeeCreators";
 import "../Counterparties.scss";
 
 /** Роль агента: контрагент при создании автоматически привязывается к текущему пользователю на бэкенде */
@@ -15,9 +16,13 @@ const isAgentRole = (profile) =>
 const CreateCounterpartyModal = ({ onClose }) => {
   const dispatch = useDispatch();
   const { profile } = useUser() || {};
+  const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
+
   const [formData, setFormData] = useState({
     name: "",
     type: "CLIENT",
+    phone: "",
+    agent: "",
   });
   const [error, setError] = useState("");
   const [localError, setLocalError] = useState("");
@@ -25,6 +30,11 @@ const CreateCounterpartyModal = ({ onClose }) => {
   // Получаем состояние создания из Redux
   const creating = useSelector((state) => state.counterparty.creating || false);
   const createError = useSelector((state) => state.counterparty.createError);
+  const {
+    list: employees = [],
+    loading: employeesLoading = false,
+    error: employeesError = null,
+  } = useSelector((state) => state.employee || {});
 
   // Отслеживаем ошибки из Redux
   useEffect(() => {
@@ -34,12 +44,23 @@ const CreateCounterpartyModal = ({ onClose }) => {
           createError?.message ||
           typeof createError === "string"
           ? createError
-          : "Не удалось создать контрагента"
+          : "Не удалось создать контрагента",
       );
     } else {
       setError("");
     }
   }, [createError]);
+
+  useEffect(() => {
+    if (!isOwnerOrAdmin) return;
+
+    dispatch(
+      fetchEmployeesAsync({
+        page: 1,
+        search: "",
+      }),
+    );
+  }, [dispatch, isOwnerOrAdmin]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -74,6 +95,16 @@ const CreateCounterpartyModal = ({ onClose }) => {
       return false;
     }
 
+    const phoneTrim = (formData.phone || "").trim();
+    if (!phoneTrim) {
+      setLocalError("Номер телефона обязателен");
+      return false;
+    }
+    if (!/^\+?\d[\d\s\-()]{5,}$/.test(phoneTrim)) {
+      setLocalError("Неверный формат телефона");
+      return false;
+    }
+
     return true;
   };
 
@@ -88,17 +119,22 @@ const CreateCounterpartyModal = ({ onClose }) => {
     setLocalError("");
 
     try {
-      await dispatch(
-        createWarehouseCounterparty({
-          name: formData.name.trim(),
-          type: formData.type,
-        })
-      ).unwrap();
+      const payload = {
+        name: formData.name.trim(),
+        type: formData.type,
+        phone: formData.phone.trim(),
+      };
+
+      if (isOwnerOrAdmin && formData.agent) {
+        payload.agent = formData.agent;
+      }
+
+      await dispatch(createWarehouseCounterparty(payload)).unwrap();
 
       // При успешном создании закрываем модальное окно
       // Список обновится автоматически через Redux slice
       onClose();
-      setFormData({ name: "", type: "CLIENT" });
+      setFormData({ name: "", type: "CLIENT", phone: "", agent: "" });
       setError("");
       setLocalError("");
     } catch (err) {
@@ -159,6 +195,23 @@ const CreateCounterpartyModal = ({ onClose }) => {
             </div>
 
             <div className="warehouse-filter-modal__section">
+              <label className="warehouse-filter-modal__label">
+                Номер телефона *
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                className="warehouse-filter-modal__select"
+                placeholder="Введите номер телефона"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                disabled={creating}
+                autoComplete="tel"
+              />
+            </div>
+
+            <div className="warehouse-filter-modal__section">
               <label className="warehouse-filter-modal__label">Тип *</label>
               <select
                 name="type"
@@ -173,6 +226,64 @@ const CreateCounterpartyModal = ({ onClose }) => {
                 <option value="BOTH">Клиент и поставщик</option>
               </select>
             </div>
+
+            {isOwnerOrAdmin && (
+              <div className="warehouse-filter-modal__section">
+                <label className="warehouse-filter-modal__label">Агент</label>
+                <select
+                  name="agent"
+                  className="warehouse-filter-modal__select"
+                  value={formData.agent}
+                  onChange={handleChange}
+                  disabled={creating || employeesLoading}
+                >
+                  <option value="">Без агента</option>
+                  {Array.isArray(employees) &&
+                    employees
+                      .filter(
+                        (e) =>
+                          String(e.role) !== "owner" &&
+                          String(e.role) !== "admin",
+                      )
+                      .map((e) => {
+                        const label =
+                          [e.last_name || "", e.first_name || ""]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim() ||
+                          e.email ||
+                          "—";
+                        return (
+                          <option key={e.id} value={e.id}>
+                            {label}
+                          </option>
+                        );
+                      })}
+                </select>
+                {employeesLoading && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: "#555",
+                    }}
+                  >
+                    Загрузка списка агентов…
+                  </div>
+                )}
+                {employeesError && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: "#c33",
+                    }}
+                  >
+                    {String(employeesError)}
+                  </div>
+                )}
+              </div>
+            )}
 
             {isAgentRole(profile) && (
               <div
@@ -214,4 +325,3 @@ const CreateCounterpartyModal = ({ onClose }) => {
 };
 
 export default CreateCounterpartyModal;
-

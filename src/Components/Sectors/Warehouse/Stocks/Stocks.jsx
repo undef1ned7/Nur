@@ -32,7 +32,7 @@ import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 const Stocks = () => {
   const dispatch = useDispatch();
   const confirm = useConfirm();
-  const alert = useAlert()
+  const alert = useAlert();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { warehouse_id: warehouseIdFromParams } = useParams();
@@ -41,7 +41,7 @@ const Stocks = () => {
   // Получаем название склада из Redux store
   const warehouseName = useSelector((state) => {
     const warehouse = state.warehouse.list.find(
-      (w) => String(w.id) === String(warehouseId)
+      (w) => String(w.id) === String(warehouseId),
     );
     return warehouse ? warehouse.name : "";
   });
@@ -89,7 +89,9 @@ const Stocks = () => {
   const [groups, setGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupsError, setGroupsError] = useState(null);
-  const [expandedGroupIds, setExpandedGroupIds] = useState(() => new Set(["root"]));
+  const [expandedGroupIds, setExpandedGroupIds] = useState(
+    () => new Set(["root"]),
+  );
   const [dragOverGroupId, setDragOverGroupId] = useState(null);
 
   // undefined = закрыто, null = корень, string = uuid родителя
@@ -119,7 +121,7 @@ const Stocks = () => {
   // Получаем текущую страницу из URL
   const currentPageFromUrl = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
+    [searchParams],
   );
 
   // Параметры запроса
@@ -212,14 +214,14 @@ const Stocks = () => {
     (product) => {
       navigate(`/crm/warehouse/products/${product.id}`);
     },
-    [navigate]
+    [navigate],
   );
 
   const handlePageChange = useCallback(
     (newPage) => {
       handlePageChangeBase(newPage, () => setSelectedRows(new Set()));
     },
-    [handlePageChangeBase, setSelectedRows]
+    [handlePageChangeBase, setSelectedRows],
   );
 
   const handleBulkDelete = useCallback(() => {
@@ -236,7 +238,7 @@ const Stocks = () => {
           ids: Array.from(selectedRows),
           soft: true,
           require_all: false,
-        })
+        }),
       ).unwrap();
 
       setSelectedRows(new Set());
@@ -245,7 +247,7 @@ const Stocks = () => {
       dispatch(fetchProductsAsync(requestParams));
     } catch (e) {
       console.error("Ошибка при удалении товаров:", e);
-      const errorMessage = validateResErrors(e, 'Не удалось удалить товары')
+      const errorMessage = validateResErrors(e, "Не удалось удалить товары");
       alert(errorMessage, true);
     } finally {
       setBulkDeleting(false);
@@ -286,7 +288,7 @@ const Stocks = () => {
     });
     for (const [k, arr] of map.entries()) {
       arr.sort((a, b) =>
-        String(a?.name || "").localeCompare(String(b?.name || ""))
+        String(a?.name || "").localeCompare(String(b?.name || "")),
       );
       map.set(k, arr);
     }
@@ -326,21 +328,24 @@ const Stocks = () => {
     });
   }, []);
 
-  const createGroup = useCallback(async ({ name, parent }) => {
-    if (!warehouseId) return;
-    setGroupsError(null);
-    try {
-      await api.post(`/warehouse/${warehouseId}/groups/`, {
-        name: String(name || "").trim(),
-        warehouse: warehouseId,
-        parent: parent || null,
-      });
-      await loadGroups();
-    } catch (e) {
-      console.error("Ошибка при создании группы:", e);
-      setGroupsError(e);
-    }
-  }, [warehouseId, loadGroups]);
+  const createGroup = useCallback(
+    async ({ name, parent }) => {
+      if (!warehouseId) return;
+      setGroupsError(null);
+      try {
+        await api.post(`/warehouse/${warehouseId}/groups/`, {
+          name: String(name || "").trim(),
+          warehouse: warehouseId,
+          parent: parent || null,
+        });
+        await loadGroups();
+      } catch (e) {
+        console.error("Ошибка при создании группы:", e);
+        setGroupsError(e);
+      }
+    },
+    [warehouseId, loadGroups],
+  );
 
   const openInlineCreate = useCallback((parentIdOrNull) => {
     setInlineCreateParentId(parentIdOrNull);
@@ -372,20 +377,27 @@ const Stocks = () => {
   const deleteGroup = useCallback(
     async (groupId) => {
       if (!warehouseId || !groupId) return;
-      confirm("Удалить группу?", async (ok) => {
-        if (!ok) return;
-        setGroupsError(null);
-        try {
-          await api.delete(`/warehouse/${warehouseId}/groups/${groupId}/`);
-          setGroups(groups.filter((g) => g.id !== groupId));
-        } catch (e) {
-          console.error("Ошибка при удалении группы:", e);
-          const errorMessage = validateResErrors(e, 'Не удалось удалить группу')
-          alert(errorMessage, true);
-        }
-      }, true);
+      confirm(
+        "Удалить группу?",
+        async (ok) => {
+          if (!ok) return;
+          setGroupsError(null);
+          try {
+            await api.delete(`/warehouse/${warehouseId}/groups/${groupId}/`);
+            setGroups(groups.filter((g) => g.id !== groupId));
+          } catch (e) {
+            console.error("Ошибка при удалении группы:", e);
+            const errorMessage = validateResErrors(
+              e,
+              "Не удалось удалить группу",
+            );
+            alert(errorMessage, true);
+          }
+        },
+        true,
+      );
     },
-    [warehouseId, selectedGroupId, resetToFirstPage, loadGroups, groups]
+    [warehouseId, selectedGroupId, resetToFirstPage, loadGroups, groups],
   );
 
   const refreshProducts = useCallback(() => {
@@ -400,8 +412,8 @@ const Stocks = () => {
           productIds.map((pid) =>
             api.patch(`/warehouse/products/${pid}/`, {
               product_group: targetGroupIdOrNull || null,
-            })
-          )
+            }),
+          ),
         );
         clearSelection();
         await loadGroups(); // обновим products_count
@@ -411,7 +423,7 @@ const Stocks = () => {
         alert("Не удалось переместить товар в группу.");
       }
     },
-    [clearSelection, loadGroups, refreshProducts]
+    [clearSelection, loadGroups, refreshProducts],
   );
 
   const onProductDragStart = useCallback(
@@ -424,12 +436,12 @@ const Stocks = () => {
           : [pid];
       e.dataTransfer.setData(
         "application/x-warehouse-product-ids",
-        JSON.stringify(ids)
+        JSON.stringify(ids),
       );
       e.dataTransfer.setData("text/plain", JSON.stringify(ids));
       e.dataTransfer.effectAllowed = "move";
     },
-    [selectedRows]
+    [selectedRows],
   );
 
   const onGroupDrop = useCallback(
@@ -448,7 +460,7 @@ const Stocks = () => {
       if (!Array.isArray(ids) || ids.length === 0) return;
       await moveProductsToGroup(ids, targetGroupIdOrNull);
     },
-    [moveProductsToGroup]
+    [moveProductsToGroup],
   );
 
   const renderGroupTree = useCallback(
@@ -469,13 +481,18 @@ const Stocks = () => {
           selectedGroupId !== "all" && String(selectedGroupId) === gKey;
         const isDragOver = dragOverGroupId && String(dragOverGroupId) === gKey;
         const hasParent = g?.parent !== null;
-        const isChildrenSelected = children.some((c) => selectedGroupId === String(c?.id));
+        const isChildrenSelected = children.some(
+          (c) => selectedGroupId === String(c?.id),
+        );
         return (
-          <div key={gKey} className={`stocksGroups__node ${isChildrenSelected ? "is-children-selected" : ""}`}>
-
+          <div
+            key={gKey}
+            className={`stocksGroups__node ${isChildrenSelected ? "is-children-selected" : ""}`}
+          >
             <div
-              className={`stocksGroups__item ${isSelected ? "is-selected" : ""
-                } ${isDragOver ? "is-dragOver" : ""}`}
+              className={`stocksGroups__item ${
+                isSelected ? "is-selected" : ""
+              } ${isDragOver ? "is-dragOver" : ""}`}
               style={{ marginLeft: hasParent ? depth * 14 : 0 }}
               role="button"
               tabIndex={0}
@@ -505,14 +522,15 @@ const Stocks = () => {
                 }}
               >
                 {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
-
               </span>
               <span className="stocksGroups__icon">
                 {isSelected ? <FolderOpen size={16} /> : <Folder size={16} />}
               </span>
               <div className="stocksGroups__nameContainer">
                 <span className="stocksGroups__name">{g?.name || "—"}</span>
-                <span className="stocksGroups__count">{g?.products_count || "0"}</span>
+                <span className="stocksGroups__count">
+                  {g?.products_count || "0"}
+                </span>
               </div>
 
               {inlineCreateParentId !== gKey && (
@@ -598,13 +616,13 @@ const Stocks = () => {
       setInlineCreateName,
       submitInlineCreate,
       closeInlineCreate,
-    ]
+    ],
   );
 
   // Мемоизация сообщения для модального окна удаления
   const deleteModalMessage = useMemo(
     () => formatDeleteMessage(selectedCount),
-    [selectedCount]
+    [selectedCount],
   );
 
   return (
@@ -646,8 +664,6 @@ const Stocks = () => {
           {showGroups ? "Скрыть группы" : "Показать группы"}
         </button>
 
-
-
         {selectedCount > 0 && (
           <div className="stocksToolbar__move">
             <label>Переместить в</label>
@@ -670,7 +686,7 @@ const Stocks = () => {
               onClick={() =>
                 moveProductsToGroup(
                   Array.from(selectedRows),
-                  moveTargetGroupId === "none" ? null : moveTargetGroupId
+                  moveTargetGroupId === "none" ? null : moveTargetGroupId,
                 )
               }
             >
@@ -680,22 +696,23 @@ const Stocks = () => {
         )}
       </div>
 
-      <div className={`stocksLayout ${showGroups ? "" : "stocksLayout--noGroups"}`}>
+      <div
+        className={`stocksLayout ${showGroups ? "" : "stocksLayout--noGroups"}`}
+      >
         {showGroups && (
           <aside className="stocksGroups">
             <div className="stocksGroups__header">
               <div className="stocksGroups__title">Группы</div>
             </div>
-
             {groupsError && (
               <div className="stocksGroups__error">
                 Не удалось загрузить/изменить группы
               </div>
             )}
-
             <div
-              className={`stocksGroups__item ${selectedGroupId === "all" ? "is-selected" : ""
-                }`}
+              className={`stocksGroups__item ${
+                selectedGroupId === "all" ? "is-selected" : ""
+              }`}
               role="button"
               tabIndex={0}
               onClick={() => {
@@ -732,7 +749,6 @@ const Stocks = () => {
                 </button>
               )}
             </div>
-
             {inlineCreateParentId === null && (
               <div
                 className="stocksGroups__inlineCreate"

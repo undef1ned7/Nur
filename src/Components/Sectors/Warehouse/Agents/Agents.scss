@@ -240,6 +240,14 @@
     font-size: 13px;
   }
 
+  .agents-card__row--select {
+    align-items: center;
+
+    .warehouse-search__input {
+      max-width: 260px;
+    }
+  }
+
   .agents-card__label {
     color: #64748b;
   }

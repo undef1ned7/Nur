@@ -3,6 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaEdit, FaLock, FaPlus, FaSearch, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
+import {
+  createCompanyMembership,
+  listWarehouses,
+} from "../../../../api/warehouse";
 import { useUser } from "../../../../store/slices/userSlice";
 import RoleCreateModal from "./modals/RoleCreateModal";
 import RoleEditModal from "./modals/RoleEditModal";
@@ -257,6 +261,19 @@ const Masters = () => {
   const [accessModalOpen, setAccessModalOpen] = useState(false);
   const [accessModalEmployee, setAccessModalEmployee] = useState(null);
   const [accessModalAccesses, setAccessModalAccesses] = useState([]);
+
+  // Назначение агента склада (Warehouse Agents)
+  const [warehouseAgentModalOpen, setWarehouseAgentModalOpen] = useState(false);
+  const [warehouseAgentEmployee, setWarehouseAgentEmployee] = useState(null);
+  const [warehouseAgentCommonEnabled, setWarehouseAgentCommonEnabled] =
+    useState(false);
+  const [warehouseAgentCommonWarehouse, setWarehouseAgentCommonWarehouse] =
+    useState("");
+  const [warehouseAgentSaving, setWarehouseAgentSaving] = useState(false);
+  const [warehouseAgentError, setWarehouseAgentError] = useState("");
+  const [warehouseAgentWarehouses, setWarehouseAgentWarehouses] = useState([]);
+  const [warehouseAgentWarehousesLoading, setWarehouseAgentWarehousesLoading] =
+    useState(false);
 
   const copyToClipboard = async (text, key) => {
     if (!text) return;
@@ -1113,6 +1130,77 @@ const Masters = () => {
     }
   };
 
+  /* ========= Warehouse: assign as warehouse agent (company membership) ========= */
+  const openWarehouseAgentModal = (employee) => {
+    if (!employee?.id) return;
+    setWarehouseAgentEmployee(employee);
+    setWarehouseAgentCommonEnabled(false);
+    setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentError("");
+    setWarehouseAgentModalOpen(true);
+
+    if (
+      company?.sector?.name === "Склад" &&
+      !warehouseAgentWarehousesLoading &&
+      warehouseAgentWarehouses.length === 0
+    ) {
+      (async () => {
+        try {
+          setWarehouseAgentWarehousesLoading(true);
+          const res = await listWarehouses({ page_size: 1000 });
+          const list = Array.isArray(res?.results) ? res.results : res || [];
+          setWarehouseAgentWarehouses(list);
+        } catch (err) {
+          console.error("Не удалось загрузить склады для выбора:", err);
+          setWarehouseAgentError(
+            pickApiError(err, "Не удалось загрузить список складов."),
+          );
+        } finally {
+          setWarehouseAgentWarehousesLoading(false);
+        }
+      })();
+    }
+  };
+
+  const closeWarehouseAgentModal = () => {
+    if (warehouseAgentSaving) return;
+    setWarehouseAgentModalOpen(false);
+    setWarehouseAgentEmployee(null);
+    setWarehouseAgentCommonEnabled(false);
+    setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentError("");
+  };
+
+  const submitWarehouseAgent = async (e) => {
+    e?.preventDefault?.();
+    if (!warehouseAgentEmployee?.id || warehouseAgentSaving) return;
+    if (warehouseAgentCommonEnabled && !warehouseAgentCommonWarehouse.trim()) {
+      setWarehouseAgentError("Укажите UUID склада для общего прайса.");
+      return;
+    }
+    setWarehouseAgentSaving(true);
+    setWarehouseAgentError("");
+    setPageNotice("");
+    try {
+      const payload = {
+        user: warehouseAgentEmployee.id,
+      };
+      if (warehouseAgentCommonEnabled) {
+        payload.common_access_enabled = true;
+        payload.common_warehouse = warehouseAgentCommonWarehouse.trim();
+      }
+      await createCompanyMembership(payload);
+      setPageNotice("Сотрудник назначен агентом склада.");
+      closeWarehouseAgentModal();
+    } catch (err) {
+      setWarehouseAgentError(
+        pickApiError(err, "Не удалось назначить сотрудника агентом склада."),
+      );
+    } finally {
+      setWarehouseAgentSaving(false);
+    }
+  };
+
   /* ========= Small pager ========= */
   const Pager = ({ page, total, onChange }) => {
     if (total <= 1) return null;
@@ -1397,6 +1485,19 @@ const Masters = () => {
                           </span>
                         </button>
                       )}
+                    {company?.sector?.name === "Склад" &&
+                      (profile?.role === "owner" ||
+                        profile?.role === "admin") && (
+                        <button
+                          className="barbermasters__btn barbermasters__btn--secondary"
+                          onClick={() => openWarehouseAgentModal(u)}
+                          title="Назначить агентом склада (модуль агентов)"
+                        >
+                          <span className="barbermasters__btnText">
+                            🧑‍💼 Агент склада
+                          </span>
+                        </button>
+                      )}
                     <button
                       className="barbermasters__btn barbermasters__btn--secondary"
                       onClick={() => openAccessModal(u)}
@@ -1518,6 +1619,140 @@ const Masters = () => {
         company={company}
         empSaving={empSaving}
       />
+
+      {warehouseAgentModalOpen && warehouseAgentEmployee && (
+        <div className="barbermasters__overlay" role="dialog" aria-modal="true">
+          <div className="barbermasters__modal">
+            <header className="barbermasters__modalHeader">
+              <h3 className="barbermasters__modalTitle">Агент склада</h3>
+              <button
+                type="button"
+                className="barbermasters__iconBtn"
+                onClick={closeWarehouseAgentModal}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </header>
+            <form
+              className="barbermasters__form"
+              onSubmit={submitWarehouseAgent}
+            >
+              <div className="barbermasters__content">
+                <div className="barbermasters__field barbermasters__field--full">
+                  <div className="barbermasters__employeeCard">
+                    <div className="barbermasters__employeeAvatar">
+                      {(
+                        fullName(warehouseAgentEmployee) ||
+                        warehouseAgentEmployee.email ||
+                        "•"
+                      )
+                        .trim()
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                    <div className="barbermasters__employeeInfo">
+                      <div className="barbermasters__employeeName">
+                        {fullName(warehouseAgentEmployee) || "Без имени"}
+                      </div>
+                      <div className="barbermasters__employeeMeta">
+                        {warehouseAgentEmployee.email ||
+                          warehouseAgentEmployee.id}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="barbermasters__field barbermasters__field--full">
+                  <label className="barbermasters__label">
+                    Доступ к складу
+                  </label>
+                  <div className="barbermasters__seg">
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        !warehouseAgentCommonEnabled ? "is-active" : ""
+                      }`}
+                      onClick={() => setWarehouseAgentCommonEnabled(false)}
+                      disabled={warehouseAgentSaving}
+                    >
+                      Только свои остатки
+                    </button>
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        warehouseAgentCommonEnabled ? "is-active" : ""
+                      }`}
+                      onClick={() => setWarehouseAgentCommonEnabled(true)}
+                      disabled={warehouseAgentSaving}
+                    >
+                      Общий прайс склада
+                    </button>
+                  </div>
+                </div>
+
+                {warehouseAgentCommonEnabled && (
+                  <div className="barbermasters__field barbermasters__field--full">
+                    <label className="barbermasters__label">
+                      Склад общего прайса{" "}
+                      <span className="barbermasters__req">*</span>
+                    </label>
+                    <select
+                      className="barbermasters__input"
+                      value={warehouseAgentCommonWarehouse}
+                      onChange={(e) =>
+                        setWarehouseAgentCommonWarehouse(e.target.value)
+                      }
+                      disabled={
+                        warehouseAgentSaving || warehouseAgentWarehousesLoading
+                      }
+                    >
+                      <option value="">
+                        {warehouseAgentWarehousesLoading
+                          ? "Загрузка складов…"
+                          : "Выберите склад"}
+                      </option>
+                      {warehouseAgentWarehouses.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name || w.title || w.id}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="barbermasters__help">
+                      Выберите склад, из которого агент будет видеть общий
+                      прайс‑лист.
+                    </div>
+                  </div>
+                )}
+
+                {warehouseAgentError && (
+                  <div className="barbermasters__alert barbermasters__alert--inModal">
+                    {warehouseAgentError}
+                  </div>
+                )}
+              </div>
+
+              <div className="barbermasters__modalFooter pl-5 pb-5 flex gap-3">
+                <button
+                  type="submit"
+                  className="barbermasters__btn barbermasters__btn--primary"
+                  disabled={warehouseAgentSaving}
+                >
+                  {warehouseAgentSaving ? "Назначение…" : "Назначить агентом"}
+                </button>
+                <button
+                  type="button"
+                  className="barbermasters__btn barbermasters__btn--secondary"
+                  onClick={closeWarehouseAgentModal}
+                  disabled={warehouseAgentSaving}
+                >
+                  Отмена
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {openLogin && null}
     </div>

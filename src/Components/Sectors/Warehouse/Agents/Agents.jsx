@@ -27,6 +27,7 @@ import {
   rejectCompanyAgentRequest,
   removeCompanyAgent,
   patchCompanyAgentCommonAccess,
+  createCompanyMembership,
 } from "../../../../api/warehouse";
 import { VIEW_MODES } from "../../Market/Warehouse/constants";
 
@@ -1077,6 +1078,12 @@ const Agents = () => {
   const [companyRequests, setCompanyRequests] = useState([]);
   const [companyStatusFilter, setCompanyStatusFilter] = useState("");
   const [companyActionBusyId, setCompanyActionBusyId] = useState(null);
+  const [newMembershipUserId, setNewMembershipUserId] = useState("");
+  const [newMembershipCommonEnabled, setNewMembershipCommonEnabled] =
+    useState(false);
+  const [newMembershipWarehouse, setNewMembershipWarehouse] = useState("");
+  const [newMembershipBusy, setNewMembershipBusy] = useState(false);
+  const [newMembershipError, setNewMembershipError] = useState("");
   const [companySearch, setCompanySearch] = useState("");
   const [companySearchLoading, setCompanySearchLoading] = useState(false);
   const [companySearchError, setCompanySearchError] = useState("");
@@ -1351,9 +1358,7 @@ const Agents = () => {
     } catch (e) {
       console.error(e);
       alert(
-        e?.detail ||
-          e?.message ||
-          "Не удалось отстранить агента от компании",
+        e?.detail || e?.message || "Не удалось отстранить агента от компании",
       );
     } finally {
       setCompanyActionBusyId(null);
@@ -1384,6 +1389,39 @@ const Agents = () => {
       );
     } finally {
       setCompanyActionBusyId(null);
+    }
+  };
+
+  const handleCreateMembership = async () => {
+    if (!newMembershipUserId.trim() || newMembershipBusy) return;
+    if (newMembershipCommonEnabled && !newMembershipWarehouse) {
+      setNewMembershipError("Выберите склад для общего прайса.");
+      return;
+    }
+    setNewMembershipBusy(true);
+    setNewMembershipError("");
+    try {
+      const payload = {
+        user: newMembershipUserId.trim(),
+      };
+      if (newMembershipCommonEnabled) {
+        payload.common_access_enabled = true;
+        payload.common_warehouse = newMembershipWarehouse;
+      }
+      await createCompanyMembership(payload);
+      setNewMembershipUserId("");
+      setNewMembershipCommonEnabled(false);
+      setNewMembershipWarehouse("");
+      await loadCompanyRequests();
+    } catch (e) {
+      console.error(e);
+      setNewMembershipError(
+        e?.detail ||
+          e?.message ||
+          "Не удалось назначить пользователя агентом склада",
+      );
+    } finally {
+      setNewMembershipBusy(false);
     }
   };
 
@@ -2068,252 +2106,324 @@ const Agents = () => {
               </div>
 
               {ownerCompanySubTab === "incoming" && (
-                <section className="agent-cart-modal__section agents-company-card">
-                <h3 className="agent-cart-modal__section-title">
-                  Входящие заявки агентов в компанию
-                </h3>
-                <p className="agents-company-subtitle">
-                  Новые запросы от пользователей, которые хотят работать
-                  агентами по складам вашей компании.
-                </p>
-                {companyRequestsError && (
-                  <div className="agents-error">
-                    {String(companyRequestsError)}
-                  </div>
-                )}
-                <div className="warehouse-table-container w-full">
-                  <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <table className="warehouse-table w-full min-w-[900px]">
-                      <thead>
-                        <tr>
-                          <th>№</th>
-                          <th>Агент</th>
-                          <th>Email</th>
-                          <th>Статус</th>
-                          <th>Сообщение</th>
-                          <th>Создана</th>
-                          <th>Решение</th>
-                          <th>Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {companyRequestsLoading ? (
+                <section className="agent-cart-modal__section">
+                  {/* <h3 className="agent-cart-modal__section-title">
+                    Входящие заявки агентов в компанию
+                  </h3>
+                  <p className="agents-company-subtitle">
+                    Новые запросы от пользователей, которые хотят работать
+                    агентами по складам вашей компании.
+                  </p> */}
+                  {companyRequestsError && (
+                    <div className="agents-error">
+                      {String(companyRequestsError)}
+                    </div>
+                  )}
+                  <div className="warehouse-table-container w-full">
+                    <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <table className="warehouse-table w-full min-w-[900px]">
+                        <thead>
                           <tr>
-                            <td colSpan={7} className="warehouse-table__loading">
-                              Загрузка…
-                            </td>
+                            <th>№</th>
+                            <th>Агент</th>
+                            <th>Email</th>
+                            <th>Статус</th>
+                            <th>Сообщение</th>
+                            <th>Создана</th>
+                            <th>Решение</th>
+                            <th>Действия</th>
                           </tr>
-                        ) : pendingCompanyRequests.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="warehouse-table__empty">
-                              Нет входящих заявок
-                            </td>
-                          </tr>
-                        ) : (
-                          pendingCompanyRequests.map((r, idx) => (
-                            <tr key={r.id}>
-                              <td>{idx + 1}</td>
-                              <td>{r.user_display || shortId(r.user)}</td>
-                              <td>{r.user_email || "—"}</td>
-                              <td>
-                                <span
-                                  className={`agents-badge ${companyStatusClass(r.status)}`}
-                                >
-                                  {companyStatusLabel(r.status)}
-                                </span>
-                              </td>
-                              <td className="agents-note">
-                                {r.note ? String(r.note) : "—"}
-                              </td>
-                              <td>{fmtDateTime(r.created_at)}</td>
-                              <td>{fmtDateTime(r.decided_at)}</td>
-                              <td>
-                                <div className="agents-row-actions">
-                                  <button
-                                    type="button"
-                                    className="agents-action-btn agents-action-btn--approve"
-                                    onClick={() =>
-                                      handleCompanyAccept(r.id)
-                                    }
-                                    disabled={companyActionBusyId === r.id}
-                                  >
-                                    <Check size={16} />
-                                    Принять
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="agents-action-btn agents-action-btn--reject"
-                                    onClick={() =>
-                                      handleCompanyReject(r.id)
-                                    }
-                                    disabled={companyActionBusyId === r.id}
-                                  >
-                                    <X size={16} />
-                                    Отклонить
-                                  </button>
-                                </div>
+                        </thead>
+                        <tbody>
+                          {companyRequestsLoading ? (
+                            <tr>
+                              <td
+                                colSpan={7}
+                                className="warehouse-table__loading"
+                              >
+                                Загрузка…
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                          ) : pendingCompanyRequests.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={7}
+                                className="warehouse-table__empty"
+                              >
+                                Нет входящих заявок
+                              </td>
+                            </tr>
+                          ) : (
+                            pendingCompanyRequests.map((r, idx) => (
+                              <tr key={r.id}>
+                                <td>{idx + 1}</td>
+                                <td>{r.user_display || shortId(r.user)}</td>
+                                <td>{r.user_email || "—"}</td>
+                                <td>
+                                  <span
+                                    className={`agents-badge ${companyStatusClass(r.status)}`}
+                                  >
+                                    {companyStatusLabel(r.status)}
+                                  </span>
+                                </td>
+                                <td className="agents-note">
+                                  {r.note ? String(r.note) : "—"}
+                                </td>
+                                <td>{fmtDateTime(r.created_at)}</td>
+                                <td>{fmtDateTime(r.decided_at)}</td>
+                                <td>
+                                  <div className="agents-row-actions">
+                                    <button
+                                      type="button"
+                                      className="agents-action-btn agents-action-btn--approve"
+                                      onClick={() => handleCompanyAccept(r.id)}
+                                      disabled={companyActionBusyId === r.id}
+                                    >
+                                      <Check size={16} />
+                                      Принять
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="agents-action-btn agents-action-btn--reject"
+                                      onClick={() => handleCompanyReject(r.id)}
+                                      disabled={companyActionBusyId === r.id}
+                                    >
+                                      <X size={16} />
+                                      Отклонить
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
               )}
 
               {ownerCompanySubTab === "active" && (
-                <section className="agent-cart-modal__section agents-company-card">
-                <h3 className="agent-cart-modal__section-title">
-                  Активные агенты компании
-                </h3>
-                <p className="agents-company-subtitle">
-                  Пользователи, которые уже имеют доступ к складам компании.
-                  Здесь вы можете настроить общий прайс и при необходимости
-                  отстранить агента.
-                </p>
-                <div className="warehouse-table-container w-full">
-                  <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <table className="warehouse-table w-full min-w-[900px]">
-                      <thead>
-                        <tr>
-                          <th>№</th>
-                          <th>Агент</th>
-                          <th>Email</th>
-                          <th>Общий прайс</th>
-                          <th>Склад общего прайса</th>
-                          <th>Создан</th>
-                          <th>Обновлён</th>
-                          <th>Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {companyRequestsLoading ? (
-                          <tr>
-                            <td colSpan={8} className="warehouse-table__loading">
-                              Загрузка…
-                            </td>
-                          </tr>
-                        ) : activeCompanyAgents.length === 0 ? (
-                          <tr>
-                            <td colSpan={8} className="warehouse-table__empty">
-                              Активных агентов нет
-                            </td>
-                          </tr>
-                        ) : (
-                          activeCompanyAgents.map((r, idx) => (
-                            <tr key={r.id}>
-                              <td>{idx + 1}</td>
-                              <td>{r.user_display || shortId(r.user)}</td>
-                              <td>{r.user_email || "—"}</td>
-                              <td>
-                                <span
-                                  className={`agents-badge ${
-                                    r.common_access_enabled
-                                      ? "badge--approved"
-                                      : "badge--draft"
-                                  }`}
-                                >
-                                  {r.common_access_enabled
-                                    ? "Включен"
-                                    : "Выключен"}
-                                </span>
-                              </td>
-                              <td>
-                                <select
-                                  className="warehouse-search__input"
-                                  style={{ minWidth: 220 }}
-                                  value={r.common_warehouse || ""}
-                                  onChange={(e) =>
-                                    handleCompanyCommonAccessChange(
-                                      r,
-                                      e.target.value || null,
-                                    )
-                                  }
-                                  disabled={companyActionBusyId === r.id}
-                                >
-                                  <option value="">
-                                    Без общего доступа
-                                  </option>
-                                  {Object.values(warehousesById || {}).map(
-                                    (w) => (
-                                      <option value={w.id} key={w.id}>
-                                        {w.name ||
-                                          w.title ||
-                                          shortId(w.id)}
-                                      </option>
-                                    ),
-                                  )}
-                                </select>
-                              </td>
-                              <td>{fmtDateTime(r.created_at)}</td>
-                              <td>{fmtDateTime(r.updated_at)}</td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="agents-action-btn agents-action-btn--reject"
-                                  onClick={() => handleCompanyRemove(r.id)}
-                                  disabled={companyActionBusyId === r.id}
-                                >
-                                  <Trash2 size={16} />
-                                  Отстранить
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {removedOrRejectedCompanyRequests.length > 0 && (
-                  <details style={{ marginTop: 16 }}>
-                    <summary>Отклонённые и отстранённые заявки</summary>
-                    <div className="warehouse-table-container w-full mt-2">
-                      <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <table className="warehouse-table w-full min-w-[900px]">
-                          <thead>
-                            <tr>
-                              <th>№</th>
-                              <th>Агент</th>
-                              <th>Email</th>
-                          <th>Статус</th>
-                              <th>Сообщение</th>
-                              <th>Решение</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {removedOrRejectedCompanyRequests.map(
-                              (r, idx) => (
-                                <tr key={r.id}>
-                                  <td>{idx + 1}</td>
-                                  <td>
-                                    {r.user_display || shortId(r.user)}
-                                  </td>
-                                  <td>{r.user_email || "—"}</td>
-                                  <td>
-                                    <span
-                                      className={`agents-badge ${companyStatusClass(r.status)}`}
-                                    >
-                                      {companyStatusLabel(r.status)}
-                                    </span>
-                                  </td>
-                                  <td className="agents-note">
-                                    {r.note ? String(r.note) : "—"}
-                                  </td>
-                                  <td>{fmtDateTime(r.decided_at)}</td>
-                                </tr>
-                              ),
-                            )}
-                          </tbody>
-                        </table>
+                <section className="agent-cart-modal__section">
+                  {/* <h3 className="agent-cart-modal__section-title">
+                    Активные агенты компании
+                  </h3>
+                  <p className="agents-company-subtitle">
+                    Управляйте доступом агентов к складам компании и общему
+                    прайсу.
+                  </p> */}
+                  {/* <div
+                    className="warehouse-search-section"
+                    style={{ marginBottom: 12 }}
+                  >
+                    <div
+                      className="warehouse-search__info flex flex-wrap items-center gap-2"
+                      style={{ width: "100%" }}
+                    >
+                      <div
+                        className="flex flex-wrap items-center gap-2"
+                        style={{ maxWidth: "100%" }}
+                      >
+                        <input
+                          type="text"
+                          className="warehouse-search__input"
+                          style={{ minWidth: 220 }}
+                          placeholder="UUID пользователя"
+                          value={newMembershipUserId}
+                          onChange={(e) =>
+                            setNewMembershipUserId(e.target.value)
+                          }
+                          disabled={newMembershipBusy}
+                        />
+                        <label className="flex items-center gap-2 text-sm text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={newMembershipCommonEnabled}
+                            onChange={(e) =>
+                              setNewMembershipCommonEnabled(e.target.checked)
+                            }
+                            disabled={newMembershipBusy}
+                          />
+                          Общий прайс
+                        </label>
+                        <select
+                          className="warehouse-search__input"
+                          style={{ minWidth: 220 }}
+                          value={newMembershipWarehouse}
+                          onChange={(e) =>
+                            setNewMembershipWarehouse(e.target.value)
+                          }
+                          disabled={
+                            newMembershipBusy || !newMembershipCommonEnabled
+                          }
+                        >
+                          <option value="">Склад общего прайса</option>
+                          {Object.values(warehousesById || {}).map((w) => (
+                            <option value={w.id} key={w.id}>
+                              {w.name || w.title || shortId(w.id)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="agents-action-btn agents-action-btn--approve"
+                          onClick={handleCreateMembership}
+                          disabled={
+                            newMembershipBusy || !newMembershipUserId.trim()
+                          }
+                        >
+                          <Check size={16} />
+                          Назначить агентом
+                        </button>
                       </div>
                     </div>
-                  </details>
-                )}
-              </section>
+                    {newMembershipError && (
+                      <div className="agents-error" style={{ marginTop: 8 }}>
+                        {newMembershipError}
+                      </div>
+                    )}
+                  </div> */}
+                  <div className="warehouse-table-container w-full">
+                    <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <table className="warehouse-table w-full min-w-[900px]">
+                        <thead>
+                          <tr>
+                            <th>№</th>
+                            <th>Агент</th>
+                            <th>Email</th>
+                            <th>Общий прайс</th>
+                            <th>Склад общего прайса</th>
+                            <th>Создан</th>
+                            <th>Обновлён</th>
+                            <th>Действия</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {companyRequestsLoading ? (
+                            <tr>
+                              <td
+                                colSpan={8}
+                                className="warehouse-table__loading"
+                              >
+                                Загрузка…
+                              </td>
+                            </tr>
+                          ) : activeCompanyAgents.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={8}
+                                className="warehouse-table__empty"
+                              >
+                                Активных агентов нет
+                              </td>
+                            </tr>
+                          ) : (
+                            activeCompanyAgents.map((r, idx) => (
+                              <tr key={r.id}>
+                                <td>{idx + 1}</td>
+                                <td>{r.user_display || shortId(r.user)}</td>
+                                <td>{r.user_email || "—"}</td>
+                                <td>
+                                  <span
+                                    className={`agents-badge ${
+                                      r.common_access_enabled
+                                        ? "badge--approved"
+                                        : "badge--draft"
+                                    }`}
+                                  >
+                                    {r.common_access_enabled
+                                      ? "Включен"
+                                      : "Выключен"}
+                                  </span>
+                                </td>
+                                <td>
+                                  <select
+                                    className="warehouse-search__input"
+                                    style={{ minWidth: 220 }}
+                                    value={r.common_warehouse || ""}
+                                    onChange={(e) =>
+                                      handleCompanyCommonAccessChange(
+                                        r,
+                                        e.target.value || null,
+                                      )
+                                    }
+                                    disabled={companyActionBusyId === r.id}
+                                  >
+                                    <option value="">Без общего доступа</option>
+                                    {Object.values(warehousesById || {}).map(
+                                      (w) => (
+                                        <option value={w.id} key={w.id}>
+                                          {w.name || w.title || shortId(w.id)}
+                                        </option>
+                                      ),
+                                    )}
+                                  </select>
+                                </td>
+                                <td>{fmtDateTime(r.created_at)}</td>
+                                <td>{fmtDateTime(r.updated_at)}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="agents-action-btn agents-action-btn--reject"
+                                    onClick={() => handleCompanyRemove(r.id)}
+                                    disabled={companyActionBusyId === r.id}
+                                  >
+                                    <Trash2 size={16} />
+                                    Отстранить
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {removedOrRejectedCompanyRequests.length > 0 && (
+                    <details style={{ marginTop: 16 }}>
+                      <summary>Отклонённые и отстранённые заявки</summary>
+                      <div className="warehouse-table-container w-full mt-2">
+                        <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                          <table className="warehouse-table w-full min-w-[900px]">
+                            <thead>
+                              <tr>
+                                <th>№</th>
+                                <th>Агент</th>
+                                <th>Email</th>
+                                <th>Статус</th>
+                                <th>Сообщение</th>
+                                <th>Решение</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {removedOrRejectedCompanyRequests.map(
+                                (r, idx) => (
+                                  <tr key={r.id}>
+                                    <td>{idx + 1}</td>
+                                    <td>{r.user_display || shortId(r.user)}</td>
+                                    <td>{r.user_email || "—"}</td>
+                                    <td>
+                                      <span
+                                        className={`agents-badge ${companyStatusClass(r.status)}`}
+                                      >
+                                        {companyStatusLabel(r.status)}
+                                      </span>
+                                    </td>
+                                    <td className="agents-note">
+                                      {r.note ? String(r.note) : "—"}
+                                    </td>
+                                    <td>{fmtDateTime(r.decided_at)}</td>
+                                  </tr>
+                                ),
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </details>
+                  )}
+                </section>
               )}
             </>
           ) : (
@@ -2337,179 +2447,187 @@ const Agents = () => {
 
               {agentCompanySubTab === "search" && (
                 <section className="agent-cart-modal__section agents-company-card">
-                <h3 className="agent-cart-modal__section-title">
-                  Найти компанию и отправить заявку
-                </h3>
-                <p className="agents-company-subtitle">
-                  Найдите компанию по названию и отправьте заявку, чтобы работать
-                  её агентом склада.
-                </p>
-                <div className="warehouse-search-section">
-                  <div className="warehouse-search">
-                    <Search className="warehouse-search__icon" size={18} />
-                    <input
-                      type="text"
-                      className="warehouse-search__input"
-                      placeholder="Поиск компании по названию…"
-                      value={companySearch}
-                      onChange={(e) => setCompanySearch(e.target.value)}
-                    />
-                  </div>
-                </div>
-                {companySearchError && (
-                  <div className="agents-error">
-                    {String(companySearchError)}
-                  </div>
-                )}
-                <div className="agents-cards-grid" style={{ marginTop: 16 }}>
-                  {companySearchLoading ? (
-                    <div className="agents-cards-empty">Поиск компаний…</div>
-                  ) : !companySearch.trim() ? (
-                    <div className="agents-cards-empty">
-                      Введите текст для поиска компании
+                  <h3 className="agent-cart-modal__section-title">
+                    Найти компанию и отправить заявку
+                  </h3>
+                  <p className="agents-company-subtitle">
+                    Найдите компанию по названию и отправьте заявку, чтобы
+                    работать её агентом склада.
+                  </p>
+                  <div className="warehouse-search-section">
+                    <div className="warehouse-search">
+                      <Search className="warehouse-search__icon" size={18} />
+                      <input
+                        type="text"
+                        className="warehouse-search__input"
+                        placeholder="Поиск компании по названию…"
+                        value={companySearch}
+                        onChange={(e) => setCompanySearch(e.target.value)}
+                      />
                     </div>
-                  ) : companySearchResults.length === 0 ? (
-                    <div className="agents-cards-empty">
-                      Компании не найдены
+                  </div>
+                  {companySearchError && (
+                    <div className="agents-error">
+                      {String(companySearchError)}
                     </div>
-                  ) : (
-                    companySearchResults.map((c) => {
-                      const r = companyRequestsByCompanyId[c.id];
-                      const status = r?.status || "";
-                      const isPending = status === "pending";
-                      const isActive = status === "active";
-                      const isRejected = status === "rejected";
-                      const isRemoved = status === "removed";
-                      let statusText = "Вы ещё не отправляли заявку";
-                      if (isPending)
-                        statusText = "Заявка отправлена, ожидает решения";
-                      else if (isActive)
-                        statusText = "Вы уже являетесь агентом этой компании";
-                      else if (isRejected)
-                        statusText = "Заявка была отклонена";
-                      else if (isRemoved)
-                        statusText =
-                          "Вы были отстранены, можно отправить новую заявку";
-                      const canSend =
-                        !status || status === "removed" || status === "";
-                      return (
-                        <div key={c.id} className="agents-card">
-                          <div className="agents-card__header">
-                            <div className="agents-card__title">
-                              {c.name || c.company_name || "Компания"}
-                            </div>
-                            {status && (
-                              <span
-                                className={`agents-badge ${companyStatusClass(
-                                  status,
-                                )}`}
-                              >
-                                {companyStatusLabel(status)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="agents-card__row">
-                            <span className="agents-card__label">Slug</span>
-                            <span className="agents-card__value">
-                              {c.slug || "—"}
-                            </span>
-                          </div>
-                          <div className="agents-card__row">
-                            <span className="agents-card__label">Комментарий</span>
-                            <span className="agents-card__value agents-card__note">
-                              {statusText}
-                            </span>
-                          </div>
-                          <div className="agents-card__footer agents-card__footer--actions">
-                            <button
-                              type="button"
-                              className="agents-action-btn agents-action-btn--approve"
-                              disabled={
-                                !canSend || companyActionBusyId === c.id
-                              }
-                              onClick={() => handleSendCompanyRequest(c)}
-                            >
-                              <Send size={16} />
-                              Отправить заявку
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
                   )}
-                </div>
-              </section>
+                  <div className="agents-cards-grid" style={{ marginTop: 16 }}>
+                    {companySearchLoading ? (
+                      <div className="agents-cards-empty">Поиск компаний…</div>
+                    ) : !companySearch.trim() ? (
+                      <div className="agents-cards-empty">
+                        Введите текст для поиска компании
+                      </div>
+                    ) : companySearchResults.length === 0 ? (
+                      <div className="agents-cards-empty">
+                        Компании не найдены
+                      </div>
+                    ) : (
+                      companySearchResults.map((c) => {
+                        const r = companyRequestsByCompanyId[c.id];
+                        const status = r?.status || "";
+                        const isPending = status === "pending";
+                        const isActive = status === "active";
+                        const isRejected = status === "rejected";
+                        const isRemoved = status === "removed";
+                        let statusText = "Вы ещё не отправляли заявку";
+                        if (isPending)
+                          statusText = "Заявка отправлена, ожидает решения";
+                        else if (isActive)
+                          statusText = "Вы уже являетесь агентом этой компании";
+                        else if (isRejected)
+                          statusText = "Заявка была отклонена";
+                        else if (isRemoved)
+                          statusText =
+                            "Вы были отстранены, можно отправить новую заявку";
+                        const canSend =
+                          !status || status === "removed" || status === "";
+                        return (
+                          <div key={c.id} className="agents-card">
+                            <div className="agents-card__header">
+                              <div className="agents-card__title">
+                                {c.name || c.company_name || "Компания"}
+                              </div>
+                              {status && (
+                                <span
+                                  className={`agents-badge ${companyStatusClass(
+                                    status,
+                                  )}`}
+                                >
+                                  {companyStatusLabel(status)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="agents-card__row">
+                              <span className="agents-card__label">Slug</span>
+                              <span className="agents-card__value">
+                                {c.slug || "—"}
+                              </span>
+                            </div>
+                            <div className="agents-card__row">
+                              <span className="agents-card__label">
+                                Комментарий
+                              </span>
+                              <span className="agents-card__value agents-card__note">
+                                {statusText}
+                              </span>
+                            </div>
+                            <div className="agents-card__footer agents-card__footer--actions">
+                              <button
+                                type="button"
+                                className="agents-action-btn agents-action-btn--approve"
+                                disabled={
+                                  !canSend || companyActionBusyId === c.id
+                                }
+                                onClick={() => handleSendCompanyRequest(c)}
+                              >
+                                <Send size={16} />
+                                Отправить заявку
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </section>
               )}
 
               {agentCompanySubTab === "myRequests" && (
                 <section className="agent-cart-modal__section agents-company-card">
-                <h3 className="agent-cart-modal__section-title">
-                  Мои заявки в компании
-                </h3>
-                <p className="agents-company-subtitle">
-                  История всех отправленных вами заявок на роль агента склада в
-                  разных компаниях.
-                </p>
-                {companyRequestsError && (
-                  <div className="agents-error">
-                    {String(companyRequestsError)}
-                  </div>
-                )}
-                <div className="warehouse-table-container w-full">
-                  <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <table className="warehouse-table w-full min-w-[900px]">
-                      <thead>
-                        <tr>
-                          <th>№</th>
-                          <th>Компания</th>
-                          <th>Статус</th>
-                          <th>Сообщение</th>
-                          <th>Создана</th>
-                          <th>Обновлена</th>
-                          <th>Решение</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {companyRequestsLoading ? (
+                  <h3 className="agent-cart-modal__section-title">
+                    Мои заявки в компании
+                  </h3>
+                  <p className="agents-company-subtitle">
+                    История всех отправленных вами заявок на роль агента склада
+                    в разных компаниях.
+                  </p>
+                  {companyRequestsError && (
+                    <div className="agents-error">
+                      {String(companyRequestsError)}
+                    </div>
+                  )}
+                  <div className="warehouse-table-container w-full">
+                    <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <table className="warehouse-table w-full min-w-[900px]">
+                        <thead>
                           <tr>
-                            <td colSpan={7} className="warehouse-table__loading">
-                              Загрузка…
-                            </td>
+                            <th>№</th>
+                            <th>Компания</th>
+                            <th>Статус</th>
+                            <th>Сообщение</th>
+                            <th>Создана</th>
+                            <th>Обновлена</th>
+                            <th>Решение</th>
                           </tr>
-                        ) : normalizeList(companyRequests).length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="warehouse-table__empty">
-                              Вы ещё не отправляли заявок в компании
-                            </td>
-                          </tr>
-                        ) : (
-                          normalizeList(companyRequests).map((r, idx) => (
-                            <tr key={r.id}>
-                              <td>{idx + 1}</td>
-                              <td>{r.company_name || shortId(r.company)}</td>
-                              <td>
-                                <span
-                                  className={`agents-badge ${companyStatusClass(
-                                    r.status,
-                                  )}`}
-                                >
-                                  {companyStatusLabel(r.status)}
-                                </span>
+                        </thead>
+                        <tbody>
+                          {companyRequestsLoading ? (
+                            <tr>
+                              <td
+                                colSpan={7}
+                                className="warehouse-table__loading"
+                              >
+                                Загрузка…
                               </td>
-                              <td className="agents-note">
-                                {r.note ? String(r.note) : "—"}
-                              </td>
-                              <td>{fmtDateTime(r.created_at)}</td>
-                              <td>{fmtDateTime(r.updated_at)}</td>
-                              <td>{fmtDateTime(r.decided_at)}</td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                          ) : normalizeList(companyRequests).length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={7}
+                                className="warehouse-table__empty"
+                              >
+                                Вы ещё не отправляли заявок в компании
+                              </td>
+                            </tr>
+                          ) : (
+                            normalizeList(companyRequests).map((r, idx) => (
+                              <tr key={r.id}>
+                                <td>{idx + 1}</td>
+                                <td>{r.company_name || shortId(r.company)}</td>
+                                <td>
+                                  <span
+                                    className={`agents-badge ${companyStatusClass(
+                                      r.status,
+                                    )}`}
+                                  >
+                                    {companyStatusLabel(r.status)}
+                                  </span>
+                                </td>
+                                <td className="agents-note">
+                                  {r.note ? String(r.note) : "—"}
+                                </td>
+                                <td>{fmtDateTime(r.created_at)}</td>
+                                <td>{fmtDateTime(r.updated_at)}</td>
+                                <td>{fmtDateTime(r.decided_at)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
               )}
             </>
           )}
