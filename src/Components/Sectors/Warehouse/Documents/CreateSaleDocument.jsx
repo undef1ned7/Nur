@@ -271,6 +271,9 @@ const CreateSaleDocument = () => {
     null;
   const [loadingDraft, setLoadingDraft] = useState(!!editDocumentId);
 
+  // Путь к списку документов текущего типа (продажи, покупки и т.д.)
+  const documentsListPath = `/crm/warehouse/documents/${(docType || "SALE").toLowerCase()}`;
+
   const debounceTimerRef = useRef(null);
   const warehouseRef = useRef(warehouse);
 
@@ -398,6 +401,16 @@ const CreateSaleDocument = () => {
         return id == null || String(id).trim() === "";
       }
       return false;
+    });
+  };
+
+  // Сортировка товаров по дате (новые сверху)
+  const sortProductsByDate = (list) => {
+    const arr = Array.isArray(list) ? list : [];
+    return [...arr].sort((a, b) => {
+      const dateA = a?.updated_at || a?.created_at || 0;
+      const dateB = b?.updated_at || b?.created_at || 0;
+      return new Date(dateB) - new Date(dateA);
     });
   };
 
@@ -581,7 +594,7 @@ const CreateSaleDocument = () => {
                     Нет товаров
                   </div>
                 ) : (
-                  (cached?.items || []).map((product) => {
+                  sortProductsByDate(cached?.items || []).map((product) => {
                     const isSelected = selectedProductIds.has(
                       String(product.id),
                     );
@@ -687,14 +700,14 @@ const CreateSaleDocument = () => {
         if (!getWarehouseDocumentById.fulfilled.match(result)) {
           setLoadingDraft(false);
           alert("Не удалось загрузить документ");
-          navigate("/crm/warehouse/documents");
+          navigate(documentsListPath);
           return;
         }
         const doc = result.payload;
         if (!doc || typeof doc !== "object") {
           setLoadingDraft(false);
           alert("Не удалось загрузить документ");
-          navigate("/crm/warehouse/documents");
+          navigate(documentsListPath);
           return;
         }
         // API может вернуть warehouse_from/counterparty как строку (UUID) или объект
@@ -777,6 +790,8 @@ const CreateSaleDocument = () => {
                 discount: discountPct,
                 discount_percent: discountPct,
                 article: article ? String(article) : "",
+                addedAt: it.created_at || new Date().toISOString(),
+                created_at: it.created_at,
               };
             })
           : [];
@@ -789,7 +804,7 @@ const CreateSaleDocument = () => {
             "Ошибка загрузки документа: " +
               (e?.message || "Неизвестная ошибка"),
           );
-          navigate("/crm/warehouse/documents");
+          navigate(documentsListPath);
         }
       } finally {
         setLoadingDraft(false);
@@ -1051,13 +1066,18 @@ const CreateSaleDocument = () => {
     return docType === "TRANSFER";
   }, [docType]);
 
-  // Фильтрация товаров в документе
+  // Фильтрация и сортировка товаров в документе по дате (новые сверху)
   const filteredDocumentItems = useMemo(() => {
     if (!cartItems || cartItems.length === 0) return [];
     const search = documentSearch.toLowerCase();
-    return cartItems.filter((item) => {
+    const filtered = cartItems.filter((item) => {
       const name = item.productName || item.name || "";
       return name.toLowerCase().includes(search);
+    });
+    return [...filtered].sort((a, b) => {
+      const dateA = a.addedAt || a.created_at || 0;
+      const dateB = b.addedAt || b.created_at || 0;
+      return new Date(dateB) - new Date(dateA);
     });
   }, [cartItems, documentSearch]);
 
@@ -1188,6 +1208,7 @@ const CreateSaleDocument = () => {
           discount: 0,
           discount_percent: 0,
           article: product.article || "",
+          addedAt: new Date().toISOString(),
         };
         setCartItems((prev) => [...prev, newItem]);
       }
@@ -1482,7 +1503,7 @@ const CreateSaleDocument = () => {
               ", но не проведен: " +
               formatApiError(postError),
           );
-          navigate("/crm/warehouse/documents");
+          navigate(documentsListPath);
           return;
         }
       }
@@ -1503,7 +1524,7 @@ const CreateSaleDocument = () => {
       setComment("");
       setDocumentSearch("");
 
-      navigate("/crm/warehouse/documents");
+      navigate(documentsListPath);
     } catch (error) {
       console.error("Ошибка при сохранении документа:", error);
       alert("Ошибка: " + formatApiError(error?.response?.data || error));
@@ -1595,10 +1616,22 @@ const CreateSaleDocument = () => {
         }),
       };
 
-      // Создаём документ через типовой эндпоинт
+      // При редактировании — обновляем документ, иначе создаём через типовой эндпоинт
       let createdDocument;
       try {
-        createdDocument = await createDocumentByType(documentData);
+        if (editDocumentId) {
+          const result = await dispatch(
+            updateWarehouseDocument({ id: editDocumentId, documentData }),
+          );
+          if (!updateWarehouseDocument.fulfilled.match(result)) {
+            const errData = result.payload || result.error;
+            alert("Ошибка: " + formatApiError(errData));
+            return;
+          }
+          createdDocument = result.payload;
+        } else {
+          createdDocument = await createDocumentByType(documentData);
+        }
       } catch (err) {
         const errData = err?.response?.data || err;
         const errorMessage = formatApiError(errData);
@@ -1617,9 +1650,12 @@ const CreateSaleDocument = () => {
         if (!postWarehouseDocument.fulfilled.match(postResult)) {
           const postError = postResult.payload || postResult.error;
           alert(
-            "Документ создан, но не проведен: " + formatApiError(postError),
+            "Документ " +
+              (editDocumentId ? "обновлен" : "создан") +
+              ", но не проведен: " +
+              formatApiError(postError),
           );
-          navigate("/crm/warehouse/documents");
+          navigate(documentsListPath);
           return;
         }
       }
@@ -1830,7 +1866,7 @@ const CreateSaleDocument = () => {
       setComment("");
       setDocumentSearch("");
 
-      navigate("/crm/warehouse/documents");
+      navigate(documentsListPath);
     } catch (error) {
       console.error("Ошибка генерации PDF:", error);
       // Если это ошибка API, используем formatApiError, иначе обычное сообщение
@@ -1960,7 +1996,9 @@ const CreateSaleDocument = () => {
                               Нет товаров
                             </div>
                           ) : (
-                            getUngroupedProducts(entry?.items).map(
+                            sortProductsByDate(
+                              getUngroupedProducts(entry?.items),
+                            ).map(
                               (product) => {
                                 const isSelected = selectedProductIds.has(
                                   String(product.id),
@@ -2062,7 +2100,7 @@ const CreateSaleDocument = () => {
                 className="create-sale-document__back-btn"
                 onClick={() => {
                   if (cartItems.length === 0) {
-                    navigate("/crm/warehouse/documents");
+                    navigate(documentsListPath);
                   } else {
                     setShowExitModal(true);
                   }
@@ -2554,7 +2592,7 @@ const CreateSaleDocument = () => {
                 className="create-sale-document__prepayment-modal-cancel"
                 onClick={() => {
                   setShowExitModal(false);
-                  navigate("/crm/warehouse/documents");
+                  navigate(documentsListPath);
                 }}
               >
                 Выйти без сохранения

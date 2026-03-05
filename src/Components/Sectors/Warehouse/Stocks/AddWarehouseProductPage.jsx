@@ -1354,7 +1354,7 @@ const AddWarehouseProductPage = () => {
       const itemQuantity = parseFloat(item.quantity || 1);
       return sum + itemPrice * itemQuantity;
     }, 0);
-    const calculatedPrice = Math.round(totalCost * 100) / 100;
+    const calculatedPrice = Math.round(totalCost * 1000) / 1000;
     handleMarketDataChange("purchasePrice", calculatedPrice.toString());
     // Устанавливаем цену продажи равной сумме стоимостей товаров
     setNewItemData((prev) => ({
@@ -2337,7 +2337,7 @@ const MarketProductForm = ({
           const itemQuantity = parseFloat(item.quantity || 1);
           return sum + itemPrice * itemQuantity;
         }, 0);
-        const calculatedPrice = Math.round(totalCost * 100) / 100;
+        const calculatedPrice = Math.round(totalCost * 1000) / 1000;
 
         // Всегда автоматически обновляем цену продажи для комплекта
         setNewItemData((prev) => ({
@@ -2367,7 +2367,7 @@ const MarketProductForm = ({
 
       if (purchasePrice > 0 && markup >= 0) {
         const sellingPrice = purchasePrice * (1 + markup / 100);
-        const calculatedPrice = Math.round(sellingPrice * 100) / 100; // Округляем до 2 знаков
+        const calculatedPrice = Math.round(sellingPrice * 1000) / 1000; // Округляем до 3 знаков
 
         setNewItemData((prev) => ({
           ...prev,

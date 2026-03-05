@@ -273,6 +273,12 @@ const SECTOR_ACCESS_TYPES = {
     },
     { value: "Документы", label: "Документы", backendKey: "can_view_document" },
     { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
+    {
+      value: "Контрагенты",
+      label: "Контрагенты",
+      backendKey: "can_view_clients",
+    },
+    // {va}
   ],
 };
 
@@ -590,11 +596,11 @@ const AccessList = ({
         // Если permission есть в allMenuPermissions, но нет в маппинге,
         // это может быть динамическая услуга (например, "Склад", "Филиалы")
         let dynamicService = MENU_CONFIG.additional.find(
-          (s) => s.permission === permission
+          (s) => s.permission === permission,
         );
         if (!dynamicService) {
           dynamicService = ADDITIONAL_SERVICES_CONFIG.find(
-            (s) => s.permission === permission
+            (s) => s.permission === permission,
           );
         }
         if (
@@ -620,7 +626,7 @@ const AccessList = ({
     const initialAccess = {};
     availableAccessTypes.forEach((accessType) => {
       initialAccess[accessType.backendKey] = employeeAccesses?.includes(
-        accessType.value
+        accessType.value,
       );
     });
 
@@ -638,7 +644,7 @@ const AccessList = ({
     const newAccessState = {};
     availableAccessTypes.forEach((accessType) => {
       newAccessState[accessType.backendKey] = employeeAccesses?.includes(
-        accessType.value
+        accessType.value,
       );
     });
     setSelectedAccess(newAccessState);
@@ -657,7 +663,7 @@ const AccessList = ({
   // Разделяем на базовые, секторные и доп. услуги
   const basicAccessTypes = useMemo(() => {
     return availableAccessTypes.filter((type) =>
-      BASIC_ACCESS_TYPES.some((basic) => basic.backendKey === type.backendKey)
+      BASIC_ACCESS_TYPES.some((basic) => basic.backendKey === type.backendKey),
     );
   }, [availableAccessTypes]);
 
@@ -665,8 +671,8 @@ const AccessList = ({
     return availableAccessTypes.filter(
       (type) =>
         !BASIC_ACCESS_TYPES.some(
-          (basic) => basic.backendKey === type.backendKey
-        ) && !additionalServicesMapping[type.backendKey]
+          (basic) => basic.backendKey === type.backendKey,
+        ) && !additionalServicesMapping[type.backendKey],
     );
   }, [availableAccessTypes]);
 
@@ -679,14 +685,14 @@ const AccessList = ({
       }
       // Проверяем, есть ли это в MENU_CONFIG.additional
       const inMenuConfig = MENU_CONFIG.additional.some(
-        (s) => s.permission === type.backendKey
+        (s) => s.permission === type.backendKey,
       );
       if (inMenuConfig) {
         return true;
       }
       // Проверяем, есть ли это в динамических услугах
       const inDynamicServices = ADDITIONAL_SERVICES_CONFIG.some(
-        (s) => s.permission === type.backendKey
+        (s) => s.permission === type.backendKey,
       );
       return inDynamicServices;
     });
@@ -697,7 +703,7 @@ const AccessList = ({
     if (!searchQuery.trim()) return basicAccessTypes;
     const query = searchQuery.toLowerCase();
     return basicAccessTypes.filter((type) =>
-      type.label.toLowerCase().includes(query)
+      type.label.toLowerCase().includes(query),
     );
   }, [basicAccessTypes, searchQuery]);
 
@@ -705,7 +711,7 @@ const AccessList = ({
     if (!searchQuery.trim()) return sectorAccessTypes;
     const query = searchQuery.toLowerCase();
     return sectorAccessTypes.filter((type) =>
-      type.label.toLowerCase().includes(query)
+      type.label.toLowerCase().includes(query),
     );
   }, [sectorAccessTypes, searchQuery]);
 
@@ -713,7 +719,7 @@ const AccessList = ({
     if (!searchQuery.trim()) return additionalServicesTypes;
     const query = searchQuery.toLowerCase();
     return additionalServicesTypes.filter((type) =>
-      type.label.toLowerCase().includes(query)
+      type.label.toLowerCase().includes(query),
     );
   }, [additionalServicesTypes, searchQuery]);
 
@@ -1243,7 +1249,7 @@ const AccessList = ({
                   <FaRegCircle color="#ccc" />
                 )}
               </div>
-            )
+            ),
           )}
 
           <button
