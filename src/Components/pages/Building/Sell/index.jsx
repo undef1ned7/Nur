@@ -14,6 +14,7 @@ import { fetchBuildingClients } from "@/store/creators/building/clientsCreators"
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { getPageCount, DEFAULT_PAGE_SIZE } from "../shared/api";
 import { asCurrency } from "../shared/constants";
+import BuildingActionsMenu from "../shared/ActionsMenu";
 import BuildingPagination from "../shared/Pagination";
 import Modal from "@/Components/common/Modal/Modal";
 
@@ -271,7 +272,14 @@ export default function BuildingSell() {
         <div>
           <h1 className="building-page__title">Продажи</h1>
           <p className="building-page__subtitle">
-            Выберите ЖК, этаж и квартиру для продажи или брони.
+            {selectedProjectId ? (
+              <>
+                ЖК: <b>{selectedProject?.name || "—"}</b>. Выберите этаж и
+                квартиру для продажи или бронирования.
+              </>
+            ) : (
+              "Выберите ЖК, этаж и квартиру для продажи или брони."
+            )}
           </p>
         </div>
         <button
@@ -291,13 +299,6 @@ export default function BuildingSell() {
 
       {selectedProjectId && (
         <>
-          <div className="building-page__card">
-            <div className="building-page__label">Выбранный ЖК</div>
-            <div>
-              <b>{selectedProject?.name || "—"}</b>
-            </div>
-          </div>
-
           <div className="building-page__layout building-page__layout--2col">
             <div className="building-page__card">
               <h3 className="building-page__cardTitle">Этажи</h3>
@@ -322,7 +323,16 @@ export default function BuildingSell() {
                 </div>
               )}
               {!floorsLoading && !floorsError && floors.length > 0 && (
-                <div className="building-project-floors">
+                <div
+                  className="building-project-floors"
+                  style={{
+                    display: "flex",
+                    overflowX: "auto",
+                    paddingBottom: 4,
+                    gap: 8,
+                    flexWrap: "nowrap",
+                  }}
+                >
                   {floors.map((f) => (
                     <div
                       key={f.floor}
@@ -331,6 +341,7 @@ export default function BuildingSell() {
                           ? " building-project-floors__item--active"
                           : ""
                       }`}
+                      style={{ minWidth: 180, flex: "0 0 auto" }}
                       onClick={() => {
                         setPage(1);
                         setFloor(String(f.floor));
@@ -404,7 +415,7 @@ export default function BuildingSell() {
                         <th>Цена</th>
                         <th>Статус</th>
                         <th>Примечание</th>
-                        <th style={{ width: 140 }}>Действия</th>
+                        <th style={{ width: 80 }}>Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -425,40 +436,26 @@ export default function BuildingSell() {
                             </td>
                             <td>{apt?.notes || ""}</td>
                             <td>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 4,
-                                }}
-                              >
-                                {isAvailable ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      className="building-btn building-btn--primary"
-                                      onClick={() =>
-                                        handleOpenTreatyModal(apt, "sale")
-                                      }
-                                    >
-                                      Продать
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="building-btn"
-                                      onClick={() =>
-                                        handleOpenTreatyModal(apt, "booking")
-                                      }
-                                    >
-                                      Забронировать
-                                    </button>
-                                  </>
-                                ) : (
-                                  <span className="building-page__muted">
-                                    Договор уже создан
-                                  </span>
-                                )}
-                              </div>
+                              {isAvailable ? (
+                                <BuildingActionsMenu
+                                  actions={[
+                                    {
+                                      label: "Продать",
+                                      onClick: () =>
+                                        handleOpenTreatyModal(apt, "sale"),
+                                    },
+                                    {
+                                      label: "Забронировать",
+                                      onClick: () =>
+                                        handleOpenTreatyModal(apt, "booking"),
+                                    },
+                                  ]}
+                                />
+                              ) : (
+                                <span className="building-page__muted">
+                                  Договор уже создан
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );

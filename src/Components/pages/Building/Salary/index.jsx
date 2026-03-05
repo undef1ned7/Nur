@@ -43,6 +43,7 @@ export default function BuildingSalary() {
   const [newPeriodStart, setNewPeriodStart] = useState("");
   const [newPeriodEnd, setNewPeriodEnd] = useState("");
 
+  const [payrollStatusFilter, setPayrollStatusFilter] = useState("");
   const [isCreatePeriodModalOpen, setIsCreatePeriodModalOpen] = useState(false);
 
   const SALARY_TYPE_LABELS = {
@@ -59,14 +60,12 @@ export default function BuildingSalary() {
 
   useEffect(() => {
     dispatch(fetchBuildingSalaryEmployees());
-    dispatch(
-      fetchBuildingPayrolls(
-        selectedProjectId
-          ? { residential_complex: selectedProjectId }
-          : {},
-      ),
-    );
-  }, [dispatch, selectedProjectId]);
+    const params = {
+      residential_complex: selectedProjectId || undefined,
+      status: payrollStatusFilter || undefined,
+    };
+    dispatch(fetchBuildingPayrolls(params));
+  }, [dispatch, selectedProjectId, payrollStatusFilter]);
 
   const handleCreatePayroll = async (e) => {
     e.preventDefault();
@@ -116,23 +115,24 @@ export default function BuildingSalary() {
   const handleDeletePayroll = async (payroll) => {
     const id = payroll?.id ?? payroll?.uuid;
     if (!id) return;
-    const ok = await confirm(
-      "Удалить период начислений?",
-      "Вы уверены, что хотите удалить этот период начислений? Это действие нельзя отменить.",
+    confirm(
+      "Удалить период начислений? Это действие нельзя отменить.",
+      async (ok) => {
+        if (!ok) return;
+        const res = await dispatch(deleteBuildingPayroll(id));
+        if (res.meta.requestStatus === "fulfilled") {
+          alert("Период удалён");
+        } else {
+          alert(
+            validateResErrors(
+              res.payload || res.error,
+              "Не удалось удалить период",
+            ),
+            true,
+          );
+        }
+      },
     );
-    if (!ok) return;
-    const res = await dispatch(deleteBuildingPayroll(id));
-    if (res.meta.requestStatus === "fulfilled") {
-      alert("Период удалён");
-    } else {
-      alert(
-        validateResErrors(
-          res.payload || res.error,
-          "Не удалось удалить период",
-        ),
-        true,
-      );
-    }
   };
 
   return (
@@ -318,7 +318,14 @@ export default function BuildingSalary() {
             <h2 className="building-page__title" style={{ fontSize: 18 }}>
               Периоды
             </h2>
-            <div className="building-page__actions" style={{ marginBottom: 12 }}>
+            <div
+              className="building-page__actions"
+              style={{
+                marginBottom: 12,
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <button
                 type="button"
                 className="building-btn building-btn--primary"
@@ -326,6 +333,21 @@ export default function BuildingSalary() {
               >
                 Новый период
               </button>
+              <select
+                className="building-page__select"
+                style={{ maxWidth: 220 }}
+                value={payrollStatusFilter}
+                onChange={(e) => setPayrollStatusFilter(e.target.value)}
+              >
+                <option value="">Все статусы</option>
+                {Object.entries(PAYROLL_STATUS_LABELS).map(
+                  ([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
             </div>
 
             {payrollsLoading && (

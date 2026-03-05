@@ -335,7 +335,7 @@ export default function BuildingSalaryPayrollDetail() {
                         return (
                           <tr
                             key={lid}
-                            style={{ cursor: "pointer" }}
+                            data-clickable="true"
                             onClick={() =>
                               navigate(
                                 `/crm/building/salary/payroll/${id}/line/${lid}`,

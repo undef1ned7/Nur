@@ -34,9 +34,14 @@ export default function BuildingSalaryLineDetail() {
   } = useBuildingSalary();
   const { items: residentialComplexes, selectedProjectId } = useBuildingProjects();
   const cashboxId = useMemo(() => {
-    console.log(residentialComplexes);
-    console.log(selectedProjectId);
-    return residentialComplexes.find(item => item.id === selectedProjectId)?.company_cashbox;
+    const list = Array.isArray(residentialComplexes)
+      ? residentialComplexes
+      : [];
+    const rc = list.find(
+      (item) =>
+        String(item.id ?? item.uuid) === String(selectedProjectId),
+    );
+    return rc?.salary_cashbox || null;
   }, [selectedProjectId, residentialComplexes]);
   const [adjType, setAdjType] = useState("bonus");
   const [adjAmount, setAdjAmount] = useState("");
@@ -110,6 +115,22 @@ export default function BuildingSalaryLineDetail() {
   const isPayrollPaid = payroll?.status === "paid";
   const canEditAdjustments = payroll?.status === "draft";
   const canCreatePayments = isPayrollApproved;
+
+  const netToPay = useMemo(() => {
+    const v = Number(line?.net_to_pay ?? 0);
+    return Number.isFinite(v) ? v : null;
+  }, [line]);
+
+  const paidTotalNum = useMemo(() => {
+    const v = Number(line?.paid_total ?? 0);
+    return Number.isFinite(v) ? v : null;
+  }, [line]);
+
+  const remainingToPay = useMemo(() => {
+    if (netToPay == null || paidTotalNum == null) return null;
+    const diff = netToPay - paidTotalNum;
+    return diff > 0 ? diff : 0;
+  }, [netToPay, paidTotalNum]);
 
   const adjustmentsBucket =
     lineId && adjustmentsByLineId?.[String(lineId)]
@@ -203,6 +224,10 @@ export default function BuildingSalaryLineDetail() {
         if (res.meta.requestStatus === "fulfilled") {
           setPayAmount("");
           dispatch(fetchBuildingPayrollLinePayments(lineId));
+          if (payrollId) {
+            dispatch(fetchBuildingPayrollLines(payrollId));
+          }
+          setIsPaymentModalOpen(false);
         } else {
           alert(
             validateResErrors(
@@ -270,12 +295,20 @@ export default function BuildingSalaryLineDetail() {
                 <div>{line.base_amount || "—"}</div>
               </div>
               <div style={{ marginTop: 8 }}>
-                <div className="building-page__label">К выплате</div>
-                <div>{line.net_to_pay || "—"}</div>
+                <div className="building-page__label">
+                  Начислено к выплате
+                </div>
+                <div>{line.net_to_pay ?? "—"}</div>
               </div>
               <div style={{ marginTop: 8 }}>
                 <div className="building-page__label">Выплачено</div>
-                <div>{line.paid_total || "—"}</div>
+                <div>{line.paid_total ?? "—"}</div>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div className="building-page__label">Остаток к выплате</div>
+                <div>
+                  {remainingToPay != null ? remainingToPay.toFixed(2) : "—"}
+                </div>
               </div>
               <div style={{ marginTop: 8 }}>
                 <div className="building-page__label">Комментарий</div>
@@ -443,8 +476,7 @@ export default function BuildingSalaryLineDetail() {
                     <thead>
                       <tr>
                         <th>Сумма</th>
-                        <th>Касса</th>
-                        <th>Смена</th>
+                        <th>Выплатил</th>
                         <th>Дата</th>
                       </tr>
                     </thead>
@@ -452,17 +484,16 @@ export default function BuildingSalaryLineDetail() {
                       {(paymentsBucket.list || []).map((pmt) => (
                         <tr key={pmt.id ?? pmt.uuid}>
                           <td>{pmt.amount}</td>
+                         <td>{pmt.paid_by_display || pmt.paid_by || "—"}</td>
                           <td>
-                            {pmt.cashbox_display || pmt.cashbox || "—"}
-                          </td>
-                          <td>{pmt.shift || "—"}</td>
-                          <td>{pmt.paid_at || "—"}</td>
+                            {pmt.paid_at ? new Date(pmt.paid_at).toLocaleString() : "—"}</td>
                         </tr>
                       ))}
                       {(!paymentsBucket.list ||
                         paymentsBucket.list.length === 0) && (
                           <tr>
                             <td colSpan={4} style={{ textAlign: "center" }}>
+                              
                               Выплаты по этой строке ещё не создавались.
                             </td>
                           </tr>
@@ -553,6 +584,17 @@ export default function BuildingSalaryLineDetail() {
                 onChange={(e) => setPayAmount(e.target.value)}
                 placeholder="10000.00"
               />
+              <div
+                className="building-page__muted"
+                style={{ marginTop: 4, fontSize: 12 }}
+              >
+                Доступно к выплате:{" "}
+                <b>
+                  {remainingToPay != null
+                    ? remainingToPay.toFixed(2)
+                    : "—"}
+                </b>
+              </div>
             </label>
             <div className="building-page__actions" style={{ marginTop: 8 }}>
               <button

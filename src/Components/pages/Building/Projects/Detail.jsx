@@ -680,7 +680,16 @@ export default function BuildingProjectDetail() {
           </div>
         )}
         {!floorsLoading && !floorsError && floors.length > 0 && (
-          <div className="building-project-floors">
+          <div
+            className="building-project-floors"
+            style={{
+              display: "flex",
+              overflowX: "auto",
+              paddingBottom: 4,
+              gap: 8,
+              flexWrap: "nowrap",
+            }}
+          >
             {floors.map((f) => (
               <div
                 key={f.floor}
@@ -689,6 +698,7 @@ export default function BuildingProjectDetail() {
                     ? " building-project-floors__item--active"
                     : ""
                 }`}
+                style={{ minWidth: 180, flex: "0 0 auto" }}
                 onClick={() => {
                   setPage(1);
                   setFloor(String(f.floor));
