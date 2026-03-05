@@ -42,6 +42,7 @@ import buildingClientsReducer from "./slices/building/clientsSlice";
 import buildingTreatiesReducer from "./slices/building/treatiesSlice";
 import buildingTasksReducer from "./slices/building/tasksSlice";
 import buildingSalaryReducer from "./slices/building/salarySlice";
+import buildingTreatyInstallmentsReducer from "./slices/building/treatyInstallmentsSlice";
 // import { getProductInvoice, getProductCheckout } from "./slices/saleSlice";
 
 const store = configureStore({
@@ -89,6 +90,7 @@ const store = configureStore({
     buildingTreaties: buildingTreatiesReducer,
     buildingTasks: buildingTasksReducer,
     buildingSalary: buildingSalaryReducer,
+    buildingTreatyInstallments: buildingTreatyInstallmentsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
