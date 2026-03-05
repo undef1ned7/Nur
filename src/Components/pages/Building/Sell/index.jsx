@@ -40,15 +40,8 @@ export default function BuildingSell() {
   const alert = useAlert();
 
   const { items: projects, selectedProjectId } = useBuildingProjects();
-  const {
-    list,
-    count,
-    loading,
-    error,
-    floors,
-    floorsLoading,
-    floorsError,
-  } = useBuildingApartments();
+  const { list, count, loading, error, floors, floorsLoading, floorsError } =
+    useBuildingApartments();
   const { list: clientsList } = useBuildingClients();
 
   const [page, setPage] = useState(1);
@@ -115,7 +108,13 @@ export default function BuildingSell() {
       });
     }
     setInstallments(rows);
-  }, [treatyPaymentType, treatyAmount, treatyDownPayment, firstInstallmentDate, installmentMonths]);
+  }, [
+    treatyPaymentType,
+    treatyAmount,
+    treatyDownPayment,
+    firstInstallmentDate,
+    installmentMonths,
+  ]);
 
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -148,7 +147,8 @@ export default function BuildingSell() {
   );
 
   const clientsOptions = useMemo(
-    () => (clientsList || []).map((c) => ({ id: c.id ?? c.uuid, name: c.name })),
+    () =>
+      (clientsList || []).map((c) => ({ id: c.id ?? c.uuid, name: c.name })),
     [clientsList],
   );
 
@@ -258,9 +258,7 @@ export default function BuildingSell() {
         );
       }
     } catch (err) {
-      setTreatyError(
-        validateResErrors(err, "Не удалось создать договор"),
-      );
+      setTreatyError(validateResErrors(err, "Не удалось создать договор"));
     } finally {
       setCreatingTreaty(false);
     }
@@ -287,7 +285,7 @@ export default function BuildingSell() {
           className="building-btn"
           onClick={() => navigate("/crm/building/treaty")}
         >
-        Список договоров
+          Список договоров
         </button>
       </div>
 
@@ -303,9 +301,7 @@ export default function BuildingSell() {
             <div className="building-page__card">
               <h3 className="building-page__cardTitle">Этажи</h3>
               {floorsLoading && (
-                <div className="building-page__muted">
-                  Загрузка этажей...
-                </div>
+                <div className="building-page__muted">Загрузка этажей...</div>
               )}
               {floorsError && (
                 <div className="building-page__error">
@@ -362,8 +358,8 @@ export default function BuildingSell() {
               )}
             </div>
 
-            <div className="building-page__card">
-              <div className="building-page__filters">
+            <div className="building-page__card mt-5">
+              <div className="building-page__filters mb-4">
                 <select
                   className="building-page__select"
                   value={status}
@@ -394,9 +390,7 @@ export default function BuildingSell() {
               )}
 
               {loading && (
-                <div className="building-page__muted">
-                  Загрузка квартир...
-                </div>
+                <div className="building-page__muted">Загрузка квартир...</div>
               )}
               {!loading && list.length === 0 && (
                 <div className="building-page__muted">
@@ -488,8 +482,8 @@ export default function BuildingSell() {
           <form className="building-page" onSubmit={handleCreateTreaty}>
             <div className="building-page__muted" style={{ marginBottom: 8 }}>
               Квартира {treatyApartment.number || "—"}, этаж{" "}
-              {treatyApartment.floor ?? "—"},{" "}
-              площадь {treatyApartment.area ?? "—"} м²
+              {treatyApartment.floor ?? "—"}, площадь{" "}
+              {treatyApartment.area ?? "—"} м²
             </div>
             <label>
               <div className="building-page__label">Клиент *</div>
