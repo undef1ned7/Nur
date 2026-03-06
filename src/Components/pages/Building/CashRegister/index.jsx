@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Modal from "@/Components/common/Modal/Modal";
+import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -16,11 +17,11 @@ import {
   asDateTime,
   statusLabel,
 } from "../shared/constants";
-import BuildingPagination from "../shared/Pagination";
 import { useBuildingCashRegister } from "@/store/slices/building/cashRegisterSlice";
 import { fetchBuildingWarehouses } from "@/store/creators/building/warehousesCreators";
 import { useBuildingWarehouses } from "@/store/slices/building/warehousesSlice";
 import { createBuildingTransferFromProcurement } from "@/store/creators/building/procurementsCreators";
+import "./CashRegister.scss";
 
 const DECISION_INITIAL = {
   mode: "approve",
@@ -28,6 +29,38 @@ const DECISION_INITIAL = {
   reason: "",
   warehouseId: "",
 };
+
+function CashRegisterPagination({ page, totalPages, count, loading, onChange }) {
+  if (!totalPages || totalPages <= 1) return null;
+
+  const hasPrevPage = page > 1;
+  const hasNextPage = totalPages && page < totalPages;
+
+  return (
+    <div className="warehouse-pagination">
+      <button
+        type="button"
+        className="warehouse-pagination__btn"
+        onClick={() => onChange(page - 1)}
+        disabled={!hasPrevPage || loading}
+      >
+        Назад
+      </button>
+      <span className="warehouse-pagination__info">
+        Страница {page} из {totalPages ?? 1}
+        {typeof count === "number" ? ` (${count} закупок)` : ""}
+      </span>
+      <button
+        type="button"
+        className="warehouse-pagination__btn"
+        onClick={() => onChange(page + 1)}
+        disabled={!hasNextPage || loading}
+      >
+        Вперед
+      </button>
+    </div>
+  );
+}
 
 export default function BuildingCashRegister() {
   const alert = useAlert();
@@ -174,92 +207,152 @@ export default function BuildingCashRegister() {
   };
 
   return (
-    <div className="building-page">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">Касса: согласование закупок</h1>
-          <p className="building-page__subtitle">
-            Отображаются закупки со статусом{" "}
-            <b>
-              {statusLabel("submitted_to_cash", PROCUREMENT_STATUS_LABELS)}
-            </b>{" "}
-            для выбранного проекта.
-          </p>
+    <div className="warehouse-page">
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon-box">₽</div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">
+              Касса: согласование закупок
+            </h1>
+            <p className="warehouse-header__subtitle">
+              Отображаются закупки со статусом{" "}
+              <b>
+                {statusLabel("submitted_to_cash", PROCUREMENT_STATUS_LABELS)}
+              </b>{" "}
+              для выбранного проекта.
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="building-page__card">
-        <input
-          className="building-page__input"
-          value={search}
-          placeholder="Поиск по названию/комментарию"
-          onChange={(e) => {
-            setPage(1);
-            setSearch(e.target.value);
-          }}
-        />
-        {error && <div className="building-page__error">{String(error)}</div>}
+      <div className="warehouse-search-section">
+        <div className="warehouse-search">
+          <input
+            className="warehouse-search__input"
+            value={search}
+            placeholder="Поиск по названию или комментарию закупки"
+            onChange={(e) => {
+              setPage(1);
+              setSearch(e.target.value);
+            }}
+          />
+        </div>
+        <div className="warehouse-search__info">
+          <span>
+            {typeof count === "number"
+              ? `Найдено ${count} закупок`
+              : "Найдено 0 закупок"}
+          </span>
+          {!selectedProjectId && (
+            <span>Выберите жилой комплекс в шапке раздела.</span>
+          )}
+        </div>
       </div>
 
-      <div className="building-page__card">
-        <h3 className="building-page__cardTitle">Ожидают решения кассы</h3>
-        {!selectedProjectId && (
-          <div className="building-page__muted">
-            Выберите жилой комплекс в шапке раздела.
-          </div>
-        )}
-        {selectedProjectId && loading && (
-          <div className="building-page__muted">Загрузка...</div>
-        )}
-        {selectedProjectId && !loading && list.length === 0 && (
-          <div className="building-page__muted">Заявок на согласование нет.</div>
-        )}
-        {!loading &&
-          list.map((procurement) => {
-            const procurementId = procurement?.id ?? procurement?.uuid;
-            const deciding = procurementId != null && decidingIds?.[procurementId] === true;
-            return (
-              <div className="building-page__row" key={procurementId}>
-                <div>
-                  <div>
-                    <b>{procurement?.title || "Без названия"}</b>
-                  </div>
-                  <div className="building-page__label">
-                    {statusLabel(procurement?.status, PROCUREMENT_STATUS_LABELS)} /{" "}
-                    {asDateTime(procurement?.submitted_to_cash_at || procurement?.created_at)}
-                  </div>
-                  <div className="building-page__label">
-                    Сумма: {asCurrency(procurement?.total_amount)}
-                  </div>
-                </div>
-                <div className="building-page__actions">
-                  <button
-                    type="button"
-                    className="building-btn building-btn--primary"
-                    onClick={() => openDecision("approve", procurement)}
-                    disabled={deciding}
-                  >
-                    Одобрить
-                  </button>
-                  <button
-                    type="button"
-                    className="building-btn building-btn--danger"
-                    onClick={() => openDecision("reject", procurement)}
-                    disabled={deciding}
-                  >
-                    Отклонить
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        <BuildingPagination
-          page={page}
-          totalPages={totalPages}
-          disabled={loading}
-          onChange={setPage}
-        />
-      </div>
+      {error && (
+        <div className="mt-2 text-sm text-red-500">{String(error)}</div>
+      )}
+
+      <DataContainer>
+        <div className="warehouse-table-container w-full">
+          <table className="warehouse-table w-full">
+            <thead>
+              <tr>
+                <th>Закупка</th>
+                <th>Статус / дата</th>
+                <th>Сумма</th>
+                <th style={{ width: 260 }}>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!selectedProjectId ? (
+                <tr>
+                  <td colSpan={4} className="warehouse-table__empty">
+                    Выберите жилой комплекс в шапке раздела.
+                  </td>
+                </tr>
+              ) : loading && list.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="warehouse-table__loading">
+                    Загрузка...
+                  </td>
+                </tr>
+              ) : !loading && list.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="warehouse-table__empty">
+                    Заявок на согласование нет.
+                  </td>
+                </tr>
+              ) : (
+                list.map((procurement) => {
+                  const procurementId = procurement?.id ?? procurement?.uuid;
+                  const deciding =
+                    procurementId != null &&
+                    decidingIds?.[procurementId] === true;
+
+                  return (
+                    <tr key={procurementId}>
+                      <td className="warehouse-table__name">
+                        <div className="warehouse-table__name-cell">
+                          <span>{procurement?.title || "Без названия"}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="text-sm text-slate-700">
+                          {statusLabel(
+                            procurement?.status,
+                            PROCUREMENT_STATUS_LABELS
+                          )}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          {asDateTime(
+                            procurement?.submitted_to_cash_at ||
+                              procurement?.created_at
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="font-semibold">
+                          {asCurrency(procurement?.total_amount)}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            className="px-4 py-2 rounded-lg bg-emerald-500 text-white text-sm font-semibold shadow-sm hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                            onClick={() => openDecision("approve", procurement)}
+                            disabled={deciding}
+                          >
+                            Одобрить
+                          </button>
+                          <button
+                            type="button"
+                            className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-semibold shadow-sm hover:bg-red-600 disabled:opacity-60 disabled:cursor-not-allowed"
+                            onClick={() => openDecision("reject", procurement)}
+                            disabled={deciding}
+                          >
+                            Отклонить
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+
+          <CashRegisterPagination
+            page={page}
+            totalPages={totalPages}
+            count={count}
+            loading={loading}
+            onChange={setPage}
+          />
+        </div>
+      </DataContainer>
 
       <Modal
         open={Boolean(decisionModal.procurement)}
