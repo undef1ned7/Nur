@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
@@ -7,16 +7,15 @@ import { useBuildingSalary } from "../../../../store/slices/building/salarySlice
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import {
   fetchBuildingSalaryEmployees,
-  updateBuildingSalaryEmployeeCompensation,
   fetchBuildingPayrolls,
   createBuildingPayroll,
   approveBuildingPayroll,
   deleteBuildingPayroll,
-  fetchBuildingPayrollLines,
-  createBuildingPayrollLine,
 } from "../../../../store/creators/building/salaryCreators";
+import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import Modal from "@/Components/common/Modal/Modal";
 import BuildingSalaryMyLines from "./MyLines";
+import "./Salary.scss";
 
 export default function BuildingSalary() {
   const dispatch = useDispatch();
@@ -36,7 +35,16 @@ export default function BuildingSalary() {
     linesByPayrollId,
   } = useBuildingSalary();
 
-  const { selectedProjectId } = useBuildingProjects();
+  const { selectedProjectId, items: projects } = useBuildingProjects();
+
+  const selectedProjectName = useMemo(() => {
+    if (!selectedProjectId) return "—";
+    const arr = Array.isArray(projects) ? projects : [];
+    const found = arr.find(
+      (p) => String(p?.id ?? p?.uuid) === String(selectedProjectId),
+    );
+    return found?.name || "—";
+  }, [selectedProjectId, projects]);
 
   const [activeTab, setActiveTab] = useState("payrolls");
   const [newPeriodTitle, setNewPeriodTitle] = useState("");
@@ -136,15 +144,296 @@ export default function BuildingSalary() {
   };
 
   return (
-    <div className="building-page building-page--salary">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">Зарплата</h1>
-          <p className="building-page__subtitle">
-            Начисления и выплаты сотрудникам строительного подразделения.
-          </p>
+    <div className="warehouse-page building-page building-page--salary">
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon-box">💰</div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">Зарплата</h1>
+            <p className="warehouse-header__subtitle">
+              {selectedProjectId ? (
+                <>
+                  ЖК: <b>{selectedProjectName}</b>. Начисления и выплаты
+                  сотрудникам.
+                </>
+              ) : (
+                "Начисления и выплаты сотрудникам строительного подразделения."
+              )}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="warehouse-header__create-btn"
+          onClick={() => setIsCreatePeriodModalOpen(true)}
+        >
+          Новый период
+        </button>
+      </div>
+
+      <div className="warehouse-search-section">
+        <div className="warehouse-search__info flex flex-wrap items-center gap-2">
+          <div className="salary-tabs">
+            <button
+              type="button"
+              className={`salary-tab${activeTab === "payrolls" ? " salary-tab--active" : ""}`}
+              onClick={() => setActiveTab("payrolls")}
+            >
+              Периоды начислений
+            </button>
+            <button
+              type="button"
+              className={`salary-tab${activeTab === "employees" ? " salary-tab--active" : ""}`}
+              onClick={() => setActiveTab("employees")}
+            >
+              Сотрудники
+            </button>
+            <button
+              type="button"
+              className={`salary-tab${activeTab === "my" ? " salary-tab--active" : ""}`}
+              onClick={() => setActiveTab("my")}
+            >
+              Мои начисления
+            </button>
+          </div>
+          {activeTab === "payrolls" && (
+            <select
+              className="salary-toolbar__select"
+              value={payrollStatusFilter}
+              onChange={(e) => setPayrollStatusFilter(e.target.value)}
+            >
+              <option value="">Все статусы</option>
+              {Object.entries(PAYROLL_STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
+
+      {payrollsError && activeTab === "payrolls" && (
+        <div className="mt-2 text-sm text-red-500">
+          {String(
+            validateResErrors(payrollsError, "Не удалось загрузить периоды"),
+          )}
+        </div>
+      )}
+      {employeesError && activeTab === "employees" && (
+        <div className="mt-2 text-sm text-red-500">
+          {String(
+            validateResErrors(
+              employeesError,
+              "Не удалось загрузить сотрудников",
+            ),
+          )}
+        </div>
+      )}
+
+      <DataContainer>
+        <div className="warehouse-table-container w-full">
+          {activeTab === "employees" && (
+            <table className="warehouse-table w-full">
+              <thead>
+                <tr>
+                  <th>Сотрудник</th>
+                  <th>Тип оклада</th>
+                  <th>Базовый оклад</th>
+                  <th>Активен</th>
+                  <th style={{ width: 120 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {employeesLoading ? (
+                  <tr>
+                    <td colSpan={5} className="warehouse-table__loading">
+                      Загрузка сотрудников...
+                    </td>
+                  </tr>
+                ) : employeesError ? (
+                  <tr>
+                    <td colSpan={5} className="warehouse-table__empty">
+                      {String(
+                        validateResErrors(
+                          employeesError,
+                          "Не удалось загрузить сотрудников",
+                        ),
+                      )}
+                    </td>
+                  </tr>
+                ) : !employees || employees.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="warehouse-table__empty">
+                      Сотрудников пока нет.
+                    </td>
+                  </tr>
+                ) : (
+                  (employees || []).map((e) => {
+                    const id = e.id ?? e.uuid;
+                    const salaryType =
+                      e.salary_type || e.compensation?.salary_type || "—";
+                    const baseSalary =
+                      e.base_salary != null
+                        ? e.base_salary
+                        : (e.compensation?.base_salary ?? "—");
+                    const isActive =
+                      typeof e.is_active === "boolean"
+                        ? e.is_active
+                        : Boolean(e.compensation?.is_active);
+                    return (
+                      <tr
+                        key={id}
+                        onClick={() =>
+                          id && navigate(`/crm/building/salary/employee/${id}`)
+                        }
+                      >
+                        <td>{e.display || e.name || "—"}</td>
+                        <td>{SALARY_TYPE_LABELS[salaryType] || "—"}</td>
+                        <td>{baseSalary}</td>
+                        <td>{isActive ? "Да" : "Нет"}</td>
+                        <td
+                          onClick={(ev) => ev.stopPropagation()}
+                          style={{ textAlign: "right" }}
+                        >
+                          {id && (
+                            <button
+                              type="button"
+                              className="warehouse-search__filter-btn"
+                              style={{ padding: "6px 12px", fontSize: 13 }}
+                              onClick={() =>
+                                navigate(`/crm/building/salary/employee/${id}`)
+                              }
+                            >
+                              Настроить
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === "payrolls" && (
+            <table className="warehouse-table w-full">
+              <thead>
+                <tr>
+                  <th>Название</th>
+                  <th>Период</th>
+                  <th>Статус</th>
+                  <th style={{ width: 200 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {payrollsLoading ? (
+                  <tr>
+                    <td colSpan={4} className="warehouse-table__loading">
+                      Загрузка периодов...
+                    </td>
+                  </tr>
+                ) : payrollsError ? (
+                  <tr>
+                    <td colSpan={4} className="warehouse-table__empty">
+                      {String(
+                        validateResErrors(
+                          payrollsError,
+                          "Не удалось загрузить периоды",
+                        ),
+                      )}
+                    </td>
+                  </tr>
+                ) : !payrolls || payrolls.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="warehouse-table__empty">
+                      Периодов начислений пока нет. Создайте первый.
+                    </td>
+                  </tr>
+                ) : (
+                  (payrolls || []).map((p) => {
+                    const id = p.id ?? p.uuid;
+                    return (
+                      <tr
+                        key={id}
+                        onClick={() =>
+                          navigate(`/crm/building/salary/payroll/${id}`)
+                        }
+                      >
+                        <td>{p.title || "—"}</td>
+                        <td>
+                          {p.period_start} — {p.period_end}
+                        </td>
+                        <td>
+                          {PAYROLL_STATUS_LABELS[p.status] ||
+                            PAYROLL_STATUS_LABELS.draft}
+                        </td>
+                        <td
+                          onClick={(ev) => ev.stopPropagation()}
+                          style={{ textAlign: "right" }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              justifyContent: "center",
+                              // flexWrap: "wrap",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="warehouse-search__filter-btn"
+                              style={{ padding: "6px 12px", fontSize: 13 }}
+                              onClick={() =>
+                                navigate(`/crm/building/salary/payroll/${id}`)
+                              }
+                            >
+                              Детали
+                            </button>
+                            {p.status === "draft" && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="warehouse-search__filter-btn"
+                                  style={{
+                                    padding: "6px 12px",
+                                    fontSize: 13,
+                                    background: "rgba(34, 197, 94, 0.1)",
+                                    borderColor: "rgba(34, 197, 94, 0.4)",
+                                  }}
+                                  onClick={() => handleApprovePayroll(p)}
+                                >
+                                  Утвердить
+                                </button>
+                                <button
+                                  type="button"
+                                  className="warehouse-search__filter-btn"
+                                  style={{
+                                    padding: "6px 12px",
+                                    fontSize: 13,
+                                    color: "#b02a37",
+                                    borderColor: "rgba(220, 53, 69, 0.4)",
+                                  }}
+                                  onClick={() => handleDeletePayroll(p)}
+                                >
+                                  Удалить
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === "my" && <BuildingSalaryMyLines />}
+        </div>
+      </DataContainer>
 
       {isCreatePeriodModalOpen && (
         <Modal
@@ -208,237 +497,6 @@ export default function BuildingSalary() {
           </form>
         </Modal>
       )}
-
-      <div className="building-page__tabs" style={{ marginBottom: 16 }}>
-        <button
-          type="button"
-          className={`building-btn ${
-            activeTab === "payrolls" ? "building-btn--primary" : ""
-          }`}
-          onClick={() => setActiveTab("payrolls")}
-        >
-          Периоды начислений
-        </button>
-        <button
-          type="button"
-          className={`building-btn ${
-            activeTab === "employees" ? "building-btn--primary" : ""
-          }`}
-          style={{ marginLeft: 8 }}
-          onClick={() => setActiveTab("employees")}
-        >
-          Сотрудники
-        </button>
-        <button
-          type="button"
-          className={`building-btn ${
-            activeTab === "my" ? "building-btn--primary" : ""
-          }`}
-          style={{ marginLeft: 8 }}
-          onClick={() => setActiveTab("my")}
-        >
-          Мои начисления
-        </button>
-      </div>
-
-      {activeTab === "employees" && (
-        <div className="building-page__card">
-          {employeesLoading && (
-            <div className="building-page__muted">
-              Загрузка сотрудников...
-            </div>
-          )}
-          {employeesError && (
-            <div className="building-page__error">
-              {String(
-                validateResErrors(
-                  employeesError,
-                  "Не удалось загрузить сотрудников",
-                ),
-              )}
-            </div>
-          )}
-          {!employeesLoading && !employeesError && (
-            <div className="building-table building-table--shadow">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Сотрудник</th>
-                    <th>Тип оклада</th>
-                    <th>Базовый оклад</th>
-                    <th>Активен</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {(employees || []).map((e) => {
-                    const id = e.id ?? e.uuid;
-                    const salaryType =
-                      e.salary_type || e.compensation?.salary_type || "—";
-                    const baseSalary =
-                      e.base_salary != null
-                        ? e.base_salary
-                        : e.compensation?.base_salary ?? "—";
-                    const isActive =
-                      typeof e.is_active === "boolean"
-                        ? e.is_active
-                        : Boolean(e.compensation?.is_active);
-                    return (
-                      <tr key={id}>
-                        <td>{e.display || e.name || "—"}</td>
-                        <td>{SALARY_TYPE_LABELS[salaryType] || "—"}</td>
-                        <td>{baseSalary}</td>
-                        <td>{isActive ? "Да" : "Нет"}</td>
-                        <td>
-                          {id && (
-                            <button
-                              type="button"
-                              className="building-btn"
-                              onClick={() =>
-                                navigate(`/crm/building/salary/employee/${id}`)
-                              }
-                            >
-                              Настроить
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === "payrolls" && (
-        <div className="building-page__layout building-page__layout--2col">
-          <div className="building-page__card">
-            <h2 className="building-page__title" style={{ fontSize: 18 }}>
-              Периоды
-            </h2>
-            <div
-              className="building-page__actions"
-              style={{
-                marginBottom: 12,
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <button
-                type="button"
-                className="building-btn building-btn--primary"
-                onClick={() => setIsCreatePeriodModalOpen(true)}
-              >
-                Новый период
-              </button>
-              <select
-                className="building-page__select"
-                style={{ maxWidth: 220 }}
-                value={payrollStatusFilter}
-                onChange={(e) => setPayrollStatusFilter(e.target.value)}
-              >
-                <option value="">Все статусы</option>
-                {Object.entries(PAYROLL_STATUS_LABELS).map(
-                  ([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ),
-                )}
-              </select>
-            </div>
-
-            {payrollsLoading && (
-              <div className="building-page__muted">Загрузка периодов...</div>
-            )}
-            {payrollsError && (
-              <div className="building-page__error">
-                {String(
-                  validateResErrors(
-                    payrollsError,
-                    "Не удалось загрузить периоды",
-                  ),
-                )}
-              </div>
-            )}
-            {!payrollsLoading && !payrollsError && (
-              <div className="building-table building-table--shadow">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Название</th>
-                      <th>Период</th>
-                      <th>Статус</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(payrolls || []).map((p) => {
-                      const id = p.id ?? p.uuid;
-                      return (
-                        <tr key={id}>
-                          <td>{p.title || "—"}</td>
-                          <td>
-                            {p.period_start} — {p.period_end}
-                          </td>
-                          <td>
-                            {PAYROLL_STATUS_LABELS[p.status] ||
-                              PAYROLL_STATUS_LABELS.draft}
-                          </td>
-                          <td>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 4,
-                                justifyContent: "flex-end",
-                              }}
-                            >
-                              <button
-                                type="button"
-                                className="building-btn"
-                                onClick={() =>
-                                  navigate(
-                                    `/crm/building/salary/payroll/${id}`,
-                                  )
-                                }
-                              >
-                                Детали
-                              </button>
-                              {p.status === "draft" && (
-                                <>
-                                  <button
-                                    type="button"
-                                    className="building-btn"
-                                    onClick={() => handleApprovePayroll(p)}
-                                  >
-                                    Утвердить
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="building-btn"
-                                    onClick={() => handleDeletePayroll(p)}
-                                  >
-                                    Удалить
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-        </div>
-      )}
-
-      {activeTab === "my" && <BuildingSalaryMyLines />}
     </div>
   );
 }

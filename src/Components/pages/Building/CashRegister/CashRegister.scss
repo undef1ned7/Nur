@@ -152,6 +152,7 @@
     &:hover {
       background: #f9fafb;
       border-color: var(--primary);
+      color: #000;
     }
     @media (max-width: 768px) {
       width: 100%;
@@ -1482,4 +1483,3 @@
     }
   }
 }
-

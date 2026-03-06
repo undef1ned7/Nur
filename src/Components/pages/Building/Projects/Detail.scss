@@ -1,0 +1,162 @@
+@import "../../../Deposits/Sklad/AddProductPage.scss";
+
+/* Форма в модалке не должна наследовать отступы и min-height страницы */
+.add-product-page--modal-form {
+  min-height: auto;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}
+
+/* Дополнительные стили для страницы детализации ЖК (таблица, этажи, список) */
+.project-detail {
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  &__table-wrap {
+    overflow-x: auto;
+    margin-top: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+  }
+
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    thead {
+      background: #f5f5f5;
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #1a1a1a;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e0e0e0;
+      color: #333;
+    }
+
+    tbody tr:hover {
+      background: #fafafa;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  &__floors {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  &__floor-card {
+    min-width: 160px;
+    padding: 16px;
+    background: #f5f5f5;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f0f0f0;
+    }
+
+    &--active {
+      background: #fff9e6;
+      border-color: #ffd400;
+    }
+  }
+
+  &__floor-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 8px;
+  }
+
+  &__floor-stats {
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__filters {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+
+  &__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+  }
+
+  &__list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f9f9f9;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  &__muted {
+    color: #666;
+    font-size: 14px;
+    padding: 12px 0;
+  }
+
+  &__pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px 0;
+    margin-top: 16px;
+  }
+
+  &__pagination-btn {
+    padding: 8px 16px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+      background: #f5f5f5;
+      border-color: #ffd400;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}

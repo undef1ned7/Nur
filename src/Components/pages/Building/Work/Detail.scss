@@ -1,0 +1,42 @@
+@import "../../../Deposits/Sklad/AddProductPage.scss";
+
+.add-product-page--modal-form {
+  min-height: auto;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}
+
+.work-detail {
+  &__value {
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1a1a1a;
+    background: #fafafa;
+    min-height: 44px;
+  }
+
+  &__section-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  &__section-title-inline {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+  }
+
+  &__muted {
+    color: #666;
+    font-size: 14px;
+    padding: 12px 0;
+  }
+}
