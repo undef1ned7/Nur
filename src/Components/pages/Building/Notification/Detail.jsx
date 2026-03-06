@@ -19,6 +19,7 @@ import { useBuildingClients } from "../../../../store/slices/building/clientsSli
 import { useBuildingTreaties } from "../../../../store/slices/building/treatiesSlice";
 import { fetchBuildingClients } from "../../../../store/creators/building/clientsCreators";
 import { fetchBuildingTreaties } from "../../../../store/creators/building/treatiesCreators";
+import "./Notification.scss";
 
 const STATUS_LABELS = {
   open: "Открыта",
@@ -187,11 +188,7 @@ export default function BuildingTaskDetail() {
   const { list: clientsList } = useBuildingClients();
   const { list: treatiesList } = useBuildingTreaties();
 
-  const {
-    current,
-    currentLoading,
-    currentError,
-  } = useBuildingTasks();
+  const { current, currentLoading, currentError } = useBuildingTasks();
 
   const [form, setForm] = useState(TASK_FORM_INITIAL);
   const [formError, setFormError] = useState(null);
@@ -218,7 +215,9 @@ export default function BuildingTaskDetail() {
 
   useEffect(() => {
     const complexId =
-      form.residential_complex || current?.residential_complex || selectedProjectId;
+      form.residential_complex ||
+      current?.residential_complex ||
+      selectedProjectId;
     if (!complexId) return;
     dispatch(fetchBuildingClients({ residential_complex: complexId }));
     dispatch(
@@ -245,17 +244,20 @@ export default function BuildingTaskDetail() {
   }, [dispatch, id, isNew, selectedProjectId]);
 
   useEffect(() => {
-    if (!isNew && current && (current.id === id || current.uuid === id || true)) {
+    if (
+      !isNew &&
+      current &&
+      (current.id === id || current.uuid === id || true)
+    ) {
       setForm({
-        residential_complex: current?.residential_complex || selectedProjectId || "",
+        residential_complex:
+          current?.residential_complex || selectedProjectId || "",
         client: current?.client || "",
         treaty: current?.treaty || "",
         title: current?.title || "",
         description: current?.description || "",
         status: current?.status || "open",
-        due_at: current?.due_at
-          ? String(current.due_at).slice(0, 16)
-          : "",
+        due_at: current?.due_at ? String(current.due_at).slice(0, 16) : "",
         assignee_ids: Array.isArray(current?.assignees)
           ? current.assignees.map((a) => a.id).filter(Boolean)
           : [],
@@ -322,14 +324,12 @@ export default function BuildingTaskDetail() {
         );
       }
     } catch (err) {
-      setFormError(
-        validateResErrors(err, "Не удалось сохранить напоминание"),
-      );
+      setFormError(validateResErrors(err, "Не удалось сохранить напоминание"));
     }
   };
 
   const handleChecklistAdd = async () => {
-    if (!current || !current.id && !current.uuid) return;
+    if (!current || (!current.id && !current.uuid)) return;
     const text = checklistText.trim();
     if (!text) return;
     const taskId = current.id ?? current.uuid;
@@ -435,8 +435,10 @@ export default function BuildingTaskDetail() {
         res2.meta.requestStatus !== "fulfilled";
       if (failed) {
         const errPayload =
-          (res1.meta.requestStatus !== "fulfilled" && (res1.payload || res1.error)) ||
-          (res2.meta.requestStatus !== "fulfilled" && (res2.payload || res2.error));
+          (res1.meta.requestStatus !== "fulfilled" &&
+            (res1.payload || res1.error)) ||
+          (res2.meta.requestStatus !== "fulfilled" &&
+            (res2.payload || res2.error));
         alert(
           validateResErrors(
             errPayload,
@@ -447,10 +449,7 @@ export default function BuildingTaskDetail() {
       }
     } catch (err) {
       alert(
-        validateResErrors(
-          err,
-          "Не удалось поменять порядок пунктов чек-листа",
-        ),
+        validateResErrors(err, "Не удалось поменять порядок пунктов чек-листа"),
         true,
       );
     }
@@ -505,9 +504,7 @@ export default function BuildingTaskDetail() {
           ),
         ),
       );
-      const failed = results.find(
-        (r) => r.meta.requestStatus !== "fulfilled",
-      );
+      const failed = results.find((r) => r.meta.requestStatus !== "fulfilled");
       if (failed) {
         alert(
           validateResErrors(
@@ -519,10 +516,7 @@ export default function BuildingTaskDetail() {
       }
     } catch (err) {
       alert(
-        validateResErrors(
-          err,
-          "Не удалось поменять порядок пунктов чек-листа",
-        ),
+        validateResErrors(err, "Не удалось поменять порядок пунктов чек-листа"),
         true,
       );
     } finally {
@@ -552,27 +546,36 @@ export default function BuildingTaskDetail() {
     return withOrder;
   })();
   return (
-    <div className="building-page building-page--task-detail">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">
-            {isNew ? "Новое напоминание" : "Напоминание"}
-          </h1>
-          {!isNew && (
-            <p className="building-page__subtitle">
-              Статус:{" "}
-              <b>
-                {STATUS_LABELS[current?.status] || current?.status || "—"}
-              </b>
-            </p>
-          )}
+    <div className="warehouse-page building-page building-page--task-detail">
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon-box">🔔</div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">
+              {isNew ? "Новое напоминание" : "Напоминание"}
+            </h1>
+            {!isNew && (
+              <p className="warehouse-header__subtitle">
+                Статус:{" "}
+                <b>
+                  {STATUS_LABELS[current?.status] || current?.status || "—"}
+                </b>
+                {current?.due_at && (
+                  <>
+                    {" • "}Срок:{" "}
+                    {new Date(current.due_at).toLocaleString() || "—"}
+                  </>
+                )}
+              </p>
+            )}
+          </div>
         </div>
         <button
           type="button"
-          className="building-btn"
+          className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           onClick={() => navigate("/crm/building/notification")}
         >
-          ← К списку напоминаний
+          ← К списку
         </button>
       </div>
       {!isNew && (
@@ -607,20 +610,16 @@ export default function BuildingTaskDetail() {
                       padding: "6px 8px",
                       borderRadius: 4,
                       border:
-                        String(draggingId) ===
-                        String(item.id ?? item.uuid)
+                        String(draggingId) === String(item.id ?? item.uuid)
                           ? "1px dashed #1d6fdc"
                           : "1px solid rgba(0,0,0,0.06)",
                       marginBottom: 4,
                       backgroundColor:
-                        String(draggingId) ===
-                        String(item.id ?? item.uuid)
+                        String(draggingId) === String(item.id ?? item.uuid)
                           ? "rgba(29,111,220,0.04)"
                           : "#fff",
                     }}
-                    onDragStart={() =>
-                      setDraggingId(item.id ?? item.uuid)
-                    }
+                    onDragStart={() => setDraggingId(item.id ?? item.uuid)}
                     onDragEnd={() => setDraggingId(null)}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -741,7 +740,6 @@ export default function BuildingTaskDetail() {
       )}
 
       <div className="building-page__card">
-
         {currentLoading && !isNew ? (
           <div className="building-page__muted">Загрузка напоминания...</div>
         ) : (
@@ -843,9 +841,7 @@ export default function BuildingTaskDetail() {
                 }
                 options={(employees || []).map((e) => {
                   const fullName =
-                    [e.first_name, e.last_name]
-                      .filter(Boolean)
-                      .join(" ") ||
+                    [e.first_name, e.last_name].filter(Boolean).join(" ") ||
                     e.display ||
                     e.name ||
                     e.email ||
@@ -888,9 +884,6 @@ export default function BuildingTaskDetail() {
           </form>
         )}
       </div>
-
-
     </div>
   );
 }
-
