@@ -115,17 +115,14 @@ export default function BuildingClientDetail() {
   const renderTreatiesTable = (items) => {
     if (!items || items.length === 0) {
       return (
-        <div className="building-page__muted" style={{ marginTop: 8 }}>
+        <div className="client-detail__empty">
           Договоров пока нет.
         </div>
       );
     }
     return (
-      <div
-        className="building-table building-table--shadow"
-        style={{ marginTop: 8 }}
-      >
-        <table>
+      <div className="client-detail__tableWrap">
+        <table className="client-detail__table">
           <thead>
             <tr>
               <th>Номер</th>
@@ -144,7 +141,7 @@ export default function BuildingClientDetail() {
               return (
                 <tr
                   key={tid}
-                  style={{ cursor: "pointer" }}
+                  className="client-detail__tableRow"
                   onClick={() =>
                     tid && navigate(`/crm/building/treaty/${tid}`)
                   }
@@ -178,30 +175,38 @@ export default function BuildingClientDetail() {
     );
   };
 
+  const renderTreatiesLoading = () => (
+    <div className="sell-loading">
+      <div className="sell-loading__spinner" />
+      <p className="sell-loading__text">Загрузка договоров...</p>
+    </div>
+  );
+
   return (
     <div className="building-page building-page--clients-detail">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">
+      <header className="sell-header">
+        <div className="sell-header__content">
+          <h1 className="sell-header__title">
             {client?.name || "Клиент"}
           </h1>
-          <p className="building-page__subtitle">
-            Детальная информация по клиенту и его договорам.
+          <p className="sell-header__subtitle">
+            Детальная информация по клиенту и его договорам
           </p>
         </div>
         <button
           type="button"
-          className="building-btn"
+          className="sell-header__btn sell-header__btn--secondary"
           onClick={handleBack}
         >
           ← К списку клиентов
         </button>
-      </div>
+      </header>
 
-      <div className="building-page__card">
+      <div className="sell-card client-detail__card">
         {clientLoading && (
-          <div className="building-page__muted">
-            Загрузка информации о клиенте...
+          <div className="sell-loading">
+            <div className="sell-loading__spinner" />
+            <p className="sell-loading__text">Загрузка информации о клиенте...</p>
           </div>
         )}
         {clientError && (
@@ -215,57 +220,69 @@ export default function BuildingClientDetail() {
           </div>
         )}
         {client && !clientLoading && (
-          <div className="building-page">
-            <div>
-              <div className="building-page__label">Имя / название</div>
-              <div>{client.name || "—"}</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">Телефон</div>
-              <div>{client.phone || "—"}</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">Email</div>
-              <div>{client.email || "—"}</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">ИНН</div>
-              <div>{client.inn || "—"}</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">Адрес</div>
-              <div>{client.address || "—"}</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">Заметки</div>
-              <div>{client.notes || "—"}</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">Статус</div>
-              <div>
-                {client.is_active ? "Активный" : "Отключён"}
+          <div className="sell-form client-detail__form">
+            <section className="sell-form__section">
+              <h4 className="sell-form__sectionTitle">Контакты</h4>
+              <div className="client-detail__row">
+                <span className="sell-form__label">Имя / название</span>
+                <span>{client.name || "—"}</span>
               </div>
-            </div>
+              <div className="client-detail__row">
+                <span className="sell-form__label">Телефон</span>
+                <span>{client.phone || "—"}</span>
+              </div>
+              <div className="client-detail__row">
+                <span className="sell-form__label">Email</span>
+                <span>{client.email || "—"}</span>
+              </div>
+            </section>
+            <section className="sell-form__section">
+              <h4 className="sell-form__sectionTitle">Реквизиты</h4>
+              <div className="client-detail__row">
+                <span className="sell-form__label">ИНН</span>
+                <span>{client.inn || "—"}</span>
+              </div>
+              <div className="client-detail__row">
+                <span className="sell-form__label">Адрес</span>
+                <span>{client.address || "—"}</span>
+              </div>
+            </section>
+            <section className="sell-form__section">
+              <h4 className="sell-form__sectionTitle">Прочее</h4>
+              <div className="client-detail__row">
+                <span className="sell-form__label">Заметки</span>
+                <span>{client.notes || "—"}</span>
+              </div>
+              <div className="client-detail__row">
+                <span className="sell-form__label">Статус</span>
+                <span>
+                  {client.is_active ? (
+                    <span className="clients-table__status clients-table__status--active">
+                      Активен
+                    </span>
+                  ) : (
+                    <span className="clients-table__status clients-table__status--inactive">
+                      Отключён
+                    </span>
+                  )}
+                </span>
+              </div>
+            </section>
           </div>
         )}
       </div>
 
-      <div className="building-page__card">
+      <div className="sell-card client-detail__section">
         <details
+          className="client-detail__details"
           onToggle={(e) => {
-            if (e.currentTarget.open) {
-              loadTreatiesForClient();
-            }
+            if (e.currentTarget.open) loadTreatiesForClient();
           }}
         >
-          <summary className="building-page__cardTitle">
+          <summary className="client-detail__summary">
             Все договоры клиента
           </summary>
-          {allTreaties.loading && (
-            <div className="building-page__muted">
-              Загрузка договоров...
-            </div>
-          )}
+          {allTreaties.loading && renderTreatiesLoading()}
           {allTreaties.error && (
             <div className="building-page__error">
               {String(
@@ -281,64 +298,55 @@ export default function BuildingClientDetail() {
         </details>
       </div>
 
-      <div className="building-page__card">
+      <div className="sell-card client-detail__section">
         <details
+          className="client-detail__details"
           onToggle={(e) => {
             if (e.currentTarget.open && !allTreaties.loaded) {
               loadTreatiesForClient();
             }
           }}
         >
-          <summary className="building-page__cardTitle">
+          <summary className="client-detail__summary">
             Покупки (продажи)
           </summary>
-          {allTreaties.loading && !allTreaties.loaded && (
-            <div className="building-page__muted">
-              Загрузка договоров...
-            </div>
-          )}
+          {allTreaties.loading && !allTreaties.loaded && renderTreatiesLoading()}
           {allTreaties.loaded &&
             renderTreatiesTable(treatiesByCategory.purchases)}
         </details>
       </div>
 
-      <div className="building-page__card">
+      <div className="sell-card client-detail__section">
         <details
+          className="client-detail__details"
           onToggle={(e) => {
             if (e.currentTarget.open && !allTreaties.loaded) {
               loadTreatiesForClient();
             }
           }}
         >
-          <summary className="building-page__cardTitle">
+          <summary className="client-detail__summary">
             Бронирования
           </summary>
-          {allTreaties.loading && !allTreaties.loaded && (
-            <div className="building-page__muted">
-              Загрузка договоров...
-            </div>
-          )}
+          {allTreaties.loading && !allTreaties.loaded && renderTreatiesLoading()}
           {allTreaties.loaded &&
             renderTreatiesTable(treatiesByCategory.bookings)}
         </details>
       </div>
 
-      <div className="building-page__card">
+      <div className="sell-card client-detail__section">
         <details
+          className="client-detail__details"
           onToggle={(e) => {
             if (e.currentTarget.open && !allTreaties.loaded) {
               loadTreatiesForClient();
             }
           }}
         >
-          <summary className="building-page__cardTitle">
+          <summary className="client-detail__summary">
             Рассрочки
           </summary>
-          {allTreaties.loading && !allTreaties.loaded && (
-            <div className="building-page__muted">
-              Загрузка договоров...
-            </div>
-          )}
+          {allTreaties.loading && !allTreaties.loaded && renderTreatiesLoading()}
           {allTreaties.loaded &&
             renderTreatiesTable(treatiesByCategory.installments)}
         </details>

@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { LayoutGrid, Table2 } from "lucide-react";
+import { Calendar as CalendarIcon, LayoutGrid, Table2 } from "lucide-react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import interactionPlugin from "@fullcalendar/interaction";
 import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import { useConfirm } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -23,6 +26,7 @@ const STATUS_LABELS = {
 const VIEW_MODES = {
   TABLE: "table",
   CARDS: "cards",
+  CALENDAR: "calendar",
 };
 
 const STORAGE_KEY = "building_notifications_view_mode";
@@ -41,7 +45,12 @@ export default function BuildingNotification() {
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved === VIEW_MODES.TABLE || saved === VIEW_MODES.CARDS) return saved;
+    if (
+      saved === VIEW_MODES.TABLE ||
+      saved === VIEW_MODES.CARDS ||
+      saved === VIEW_MODES.CALENDAR
+    )
+      return saved;
     return VIEW_MODES.TABLE;
   });
 
@@ -85,6 +94,35 @@ export default function BuildingNotification() {
 
   const totalTasks = Array.isArray(list) ? list.length : 0;
   const filteredCount = Array.isArray(effectiveList) ? effectiveList.length : 0;
+
+  const calendarEvents = useMemo(() => {
+    const arr = Array.isArray(effectiveList) ? effectiveList : [];
+    return arr
+      .filter((t) => t?.due_at)
+      .map((t) => {
+        const id = t?.id ?? t?.uuid;
+        const start = new Date(t.due_at);
+        return {
+          id: String(id),
+          title: t?.title || "Без названия",
+          start: start.toISOString(),
+          allDay: false,
+          extendedProps: { task: t },
+        };
+      });
+  }, [effectiveList]);
+
+  const handleCalendarDateClick = (info) => {
+    if (!selectedProjectId) return;
+    const dateStr = info.dateStr;
+    const dueAt = dateStr.includes("T") ? dateStr.slice(0, 16) : `${dateStr}T09:00`;
+    navigate("/crm/building/notification/new", { state: { due_at: dueAt } });
+  };
+
+  const handleCalendarEventClick = (info) => {
+    const task = info.event.extendedProps?.task;
+    if (task) openEdit(task);
+  };
 
   const openCreate = () => {
     if (!selectedProjectId) return;
@@ -198,6 +236,20 @@ export default function BuildingNotification() {
               <LayoutGrid size={16} />
               Карточки
             </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode(VIEW_MODES.CALENDAR)}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition
+                ${
+                  viewMode === VIEW_MODES.CALENDAR
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+            >
+              <CalendarIcon size={16} />
+              Календарь
+            </button>
           </div>
         </div>
       </div>
@@ -210,7 +262,35 @@ export default function BuildingNotification() {
 
       <DataContainer>
         <div className="warehouse-table-container w-full">
-          {viewMode === VIEW_MODES.TABLE ? (
+          {viewMode === VIEW_MODES.CALENDAR ? (
+            <div className="building-notification-calendar">
+              {!selectedProjectId ? (
+                <div className="warehouse-table__empty">
+                  Выберите жилой комплекс в шапке раздела, чтобы увидеть
+                  напоминания в календаре.
+                </div>
+              ) : (
+                <FullCalendar
+                  plugins={[dayGridPlugin, interactionPlugin]}
+                  initialView="dayGridMonth"
+                  locale="ru"
+                  headerToolbar={{
+                    left: "prev,next today",
+                    center: "title",
+                    right: "dayGridMonth,dayGridWeek",
+                  }}
+                  events={calendarEvents}
+                  dateClick={handleCalendarDateClick}
+                  eventClick={handleCalendarEventClick}
+                  height="auto"
+                  eventDisplay="block"
+                  dayMaxEvents={4}
+                  moreLinkClick="popover"
+                  classNames="building-notification-calendar__fc"
+                />
+              )}
+            </div>
+          ) : viewMode === VIEW_MODES.TABLE ? (
             <table className="warehouse-table w-full">
               <thead>
                 <tr>

@@ -368,6 +368,1412 @@
   color: rgba(11, 35, 68, 0.8);
 }
 
+/* --- Страница продаж: тулбар и легенда --- */
+.building-page__card--sell-table {
+  padding: 18px 20px;
+}
+
+.building-sell-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 24px;
+  margin-bottom: 16px;
+}
+
+.building-sell-toolbar__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+}
+
+.building-sell-toolbar__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.building-sell-toolbar__labelText {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(11, 35, 68, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.building-sell-toolbar__select {
+  min-width: 200px;
+}
+
+.building-sell-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(11, 35, 68, 0.03);
+  border: 1px solid rgba(11, 35, 68, 0.08);
+  font-size: 12px;
+}
+
+.building-sell-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #0b2344;
+}
+
+.building-sell-legend__item::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.building-sell-legend__item--available::before {
+  background: rgba(34, 197, 94, 0.35);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.building-sell-legend__item--reserved::before {
+  background: rgba(249, 115, 22, 0.35);
+  border: 1px solid rgba(249, 115, 22, 0.5);
+}
+
+.building-sell-legend__item--sold::before {
+  background: rgba(220, 53, 69, 0.35);
+  border: 1px solid rgba(220, 53, 69, 0.5);
+}
+
+.building-sell-legend__hint {
+  color: rgba(11, 35, 68, 0.6);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* Обёртка таблицы: скролл + тень */
+.building-sell-plan-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+  margin: 0 -4px 4px;
+  padding: 4px;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 35, 68, 0.08);
+  background: rgba(11, 35, 68, 0.02);
+  min-height: 120px;
+}
+
+/* Шахматка квартир (продажи): таблица этаж → квартиры */
+.building-page__card--sell-table .building-sell-plan.building-table {
+  display: inline-block;
+  overflow: visible;
+}
+
+.building-sell-plan {
+  display: inline-block;
+  width: max-content;
+  min-width: 100%;
+  vertical-align: top;
+
+  table {
+    display: table;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: auto;
+    min-width: 100%;
+  }
+
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f1f5f9;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: rgba(11, 35, 68, 0.8);
+    padding: 10px 8px;
+    border-bottom: 2px solid rgba(11, 35, 68, 0.12);
+    box-shadow: 0 1px 0 rgba(11, 35, 68, 0.06);
+  }
+
+  .building-sell-plan__floorCol {
+    width: 52px;
+    min-width: 52px;
+    font-weight: 700;
+    font-size: 13px;
+    color: #0b2344;
+    background: rgba(11, 35, 68, 0.06);
+    text-align: center;
+    vertical-align: middle;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    box-shadow: 2px 0 4px rgba(11, 35, 68, 0.06);
+  }
+
+  thead .building-sell-plan__floorCol {
+    z-index: 3;
+    background: #e2e8f0;
+  }
+
+  .building-sell-plan__aptCol {
+    min-width: 76px;
+    width: 76px;
+    padding: 8px 6px;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .building-sell-plan__cell--empty {
+    background: rgba(11, 35, 68, 0.02);
+    border: 1px dashed rgba(11, 35, 68, 0.1);
+  }
+
+  .building-sell-plan__cell {
+    border: 1px solid rgba(11, 35, 68, 0.1);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+
+  .building-sell-plan__cell--available {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #0f2d1a;
+  }
+
+  .building-sell-plan__cell--available:hover {
+    box-shadow: inset 0 0 0 2px rgba(34, 197, 94, 0.35);
+  }
+
+  .building-sell-plan__cell--reserved {
+    background: rgba(249, 115, 22, 0.18);
+    border-color: rgba(249, 115, 22, 0.4);
+    color: #3d2204;
+  }
+
+  .building-sell-plan__cell--reserved.building-sell-plan__cell--clickable:hover {
+    box-shadow: inset 0 0 0 2px rgba(249, 115, 22, 0.4);
+  }
+
+  .building-sell-plan__cell--sold {
+    background: rgba(220, 53, 69, 0.18);
+    border-color: rgba(220, 53, 69, 0.4);
+    color: #5c1a1f;
+  }
+
+  .building-sell-plan__cell--sold.building-sell-plan__cell--clickable:hover {
+    box-shadow: inset 0 0 0 2px rgba(220, 53, 69, 0.4);
+  }
+
+  .building-sell-plan__cellInner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .building-sell-plan__aptNum {
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .building-sell-plan__cell--clickable {
+    cursor: pointer;
+  }
+
+  .building-sell-plan__cell--clickable:hover {
+    filter: brightness(0.97);
+  }
+
+  .building-sell-plan__cell--loading {
+    pointer-events: none;
+    opacity: 0.85;
+  }
+
+  .building-sell-plan__cellLoading {
+    font-size: 12px;
+    display: block;
+    margin-top: 2px;
+  }
+}
+
+/* Быстрый выбор / создание клиента в модалке договора */
+.building-treaty-clientRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.building-treaty-clientSelect {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.building-treaty-clientSelectTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(11, 35, 68, 0.18);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: #0b2344;
+}
+
+.building-treaty-clientSelectTrigger:hover {
+  border-color: rgba(11, 35, 68, 0.3);
+}
+
+.building-treaty-clientSelectValue {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.building-treaty-clientSelectValue:empty::before,
+.building-treaty-clientSelectTrigger:not([data-value]) .building-treaty-clientSelectValue {
+  color: rgba(11, 35, 68, 0.5);
+}
+
+.building-treaty-clientSelectArrow {
+  flex-shrink: 0;
+  margin-left: 8px;
+  font-size: 10px;
+  color: rgba(11, 35, 68, 0.6);
+}
+
+.building-treaty-clientSelectDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: 4px;
+  padding: 6px;
+  border: 1px solid rgba(11, 35, 68, 0.15);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(11, 35, 68, 0.12);
+  max-height: 260px;
+  display: flex;
+  flex-direction: column;
+}
+
+.building-treaty-clientSelectSearch {
+  flex-shrink: 0;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+}
+
+.building-treaty-clientSelectList {
+  overflow-y: auto;
+  min-height: 40px;
+}
+
+.building-treaty-clientSelectEmpty {
+  padding: 12px;
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.6);
+  text-align: center;
+}
+
+.building-treaty-clientSelectOption {
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.building-treaty-clientSelectOption:hover,
+.building-treaty-clientSelectOption--selected {
+  background: rgba(11, 35, 68, 0.08);
+}
+
+.building-treaty-clientSelectOption--selected {
+  font-weight: 600;
+}
+
+.building-treaty-clientForm {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 35, 68, 0.14);
+  background: rgba(11, 35, 68, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.building-treaty-clientFormGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.building-treaty-clientFormGrid .building-page__input {
+  flex: 1 1 160px;
+}
+
+.building-treaty-clientFormActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Список файлов договора */
+.building-treaty-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.building-treaty-filesList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid rgba(11, 35, 68, 0.1);
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(11, 35, 68, 0.02);
+}
+
+.building-treaty-filesItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid rgba(11, 35, 68, 0.08);
+  font-size: 13px;
+}
+
+.building-treaty-filesItemName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.building-treaty-filesItemRemove {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(220, 53, 69, 0.1);
+  color: #b02a37;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.building-treaty-filesItemRemove:hover {
+  background: rgba(220, 53, 69, 0.2);
+}
+
+/* ========== Страница продаж — современный вид ========== */
+.building-page--sell {
+  padding: 20px 0 28px;
+  gap: 20px;
+}
+
+.sell-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff 0%, rgba($building-primary, 0.06) 100%);
+  border: 1px solid rgba($building-primary, 0.2);
+  box-shadow: 0 2px 12px rgba(11, 35, 68, 0.04);
+}
+
+.sell-header__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.sell-header__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0b2344;
+  line-height: 1.25;
+}
+
+.sell-header__subtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: rgba(11, 35, 68, 0.72);
+  line-height: 1.4;
+}
+
+.sell-header__subtitle strong {
+  color: #0b2344;
+  font-weight: 600;
+}
+
+.sell-header__btn {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 35, 68, 0.16);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0b2344;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sell-header__btn:hover:not(:disabled) {
+  border-color: rgba($building-primary, 0.5);
+  background: rgba($building-primary, 0.08);
+  box-shadow: 0 2px 8px rgba(11, 35, 68, 0.06);
+}
+
+.sell-header__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sell-header__btn--secondary {
+  background: transparent;
+  border-color: rgba(11, 35, 68, 0.2);
+  font-weight: 500;
+}
+
+.sell-header__btn--secondary:hover:not(:disabled) {
+  background: rgba(11, 35, 68, 0.05);
+}
+
+.sell-empty-hint {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: rgba(11, 35, 68, 0.03);
+  border: 1px dashed rgba(11, 35, 68, 0.18);
+}
+
+.sell-empty-hint__icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.sell-empty-hint__text {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(11, 35, 68, 0.78);
+  line-height: 1.45;
+}
+
+.sell-card {
+  padding: 22px 24px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(11, 35, 68, 0.1);
+  box-shadow: 0 4px 20px rgba(11, 35, 68, 0.06);
+}
+
+.sell-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 18px 28px;
+  margin-bottom: 20px;
+}
+
+.sell-toolbar__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px 24px;
+}
+
+.sell-toolbar__label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sell-toolbar__labelText {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(11, 35, 68, 0.65);
+}
+
+.sell-toolbar__select {
+  min-width: 200px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 35, 68, 0.16);
+  background: #fff;
+  font-size: 14px;
+  color: #0b2344;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sell-toolbar__select:focus {
+  outline: none;
+  border-color: $building-primary;
+  box-shadow: 0 0 0 3px rgba($building-primary, 0.18);
+}
+
+.sell-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 24px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(11, 35, 68, 0.03);
+  border: 1px solid rgba(11, 35, 68, 0.08);
+  font-size: 12px;
+}
+
+.sell-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #0b2344;
+}
+
+.sell-legend__item::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
+}
+
+.sell-legend__item--available::before {
+  background: rgba(34, 197, 94, 0.35);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.sell-legend__item--reserved::before {
+  background: rgba(249, 115, 22, 0.35);
+  border: 1px solid rgba(249, 115, 22, 0.5);
+}
+
+.sell-legend__item--sold::before {
+  background: rgba(220, 53, 69, 0.35);
+  border: 1px solid rgba(220, 53, 69, 0.5);
+}
+
+.sell-legend__hint {
+  color: rgba(11, 35, 68, 0.58);
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.sell-plan-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+  margin: 0 -4px 8px;
+  padding: 6px;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+  border: 1px solid rgba(11, 35, 68, 0.08);
+  background: rgba(11, 35, 68, 0.02);
+  min-height: 120px;
+}
+
+.sell-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 56px 24px;
+}
+
+.sell-loading__spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(11, 35, 68, 0.1);
+  border-top-color: $building-primary;
+  border-radius: 50%;
+  animation: building-sell-spin 0.7s linear infinite;
+}
+
+.sell-loading__text {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(11, 35, 68, 0.7);
+}
+
+.sell-empty {
+  padding: 48px 28px;
+  text-align: center;
+  border-radius: 14px;
+  border: 1px dashed rgba(11, 35, 68, 0.14);
+  background: rgba(11, 35, 68, 0.02);
+}
+
+.sell-empty__text {
+  margin: 0;
+  font-size: 15px;
+  color: rgba(11, 35, 68, 0.75);
+  line-height: 1.5;
+}
+
+/* Модалка выбора: Продажа / Бронь */
+.sell-choice {
+  padding: 8px 0;
+}
+
+.sell-choice__info {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.7);
+}
+
+.sell-choice__prompt {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0b2344;
+}
+
+.sell-choice__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sell-choice__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 35, 68, 0.12);
+  background: #fff;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sell-choice__btn:hover {
+  border-color: rgba(11, 35, 68, 0.22);
+  background: rgba(11, 35, 68, 0.03);
+  box-shadow: 0 2px 8px rgba(11, 35, 68, 0.06);
+}
+
+.sell-choice__btn--sale {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.06);
+}
+
+.sell-choice__btn--sale:hover {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.sell-choice__btnTitle {
+  font-weight: 700;
+  color: #0b2344;
+}
+
+.sell-choice__btn--sale .sell-choice__btnTitle {
+  color: #166534;
+}
+
+.sell-choice__btnDesc {
+  font-size: 12px;
+  color: rgba(11, 35, 68, 0.6);
+}
+
+.sell-choice__btn--booking {
+  border-color: rgba(249, 115, 22, 0.35);
+  background: rgba(249, 115, 22, 0.06);
+}
+
+.sell-choice__btn--booking:hover {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(249, 115, 22, 0.12);
+}
+
+.sell-choice__btn--booking .sell-choice__btnTitle {
+  color: #c2410c;
+}
+
+.sell-choice__btn--cancel {
+  margin-top: 6px;
+  padding: 10px 18px;
+  font-weight: 500;
+  color: rgba(11, 35, 68, 0.7);
+}
+
+.sell-choice__btn--cancel:hover {
+  background: rgba(11, 35, 68, 0.05);
+  color: #0b2344;
+}
+
+/* Форма договора */
+.sell-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sell-form__apt {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(11, 35, 68, 0.04);
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.85);
+}
+
+.sell-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sell-form__sectionTitle {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(11, 35, 68, 0.6);
+}
+
+.sell-form__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0b2344;
+  margin-bottom: 6px;
+}
+
+.sell-form__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: rgba(11, 35, 68, 0.6);
+}
+
+.sell-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(11, 35, 68, 0.1);
+}
+
+@media (max-width: 640px) {
+  .building-page--sell {
+    padding: 14px 0 20px;
+    gap: 16px;
+  }
+
+  .sell-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px 18px;
+  }
+
+  .sell-header__title {
+    font-size: 19px;
+  }
+
+  .sell-card {
+    padding: 16px 18px;
+  }
+
+  .sell-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .sell-toolbar__select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sell-legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .building-treaty-clientRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .building-treaty-clientFormGrid {
+    flex-direction: column;
+  }
+}
+
+/* Загрузка и пустое состояние — продажи */
+.building-sell-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+}
+
+.building-sell-loading__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(11, 35, 68, 0.12);
+  border-top-color: $building-primary;
+  border-radius: 50%;
+  animation: building-sell-spin 0.7s linear infinite;
+}
+
+@keyframes building-sell-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========== Страница клиентов (список) ========== */
+.building-page--clients {
+  padding: 20px 0 28px;
+  gap: 20px;
+}
+
+.clients-card {
+  margin-top: 0;
+}
+
+.clients-toolbar {
+  margin-bottom: 20px;
+}
+
+.clients-toolbar__search-wrap {
+  flex: 1;
+  min-width: 200px;
+}
+
+.clients-toolbar__search {
+  width: 100%;
+  max-width: 360px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 35, 68, 0.16);
+  background: #fff;
+  font-size: 14px;
+  color: #0b2344;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clients-toolbar__search::placeholder {
+  color: rgba(11, 35, 68, 0.45);
+}
+
+.clients-toolbar__search:focus {
+  outline: none;
+  border-color: $building-primary;
+  box-shadow: 0 0 0 3px rgba($building-primary, 0.18);
+}
+
+.clients-toolbar__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+}
+
+.clients-toolbar__count {
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.7);
+}
+
+.clients-toolbar__view {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.clients-toolbar__viewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 35, 68, 0.18);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(11, 35, 68, 0.85);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.clients-toolbar__viewBtn:hover {
+  border-color: rgba(11, 35, 68, 0.3);
+  background: rgba(11, 35, 68, 0.04);
+}
+
+.clients-toolbar__viewBtn--active {
+  border-color: $building-primary;
+  background: rgba($building-primary, 0.1);
+  color: #0b2344;
+  font-weight: 600;
+}
+
+.clients-toolbar__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.8);
+  cursor: pointer;
+}
+
+.clients-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 35, 68, 0.08);
+}
+
+.clients-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.clients-table thead {
+  background: rgba(11, 35, 68, 0.04);
+}
+
+.clients-table th,
+.clients-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(11, 35, 68, 0.08);
+  text-align: left;
+}
+
+.clients-table th {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(11, 35, 68, 0.75);
+}
+
+.clients-table__actionsCol {
+  width: 80px;
+  text-align: right;
+}
+
+.clients-table__row {
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.clients-table__row:hover {
+  background: rgba(11, 35, 68, 0.03);
+}
+
+.clients-table__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.clients-table__status--active {
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.12);
+  color: #166534;
+}
+
+.clients-table__status--inactive {
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  background: rgba(220, 53, 69, 0.08);
+  color: #b02a37;
+}
+
+.clients-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.clients-grid__card {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(11, 35, 68, 0.1);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clients-grid__card:hover {
+  border-color: rgba(11, 35, 68, 0.2);
+  box-shadow: 0 4px 16px rgba(11, 35, 68, 0.08);
+}
+
+.clients-grid__cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.clients-grid__cardName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0b2344;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+.clients-grid__cardMeta {
+  flex-shrink: 0;
+}
+
+.clients-grid__cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clients-grid__cardRow {
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.85);
+}
+
+.clients-grid__cardRow--address {
+  word-break: break-word;
+}
+
+.clients-grid__cardLabel {
+  display: inline-block;
+  min-width: 64px;
+  font-weight: 500;
+  color: rgba(11, 35, 68, 0.6);
+  margin-right: 6px;
+}
+
+.clients-grid__cardNotes {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: rgba(11, 35, 68, 0.6);
+  line-height: 1.4;
+}
+
+.clients-grid__cardActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(11, 35, 68, 0.08);
+}
+
+.clients-grid__cardBtn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 35, 68, 0.16);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0b2344;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.clients-grid__cardBtn:hover:not(:disabled) {
+  border-color: rgba(11, 35, 68, 0.3);
+  background: rgba(11, 35, 68, 0.04);
+}
+
+.clients-grid__cardBtn--danger {
+  border-color: rgba(220, 53, 69, 0.35);
+  color: #b02a37;
+}
+
+.clients-grid__cardBtn--danger:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.clients-form__activeCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0b2344;
+  cursor: pointer;
+}
+
+/* ========== Детальная страница клиента ========== */
+.building-page--clients-detail {
+  padding: 20px 0 28px;
+  gap: 20px;
+}
+
+.client-detail__card {
+  margin-top: 0;
+}
+
+.client-detail__form {
+  gap: 24px;
+}
+
+.client-detail__row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(11, 35, 68, 0.1);
+  font-size: 14px;
+  color: #0b2344;
+}
+
+.client-detail__row:last-child {
+  border-bottom: 0;
+}
+
+.client-detail__row .sell-form__label {
+  flex-shrink: 0;
+  min-width: 120px;
+  margin-bottom: 0;
+  font-weight: 500;
+  color: rgba(11, 35, 68, 0.7);
+}
+
+.client-detail__section {
+  margin-top: 0;
+}
+
+.client-detail__details {
+  display: block;
+}
+
+.client-detail__summary {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0b2344;
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.client-detail__summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-detail__summary::before {
+  content: "▸ ";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.2s ease;
+}
+
+.client-detail__details[open] .client-detail__summary::before {
+  transform: rotate(90deg);
+}
+
+.client-detail__empty {
+  padding: 16px;
+  border-radius: 10px;
+  background: rgba(11, 35, 68, 0.03);
+  border: 1px dashed rgba(11, 35, 68, 0.12);
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.7);
+  text-align: center;
+}
+
+.client-detail__tableWrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 35, 68, 0.08);
+  margin-top: 8px;
+}
+
+.client-detail__table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.client-detail__table thead {
+  background: rgba(11, 35, 68, 0.04);
+}
+
+.client-detail__table th,
+.client-detail__table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(11, 35, 68, 0.08);
+  text-align: left;
+}
+
+.client-detail__table th {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(11, 35, 68, 0.75);
+}
+
+.client-detail__tableRow {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.client-detail__tableRow:hover {
+  background: rgba(11, 35, 68, 0.03);
+}
+
+@media (max-width: 640px) {
+  .building-page--clients .sell-toolbar.clients-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .clients-toolbar__search {
+    max-width: none;
+  }
+
+  .clients-toolbar__meta {
+    flex-wrap: wrap;
+  }
+
+  .clients-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-detail__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .client-detail__row .sell-form__label {
+    min-width: 0;
+  }
+}
+
+.building-sell-loading__text {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(11, 35, 68, 0.7);
+}
+
+.building-sell-empty {
+  padding: 40px 24px;
+  text-align: center;
+  border-radius: 12px;
+  border: 1px dashed rgba(11, 35, 68, 0.15);
+  background: rgba(11, 35, 68, 0.02);
+}
+
+.building-sell-empty__text {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(11, 35, 68, 0.75);
+}
+
+@media (max-width: 640px) {
+  .building-page__card--sell-table {
+    padding: 12px 14px;
+  }
+
+  .building-sell-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .building-sell-toolbar__filters {
+    flex-direction: column;
+  }
+
+  .building-sell-toolbar__select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .building-sell-legend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .building-sell-plan__floorCol {
+    width: 44px;
+    min-width: 44px;
+    font-size: 12px;
+  }
+
+  .building-sell-plan__aptCol {
+    min-width: 64px;
+    width: 64px;
+    padding: 6px 4px;
+  }
+
+  .building-sell-plan__cellInner {
+    min-height: 38px;
+    gap: 4px;
+  }
+
+  .building-sell-plan__aptNum {
+    font-size: 13px;
+  }
+}
+
 .building-page--clients .building-page__header,
 .building-page--treaties .building-page__header {
   @media (max-width: 640px) {

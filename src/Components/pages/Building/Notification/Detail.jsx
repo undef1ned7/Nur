@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -179,6 +179,7 @@ const MultipleSearchSelect = ({
 
 export default function BuildingTaskDetail() {
   const { id } = useParams();
+  const location = useLocation();
   const isNew = !id;
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -236,12 +237,17 @@ export default function BuildingTaskDetail() {
     if (!isNew && id) {
       dispatch(fetchBuildingTaskById(id));
     } else if (isNew) {
+      const dueAtFromCalendar = location.state?.due_at;
       setForm((prev) => ({
         ...TASK_FORM_INITIAL,
         residential_complex: selectedProjectId || "",
+        due_at:
+          dueAtFromCalendar && String(dueAtFromCalendar).trim()
+            ? String(dueAtFromCalendar).slice(0, 16)
+            : "",
       }));
     }
-  }, [dispatch, id, isNew, selectedProjectId]);
+  }, [dispatch, id, isNew, selectedProjectId, location.state?.due_at]);
 
   useEffect(() => {
     if (
