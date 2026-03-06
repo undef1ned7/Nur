@@ -12,6 +12,7 @@ import { useShifts } from "../../../../store/slices/shiftSlice";
 import api from "../../../../api";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import "./ShiftPage.scss";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 const ShiftPage = ({ onBack }) => {
   const dispatch = useDispatch();
@@ -161,9 +162,9 @@ const ShiftPage = ({ onBack }) => {
         const params = url
           ? {}
           : {
-              shift: openShiftId,
-              page: currentPage,
-            };
+            shift: openShiftId,
+            page: currentPage,
+          };
 
         const response = await api.get(requestUrl, { params });
         const data = response.data;
@@ -540,17 +541,15 @@ const ShiftPage = ({ onBack }) => {
 
       <div className="shift-page__tabs">
         <button
-          className={`shift-page__tab ${
-            activeTab === "sales" ? "shift-page__tab--active" : ""
-          }`}
+          className={`shift-page__tab ${activeTab === "sales" ? "shift-page__tab--active" : ""
+            }`}
           onClick={() => setActiveTab("sales")}
         >
           Продажи
         </button>
         <button
-          className={`shift-page__tab ${
-            activeTab === "money" ? "shift-page__tab--active" : ""
-          }`}
+          className={`shift-page__tab ${activeTab === "money" ? "shift-page__tab--active" : ""
+            }`}
           onClick={() => setActiveTab("money")}
         >
           Движение денег
@@ -571,101 +570,107 @@ const ShiftPage = ({ onBack }) => {
         {loadingSales ? (
           <div className="shift-page__loading">Загрузка данных...</div>
         ) : activeTab === "sales" ? (
-          <table className="shift-page__table">
-            <thead>
-              <tr>
-                <th scope="col">НОМЕР</th>
-                <th scope="col">ДАТА/ВРЕМЯ</th>
-                <th scope="col">ПОКУПАТЕЛЬ</th>
-                <th scope="col">СПОСОБ ОПЛАТЫ</th>
-                <th scope="col">СУММА</th>
-                <th scope="col">СТАТУС</th>
-                <th scope="col" aria-label="Действия"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSales.length === 0 ? (
+          <DataContainer>
+
+            <table className="shift-page__table">
+              <thead>
                 <tr>
-                  <td colSpan="7" className="shift-page__empty">
-                    Продажи не найдены
-                  </td>
+                  <th scope="col">НОМЕР</th>
+                  <th scope="col">ДАТА/ВРЕМЯ</th>
+                  <th scope="col">ПОКУПАТЕЛЬ</th>
+                  <th scope="col">СПОСОБ ОПЛАТЫ</th>
+                  <th scope="col">СУММА</th>
+                  <th scope="col">СТАТУС</th>
+                  <th scope="col" aria-label="Действия"></th>
                 </tr>
-              ) : (
-                filteredSales.map((sale, idx) => (
-                  <tr key={sale.saleId || sale.id}>
-                    <td>{(currentSalesPage - 1) * pageSize + idx + 1}</td>
-                    <td>{sale.date}</td>
-                    <td>{sale.buyer}</td>
-                    <td>{sale.paymentMethod}</td>
-                    <td>{sale.amount.toFixed(2)} сом</td>
-                    <td>
-                      <span
-                        className={`shift-page__status shift-page__status--${sale.statusType}`}
-                      >
-                        {sale.status}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="shift-page__more-btn"
-                        aria-label="Дополнительные действия"
-                      >
-                        <MoreVertical size={18} />
-                      </button>
+              </thead>
+              <tbody>
+                {filteredSales.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="shift-page__empty">
+                      Продажи не найдены
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredSales.map((sale, idx) => (
+                    <tr key={sale.saleId || sale.id}>
+                      <td>{(currentSalesPage - 1) * pageSize + idx + 1}</td>
+                      <td>{sale.date}</td>
+                      <td>{sale.buyer}</td>
+                      <td>{sale.paymentMethod}</td>
+                      <td>{sale.amount.toFixed(2)} сом</td>
+                      <td>
+                        <span
+                          className={`shift-page__status shift-page__status--${sale.statusType}`}
+                        >
+                          {sale.status}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="shift-page__more-btn"
+                          aria-label="Дополнительные действия"
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </DataContainer>
         ) : (
-          <table className="shift-page__table">
-            <thead>
-              <tr>
-                <th scope="col">НОМЕР</th>
-                <th scope="col">ДАТА/ВРЕМЯ</th>
-                <th scope="col">ОПИСАНИЕ</th>
-                <th scope="col">СПОСОБ ОПЛАТЫ</th>
-                <th scope="col">СУММА</th>
-                <th scope="col">ТИП</th>
-                <th scope="col" aria-label="Действия"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMovements.length === 0 ? (
+          <DataContainer>
+            <table className="shift-page__table">
+              <thead>
                 <tr>
-                  <td colSpan="7" className="shift-page__empty">
-                    Движение денег не найдено
-                  </td>
+                  <th scope="col">НОМЕР</th>
+                  <th scope="col">ДАТА/ВРЕМЯ</th>
+                  <th scope="col">ОПИСАНИЕ</th>
+                  <th scope="col">СПОСОБ ОПЛАТЫ</th>
+                  <th scope="col">СУММА</th>
+                  <th scope="col">ТИП</th>
+                  <th scope="col" aria-label="Действия"></th>
                 </tr>
-              ) : (
-                filteredMovements.map((movement, idx) => (
-                  <tr key={movement.id}>
-                    <td>{movement.id}</td>
-                    <td>{movement.date}</td>
-                    <td>{movement.description}</td>
-                    <td>{movement.paymentMethod}</td>
-                    <td>{movement.amount.toFixed(2)} сом</td>
-                    <td>
-                      <span
-                        className={`shift-page__type shift-page__type--${movement.type}`}
-                      >
-                        {movement.type === "income" ? "Приход" : "Расход"}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="shift-page__more-btn"
-                        aria-label="Дополнительные действия"
-                      >
-                        <MoreVertical size={18} />
-                      </button>
+              </thead>
+              <tbody>
+                {filteredMovements.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="shift-page__empty">
+                      Движение денег не найдено
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredMovements.map((movement, idx) => (
+                    <tr key={movement.id}>
+                      <td>{movement.id}</td>
+                      <td>{movement.date}</td>
+                      <td>{movement.description}</td>
+                      <td>{movement.paymentMethod}</td>
+                      <td>{movement.amount.toFixed(2)} сом</td>
+                      <td>
+                        <span
+                          className={`shift-page__type shift-page__type--${movement.type}`}
+                        >
+                          {movement.type === "income" ? "Приход" : "Расход"}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="shift-page__more-btn"
+                          aria-label="Дополнительные действия"
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </DataContainer>
+
         )}
 
         {/* Пагинация */}

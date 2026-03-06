@@ -1,6 +1,6 @@
 // Константы для компонента Warehouse
 export const STORAGE_KEY = "warehouse_view_mode";
-export const PAGE_SIZE = 100;
+export const PAGE_SIZE = 50;
 export const DEBOUNCE_DELAY = 300;
 
 export const VIEW_MODES = {

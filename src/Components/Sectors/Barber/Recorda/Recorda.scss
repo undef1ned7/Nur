@@ -1,6 +1,4 @@
 /* Recorda.scss */
-@use "../styles/barbershop.scss";
-
 $radius: 16px;
 $shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
 $slot-h: 32px;
@@ -1259,9 +1257,11 @@ $col-header-h: 56px;
 .barberrecorda__svcSearch,
 .barberrecorda__comboPopup,
 .barberrecorda__svcDropdown,
+.barberrecorda__svcCardDel,
 .barberrecorda__btn {
   pointer-events: auto; // возвращаем клики только нужным элементам
 }
+
   /* ===== услуги ===== */
   &__svcField {
     display: flex;

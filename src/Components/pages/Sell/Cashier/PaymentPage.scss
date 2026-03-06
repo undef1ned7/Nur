@@ -1,0 +1,750 @@
+.payment-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #f5f5f5;
+  overflow: hidden;
+  z-index: 1000;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    width: 100%;
+    // max-width: 1400px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  &__back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+
+    &:hover {
+      background: #f5f5f5;
+    }
+  }
+
+  &__title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+  }
+
+  &__total {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 2px 0 0 0;
+  }
+
+  &__content {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    overflow-y: auto;
+    justify-content: center;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+    align-items: flex-start;
+    flex: 1;
+  }
+
+  &__left {
+    width: 400px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  &__right {
+    flex: 1;
+    min-width: 400px;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  &__section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  &__section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 12px 0;
+  }
+
+  &__methods {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__method {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #d1d5db;
+    }
+
+    &--active {
+      border-color: #f7d617;
+      background: #fffbeb;
+    }
+  }
+
+  &__method-content {
+    flex: 1;
+  }
+
+  &__method-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 2px;
+  }
+
+  &__method-description {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  &__method-check {
+    width: 20px;
+    height: 20px;
+    background: #f7d617;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #111827;
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  &__banks {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db #f5f5f5;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f5f5f5;
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 3px;
+
+      &:hover {
+        background: #9ca3af;
+      }
+    }
+  }
+
+  &__bank {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    min-width: 100px;
+    height: 80px;
+    white-space: nowrap;
+
+    &:hover {
+      border-color: #d1d5db;
+      transform: translateY(-2px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    &--active {
+      border-color: #f7d617;
+      background: #fffbeb;
+    }
+  }
+
+  &__bank-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__bank-logo {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+  }
+
+  &__bank-svg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+
+    svg {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+    }
+  }
+
+  &__bank-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    text-align: center;
+  }
+
+  &__bank-check {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    background: #f7d617;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #111827;
+    font-weight: 700;
+    font-size: 12px;
+    z-index: 1;
+  }
+
+  &__customer {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+
+  &__customer-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #f7d617;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  &__customer-info {
+    flex: 1;
+  }
+
+  &__customer-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 6px;
+  }
+
+  &__customer-change {
+    font-size: 12px;
+    color: #3b82f6;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+
+    &:hover {
+      color: #2563eb;
+    }
+  }
+
+  &__customer-phone {
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  &__customer-debt {
+    font-size: 12px;
+    color: #ef4444;
+    font-weight: 600;
+  }
+
+  &__select-customer-btn {
+    width: 100%;
+    padding: 12px;
+    background: #f9fafb;
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #f5f5f5;
+      border-color: #9ca3af;
+    }
+  }
+
+  &__amount-section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  &__amount-input-wrapper {
+    margin: 12px 0;
+  }
+
+  &__amount-input {
+    width: 100%;
+    padding: 16px;
+    font-size: 36px;
+    font-weight: 700;
+    text-align: center;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: #f7d617;
+    }
+  }
+
+  &__quick-select {
+    margin-top: 20px;
+  }
+
+  &__quick-select-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+
+  &__quick-select-buttons {
+    display: flex;
+    gap: 10px;
+  }
+
+  &__quick-select-btn {
+    flex: 1;
+    padding: 10px;
+    background: #f5f5f5;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: #e5e5e5;
+      border-color: #d1d5db;
+    }
+  }
+
+  &__change {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding: 12px;
+    background: #f0fdf4;
+    border-radius: 8px;
+  }
+
+  &__change-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  &__change-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #22c55e;
+  }
+
+  &__summary {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    // margin-bottom: 20px;
+  }
+
+  &__summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &--total {
+      margin-top: 8px;
+      padding-top: 16px;
+      border-top: 2px solid #e5e7eb;
+      border-bottom: none;
+    }
+  }
+
+  &__summary-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  &__summary-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+
+    &--discount {
+      color: #ef4444;
+    }
+
+    &--total {
+      font-size: 24px;
+      font-weight: 700;
+      color: #111827;
+    }
+  }
+
+  &__debt-section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  &__debt-months {
+    margin: 20px 0;
+    padding: 16px;
+    background: #f9fafb;
+    border-radius: 8px;
+  }
+
+  &__debt-months-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+
+  &__debt-months-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: #f7d617;
+    }
+  }
+
+  &__debt-amount {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  &__debt-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+
+  &__debt-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  &__total-debt {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #fff7ed;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  &__total-debt-amount {
+    color: #f97316;
+    font-size: 18px;
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__accept-btn {
+    width: 100%;
+    padding: 14px;
+    background: #f7d617;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+      background: #e6c614;
+    }
+
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+
+  &__cancel-btn {
+    width: 100%;
+    padding: 10px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+      background: #f9fafb;
+    }
+  }
+}
+
+// Адаптивные стили для мобильных устройств
+@media (max-width: 768px) {
+  .payment-page {
+    position: static;
+    height: auto;
+    &__header {
+      padding: 12px 16px;
+    }
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__total {
+      font-size: 14px;
+    }
+
+    &__content {
+      flex-direction: column;
+      padding: 16px;
+      gap: 16px;
+      overflow-y: auto;
+      max-width: 100%;
+    }
+
+    &__left {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    &__right {
+      width: 100%;
+      max-width: 100%;
+      min-width: auto;
+    }
+
+    &__section {
+      padding: 16px;
+    }
+
+    &__method {
+      padding: 12px;
+    }
+
+    &__method-label {
+      font-size: 14px;
+    }
+
+    &__method-description {
+      font-size: 12px;
+    }
+
+    &__banks {
+      gap: 8px;
+    }
+
+    &__bank {
+      padding: 12px;
+      min-width: 120px;
+    }
+
+    &__bank-name {
+      font-size: 14px;
+    }
+
+    &__amount-input {
+      font-size: 28px;
+      padding: 14px;
+    }
+
+    &__debt-value {
+      font-size: 32px;
+    }
+
+    &__change-value {
+      font-size: 36px;
+    }
+
+    &__quick-select-buttons {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    &__quick-select-btn {
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .payment-page {
+    &__header {
+      padding: 10px 12px;
+    }
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__content {
+      padding: 12px;
+      gap: 12px;
+    }
+
+    &__section {
+      padding: 12px;
+    }
+
+    &__section-title {
+      font-size: 11px;
+    }
+
+    &__method {
+      padding: 10px;
+    }
+
+    &__banks {
+      gap: 8px;
+    }
+
+    &__bank {
+      padding: 10px;
+      min-width: 110px;
+    }
+
+    &__bank-name {
+      font-size: 13px;
+    }
+
+    &__amount-input {
+      font-size: 24px;
+      padding: 12px;
+    }
+
+    &__debt-value {
+      font-size: 28px;
+    }
+
+    &__change-value {
+      font-size: 32px;
+    }
+
+    &__accept-btn {
+      padding: 12px;
+      font-size: 16px;
+    }
+  }
+}

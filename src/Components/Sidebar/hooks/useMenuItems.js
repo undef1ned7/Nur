@@ -32,7 +32,7 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     });
 
     return result;
-  }, [sector, tariff,company, profile]);
+  }, [sector, tariff, company, profile]);
 
   /**
    * Получает секторные пункты меню
@@ -78,8 +78,10 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
       return filteredItems;
     }
 
-    const filteredItems = sectorConfig.filter((item) =>
-      hasPermission(item.permission)
+    const filteredItems = sectorConfig.filter((item) => {
+      if ('production' === configKey && item.permission === 'can_view_catalog' && profile?.role === 'owner') return true
+      return hasPermission(item.permission)
+    }
     );
 
     return filteredItems;
@@ -196,11 +198,16 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     let items = [];
 
     // Основные пункты меню
-    const basicItems = MENU_CONFIG.basic.filter((item) =>
+    let basicItems = MENU_CONFIG.basic.filter((item) =>
       hasPermission(item.permission)
     );
+    // if (tariff !== "Старт") {
+    //   if (company.industry.name !== 'Парикмахерские' && company.industry.name !== 'Производство') {
+    //   }
+    //   basicItems = basicItems.filter((item) => item.to !== "/crm/sell");
 
-    // Секторные пункты меню
+    // }
+
     const sectorItems = getSectorMenuItems();
 
     // Дополнительные услуги

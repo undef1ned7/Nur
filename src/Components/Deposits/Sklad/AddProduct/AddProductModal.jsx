@@ -11,6 +11,8 @@ import { useClient } from "../../../../store/slices/ClientSlice";
 import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { updateProductAsync } from "../../../../store/creators/productCreators";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import "./AddProductModal.scss";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const toNum = (v) => {
   const n = Number(String(v ?? "").replace(",", "."));
@@ -83,7 +85,7 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
     if (!q) return "Введите количество";
     if (q <= 0) return "Количество должно быть больше 0";
     if (!Number.isInteger(q)) return "Количество должно быть целым числом";
-    if (!pp || pp <= 0) return "Введите корректную закупочную цену";
+    if (pp < 0) return "Введите корректную закупочную цену";
     if (!rp || rp <= 0) return "Введите корректную розничную цену";
     // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
     // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
@@ -126,139 +128,140 @@ const AddProductModal = ({ onClose, onChanged, item }) => {
         })
       ).unwrap();
 
-      // списываем расход из кассы (закупка по себестоимости)
-      await dispatch(
-        addCashFlows({
-          cashbox: selectCashBox,
-          type: "expense",
-          name: `Закупка товара: ${itemName}`,
-          amount: expense,
-          status:
-            company?.subscription_plan?.name === "Старт"
-              ? "approved"
-              : "pending",
-          // description: `Закупка ${q} шт. × ${pp} = ${expense}`,
-        })
-      ).unwrap();
+      // списываем расход из кассы (закупка по себестоимости) только если сумма > 0
+      if (expense > 0) {
+        await dispatch(
+          addCashFlows({
+            cashbox: selectCashBox,
+            type: "expense",
+            name: `Закупка товара: ${itemName}`,
+            amount: expense,
+            status:
+              company?.subscription_plan?.name === "Старт"
+                ? "approved"
+                : "pending",
+            // description: `Закупка ${q} шт. × ${pp} = ${expense}`,
+          })
+        ).unwrap();
+      }
       alert('Товар добавлен', () => {
         onChanged?.();
         onClose?.();
       })
     } catch (e) {
-      console.log(e);
-      alert("Не удалось сохранить. Попробуйте ещё раз.", true)
+      const errorMessage = validateResErrors(e, "Не удалось сохранить. Попробуйте ещё раз.");
+      alert(errorMessage, true)
     }
   };
 
   const disabled = !!validate();
 
   return (
-    <div className="add-modal z-50!">
+    <div className="add-modal z-50! sklad-add-product-modal">
       <div className="add-modal__overlay z-50!" onClick={onClose} />
-      <div className="add-modal__content z-50!" style={{ height: "auto" }}>
+      <div className="add-modal__content z-50!">
         <div className="add-modal__header ">
           <h3 className="text-xl!">Добавление товара</h3>
           <X className="add-modal__close-icon" size={20} onClick={onClose} />
         </div>
 
-        <form onSubmit={onFormSubmit}>
-          <h4 className="">Товар: <span className="font-medium">{itemName}</span> </h4>
+        <form className="sklad-add-product-modal__form" onSubmit={onFormSubmit}>
+          <div className="sklad-add-product-modal__card">
+            <div className="sklad-add-product-modal__title">
+              Товар: <span className="sklad-add-product-modal__titleName">{itemName}</span>
+            </div>
           {!!itemId && (
-            <div className=" border rounded-lg p-2 w-full" style={{ marginTop: 8, opacity: 0.8 }}>
+              <div className="sklad-add-product-modal__meta">
               В наличии сейчас: <b>{stockQty}</b> шт.
             </div>
           )}
+          </div>
 
-          <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
-            Количество
-          </label>
+          <div className="add-modal__section">
+            <label htmlFor="add-product-qty">Количество</label>
+            <input
+              id="add-product-qty"
+              type="number"
+              name="qty"
+              placeholder="Количество"
+              className="add-modal__input"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              min={1}
+              step={1}
+              inputMode="numeric"
+              disabled={!itemId}
+            />
+          </div>
 
-          <input
-            type="number"
-            name="qty"
-            placeholder="Количество"
-            className=" border rounded-lg p-2 w-full"
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            min={1}
-            step={1}
-            disabled={!itemId}
-          />
+          <div className="sklad-add-product-modal__grid">
+            <div className="add-modal__section">
+              <label htmlFor="add-product-purchasePrice">Закупочная цена</label>
+              <input
+                id="add-product-purchasePrice"
+                type="number"
+                name="purchasePrice"
+                placeholder="Закупочная (за 1 шт.)"
+                className="add-modal__input"
+                value={purchasePrice}
+                onChange={(e) => setPurchasePrice(e.target.value)}
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                disabled={!itemId}
+              />
+            </div>
 
-          <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
-            Закупочная цена
-          </label>
+            <div className="add-modal__section">
+              <label htmlFor="add-product-retailPrice">Розничная цена</label>
+              <input
+                id="add-product-retailPrice"
+                type="number"
+                name="retailPrice"
+                placeholder="Розничная (за 1 шт.)"
+                className="add-modal__input"
+                value={retailPrice}
+                onChange={(e) => setRetailPrice(e.target.value)}
+                min={0}
+                step="0.01"
+                inputMode="decimal"
+                disabled={!itemId}
+              />
+            </div>
+          </div>
 
-          <input
-
-            type="number"
-            name="purchasePrice"
-            placeholder="Закупочная цена (за 1 шт.)"
-            className="border rounded-lg p-2 w-full"
-            value={purchasePrice}
-            onChange={(e) => setPurchasePrice(e.target.value)}
-            min={0}
-            step="0.01"
-            disabled={!itemId}
-          />
-
-          <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
-            Розничная цена
-          </label>
-
-          <input
-
-            type="number"
-            name="retailPrice"
-            placeholder="Розничная цена (за 1 шт.)"
-            className="border rounded-lg p-2 w-full"
-            value={retailPrice}
-            onChange={(e) => setRetailPrice(e.target.value)}
-            min={0}
-            step="0.01"
-            disabled={!itemId}
-          />
-
-          <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
-            Поставщик
-          </label>
-
-          <select
-
-            className="border rounded-lg p-2 w-full"
-            value={selectedSupplier}
-            onChange={(e) => setSelectedSupplier(e.target.value)}
-            disabled={!itemId}
-          >
-            <option value="">Выберите поставщика</option>
-            {suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.full_name || supplier.name}
-              </option>
-            ))}
-          </select>
+          <div className="add-modal__section">
+            <label htmlFor="add-product-supplier">Поставщик</label>
+            <select
+              id="add-product-supplier"
+              className="add-modal__input"
+              value={selectedSupplier}
+              onChange={(e) => setSelectedSupplier(e.target.value)}
+              disabled={!itemId}
+            >
+              <option value="">Выберите поставщика</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.full_name || supplier.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* касса автоматически выбирается - скрыто от пользователя */}
 
-          <div style={{ marginTop: 12 }}>
+          <div className="sklad-add-product-modal__summary">
             Итог к списанию: <b>{Number.isFinite(expense) ? expense : 0}</b>
           </div>
 
           {error && (
-            <div
-              style={{
-                marginTop: 10,
-                color: "#c0392b",
-                fontSize: 14,
-                lineHeight: 1.3,
-              }}
-            >
+            <div className="sklad-add-product-modal__error" role="alert">
               {error}
             </div>
           )}
 
           <button
-            className="btn edit-btn w-full py-2! text-lg! justify-center mt-2"
+            className="btn sklad-add-product-modal__save"
             type="submit"
             disabled={disabled}
           >

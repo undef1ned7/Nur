@@ -495,18 +495,14 @@
 //   }
 // }
 
-
-
-
-
-
 // src/Components/pages/Info/Settings/Settings.scss
 
 .settings {
   min-height: 100vh;
   background: #fff;
   padding: 0;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    sans-serif;
   color: #1a1a1a;
 
   &__header {
@@ -996,6 +992,137 @@
       border-radius: 8px;
     }
   }
+
+  /* ===== additions: printing (cafe) ===== */
+  &__segmented {
+    display: inline-flex;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 14px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+  }
+
+  &__segBtn {
+    border: 2px solid transparent;
+    background: transparent;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 13px;
+    cursor: pointer;
+    color: #374151;
+    transition: 0.2s ease;
+
+    &:hover {
+      background: #e5e7eb;
+    }
+
+    &--active {
+      background: #ffd600;
+      color: #000;
+      border-color: rgba(0, 0, 0, 0.06);
+      box-shadow: 0 6px 18px rgba(255, 214, 0, 0.35);
+    }
+  }
+
+  &__input--plain {
+    padding-left: 1rem;
+  }
+
+  &__usbRow {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+  }
+
+  &__select {
+    width: 100%;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    background: #fff;
+    color: #111;
+    outline: none;
+
+    &:focus {
+      border-color: #667eea;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+  }
+
+  &__sectionHeadRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__sectionHeadBtns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    @media screen and (max-width: 768px) {
+      flex-wrap: wrap;
+      button {
+        width: 100%;
+        flex: none;
+      }
+    }
+  }
+
+  &__cardsGrid {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  &__card {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 14px;
+    background: #fafafa;
+  }
+
+  &__cardHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  &__cardTitle {
+    font-size: 15px;
+    font-weight: 900;
+    color: #111827;
+  }
+
+  &__chip {
+    font-size: 12px;
+    font-weight: 800;
+    color: #374151;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 6px 10px;
+    white-space: nowrap;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__cardActions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    justify-content: flex-end;
+  }
 }
 
 /* Анимации */
@@ -1079,6 +1206,75 @@
     &__onlineBtns {
       justify-content: flex-end;
     }
+
+    /* Раздел Печать */
+    &__tab-content--print {
+      .settings__segmented {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+
+      .settings__segBtn {
+        // flex: 1;
+        min-width: 120px;
+      }
+
+      .settings__usbRow {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .settings__usbRow .settings__select {
+        width: 100%;
+      }
+
+      .settings__usbRow .settings__btnSmall {
+        width: 100%;
+      }
+
+      .settings__sectionHeadRow {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .settings__sectionHeadBtns {
+        justify-content: stretch;
+      }
+
+      .settings__sectionHeadBtns .settings__btnSmall {
+        // flex: 1;
+        min-width: 0;
+      }
+
+      .settings__cardHead {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .settings__chip {
+        max-width: 100%;
+      }
+
+      .settings__cardActions {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+
+      .settings__cardActions .settings__btnSmall {
+        // flex: 1;
+        min-width: 100px;
+        width: calc(50% - 4px);
+      }
+
+      .settings__actions {
+        flex-direction: column;
+      }
+
+      .settings__actions .settings__btn {
+        width: 100%;
+      }
+    }
   }
 }
 
@@ -1133,6 +1329,28 @@
       padding: 0.875rem 1.5rem;
       font-size: 0.95rem;
     }
+
+    /* Раздел Печать — планшеты и мелкие экраны */
+    &__tab-content--print {
+      .settings__segBtn {
+        min-width: 100px;
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+
+      .settings__section-title {
+        font-size: 1.15rem;
+      }
+
+      .settings__cardTitle {
+        font-size: 14px;
+      }
+
+      .settings__chip {
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+    }
   }
 }
 
@@ -1182,6 +1400,38 @@
     &__btn {
       padding: 0.75rem 1.25rem;
       font-size: 0.9rem;
+    }
+
+    /* Раздел Печать — очень маленькие экраны */
+    &__tab-content--print {
+      .settings__segmented {
+        padding: 4px;
+      }
+
+      .settings__segBtn {
+        min-width: 0;
+        padding: 6px 10px;
+        font-size: 11px;
+      }
+
+      .settings__section-title {
+        font-size: 1rem;
+      }
+
+      .settings__smallTitle,
+      .settings__cardTitle {
+        font-size: 13px;
+      }
+
+      .settings__card {
+        padding: 10px;
+      }
+
+      .settings__cardActions .settings__btnSmall {
+        min-width: 80px;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
     }
   }
 }

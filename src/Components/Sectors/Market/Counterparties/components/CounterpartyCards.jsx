@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { formatPhone, getCounterpartyName } from "../utils";
+import { formatPhone, getCounterpartyName, getAgentDisplay } from "../utils";
 import "./CounterpartyCards.scss";
 
 /**
@@ -12,6 +12,7 @@ const CounterpartyCard = React.memo(
     rowNumber,
     onRowSelect,
     onCounterpartyClick,
+    showAgentColumn,
   }) => {
     const name = getCounterpartyName(counterparty);
     const phone = formatPhone(counterparty?.phone);
@@ -29,10 +30,7 @@ const CounterpartyCard = React.memo(
     const typeLabel = typeLabels[type] || type;
 
     return (
-      <div
-        className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-        onClick={() => onCounterpartyClick(counterparty)}
-      >
+      <div className="warehouse-table__row warehouse-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
         <div className="flex items-start gap-3">
           <div className="pt-1" onClick={(e) => onRowSelect(counterparty.id, e)}>
             <input
@@ -59,6 +57,14 @@ const CounterpartyCard = React.memo(
                 Тип:{" "}
                 <span className="font-medium">{typeLabel}</span>
               </span>
+              {showAgentColumn && (counterparty?.agent || counterparty?.agent_display) && (
+                <span className="whitespace-nowrap">
+                  Агент:{" "}
+                  <span className="font-medium">
+                    {getAgentDisplay(counterparty)}
+                  </span>
+                </span>
+              )}
               {phone !== "—" && (
                 <span className="whitespace-nowrap">
                   Телефон:{" "}
@@ -97,6 +103,19 @@ const CounterpartyCard = React.memo(
             </div>
           )}
         </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            className="warehouse-card__open-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCounterpartyClick(counterparty);
+            }}
+          >
+            Открыть
+          </button>
+        </div>
       </div>
     );
   },
@@ -104,7 +123,8 @@ const CounterpartyCard = React.memo(
     return (
       prevProps.counterparty.id === nextProps.counterparty.id &&
       prevProps.isSelected === nextProps.isSelected &&
-      prevProps.rowNumber === nextProps.rowNumber
+      prevProps.rowNumber === nextProps.rowNumber &&
+      prevProps.showAgentColumn === nextProps.showAgentColumn
     );
   }
 );
@@ -123,6 +143,7 @@ const CounterpartyCards = ({
   onSelectAll,
   onCounterpartyClick,
   getRowNumber,
+  showAgentColumn = false,
 }) => {
   const selectedRowsSize = selectedRows.size;
   const counterpartiesData = useMemo(() => {
@@ -185,6 +206,7 @@ const CounterpartyCards = ({
             rowNumber={data.rowNumber}
             onRowSelect={onRowSelect}
             onCounterpartyClick={onCounterpartyClick}
+            showAgentColumn={showAgentColumn}
           />
         ))}
       </div>
@@ -197,7 +219,8 @@ const areEqual = (prevProps, nextProps) => {
     prevProps.loading !== nextProps.loading ||
     prevProps.isAllSelected !== nextProps.isAllSelected ||
     prevProps.selectedRows.size !== nextProps.selectedRows.size ||
-    prevProps.getRowNumber !== nextProps.getRowNumber
+    prevProps.getRowNumber !== nextProps.getRowNumber ||
+    prevProps.showAgentColumn !== nextProps.showAgentColumn
   ) {
     return false;
   }

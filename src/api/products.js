@@ -49,7 +49,7 @@ export const getCategoriesPorduct = async (params = {}) => {
   }
 };
 
-export const createProductApi = async (productData) => {
+export const createProductApi = async (productData,) => {
   try {
     const response = await api.post(
       "main/products/create-manual/",
@@ -60,8 +60,9 @@ export const createProductApi = async (productData) => {
     if (error.response) {
       console.error("Create Product Error Data:", error.response.data);
       console.error("Create Product Error Status:", error.response.status);
-      return Promise.reject(error.response.data);
+      return Promise.reject(error);
     }
+    return Promise.reject(error);
   }
 };
 

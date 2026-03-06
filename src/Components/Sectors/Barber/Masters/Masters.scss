@@ -1,5 +1,4 @@
 /* Masters.scss */
-@use "../styles/barbershop.scss";
 :root {
   --primary: #f7d74f;
   --primary-dark: #d4b800;
@@ -20,19 +19,19 @@
 
 /* ====== Контейнер ====== */
 .barbermasters {
-  --radius: 16px;
-  --shadow: 0 10px 30px rgba(2, 6, 23, 0.12);
-  --shadow-lg: 0 20px 40px rgba(2, 6, 23, 0.15);
-  --padX: 24px;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --padX: 20px;
 
-  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
-  padding: 24px;
+  background: #ffffff;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-height: 100dvh;
+  gap: 0;
+  // max-height: 100dvh;
   overflow: auto;
 
   /* ====== Хедер ====== */
@@ -41,6 +40,8 @@
     grid-template-columns: 1fr auto;
     gap: 12px;
     align-items: end;
+    padding: 20px;
+    border-bottom: 1px solid #e5e7eb;
   }
 
   &__titleWrap {
@@ -80,57 +81,69 @@
     align-items: center;
     gap: 8px;
     height: 40px;
-    padding: 0 14px;
+    padding: 0 16px;
     line-height: 1;
-    border-radius: 12px;
+    border-radius: 6px;
     border: 1px solid transparent;
-    background: #fff;
+    background: #ffffff;
     color: var(--text);
-    font-weight: 700;
+    font-weight: 500;
     font-size: 14px;
     cursor: pointer;
-    transition: 0.18s;
+    transition: all 0.15s ease;
 
     svg {
-      width: 18px;
-      height: 18px;
+      width: 16px;
+      height: 16px;
       flex: 0 0 auto;
     }
 
     &.is-active {
-      background: #f9fafb;
-      border-color: var(--border);
+      background: #f3f4f6;
+      border-color: #d1d5db;
+      font-weight: 600;
     }
 
     &--primary {
       background: var(--primary);
-      color: #111;
+      color: #111827;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
 
-      &:hover {
+      &:hover:not(:disabled) {
         background: var(--primary-dark);
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+        transform: translateY(-1px);
       }
     }
 
     &--secondary {
-      border: 1px solid var(--border);
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
 
-      &:hover {
-        background: #f9fafb;
+      &:hover:not(:disabled) {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+        transform: translateY(-1px);
       }
     }
 
     &--danger {
-      border: 1px solid #ef4444;
-      color: #ef4444;
-      background: #fff;
+      border: 1px solid #fee2e2;
+      color: #dc2626;
+      background: #ffffff;
 
       &:hover {
-        background: rgba(239, 68, 68, 0.06);
+        background: #fee2e2;
       }
     }
 
     &:active {
       transform: translateY(1px);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   }
 
@@ -148,20 +161,25 @@
   &__searchInput {
     width: 100%;
     height: 40px;
-    padding: 10px 12px 10px 34px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
     font-size: 14px;
-    background: #fff;
+    background: #ffffff;
+    transition: all 0.15s ease;
 
     &::placeholder {
-      color: var(--muted);
-      opacity: 0.9;
+      color: #9ca3af;
+    }
+
+    &:hover {
+      border-color: #9ca3af;
     }
 
     &:focus {
       outline: none;
       border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
     }
   }
 
@@ -177,22 +195,28 @@
   /* ====== Лист и карточки ====== */
   &__list {
     display: grid;
-    gap: 10px;
-    max-height: clamp(340px, 64dvh, 720px);
-    overflow: auto;
-    padding-right: 6px;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
+    gap: 0;
+    // max-height: clamp(340px, 64dvh, 720px);
+    // overflow: auto;
+    padding: 0 20px;
 
-    &::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
+    // &::-webkit-scrollbar {
+    //   width: 6px;
+    //   height: 6px;
+    // }
 
-    &::-webkit-scrollbar-thumb {
-      background: #e2e8f0;
-      border-radius: 8px;
-    }
+    // &::-webkit-scrollbar-track {
+    //   background: #f3f4f6;
+    // }
+
+    // &::-webkit-scrollbar-thumb {
+    //   background: #d1d5db;
+    //   border-radius: 3px;
+
+    //   &:hover {
+    //     background: #9ca3af;
+    //   }
+    // }
   }
 
   &__card {
@@ -200,21 +224,26 @@
     align-items: center;
     gap: 12px;
     justify-content: space-between;
-    padding: 14px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: #fafafa;
-    transition: background 0.18s;
+    padding: 16px 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    transition: background 0.15s;
+    border-bottom: 1px solid #f3f4f6;
 
     &:hover {
-      background: #f1f5f9;
+      background: #fafafa;
+    }
+
+    &:last-child {
+      border-bottom: none;
     }
   }
 
   &__cardLeft {
     display: flex;
     gap: 12px;
-    align-items: flex-start;
+    align-items: center;
     min-width: 0;
   }
 
@@ -222,13 +251,13 @@
     min-width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
-    font-weight: 800;
+    background: var(--primary);
+    color: #111827;
+    font-weight: 700;
     font-size: 14px;
     display: grid;
     place-items: center;
-    box-shadow: var(--shadow);
+    box-shadow: none;
   }
 
   &__nameRow {
@@ -278,14 +307,17 @@
 
   /* ====== Алерты ====== */
   &__alert {
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(231, 76, 60, 0.35);
-    background: rgba(231, 76, 60, 0.12);
-    color: #e74c3c;
+    padding: 12px 20px;
+    border-radius: 0;
+    border: none;
+    border-left: 3px solid #dc2626;
+    background: #fee2e2;
+    color: #dc2626;
+    margin: 0;
 
     &--inModal {
-      margin: 12px var(--padX) 0;
+      margin: 12px 20px 0;
+      border-radius: 6px;
     }
   }
 
@@ -294,9 +326,11 @@
     display: flex;
     gap: 10px;
     align-items: center;
-    justify-content: center;
-    margin-top: 10px;
+    justify-content: flex-end;
+    margin-top: 0;
+    padding: 16px 20px;
     flex-wrap: wrap;
+    border-top: 1px solid #f3f4f6;
   }
 
   &__pageList {
@@ -308,24 +342,29 @@
   }
 
   &__pageBtn {
-    border: 1px solid var(--border);
-    background: #fff;
-    padding: 8px 12px;
-    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    padding: 8px 14px;
+    border-radius: 6px;
     cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s ease;
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: #f9fafb;
+      border-color: #d1d5db;
     }
 
     &.is-active {
       background: var(--primary);
       border-color: var(--primary);
-      color: #111;
+      color: #111827;
+      font-weight: 600;
     }
 
     &:disabled {
-      opacity: 0.6;
+      opacity: 0.4;
       cursor: default;
     }
   }
@@ -430,6 +469,72 @@
 
     &--invalid .barbermasters__input {
       border-color: #dc2626;
+    }
+  }
+
+  /* Модалка "Агент склада" */
+  &__employeeCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #f9fafb;
+  }
+
+  &__employeeAvatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: #111827;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  &__employeeInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__employeeName {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  &__employeeMeta {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  &__seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  &__segBtn {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+    &.is-active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: #111827;
     }
   }
 
@@ -870,12 +975,8 @@
 .barbermasters__list {
   display: grid;
   gap: 12px;
-  max-height: clamp(340px, 64dvh, 720px);
-  overflow: auto;
   padding-right: 8px;
   padding-top: 4px;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 .barbermasters__list::-webkit-scrollbar {
   width: 8px;
@@ -908,7 +1009,7 @@
   background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 
   &::before {
     content: "";
@@ -1706,7 +1807,7 @@
     }
 
     &__list {
-      max-height: 60dvh;
+      // max-height: 60dvh;
       gap: 10px;
     }
 
@@ -1851,7 +1952,7 @@
     }
 
     &__list {
-      max-height: 55dvh;
+      // max-height: 55dvh;
       gap: 8px;
     }
 
@@ -2039,10 +2140,6 @@
     &__btn {
       height: 38px;
       padding: 0 12px;
-    }
-
-    &__list {
-      max-height: 50dvh;
     }
 
     &__card {
@@ -2512,10 +2609,6 @@
 /* Улучшения для горизонтальной ориентации на мобильных */
 @media (max-width: 900px) and (orientation: landscape) {
   .barbermasters {
-    &__list {
-      max-height: 50dvh;
-    }
-
     &__modal {
       max-height: 85dvh;
     }
@@ -2533,10 +2626,6 @@
 /* Улучшения для очень маленьких экранов в альбомной ориентации */
 @media (max-width: 600px) and (orientation: landscape) {
   .barbermasters {
-    &__list {
-      max-height: 45dvh;
-    }
-
     &__modal {
       max-height: 80dvh;
     }
@@ -2592,10 +2681,6 @@
 /* Улучшения для низких экранов */
 @media (max-height: 600px) {
   .barbermasters {
-    &__list {
-      max-height: 40dvh;
-    }
-
     &__modal {
       max-height: 85dvh;
     }

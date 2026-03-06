@@ -1,0 +1,10 @@
+.datacontainer {
+    max-height: auto;
+    height: 100%;
+    overflow: auto;
+
+
+    @include ifdesktop {
+        max-height: 100dvh;
+    }
+}

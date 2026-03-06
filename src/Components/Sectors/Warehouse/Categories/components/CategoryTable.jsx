@@ -5,26 +5,20 @@ import "./CategoryTable.scss";
  * Мемоизированный компонент строки таблицы
  */
 const CategoryRow = React.memo(
-  ({
-    category,
-    isSelected,
-    rowNumber,
-    onRowSelect,
-    onCategoryClick,
-  }) => {
+  ({ category, isSelected, rowNumber, onRowSelect, onCategoryClick }) => {
     return (
       <tr
         className="warehouse-table__row"
         onClick={() => onCategoryClick(category)}
       >
-        <td onClick={(e) => onRowSelect(category.id, e)}>
+        {/* <td onClick={(e) => onRowSelect(category.id, e)}>
           <input
             type="checkbox"
             checked={isSelected}
             onChange={(e) => onRowSelect(category.id, e)}
             onClick={(e) => e.stopPropagation()}
           />
-        </td>
+        </td> */}
 
         <td>{rowNumber}</td>
 
@@ -32,7 +26,7 @@ const CategoryRow = React.memo(
           <span>{category.name || "—"}</span>
         </td>
 
-        <td>{category.id || "—"}</td>
+        {/* <td>{category.id || "—"}</td> */}
       </tr>
     );
   },
@@ -106,16 +100,16 @@ const CategoryTable = ({
       <table className="warehouse-table w-full min-w-[600px]">
         <thead>
           <tr>
-            <th>
+            {/* <th>
               <input
                 type="checkbox"
                 checked={isAllSelected}
                 onChange={onSelectAll}
               />
-            </th>
+            </th> */}
             <th>№</th>
             <th>Название</th>
-            <th>ID</th>
+            {/* <th>ID</th> */}
           </tr>
         </thead>
         <tbody>
@@ -150,4 +144,3 @@ const areEqual = (prevProps, nextProps) => {
 };
 
 export default React.memo(CategoryTable, areEqual);
-

@@ -22,8 +22,19 @@ const chunkBytes = (u8, size = 12 * 1024) => {
   return out;
 };
 
+function u8ToBase64(u8) {
+  // chunked to avoid call stack limits
+  const CHUNK = 0x8000;
+  let binary = "";
+  for (let i = 0; i < u8.length; i += CHUNK) {
+    const slice = u8.subarray(i, i + CHUNK);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
 const LS_PRINTERS = "escpos_printers";
-const LS_ACTIVE = "escpos_printer_active";
+export const LS_ACTIVE = "escpos_printer_active";
 
 const toHex4 = (n) => Number(n || 0).toString(16).padStart(4, "0");
 const safeSerial = (s) => {
@@ -44,7 +55,7 @@ function readJson(key, fallback) {
 function writeJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+  } catch { }
 }
 
 export function getSavedPrinters() {
@@ -73,7 +84,7 @@ export function getActivePrinterKey() {
 export function setActivePrinterKey(printerKey) {
   try {
     localStorage.setItem(LS_ACTIVE, String(printerKey || ""));
-  } catch {}
+  } catch { }
 }
 
 function upsertSavedPrinter(dev) {
@@ -95,7 +106,7 @@ function upsertSavedPrinter(dev) {
   try {
     localStorage.setItem("escpos_vid", vidHex);
     localStorage.setItem("escpos_pid", pidHex);
-  } catch {}
+  } catch { }
 }
 
 export async function listAuthorizedPrinters() {
@@ -126,7 +137,7 @@ export async function choosePrinterByDialog() {
   if (usbState.dev && usbState.dev !== dev) {
     try {
       await usbState.dev.close();
-    } catch {}
+    } catch { }
   }
   usbState.dev = dev;
 
@@ -146,7 +157,7 @@ export async function setActivePrinterByKey(printerKey) {
   if (usbState.dev) {
     try {
       await usbState.dev.close();
-    } catch {}
+    } catch { }
     usbState.dev = null;
   }
 }
@@ -183,8 +194,8 @@ const getEncoder = (n) =>
   CP866_CODES.has(n)
     ? encodeCP866
     : CP1251_CODES.has(n)
-    ? encodeCP1251
-    : encodeCP1251;
+      ? encodeCP1251
+      : encodeCP1251;
 
 const money = (n) => Number(n || 0).toFixed(2);
 
@@ -213,10 +224,10 @@ async function openUsbDevice(dev) {
   }
 
   if (dev.configuration == null) {
-    await dev.selectConfiguration(1).catch(() => {});
+    await dev.selectConfiguration(1).catch(() => { });
     if (dev.configuration == null && dev.configurations?.length) {
       const cfgNum = dev.configurations[0]?.configurationValue ?? 1;
-      await dev.selectConfiguration(cfgNum).catch(() => {});
+      await dev.selectConfiguration(cfgNum).catch(() => { });
     }
   }
 
@@ -242,7 +253,7 @@ async function openUsbDevice(dev) {
       } catch {
         try {
           await dev.releaseInterface(intf.interfaceNumber);
-        } catch {}
+        } catch { }
         continue;
       }
 
@@ -307,7 +318,7 @@ export function attachUsbListenersOnce() {
       if (keyOf(e.device.vendorId, e.device.productId, e.device.serialNumber) !== activeKey) return;
       await openUsbDevice(e.device);
       usbState.dev = e.device;
-    } catch {}
+    } catch { }
   });
 
   navigator.usb.addEventListener("disconnect", (e) => {
@@ -357,6 +368,11 @@ function buildPrettyReceiptFromJSON(payload) {
   if (cashier) chunks.push(enc(`Кассир: ${cashier}\n`));
   chunks.push(enc("\n"));
 
+  if ('menu_title' in payload) {
+    const name = String(payload.menu_title ?? "").trim() || "Позиция";
+    chunks.push(enc(name + "\n"));
+  }
+
   for (const it of items) {
     const name = String(it.name ?? "").trim() || "Позиция";
     const qty = Math.max(1, Number(it.qty || 0));
@@ -378,6 +394,7 @@ function buildPrettyReceiptFromJSON(payload) {
 
   return chunks;
 }
+
 
 export async function printOrderReceiptJSONViaUSB(payload) {
   if (!("usb" in navigator)) throw new Error("WebUSB не поддерживается");
@@ -404,12 +421,13 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
 
   const filters = [{ classCode: 0x07 }, { classCode: 0xff }];
   const dev = await navigator.usb.requestDevice({ filters });
+  upsertSavedPrinter(dev);
 
-  try {
-    const key = keyOf(dev.vendorId, dev.productId, dev.serialNumber);
-    localStorage.setItem(LS_ACTIVE, key);
-  } catch {}
-
+  if (usbState.dev && usbState.dev !== dev) {
+    try {
+      await usbState.dev.close();
+    } catch { }
+  }
   usbState.dev = dev;
 
   const { outEP } = await openUsbDevice(dev);
@@ -420,4 +438,117 @@ export async function printOrderReceiptJSONViaUSBWithDialog(payload) {
       await dev.transferOut(outEP, chunk);
     }
   }
+  return {
+    key: keyOf(dev.vendorId, dev.productId, dev.serialNumber),
+    vendorId: dev.vendorId,
+    productId: dev.productId,
+    serial: safeSerial(dev.serialNumber),
+    name: dev.productName || "USB Printer",
+  };
+}
+
+export function parsePrinterBinding(raw) {
+  const v0 = String(raw || "").trim();
+  if (!v0) return { kind: "", raw: "" };
+
+  // normalize: allow plain "192.168.1.200:9100" or "http://192.168.1.200:9100/"
+  let v = v0.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+
+  if (v.startsWith("usb/")) {
+    const usbKey = v.slice(4).trim();
+    return usbKey ? { kind: "usb", usbKey } : { kind: "", raw: v0 };
+  }
+
+  if (v.startsWith("ip/")) v = v.slice(3).trim();
+
+  // host[:port]
+  const m = v.match(/^(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?$/);
+  if (!m) return { kind: "unknown", raw: v0 };
+
+  const ip = m[1];
+  const portNum = m[2] ? Number(m[2]) : 9100;
+  const port =
+    Number.isFinite(portNum) && portNum > 0 && portNum <= 65535 ? portNum : 9100;
+
+  return { kind: "ip", ip, port };
+}
+
+export function formatPrinterBinding(input) {
+  const kind = input?.kind;
+  if (kind === "usb") {
+    const usbKey = String(input?.usbKey || "").trim();
+    return usbKey ? `usb/${usbKey}` : "";
+  }
+  if (kind === "ip") {
+    // accept ipPort string or ip+port
+    const ipPort = String(input?.ipPort || "").trim();
+    if (ipPort) {
+      const parsed = parsePrinterBinding(`ip/${ipPort}`);
+      if (parsed.kind !== "ip") return "";
+      return parsed.port === 9100 ? `ip/${parsed.ip}` : `ip/${parsed.ip}:${parsed.port}`;
+    }
+
+    const ip = String(input?.ip || "").trim();
+    const portNum = Number(input?.port ?? 9100);
+    const port =
+      Number.isFinite(portNum) && portNum > 0 && portNum <= 65535 ? portNum : 9100;
+    if (!ip) return "";
+    return port === 9100 ? `ip/${ip}` : `ip/${ip}:${port}`;
+  }
+  return "";
+}
+
+export async function printViaWiFiSimple(payload, ip, port = 9100) {
+  try {
+    const parts = buildPrettyReceiptFromJSON(payload);
+    const combinedData = combineDataParts(parts);
+
+    // Preferred: local RAW-TCP bridge (prints without HTTP headers)
+    // Run: `npm run printer-bridge`
+    // Optional override:
+    // localStorage.setItem("cafe_printer_bridge_url", "http://127.0.0.1:5179/print")
+    const bridgeUrl =
+      localStorage.getItem("cafe_printer_bridge_url") || "http://127.0.0.1:5179/print";
+
+    let r;
+    try {
+      r = await fetch(bridgeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ip,
+          port,
+          data: u8ToBase64(combinedData),
+          timeoutMs: 2000,
+        }),
+      });
+    } catch (bridgeErr) {
+      throw new Error(
+        `Printer-bridge недоступен. Запустите на ПК с принтером: npm run printer-bridge. Печать по Wi‑Fi только через bridge — иначе на чек печатаются HTTP-заголовки. ${String(bridgeErr?.message || bridgeErr)}`
+      );
+    }
+    if (r.ok) return true;
+
+    const errText = await r.text().catch(() => "");
+    throw new Error(
+      `Printer-bridge ответил ${r.status}. ${errText ? errText.slice(0, 100) : ""}`
+    );
+
+  } catch (error) {
+    console.warn(`Не удалось отправить на ${ip}:${port}`, error);
+    throw error;
+  }
+}
+
+function combineDataParts(parts) {
+  const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const part of parts) {
+    combined.set(part, offset);
+    offset += part.length;
+  }
+
+  return combined;
 }

@@ -17,11 +17,11 @@ const ProductDetailModal = ({
   const imagesList = Array.isArray(product?.images) ? product.images : [];
   const hasImages = imagesList.length > 0;
 
-  const maxQuantity = 999;
+  const maxQuantity = product?.quantity;
   const available = true;
 
   const handleQuantityChange = (newQuantity) => {
-    const qty = Math.max(1, Math.min(maxQuantity || 999, newQuantity));
+    const qty = Math.max(Math.min(product.quantity, newQuantity));
     setQuantity(qty);
   };
 
@@ -43,6 +43,12 @@ const ProductDetailModal = ({
       setQuantity(1);
     }
   };
+
+  useEffect(() => {
+    if (!product?.quantity) {
+      onClose();
+    }
+  },[product])
 
   const handleRequestWithoutCart = () => {
     if (available && quantity > 0 && onRequestWithoutCart) {
@@ -99,9 +105,9 @@ const ProductDetailModal = ({
       if (e.key === "Escape") {
         handleCloseFullScreen();
       } else if (e.key === "ArrowLeft") {
-        handleFullScreenPrev({ stopPropagation: () => {} });
+        handleFullScreenPrev({ stopPropagation: () => { } });
       } else if (e.key === "ArrowRight") {
-        handleFullScreenNext({ stopPropagation: () => {} });
+        handleFullScreenNext({ stopPropagation: () => { } });
       }
     };
 
@@ -163,7 +169,7 @@ const ProductDetailModal = ({
               <img
                 src={
                   imagesList[currentImageIndex]?.image_url ||
-                  "https://via.placeholder.com/300x200"
+                  "/images/placeholder.avif"
                 }
                 alt={product.name}
                 onClick={handleImageClick}
@@ -193,9 +199,8 @@ const ProductDetailModal = ({
                     key={image.id || index}
                     src={image.image_url || "https://via.placeholder.com/100"}
                     alt={`${product.name} ${index + 1}`}
-                    className={`thumbnail ${
-                      index === currentImageIndex ? "active" : ""
-                    }`}
+                    className={`thumbnail ${index === currentImageIndex ? "active" : ""
+                      }`}
                     onClick={() => setCurrentImageIndex(index)}
                   />
                 ))}
@@ -238,7 +243,7 @@ const ProductDetailModal = ({
                 <img
                   src={
                     imagesList[currentImageIndex]?.image_url ||
-                    "https://via.placeholder.com/300x200"
+                    "/images/placeholder.avif"
                   }
                   alt={product.name}
                   className="fullscreen-image"
@@ -249,12 +254,11 @@ const ProductDetailModal = ({
                       <img
                         key={image.id || index}
                         src={
-                          image.image_url || "https://via.placeholder.com/100"
+                          image.image_url || "/images/placeholder.avif"
                         }
                         alt={`${product.name} ${index + 1}`}
-                        className={`fullscreen-thumbnail ${
-                          index === currentImageIndex ? "active" : ""
-                        }`}
+                        className={`fullscreen-thumbnail ${index === currentImageIndex ? "active" : ""
+                          }`}
                         onClick={(e) =>
                           handleFullScreenThumbnailClick(e, index)
                         }
@@ -294,7 +298,7 @@ const ProductDetailModal = ({
                 fontWeight: "500",
               }}
             >
-              Доступно для запроса
+              Доступно для запроса ({product.quantity} шт)
             </div>
 
             <div className="modal-quantity-controls">
@@ -327,11 +331,12 @@ const ProductDetailModal = ({
                   </button>
                   <input
                     type="number"
-                    min="1"
-                    max={maxQuantity || 999}
+                    min="0"
+                    max={+product.quantity}
                     value={quantity}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       handleQuantityChange(Number(e.target.value))
+                    }
                     }
                     className="quantity-input-modal"
                   />
@@ -353,14 +358,14 @@ const ProductDetailModal = ({
                   flexDirection: "column",
                 }}
               >
-                <button
+                {/* <button
                   className="request-without-cart-btn-modal"
                   onClick={handleRequestWithoutCart}
                   disabled={!available || quantity <= 0}
                 >
                   <Send size={18} />
                   Запросить без корзины ({quantity} шт.)
-                </button>
+                </button> */}
                 <button
                   className="request-with-cart-btn-modal"
                   onClick={handleRequestWithCart}

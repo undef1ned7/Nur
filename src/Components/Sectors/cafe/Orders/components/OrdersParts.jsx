@@ -1,6 +1,10 @@
 // src/.../OrdersParts.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaChevronDown, FaClipboardList, FaPlus, FaSearch, FaTimes } from "react-icons/fa";
+import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+import api from "../../../../../api";
+
+const PAGE_SIZE = 50;
 
 /* =========================================================
    SearchSelect — один открытый и закрывается после выбора
@@ -125,9 +129,8 @@ export const SearchSelect = ({
       {label ? <div className="cafeOrdersSselect__label">{label}</div> : null}
 
       <div
-        className={`cafeOrdersSselect__control ${open ? "cafeOrdersSselect__control--open" : ""} ${
-          disabled ? "cafeOrdersSselect__control--disabled" : ""
-        }`}
+        className={`cafeOrdersSselect__control ${open ? "cafeOrdersSselect__control--open" : ""} ${disabled ? "cafeOrdersSselect__control--disabled" : ""
+          }`}
         onMouseDown={(e) => {
           if (disabled) return;
           e.preventDefault();
@@ -210,22 +213,130 @@ export const SearchSelect = ({
     </div>
   );
 };
+const getListFromResponse = (res) => res?.data?.results || res?.data || [];
 
 /* =========================================================
    Правая панель меню
    ========================================================= */
-export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick, fmtMoney }) => {
+export const RightMenuPanel = ({
+  open,
+  onClose,
+  menuItems,
+  menuImageUrl,
+  onPick,
+  fmtMoney,
+  currentPage,
+  loading,
+  onPageChange,
+  cartItems,
+  selectedCategoryFilter,
+  setSelectedCategoryFilter
+}) => {
   const [q, setQ] = useState("");
+  const isCart = useCallback((id) => cartItems.find(el => el.menu_item == id), [cartItems])
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!open) setQ("");
+    if (!open) {
+      setQ("");
+      setSearchQuery("");
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    }
   }, [open]);
+  const [categories, setCategories] = useState([]);
+  const fetchCategories = useCallback(async () => {
+    const res = await api.get("/cafe/categories/");
+    setCategories(getListFromResponse(res));
+  }, []);
+  useEffect(() => {
+    (async () => {
+      await fetchCategories();
+    })();
+  }, []);
+  const categoryOptions = useMemo(() => {
+    const baseOptions = (Array.isArray(categories) ? categories : [])
+      .map((cat) => ({
+        value: String(cat.id),
+        label: (cat.title),
+      }))
+      .filter((opt) => opt.value && opt.label);
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return menuItems || [];
-    return (menuItems || []).filter((m) => String(m?.title || "").toLowerCase().includes(s));
-  }, [menuItems, q]);
+    return [{ value: "", label: "Все категории" }, ...baseOptions];
+  }, [categories]);
+  // Debounce для поиска - отправляем запрос на бэкенд через 500ms после остановки ввода
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    const timeoutId = setTimeout(() => {
+      const trimmedQuery = q.trim();
+      if (trimmedQuery !== searchQuery) {
+        setSearchQuery(trimmedQuery);
+        // Сбрасываем на первую страницу при новом поиске
+        if (onPageChange) {
+          onPageChange(1, trimmedQuery);
+        }
+      }
+    }, 500);
+
+    searchTimeoutRef.current = timeoutId;
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [q, searchQuery, onPageChange]);
+
+  // Извлекаем массив блюд из объекта пагинации или используем как массив
+  const itemsArray = useMemo(() => {
+    if (!menuItems) return [];
+    // Если это объект с пагинацией (имеет results)
+    if (menuItems.results && Array.isArray(menuItems.results)) {
+      return menuItems.results;
+    }
+    // Если это массив
+    if (Array.isArray(menuItems)) {
+      return menuItems;
+    }
+    return [];
+  }, [menuItems]);
+
+  // Пагинация - всегда используем данные с сервера
+  const totalPages = useMemo(() => {
+    // Если есть объект с пагинацией, используем count
+    if (menuItems?.count && typeof menuItems.count === 'number') {
+      return Math.ceil(menuItems.count / PAGE_SIZE);
+    }
+
+    // Иначе используем длину массива
+    return Math.ceil((itemsArray.length || 0) / PAGE_SIZE);
+  }, [itemsArray.length, menuItems?.count]);
+
+  // Показываем все загруженные элементы (сервер уже вернул нужную страницу)
+  const paginatedItems = itemsArray;
+
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
+
+  const handlePageChange = useCallback((newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+
+    // Вызываем переданную функцию пагинации с текущим поисковым запросом
+    if (onPageChange) {
+      onPageChange(newPage, searchQuery);
+    }
+
+    // Прокрутка вверх списка
+    const listEl = document.querySelector('.cafeOrdersRpanel__list');
+    if (listEl) {
+      listEl.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [totalPages, searchQuery, onPageChange]);
 
   if (!open) return null;
 
@@ -247,32 +358,81 @@ export const RightMenuPanel = ({ open, onClose, menuItems, menuImageUrl, onPick,
           placeholder="Поиск блюд…"
         />
       </div>
+      <div className="cafeOrdersRpanel__search mt-0! pt-0!">
+        <SearchableCombobox
+          value={selectedCategoryFilter}
+          onChange={(val) => setSelectedCategoryFilter(val || "")}
+          options={categoryOptions}
+          placeholder="Фильтр по категории…"
+          disabled={!categoryOptions.length}
+          classNamePrefix="cafeMenuCombo"
+        />
+      </div>
 
       <div className="cafeOrdersRpanel__list">
-        {filtered.length ? (
-          filtered.map((m) => {
+        {loading && (
+          <div className="cafeOrdersRpanel__empty">Загрузка…</div>
+        )}
+        {(
+          paginatedItems.map((m) => {
             const img = menuImageUrl?.(m.id);
+            const cartItem = isCart(m.id);
+            const cartQty = cartItem?.quantity || 0;
             return (
-              <button key={m.id} type="button" className="cafeOrdersRpanel__item" onClick={() => onPick(m)} title={m.title}>
-                <span className="cafeOrdersRpanel__thumb" aria-hidden>
+              <button key={m.id} type="button" className={`cafeOrdersRpanel__item `} onClick={() => onPick(m)} title={m.title}>
+                {/* <span className="cafeOrdersRpanel__thumb" aria-hidden>
                   {img ? <img src={img} alt="" /> : <FaClipboardList />}
-                </span>
+                </span> */}
+                <div className="cafeOrdersRpanel__image" style={{backgroundImage: `url(${img})`}}>
 
+                </div>
                 <span className="cafeOrdersRpanel__meta">
                   <span className="cafeOrdersRpanel__name">{m.title}</span>
                   <span className="cafeOrdersRpanel__price">{fmtMoney?.(m.price)} сом</span>
                 </span>
 
+
                 <span className="cafeOrdersRpanel__add" aria-hidden>
-                  <FaPlus />
+                  {
+                    !cartQty ? (<FaPlus />) : cartQty
+                  }
                 </span>
               </button>
             );
           })
-        ) : (
-          <div className="cafeOrdersRpanel__empty">Ничего не найдено</div>
         )}
+        {
+          !loading && !paginatedItems.length && (
+            <div className="cafeOrdersRpanel__empty">Ничего не найдено</div>
+          )
+        }
       </div>
+
+      {/* Пагинация */}
+      {totalPages > 1 && (
+        <div className="cafeOrdersRpanel__pagination">
+          <button
+            type="button"
+            className="cafeOrdersRpanel__pagination-btn"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={!hasPrevPage || loading}
+          >
+            Назад
+          </button>
+          {/* <span className="cafeOrdersRpanel__pagination-info">
+            Страница {currentPage} из {totalPages}
+            {menuItems?.count ? ` (${menuItems.count} блюд)` : filtered.length ? ` (${filtered.length} блюд)` : ""}
+          </span> */}
+          <button
+            type="button"
+            className="cafeOrdersRpanel__pagination-btn"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={!hasNextPage || loading}
+          >
+            Вперед
+          </button>
+        </div>
+      )}
 
       <div className="cafeOrdersRpanel__footer">
         <button type="button" className="cafeOrders__btn cafeOrders__btn--primary cafeOrders__btn--wide" onClick={onClose}>

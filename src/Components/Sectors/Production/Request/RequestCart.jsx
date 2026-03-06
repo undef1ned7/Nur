@@ -25,6 +25,8 @@ import { useClient } from "../../../../store/slices/ClientSlice";
 import { createDeal } from "../../../../store/creators/saleThunk";
 import { useUser } from "../../../../store/slices/userSlice";
 import "./RequestCart.scss";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
   const [quantity, setQuantity] = useState(
@@ -44,30 +46,33 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
   const handleIncrement = (e) => {
     e.stopPropagation();
     if (!editable) return;
-    const newQuantity = quantity + 1;
+    const current = Number(quantity) || 0;
+    const newQuantity = current + 1;
     setQuantity(newQuantity);
     onUpdateQuantity(item.id, newQuantity);
   };
 
   const handleDecrement = (e, id) => {
     e?.stopPropagation();
-    if (!editable || quantity <= 1) {
-      handleRemove(id)
-    };
-    const newQuantity = quantity - 1;
-    setQuantity(oldQuantity => {
-      const newQuantity = oldQuantity - 1;
-      if (newQuantity <= 0) {
-        handleRemove(id)
-      }
-      return newQuantity
-    });
+    if (!editable) return;
+    const current = Number(quantity) || 0;
+    if (current <= 1) {
+      handleRemove(e);
+      return;
+    }
+    const newQuantity = current - 1;
+    setQuantity(newQuantity);
     onUpdateQuantity(item.id, newQuantity);
   };
 
   const handleQuantityInputChange = (e) => {
     e.stopPropagation();
-    const value = Number(e.target.value);
+    const raw = e.target.value;
+    if (raw === "") {
+      setQuantity("");
+      return;
+    }
+    const value = Number(raw);
     if (!isNaN(value) && value >= 1) {
       setQuantity(value);
     }
@@ -75,8 +80,9 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
 
   const handleQuantityInputBlur = (e) => {
     e.stopPropagation();
-    const value = Number(e.target.value);
-    if (isNaN(value) || value < 1) {
+    const raw = e.target.value;
+    const value = Number(raw);
+    if (raw === "" || isNaN(value) || value < 1) {
       setQuantity(1);
       onUpdateQuantity(item.id, 1);
     } else {
@@ -122,8 +128,7 @@ const CartItem = ({ item, onUpdateQuantity, onRemoveItem, editable }) => {
               <Minus size={16} />
             </button>
             <input
-              type="number"
-              min="1"
+              type="text"
               value={quantity}
               onChange={handleQuantityInputChange}
               onBlur={handleQuantityInputBlur}
@@ -367,6 +372,7 @@ const RequestCart = ({
   isOpen = false,
   onOpenChange,
   totalItemsCount = 0,
+  isHiddenCart = false,
 }) => {
   const dispatch = useDispatch();
   const {
@@ -375,8 +381,8 @@ const RequestCart = ({
     creating,
     error: clientError,
   } = useClient();
+  const alert = useAlert();
   const { company } = useUser();
-
   const [submitting, setSubmitting] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isClientSelectorOpen, setIsClientSelectorOpen] = useState(false);
@@ -665,6 +671,7 @@ const RequestCart = ({
     };
   }, []);
 
+
   // Блокируем задний фон и прокрутку когда секция открыта
   useEffect(() => {
     if (!isMobile) return;
@@ -859,6 +866,8 @@ const RequestCart = ({
     } catch (e) {
       console.error("Error creating client:", e);
       // error handled in slice
+      const errorMessage = validateResErrors(e, "Ошибка при создании клиента");
+      alert(errorMessage, true);
     }
   };
 
@@ -975,15 +984,8 @@ const RequestCart = ({
         setIsOrderSectionOpen(false);
       }
     } catch (e) {
-      console.error("Error submitting request:", e);
-      const errorMessage =
-        e?.response?.data?.detail ||
-        e?.response?.data?.message ||
-        e?.message ||
-        e?.detail ||
-        "неизвестная ошибка";
-      onNotify &&
-        onNotify("error", `Не удалось отправить запрос: ${errorMessage}`);
+      const errorMessage = validateResErrors(e, "Ошибка при отправке запроса");
+      alert(errorMessage, true);
     } finally {
       setSubmitting(false);
     }
@@ -1290,7 +1292,6 @@ const RequestCart = ({
       </div>
     </div>
   );
-
   return (
     <>
       {/* Модалка корзины - открывается при нажатии на кнопку корзины в ProductionRequest */}
@@ -1447,7 +1448,7 @@ const RequestCart = ({
       )}
 
       {/* Кнопка корзины внизу экрана - для мобильных/планшетов */}
-      {isMobile && (() => {
+      {isMobile && !isHiddenCart && (() => {
         // Вычисляем итог запроса по той же логике, что и в RequestSummary
         let total = 0;
 

@@ -86,7 +86,7 @@ const PayrollDaily = () => {
 
   const loadRates = async (period) => {
     try {
-      const RATES_EP = "/education/teacher-rates/";
+      const RATES_EP = "/barbershop/payouts/";
 
       const safeGet = async (mode) => {
         try {
@@ -98,23 +98,22 @@ const PayrollDaily = () => {
         }
       };
 
-      const resLesson = await safeGet("lesson");
+      const resRecord = await safeGet("record");
       let resPercent = await safeGet("percent");
-      if (!resPercent) resPercent = await safeGet("month");
+      if (!resPercent) resPercent = await safeGet("fixed");
 
       const map = {};
 
       const put = (resp, kind) =>
         (asArray(resp?.data) || []).forEach((r) => {
-          const id =
-            r.teacher || r.teacher_id || r.user || r.employee || r.master;
+          const id = r.barber || r.employee || r.master;
           if (!id) return;
           map[id] = map[id] || {};
-          if (kind === "lesson") map[id].perRecord = toNum(r.rate);
+          if (kind === "record") map[id].perRecord = toNum(r.rate);
           else map[id].percent = Math.min(100, Math.max(0, toNum(r.rate)));
         });
 
-      if (resLesson) put(resLesson, "lesson");
+      if (resRecord) put(resRecord, "record");
       if (resPercent) put(resPercent, "percent");
 
       setRates(map);
@@ -201,7 +200,7 @@ const PayrollDaily = () => {
           const r = rates[row.id] || {};
           const percent = Math.min(100, Math.max(0, toNum(r.percent)));
           const perRecord = toNum(r.perRecord);
-          const mode = percent > 0 ? "percent" : "lesson";
+          const mode = percent > 0 ? "percent" : "record";
           const rateLabel =
             percent > 0 ? `${percent}%` : `${fmtMoney(perRecord)}`;
           const payout =

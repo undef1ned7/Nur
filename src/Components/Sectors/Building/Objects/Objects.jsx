@@ -85,7 +85,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
 
     if (!name || price === "" || !date || quantity === "") {
       alert(
-        "Пожалуйста, заполните обязательные поля: Наименование, Цена, Дата, Количество."
+        "Пожалуйста, заполните обязательные поля: Наименование, Цена, Дата, Количество.",
       );
       return;
     }
@@ -111,7 +111,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
       setCreateError(
         err?.data
           ? JSON.stringify(err.data)
-          : err?.message || "Ошибка при добавлении"
+          : err?.message || "Ошибка при добавлении",
       );
     } finally {
       setCreating(false);

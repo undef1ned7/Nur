@@ -579,6 +579,8 @@ import { Search, Plus, LayoutGrid, Table2 } from "lucide-react";
 import "./Clients.scss";
 import api from "../../../../api";
 import { useUser } from "../../../../store/slices/userSlice";
+import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const HostelClients = lazy(() => import("../../Hostel/Clients/Clients"));
 
@@ -660,6 +662,7 @@ const TYPE_VARIANTS_BY_TAB = {
 
 export default function MarketClients() {
   const navigate = useNavigate();
+
   const { company: user } = useUser();
   const sectorName = user?.sector?.name;
 
@@ -757,8 +760,8 @@ export default function MarketClients() {
 
       setRows(list);
     } catch (e) {
-      console.error(e);
-      setError("Не удалось загрузить список");
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке списка клиентов. ")
+      setError(errorMessage);
       setRows([]);
     } finally {
       setLoading(false);
@@ -857,9 +860,9 @@ export default function MarketClients() {
     const variants = TYPE_VARIANTS_BY_TAB[activeTab] || [];
     const preferredFirst = acceptedTypeByTab[activeTab]
       ? [
-          acceptedTypeByTab[activeTab],
-          ...variants.filter((v) => v !== acceptedTypeByTab[activeTab]),
-        ]
+        acceptedTypeByTab[activeTab],
+        ...variants.filter((v) => v !== acceptedTypeByTab[activeTab]),
+      ]
       : variants;
 
     const tryList = preferredFirst.length
@@ -915,7 +918,6 @@ export default function MarketClients() {
         email: addEmail,
         date: addDate,
       });
-
       if (created?.id) navigate(`${CARD_BASE}${created.id}`); // абсолютный путь
       setRows((prev) => [created, ...(Array.isArray(prev) ? prev : [])]);
       setIsAddOpen(false);
@@ -940,14 +942,14 @@ export default function MarketClients() {
     activeTab === "clients"
       ? "Клиенты"
       : activeTab === "suppliers"
-      ? "Поставщики"
-      : activeTab === "resellers"
-      ? resellersTabLabel
-      : activeTab === "clientsBooking"
-      ? "Клиенты бронирование"
-      : activeTab === "debtors"
-      ? "Должники"
-      : "Клиенты";
+        ? "Поставщики"
+        : activeTab === "resellers"
+          ? resellersTabLabel
+          : activeTab === "clientsBooking"
+            ? "Клиенты бронирование"
+            : activeTab === "debtors"
+              ? "Должники"
+              : "Клиенты";
 
   // ───────────────────────── clientsBooking рендерит HostelClients
   if (activeTab === "clientsBooking") {
@@ -988,9 +990,8 @@ export default function MarketClients() {
         {TABS.map((t) => (
           <button
             key={t.key}
-            className={`clients-tabs__tab ${
-              activeTab === t.key ? "clients-tabs__tab--active" : ""
-            }`}
+            className={`clients-tabs__tab ${activeTab === t.key ? "clients-tabs__tab--active" : ""
+              }`}
             onClick={() => setActiveTab(t.key)}
             type="button"
           >
@@ -1021,10 +1022,10 @@ export default function MarketClients() {
             {activeTab === "clients"
               ? "Новый клиент"
               : activeTab === "suppliers"
-              ? "Новый поставщик"
-              : sectorName === "Строительная компания"
-              ? "Новый подрядчик"
-              : "Новый реализатор"}
+                ? "Новый поставщик"
+                : sectorName === "Строительная компания"
+                  ? "Новый подрядчик"
+                  : "Новый реализатор"}
           </button>
         )}
       </div>
@@ -1052,9 +1053,8 @@ export default function MarketClients() {
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`clients-view-btn ${
-                viewMode === "table" ? "clients-view-btn--active" : ""
-              }`}
+              className={`clients-view-btn ${viewMode === "table" ? "clients-view-btn--active" : ""
+                }`}
             >
               <Table2 size={16} />
               Таблица
@@ -1063,9 +1063,8 @@ export default function MarketClients() {
             <button
               type="button"
               onClick={() => setViewMode("cards")}
-              className={`clients-view-btn ${
-                viewMode === "cards" ? "clients-view-btn--active" : ""
-              }`}
+              className={`clients-view-btn ${viewMode === "cards" ? "clients-view-btn--active" : ""
+                }`}
             >
               <LayoutGrid size={16} />
               Карточки
@@ -1077,131 +1076,133 @@ export default function MarketClients() {
       {error && <div className="clients-error">{error}</div>}
 
       {/* Table/Cards Container */}
-      <div className="clients-table-container">
-        {viewMode === "table" && (
-          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="clients-table w-full min-w-[800px]">
-              <thead>
-                <tr>
-                  <th>№</th>
-                  <th>ФИО</th>
-                  <th>Телефон</th>
-                  <th>Тип</th>
-                  <th>Дата</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
+      <DataContainer>
+        <div className="clients-table-container">
+          {viewMode === "table" && (
+            <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <table className="clients-table w-full min-w-[800px]">
+                <thead>
                   <tr>
-                    <td colSpan={6} className="clients-table__loading">
-                      Загрузка...
-                    </td>
+                    <th>№</th>
+                    <th>ФИО</th>
+                    <th>Телефон</th>
+                    <th>Тип</th>
+                    <th>Дата</th>
+                    <th>Действия</th>
                   </tr>
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="clients-table__empty">
-                      {search ? "Ничего не найдено" : "Нет данных"}
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((c, index) => (
-                    <tr
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="clients-table__loading">
+                        Загрузка...
+                      </td>
+                    </tr>
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="clients-table__empty">
+                        {search ? "Ничего не найдено" : "Нет данных"}
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((c, index) => (
+                      <tr
+                        key={c.id}
+                        className="clients-table__row"
+                        onClick={() => openCard(c)}
+                      >
+                        <td data-label="№">{index + 1}</td>
+                        <td data-label="ФИО" className="clients-table__name">
+                          {c.full_name || c.fio || "—"}
+                        </td>
+                        <td data-label="Телефон">{c.phone || "—"}</td>
+                        <td data-label="Тип">{ctxTypeLabel(c.type)}</td>
+                        <td data-label="Дата">{c.date || "—"}</td>
+                        <td
+                          data-label="Действия"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Link
+                            to={`${CARD_BASE}${c.id}`}
+                            state={c}
+                            className="clients-table__link"
+                          >
+                            Открыть
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Cards View */}
+          {viewMode === "cards" && (
+            <div className="block">
+              {loading ? (
+                <div className="clients-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Загрузка...
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="clients-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  {debouncedSearch ? "Ничего не найдено" : "Нет данных"}
+                </div>
+              ) : (
+                <div className="clients-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {filtered.map((c, index) => (
+                    <div
                       key={c.id}
-                      className="clients-table__row"
+                      className="clients-card"
                       onClick={() => openCard(c)}
                     >
-                      <td data-label="№">{index + 1}</td>
-                      <td data-label="ФИО" className="clients-table__name">
-                        {c.full_name || c.fio || "—"}
-                      </td>
-                      <td data-label="Телефон">{c.phone || "—"}</td>
-                      <td data-label="Тип">{ctxTypeLabel(c.type)}</td>
-                      <td data-label="Дата">{c.date || "—"}</td>
-                      <td
-                        data-label="Действия"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="clients-card__field">
+                        <span className="clients-card__label">№</span>
+                        <span className="clients-card__value">{index + 1}</span>
+                      </div>
+                      <div className="clients-card__field">
+                        <span className="clients-card__label">ФИО</span>
+                        <span className="clients-card__value">
+                          {c.full_name || c.fio || "—"}
+                        </span>
+                      </div>
+                      <div className="clients-card__field">
+                        <span className="clients-card__label">Телефон</span>
+                        <span className="clients-card__value">
+                          {c.phone || "—"}
+                        </span>
+                      </div>
+                      <div className="clients-card__field">
+                        <span className="clients-card__label">Тип</span>
+                        <span className="clients-card__value">
+                          {ctxTypeLabel(c.type)}
+                        </span>
+                      </div>
+                      <div className="clients-card__field">
+                        <span className="clients-card__label">Дата</span>
+                        <span className="clients-card__value">
+                          {c.date || "—"}
+                        </span>
+                      </div>
+                      <div className="clients-card__actions">
                         <Link
                           to={`${CARD_BASE}${c.id}`}
                           state={c}
-                          className="clients-table__link"
+                          onClick={(e) => e.stopPropagation()}
+                          className="clients-card__link"
                         >
                           Открыть
                         </Link>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Cards View */}
-        {viewMode === "cards" && (
-          <div className="block">
-            {loading ? (
-              <div className="clients-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Загрузка...
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="clients-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                {debouncedSearch ? "Ничего не найдено" : "Нет данных"}
-              </div>
-            ) : (
-              <div className="clients-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filtered.map((c, index) => (
-                  <div
-                    key={c.id}
-                    className="clients-card"
-                    onClick={() => openCard(c)}
-                  >
-                    <div className="clients-card__field">
-                      <span className="clients-card__label">№</span>
-                      <span className="clients-card__value">{index + 1}</span>
+                      </div>
                     </div>
-                    <div className="clients-card__field">
-                      <span className="clients-card__label">ФИО</span>
-                      <span className="clients-card__value">
-                        {c.full_name || c.fio || "—"}
-                      </span>
-                    </div>
-                    <div className="clients-card__field">
-                      <span className="clients-card__label">Телефон</span>
-                      <span className="clients-card__value">
-                        {c.phone || "—"}
-                      </span>
-                    </div>
-                    <div className="clients-card__field">
-                      <span className="clients-card__label">Тип</span>
-                      <span className="clients-card__value">
-                        {ctxTypeLabel(c.type)}
-                      </span>
-                    </div>
-                    <div className="clients-card__field">
-                      <span className="clients-card__label">Дата</span>
-                      <span className="clients-card__value">
-                        {c.date || "—"}
-                      </span>
-                    </div>
-                    <div className="clients-card__actions">
-                      <Link
-                        to={`${CARD_BASE}${c.id}`}
-                        state={c}
-                        onClick={(e) => e.stopPropagation()}
-                        className="clients-card__link"
-                      >
-                        Открыть
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </DataContainer>
 
       {/* ===== Add Modal ===== */}
       {isAddOpen && (
@@ -1217,10 +1218,10 @@ export default function MarketClients() {
                 {activeTab === "clients"
                   ? "Новый клиент"
                   : activeTab === "suppliers"
-                  ? "Новый поставщик"
-                  : sectorName === "Строительная компания"
-                  ? "Новый подрядчик"
-                  : "Новый реализатор"}
+                    ? "Новый поставщик"
+                    : sectorName === "Строительная компания"
+                      ? "Новый подрядчик"
+                      : "Новый реализатор"}
               </h3>
             </div>
 

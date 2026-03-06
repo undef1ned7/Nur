@@ -2,6 +2,7 @@ import SkladHeader from "./SkladHeader";
 import SkladTable from "./SkladTable";
 import SelectionActions from "./SelectionActions";
 import Pagination from "./Pagination";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /**
  * Компонент вкладки "Склад"
@@ -66,6 +67,7 @@ const SkladTab = ({
       )}
 
       {filterP.length !== 0 && (
+        
         <SelectionActions
           pageItems={filterP}
           selectedIds={selectedIds}
@@ -83,6 +85,8 @@ const SkladTab = ({
       ) : filterP.length === 0 ? (
         <p className="sklad__no-products-message">Нет доступных товаров.</p>
       ) : (
+        <DataContainer>
+
         <SkladTable
           products={filterP}
           onEdit={onEdit}
@@ -92,6 +96,8 @@ const SkladTab = ({
           toggleRow={toggleRow}
           toggleSelectAllOnPage={toggleSelectAllOnPage}
         />
+        </DataContainer>
+
       )}
 
       <Pagination

@@ -1,5 +1,6 @@
-import { Route } from "react-router-dom";
+import { Route, Navigate, useSearchParams, Outlet } from "react-router-dom";
 import ProtectedRoute from "../ProtectedRoute";
+import { useUser } from "../store/slices/userSlice";
 
 // Public routes
 import Login from "../Components/Auth/Login/Login";
@@ -27,6 +28,7 @@ import LogisticsPage from "../Components/Sectors/logistics/LogisticsPage/Logisti
 import LogisticsAnalytics from "../Components/pages/LogisticsAnalytics/LogisticsAnalytics";
 import Shifts from "../Components/pages/Shifts/Shifts";
 import ShiftDetail from "../Components/pages/Shifts/ShiftDetail";
+import PosPrintSettings from "../Components/pages/Info/Settings/PosPrintSettings";
 
 // Deposits
 import Obzor from "../Components/Deposits/Obzor/Obzor";
@@ -92,6 +94,7 @@ import MarketHistory from "../Components/Sectors/Market/History/History";
 import MarketDocuments from "../Components/Sectors/Market/Documents/Documents";
 import CreateSaleDocument from "../Components/Sectors/Market/Documents/CreateSaleDocument";
 import Counterparties from "../Components/Sectors/Market/Counterparties/Counterparties";
+import CounterpartyDetail from "../Components/Sectors/Market/Counterparties/CounterpartyDetail";
 import MarketAnalytics from "../Components/Sectors/Market/Analytics/Analytics";
 
 // Cafe
@@ -128,6 +131,7 @@ import ConsultingReports from "../Components/Sectors/Consulting/Kassa/Reports/Re
 
 // Warehouse
 import WarehouseAnalytics from "../Components/Sectors/Warehouse/Analytics/Analytics";
+import WarehouseAgentAnalytics from "../Components/Sectors/Warehouse/Analytics/AgentAnalytics";
 import WarehouseClients from "../Components/Sectors/Warehouse/Clients/Clients";
 import WarehouseDirectories from "../Components/Sectors/Warehouse/Directories/Directories";
 import WarehouseMovements from "../Components/Sectors/Warehouse/Movements/Movements";
@@ -139,11 +143,15 @@ import WarehouseSupply from "../Components/Sectors/Warehouse/Supply/Supply";
 import WarehouseWriteOffs from "../Components/Sectors/Warehouse/WriteOffs/WriteOffs";
 import Warehouses from "../Components/Sectors/Warehouse/Warehouses/Warehouses";
 import WarehouseBrandCategory from "../Components/Sectors/Warehouse/BrandCategory/BrandCategoryPage";
+import WarehouseDocumentsLayout from "../Components/Sectors/Warehouse/Documents/DocumentsLayout";
 import WarehouseDocuments from "../Components/Sectors/Warehouse/Documents/Documents";
-import WarehouseCreateSaleDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
-
+import CreateWarehouseDocument from "../Components/Sectors/Warehouse/Documents/CreateSaleDocument";
+import MoneyDocumentsPage from "../Components/Sectors/Warehouse/Money/MoneyDocumentsPage";
+import WarehouseKassa from "../Components/Sectors/Warehouse/Kassa/WarehouseKassa";
+import WarehouseAgents from "../Components/Sectors/Warehouse/Agents/Agents";
 // Production
 import ProductionWarehouse from "../Components/Sectors/Production/Warehouse/ProductionWarehouse";
+import ProductionWarehouseProductDetail from "../Components/Sectors/Production/Warehouse/ProductionWarehouseProductDetail";
 import ProductionAgents from "../Components/Sectors/Production/ProductionAgents/ProductionAgents";
 import ProductionCatalog from "../Components/Sectors/Production/Catalog/ProductionCatalog";
 import ProductionRequest from "../Components/Sectors/Production/Request/ProductionRequest";
@@ -153,20 +161,49 @@ import ProductionAnalytics from "../Components/Sectors/Production/Analytics/Prod
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
 
-
-
 // Public pages
 import CafeMenuOnline from "../Components/Sectors/cafe/CafeMenuOnline/CafeMenuOnline";
 import OnlineCatalog from "../Components/Sectors/Market/Catalog/Catalog";
 import OnlineBooking from "../Components/Sectors/Barber/OnlineBooking/OnlineBooking";
-import CreateSaleDocumentForMarket from "../Components/Sectors/Market/Documents/CreateSaleDocumentForMarket";
-// import OnlineCatalog from "../Components/Online/Market/Catalog";
+import CafeOrdersLayout from "../Components/Sectors/cafe/Orders";
+import Orders from "../Components/Sectors/cafe/Orders/Orders";
+import CafeOrderHistory from "../Components/Sectors/cafe/Orders/CafeOrdersHistory";
+import SellLayout from "../Components/pages/Sell/SellLayout";
+import SellMainStart from "../Components/pages/Sell/SellMainStart";
+import CafeLayout from "../Components/Sectors/cafe/CafeLayout";
+import SellCashierPage from "../Components/pages/Sell/Cashier/SellCashierPage";
 
+import BuildingLayout, {
+  BuildingAnalytics,
+  BuildingCashRegister,
+  BuildingClients,
+  BuildingClientDetail,
+  BuildingDepartment,
+  BuildingNotification,
+  BuildingTaskDetail,
+  BuildingProcurement,
+  BuildingProjects,
+  BuildingProjectDetail,
+  BuildingSalary,
+  BuildingSalaryEmployeeDetail,
+  BuildingSalaryPayrollDetail,
+  BuildingSalaryLineDetail,
+  BuildingSell,
+  BuildingStock,
+  BuildingTreaty,
+  BuildingTreatyDetail,
+  BuildingProcurementDetail,
+  BuildingStockDetail,
+  BuildingStockTransferDetail,
+  BuildingWorkProcess,
+  BuildingWorkProcessDetail,
+  BuildingDrawings,
+} from "../Components/pages/Building";
 
 /**
  * Создает защищенный роут
  */
-const createProtectedRoute = (path, Component) => (
+const createProtectedRoute = (path, Component, props) => (
   <Route
     key={path}
     path={path}
@@ -175,27 +212,130 @@ const createProtectedRoute = (path, Component) => (
         <Component />
       </ProtectedRoute>
     }
+    {...props}
   />
 );
-
 
 /**
- * Создает защищенный Layout
+ * Аналитика склада:
+ * - новая аналитика агента (WarehouseAgentAnalytics) — для агента без agent_id или при agent_id в URL;
+ * - аналитика владельца/админа (WarehouseAnalytics) — во всех остальных случаях.
+ *
+ * Ожидаемые структуры ответов API:
+ *
+ * 1) Владелец/админ — общая аналитика склада
+ *    GET /api/warehouse/owner/analytics/?period=month&date=2026-02-05
+ *
+ *    {
+ *      "period": "month",
+ *      "date_from": "2026-01-07",
+ *      "date_to": "2026-02-05",
+ *      "summary": {
+ *        "requests_approved": 8,
+ *        "items_approved": "20.000",
+ *        "sales_count": 0,
+ *        "sales_amount": "0.00",
+ *        "on_hand_qty": "20.000",
+ *        "on_hand_amount": "3709.08000"
+ *      },
+ *      "charts": {
+ *        "sales_by_date": []
+ *      },
+ *      "top_agents": {
+ *        "by_sales": [],
+ *        "by_received": [
+ *          {
+ *            "agent_id": "4478407d-660b-4683-a0af-ceb15c25b507",
+ *            "agent_name": "agentt agentt",
+ *            "items_approved": "16.000"
+ *          },
+ *          {
+ *            "agent_id": "062ca63c-0fe5-4070-ab01-a9ef554fce1e",
+ *            "agent_name": "agent agent",
+ *            "items_approved": "2.000"
+ *          },
+ *          {
+ *            "agent_id": "fab742f8-66ca-48fa-b318-9ac8a48fceab",
+ *            "agent_name": "warehouse warehouse",
+ *            "items_approved": "2.000"
+ *          }
+ *        ]
+ *      },
+ *      "details": {
+ *        "warehouses": [
+ *          {
+ *            "warehouse_id": "8f5d5f2c-6de6-4e2b-9747-273bc5aa3a19",
+ *            "warehouse_name": "new склад",
+ *            "carts_approved": 5,
+ *            "items_approved": "8.000",
+ *            "sales_count": 0,
+ *            "sales_amount": "0.00",
+ *            "on_hand_qty": "8.000",
+ *            "on_hand_amount": "589.08000"
+ *          },
+ *          {
+ *            "warehouse_id": "4cf95f0e-e72e-4621-8c4c-e5c88bafb09e",
+ *            "warehouse_name": "JAY",
+ *            "carts_approved": 3,
+ *            "items_approved": "12.000",
+ *            "sales_count": 0,
+ *            "sales_amount": "0.00",
+ *            "on_hand_qty": "12.000",
+ *            "on_hand_amount": "3120.00000"
+ *          }
+ *        ],
+ *        "sales_by_product": []
+ *      }
+ *    }
+ *
+ * 2) Владелец/админ — аналитика конкретного агента
+ *    GET /api/warehouse/owner/agents/{agent_id}/analytics/?period=month&date=2026-02-05
+ *
+ *    {
+ *      "period": "month",
+ *      "date_from": "2026-01-07",
+ *      "date_to": "2026-02-05",
+ *      "summary": {
+ *        "requests_submitted": 6,
+ *        "requests_approved": 6,
+ *        "requests_rejected": 0,
+ *        "items_approved": "16.000",
+ *        "sales_count": 0,
+ *        "sales_qty": "0.000",
+ *        "sales_amount": "0.00",
+ *        "returns_count": 0,
+ *        "returns_amount": "0.00",
+ *        "write_off_count": 0,
+ *        "write_off_qty": "0.000",
+ *        "on_hand_qty": "16.000",
+ *        "on_hand_amount": "3485.52000"
+ *      },
+ *      "charts": {
+ *        "requests_by_date": [
+ *          {
+ *            "date": "2026-02-05",
+ *            "carts_approved": 6,
+ *            "items_approved": 16.0
+ *          }
+ *        ],
+ *        "sales_by_date": []
+ *      },
+ *      "details": {
+ *        "sales_by_product": [],
+ *        "sales_by_warehouse": []
+ *      }
+ *    }
  */
-const createProtectedLayoute = (path, children) => (
-  <Route
-    key={path}
-    path={path}
-    element={
-      <ProtectedRoute>
-        {children}
-      </ProtectedRoute>
-    }
-  />
-);
 
-
-
+const WarehouseAnalyticsRoute = () => {
+  const { profile } = useUser();
+  const [searchParams] = useSearchParams();
+  const agentId = searchParams.get("agent_id");
+  const isAgent = profile?.role !== "owner" && profile?.role !== "admin";
+  if (isAgent && !agentId) return <WarehouseAgentAnalytics />;
+  if (agentId) return <WarehouseAgentAnalytics />;
+  return <WarehouseAnalytics />;
+};
 
 /**
  * Конфигурация публичных роутов
@@ -205,10 +345,8 @@ export const publicRoutes = [
   <Route key="/" path="/" element={<Landing />} />,
   <Route key="/register" path="/register" element={<Register />} />,
 
-
-
- // Public routes
-<Route
+  // Public routes
+  <Route
     key="/catalog/:slug"
     path="/catalog/:slug"
     element={<OnlineCatalog />}
@@ -223,8 +361,6 @@ export const publicRoutes = [
     path="/barber/:company_slug/booking"
     element={<OnlineBooking />}
   />,
-
-
 
   <Route
     key="/submit-application"
@@ -248,6 +384,8 @@ export const publicRoutes = [
 export const crmRoutes = (profile) => [
   // Common routes
   createProtectedRoute("set", Set),
+  // Скрытая страница тонкой настройки POS‑печати (ESC/POS)
+  createProtectedRoute("pos-print-settings", PosPrintSettings),
   createProtectedRoute("raspisanie", Raspisanie),
   createProtectedRoute("registration", Registration),
   createProtectedRoute("obzor", Obzor),
@@ -260,6 +398,8 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("barcodes", BarcodePrintPage),
   createProtectedRoute("scales", ScalesPage),
   createProtectedRoute("sell", Sell),
+  createProtectedRoute("sell/start", SellCashierPage),
+
   createProtectedRoute("sell/:id", SellDetail),
   createProtectedRoute("brand-category", BrandCategoryPage),
   createProtectedRoute("sklad-accounting", WarehouseAccounting),
@@ -278,9 +418,9 @@ export const crmRoutes = (profile) => [
   // Kassa routes (conditional based on role)
   ...(profile?.role === "owner"
     ? [
-      createProtectedRoute("kassa/*", Kassa),
-      createProtectedRoute("kassa/:id", KassaDet),
-    ]
+        createProtectedRoute("kassa/*", Kassa),
+        createProtectedRoute("kassa/:id", KassaDet),
+      ]
     : [createProtectedRoute("kassa/*", KassWorker)]),
 
   // Barber routes
@@ -323,28 +463,79 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("clients/:id", MarketClientDetails),
   createProtectedRoute("market/history", MarketHistory),
   createProtectedRoute("market/documents", MarketDocuments),
-  createProtectedRoute("market/documents/create", CreateSaleDocumentForMarket),
+  createProtectedRoute("market/documents/create", CreateSaleDocument),
   createProtectedRoute("market/analytics", MarketAnalytics),
 
+  <Route element={<BuildingLayout />} path="building">
+    {[
+      createProtectedRoute("analytics", BuildingAnalytics),
+      createProtectedRoute("cash-register", BuildingCashRegister),
+      createProtectedRoute("clients", BuildingClients),
+      createProtectedRoute("clients/:id", BuildingClientDetail),
+      createProtectedRoute("department", BuildingDepartment),
+      createProtectedRoute("notification", BuildingNotification),
+      createProtectedRoute("notification/new", BuildingTaskDetail),
+      createProtectedRoute("notification/:id", BuildingTaskDetail),
+      createProtectedRoute("work", BuildingWorkProcess),
+      createProtectedRoute("work/:id", BuildingWorkProcessDetail),
+      createProtectedRoute("procurement", BuildingProcurement),
+      createProtectedRoute("procurement/:id", BuildingProcurementDetail),
+      createProtectedRoute("projects", BuildingProjects),
+      createProtectedRoute("projects/:id", BuildingProjectDetail),
+      createProtectedRoute("drawings", BuildingDrawings),
+      createProtectedRoute("salary", BuildingSalary),
+      createProtectedRoute(
+        "salary/employee/:id",
+        BuildingSalaryEmployeeDetail,
+      ),
+      createProtectedRoute(
+        "salary/payroll/:id",
+        BuildingSalaryPayrollDetail,
+      ),
+      createProtectedRoute(
+        "salary/payroll/:payrollId/line/:lineId",
+        BuildingSalaryLineDetail,
+      ),
+      createProtectedRoute("sell", BuildingSell),
+      createProtectedRoute("stock", BuildingStock),
+      createProtectedRoute("stock/:id", BuildingStockDetail),
+      createProtectedRoute(
+        "stock/:warehouseId/transfer/:id",
+        BuildingStockTransferDetail,
+      ),
+      createProtectedRoute("treaty", BuildingTreaty),
+      createProtectedRoute("treaty/new", BuildingTreatyDetail),
+      createProtectedRoute("treaty/:id", BuildingTreatyDetail),
+    ]}
+  </Route>,
   // Cafe routes
-  createProtectedRoute("cafe/analytics", CafeAnalytics),
-  createProtectedRoute("cafe/documents", CafeDocuments),
-  createProtectedRoute("cafe/cook", Cook),
-  createProtectedRoute("cafe/inventory", CafeInventory),
-  createProtectedRoute("cafe/menu", CafeMenu),
-  createProtectedRoute("cafe/orders", CafeOrders),
-  createProtectedRoute("cafe/payroll", CafePayroll),
-  createProtectedRoute("cafe/purchasing", CafePurchasing),
-  createProtectedRoute("cafe/reports", CafeReports),
-  createProtectedRoute("cafe/reservations", CafeReservations),
-  createProtectedRoute("cafe/stock", CafeStock),
-  createProtectedRoute("cafe/kassa/*", CafeKassa),
-  createProtectedRoute("cafe/clients", CafeClients),
-  createProtectedRoute("cafe/tables", CafeTables),
+  <Route key="cafe" element={<CafeLayout />} path="cafe">
+    {[
+      createProtectedRoute("analytics", CafeAnalytics),
+      createProtectedRoute("documents", CafeDocuments),
+      createProtectedRoute("cook", Cook),
+      createProtectedRoute("inventory", CafeInventory),
+      createProtectedRoute("menu", CafeMenu),
+      <Route path="orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>
+        {[
+          createProtectedRoute("*", CafeOrders, { index: true }),
+          createProtectedRoute("history", CafeOrderHistory),
+        ]}
+      </Route>,
+      createProtectedRoute("payroll", CafePayroll),
+      createProtectedRoute("purchasing", CafePurchasing),
+      createProtectedRoute("reports", CafeReports),
+      createProtectedRoute("reservations", CafeReservations),
+      createProtectedRoute("stock", CafeStock),
+      createProtectedRoute("kassa/*", CafeKassa),
+      createProtectedRoute("clients", CafeClients),
+      createProtectedRoute("tables", CafeTables),
+    ]}
+  </Route>,
 
   // Building routes
-  createProtectedRoute("building/work", BuildingWork),
-  createProtectedRoute("building/objects", Objects),
+  // createProtectedRoute("building/work", BuildingWork),
+  // createProtectedRoute("building/objects", Objects),
 
   // Consulting routes
   createProtectedRoute("consulting/client", ConsultingClients),
@@ -359,9 +550,44 @@ export const crmRoutes = (profile) => [
 
   // Warehouse routes
   createProtectedRoute("warehouse/warehouses", Warehouses),
-  createProtectedRoute("warehouse/analytics", WarehouseAnalytics),
+  createProtectedRoute("warehouse/analytics", WarehouseAnalyticsRoute),
   createProtectedRoute("warehouse/clients", WarehouseClients),
-  createProtectedRoute("warehouse/directories", WarehouseDirectories),
+  <Route
+    path="warehouse/documents"
+    key="warehouse/documents"
+    element={
+      <ProtectedRoute>
+        <WarehouseDocumentsLayout />
+      </ProtectedRoute>
+    }
+  >
+    <Route
+      key="warehouse/documents-index"
+      index
+      element={<Navigate to="all" replace />}
+    />
+    <Route
+      key="warehouse/documents-create"
+      path="create"
+      element={<CreateWarehouseDocument />}
+    />
+    <Route
+      key="warehouse/documents-edit"
+      path="edit/:id"
+      element={<CreateWarehouseDocument />}
+    />
+    <Route
+      key="warehouse/documents-type"
+      path=":docType"
+      element={<WarehouseDocuments />}
+    />
+    <Route
+      key="warehouse/documents-money"
+      path="money/:docType"
+      element={<MoneyDocumentsPage />}
+    />
+  </Route>,
+  createProtectedRoute("warehouse/agents", WarehouseAgents),
   createProtectedRoute("warehouse/movements", WarehouseMovements),
   createProtectedRoute("warehouse/products", WarehouseProducts),
   createProtectedRoute("warehouse/products/:id", WarehouseProductDetail),
@@ -370,18 +596,34 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("warehouse/stocks/add-product", AddWarehouseProductPage),
   createProtectedRoute(
     "warehouse/stocks/add-product/:id",
-    AddWarehouseProductPage
+    AddWarehouseProductPage,
   ),
+  <Route
+    key="warehouse/kassa"
+    path="warehouse/kassa"
+    element={
+      <ProtectedRoute>
+        <Outlet />
+      </ProtectedRoute>
+    }
+  >
+    <Route key="warehouse/kassa-index" index element={<WarehouseKassa />} />
+    <Route key="warehouse/kassa-id" path=":id" element={<WarehouseKassa />} />
+  </Route>,
   createProtectedRoute("warehouse/supply", WarehouseSupply),
   createProtectedRoute("warehouse/write_offs", WarehouseWriteOffs),
   createProtectedRoute("warehouse/brands", WarehouseBrandCategory),
   createProtectedRoute("warehouse/categories", WarehouseBrandCategory),
+  createProtectedRoute("warehouse/payment_categories", WarehouseBrandCategory),
   createProtectedRoute("warehouse/counterparties", Counterparties),
-  createProtectedRoute("warehouse/documents", WarehouseDocuments),
-  createProtectedRoute("warehouse/documents/create", WarehouseCreateSaleDocument),
+  createProtectedRoute("warehouse/counterparties/:id", CounterpartyDetail),
 
   // Production routes
   createProtectedRoute("production/warehouse", ProductionWarehouse),
+  createProtectedRoute(
+    "production/warehouse/:id",
+    ProductionWarehouseProductDetail,
+  ),
   createProtectedRoute("production/analytics", ProductionAnalytics),
   createProtectedRoute("production/agents/:agentId/analytics", AgentAnalytics),
   createProtectedRoute("production/agents", ProductionAgents),

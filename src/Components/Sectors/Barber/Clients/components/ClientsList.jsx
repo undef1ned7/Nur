@@ -1,8 +1,9 @@
 // ClientsList.jsx
 import React from "react";
 import { FaHistory } from "react-icons/fa";
-import { UI_TO_API_STATUS, PAGE_SIZE } from "../barberClientConstants";
+import { UI_TO_API_STATUS } from "../barberClientConstants";
 import { getInitials } from "../barberClientUtils";
+import Loading from "../../../../common/Loading/Loading";
 import Pager from "./Pager";
 
 const formatDate = (dateStr) => {
@@ -15,15 +16,15 @@ const formatDate = (dateStr) => {
 const ClientsList = ({
   pageError,
   loading,
-  pageSlice,
-  filteredCount,
-  pageSafe,
+  clients,
+  count,
+  page,
+  next,
+  previous,
   totalPages,
-  apptsByClient,
   viewMode,
   onOpenModal,
   onPageChange,
-  getLastVisit,
   onOpenHistory,
 }) => {
   if (pageError) {
@@ -31,16 +32,10 @@ const ClientsList = ({
   }
 
   if (loading) {
-    return (
-      <div className="barberclient__skeletonList">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="barberclient__skeletonCard" />
-        ))}
-      </div>
-    );
+    return <Loading message="Загрузка клиентов..." />;
   }
 
-  if (!pageSlice.length) {
+  if (!clients || clients.length === 0) {
     return (
       <div className="barberclient__empty">
         Ничего не найдено
@@ -49,7 +44,6 @@ const ClientsList = ({
   }
 
   const renderCard = (client) => {
-    const appts = apptsByClient.get(client.id) || [];
     const statusCode = UI_TO_API_STATUS[client.status] || "active";
 
     const cardClass = `barberclient__card ${
@@ -71,7 +65,6 @@ const ClientsList = ({
             <h4 className="barberclient__cardName">{client.fullName || "—"}</h4>
             <div className="barberclient__cardMeta">
               <span className="barberclient__cardPhone">{client.phone || "—"}</span>
-              <span className="barberclient__cardVisits">Визитов: {appts.length}</span>
             </div>
           </div>
         </div>
@@ -98,13 +91,11 @@ const ClientsList = ({
           <tr>
             <th>Клиент</th>
             <th>Телефон</th>
-            <th>Визитов</th>
             <th>История</th>
           </tr>
         </thead>
         <tbody>
-          {pageSlice.map((client) => {
-            const appts = apptsByClient.get(client.id) || [];
+          {clients.map((client) => {
             const statusCode = UI_TO_API_STATUS[client.status] || "active";
 
             const rowClass = `barberclient__row ${
@@ -127,7 +118,6 @@ const ClientsList = ({
                   </div>
                 </td>
                 <td>{client.phone || "—"}</td>
-                <td className="barberclient__cellVisits">{appts.length}</td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
@@ -151,15 +141,17 @@ const ClientsList = ({
     <>
       {viewMode === "cards" ? (
         <div className="barberclient__list">
-          {pageSlice.map(renderCard)}
+          {clients.map(renderCard)}
         </div>
       ) : (
         renderTable()
       )}
       <Pager
-        filteredCount={filteredCount}
-        page={pageSafe}
+        count={count}
+        page={page}
         totalPages={totalPages}
+        next={next}
+        previous={previous}
         onChange={onPageChange}
       />
     </>

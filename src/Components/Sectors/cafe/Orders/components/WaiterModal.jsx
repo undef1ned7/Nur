@@ -80,10 +80,9 @@ const WaiterModal = ({
                                 onChange={(e) =>
                                     setForm((f) => ({ ...f, table: e.target.value }))
                                 }
-                                required
                                 disabled={saving}
                             >
-                                {!isEditing && <option value="">— Выберите стол —</option>}
+                                <option value="">С собой</option>
                                 {tables
                                     .filter(
                                         (t) =>
@@ -442,7 +441,7 @@ const WaiterModal = ({
                         <button
                             type="submit"
                             className="cafeOrders__btn cafeOrders__btn--primary"
-                            disabled={saving || !form.table || !form.items.length}
+                            disabled={saving || !form.items.length}
                         >
                             {saving ? "Сохраняем…" : isEditing ? "Сохранить" : "Добавить"}
                         </button>

@@ -1,5 +1,4 @@
-import React, { useMemo } from "react";
-import { FaSearch, FaCheckCircle, FaClock, FaPlus } from "react-icons/fa";
+import { FaSearch, FaCheckCircle, FaClock, FaPlus, FaUtensils } from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
 
 const CookHeader = ({
@@ -12,7 +11,7 @@ const CookHeader = ({
   statusOptions,
   onCreateKitchen,
 }) => {
-
+  
   return (
     <>
       <div className="cafeCook__header">
@@ -84,6 +83,16 @@ const CookHeader = ({
           aria-selected={activeTab === "history" ? "true" : "false"}
         >
           <FaCheckCircle /> История
+        </button>
+
+        <button
+          className={`cafeCook__tab ${activeTab === "kitchens" ? "cafeCook__tab--active" : ""}`}
+          onClick={() => setActiveTab("kitchens")}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "kitchens" ? "true" : "false"}
+        >
+          <FaUtensils /> Кухни
         </button>
       </div>
     </>

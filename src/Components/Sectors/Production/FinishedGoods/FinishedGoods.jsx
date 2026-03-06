@@ -12,7 +12,6 @@ import { useDispatch, useSelector } from "react-redux";
 
 /* ---- Thunks / Creators ---- */
 import {
-  consumeItemsMake,
   createProductAsync,
   deleteProductAsync,
   fetchBrandsAsync,
@@ -52,6 +51,7 @@ import { useClient } from "../../../../store/slices/ClientSlice";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
 import { Checkbox, TextField } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { getEmployees } from "../../../../store/creators/departmentCreators";
 import { useDepartments } from "../../../../store/slices/departmentSlice";
 import MarriageModal from "../../../Deposits/Sklad/MarriageModal";
@@ -68,6 +68,8 @@ import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import usePlurize from "../../../../hooks/usePlurize";
 import useResize from "../../../../hooks/useResize";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
+import DataContainer from "../../../common/DataContainer/DataContainer";
 
 /* ============================================================
    Модалка добавления товара (Redux, без localStorage)
@@ -102,7 +104,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     price: "",
     quantity: "", // ВАЖНО: храним как строку для удобного двустороннего биндинга
     client: "",
-    purchase_price: "",
+    purchase_price: '0',
     stock: false, // Акционный товар
   });
 
@@ -229,6 +231,15 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       return;
     }
 
+    // Поставщик: при смене/очистке сбрасываем зависимые поля долга/предоплаты
+    if (name === "client") {
+      setProduct((prev) => ({ ...prev, [name]: value }));
+      setDealStatus("");
+      setDebtMonths("");
+      setPrepayment("");
+      return;
+    }
+
     // quantity и price удобно хранить строкой (пустое значение тоже валидно)
     if (name === "quantity" || name === "price" || name === "purchase_price") {
       setProduct((prev) => ({ ...prev, [name]: value }));
@@ -282,20 +293,22 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       );
     } else {
       // ДОБАВЛЕНИЕ: всегда разрешено
-      // При добавлении ставим количество как у товара, или "1" если количество товара не указано
-      const syncedQty = String(product.quantity || "1");
+      // ВАЖНО: quantity в recipeItems — это расход сырья НА 1 ЕДИНИЦУ товара (qty_per_unit),
+      // а общий расход считается как qty_per_unit × product.quantity.
+      // Поэтому по умолчанию ставим "1", а не product.quantity (иначе получится product.quantity²).
+      const perUnitQty = "1";
       const material = (Array.isArray(materials) ? materials : []).find(
         (m) => m && m.id != null && String(m.id) === key
       );
 
       // Добавляем сырье (всегда разрешено, даже если материал не найден в списке)
       // Сохраняем materialId как есть (может быть строкой или UUID), но при сравнении всегда используем строку
-      setRecipeItems((prev) => [...prev, { materialId, quantity: syncedQty }]);
+      setRecipeItems((prev) => [...prev, { materialId, quantity: perUnitQty }]);
 
       // Предупреждаем, если сырья может быть недостаточно (но НЕ блокируем добавление)
       if (material) {
         const availableQty = Number(material.quantity || 0);
-        const requestedQty = Number(syncedQty || 0);
+        const requestedQty = Number(perUnitQty || 0);
         const units = Number(product.quantity || 0);
         const totalNeeded = requestedQty * units;
 
@@ -362,13 +375,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     );
   }, []);
 
-  // НОВОЕ: авто-синхронизация количества сырья при изменении количества товара
-  useEffect(() => {
-    const syncedQty = String(product.quantity ?? "");
-    setRecipeItems((prev) =>
-      prev.map((it) => ({ ...it, quantity: syncedQty }))
-    );
-  }, [product.quantity]);
+  // ВАЖНО: recipeItems[].quantity — это qty_per_unit (расход на 1 ед. товара),
+  // поэтому НЕ синхронизируем его с количеством готового товара.
 
   // валидатор товара
   const validateProduct = useCallback(() => {
@@ -385,6 +393,41 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     if (missed.length) {
       error("Пожалуйста, заполните все обязательные поля.");
       return false;
+    }
+
+    // Если выбран поставщик — тип оплаты обязателен
+    if (product.client && !dealStatus?.trim()) {
+      error("При выбранном поставщике укажите тип оплаты.");
+      return false;
+    }
+
+    // Долги: срок долга обязателен (только если выбран поставщик)
+    if (product.client && dealStatus === "Долги") {
+      if (!debtMonths || Number(debtMonths) < 1) {
+        error("Укажите срок долга.");
+        return false;
+      }
+    }
+
+    // Предоплата: сумма предоплаты и срок долга обязательны (только если выбран поставщик)
+    if (product.client && dealStatus === "Предоплата") {
+      if (!prepayment || Number(prepayment) < 0) {
+        error("Укажите сумму предоплаты.");
+        return false;
+      }
+      // ВАЖНО: мы покупаем у поставщика => все расчёты идут по закупочной цене
+      const purchaseTotal =
+        Number(product.purchase_price || 0) * Number(product.quantity || 0);
+      if (Number(prepayment) > purchaseTotal) {
+        error(
+          `Предоплата не может быть больше суммы закупки (${purchaseTotal.toFixed(2)}).`
+        );
+        return false;
+      }
+      if (!debtMonths || Number(debtMonths) < 1) {
+        error("Укажите срок долга.");
+        return false;
+      }
     }
 
     // Проверка количества сырья
@@ -417,7 +460,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     }
 
     return true;
-  }, [product, recipeItems, materials]);
+  }, [product, recipeItems, materials, dealStatus, debtMonths, prepayment]);
 
   // submit
   const handleSubmit = async () => {
@@ -425,13 +468,13 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     if (!validateProduct()) return;
 
     // рецепт для списания: [{id, qty_per_unit}]
-    // ВАЖНО: сейчас quantity у сырья = общему количеству товара,
-    // если нужно списывать на весь объём, можно интерпретировать как "на 1 ед."
-    // и умножать на units (ниже уже есть логика units).
+    // API допускает не более 3 знаков после запятой — округляем, чтобы избежать 84072.79999999999
+    const roundTo3 = (v) =>
+      Math.round(Number(v) * 1000) / 1000;
     const recipe = recipeItems
       .map((it) => ({
         id: String(it.materialId),
-        qty_per_unit: Number(it.quantity || 0),
+        qty_per_unit: roundTo3(it.quantity || 0),
       }))
       .filter((r) => r.qty_per_unit > 0);
 
@@ -443,18 +486,16 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
     setCreating(true);
     try {
-      // списание сырья
-      if (recipe.length && units > 0) {
-        await dispatch(consumeItemsMake({ recipe, units })).unwrap();
-      }
-
       if (product.client !== "") {
+        // ВАЖНО: расчёт суммы для поставщика — по закупочной цене (а не по розничной)
+        const purchaseTotal =
+          Number(product.purchase_price || 0) * Number(product.quantity || 0);
         const result = await dispatch(
           createDeal({
             clientId: product.client,
             title: dealStatus, // заголовок
             statusRu: dealStatus, // маппинг в kind внутри thunk
-            amount: product.price * product.quantity,
+            amount: purchaseTotal,
             // prepayment только при "Предоплата"
             prepayment:
               dealStatus === "Предоплата" ? Number(prepayment) : undefined,
@@ -478,18 +519,24 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
         client: product.client, // id поставщика
         purchase_price: product.purchase_price,
         stock: Boolean(product.stock), // Акционный товар
+        // Новый формат (см. docs/PRODUCTION_FINISHED_GOODS_RECIPE_AND_AUTO_CONSUMPTION_API.md)
+        // Backend сам списывает/возвращает сырьё по дельте.
+        recipe,
+        // Оставляем item_make для совместимости/поиска на бэке (можно удалить, когда бэк перейдёт полностью на recipe)
         item_make,
       };
 
       const created = await dispatch(createProductAsync(payload)).unwrap();
-
-      await dispatch(
-        addCashFlows({
-          ...cashData,
-          amount: (product?.purchase_price * product?.quantity).toFixed(2),
-          source_cashbox_flow_id: created.id,
-        })
-      ).unwrap();
+      const amount = (product?.purchase_price * product?.quantity).toFixed(2);
+      if (amount > 0) {
+        await dispatch(
+          addCashFlows({
+            ...cashData,
+            amount: amount,
+            source_cashbox_flow_id: created.id,
+          })
+        ).unwrap();
+      }
 
       // Загрузка изображений (после создания товара)
       try {
@@ -521,19 +568,24 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     } catch (err) {
       setCreating(false);
       setCreateError(err);
+      console.log('ERERERRR', err);
+
       error(
-        `Ошибка при добавлении товара: ${err?.message || "неизвестная ошибка"}`
+        validateResErrors(err, 'Ошибка при добавлении товара')
       );
     }
   };
 
   // актуализируем данные по кассе при изменениях
   useEffect(() => {
+    const purchaseTotal =
+      Number(product.purchase_price || 0) * Number(product.quantity || 0);
     setCashData((prev) => ({
       ...prev,
       cashbox: selectCashBox,
       name: product.name,
-      amount: product.price,
+      // по смыслу это закупка (расход) => сумма по закупочной цене
+      amount: purchaseTotal ? purchaseTotal.toFixed(2) : "",
     }));
   }, [product, selectCashBox]);
 
@@ -551,378 +603,727 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
             <X size={20} />
           </button>
         </div>
-
-        {createError && (
-          <p className="finished-goods-add-modal__error-message">
-            Ошибка добавления: {createError.message || "ошибка"}
-          </p>
-        )}
-
-        {/* Основные поля */}
-        <div className="finished-goods-add-modal__section">
-          <label>Название *</label>
-          <input
-            name="name"
-            className="finished-goods-add-modal__input"
-            placeholder="Например, Буханка хлеба"
-            value={product.name}
-            onChange={onProductChange}
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Штрих код *</label>
-          <input
-            name="barcode"
-            className="finished-goods-add-modal__input"
-            placeholder="Штрих код"
-            value={product.barcode}
-            onChange={onProductChange}
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Бренд *</label>
-          <select
-            name="brand_name"
-            className="finished-goods-add-modal__input"
-            value={product.brand_name}
-            onChange={onProductChange}
-            required
-          >
-            <option value="">-- Выберите бренд --</option>
-            {categories &&
-              brands?.map((b) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Категория *</label>
-          <select
-            name="category_name"
-            className="finished-goods-add-modal__input"
-            value={product.category_name}
-            onChange={onProductChange}
-            required
-          >
-            <option value="">-- Выберите категорию --</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Поставщик + быстрое создание */}
-        <div className="finished-goods-add-modal__section">
-          <label>Поставщик *</label>
-          <select
-            name="client"
-            className="finished-goods-add-modal__input"
-            value={product.client}
-            onChange={onProductChange}
-            required
-          >
-            <option value="">-- Выберите поставщика --</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            className="create-client"
-            onClick={() => setShowSupplierForm((v) => !v)}
-          >
-            {showSupplierForm ? "Отменить" : "Создать поставщика"}
-          </button>
-
-          {showSupplierForm && (
-            <form
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                rowGap: "10px",
-              }}
-              onSubmit={createSupplier}
-            >
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                placeholder="ФИО"
-                name="full_name"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="llc"
-                placeholder="ОсОО"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="inn"
-                placeholder="ИНН"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="okpo"
-                placeholder="ОКПО"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="score"
-                placeholder="Р/СЧЁТ"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="bik"
-                placeholder="БИК"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="address"
-                placeholder="Адрес"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="text"
-                name="phone"
-                placeholder="Телефон"
-              />
-              <input
-                className="finished-goods-add-modal__input"
-                onChange={onSupplierChange}
-                type="email"
-                name="email"
-                placeholder="Почта"
-              />
-              <div style={{ display: "flex", columnGap: "10px" }}>
-                <button
-                  className="create-client"
-                  type="button"
-                  onClick={() => setShowSupplierForm(false)}
-                >
-                  Отмена
-                </button>
-                <button className="create-client">Создать</button>
-              </div>
-            </form>
+        <form className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
+          {createError && (
+            <p className="finished-goods-add-modal__error-message">
+              Ошибка добавления: {createError.message || "ошибка"}
+            </p>
           )}
-        </div>
 
-        <div className="finished-goods-add-modal__section">
-          <label>Тип оплаты *</label>
-          <select
-            name="category_name"
-            className="finished-goods-add-modal__input"
-            value={dealStatus}
-            onChange={(e) => setDealStatus(e.target.value)}
-            required
-          >
-            <option value="">-- Выберите тип оплаты --</option>
-            {DEAL_STATUS_RU?.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {dealStatus === "Долги" && (
+          {/* Основные поля */}
           <div className="finished-goods-add-modal__section">
-            <label>Срок долга</label>
+            <label>Название *</label>
             <input
+              name="name"
               className="finished-goods-add-modal__input"
-              type="number"
-              min={1}
-              step={1}
-              value={debtMonths}
-              onChange={(e) => setDebtMonths(e.target.value)}
-              placeholder="Например, 6"
+              placeholder="Например, Буханка хлеба"
+              value={product.name}
+              onChange={onProductChange}
+              required
             />
           </div>
-        )}
 
-        {dealStatus === "Предоплата" && (
-          <>
-            <div className="finished-goods-add-modal__section">
-              <label>Предоплата</label>
-              <input
-                className="finished-goods-add-modal__input"
-                type="number"
-                min={1}
-                step={1}
-                value={prepayment}
-                onChange={(e) => setPrepayment(e.target.value)}
-                placeholder="Сумма предоплаты"
-              />
-            </div>
-            <div className="finished-goods-add-modal__section">
-              <label>Срок долга</label>
-              <input
-                className="finished-goods-add-modal__input"
-                type="number"
-                min={1}
-                step={1}
-                value={debtMonths}
-                onChange={(e) => setDebtMonths(e.target.value)}
-                placeholder="Например, 6"
-              />
-            </div>
-          </>
-        )}
-
-        {/* Цена и количество */}
-        <div className="finished-goods-add-modal__section">
-          <label>Розничная цена *</label>
-          <input
-            type="number"
-            name="price"
-            className="finished-goods-add-modal__input"
-            placeholder="120"
-            value={product.price}
-            onChange={onProductChange}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-
-        {/* Фото (динамические) */}
-
-        <div className="finished-goods-add-modal__section">
-          <label>Закупочная цена *</label>
-          <input
-            type="number"
-            name="purchase_price"
-            className="finished-goods-add-modal__input"
-            placeholder="110"
-            value={product.purchase_price}
-            onChange={onProductChange}
-            min="0"
-            step="0.01"
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label>Количество *</label>
-          <input
-            type="number"
-            name="quantity"
-            className="finished-goods-add-modal__input"
-            placeholder="100"
-            value={product.quantity}
-            onChange={onProductChange}
-            min="0"
-            required
-          />
-        </div>
-
-        <div className="finished-goods-add-modal__section">
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              cursor: "pointer",
-            }}
-          >
+          <div className="finished-goods-add-modal__section">
+            <label>Штрих код *</label>
             <input
-              type="checkbox"
-              name="stock"
-              checked={product.stock}
+              name="barcode"
+              className="finished-goods-add-modal__input"
+              placeholder="Штрих код"
+              value={product.barcode}
               onChange={onProductChange}
+              required
+            />
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label>Бренд *</label>
+            <select
+              name="brand_name"
+              className="finished-goods-add-modal__input"
+              value={product.brand_name}
+              onChange={onProductChange}
+              required
+            >
+              <option value="">-- Выберите бренд --</option>
+              {categories &&
+                brands?.map((b) => (
+                  <option key={b.id} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label>Категория *</label>
+            <select
+              name="category_name"
+              className="finished-goods-add-modal__input"
+              value={product.category_name}
+              onChange={onProductChange}
+              required
+            >
+              <option value="">-- Выберите категорию --</option>
+              {categories?.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Поставщик + быстрое создание */}
+          <div className="finished-goods-add-modal__section">
+            <label>Поставщик</label>
+            <select
+              name="client"
+              className="finished-goods-add-modal__input"
+              value={product.client}
+              onChange={onProductChange}
+            >
+              <option value="">-- Выберите поставщика --</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.full_name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              className="create-client"
+              onClick={() => setShowSupplierForm((v) => !v)}
+            >
+              {showSupplierForm ? "Отменить" : "Создать поставщика"}
+            </button>
+
+            {showSupplierForm && (
+              <form
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  rowGap: "10px",
+                }}
+                onSubmit={createSupplier}
+              >
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  placeholder="ФИО"
+                  name="full_name"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="llc"
+                  placeholder="ОсОО"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="inn"
+                  placeholder="ИНН"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="okpo"
+                  placeholder="ОКПО"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="score"
+                  placeholder="Р/СЧЁТ"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="bik"
+                  placeholder="БИК"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="address"
+                  placeholder="Адрес"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="text"
+                  name="phone"
+                  placeholder="Телефон"
+                />
+                <input
+                  className="finished-goods-add-modal__input"
+                  onChange={onSupplierChange}
+                  type="email"
+                  name="email"
+                  placeholder="Почта"
+                />
+                <div style={{ display: "flex", columnGap: "10px" }}>
+                  <button
+                    className="create-client"
+                    type="button"
+                    onClick={() => setShowSupplierForm(false)}
+                  >
+                    Отмена
+                  </button>
+                  <button className="create-client">Создать</button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {product.client && (
+            <>
+              <div className="finished-goods-add-modal__section">
+                <label>Тип оплаты *</label>
+                <select
+                  name="category_name"
+                  className="finished-goods-add-modal__input"
+                  value={dealStatus}
+                  onChange={(e) => setDealStatus(e.target.value)}
+                  required
+                >
+                  <option value="">-- Выберите тип оплаты --</option>
+                  {DEAL_STATUS_RU?.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {dealStatus === "Долги" && (
+                <div className="finished-goods-add-modal__section">
+                  <label>Срок долга *</label>
+                  <input
+                    className="finished-goods-add-modal__input"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={debtMonths}
+                    onChange={(e) => setDebtMonths(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    placeholder="Например, 6"
+                    required
+                  />
+                </div>
+              )}
+
+              {dealStatus === "Предоплата" && (
+                <>
+                  <div className="finished-goods-add-modal__section">
+                    <label>Предоплата *</label>
+                    <input
+                      className="finished-goods-add-modal__input"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={prepayment}
+                      onChange={(e) => setPrepayment(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="Сумма предоплаты"
+                      required
+                    />
+                  </div>
+                  <div className="finished-goods-add-modal__section">
+                    <label>Срок долга *</label>
+                    <input
+                      className="finished-goods-add-modal__input"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={debtMonths}
+                      onChange={(e) => setDebtMonths(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      placeholder="Например, 6"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Цена и количество */}
+          <div className="finished-goods-add-modal__section">
+            <label>Розничная цена *</label>
+            <input
+              type="number"
+              name="price"
+              className="finished-goods-add-modal__input"
+              placeholder="120"
+              value={product.price}
+              onChange={onProductChange}
+              onWheel={(e) => e.currentTarget.blur()}
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          {/* Фото (динамические) */}
+
+          <div className="finished-goods-add-modal__section">
+            <label>Закупочная цена *</label>
+            <input
+              type="number"
+              name="purchase_price"
+              className="finished-goods-add-modal__input"
+              placeholder="110"
+              value={product.purchase_price}
+              onChange={onProductChange}
+              onWheel={(e) => e.currentTarget.blur()}
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label>Количество *</label>
+            <input
+              type="number"
+              name="quantity"
+              className="finished-goods-add-modal__input"
+              placeholder="100"
+              value={product.quantity}
+              onChange={onProductChange}
+              onWheel={(e) => e.currentTarget.blur()}
+              min="0"
+              required
+            />
+          </div>
+
+          <div className="finished-goods-add-modal__section">
+            <label
               style={{
-                width: "18px",
-                height: "18px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
                 cursor: "pointer",
               }}
-            />
-            <span>Акционный товар</span>
-          </label>
-        </div>
-        <div className="finished-goods-add-modal__section">
-          <label>Фото товара</label>
-          <button
-            type="button"
-            className="create-client"
-            onClick={addImageSlot}
-            style={{ marginBottom: 10 }}
-          >
-            + Добавить картинку
-          </button>
-          {images.length > 0 && (
+            >
+              <input
+                type="checkbox"
+                name="stock"
+                checked={product.stock}
+                onChange={onProductChange}
+                style={{
+                  width: "18px",
+                  height: "18px",
+                  cursor: "pointer",
+                }}
+              />
+              <span>Акционный товар</span>
+            </label>
+          </div>
+          <div className="finished-goods-add-modal__section">
+            <label>Фото товара</label>
+            <button
+              type="button"
+              className="create-client"
+              onClick={addImageSlot}
+              style={{ marginBottom: 10 }}
+            >
+              + Добавить картинку
+            </button>
+            {images.length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr",
+                  gap: 12,
+                }}
+              >
+                {images.map((im, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: "1px dashed #ccc",
+                      borderRadius: 8,
+                      padding: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: 6,
+                        gap: 8,
+                      }}
+                    >
+                      <span style={{ opacity: 0.8 }}>Фото #{idx + 1}</span>
+                      <div
+                        style={{ display: "flex", alignItems: "center", gap: 10 }}
+                      >
+                        <label
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="primary_image"
+                            checked={Boolean(im.is_primary)}
+                            onChange={() => handlePrimarySelect(idx)}
+                          />
+                          Главная
+                        </label>
+                        <button
+                          type="button"
+                          className="select-materials__remove"
+                          onClick={() => removeImageSlot(idx)}
+                          aria-label="Удалить изображение"
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 8,
+                            border: "1px solid var(--border,#444)",
+                            background: "transparent",
+                            color: "inherit",
+                            cursor: "pointer",
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                    {/* <input
+                    type="file"
+                    accept="image/*"
+                    className="finished-goods-add-modal__input"
+                    onChange={(e) =>
+                      handleImageChange(idx, e.target.files?.[0] || null)
+                    }
+                  /> */}
+                    <FileInput
+                      onChange={(e) =>
+                        handleImageChange(idx, e.target.files?.[0] || null)
+                      }
+                      accept={`image/*`}
+                      name="image"
+                      label="Image"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Состав (сырьё) */}
+          <div className="finished-goods-add-modal__section">
             <div
+              className="select-materials__head"
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
                 gap: 12,
               }}
             >
-              {images.map((im, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    border: "1px dashed #ccc",
-                    borderRadius: 8,
-                    padding: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: 6,
-                      gap: 8,
-                    }}
-                  >
-                    <span style={{ opacity: 0.8 }}>Фото #{idx + 1}</span>
+              <label>Состав (сырьё)</label>
+              <button
+                type="button"
+                className="create-client"
+                onClick={() => setMaterialsOpen((prev) => !prev)}
+                disabled={materialsLoading}
+              >
+                {materialsOpen
+                  ? "Скрыть список"
+                  : materialsLoading
+                    ? "Загрузка…"
+                    : "+ Добавить сырьё"}
+              </button>
+            </div>
+
+            {materialsOpen && (
+              <div
+                className="select-materials__head-search"
+                style={{ marginTop: 8 }}
+              >
+                <input
+                  className="finished-goods-add-modal__input"
+                  name="materialQuery"
+                  placeholder="Поиск сырья"
+                  value={materialQuery}
+                  onChange={(e) => setMaterialQuery(e.target.value)}
+                />
+              </div>
+            )}
+
+            {materialsOpen && (
+              <div
+                className="select-materials__check active"
+                style={{
+                  marginTop: 8,
+                  position: "relative",
+                  maxHeight: 260,
+                  overflow: "auto",
+                  border: "1px solid var(--border,#333)",
+                  borderRadius: 8,
+                  padding: 8,
+                }}
+              >
+                {
+                  filteredMaterials
+                    ?.map((m) => {
+                      try {
+                        const materialId = m.id;
+                        const materialKey = String(materialId);
+                        const checked = recipeMap.has(materialKey);
+                        const qty = recipeMap.get(materialKey) ?? "";
+                        const availableQty = Number(m.quantity || 0);
+                        const requestedQty = Number(qty || 0);
+                        const units = Number(product.quantity || 0);
+                        const totalNeeded = requestedQty * units;
+                        const isInsufficient =
+                          checked && totalNeeded > availableQty;
+
+                        return (
+                          <div
+                            key={materialId}
+                            className="select-materials__item"
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              // Не переключать при клике по полю количества
+                              if (e.target.closest?.(".MuiTextField-root")) return;
+                              toggleRecipeItem(materialId);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                if (e.target.closest?.(".MuiTextField-root")) return;
+                                toggleRecipeItem(materialId);
+                              }
+                            }}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "auto 1fr 160px",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "6px 4px",
+                              backgroundColor: isInsufficient
+                                ? "#ffebee"
+                                : "transparent",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <Checkbox
+                              icon={
+                                <CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />
+                              }
+                              checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
+                              checked={checked}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                // Даём клику всплыть до строки — переключение через onClick строки
+                                // (на десктопе клик часто попадает по иконке, а не по input)
+                              }}
+                              sx={{
+                                color: "#000",
+                                "&.Mui-checked": { color: "#f9cf00" },
+                                pointerEvents: "auto",
+                              }}
+                            />
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 2,
+                              }}
+                            >
+                              <p
+                                title={m.name || m.title || `#${materialId}`}
+                                style={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  margin: 0,
+                                }}
+                              >
+                                {m.name || m.title || `#${materialId}`}
+                              </p>
+                              <small
+                                style={{
+                                  fontSize: "11px",
+                                  opacity: 0.7,
+                                  color: isInsufficient ? "#d32f2f" : "inherit",
+                                }}
+                              >
+                                Доступно: {availableQty}
+                                {checked && units > 0 && (
+                                  <span
+                                    style={{
+                                      color: isInsufficient ? "#d32f2f" : "#666",
+                                    }}
+                                  >
+                                    {" "}
+                                    | Нужно: {totalNeeded}
+                                    {isInsufficient && " ⚠️"}
+                                  </span>
+                                )}
+                              </small>
+                            </div>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <TextField
+                                size="small"
+                                placeholder="Кол-во"
+                                type="number"
+                                inputProps={{
+                                  step: "0.0001",
+                                  min: "0",
+                                  max: units > 0 ? availableQty / units : undefined,
+                                  onWheel: (e) => e.currentTarget.blur(),
+                                }}
+                                disabled={!checked}
+                                value={qty}
+                                onChange={(e) =>
+                                  changeRecipeQty(materialId, e.target.value)
+                                }
+                                error={isInsufficient}
+                                helperText={
+                                  isInsufficient
+                                    ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
+                                    : ""
+                                }
+                              />
+                            </div>
+                          </div>
+                        );
+                      } catch (error) {
+                        // Пропускаем проблемный материал, но не блокируем остальные
+                        return null;
+                      }
+                    })
+                }
+                {(!filteredMaterials || filteredMaterials.length === 0) &&
+                  !materialsLoading && (
+                    <div style={{ padding: 8, opacity: 0.7 }}>
+                      Ничего не найдено…
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {recipeItems.length > 0 && (
+              <div
+                className="select-materials__selected"
+                style={{ marginTop: 10 }}
+              >
+                {recipeItems.map((it) => {
+                  const mat = (Array.isArray(materials) ? materials : []).find(
+                    (m) => String(m.id) === String(it.materialId)
+                  );
+                  const availableQty = Number(mat?.quantity || 0);
+                  const requestedQty = Number(it.quantity || 0);
+                  const units = Number(product.quantity || 0);
+                  const totalNeeded = requestedQty * units;
+                  const isInsufficient = totalNeeded > availableQty;
+
+                  return (
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                      key={it.materialId}
+                      className="select-materials__selected-item"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 160px 40px",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "6px 0",
+                        borderBottom: "1px dashed var(--border,#444)",
+                        backgroundColor: isInsufficient
+                          ? "#ffebee"
+                          : "transparent",
+                      }}
                     >
-                      <label
+                      <div
                         style={{
                           display: "flex",
-                          alignItems: "center",
-                          gap: 6,
+                          flexDirection: "column",
+                          gap: 2,
                         }}
                       >
-                        <input
-                          type="radio"
-                          name="primary_image"
-                          checked={Boolean(im.is_primary)}
-                          onChange={() => handlePrimarySelect(idx)}
-                        />
-                        Главная
-                      </label>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <Checkbox
+                            checked
+                            onChange={() => removeRecipeItem(it.materialId)}
+                            sx={{
+                              color: "#000",
+                              "&.Mui-checked": { color: "#f9cf00" },
+                            }}
+                          />
+                          <p style={{ margin: 0 }}>
+                            {mat?.name ?? mat?.title ?? `ID ${it.materialId}`}
+                          </p>
+                        </div>
+                        <small
+                          style={{
+                            fontSize: "11px",
+                            opacity: 0.7,
+                            color: isInsufficient ? "#d32f2f" : "inherit",
+                            marginLeft: "40px",
+                          }}
+                        >
+                          Доступно: {availableQty}
+                          {units > 0 && (
+                            <span
+                              style={{
+                                color: isInsufficient ? "#d32f2f" : "#666",
+                              }}
+                            >
+                              {" "}
+                              | Нужно: {totalNeeded}
+                              {isInsufficient && " ⚠️ Недостаточно!"}
+                            </span>
+                          )}
+                        </small>
+                      </div>
+                      <TextField
+                        size="small"
+                        placeholder="Кол-во"
+                        type="number"
+                        inputProps={{
+                          step: "0.0001",
+                          min: "0",
+                          max: availableQty / (units || 1),
+                          onWheel: (e) => e.currentTarget.blur(),
+                        }}
+                        value={it.quantity}
+                        onChange={(e) =>
+                          changeRecipeQty(it.materialId, e.target.value)
+                        }
+                        error={isInsufficient}
+                        helperText={
+                          isInsufficient
+                            ? `Нужно ${totalNeeded}, есть ${availableQty}`
+                            : ""
+                        }
+                      />
                       <button
                         type="button"
                         className="select-materials__remove"
-                        onClick={() => removeImageSlot(idx)}
-                        aria-label="Удалить изображение"
+                        onClick={() => removeRecipeItem(it.materialId)}
+                        aria-label="Удалить"
                         style={{
                           width: 36,
                           height: 36,
@@ -936,348 +1337,31 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                         ×
                       </button>
                     </div>
-                  </div>
-                  {/* <input
-                    type="file"
-                    accept="image/*"
-                    className="finished-goods-add-modal__input"
-                    onChange={(e) =>
-                      handleImageChange(idx, e.target.files?.[0] || null)
-                    }
-                  /> */}
-                  <FileInput
-                    onChange={(e) =>
-                      handleImageChange(idx, e.target.files?.[0] || null)
-                    }
-                    accept={`image/*`}
-                    name="image"
-                    label="Image"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Состав (сырьё) */}
-        <div className="finished-goods-add-modal__section">
-          <div
-            className="select-materials__head"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <label>Состав (сырьё)</label>
-            <button
-              type="button"
-              className="create-client"
-              onClick={() => setMaterialsOpen((prev) => !prev)}
-              disabled={materialsLoading}
-            >
-              {materialsOpen
-                ? "Скрыть список"
-                : materialsLoading
-                  ? "Загрузка…"
-                  : "+ Добавить сырьё"}
-            </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {materialsOpen && (
-            <div
-              className="select-materials__head-search"
-              style={{ marginTop: 8 }}
+          {/* Кнопки */}
+          <div className="finished-goods-add-modal__footer">
+            <button
+              className="finished-goods-add-modal__cancel"
+              onClick={onClose}
+              disabled={creating}
             >
-              <input
-                className="finished-goods-add-modal__input"
-                name="materialQuery"
-                placeholder="Поиск сырья"
-                value={materialQuery}
-                onChange={(e) => setMaterialQuery(e.target.value)}
-              />
-            </div>
-          )}
-
-          {materialsOpen && (
-            <div
-              className="select-materials__check active"
-              style={{
-                marginTop: 8,
-                position: "relative",
-                maxHeight: 260,
-                overflow: "auto",
-                border: "1px solid var(--border,#333)",
-                borderRadius: 8,
-                padding: 8,
-              }}
+              Отмена
+            </button>
+            <button
+              className="finished-goods-add-modal__save"
+              onClick={handleSubmit}
+              disabled={creating || materialsLoading}
             >
-              {
-                filteredMaterials
-                  ?.map((m) => {
-                    try {
-                      const materialId = m.id;
-                      const materialKey = String(materialId);
-                      const checked = recipeMap.has(materialKey);
-                      const qty = recipeMap.get(materialKey) ?? "";
-                      const availableQty = Number(m.quantity || 0);
-                      const requestedQty = Number(qty || 0);
-                      const units = Number(product.quantity || 0);
-                      const totalNeeded = requestedQty * units;
-                      const isInsufficient =
-                        checked && totalNeeded > availableQty;
+              {creating ? "Добавление..." : "Добавить"}
+            </button>
+          </div>
+        </form>
 
-                      return (
-                        <div
-                          key={materialId}
-                          className="select-materials__item"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "auto 1fr 160px",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 4px",
-                            backgroundColor: isInsufficient
-                              ? "#ffebee"
-                              : "transparent",
-                          }}
-                        >
-                          <Checkbox
-                            icon={
-                              <CheckBoxOutlineBlankIcon sx={{ fontSize: 28 }} />
-                            }
-                            checkedIcon={<CheckBoxIcon sx={{ fontSize: 28 }} />}
-                            checked={checked}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleRecipeItem(materialId);
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
-                            sx={{
-                              color: "#000",
-                              "&.Mui-checked": { color: "#f9cf00" },
-                            }}
-                          />
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 2,
-                            }}
-                          >
-                            <p
-                              title={m.name || m.title || `#${materialId}`}
-                              style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                margin: 0,
-                              }}
-                            >
-                              {m.name || m.title || `#${materialId}`}
-                            </p>
-                            <small
-                              style={{
-                                fontSize: "11px",
-                                opacity: 0.7,
-                                color: isInsufficient ? "#d32f2f" : "inherit",
-                              }}
-                            >
-                              Доступно: {availableQty}
-                              {checked && units > 0 && (
-                                <span
-                                  style={{
-                                    color: isInsufficient ? "#d32f2f" : "#666",
-                                  }}
-                                >
-                                  {" "}
-                                  | Нужно: {totalNeeded}
-                                  {isInsufficient && " ⚠️"}
-                                </span>
-                              )}
-                            </small>
-                          </div>
-                          <TextField
-                            size="small"
-                            placeholder="Кол-во"
-                            type="number"
-                            inputProps={{
-                              step: "0.0001",
-                              min: "0",
-                              max: units > 0 ? availableQty / units : undefined,
-                            }}
-                            disabled={!checked}
-                            value={qty}
-                            onChange={(e) =>
-                              changeRecipeQty(materialId, e.target.value)
-                            }
-                            error={isInsufficient}
-                            helperText={
-                              isInsufficient
-                                ? `Недостаточно! Нужно ${totalNeeded}, доступно ${availableQty}`
-                                : ""
-                            }
-                          />
-                        </div>
-                      );
-                    } catch (error) {
-                      // Пропускаем проблемный материал, но не блокируем остальные
-                      return null;
-                    }
-                  })
-              }
-              {(!filteredMaterials || filteredMaterials.length === 0) &&
-                !materialsLoading && (
-                  <div style={{ padding: 8, opacity: 0.7 }}>
-                    Ничего не найдено…
-                  </div>
-                )}
-            </div>
-          )}
-
-          {recipeItems.length > 0 && (
-            <div
-              className="select-materials__selected"
-              style={{ marginTop: 10 }}
-            >
-              {recipeItems.map((it) => {
-                const mat = (Array.isArray(materials) ? materials : []).find(
-                  (m) => String(m.id) === String(it.materialId)
-                );
-                const availableQty = Number(mat?.quantity || 0);
-                const requestedQty = Number(it.quantity || 0);
-                const units = Number(product.quantity || 0);
-                const totalNeeded = requestedQty * units;
-                const isInsufficient = totalNeeded > availableQty;
-
-                return (
-                  <div
-                    key={it.materialId}
-                    className="select-materials__selected-item"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 160px 40px",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 0",
-                      borderBottom: "1px dashed var(--border,#444)",
-                      backgroundColor: isInsufficient
-                        ? "#ffebee"
-                        : "transparent",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 2,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <Checkbox
-                          checked
-                          onChange={() => removeRecipeItem(it.materialId)}
-                          sx={{
-                            color: "#000",
-                            "&.Mui-checked": { color: "#f9cf00" },
-                          }}
-                        />
-                        <p style={{ margin: 0 }}>
-                          {mat?.name ?? mat?.title ?? `ID ${it.materialId}`}
-                        </p>
-                      </div>
-                      <small
-                        style={{
-                          fontSize: "11px",
-                          opacity: 0.7,
-                          color: isInsufficient ? "#d32f2f" : "inherit",
-                          marginLeft: "40px",
-                        }}
-                      >
-                        Доступно: {availableQty}
-                        {units > 0 && (
-                          <span
-                            style={{
-                              color: isInsufficient ? "#d32f2f" : "#666",
-                            }}
-                          >
-                            {" "}
-                            | Нужно: {totalNeeded}
-                            {isInsufficient && " ⚠️ Недостаточно!"}
-                          </span>
-                        )}
-                      </small>
-                    </div>
-                    <TextField
-                      size="small"
-                      placeholder="Кол-во"
-                      type="number"
-                      inputProps={{
-                        step: "0.0001",
-                        min: "0",
-                        max: availableQty / (units || 1),
-                      }}
-                      value={it.quantity}
-                      onChange={(e) =>
-                        changeRecipeQty(it.materialId, e.target.value)
-                      }
-                      error={isInsufficient}
-                      helperText={
-                        isInsufficient
-                          ? `Нужно ${totalNeeded}, есть ${availableQty}`
-                          : ""
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="select-materials__remove"
-                      onClick={() => removeRecipeItem(it.materialId)}
-                      aria-label="Удалить"
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        border: "1px solid var(--border,#444)",
-                        background: "transparent",
-                        color: "inherit",
-                        cursor: "pointer",
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Кнопки */}
-        <div className="finished-goods-add-modal__footer">
-          <button
-            className="finished-goods-add-modal__cancel"
-            onClick={onClose}
-            disabled={creating}
-          >
-            Отмена
-          </button>
-          <button
-            className="finished-goods-add-modal__save"
-            onClick={handleSubmit}
-            disabled={creating || materialsLoading}
-          >
-            {creating ? "Добавление..." : "Добавить"}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -1307,7 +1391,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
     category_name: item.category_name || item.category || "",
     client: item.client || "",
     price: item.price ?? "",
-    purchase_price: item.purchase_price ?? "",
+    purchase_price: item.purchase_price ?? "0",
     quantity: item.quantity ?? "",
     stock: item.stock ?? false, // Акционный товар
   });
@@ -1367,7 +1451,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           setExistingImages((prev) => prev.filter((img) => img.id !== imageId));
         } catch (error) {
           console.error("Ошибка удаления изображения:", error);
-          alert("Не удалось удалить изображение", null, true);
+          const errorMessage = validateResErrors(error, "Ошибка удаления изображения");
+          alert(errorMessage, null, true);
         }
       }
     })
@@ -1387,7 +1472,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
       );
     } catch (error) {
       console.error("Ошибка установки главного изображения:", error);
-      alert("Не удалось установить главное изображение");
+      const errorMessage = validateResErrors(error, "Ошибка установки главного изображения");
+      alert(errorMessage);
     }
   };
 
@@ -1467,7 +1553,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
           });
         if (uploads.length) await Promise.allSettled(uploads);
       } catch (e) {
-        alert("Загрузка новых изображений не удалась", true);
+        const errorMessage = validateResErrors(e, "Загрузка новых изображений не удалась");
+        alert(errorMessage, true);
         // не блокируем основной флоу
       }
       alert('Товар отредактирован!', () => {
@@ -1475,11 +1562,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
         onSaveSuccess?.();
       })
     } catch (err) {
-      console.error("Failed to update product:", err);
-      alert(
-        `Ошибка при обновлении товара: ${err.message || JSON.stringify(err)}`,
-        true
-      );
+      const errorMessage = validateResErrors(err, "Ошибка при обновлении товара");
+      alert(errorMessage, true);
     }
   };
 
@@ -1493,12 +1577,8 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
             onDeleteConfirm?.();
           })
         } catch (err) {
-          console.error("Failed to delete product:", err);
-          alert(
-            `Ошибка при удалении товара: ${err.message || JSON.stringify(err)}`,
-            null,
-            true
-          );
+          const errorMessage = validateResErrors(err, "Ошибка при удалении товара");
+          alert(errorMessage, null, true);
         }
       }
     })
@@ -1512,7 +1592,7 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
   }, [dispatch]);
 
   return (
-    <div className="product-edit-modal z-50!">
+    <div className="product-edit-modal z-100!">
       <div className="product-edit-modal__backdrop" onClick={onClose} />
       <div className="product-edit-modal__container">
         <div className="product-edit-modal__wrapper">
@@ -1727,7 +1807,6 @@ const EditModal = ({ item, onClose, onSaveSuccess, onDeleteConfirm }) => {
                         min="0"
                         step="0.01"
                         placeholder="0.00"
-                        required
                       />
                       <span className="product-edit-modal__input-suffix">
                         сом
@@ -2107,11 +2186,8 @@ const TransferProductModal = ({
         onClose();
       });
     } catch (error) {
-      console.error("Transfer creation failed:", error);
-      error(
-        `Ошибка при создании передачи: ${error?.message || "неизвестная ошибка"
-        }`
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании передачи");
+      alert(errorMessage, true);
     }
   };
 
@@ -2386,10 +2462,8 @@ const AcceptProductModal = ({ onClose, onChanged, item }) => {
       );
 
     } catch (error) {
-      console.error("Accept inline failed:", error);
-      alert(
-        `Ошибка при создании приёмки: ${error?.message || "неизвестная ошибка"}`, true
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании приёмки");
+      alert(errorMessage, true);
     }
   };
 
@@ -2580,10 +2654,8 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 
     } catch (error) {
       console.error("Return creation failed:", error);
-      alert(
-        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка", true
-        }`
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании возврата");
+      alert(errorMessage, true);
     }
   };
 
@@ -2673,6 +2745,7 @@ const safeDate = (s) => {
 
 const FinishedGoods = ({ products, onChanged }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { loading, error } = useProducts();
   const { list: cashBoxes } = useCash();
 
@@ -2682,8 +2755,7 @@ const FinishedGoods = ({ products, onChanged }) => {
   // состояние для редактирования
   const [showEdit, setShowEdit] = useState(false);
   const [showMarriageModal, setShowMarriageModal] = useState(false);
-  const [showTransferProductModal, setShowTransferProductModal] =
-    useState(false);
+  const [showTransferProductModal, setShowTransferProductModal] = useState(false);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
 
   const [showAcceptProductModal, setShowAcceptProductModal] = useState(false);
@@ -2719,17 +2791,15 @@ const FinishedGoods = ({ products, onChanged }) => {
     return isSmall ? "cards" : "table";
   }, []);
   const [viewMode, setViewMode] = useState(getInitialViewMode);
-
-  // Сохраняем режим просмотра в localStorage
-
-  const { isMobile } = useResize((media) => {
-    const { isMobile } = media
+  const { isMobile } = useResize(({ isMobile }) => {
     if (isMobile) {
       setViewMode('cards')
     } else {
       setViewMode(getInitialViewMode())
     }
-  })
+  });
+  // Сохраняем режим просмотра в localStorage
+
   useEffect(() => {
     if (isMobile) return;
     if (typeof window !== "undefined") {
@@ -2977,313 +3047,360 @@ const FinishedGoods = ({ products, onChanged }) => {
       </div>
 
       {/* Products */}
-      <div className="warehouse-table-container w-full">
-        {/* ===== TABLE ===== */}
-        {viewMode === "table" && (
-          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="warehouse-table w-full min-w-275">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>№</th>
-                  <th></th>
-                  <th>Название</th>
-                  <th>Поставщик</th>
-                  <th>Цена</th>
-                  <th>Дата</th>
-                  <th>Количество / У агентов</th>
-                  <th>Категория</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
+      <DataContainer>
 
-              <tbody>
-                {loading ? (
+        <div className="warehouse-table-container w-full">
+          {/* ===== TABLE ===== */}
+          {viewMode === "table" && (
+            <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <table className="warehouse-table w-full min-w-275">
+                <thead>
                   <tr>
-                    <td colSpan={10} className="warehouse-table__loading">
-                      Загрузка...
-                    </td>
+                    <th></th>
+                    <th>№</th>
+                    <th></th>
+                    <th>Название</th>
+                    <th>Поставщик</th>
+                    <th>Цена</th>
+                    <th>Дата</th>
+                    <th>Количество / У агентов</th>
+                    <th>Категория</th>
+                    <th>Действия</th>
                   </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={10} className="warehouse-table__empty">
-                      Ошибка загрузки
-                    </td>
-                  </tr>
-                ) : viewProducts.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="warehouse-table__empty">
-                      Товары не найдены
-                    </td>
-                  </tr>
-                ) : (
-                  viewProducts.map((item, idx) => {
-                    const primaryImage = getPrimaryImage(item);
-                    return (
-                      <tr
-                        key={item.id}
-                        className="warehouse-table__row"
-                        onClick={() => openEdit(item)}
-                      >
-                        <td>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEdit(item);
-                            }}
-                            className="warehouse-table__edit-btn"
-                            title="Редактировать"
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-                        </td>
+                </thead>
 
-                        <td>{idx + 1}</td>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={10} className="warehouse-table__loading">
+                        Загрузка...
+                      </td>
+                    </tr>
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={10} className="warehouse-table__empty">
+                        Ошибка загрузки
+                      </td>
+                    </tr>
+                  ) : viewProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="warehouse-table__empty">
+                        Товары не найдены
+                      </td>
+                    </tr>
+                  ) : (
+                    viewProducts.map((item, idx) => {
+                      const primaryImage = getPrimaryImage(item);
+                      return (
+                        <tr
+                          key={item.id}
+                          className="warehouse-table__row"
+                          onClick={() =>
+                            navigate(`/crm/production/warehouse/${item.id}`)
 
-                        <td>
-                          <img
-                            src={getImageUrl(primaryImage)}
-                            alt={primaryImage?.alt || item.name || "Товар"}
-                            className="warehouse-table__product-image"
-                            onError={(e) => {
-                              e.currentTarget.src = noImage;
-                            }}
-                            loading="lazy"
-                          />
-                        </td>
-
-                        <td className="warehouse-table__name">
-                          <div className="warehouse-table__name-cell">
-                            <span>{item.name || "—"}</span>
-                          </div>
-                        </td>
-
-                        <td>{item.client_name || "—"}</td>
-                        <td>{formatPrice(item.price)}</td>
-                        <td>
-                          {new Date(item.created_at).toLocaleDateString()}
-                        </td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "4px",
-                            }}
-                          >
-                            <div>На складе: {item.quantity || 0}</div>
-                            {item.qty_on_agent > 0 && (
-                              <div style={{ fontSize: "12px", color: "#666" }}>
-                                У агентов: {item.qty_on_agent}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td>{item.category || item.category_name || "—"}</td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "8px",
-                              flexWrap: "wrap",
-                            }}
-                          >
+                          }
+                        >
+                          <td>
                             <button
-                              className="warehouse-header__create-btn"
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "12px",
-                                background: "#f59e0b",
-                                color: "white",
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEdit(item);
                               }}
-                              onClick={() => handleOpen(item)}
+                              className="warehouse-table__edit-btn"
+                              title="Редактировать"
                             >
-                              В брак
+                              <MoreVertical size={16} />
                             </button>
-                            <button
-                              className="warehouse-header__create-btn"
-                              style={{
-                                padding: "6px 12px",
-                                fontSize: "12px",
-                                background: "#f7d74f",
-                                color: "black",
+                          </td>
+
+                          <td>{idx + 1}</td>
+
+                          <td>
+                            <img
+                              src={getImageUrl(primaryImage)}
+                              alt={primaryImage?.alt || item.name || "Товар"}
+                              className="warehouse-table__product-image"
+                              onError={(e) => {
+                                e.currentTarget.src = noImage;
                               }}
-                              onClick={() => handleOpen1(item)}
+                              loading="lazy"
+                            />
+                          </td>
+
+                          <td className="warehouse-table__name">
+                            <div className="warehouse-table__name-cell">
+                              <button
+                                type="button"
+                                className="finished-goods__detailLink"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/crm/production/warehouse/${item.id}`);
+                                }}
+                                title="Открыть детальную страницу"
+                              >
+                                {item.name || "—"}
+                              </button>
+                            </div>
+                          </td>
+
+                          <td>{item.client_name || "—"}</td>
+                          <td>{formatPrice(item.price)}</td>
+                          <td>
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </td>
+                          <td>
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "4px",
+                              }}
                             >
-                              Добавить
-                            </button>
-                            {item.qty_on_agent > 0 && (
+                              <div>На складе: {item.quantity || 0}</div>
+                              {item.qty_on_agent > 0 && (
+                                <div style={{ fontSize: "12px", color: "#666" }}>
+                                  У агентов: {item.qty_on_agent}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td>{item.category || item.category_name || "—"}</td>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "8px",
+                                flexWrap: "wrap",
+                              }}
+                            >
                               <button
                                 className="warehouse-header__create-btn"
                                 style={{
                                   padding: "6px 12px",
                                   fontSize: "12px",
-                                  background: "#3b82f6",
+                                  background: "#111827",
                                   color: "white",
                                 }}
-                                onClick={() => handleOpen3(item)}
+                                type="button"
+                                onClick={() =>
+                                  openEdit(item)
+                                }
                               >
-                                Принять возврат
+                                Редактировать
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                              <button
+                                className="warehouse-header__create-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  background: "#f59e0b",
+                                  color: "white",
+                                }}
+                                onClick={() => handleOpen(item)}
+                              >
+                                В брак
+                              </button>
+                              <button
+                                className="warehouse-header__create-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  background: "#f7d74f",
+                                  color: "black",
+                                }}
+                                onClick={() => handleOpen1(item)}
+                              >
+                                Добавить
+                              </button>
+                              {item.qty_on_agent > 0 && (
+                                <button
+                                  className="warehouse-header__create-btn"
+                                  style={{
+                                    padding: "6px 12px",
+                                    fontSize: "12px",
+                                    background: "#3b82f6",
+                                    color: "white",
+                                  }}
+                                  onClick={() => handleOpen3(item)}
+                                >
+                                  Принять возврат
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {/* ===== CARDS ===== */}
-        {viewMode === "cards" && (
-          <div className="block">
-            {loading ? (
-              <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Загрузка...
-              </div>
-            ) : error ? (
-              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Ошибка загрузки
-              </div>
-            ) : viewProducts.length === 0 ? (
-              <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                Товары не найдены
-              </div>
-            ) : (
-              <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {viewProducts.map((item, idx) => {
-                  const primaryImage = getPrimaryImage(item);
-                  return (
-                    <div
-                      key={item.id}
-                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-                      onClick={() => openEdit(item)}
-                    >
-                      <div className="flex items-start gap-3">
-                        <img
-                          src={getImageUrl(primaryImage)}
-                          alt={item.name || "Товар"}
-                          className="warehouse-table__product-image h-12 w-12 flex-none rounded-xl border border-slate-200 object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = noImage;
-                          }}
-                          loading="lazy"
-                        />
-
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs text-slate-500">
-                            #{idx + 1}
-                          </div>
-                          <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
-                            {item.name || "—"}
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                            <span className="whitespace-nowrap">
-                              Поставщик:{" "}
-                              <span className="font-medium">
-                                {item.client_name || "—"}
-                              </span>
-                            </span>
-                            <span className="whitespace-nowrap">
-                              Категория:{" "}
-                              <span className="font-medium">
-                                {item.category || item.category_name || "—"}
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-xl bg-slate-50 p-2">
-                          <div className="text-slate-500">Цена</div>
-                          <div className="mt-0.5 font-semibold text-slate-900">
-                            {formatPrice(item.price)}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-slate-50 p-2">
-                          <div className="text-slate-500">Дата</div>
-                          <div className="mt-0.5 font-semibold text-slate-900">
-                            {new Date(item.created_at).toLocaleDateString()}
-                          </div>
-                        </div>
-
-                        <div className="col-span-2 rounded-xl bg-slate-50 p-2">
-                          <div className="text-slate-500">Количество</div>
-                          <div className="mt-0.5 font-semibold text-slate-900">
-                            На складе: {item.quantity || 0}
-                            {item.qty_on_agent > 0 && (
-                              <span className="ml-2 text-xs text-slate-600">
-                                • У агентов: {item.qty_on_agent}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
+          {/* ===== CARDS ===== */}
+          {viewMode === "cards" && (
+            <div className="block">
+              {loading ? (
+                <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Загрузка...
+                </div>
+              ) : error ? (
+                <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Ошибка загрузки
+                </div>
+              ) : viewProducts.length === 0 ? (
+                <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                  Товары не найдены
+                </div>
+              ) : (
+                <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {viewProducts.map((item, idx) => {
+                    const primaryImage = getPrimaryImage(item);
+                    return (
                       <div
-                        className="mt-4 flex flex-wrap gap-2"
-                        onClick={(e) => e.stopPropagation()}
+                        key={item.id}
+                        className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                        onClick={() => navigate(`/crm/production/warehouse/${item.id}`)}
                       >
-                        <button
-                          className="warehouse-header__create-btn"
-                          style={{
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            background: "#f59e0b",
-                            color: "white",
-                            flex: "1",
-                            minWidth: "80px",
-                          }}
-                          onClick={() => handleOpen(item)}
+                        <div className="flex items-start gap-3">
+                          <img
+                            src={getImageUrl(primaryImage)}
+                            alt={item.name || "Товар"}
+                            className="warehouse-table__product-image h-12 w-12 flex-none rounded-xl border border-slate-200 object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = noImage;
+                            }}
+                            loading="lazy"
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs text-slate-500">
+                              #{idx + 1}
+                            </div>
+                            <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
+                              {item.name || "—"}
+                            </div>
+
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                              <span className="whitespace-nowrap">
+                                Поставщик:{" "}
+                                <span className="font-medium">
+                                  {item.client_name || "—"}
+                                </span>
+                              </span>
+                              <span className="whitespace-nowrap">
+                                Категория:{" "}
+                                <span className="font-medium">
+                                  {item.category || item.category_name || "—"}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">Цена</div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              {formatPrice(item.price)}
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">Дата</div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              {new Date(item.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+
+                          <div className="col-span-2 rounded-xl bg-slate-50 p-2">
+                            <div className="text-slate-500">Количество</div>
+                            <div className="mt-0.5 font-semibold text-slate-900">
+                              На складе: {item.quantity || 0}
+                              {item.qty_on_agent > 0 && (
+                                <span className="ml-2 text-xs text-slate-600">
+                                  • У агентов: {item.qty_on_agent}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          className="mt-4 flex flex-wrap gap-2"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          В брак
-                        </button>
-                        <button
-                          className="warehouse-header__create-btn"
-                          style={{
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            background: "#f7d74f",
-                            color: "black",
-                            flex: "1",
-                            minWidth: "80px",
-                          }}
-                          onClick={() => handleOpen1(item)}
-                        >
-                          Добавить
-                        </button>
-                        {item.qty_on_agent > 0 && (
                           <button
                             className="warehouse-header__create-btn"
                             style={{
                               padding: "6px 12px",
                               fontSize: "12px",
-                              background: "#3b82f6",
+                              background: "#111827",
+                              color: "white",
+                              flex: "1",
+                              minWidth: "110px",
+                            }}
+                            type="button"
+                            onClick={() => openEdit(item)}
+                          >
+                            Редактировать
+                          </button>
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              background: "#f59e0b",
                               color: "white",
                               flex: "1",
                               minWidth: "80px",
                             }}
-                            onClick={() => handleOpen3(item)}
+                            onClick={() => handleOpen(item)}
                           >
-                            Принять возврат
+                            В брак
                           </button>
-                        )}
+                          <button
+                            className="warehouse-header__create-btn"
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: "12px",
+                              background: "#f7d74f",
+                              color: "black",
+                              flex: "1",
+                              minWidth: "80px",
+                            }}
+                            onClick={() => handleOpen1(item)}
+                          >
+                            Добавить
+                          </button>
+                          {item.qty_on_agent > 0 && (
+                            <button
+                              className="warehouse-header__create-btn"
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "12px",
+                                background: "#3b82f6",
+                                color: "white",
+                                flex: "1",
+                                minWidth: "80px",
+                              }}
+                              onClick={() => handleOpen3(item)}
+                            >
+                              Принять возврат
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </DataContainer>
+
 
       {showAdd && (
         <AddModal

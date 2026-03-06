@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 import React, { useEffect } from "react";
 import "./universalModal.scss";
 
-const UniversalModal = ({ children, onClose, title }) => {
+const UniversalModal = ({ children, onClose, title, className = '' }) => {
   useEffect(() => {
     const handleEsc = (event) => {
       if (event.keyCode === 27) {
@@ -15,7 +15,7 @@ const UniversalModal = ({ children, onClose, title }) => {
   }, []);
 
   return (
-    <div className="universalModal">
+    <div className={"universalModal " + className}>
       <div className="backdrop" onClick={onClose} />
       <div className="universalModal__content">
         <div className="universalModal__content-header">

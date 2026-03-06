@@ -41,12 +41,15 @@ import {
 } from "../../../../store/creators/saleThunk";
 import "../../Market/Warehouse/Warehouse.scss";
 import "./productionAgents.scss";
-import { useAlert } from "../../../../hooks/useDialog";
+import { useAlert } from "@/hooks/useDialog";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import useResize from "../../../../hooks/useResize";
+import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Компонент для детального просмотра продажи
 const SaleDetailModal = ({ onClose, saleId }) => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { historyDetail: saleDetail } = useSale();
 
@@ -74,7 +77,8 @@ const SaleDetailModal = ({ onClose, saleId }) => {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.detail);
+      const errorMessage = validateResErrors(err, "Ошибка при печати чека");
+      alert(errorMessage, true);
     }
   };
 
@@ -90,7 +94,8 @@ const SaleDetailModal = ({ onClose, saleId }) => {
       link1.click();
       window.URL.revokeObjectURL(url1);
     } catch (err) {
-      alert(err.detail);
+      const errorMessage = validateResErrors(err, "Ошибка при печати накладной");
+      alert(errorMessage, true);
     }
   };
 
@@ -216,11 +221,8 @@ const PendingModal = ({ onClose, onChanged }) => {
         onClose?.();
       });
     } catch (error) {
-      console.error("Accept transfer failed:", error);
-      alert(
-        `Ошибка при принятии передачи: ${error?.message || "неизвестная ошибка"
-        }`, true
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при принятии передачи");
+      alert(errorMessage, true);
     }
   };
 
@@ -258,64 +260,68 @@ const PendingModal = ({ onClose, onChanged }) => {
         ) : filteredTransfers.length === 0 ? (
           <div className="add-modal__section">Нет передач для принятия.</div>
         ) : (
-          <div
-            className="table-wrapper"
-            style={{ maxHeight: 400, overflow: "auto" }}
-          >
-            <table className="sklad__table">
-              <thead>
-                <tr>
-                  <th>№</th>
-                  <th>Товар</th>
-                  {profile?.role === "owner" && <th>Агент</th>}
-                  <th>Количество</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
-                  <th>Действия</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransfers.map((transfer, idx) => (
-                  <tr key={transfer.id}>
-                    <td data-label="№">{idx + 1}</td>
-                    <td data-label="Товар">{transfer.product_name || "—"}</td>
-                    {profile?.role === "owner" && (
-                      <td data-label="Агент">{transfer.agent_name || "—"}</td>
-                    )}
-                    <td data-label="Количество">
-                      {transfer.qty_transferred || 0}
-                    </td>
-                    <td data-label="Статус">
-                      <span
-                        className={`sell__badge--${transfer.status === "open" ? "warning" : "success"
-                          }`}
-                      >
-                        {transfer.status === "open" ? "Открыта" : "Закрыта"}
-                      </span>
-                    </td>
-                    <td data-label="Дата">
-                      {new Date(transfer.created_at).toLocaleDateString()}
-                    </td>
-                    <td data-label="Действия">
-                      {profile?.role !== "owner" ? (
-                        <button
-                          className="add-modal__save"
-                          style={{ marginRight: 8 }}
-                          title="Принять передачу"
-                          onClick={() => handleAcceptTransfer(transfer)}
-                          disabled={transfer.status !== "open"}
-                        >
-                          Принять
-                        </button>
-                      ) : (
-                        <span style={{ opacity: 0.7 }}>Просмотр</span>
-                      )}
-                    </td>
+          <DataContainer>
+
+            <div
+              className="table-wrapper"
+              style={{ maxHeight: 400, overflow: "auto" }}
+            >
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Товар</th>
+                    {profile?.role === "owner" && <th>Агент</th>}
+                    <th>Количество</th>
+                    <th>Статус</th>
+                    <th>Дата</th>
+                    <th>Действия</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredTransfers.map((transfer, idx) => (
+                    <tr key={transfer.id + idx}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Товар">{transfer.product_name || "—"}</td>
+                      {profile?.role === "owner" && (
+                        <td data-label="Агент">{transfer.agent_name || "—"}</td>
+                      )}
+                      <td data-label="Количество">
+                        {transfer.qty_transferred || 0}
+                      </td>
+                      <td data-label="Статус">
+                        <span
+                          className={`sell__badge--${transfer.status === "open" ? "warning" : "success"
+                            }`}
+                        >
+                          {transfer.status === "open" ? "Открыта" : "Закрыта"}
+                        </span>
+                      </td>
+                      <td data-label="Дата">
+                        {new Date(transfer.created_at).toLocaleDateString()}
+                      </td>
+                      <td data-label="Действия">
+                        {profile?.role !== "owner" ? (
+                          <button
+                            className="add-modal__save"
+                            style={{ marginRight: 8 }}
+                            title="Принять передачу"
+                            onClick={() => handleAcceptTransfer(transfer)}
+                            disabled={transfer.status !== "open"}
+                          >
+                            Принять
+                          </button>
+                        ) : (
+                          <span style={{ opacity: 0.7 }}>Просмотр</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataContainer>
+
         )}
 
         <div className="add-modal__footer">
@@ -334,6 +340,105 @@ const PendingModal = ({ onClose, onChanged }) => {
             }}
           >
             Обновить список
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MyReturnsModal = ({
+  onClose,
+  onRefresh,
+  loading,
+  summary,
+  returnsList,
+}) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const list = Array.isArray(returnsList) ? returnsList : [];
+    const q = String(searchQuery || "").toLowerCase().trim();
+    if (!q) return list;
+    return list.filter((r) => {
+      const p = String(r?.product || r?.product_name || r?.name || "").toLowerCase();
+      const s = String(r?.status_display || r?.status || "").toLowerCase();
+      return p.includes(q) || s.includes(q);
+    });
+  }, [returnsList, searchQuery]);
+
+  return (
+    <div className="add-modal accept my-returns-modal">
+      <div className="add-modal__overlay z-100!" onClick={onClose} />
+      <div className="add-modal__content z-100!" role="dialog" aria-modal="true">
+        <div className="add-modal__header">
+          <h3>Мои возвраты</h3>
+          <X className="add-modal__close-icon" size={20} onClick={onClose} />
+        </div>
+
+        <div className="my-returns-modal__summary">
+          Ожидают приёма: <b>{summary?.pending_count ?? 0}</b> возвратов,{" "}
+          <b>{summary?.pending_qty ?? 0}</b> шт.
+        </div>
+
+        <div className="add-modal__section" style={{ marginBottom: 12 }}>
+          <input
+            type="text"
+            placeholder="Поиск по товару или статусу"
+            className="add-modal__input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </div>
+
+        {loading ? (
+          <div className="add-modal__section">Загрузка возвратов…</div>
+        ) : filtered.length === 0 ? (
+          <div className="add-modal__section">Возвратов нет.</div>
+        ) : (
+          <DataContainer>
+            <div className="table-wrapper" style={{ maxHeight: 420, overflow: "auto" }}>
+              <table className="sklad__table">
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>Товар</th>
+                    <th>Количество</th>
+                    <th>Статус</th>
+                    <th>Дата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r, idx) => (
+                    <tr key={r?.id ?? idx}>
+                      <td data-label="№">{idx + 1}</td>
+                      <td data-label="Товар">
+                        {r?.product || r?.product_name || r?.name || "—"}
+                      </td>
+                      <td data-label="Количество">{r?.qty ?? 0}</td>
+                      <td data-label="Статус">{r?.status_display || r?.status || "—"}</td>
+                      <td data-label="Дата">
+                        {r?.returned_at
+                          ? new Date(r.returned_at).toLocaleDateString()
+                          : r?.created_at
+                            ? new Date(r.created_at).toLocaleDateString()
+                            : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataContainer>
+        )}
+
+        <div className="add-modal__footer">
+          <button className="add-modal__cancel" onClick={onClose}>
+            Закрыть
+          </button>
+          <button className="add-modal__save" onClick={onRefresh} disabled={loading}>
+            Обновить
           </button>
         </div>
       </div>
@@ -377,6 +482,9 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
     );
   }
 
+  const pendingReturnQty = Number(item?._pending_return_qty || 0) || 0;
+  const effectiveOnHand = Math.max(0, Number(item?.qty_on_hand || 0) - pendingReturnQty);
+
   const onChange = useCallback((e) => {
     const { name, value } = e.target;
     setState((prev) => ({ ...prev, [name]: value }));
@@ -411,11 +519,8 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
         onClose();
       });
     } catch (error) {
-      console.error("Return creation failed:", error);
-      alert(
-        `Ошибка при создании возврата: ${error?.message || "неизвестная ошибка"
-        }`, true
-      );
+      const errorMessage = validateResErrors(error, "Ошибка при создании возврата");
+      alert(errorMessage, true);
     }
   };
 
@@ -446,7 +551,12 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
               <strong>{item?.qty_on_hand || 0}</strong>
             </p>
             <p style={{ opacity: 0.7, margin: "5px 0" }}>
-              Доступно для возврата: <strong>{item?.qty_on_hand || 0}</strong>
+              Доступно для возврата: <strong>{effectiveOnHand}</strong>
+              {pendingReturnQty > 0 && (
+                <span style={{ marginLeft: 8, color: "#6b7280" }}>
+                  (в ожидании приёма: {pendingReturnQty})
+                </span>
+              )}
             </p>
           </div>
           <div className="add-modal__section">
@@ -460,12 +570,12 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
               value={state.qty}
               onChange={onChange}
               min={1}
-              max={item?.qty_on_hand || 0}
+              max={effectiveOnHand}
               step={1}
               required
             />
             <small style={{ opacity: 0.7, marginTop: 5, display: "block" }}>
-              Максимум: {item?.qty_on_hand || 0}
+              Максимум: {effectiveOnHand}
             </small>
           </div>
 
@@ -488,24 +598,14 @@ const ReturnProductModal = ({ onClose, onChanged, item }) => {
 };
 
 /* ---- UI ---- */
-const toStartOfDay = (d) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
-const toEndOfDay = (d) => {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-};
-const safeDate = (s) => {
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-};
 
 const ProductionAgents = () => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const { profile } = useUser();
+  const { list: transfers } = useSelector(
+    (state) => state.transfer || { list: [] }
+  );
   const {
     // list: products,
     loading,
@@ -514,14 +614,15 @@ const ProductionAgents = () => {
     agentProductsLoading,
     agentProductsError,
   } = useProducts();
+
   const { start: startInAgent } = useAgent();
-  const {isMobile} = useResize((media) => {
-    const {isMobile} = media
+  const { isMobile } = useResize((media) => {
+    const { isMobile } = media
     if (isMobile) {
-        setViewMode('cards')
+      setViewMode('cards')
     }
   })
-  
+
   const [agents, setAgents] = useState([]);
   const [showAddCashboxModal, setShowAddCashboxModal] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
@@ -538,6 +639,7 @@ const ProductionAgents = () => {
   const [showEdit, setShowEdit] = useState(false);
   const [showMarriageModal, setShowMarriageModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showMyReturnsModal, setShowMyReturnsModal] = useState(false);
   const [selectCashBox, setSelectCashBox] = useState("");
   const [showTransferProductModal, setShowTransferProductModal] =
     useState(false);
@@ -552,6 +654,13 @@ const ProductionAgents = () => {
   const [itemId3, setItemId3] = useState({});
   const [selectedItem, setSelectedItem] = useState(null);
 
+  const [myReturnsLoading, setMyReturnsLoading] = useState(false);
+  const [myReturns, setMyReturns] = useState([]);
+  const [myReturnsSummary, setMyReturnsSummary] = useState({
+    pending_count: 0,
+    pending_qty: 0,
+  });
+
   const [search, setSearch] = useState("");
   // Debounce для поиска
   const debouncedSearch = useDebouncedValue(search, 400);
@@ -560,6 +669,73 @@ const ProductionAgents = () => {
   // Фильтр по дате
   const [dateFrom, setDateFrom] = useState(""); // YYYY-MM-DD
   const [dateTo, setDateTo] = useState(""); // YYYY-MM-DD
+
+  const agentProductsParams = useMemo(() => {
+    const params = {};
+    if (debouncedSearch) params.search = debouncedSearch;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    return params;
+  }, [debouncedSearch, dateFrom, dateTo]);
+
+  // Обновление списка передач (для агента — только свои)
+  const refreshTransfers = useCallback(() => {
+    dispatch(
+      fetchTransfersAsync(profile?.role === "owner" ? {} : { agent: profile?.id })
+    );
+  }, [dispatch, profile?.id, profile?.role]);
+
+  const loadMyReturns = useCallback(async () => {
+    if (profile?.role === "owner") return;
+    setMyReturnsLoading(true);
+    try {
+      const { data } = await api.get("/main/agents/me/returns/");
+      const list = Array.isArray(data) ? data : data?.results || [];
+      setMyReturns(list);
+      setMyReturnsSummary(
+        data?.returns_summary || { pending_count: 0, pending_qty: 0 }
+      );
+    } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка при загрузке моих возвратов");
+      alert(errorMessage, true);
+      setMyReturns([]);
+      setMyReturnsSummary({ pending_count: 0, pending_qty: 0 });
+
+    } finally {
+      setMyReturnsLoading(false);
+    }
+  }, [profile?.role]);
+
+  // Обновление списка товаров у агентов для owner (локальный state `agents`)
+  const loadAgentsProducts = useCallback(() => {
+    if (profile?.role !== "owner") return;
+    const params = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    api
+      .get("/main/owners/agents/products/", { params })
+      .then(({ data }) => {
+        setAgents(data);
+      })
+      .catch((e) => console.log(e));
+  }, [profile?.role, dateFrom, dateTo]);
+
+  // Обновление основного списка товаров на странице
+  const refreshProductsList = useCallback(() => {
+    if (profile?.role === "owner") {
+      loadAgentsProducts();
+    } else {
+      // Важно: сохраняем текущие фильтры/поиск/дату
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
+    }
+  }, [dispatch, profile?.role, agentProductsParams, loadAgentsProducts]);
+
+  // После "Принять" и "Вернуть" — обновляем и товары, и передачи
+  const refreshAfterAcceptOrReturn = useCallback(() => {
+    refreshTransfers();
+    refreshProductsList();
+    loadMyReturns();
+  }, [refreshTransfers, refreshProductsList, loadMyReturns]);
 
   // View mode (table/cards)
   const STORAGE_KEY = "production_agents_view_mode";
@@ -582,9 +758,9 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
-  }, [debouncedSearch])
+  }, [agentProductsParams, dispatch, profile?.role]);
   useEffect(() => {
     // dispatch(fetchCategoriesAsync());
     // dispatch(getCashBoxes());
@@ -599,7 +775,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
     dispatch(getItemsMake());
   };
@@ -610,7 +786,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
   };
   const handleOpen = (id) => {
@@ -628,7 +804,9 @@ const ProductionAgents = () => {
   };
   const handleOpen3 = (item) => {
     setShowReturnProductModal(true);
-    setItemId3(item);
+    // прокидываем количество, которое уже в "ожидает приёма" (чтобы вычиталось из доступного)
+    const pendingQty = getPendingReturnQtyForItem(item);
+    setItemId3({ ...item, _pending_return_qty: pendingQty });
   };
 
   const onEditDeleted = () => {
@@ -637,7 +815,7 @@ const ProductionAgents = () => {
     if (profile?.role === "owner") {
       dispatch(fetchProductsAsync());
     } else {
-      dispatch(fetchAgentProductsAsync({ search: debouncedSearch }));
+      dispatch(fetchAgentProductsAsync(agentProductsParams));
     }
   };
 
@@ -650,24 +828,27 @@ const ProductionAgents = () => {
 
   useEffect(() => {
     // dispatch(getProfile());
-    dispatch(
-      fetchTransfersAsync(
-        profile?.role === "owner" ? {} : { agent: profile?.id }
-      )
-    );
-  }, [dispatch, profile]);
+    refreshTransfers();
+    loadMyReturns();
+  }, [refreshTransfers, loadMyReturns]);
   useEffect(() => {
     if (showSellModal) dispatch(startSale());
   }, [showSellModal, dispatch]);
 
   useEffect(() => {
-    api
-      .get("/main/owners/agents/products/")
-      .then(({ data }) => {
-        setAgents(data);
-      })
-      .catch((e) => console.log(e));
-  }, []);
+    loadAgentsProducts();
+  }, [loadAgentsProducts]);
+
+  // Обработчик для кнопки "Продать товар"
+  const handleStartSale = async () => {
+    try {
+      await dispatch(startSaleInAgent()).unwrap();
+      setShowStart(true);
+    } catch (error) {
+      const errorMessage = validateResErrors(error, "Ошибка при инициализации продажи");
+      alert(errorMessage, true);
+    }
+  };
 
   // Функция для загрузки истории продаж
   const loadSalesHistory = useCallback(async () => {
@@ -676,7 +857,8 @@ const ProductionAgents = () => {
       const result = await dispatch(historySellProduct({})).unwrap();
       setSalesHistory(result);
     } catch (error) {
-      console.error("Ошибка загрузки истории продаж:", error);
+      const errorMessage = validateResErrors(error, "Ошибка загрузки истории продаж");
+      alert(errorMessage, true);
     } finally {
       setSalesHistoryLoading(false);
     }
@@ -696,10 +878,36 @@ const ProductionAgents = () => {
   }, []);
 
   // Фильтрация по названию, категории и ДАТЕ created_at
-  const viewProducts = useMemo(() => {
-    const from = dateFrom ? toStartOfDay(dateFrom) : null;
-    const to = dateTo ? toEndOfDay(dateTo) : null;
+  const pendingReturnQtyBySubrealId = useMemo(() => {
+    const map = new Map();
+    (Array.isArray(myReturns) ? myReturns : []).forEach((r) => {
+      const status = String(r?.status || "").toLowerCase();
+      if (status !== "pending") return;
+      const sid = r?.subreal || r?.subreal_id || r?.subreal?.id;
+      if (!sid) return;
+      const qty = Number(r?.qty || 0) || 0;
+      if (qty <= 0) return;
+      map.set(String(sid), (map.get(String(sid)) || 0) + qty);
+    });
+    return map;
+  }, [myReturns]);
 
+  const getPendingReturnQtyForItem = useCallback(
+    (item) => {
+      const subreals = Array.isArray(item?.subreals) ? item.subreals : [];
+      if (subreals.length === 0) return 0;
+      let sum = 0;
+      subreals.forEach((sr) => {
+        const sid = sr?.id ?? sr;
+        if (!sid) return;
+        sum += pendingReturnQtyBySubrealId.get(String(sid)) || 0;
+      });
+      return sum;
+    },
+    [pendingReturnQtyBySubrealId]
+  );
+
+  const viewProducts = useMemo(() => {
     // Выбираем источник данных в зависимости от роли
     let dataSource;
     if (profile?.role === "owner") {
@@ -718,20 +926,20 @@ const ProductionAgents = () => {
       dataSource = agentProducts;
     }
 
-    let filteredProducts = (dataSource || []).filter((p) => {
-      // фильтр по дате (только для владельца, у агентов может не быть created_at)
-      if (profile?.role === "owner") {
-        const created = safeDate(p.created_at);
-        if (!created) return false;
-        if (from && created < from) return false;
-        if (to && created > to) return false;
-      }
-      return true
-    });
+    let filteredProducts = (dataSource || []).filter(() => true);
 
     // Если это агент, показываем только товары с qty_on_hand > 0 (товары на руках)
-    if (profile?.role === "agent") {
-      filteredProducts = filteredProducts.filter((p) => p.qty_on_hand > 0);
+    if (profile?.role !== "owner") {
+      filteredProducts = filteredProducts
+        .map((p) => {
+          const pendingQty = getPendingReturnQtyForItem(p);
+          const effective = Math.max(
+            0,
+            Number(p?.qty_on_hand || 0) - Number(pendingQty || 0)
+          );
+          return { ...p, qty_on_hand_effective: effective, _pending_return_qty: pendingQty };
+        })
+        .filter((p) => (p.qty_on_hand_effective || 0) > 0);
     }
 
     return filteredProducts.sort((a, b) => {
@@ -747,10 +955,19 @@ const ProductionAgents = () => {
     agents,
     agentProducts,
     categoryFilter,
-    dateFrom,
-    dateTo,
     profile?.role,
+    getPendingReturnQtyForItem,
   ]);
+
+  const pendingTransfersSummary = useMemo(() => {
+    if (profile?.role === "owner") return { count: 0, qty: 0 };
+    const list = Array.isArray(transfers) ? transfers : [];
+    const mine = list.filter((t) => t.agent === profile?.id);
+    const open = mine.filter((t) => String(t?.status || "").toLowerCase() === "open");
+    const count = open.length;
+    const qty = open.reduce((acc, t) => acc + (Number(t?.qty_transferred || 0) || 0), 0);
+    return { count, qty };
+  }, [transfers, profile?.id, profile?.role]);
 
   const formatPrice = useCallback((price) => parseFloat(price || 0).toFixed(2), []);
 
@@ -826,13 +1043,34 @@ const ProductionAgents = () => {
                 </div>
                 <div className="flex mx-auto gap-3 lg:mr-0 flex-wrap justify-center">
                   {profile?.role !== "owner" ? (
-                    <button
+                    <div className="flex gap-2 align-middle">  <button
                       className="warehouse-header__create-btn"
                       onClick={() => setShowPendingModal(true)}
                     >
                       <Plus size={16} />
                       Мои передачи
+                      {pendingTransfersSummary.count > 0 && (
+                        <span className="pa-badge">
+                          {pendingTransfersSummary.count}
+                        </span>
+                      )}
                     </button>
+                      <button
+                        className="warehouse-header__create-btn"
+                        onClick={() => setShowMyReturnsModal(true)}
+                      >
+                        Мои возвраты
+                        {(myReturnsSummary?.pending_count || 0) > 0 && (
+                          <span className="pa-badge pa-badge--warning">
+                            {myReturnsSummary.pending_count}
+                          </span>
+                        )}
+                      </button>
+                      {/* <button className="warehouse-header__create-btn" onClick={handleStartSale}>
+                  <Plus size={16} />
+                  Продать товар
+                </button> */}
+                    </div>
                   ) : (
                     <button
                       className="warehouse-header__create-btn"
@@ -939,244 +1177,92 @@ const ProductionAgents = () => {
               </div>
 
               {/* Products */}
-              <div className="warehouse-table-container w-full">
-                {/* ===== TABLE ===== */}
-                {viewMode === "table" && (
-                  <div className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <table className="warehouse-table w-full min-w-225">
-                      <thead>
-                        <tr>
-                          <th>№</th>
-                          <th>Название</th>
-                          {profile?.role === "owner" && <th>Агент</th>}
-                          <th>Дата</th>
-                          <th>
-                            {profile?.role !== "owner"
-                              ? "На руках"
-                              : "Количество / У агентов"}
-                          </th>
-                          {
-                            profile?.role !== 'owner' &&
-                            <th>Действия</th>
-                          }
-                        </tr>
-                      </thead>
+              <DataContainer>
 
-                      <tbody>
-                        {(
-                          profile?.role === "owner"
-                            ? loading
-                            : agentProductsLoading
-                        ) ? (
+                <div className="warehouse-table-container w-full">
+                  {/* ===== TABLE ===== */}
+                  {viewMode === "table" && (
+                    <div key={'table'} className="overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <table className="warehouse-table w-full min-w-225">
+                        <thead>
                           <tr>
-                            <td
-                              colSpan={profile?.role === "owner" ? 6 : 5}
-                              className="warehouse-table__loading"
-                            >
-                              Загрузка...
-                            </td>
+                            <th>№</th>
+                            <th>Название</th>
+                            {profile?.role === "owner" && <th>Агент</th>}
+                            <th>Дата</th>
+                            <th>
+                              {profile?.role !== "owner"
+                                ? "На руках"
+                                : "Количество / У агентов"}
+                            </th>
+                            {
+                              profile?.role !== 'owner' &&
+                              <th>Действия</th>
+                            }
                           </tr>
-                        ) : (
-                          profile?.role === "owner"
-                            ? error
-                            : agentProductsError
-                        ) ? (
-                          <tr>
-                            <td
-                              colSpan={profile?.role === "owner" ? 6 : 5}
-                              className="warehouse-table__empty"
-                            >
-                              Ошибка загрузки
-                            </td>
-                          </tr>
-                        ) : viewProducts?.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={profile?.role === "owner" ? 6 : 5}
-                              className="warehouse-table__empty"
-                            >
-                              Товары не найдены
-                            </td>
-                          </tr>
-                        ) : (
-                          viewProducts?.map((item, idx) => (
-                            <tr
-                              key={item.id || item.product}
-                              className="warehouse-table__row"
-                            >
-                              <td>{idx + 1}</td>
-                              <td className="warehouse-table__name">
-                                <div className="warehouse-table__name-cell">
-                                  <span>
-                                    {item.product_name || item.name || "—"}
-                                  </span>
-                                </div>
-                              </td>
-                              {profile?.role === "owner" && (
-                                <td>
-                                  {`${item.agent_last_name || ""} ${item.agent_first_name || ""
-                                    } ${company.sector.name === "Пилорама"
-                                      ? `/ номер машины: ${item.agent_track_number || ""
-                                      }`
-                                      : ""
-                                    }`}
-                                </td>
-                              )}
-                              <td>
-                                {profile?.role === "owner"
-                                  ? new Date(
-                                    item.created_at || item.last_movement_at
-                                  ).toLocaleDateString()
-                                  : new Date(
-                                    item.last_movement_at
-                                  ).toLocaleDateString()}
-                              </td>
-                              <td>
-                                {profile?.role !== "owner" ? (
-                                  item.qty_on_hand > 0 ? (
-                                    <span
-                                      style={{
-                                        padding: "4px 8px",
-                                        background: "#d1fae5",
-                                        color: "#059669",
-                                        borderRadius: "6px",
-                                        fontSize: "12px",
-                                        fontWeight: "600",
-                                      }}
-                                    >
-                                      {item.qty_on_hand}
-                                    </span>
-                                  ) : (
-                                    <span
-                                      style={{
-                                        padding: "4px 8px",
-                                        background: "#fee2e2",
-                                        color: "#dc2626",
-                                        borderRadius: "6px",
-                                        fontSize: "12px",
-                                        fontWeight: "600",
-                                      }}
-                                    >
-                                      Нет на руках
-                                    </span>
-                                  )
-                                ) : (
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      gap: "4px",
-                                    }}
-                                  >
-                                    <div>У агента: {item.qty_on_hand || 0}</div>
-                                    {item.subreals &&
-                                      item.subreals.length > 0 && (
-                                        <div
-                                          style={{
-                                            fontSize: "12px",
-                                            color: "#666",
-                                          }}
-                                        >
-                                          Передач: {item.subreals.length}
-                                        </div>
-                                      )}
-                                  </div>
-                                )}
-                              </td>
-                              {
-                                profile?.role !== "owner" && (
-                                  <td onClick={(e) => e.stopPropagation()}>
-                                    <button
-                                      className="warehouse-header__create-btn"
-                                      style={{
-                                        padding: "6px 12px",
-                                        fontSize: "12px",
-                                        background: "#ef4444",
-                                        color: "white",
-                                      }}
-                                      onClick={() => handleOpen3(item)}
-                                      disabled={
-                                        !item.qty_on_hand || item.qty_on_hand <= 0
-                                      }
-                                      title={
-                                        !item.qty_on_hand || item.qty_on_hand <= 0
-                                          ? "Нет товара для возврата"
-                                          : "Вернуть товар"
-                                      }
-                                    >
-                                      Вернуть
-                                    </button>
-                                  </td>
-                                )
-                              }
+                        </thead>
 
+                        <tbody>
+                          {(
+                            profile?.role === "owner"
+                              ? loading
+                              : agentProductsLoading
+                          ) ? (
+                            <tr>
+                              <td
+                                colSpan={profile?.role === "owner" ? 6 : 5}
+                                className="warehouse-table__loading"
+                              >
+                                Загрузка...
+                              </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* ===== CARDS ===== */}
-                {viewMode === "cards" && (
-                  <div className="block">
-                    {(
-                      profile?.role === "owner" ? loading : agentProductsLoading
-                    ) ? (
-                      <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                        Загрузка...
-                      </div>
-                    ) : (
-                      profile?.role === "owner" ? error : agentProductsError
-                    ) ? (
-                      <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                        Ошибка загрузки
-                      </div>
-                    ) : viewProducts?.length === 0 ? (
-                      <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
-                        Товары не найдены
-                      </div>
-                    ) : (
-                      <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {viewProducts?.map((item, idx) => (
-                          <div
-                            key={item.id || item.product}
-                            className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs text-slate-500">
-                                #{idx + 1}
-                              </div>
-                              <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
-                                {item.product_name || item.name || "—"}
-                              </div>
-
-                              {profile?.role === "owner" && (
-                                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                                  <span className="whitespace-nowrap">
-                                    Агент:{" "}
-                                    <span className="font-medium">
-                                      {`${item.agent_last_name || ""} ${item.agent_first_name || ""
-                                        }`}
+                          ) : (
+                            profile?.role === "owner"
+                              ? error
+                              : agentProductsError
+                          ) ? (
+                            <tr>
+                              <td
+                                colSpan={profile?.role === "owner" ? 6 : 5}
+                                className="warehouse-table__empty"
+                              >
+                                Ошибка загрузки
+                              </td>
+                            </tr>
+                          ) : viewProducts?.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={profile?.role === "owner" ? 6 : 5}
+                                className="warehouse-table__empty"
+                              >
+                                Товары не найдены
+                              </td>
+                            </tr>
+                          ) : (
+                            viewProducts?.map((item, idx) => (
+                              <tr
+                                key={item.id}
+                                className="warehouse-table__row"
+                              >
+                                <td>{idx + 1}</td>
+                                <td className="warehouse-table__name">
+                                  <div className="warehouse-table__name-cell">
+                                    <span>
+                                      {item.product_name || item.name || "—"}
                                     </span>
-                                  </span>
-                                  {company.sector.name === "Пилорама" && (
-                                    <span className="whitespace-nowrap">
-                                      Машина:{" "}
-                                      <span className="font-medium">
-                                        {item.agent_track_number || "—"}
-                                      </span>
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                              <div className="rounded-xl bg-slate-50 p-2">
-                                <div className="text-slate-500">Дата</div>
-                                <div className="mt-0.5 font-semibold text-slate-900">
+                                  </div>
+                                </td>
+                                {profile?.role === "owner" && (
+                                  <td>
+                                    {`${item.agent_last_name || ""} ${item.agent_first_name || ""
+                                      } ${company.sector.name === "Пилорама"
+                                        ? `/ номер машины: ${item.agent_track_number || ""
+                                        }`
+                                        : ""
+                                      }`}
+                                  </td>
+                                )}
+                                <td>
                                   {profile?.role === "owner"
                                     ? new Date(
                                       item.created_at || item.last_movement_at
@@ -1184,89 +1270,248 @@ const ProductionAgents = () => {
                                     : new Date(
                                       item.last_movement_at
                                     ).toLocaleDateString()}
-                                </div>
-                              </div>
-
-                              <div className="rounded-xl bg-slate-50 p-2">
-                                <div className="text-slate-500">
-                                  {profile?.role !== "owner"
-                                    ? "На руках"
-                                    : "У агента"}
-                                </div>
-                                <div className="mt-0.5 font-semibold text-slate-900">
-                                  {item.qty_on_hand > 0 ? (
-                                    <span
-                                      style={{
-                                        padding: "2px 6px",
-                                        background: "#d1fae5",
-                                        color: "#059669",
-                                        borderRadius: "4px",
-                                        fontSize: "11px",
-                                      }}
-                                    >
-                                      {item.qty_on_hand}
-                                    </span>
+                                </td>
+                                <td>
+                                  {profile?.role !== "owner" ? (
+                                    (item.qty_on_hand_effective ?? item.qty_on_hand) > 0 ? (
+                                      <span
+                                        style={{
+                                          padding: "4px 8px",
+                                          background: "#d1fae5",
+                                          color: "#059669",
+                                          borderRadius: "6px",
+                                          fontSize: "12px",
+                                          fontWeight: "600",
+                                        }}
+                                      >
+                                        {item.qty_on_hand_effective ?? item.qty_on_hand}
+                                      </span>
+                                    ) : (
+                                      <span
+                                        style={{
+                                          padding: "4px 8px",
+                                          background: "#fee2e2",
+                                          color: "#dc2626",
+                                          borderRadius: "6px",
+                                          fontSize: "12px",
+                                          fontWeight: "600",
+                                        }}
+                                      >
+                                        Нет на руках
+                                      </span>
+                                    )
                                   ) : (
-                                    <span
+                                    <div
                                       style={{
-                                        padding: "2px 6px",
-                                        background: "#fee2e2",
-                                        color: "#dc2626",
-                                        borderRadius: "4px",
-                                        fontSize: "11px",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "4px",
                                       }}
                                     >
-                                      Нет на руках
-                                    </span>
+                                      <div>У агента: {item.qty_on_hand || 0}</div>
+                                      {item.subreals &&
+                                        item.subreals.length > 0 && (
+                                          <div
+                                            style={{
+                                              fontSize: "12px",
+                                              color: "#666",
+                                            }}
+                                          >
+                                            Передач: {item.subreals.length}
+                                          </div>
+                                        )}
+                                    </div>
                                   )}
-                                </div>
-                              </div>
+                                </td>
+                                {
+                                  profile?.role !== "owner" && (
+                                    <td onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        className="warehouse-header__create-btn"
+                                        style={{
+                                          padding: "6px 12px",
+                                          fontSize: "12px",
+                                          background: "#ef4444",
+                                          color: "white",
+                                        }}
+                                        onClick={() => handleOpen3(item)}
+                                        disabled={
+                                          !(item.qty_on_hand_effective ?? item.qty_on_hand) ||
+                                          (item.qty_on_hand_effective ?? item.qty_on_hand) <= 0
+                                        }
+                                        title={
+                                          !(item.qty_on_hand_effective ?? item.qty_on_hand) ||
+                                            (item.qty_on_hand_effective ?? item.qty_on_hand) <= 0
+                                            ? "Нет товара для возврата"
+                                            : "Вернуть товар"
+                                        }
+                                      >
+                                        Вернуть
+                                      </button>
+                                    </td>
+                                  )
+                                }
 
-                              {profile?.role === "owner" &&
-                                item.subreals &&
-                                item.subreals.length > 0 && (
-                                  <div className="col-span-2 rounded-xl bg-slate-50 p-2">
-                                    <div className="text-slate-500">
-                                      Передач
-                                    </div>
-                                    <div className="mt-0.5 font-semibold text-slate-900">
-                                      {item.subreals.length}
-                                    </div>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* ===== CARDS ===== */}
+                  {viewMode === "cards" && (
+                    <div key={'cards'} className="block">
+                      {(
+                        profile?.role === "owner" ? loading : agentProductsLoading
+                      ) ? (
+                        <div className="warehouse-table__loading rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                          Загрузка...
+                        </div>
+                      ) : (
+                        profile?.role === "owner" ? error : agentProductsError
+                      ) ? (
+                        <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                          Ошибка загрузки
+                        </div>
+                      ) : viewProducts?.length === 0 ? (
+                        <div className="warehouse-table__empty rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600">
+                          Товары не найдены
+                        </div>
+                      ) : (
+                        <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {viewProducts?.map((item, idx) => (
+                            <div
+                              key={item.id}
+                              className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs text-slate-500">
+                                  #{idx + 1}
+                                </div>
+                                <div className="warehouse-table__name mt-0.5 truncate text-sm font-semibold text-slate-900">
+                                  {item.product_name || item.name || "—"}
+                                </div>
+
+                                {profile?.role === "owner" && (
+                                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
+                                    <span className="whitespace-nowrap">
+                                      Агент:{" "}
+                                      <span className="font-medium">
+                                        {`${item.agent_last_name || ""} ${item.agent_first_name || ""
+                                          }`}
+                                      </span>
+                                    </span>
+                                    {company.sector.name === "Пилорама" && (
+                                      <span className="whitespace-nowrap">
+                                        Машина:{" "}
+                                        <span className="font-medium">
+                                          {item.agent_track_number || "—"}
+                                        </span>
+                                      </span>
+                                    )}
                                   </div>
                                 )}
-                            </div>
-
-                            {profile?.role !== "owner" && (
-                              <div
-                                className="mt-4 flex flex-wrap gap-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <button
-                                  className="warehouse-header__create-btn"
-                                  style={{
-                                    padding: "6px 12px",
-                                    fontSize: "12px",
-                                    background: "#ef4444",
-                                    color: "white",
-                                    flex: "1",
-                                    minWidth: "80px",
-                                  }}
-                                  onClick={() => handleOpen3(item)}
-                                  disabled={
-                                    !item.qty_on_hand || item.qty_on_hand <= 0
-                                  }
-                                >
-                                  Вернуть
-                                </button>
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+
+                              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                                <div className="rounded-xl bg-slate-50 p-2">
+                                  <div className="text-slate-500">Дата</div>
+                                  <div className="mt-0.5 font-semibold text-slate-900">
+                                    {profile?.role === "owner"
+                                      ? new Date(
+                                        item.created_at || item.last_movement_at
+                                      ).toLocaleDateString()
+                                      : new Date(
+                                        item.last_movement_at
+                                      ).toLocaleDateString()}
+                                  </div>
+                                </div>
+
+                                <div className="rounded-xl bg-slate-50 p-2">
+                                  <div className="text-slate-500">
+                                    {profile?.role !== "owner"
+                                      ? "На руках"
+                                      : "У агента"}
+                                  </div>
+                                  <div className="mt-0.5 font-semibold text-slate-900">
+                                    {(item.qty_on_hand_effective ?? item.qty_on_hand) > 0 ? (
+                                      <span
+                                        style={{
+                                          padding: "2px 6px",
+                                          background: "#d1fae5",
+                                          color: "#059669",
+                                          borderRadius: "4px",
+                                          fontSize: "11px",
+                                        }}
+                                      >
+                                        {item.qty_on_hand_effective ?? item.qty_on_hand}
+                                      </span>
+                                    ) : (
+                                      <span
+                                        style={{
+                                          padding: "2px 6px",
+                                          background: "#fee2e2",
+                                          color: "#dc2626",
+                                          borderRadius: "4px",
+                                          fontSize: "11px",
+                                        }}
+                                      >
+                                        Нет на руках
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {profile?.role === "owner" &&
+                                  item.subreals &&
+                                  item.subreals.length > 0 && (
+                                    <div className="col-span-2 rounded-xl bg-slate-50 p-2">
+                                      <div className="text-slate-500">
+                                        Передач
+                                      </div>
+                                      <div className="mt-0.5 font-semibold text-slate-900">
+                                        {item.subreals.length}
+                                      </div>
+                                    </div>
+                                  )}
+                              </div>
+
+                              {profile?.role !== "owner" && (
+                                <div
+                                  className="mt-4 flex flex-wrap gap-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    className="warehouse-header__create-btn"
+                                    style={{
+                                      padding: "6px 12px",
+                                      fontSize: "12px",
+                                      background: "#ef4444",
+                                      color: "white",
+                                      flex: "1",
+                                      minWidth: "80px",
+                                    }}
+                                    onClick={() => handleOpen3(item)}
+                                    disabled={
+                                      !(item.qty_on_hand_effective ?? item.qty_on_hand) ||
+                                      (item.qty_on_hand_effective ?? item.qty_on_hand) <= 0
+                                    }
+                                  >
+                                    Вернуть
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </DataContainer>
+
             </div>
           )}
 
@@ -1390,11 +1635,7 @@ const ProductionAgents = () => {
         <PendingModal
           onClose={() => setShowPendingModal(false)}
           onChanged={() => {
-            if (profile?.role === "owner") {
-              dispatch(fetchTransfersAsync());
-            } else {
-              dispatch(fetchAgentProductsAsync());
-            }
+            refreshAfterAcceptOrReturn();
           }}
         />
       )}
@@ -1402,13 +1643,18 @@ const ProductionAgents = () => {
         <ReturnProductModal
           onClose={() => setShowReturnProductModal(false)}
           onChanged={() => {
-            if (profile?.role === "owner") {
-              dispatch(fetchTransfersAsync());
-            } else {
-              dispatch(fetchAgentProductsAsync());
-            }
+            refreshAfterAcceptOrReturn();
           }}
           item={itemId3}
+        />
+      )}
+      {showMyReturnsModal && (
+        <MyReturnsModal
+          onClose={() => setShowMyReturnsModal(false)}
+          onRefresh={loadMyReturns}
+          loading={myReturnsLoading}
+          summary={myReturnsSummary}
+          returnsList={myReturns}
         />
       )}
       {showSellModal && (

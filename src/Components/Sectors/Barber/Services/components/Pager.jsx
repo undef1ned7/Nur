@@ -1,61 +1,38 @@
 import React from "react";
-import { PAGE_SIZE } from "../BarberServicesUtils";
 
-const Pager = ({ filteredCount, page, totalPages, onChange }) => {
-  if (filteredCount <= PAGE_SIZE) return null;
+const Pager = ({ count, page, hasNext, hasPrevious, onChange }) => {
+  if (count === 0 || (!hasNext && !hasPrevious)) return null;
 
-  const pageSafe = Math.min(Math.max(1, page), totalPages);
+  const pageSafe = Math.max(1, page);
 
-  const onPrev = () => onChange(Math.max(1, pageSafe - 1));
-  const onNext = () => onChange(Math.min(totalPages, pageSafe + 1));
+  const onPrev = () => {
+    if (hasPrevious) {
+      onChange(pageSafe - 1);
+    }
+  };
 
-  const pages = new Set([
-    1,
-    pageSafe - 1,
-    pageSafe,
-    pageSafe + 1,
-    totalPages,
-  ]);
-
-  const list = [...pages]
-    .filter((n) => n >= 1 && n <= totalPages)
-    .sort((a, b) => a - b);
+  const onNext = () => {
+    if (hasNext) {
+      onChange(pageSafe + 1);
+    }
+  };
 
   return (
     <nav className="barberservices__pager" aria-label="Пагинация">
       <button
         className="barberservices__pageBtn"
         onClick={onPrev}
-        disabled={pageSafe === 1}
+        disabled={!hasPrevious}
       >
         Назад
       </button>
-      <ul className="barberservices__pageList">
-        {list.map((n, i) => {
-          const prev = list[i - 1];
-          const needDots = prev && n - prev > 1;
-          return (
-            <React.Fragment key={n}>
-              {needDots && <li className="barberservices__dots">…</li>}
-              <li>
-                <button
-                  className={`barberservices__pageBtn ${
-                    n === pageSafe ? "is-active" : ""
-                  }`}
-                  aria-current={n === pageSafe ? "page" : undefined}
-                  onClick={() => onChange(n)}
-                >
-                  {n}
-                </button>
-              </li>
-            </React.Fragment>
-          );
-        })}
-      </ul>
+      <div className="barberservices__pageInfo">
+        Страница {pageSafe}
+      </div>
       <button
         className="barberservices__pageBtn"
         onClick={onNext}
-        disabled={pageSafe === totalPages}
+        disabled={!hasNext}
       >
         Далее
       </button>

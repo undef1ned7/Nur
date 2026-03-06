@@ -1,11 +1,15 @@
 // src/.../Tables.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { FaChair, FaTimes, FaPlus, FaFilter } from "react-icons/fa";
 import api from "../../../../api";
 import TablesHall from "./components/TablesHall";
 import TablesZones from "./components/TablesZones";
 import TablesFiltersModal from "./components/TablesFiltersModal";
 import "./Tables.scss";
+import { useCafeTablesWebSocket } from "../../../../hooks/useCafeWebSocket";
+import { useOutletContext } from "react-router-dom";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const listFrom = (r) => r?.data?.results || r?.data || [];
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
@@ -27,13 +31,14 @@ const isActiveOrderStatus = (s) => {
 };
 
 const Tables = () => {
+  const alert = useAlert();
   const [activeTab, setActiveTab] = useState("tables"); // tables | zones
   const [tablesView, setTablesView] = useState("hall"); // hall | manage
 
   const [zones, setZones] = useState([]);
   const [tables, setTables] = useState([]);
   const [ordersActive, setOrdersActive] = useState([]);
-
+  const { socketTables: socket } = useOutletContext()
   // confirm modal (no window.confirm)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -118,13 +123,16 @@ const Tables = () => {
       const full = await hydrateOrdersDetails(active);
       setOrdersActive(full);
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка загрузки данных");
+      alert(errorMessage, true);
       // Ошибка загрузки данных - неудачно при сетевых проблемах
     }
-  }, [hydrateOrdersDetails]);
+  }, [hydrateOrdersDetails, socket.tables]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
 
   useEffect(() => {
     const handler = () => loadAll();
@@ -177,7 +185,8 @@ const Tables = () => {
           await api.patch(`/cafe/tables/${t.id}/`, { status: "free" });
           setTables((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: "free" } : x)));
         } catch (e) {
-          // Не удалось обновить статус стола
+          const errorMessage = validateResErrors(e, "Не удалось обновить статус стола");
+          alert(errorMessage, true);
         }
       }
     })();
@@ -190,6 +199,8 @@ const Tables = () => {
       setZones((prev) => [...prev, res.data]);
       return true;
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка создания зоны");
+      alert(errorMessage, true);
       return false;
     }
   };
@@ -200,6 +211,8 @@ const Tables = () => {
       setZones((prev) => prev.map((z) => (z.id === id ? res.data : z)));
       return true;
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка обновления зоны");
+      alert(errorMessage, true);
       return false;
     }
   };
@@ -211,6 +224,8 @@ const Tables = () => {
       setTables((prev) => prev.map((t) => ((t.zone?.id || t.zone) === id ? { ...t, zone: "" } : t)));
       return true;
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка удаления зоны");
+      alert(errorMessage, true);
       return false;
     }
   };
@@ -222,6 +237,8 @@ const Tables = () => {
       setTables((prev) => [...prev, res.data]);
       return true;
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка создания стола");
+      alert(errorMessage, true);
       return false;
     }
   };
@@ -232,6 +249,8 @@ const Tables = () => {
       setTables((prev) => prev.map((t) => (t.id === id ? res.data : t)));
       return true;
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка обновления стола");
+      alert(errorMessage, true);
       return false;
     }
   };
@@ -242,6 +261,8 @@ const Tables = () => {
       setTables((prev) => prev.filter((t) => t.id !== id));
       return true;
     } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка удаления стола");
+      alert(errorMessage, true);
       return false;
     }
   };

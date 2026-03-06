@@ -77,7 +77,7 @@ const RecordaRatesTable = ({
             {!visible.length && (
               <tr>
                 <td className="barberrecordarates__muted" colSpan={4}>
-                  Нет мастеров.
+                  Нет мастеров
                 </td>
               </tr>
             )}
@@ -100,6 +100,7 @@ const RecordaRatesTable = ({
                 type="button"
                 className="barberrecordarates__iconBtn"
                 onClick={closeRatesModal}
+                aria-label="Закрыть"
               >
                 <FaTimes />
               </button>

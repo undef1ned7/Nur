@@ -1,0 +1,191 @@
+.marriage-modal {
+  // локальные переменные (с фолбэками)
+  --mm-bg: var(--panel-bg, #ffffff);
+  --mm-text: var(--text, #111827);
+  --mm-muted: var(--c-muted, #6b7280);
+  --mm-border: var(--c-border, #e5e7eb);
+  --mm-soft: var(--c-bg-soft, #f9fafb);
+  --mm-accent: var(--fg-accent, #f7d74f);
+  --mm-accent-hover: var(--fg-accent-darker, #e6c530);
+
+  color: var(--mm-text);
+
+  .add-modal__content {
+    background: var(--mm-bg);
+    width: min(520px, calc(100vw - 24px));
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .add-modal__header {
+    margin-bottom: 12px;
+
+    h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+  }
+
+  .add-modal__close-icon {
+    cursor: pointer;
+    color: var(--mm-muted);
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+
+  .add-modal__close-icon:hover {
+    color: var(--mm-text);
+    transform: scale(1.05);
+  }
+}
+
+.marriage-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.marriage-modal__card {
+  border: 1px solid var(--mm-border);
+  background: var(--mm-soft);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.marriage-modal__title {
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 700;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+
+.marriage-modal__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  font-size: 13px;
+  color: var(--mm-muted);
+}
+
+.marriage-modal__meta b {
+  color: var(--mm-text);
+  font-weight: 700;
+}
+
+.marriage-modal__amount {
+  grid-column: 1 / -1;
+  padding-top: 8px;
+  border-top: 1px dashed var(--mm-border);
+}
+
+.marriage-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.marriage-modal__label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.marriage-modal__input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--mm-border);
+  background: var(--c-input-bg, #ffffff);
+  color: var(--mm-text);
+  outline: none;
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.marriage-modal__input:focus {
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.marriage-modal__hint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--mm-muted);
+}
+
+.marriage-modal__error {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.marriage-modal__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.marriage-modal .btn {
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 42px;
+}
+
+.marriage-modal .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.marriage-modal__btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  transition: background-color 0.15s ease, transform 0.05s ease,
+    box-shadow 0.15s ease;
+}
+
+.marriage-modal__btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.marriage-modal__btn--primary {
+  background: var(--mm-accent);
+  color: #000;
+  box-shadow: 0 6px 16px rgba(247, 215, 79, 0.18);
+}
+
+.marriage-modal__btn--primary:hover:not(:disabled) {
+  background: var(--mm-accent-hover);
+}
+
+.marriage-modal__btn--danger {
+  background: #ef4444;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.18);
+}
+
+.marriage-modal__btn--danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+@media (max-width: 520px) {
+  .marriage-modal__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .marriage-modal__actions {
+    flex-direction: column;
+  }
+}
+

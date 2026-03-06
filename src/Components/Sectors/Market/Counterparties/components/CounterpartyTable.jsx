@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { formatPhone, getCounterpartyName } from "../utils";
+import { formatPhone, getCounterpartyName, getAgentDisplay } from "../utils";
 import "./CounterpartyTable.scss";
 
 /**
@@ -12,6 +12,7 @@ const CounterpartyRow = React.memo(
     rowNumber,
     onRowSelect,
     onCounterpartyClick,
+    showAgentColumn,
   }) => {
     const name = getCounterpartyName(counterparty);
     const phone = formatPhone(counterparty?.phone);
@@ -19,7 +20,7 @@ const CounterpartyRow = React.memo(
     const type = counterparty?.type || "—";
     const inn = counterparty?.inn || "—";
 
-    // Маппинг типов для отображения
+    // Маппинг типов для отображения 
     const typeLabels = {
       CLIENT: "Клиент",
       SUPPLIER: "Поставщик",
@@ -29,10 +30,7 @@ const CounterpartyRow = React.memo(
     const typeLabel = typeLabels[type] || type;
 
     return (
-      <tr
-        className="warehouse-table__row"
-        onClick={() => onCounterpartyClick(counterparty)}
-      >
+      <tr className="warehouse-table__row">
         <td onClick={(e) => onRowSelect(counterparty.id, e)}>
           <input
             type="checkbox"
@@ -49,9 +47,24 @@ const CounterpartyRow = React.memo(
         </td>
 
         <td>{typeLabel}</td>
-        {/* <td>{phone}</td>
-        <td>{email}</td>
-        <td>{inn}</td> */}
+
+        {showAgentColumn && (
+          <td className="warehouse-table__agent">
+            {getAgentDisplay(counterparty)}
+          </td>
+        )}
+        <td>
+          <button
+            type="button"
+            className="warehouse-table__open-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCounterpartyClick(counterparty);
+            }}
+          >
+            Открыть
+          </button>
+        </td>
       </tr>
     );
   },
@@ -59,7 +72,8 @@ const CounterpartyRow = React.memo(
     return (
       prevProps.counterparty.id === nextProps.counterparty.id &&
       prevProps.isSelected === nextProps.isSelected &&
-      prevProps.rowNumber === nextProps.rowNumber
+      prevProps.rowNumber === nextProps.rowNumber &&
+      prevProps.showAgentColumn === nextProps.showAgentColumn
     );
   }
 );
@@ -78,8 +92,10 @@ const CounterpartyTable = ({
   onSelectAll,
   onCounterpartyClick,
   getRowNumber,
+  showAgentColumn = false,
 }) => {
   const selectedRowsSize = selectedRows.size;
+  const colCount = 5 + (showAgentColumn ? 1 : 0);
   const counterpartiesData = useMemo(() => {
     return counterparties.map((counterparty, index) => ({
       counterparty,
@@ -94,7 +110,7 @@ const CounterpartyTable = ({
         <table className="warehouse-table w-full min-w-[1100px]">
           <tbody>
             <tr>
-              <td colSpan={7} className="warehouse-table__loading">
+              <td colSpan={colCount} className="warehouse-table__loading">
                 Загрузка...
               </td>
             </tr>
@@ -110,7 +126,7 @@ const CounterpartyTable = ({
         <table className="warehouse-table w-full min-w-[1100px]">
           <tbody>
             <tr>
-              <td colSpan={7} className="warehouse-table__empty">
+              <td colSpan={colCount} className="warehouse-table__empty">
                 Контрагенты не найдены
               </td>
             </tr>
@@ -141,9 +157,8 @@ const CounterpartyTable = ({
             <th>№</th>
             <th>Название</th>
             <th>Тип</th>
-            {/* <th>Телефон</th>
-            <th>Email</th>
-            <th>ИНН</th> */}
+            {showAgentColumn && <th>Агент</th>}
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -155,6 +170,7 @@ const CounterpartyTable = ({
               rowNumber={data.rowNumber}
               onRowSelect={onRowSelect}
               onCounterpartyClick={onCounterpartyClick}
+              showAgentColumn={showAgentColumn}
             />
           ))}
         </tbody>
@@ -168,7 +184,8 @@ const areEqual = (prevProps, nextProps) => {
     prevProps.loading !== nextProps.loading ||
     prevProps.isAllSelected !== nextProps.isAllSelected ||
     prevProps.selectedRows.size !== nextProps.selectedRows.size ||
-    prevProps.getRowNumber !== nextProps.getRowNumber
+    prevProps.getRowNumber !== nextProps.getRowNumber ||
+    prevProps.showAgentColumn !== nextProps.showAgentColumn
   ) {
     return false;
   }
@@ -181,7 +198,10 @@ const areEqual = (prevProps, nextProps) => {
     return true;
   }
 
-  if (prevProps.counterparties.length > 0 && nextProps.counterparties.length > 0) {
+  if (
+    prevProps.counterparties.length > 0 &&
+    nextProps.counterparties.length > 0
+  ) {
     if (prevProps.counterparties[0]?.id !== nextProps.counterparties[0]?.id) {
       return false;
     }
@@ -191,4 +211,3 @@ const areEqual = (prevProps, nextProps) => {
 };
 
 export default React.memo(CounterpartyTable, areEqual);
-

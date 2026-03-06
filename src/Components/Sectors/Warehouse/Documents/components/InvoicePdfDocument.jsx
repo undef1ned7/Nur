@@ -99,6 +99,12 @@ const s = StyleSheet.create({
   colDiscount: { width: "8%", textAlign: "right" },
   colPrice: { width: "12%", textAlign: "right" },
   colSum: { width: "13%", textAlign: "right" },
+  // Накладная на перемещение: 5 колонок (№, Наименование, Арт., Ед. изм., Кол-во)
+  colNoTransfer: { width: "5%" },
+  colNameTransfer: { width: "52%" },
+  colArtTransfer: { width: "8%" },
+  colUnitTransfer: { width: "10%" },
+  colQtyTransfer: { width: "25%", textAlign: "right" },
 
   // Итоги
   totalsSection: {
@@ -369,19 +375,25 @@ export default function InvoicePdfDocument({ data }) {
   const isInventory = docType === "INVENTORY";
   const isTransfer = docType === "TRANSFER";
 
-  // Скидка на уровне документа (может быть в процентах или абсолютном значении)
+  // Скидка на уровне документа (процент 0–100 или сумма в валюте)
+  const docPercent = Number(doc.discount_percent);
+  const hasExplicitPercent =
+    !Number.isNaN(docPercent) && docPercent >= 0 && docPercent <= 100;
   const documentDiscount = Number(
     doc.order_discount_total ??
     doc.discount_total ??
+    doc.discount_amount ??
     doc.discount_percent ??
     data.order_discount_total ??
     0
   );
 
-  // Вычисляем процент скидки документа, если он не указан напрямую
   let documentDiscountPercent = 0;
-  if (documentDiscount > 0 && subtotal > 0) {
-    // Если скидка больше 100, считаем её абсолютным значением
+  if (hasExplicitPercent) {
+    // Явно передан процент (например 10%) — используем его
+    documentDiscountPercent = docPercent;
+  } else if (documentDiscount > 0 && subtotal > 0) {
+    // Иначе выводим процент из суммы: если число > 100, считаем суммой в валюте
     if (documentDiscount > 100) {
       documentDiscountPercent = (documentDiscount / subtotal) * 100;
     } else {
@@ -389,68 +401,39 @@ export default function InvoicePdfDocument({ data }) {
     }
   }
 
-  // Поддержка обоих форматов: unit_price (API) и price (если где-то уже нормализовали)
+  // Как в форме: сумма по строке = кол-во × цена − скидка по товару (только % по позиции).
+  // Скидка документа в строку не входит, выводится отдельно в итогах.
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
-      const qty = Number(it.qty || it.quantity || 0);
-      const unit = Number(it.unit_price ?? it.price ?? 0);
-      const total = Number(it.total ?? qty * unit);
+        const qty = Number(it.qty || it.quantity || 0);
+        const unit = Number(it.unit_price ?? it.price ?? 0);
+        const itemDiscountPercent = Number(it.discount_percent ?? it.discount ?? 0);
+        // Сумма по строке только с учётом скидки товара: (кол-во × цена) × (1 − скидка%/100)
+        const subtotalRow = qty * unit;
+        const total = subtotalRow * (1 - itemDiscountPercent / 100);
 
-      // Скидка на уровне товара (если есть) - используем discount_percent в процентах
-      const itemDiscountPercent = Number(it.discount_percent ?? 0);
-
-      // Цена без скидки товара (если есть original_price или price_before_discount)
-      let priceNoDiscount = Number(
-        it.original_price ??
-        it.price_before_discount ??
-        it.price_without_discount ??
-        0
-      );
-
-      // Если цена без скидки не указана, вычисляем её из текущей цены и скидок
-      if (priceNoDiscount === 0 || priceNoDiscount === unit) {
-        // Если есть скидка на товар, вычисляем цену без скидки товара
-        if (itemDiscountPercent > 0) {
-          priceNoDiscount = unit / (1 - itemDiscountPercent / 100);
-        } else if (documentDiscountPercent > 0) {
-          // Если есть скидка на документ, вычисляем цену без скидки документа
-          priceNoDiscount = unit / (1 - documentDiscountPercent / 100);
-        } else {
-          // Если скидок нет, цена без скидки = текущая цена
+        let priceNoDiscount = Number(
+          it.original_price ??
+            it.price_before_discount ??
+            it.price_without_discount ??
+            unit
+        );
+        if (!priceNoDiscount) {
           priceNoDiscount = unit;
         }
-      }
 
-      // Общая скидка для товара (скидка товара + скидка документа)
-      let finalDiscountPercent = itemDiscountPercent;
-      if (documentDiscountPercent > 0 && itemDiscountPercent === 0) {
-        // Если есть только скидка документа, используем её
-        finalDiscountPercent = documentDiscountPercent;
-      } else if (documentDiscountPercent > 0 && itemDiscountPercent > 0) {
-        // Если есть обе скидки, вычисляем общую эффективную скидку
-        const itemPriceBeforeDiscount = priceNoDiscount;
-        const itemPriceAfterItemDiscount =
-          itemPriceBeforeDiscount * (1 - itemDiscountPercent / 100);
-        const itemPriceAfterDocumentDiscount =
-          itemPriceAfterItemDiscount * (1 - documentDiscountPercent / 100);
-        finalDiscountPercent =
-          ((itemPriceBeforeDiscount - itemPriceAfterDocumentDiscount) /
-            itemPriceBeforeDiscount) *
-          100;
-      }
-
-      return {
-        id: it.id,
-        name: it.name || it.product_name || "Товар",
-        qty,
-        unit_price: unit,
-        price_no_discount: priceNoDiscount,
-        discount: finalDiscountPercent,
-        total,
-        unit: it.unit || "ШТ",
-        article: it.article || "",
-      };
-    })
+        return {
+          id: it.id,
+          name: it.name || it.product_name || "Товар",
+          qty,
+          unit_price: unit,
+          price_no_discount: priceNoDiscount,
+          discount: itemDiscountPercent,
+          total,
+          unit: it.unit || "ШТ",
+          article: it.article || "",
+        };
+      })
     : [];
 
   const invoiceNumber = doc.number || "";
@@ -473,12 +456,14 @@ export default function InvoicePdfDocument({ data }) {
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        {/* Дата и время создания */}
-        <Text style={{ fontSize: 7, marginBottom: 4 }}>
-          {fmtDateTime(new Date().toISOString())}
-        </Text>
+        {/* Дата и время — слева сверху (как в образце накладной на перемещение) */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+          <Text style={{ fontSize: 7 }}>
+            {fmtDateTime(invoiceDate || new Date().toISOString())}
+          </Text>
+        </View>
 
-        {/* Заголовок */}
+        {/* Заголовок — жирный, крупнее */}
         <View style={s.header}>
           <Text style={s.title}>
             {documentTitle} № {invoiceNumber || "—"} от{" "}
@@ -486,25 +471,27 @@ export default function InvoicePdfDocument({ data }) {
           </Text>
         </View>
 
-        {/* Автор */}
-        {seller?.name && (
+        {/* Автор — не показываем для накладной на перемещение */}
+        {seller?.name && !isTransfer && (
           <Text style={{ fontSize: 7, textAlign: "right", marginBottom: 4 }}>
             Автор: {safe(seller.name)}
           </Text>
         )}
 
-        {/* Организация (для INVENTORY) */}
-        {isInventory && seller?.name && (
-          <View style={{ marginTop: 4, marginBottom: 4 }}>
-            <Text style={{ fontSize: 8 }}>
+        {/* Организация (для INVENTORY и для TRANSFER — как в образце) */}
+        {(isInventory || isTransfer) && seller?.name && (
+          <View style={{ marginTop: 4, marginBottom: 6 }}>
+            <Text style={{ fontSize: 8, marginBottom: 2 }}>
               Организация: {safe(seller.name)}
-              {seller.address && ` ${safe(seller.address)}`}
             </Text>
+            {seller.address && (
+              <Text style={{ fontSize: 8 }}>{safe(seller.address)}</Text>
+            )}
           </View>
         )}
 
         {/* Поставщик и Покупатель (для документов с контрагентами) */}
-        {!isInventory && (
+        {!isInventory && !isTransfer && (
           <View
             style={{
               flexDirection: "column",
@@ -587,9 +574,9 @@ export default function InvoicePdfDocument({ data }) {
           </View>
         )}
 
-        {/* Склады для TRANSFER */}
+        {/* Склады для накладной на перемещение — как в образце */}
         {isTransfer && (
-          <View style={{ marginTop: 4, marginBottom: 6, gap: 4 }}>
+          <View style={{ marginTop: 4, marginBottom: 8, gap: 4 }}>
             {data?.warehouse && (
               <Text style={{ fontSize: 8 }}>
                 Со склада: «{safe(data.warehouse)}»
@@ -605,128 +592,172 @@ export default function InvoicePdfDocument({ data }) {
 
         {/* Таблица товаров */}
         <View style={s.goodsTable}>
-          {/* Заголовок таблицы */}
-          <View style={[s.tableRow, s.tableHeader]}>
-            <View style={[s.tableCell, s.colNo]}>
-              <Text>№</Text>
-            </View>
-            <View style={[s.tableCell, s.colName]}>
-              <Text>Наименование</Text>
-            </View>
-            <View style={[s.tableCell, { width: "8%" }]}>
-              <Text>Арт.</Text>
-            </View>
-            <View style={[s.tableCell, s.colUnit]}>
-              <Text>Ед. изм.</Text>
-            </View>
-            {isInventory ? (
-              <View style={[s.tableCell, { width: "55%", textAlign: "right" }, s.tableCellLast]}>
-                <Text style={{ textAlign: "right" }}>Остаток факт.</Text>
-              </View>
-            ) : (
-              <>
-                <View style={[s.tableCell, s.colQty]}>
+          {/* Накладная на перемещение: 5 колонок — №, Наименование, Арт., Ед. изм., Кол-во */}
+          {isTransfer ? (
+            <>
+              <View style={[s.tableRow, s.tableHeader]}>
+                <View style={[s.tableCell, s.colNoTransfer]}>
+                  <Text>№</Text>
+                </View>
+                <View style={[s.tableCell, s.colNameTransfer]}>
+                  <Text>Наименование</Text>
+                </View>
+                <View style={[s.tableCell, s.colArtTransfer]}>
+                  <Text>Арт.</Text>
+                </View>
+                <View style={[s.tableCell, s.colUnitTransfer]}>
+                  <Text>Ед. изм.</Text>
+                </View>
+                <View style={[s.tableCell, s.colQtyTransfer, s.tableCellLast]}>
                   <Text style={{ textAlign: "right" }}>Кол-во</Text>
                 </View>
-                {showPriceColumns && (
+              </View>
+              {(items.length > 0 ? items : []).map((it, idx) => (
+                <View key={it.id || idx} style={idx === items.length - 1 ? [s.tableRow, s.tableRowLast] : s.tableRow}>
+                  <View style={[s.tableCell, s.colNoTransfer]}>
+                    <Text>{idx + 1}</Text>
+                  </View>
+                  <View style={[s.tableCell, s.colNameTransfer]}>
+                    <Text>{it.name}</Text>
+                  </View>
+                  <View style={[s.tableCell, s.colArtTransfer]}>
+                    <Text>{it.article || ""}</Text>
+                  </View>
+                  <View style={[s.tableCell, s.colUnitTransfer]}>
+                    <Text>{it.unit || "ШТ"}</Text>
+                  </View>
+                  <View style={[s.tableCell, s.colQtyTransfer, s.tableCellLast]}>
+                    <Text style={{ textAlign: "right" }}>{fmtQty(it.qty)}</Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : (
+            <>
+              {/* Заголовок таблицы (не TRANSFER) */}
+              <View style={[s.tableRow, s.tableHeader]}>
+                <View style={[s.tableCell, s.colNo]}>
+                  <Text>№</Text>
+                </View>
+                <View style={[s.tableCell, s.colName]}>
+                  <Text>Наименование</Text>
+                </View>
+                <View style={[s.tableCell, { width: "8%" }]}>
+                  <Text>Арт.</Text>
+                </View>
+                <View style={[s.tableCell, s.colUnit]}>
+                  <Text>Ед. изм.</Text>
+                </View>
+                {isInventory ? (
+                  <View style={[s.tableCell, { width: "55%", textAlign: "right" }, s.tableCellLast]}>
+                    <Text style={{ textAlign: "right" }}>Остаток факт.</Text>
+                  </View>
+                ) : (
                   <>
-                    {showDiscountColumns && (
+                    <View style={[s.tableCell, s.colQty]}>
+                      <Text style={{ textAlign: "right" }}>Кол-во</Text>
+                    </View>
+                    {showPriceColumns && (
                       <>
-                        <View style={[s.tableCell, s.colPriceNoDiscount]}>
-                          <Text style={{ textAlign: "right" }}>Цена без скидки</Text>
-                        </View>
-                        <View style={[s.tableCell, s.colDiscount]}>
-                          <Text style={{ textAlign: "right" }}>Скидка</Text>
-                        </View>
-                        <View style={[s.tableCell, s.colPrice]}>
-                          <Text style={{ textAlign: "right" }}>Цена</Text>
+                        {showDiscountColumns && (
+                          <>
+                            <View style={[s.tableCell, s.colPriceNoDiscount]}>
+                              <Text style={{ textAlign: "right" }}>Цена без скидки</Text>
+                            </View>
+                            <View style={[s.tableCell, s.colDiscount]}>
+                              <Text style={{ textAlign: "right" }}>Скидка</Text>
+                            </View>
+                            <View style={[s.tableCell, s.colPrice]}>
+                              <Text style={{ textAlign: "right" }}>Цена</Text>
+                            </View>
+                          </>
+                        )}
+                        {!showDiscountColumns && (
+                          <View style={[s.tableCell, s.colPrice]}>
+                            <Text style={{ textAlign: "right" }}>Цена</Text>
+                          </View>
+                        )}
+                        <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
+                          <Text style={{ textAlign: "right" }}>Сумма</Text>
                         </View>
                       </>
                     )}
-                    {!showDiscountColumns && (
-                      <View style={[s.tableCell, s.colPrice]}>
-                        <Text style={{ textAlign: "right" }}>Цена</Text>
+                    {!showPriceColumns && (
+                      <View style={[s.tableCell, { width: "47%", textAlign: "right" }, s.tableCellLast]}>
+                        <Text></Text>
                       </View>
                     )}
-                    <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
-                      <Text style={{ textAlign: "right" }}>Сумма</Text>
-                    </View>
                   </>
                 )}
-                {!showPriceColumns && (
-                  <View style={[s.tableCell, { width: "47%", textAlign: "right" }, s.tableCellLast]}>
-                    <Text></Text>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
+              </View>
 
-          {/* Строки товаров */}
-          {(items.length > 0 ? items : []).map((it, idx) => (
-            <View key={it.id || idx} style={s.tableRow}>
-              <View style={[s.tableCell, s.colNo]}>
-                <Text>{idx + 1}</Text>
-              </View>
-              <View style={[s.tableCell, s.colName]}>
-                <Text>{it.name}</Text>
-              </View>
-              <View style={[s.tableCell, { width: "8%" }]}>
-                <Text>{it.article || "—"}</Text>
-              </View>
-              <View style={[s.tableCell, s.colUnit]}>
-                <Text style={{ textAlign: "right" }}>{it.unit || "ШТ"}</Text>
-              </View>
-              {isInventory ? (
-                <View style={[s.tableCell, { width: "55%", textAlign: "right" }, s.tableCellLast]}>
-                  <Text style={{ textAlign: "right" }}>—</Text>
-                </View>
-              ) : (
-                <>
-                  <View style={[s.tableCell, s.colQty]}>
-                    <Text style={{ textAlign: "right" }}>{fmtQty(it.qty)}</Text>
+              {/* Строки товаров (не TRANSFER) */}
+              {(items.length > 0 ? items : []).map((it, idx) => (
+                <View key={it.id || idx} style={s.tableRow}>
+                  <View style={[s.tableCell, s.colNo]}>
+                    <Text>{idx + 1}</Text>
                   </View>
-                  {showPriceColumns && (
+                  <View style={[s.tableCell, s.colName]}>
+                    <Text>{it.name}</Text>
+                  </View>
+                  <View style={[s.tableCell, { width: "8%" }]}>
+                    <Text>{it.article || "—"}</Text>
+                  </View>
+                  <View style={[s.tableCell, s.colUnit]}>
+                    <Text style={{ textAlign: "right" }}>{it.unit || "ШТ"}</Text>
+                  </View>
+                  {isInventory ? (
+                    <View style={[s.tableCell, { width: "55%", textAlign: "right" }, s.tableCellLast]}>
+                      <Text style={{ textAlign: "right" }}>—</Text>
+                    </View>
+                  ) : (
                     <>
-                      {showDiscountColumns && (
+                      <View style={[s.tableCell, s.colQty]}>
+                        <Text style={{ textAlign: "right" }}>{fmtQty(it.qty)}</Text>
+                      </View>
+                      {showPriceColumns && (
                         <>
-                          <View style={[s.tableCell, s.colPriceNoDiscount]}>
-                            <Text style={{ textAlign: "right" }}>
-                              {n2(it.price_no_discount)}
-                            </Text>
-                          </View>
-                          <View style={[s.tableCell, s.colDiscount]}>
-                            <Text style={{ textAlign: "right" }}>
-                              {it.discount > 0 ? `${n2(it.discount)}%` : "—"}
-                            </Text>
-                          </View>
-                          <View style={[s.tableCell, s.colPrice]}>
-                            <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
+                          {showDiscountColumns && (
+                            <>
+                              <View style={[s.tableCell, s.colPriceNoDiscount]}>
+                                <Text style={{ textAlign: "right" }}>
+                                  {n2(it.price_no_discount)}
+                                </Text>
+                              </View>
+                              <View style={[s.tableCell, s.colDiscount]}>
+                                <Text style={{ textAlign: "right" }}>
+                                  {it.discount > 0 ? `${n2(it.discount)}%` : "—"}
+                                </Text>
+                              </View>
+                              <View style={[s.tableCell, s.colPrice]}>
+                                <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
+                              </View>
+                            </>
+                          )}
+                          {!showDiscountColumns && (
+                            <View style={[s.tableCell, s.colPrice]}>
+                              <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
+                            </View>
+                          )}
+                          <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
+                            <Text style={{ textAlign: "right" }}>{n2(it.total)}</Text>
                           </View>
                         </>
                       )}
-                      {!showDiscountColumns && (
-                        <View style={[s.tableCell, s.colPrice]}>
-                          <Text style={{ textAlign: "right" }}>{n2(it.unit_price)}</Text>
+                      {!showPriceColumns && (
+                        <View style={[s.tableCell, { width: "47%", textAlign: "right" }, s.tableCellLast]}>
+                          <Text></Text>
                         </View>
                       )}
-                      <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
-                        <Text style={{ textAlign: "right" }}>{n2(it.total)}</Text>
-                      </View>
                     </>
                   )}
-                  {!showPriceColumns && (
-                    <View style={[s.tableCell, { width: "47%", textAlign: "right" }, s.tableCellLast]}>
-                      <Text></Text>
-                    </View>
-                  )}
-                </>
-              )}
-            </View>
-          ))}
+                </View>
+              ))}
+            </>
+          )}
 
           {/* Строка "Итого:" (только для документов с ценой и суммой) */}
-          {showPriceColumns && (
+          {showPriceColumns && !isTransfer && (
             <View style={[s.tableRow, s.tableRowLast, s.tableHeader]}>
               <View style={[s.tableCell, s.colNo]}>
                 <Text></Text>
@@ -765,7 +796,7 @@ export default function InvoicePdfDocument({ data }) {
               )}
               <View style={[s.tableCell, s.colSum, s.tableCellLast]}>
                 <Text style={{ textAlign: "right", fontWeight: "bold" }}>
-                  {n2(total)}
+                  {n2(items.reduce((sum, it) => sum + Number(it.total || 0), 0))}
                 </Text>
               </View>
             </View>
@@ -776,6 +807,27 @@ export default function InvoicePdfDocument({ data }) {
         {showPriceColumns && (
           <>
             <View style={s.totalsSection}>
+              {(() => {
+                // Скидка документа в деньгах и процентах — показываем отдельно, как в форме
+                const documentDiscountAmount = Number(
+                  doc.discount_amount ?? doc.discount_total ?? 0
+                );
+
+                if (documentDiscountAmount > 0 || documentDiscountPercent > 0) {
+                  return (
+                    <View style={s.totalRow}>
+                      <Text style={s.totalLabel}>Скидка документа:</Text>
+                      <Text style={s.totalValue}>
+                        {n2(documentDiscountAmount)}{" "}
+                        {documentDiscountPercent > 0
+                          ? `(${n2(documentDiscountPercent)}%)`
+                          : ""}
+                      </Text>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
               <View style={[s.totalRow, s.totalBold]}>
                 <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
                 <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>

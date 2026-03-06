@@ -82,6 +82,16 @@ const ClientsHeader = ({
             </button>
           </div>
 
+          <button
+            className="barberclient__addBtn"
+            onClick={onAdd}
+            type="button"
+            aria-label="Добавить клиента"
+            title="Добавить клиента"
+          >
+            <FaPlus />
+          </button>
+
           <div className="barberclient__viewToggle">
             <button
               className={`barberclient__viewBtn ${viewMode === "table" ? "is-active" : ""}`}
@@ -100,16 +110,6 @@ const ClientsHeader = ({
               <FaThLarge />
             </button>
           </div>
-
-          <button
-            className="barberclient__addBtn"
-            onClick={onAdd}
-            type="button"
-            aria-label="Добавить клиента"
-            title="Добавить клиента"
-          >
-            <FaPlus />
-          </button>
 
           {hasFilters && (
             <button

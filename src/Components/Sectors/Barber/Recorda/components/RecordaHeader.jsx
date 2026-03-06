@@ -9,7 +9,7 @@ const STATUS_OPTIONS = [
   { value: "confirmed", label: "Подтверждено" },
   { value: "completed", label: "Завершено" },
   { value: "cancelled", label: "Отменено" },
-  { value: "no_show", label: "Не пришёл" },
+  { value: "no_show", label: "Не явился" },
 ];
 
 const RecordaHeader = ({
@@ -31,7 +31,7 @@ const RecordaHeader = ({
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const barberOptions = [
-    { value: "", label: "Все сотрудники" },
+    { value: "", label: "Все мастера" },
     ...barbers.map((b) => ({ value: String(b.id), label: b.name })),
   ];
 
@@ -167,12 +167,12 @@ const RecordaHeader = ({
 
             <div className="barberrecorda__filtersPanelBody">
               <div className="barberrecorda__filtersPanelRow">
-                <label className="barberrecorda__filtersPanelLabel">Сотрудник</label>
+                <label className="barberrecorda__filtersPanelLabel">Мастер</label>
                 <BarberSelect
                   value={fltBarber}
                   onChange={onBarberChange}
                   options={barberOptions}
-                  placeholder="Все сотрудники"
+                  placeholder="Все мастера"
                 />
               </div>
 

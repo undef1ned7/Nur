@@ -1,8 +1,9 @@
 import React, { useMemo } from "react";
 import { FaTimes, FaPlus, FaTrash } from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+import { useAlert } from "../../../../../hooks/useDialog";
 
-const safeStr = (value) => String(value ?? "").trim();
+const safeStr = (value) => String(value ?? "");
 
 const formatDecimalInput = (value) => {
   const cleaned = String(value ?? "").replace(",", ".");
@@ -43,11 +44,10 @@ const MenuItemModal = ({
           kitchen.title || kitchen.name || kitchen.kitchen_title
         );
         const number = kitchen.number ?? kitchen.kitchen_number;
-        const label = `${title || "Кухня"}${
-          number !== undefined && number !== null && number !== "" 
-            ? ` №${number}` 
-            : ""
-        }`;
+        const label = `${title || "Кухня"}${number !== undefined && number !== null && number !== ""
+          ? ` №${number}`
+          : ""
+          }`;
         return { value: String(kitchen.id), label: safeStr(label) };
       })
       .filter((opt) => opt.value && opt.label);
@@ -59,9 +59,8 @@ const MenuItemModal = ({
     return (Array.isArray(warehouse) ? warehouse : [])
       .map((product) => ({
         value: String(product.id),
-        label: `${safeStr(product.title)}${
-          safeStr(product.unit) ? ` (${safeStr(product.unit)})` : ""
-        }`,
+        label: `${safeStr(product.title)}${safeStr(product.unit) ? ` (${safeStr(product.unit)})` : ""
+          }`,
       }))
       .filter((opt) => opt.value && opt.label);
   }, [warehouse]);
@@ -77,7 +76,7 @@ const MenuItemModal = ({
 
   const imageSrc = imagePreview || "";
 
-  const handlePriceChange = (e) => 
+  const handlePriceChange = (e) =>
     updateField({ price: formatDecimalInput(e.target.value) });
 
   return (
@@ -156,6 +155,11 @@ const MenuItemModal = ({
                     placeholder="Например: 250"
                     type="text"
                     inputMode="decimal"
+                    onFocus={(e) => {
+                      if (e?.currentTarget?.value == 0) {
+                        updateField({ price: '' });
+                      }
+                    }}
                     autoComplete="off"
                     required
                   />

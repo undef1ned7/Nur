@@ -583,6 +583,65 @@
   width: fit-content;
 }
 
+.client-details__deal-status.is-debt {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  // border/background/color задаются инлайном из JSX (по проценту)
+}
+
+.client-details__debtProgress {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.client-details__debtText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.client-details__debtPercent {
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+
+/* Battery-like progress */
+.client-details__battery {
+  position: relative;
+  width: 54px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid rgba(15, 23, 42, 0.28);
+  background: rgba(255, 255, 255, 0.7);
+  padding: 2px;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.client-details__battery::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.client-details__batteryFill {
+  height: 100%;
+  border-radius: 3px;
+  width: 0%;
+  transition: width 360ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 .client-details__deal-tasks {
   color: var(--muted);
   font-weight: 600;
@@ -661,6 +720,15 @@
     border: none;
     margin: 0 0 16px 20px;
     width: fit-content;
+  }
+
+  .client-details__debtProgress {
+    gap: 8px;
+  }
+
+  .client-details__battery {
+    width: 48px;
+    height: 16px;
   }
 
   .client-details__deal-tasks {

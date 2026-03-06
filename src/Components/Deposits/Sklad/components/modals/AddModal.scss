@@ -1,0 +1,178 @@
+.sklad-add-modal {
+  // лёгкая модернизация складского AddModal, не ломая базовый `.add-modal` из `Sklad.scss`
+  --sam-border: var(--c-border, #e5e7eb);
+  --sam-muted: var(--c-muted, #6b7280);
+  --sam-text: var(--text, #111827);
+  --sam-bg: var(--panel-bg, #ffffff);
+  --sam-soft: var(--c-bg-soft, #f9fafb);
+
+  .add-modal__content {
+    background: var(--sam-bg);
+    border-radius: 14px;
+    padding: 18px 16px;
+  }
+
+  .add-modal__header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .add-modal__close-icon {
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+
+  .add-modal__close-icon:hover {
+    color: var(--sam-text);
+    transform: scale(1.05);
+  }
+}
+
+.sklad-add-modal__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sklad-add-modal .add-modal__button {
+  width: 100%;
+  margin-left: 0; // перебиваем базовый стиль
+  margin-bottom: 0;
+  background: var(--sam-soft);
+  border: 1px solid var(--sam-border);
+  padding: 10px 12px;
+  font-weight: 700;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.05s ease;
+}
+
+.sklad-add-modal .add-modal__button:hover {
+  border-color: rgba(17, 24, 39, 0.2);
+}
+
+.sklad-add-modal .add-modal__button:active {
+  transform: translateY(1px);
+}
+
+.sklad-add-modal .add-modal__button.add-modal__button-active {
+  background: var(--fg-accent, #ffd400);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.sklad-add-modal__tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sklad-add-modal .add-modal__section {
+  gap: 8px;
+}
+
+.sklad-add-modal .add-modal__input {
+  padding: 10px 12px;
+  border: 1px solid var(--sam-border);
+  border-radius: 10px;
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sklad-add-modal .add-modal__input:focus {
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+.sklad-add-modal .create-client {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(17, 24, 39, 0.25);
+  background: transparent;
+  font-weight: 700;
+}
+
+.sklad-add-modal__subform {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--sam-border);
+  background: var(--sam-soft);
+}
+
+.sklad-add-modal__subformActions {
+  display: flex;
+  gap: 10px;
+}
+
+.sklad-add-modal__subformActions .create-client {
+  flex: 1;
+  margin-top: 0;
+  border-style: solid;
+}
+
+.sklad-add-modal__checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  margin: 4px 0;
+}
+
+.sklad-add-modal__checkboxRow--expanded {
+  margin-bottom: 10px;
+}
+
+.sklad-add-modal__checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.sklad-add-modal__checkboxText {
+  font-size: 14px;
+}
+
+.sklad-add-modal__debtForm {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--sam-border);
+  border-radius: 12px;
+  background: var(--sam-soft);
+}
+
+.sklad-add-modal__subLabel {
+  display: block;
+  margin: 6px 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sam-text);
+}
+
+.sklad-add-modal__warning {
+  margin: 6px 0 10px;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.sklad-add-modal__summary {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.08);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 520px) {
+  .sklad-add-modal__tabs {
+    grid-template-columns: 1fr;
+  }
+}
+

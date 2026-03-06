@@ -1,7 +1,7 @@
 // MastersHistoryUtils.js
 
 /* ===== базовые утилиты ===== */
-export const PAGE_SIZE = 15;
+export const PAGE_SIZE = 50;
 
 export const pad = (n) => String(n).padStart(2, "0");
 

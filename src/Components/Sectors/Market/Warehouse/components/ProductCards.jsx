@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { GripVertical } from "lucide-react";
 import { formatPrice, formatStock, getPrimaryImage } from "../utils";
 import noImage from "./placeholder.png";
 import "./ProductCards.scss";
@@ -14,13 +15,32 @@ const ProductCard = React.memo(
     rowNumber,
     onRowSelect,
     onProductClick,
+    enableDrag,
+    onProductDragStart,
   }) => {
     return (
       <div
-        className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+        className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
         onClick={() => onProductClick(product)}
       >
         <div className="flex items-start gap-3">
+          {enableDrag && onProductDragStart && (
+            <button
+              type="button"
+              className="warehouse-drag-handle warehouse-drag-handle--card"
+              draggable
+              onDragStart={(e) => {
+                e.stopPropagation();
+                onProductDragStart(product, e);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              title="Перетащить"
+              aria-label="Перетащить"
+            >
+              <GripVertical size={18} />
+            </button>
+          )}
           <div className="pt-1" onClick={(e) => onRowSelect(product.id, e)}>
             <input
               type="checkbox"
@@ -97,7 +117,9 @@ const ProductCard = React.memo(
       prevProps.product.id === nextProps.product.id &&
       prevProps.isSelected === nextProps.isSelected &&
       prevProps.rowNumber === nextProps.rowNumber &&
-      prevProps.primaryImage?.image_url === nextProps.primaryImage?.image_url
+      prevProps.primaryImage?.image_url === nextProps.primaryImage?.image_url &&
+      prevProps.enableDrag === nextProps.enableDrag &&
+      prevProps.onProductDragStart === nextProps.onProductDragStart
     );
   }
 );
@@ -116,6 +138,8 @@ const ProductCards = ({
   onSelectAll,
   onProductClick,
   getRowNumber,
+  enableDrag = false,
+  onProductDragStart,
 }) => {
   // Мемоизация вычислений для всех товаров
   // Используем selectedRows.size вместо selectedRows для более стабильного сравнения
@@ -184,6 +208,8 @@ const ProductCards = ({
             rowNumber={productData.rowNumber}
             onRowSelect={onRowSelect}
             onProductClick={onProductClick}
+            enableDrag={enableDrag}
+            onProductDragStart={onProductDragStart}
           />
         ))}
       </div>
@@ -198,7 +224,9 @@ const areEqual = (prevProps, nextProps) => {
     prevProps.loading !== nextProps.loading ||
     prevProps.isAllSelected !== nextProps.isAllSelected ||
     prevProps.selectedRows.size !== nextProps.selectedRows.size ||
-    prevProps.getRowNumber !== nextProps.getRowNumber
+    prevProps.getRowNumber !== nextProps.getRowNumber ||
+    prevProps.enableDrag !== nextProps.enableDrag ||
+    prevProps.onProductDragStart !== nextProps.onProductDragStart
   ) {
     return false;
   }

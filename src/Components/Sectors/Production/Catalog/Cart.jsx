@@ -42,13 +42,15 @@ import { useShifts } from "../../../../store/slices/shiftSlice";
 import { useCash, getCashBoxes } from "../../../../store/slices/cashSlice";
 // Alert is handled by parent (ProductionCatalog) via onNotify
 import "./Cart.scss";
-import { useConfirm } from "../../../../hooks/useDialog";
+import { useAlert, useConfirm } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 
 const CartItem = ({
   item,
   onUpdateQuantity,
   onUpdateGift,
+  maxStock,
   onRemoveItem,
   editable,
 }) => {
@@ -87,25 +89,25 @@ const CartItem = ({
       console.log("CartItem: increment disabled, editable:", editable);
       return;
     }
-    const newQuantity = quantity + 1;
+    const current = Number(quantity) || 0;
+    const newQuantity = current + 1;
     setQuantity(newQuantity);
     console.log("CartItem: incrementing", item.id, "to", newQuantity);
     onUpdateQuantity(item.id, newQuantity);
   };
-
+  
   const handleDecrement = (e, id) => {
     e.stopPropagation();
-    if (!editable || quantity <= 0) {
-      handleRemove(id)
-      console.log(
-        "CartItem: decrement disabled, editable:",
-        editable,
-        "quantity:",
-        quantity
-      );
+    if (!editable) {
+      console.log("CartItem: decrement disabled, editable:", editable);
       return;
     }
-    const newQuantity = quantity - 1;
+    const current = Number(quantity) || 0;
+    if (current <= 1) {
+      handleRemove(e);
+      return;
+    }
+    const newQuantity = current - 1;
     setQuantity(newQuantity);
     console.log("CartItem: decrementing", item.id, "to", newQuantity);
     onUpdateQuantity(item.id, newQuantity);
@@ -113,16 +115,22 @@ const CartItem = ({
 
   const handleQuantityInputChange = (e) => {
     e.stopPropagation();
-    const value = Number(e.target.value);
-    if (!isNaN(value) && value >= 1) {
+    const raw = e.target.value;
+    if (raw === "") {
+      setQuantity("");
+      return;
+    }
+    const value = Number(raw);
+    if (!isNaN(value) && value >= 1 && value <= maxStock + item.quantity) {
       setQuantity(value);
     }
   };
 
   const handleQuantityInputBlur = (e) => {
     e.stopPropagation();
-    const value = Number(e.target.value);
-    if (isNaN(value) || value < 1) {
+    const raw = e.target.value;
+    const value = Number(raw);
+    if (raw === "" || isNaN(value) || value < 1) {
       setQuantity(1);
       onUpdateQuantity(item.id, 1);
     } else {
@@ -202,7 +210,6 @@ const CartItem = ({
             </button>
             <input
               type="number"
-              min="0"
               value={quantity}
               onChange={handleQuantityInputChange}
               onBlur={handleQuantityInputBlur}
@@ -210,6 +217,7 @@ const CartItem = ({
               onClick={(e) => e.stopPropagation()}
               className="quantity-input"
               disabled={!editable}
+              max={maxStock}
             />
             <button
               className="quantity-btn"
@@ -257,6 +265,7 @@ const CartItem = ({
 
         <div className="item-info">
           <p className="gift">Подарок: {Number(giftQty).toLocaleString()}</p>
+          <p className="gift">В наличии: {Number(maxStock + +item.quantity).toLocaleString()}</p>
           <p className="total-qty">
             Итого шт: {Number(item.quantity || 0).toLocaleString()}
           </p>
@@ -816,11 +825,14 @@ const Cart = ({
   agentCartId: agentCartIdProp = null,
   onNotify,
   onClose,
+  productsList,
   isOpen = false,
   onOpenChange,
   setAgentCartItemsCount,
   totalItemsCount = 0,
+  onMobileViewChange,
 }) => {
+  const alert  = useAlert();
   const confirm = useConfirm();
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
@@ -862,10 +874,16 @@ const Cart = ({
 
   // Alerts delegated to parent
 
-  // Загружаем клиентов при монтировании
+  // Корзина может быть:
+  // - десктоп-модалкой (isOpen === true)
+  // - мобильной нижней секцией (isMobile && isOrderSectionOpen)
+  const isCartActive = isOpen || (isMobile && isOrderSectionOpen);
+
+  // Загружаем клиентов только когда корзина реально открыта/активна
   useEffect(() => {
+    if (!isCartActive) return;
     dispatch(fetchClientsAsync());
-  }, [dispatch]);
+  }, [dispatch, isCartActive]);
 
   // Проверяем, мобильное ли это устройство
   useEffect(() => {
@@ -881,81 +899,49 @@ const Cart = ({
     };
   }, []);
 
-  // Load items for provided or discovered draft cart; do not create here
+  useEffect(() => {
+    onMobileViewChange?.(isMobile);
+  }, [isMobile, onMobileViewChange]);
+
+  // Load items for provided or discovered draft cart.
+  // ВАЖНО: не создаём корзину на монтировании компонента (Cart рендерится всегда),
+  // чтобы не плодить лишние запросы `/main/agents/me/cart/start/` при открытии страницы.
   useEffect(() => {
     (async () => {
       try {
-        let cid = agentCartIdProp;
-        if (!cid) {
-          // Используем startAgentCart для получения/создания корзины
-          const cart = await dispatch(
-            startAgentCart({ agent: null, order_discount_total: "0.00" })
-          ).unwrap();
-          if (cart?.id) {
-            cid = cart.id;
-            setAgentCart(cart);
-            localStorage.setItem("agentCartId", cid);
-          }
-        }
-        setAgentCartId(cid || null);
-        if (cid) {
-          setLoadingAgentItems(true);
-          try {
-            // Используем getAgentCart для получения активной корзины
-            const cart = await dispatch(
-              getAgentCart({ agent: null, order_discount_total: "0.00" })
-            ).unwrap();
-            if (cart?.id) {
-              setAgentCart(cart);
-              setAgentItems(Array.isArray(cart.items) ? cart.items : []);
-              // Обновляем ID корзины если он изменился
-              if (cart.id !== cid) {
-                setAgentCartId(cart.id);
-                localStorage.setItem("agentCartId", cart.id);
-              }
-            } else {
-              // Если корзина не найдена, создаем новую
-              const newCart = await dispatch(
-                startAgentCart({ agent: null, order_discount_total: "0.00" })
-              ).unwrap();
-              if (newCart?.id) {
-                setAgentCartId(newCart.id);
-                setAgentCart(newCart);
-                setAgentItems(
-                  Array.isArray(newCart.items) ? newCart.items : []
-                );
-                localStorage.setItem("agentCartId", newCart.id);
-              }
-            }
-          } catch (e) {
-            // Если корзина не найдена, создаем новую
-            try {
-              const newCart = await dispatch(
-                startAgentCart({ agent: null, order_discount_total: "0.00" })
-              ).unwrap();
-              if (newCart?.id) {
-                setAgentCartId(newCart.id);
-                setAgentCart(newCart);
-                setAgentItems(
-                  Array.isArray(newCart.items) ? newCart.items : []
-                );
-                localStorage.setItem("agentCartId", newCart.id);
-              }
-            } catch (err) {
-              console.error("Error creating cart:", err);
-            }
-          } finally {
-            setLoadingAgentItems(false);
+        if (!isCartActive) return;
+
+        // cart id может прийти пропсом от родителя или лежать в localStorage
+        const storedId = localStorage.getItem("agentCartId");
+        const cid = agentCartIdProp || storedId || null;
+        setAgentCartId(cid);
+
+        setLoadingAgentItems(true);
+        // Используем getAgentCart (legacy /cart/start/) как единственный источник истины
+        const cart = await dispatch(
+          getAgentCart({ agent: null, order_discount_total: "0.00" })
+        ).unwrap();
+
+        if (cart?.id) {
+          setAgentCart(cart);
+          setAgentItems(Array.isArray(cart.items) ? cart.items : []);
+          // Обновляем ID корзины если он изменился
+          if (cart.id !== cid) {
+            setAgentCartId(cart.id);
+            localStorage.setItem("agentCartId", cart.id);
           }
         } else {
-          setAgentItems([]);
           setAgentCart(null);
+          setAgentItems([]);
         }
       } catch (e) {
-        console.error("Error loading cart:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при загрузке корзины");
+        alert(errorMessage, true);
+      } finally {
+        setLoadingAgentItems(false);
       }
     })();
-  }, [dispatch, agentCartIdProp]);
+  }, [dispatch, agentCartIdProp, isCartActive]);
 
   const handleUpdateQuantity = async (itemId, newQuantity) => {
     console.log("Cart: handleUpdateQuantity called", {
@@ -964,7 +950,7 @@ const Cart = ({
       agentCartId,
     });
     if (newQuantity < 0) {
-      console.log("Cart: invalid quantity", newQuantity);
+      alert("Количество не может быть отрицательным", true);
       return;
     }
 
@@ -998,7 +984,8 @@ const Cart = ({
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
         }
       } catch (e) {
-        console.error("Error updating quantity:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при обновлении количества");
+        alert(errorMessage, true);
         // Восстанавливаем предыдущее значение при ошибке
       }
     } else {
@@ -1037,7 +1024,8 @@ const Cart = ({
         setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
       }
     } catch (e) {
-      console.error("Error updating gift quantity:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при обновлении количества");
+      alert(errorMessage, true);
     }
   };
 
@@ -1062,7 +1050,8 @@ const Cart = ({
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
         }
       } catch (e) {
-        console.error("Error removing item:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при удалении товара");
+        alert(errorMessage, true);
       }
     } else {
       dispatch(removeFromCart(itemId));
@@ -1071,6 +1060,7 @@ const Cart = ({
 
   // Обновляем корзину при изменении agentCartId
   useEffect(() => {
+    if (!isCartActive) return;
     if (agentCartId && agentCartIdProp === agentCartId) {
       (async () => {
         try {
@@ -1080,36 +1070,36 @@ const Cart = ({
           setAgentCart(cart);
           setAgentItems(Array.isArray(cart.items) ? cart.items : []);
         } catch (e) {
-          console.error("Error refreshing cart:", e);
+          const errorMessage = validateResErrors(e, "Ошибка при обновлении корзины");
+          alert(errorMessage, true);
         }
       })();
     }
-  }, [agentCartId, agentCartIdProp, dispatch]);
+  }, [agentCartId, agentCartIdProp, dispatch, isCartActive]);
 
   // Функция для обновления корзины
   const refreshCart = useCallback(async () => {
     try {
       setLoadingAgentItems(true);
-      // Проверяем актуальный ID корзины из localStorage
-      const storedCartId = localStorage.getItem("agentCartId");
-      const cartIdToUse = storedCartId || agentCartId || agentCartIdProp;
-
-      if (cartIdToUse) {
-        const cart = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" })
-        ).unwrap();
-        if (cart?.id) {
-          setAgentCart(cart);
-          setAgentItems(Array.isArray(cart.items) ? cart.items : []);
-          // Обновляем ID корзины если он изменился
-          if (cart.id !== agentCartId) {
-            setAgentCartId(cart.id);
-            localStorage.setItem("agentCartId", cart.id);
-          }
+      // legacy endpoint /cart/start/ сам создаёт/возвращает активную корзину,
+      // поэтому НЕ требуем наличия cartId заранее.
+      const cart = await dispatch(
+        getAgentCart({ agent: null, order_discount_total: "0.00" })
+      ).unwrap();
+      if (cart?.id) {
+        setAgentCart(cart);
+        setAgentItems(Array.isArray(cart.items) ? cart.items : []);
+        if (cart.id !== agentCartId) {
+          setAgentCartId(cart.id);
+          localStorage.setItem("agentCartId", cart.id);
         }
+      } else {
+        setAgentCart(null);
+        setAgentItems([]);
       }
     } catch (e) {
-      console.error("Error refreshing cart:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при обновлении корзины");
+      alert(errorMessage, true);
     } finally {
       setLoadingAgentItems(false);
     }
@@ -1139,17 +1129,19 @@ const Cart = ({
           getAgentCart({ agent: null, order_discount_total: "0.00" })
         ).unwrap();
         setAgentCart((prev) => (prev ? { ...prev, client } : prev));
-      } catch (e) {
-        console.error("Error updating client:", e);
+      } catch (e) { 
+        const errorMessage = validateResErrors(e, "Ошибка при обновлении клиента");
+        alert(errorMessage, true);
       }
     }
   };
 
-  // Загружаем смены и кассы при монтировании
+  // Загружаем смены и кассы только когда корзина открыта
   useEffect(() => {
+    if (!isCartActive) return;
     dispatch(fetchShiftsAsync());
     dispatch(getCashBoxes());
-  }, [dispatch]);
+  }, [dispatch, isCartActive]);
 
   // Функция для проверки и открытия смены
   const ensureShiftIsOpen = async () => {
@@ -1303,11 +1295,7 @@ const Cart = ({
         setIsOrderSectionOpen(false);
       }
     } catch (e) {
-      console.error("Error submitting cart:", e);
-      const errorMessage =
-        e?.response?.data?.shift_id?.[0] ||
-        e?.message ||
-        "Не удалось оформить заказ. Попробуйте ещё раз.";
+      const errorMessage = validateResErrors(e, "Ошибка при оформлении заказа");
       onNotify && onNotify("error", errorMessage);
     } finally {
       setSubmitting(false);
@@ -1713,9 +1701,13 @@ const Cart = ({
             const cartStatus = agentCart?.status;
             const isEditable =
               !agentCart || cartStatus === "draft" || cartStatus === "active";
+
+            const maxStockTotal = productsList?.find(el => el.id === item.product)?.quantity || 0
+            
             return (
               <CartItem
                 key={item.id}
+                maxStock={maxStockTotal}
                 item={item}
                 onUpdateQuantity={handleUpdateQuantity}
                 onUpdateGift={handleUpdateGift}
@@ -1819,7 +1811,7 @@ const Cart = ({
       {isMobile && (
         <div
           className={`mobile-order-section ${isOrderSectionOpen ? "open" : ""
-            } ${isClosing ? "closing" : ""} z-50!`}
+            } ${isClosing ? "closing" : ""} z-100!`}
           onTouchStart={handleOrderTouchStart}
           onTouchMove={handleOrderTouchMove}
           onTouchEnd={handleOrderTouchEnd}

@@ -28,4 +28,4 @@ const STATUS_RANK = {
 
 export const rankOf = (ui) => STATUS_RANK[ui] ?? 1;
 
-export const PAGE_SIZE = 15;
+export const PAGE_SIZE = 50;

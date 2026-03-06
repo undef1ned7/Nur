@@ -1,94 +1,200 @@
 // MastersHistory.jsx
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import "./MastersHistory.scss";
 import api from "../../../../../api";
-import { MastersHistoryHeader, MastersHistoryList, Pager } from "./components";
+import { MastersHistoryHeader, MastersHistoryList } from "./components";
 import {
   asArray,
-  fullNameEmp,
-  PAGE_SIZE,
   pad,
-  getYMD,
   monthNames,
-  clientNameOf,
-  serviceNamesFromRecord,
-  barberNameOf,
-  dateISO,
 } from "./MastersHistoryUtils";
 
 const MastersHistory = () => {
-  const [employees, setEmployees] = useState([]);
-  const [appointments, setAppointments] = useState([]);
-  const [services, setServices] = useState([]);
-  const [clients, setClients] = useState([]);
-
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-
-  /* Filters */
+  // Server-side query state
   const [search, setSearch] = useState("");
-  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [ordering, setOrdering] = useState("newest");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [employeeFilter, setEmployeeFilter] = useState("");
   const [yearFilter, setYearFilter] = useState("");
   const [monthFilter, setMonthFilter] = useState("");
   const [dayFilter, setDayFilter] = useState("");
-  const [viewMode, setViewMode] = useState("table");
-  const [page, setPage] = useState(1);
 
-  /* Fetch functions */
-  const fetchEmployees = useCallback(
-    async () => asArray((await api.get("/users/employees/")).data),
-    []
-  );
-  const fetchAppointments = useCallback(
-    async () => asArray((await api.get("/barbershop/appointments/")).data),
-    []
-  );
-  const fetchServices = useCallback(
-    async () => asArray((await api.get("/barbershop/services/")).data),
-    []
-  );
-  const fetchClients = useCallback(
-    async () => asArray((await api.get("/barbershop/clients/")).data),
-    []
-  );
+  // Server-side data state
+  const [appointments, setAppointments] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        const [emps, appts, svcs, cls] = await Promise.all([
-          fetchEmployees(),
-          fetchAppointments(),
-          fetchServices(),
-          fetchClients(),
-        ]);
-        if (!alive) return;
-        setEmployees(emps);
-        setAppointments(appts);
-        setServices(svcs);
-        setClients(cls);
-      } catch {
-        if (!alive) return;
-        setErr("Не удалось загрузить историю.");
-      } finally {
-        if (alive) setLoading(false);
+  // UI state - по умолчанию таблица на планшетах/ноутбуках/ПК, карточки только на телефонах
+  const [viewMode, setViewMode] = useState(() => {
+    // Телефоны (до 768px) - карточки, всё остальное (планшеты/ноутбуки/ПК) - таблица
+    return window.innerWidth <= 768 ? "cards" : "table";
+  });
+
+  // Refs for request cancellation and race condition protection
+  const abortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const debounceTimerRef = useRef(null);
+
+  // Mapping ordering UI -> API
+  const getOrderingForAPI = (orderKey) => {
+    switch (orderKey) {
+      case "oldest":
+        return "date";
+      case "price_asc":
+        return "total";
+      case "price_desc":
+        return "-total";
+      case "newest":
+      default:
+        return "-date";
+    }
+  };
+
+  // Build date range from filters
+  const getDateRange = useCallback(() => {
+    if (!yearFilter) return { date_start: null, date_end: null };
+
+    const year = Number(yearFilter);
+    if (!Number.isFinite(year)) return { date_start: null, date_end: null };
+
+    let dateStart = `${year}-01-01`;
+    let dateEnd = `${year}-12-31`;
+
+    if (monthFilter) {
+      const month = Number(monthFilter);
+      if (Number.isFinite(month) && month >= 1 && month <= 12) {
+        const daysInMonth = new Date(year, month, 0).getDate();
+        dateStart = `${year}-${pad(month)}-01`;
+        dateEnd = `${year}-${pad(month)}-${pad(daysInMonth)}`;
+
+        if (dayFilter) {
+          const day = Number(dayFilter);
+          if (Number.isFinite(day) && day >= 1 && day <= daysInMonth) {
+            dateStart = `${year}-${pad(month)}-${pad(day)}`;
+            dateEnd = dateStart;
+          }
+        }
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [fetchEmployees, fetchAppointments, fetchServices, fetchClients]);
+    }
 
-  /* Options for filters */
+    return { date_start: dateStart, date_end: dateEnd };
+  }, [yearFilter, monthFilter, dayFilter]);
+
+  // Debounce search (400ms)
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [search]);
+
+  // Main effect for fetching appointments (server-side) - БЕЗ ПАГИНАЦИИ
+  useEffect(() => {
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Increment requestId for race condition protection
+    const currentRequestId = ++requestIdRef.current;
+
+    // Build query params
+    const params = {
+      page_size: 10000, // Загружаем все записи
+    };
+    
+    if (debouncedSearch.trim()) {
+      params.search = debouncedSearch.trim();
+    }
+    const orderingAPI = getOrderingForAPI(ordering);
+    if (orderingAPI) {
+      params.ordering = orderingAPI;
+    }
+    if (statusFilter !== "all") {
+      params.status = statusFilter;
+    }
+    if (employeeFilter) {
+      params.employee = employeeFilter;
+    }
+
+    // Add date filters
+    const { date_start, date_end } = getDateRange();
+    if (date_start) {
+      params.date_start = date_start;
+    }
+    if (date_end) {
+      params.date_end = date_end;
+    }
+
+    // Execute request
+    setLoading(true);
+    setErr("");
+
+    api.get("/barbershop/visits/history/", {
+      params,
+      signal: abortController.signal,
+    })
+      .then((response) => {
+        // Check if this is the current request
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
+        // Check if request was not aborted
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        const data = response.data;
+        setAppointments(asArray(data));
+        setTotalCount(data.count || 0);
+        setLoading(false);
+      })
+      .catch((error) => {
+        // Check if this is the current request
+        if (currentRequestId !== requestIdRef.current) {
+          return;
+        }
+
+        // Ignore abort errors
+        if (error.name === "CanceledError" || error.name === "AbortError") {
+          return;
+        }
+
+        setErr("Не удалось загрузить историю.");
+        setLoading(false);
+      });
+
+    // Cleanup function
+    return () => {
+      abortController.abort();
+    };
+  }, [debouncedSearch, ordering, statusFilter, employeeFilter, yearFilter, monthFilter, dayFilter, getDateRange]);
+
+  // Options for filters
   const employeeOptions = useMemo(
     () => [
       { value: "", label: "Все сотрудники" },
-      ...employees.map((e) => ({ value: String(e.id), label: fullNameEmp(e) })),
+      // Employee options will be populated from the appointments data
+      ...Array.from(new Set(appointments.map(a => a.employee).filter(Boolean)))
+        .map(name => ({ value: name, label: name }))
     ],
-    [employees]
+    [appointments]
   );
 
   const yearOptions = useMemo(
@@ -128,92 +234,12 @@ const MastersHistory = () => {
     [daysInMonth]
   );
 
-  /* Filtering */
-  const filtered = useMemo(() => {
-    let arr = appointments.slice();
 
-    // Employee filter
-    if (employeeFilter) {
-      const idStr = String(employeeFilter);
-      arr = arr.filter((a) => String(a.barber) === idStr);
-    }
-
-    // Status filter
-    if (statusFilter !== "all") {
-      arr = arr.filter(
-        (a) => String(a?.status || "").toLowerCase() === statusFilter
-      );
-    }
-
-    // Date filter (year/month/day)
-    if (yearFilter) {
-      const yStr = String(yearFilter);
-      const mStr = monthFilter ? pad(Number(monthFilter)) : "";
-      const dStr = dayFilter ? pad(Number(dayFilter)) : "";
-
-      arr = arr.filter((a) => {
-        const ymd = getYMD(a.start_at);
-        if (!ymd) return false;
-        if (String(ymd.year) !== yStr) return false;
-        if (mStr && pad(ymd.month) !== mStr) return false;
-        if (dStr && pad(ymd.day) !== dStr) return false;
-        return true;
-      });
-    }
-
-    // Search filter
-    const q = search.trim().toLowerCase();
-    if (q) {
-      arr = arr.filter((a) => {
-        const client = clientNameOf(a, clients).toLowerCase();
-        const service = serviceNamesFromRecord(a, services).toLowerCase();
-        const barber = barberNameOf(a, employees).toLowerCase();
-        const date = dateISO(a?.start_at).toLowerCase();
-        return (
-          client.includes(q) ||
-          service.includes(q) ||
-          barber.includes(q) ||
-          date.includes(q)
-        );
-      });
-    }
-
-    // Sort by newest first
-    return arr.sort(
-      (a, b) => (Date.parse(b?.start_at) || 0) - (Date.parse(a?.start_at) || 0)
-    );
-  }, [
-    appointments,
-    employeeFilter,
-    statusFilter,
-    yearFilter,
-    monthFilter,
-    dayFilter,
-    search,
-    clients,
-    services,
-    employees,
-  ]);
-
-  /* Pagination */
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-
-  useEffect(() => {
-    setPage(1);
-  }, [search, employeeFilter, statusFilter, yearFilter, monthFilter, dayFilter]);
-
-  useEffect(() => {
-    setPage((p) => Math.min(Math.max(1, p), totalPages));
-  }, [totalPages]);
-
-  const safePage = Math.min(page, totalPages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  /* Check if filters are active */
+  // Check if filters are active
   const hasFilters =
     search || employeeFilter || statusFilter !== "all" || yearFilter;
 
-  /* Reset all filters */
+  // Reset all filters
   const handleReset = () => {
     setSearch("");
     setEmployeeFilter("");
@@ -221,10 +247,10 @@ const MastersHistory = () => {
     setYearFilter("");
     setMonthFilter("");
     setDayFilter("");
-    setPage(1);
+    setOrdering("newest");
   };
 
-  /* Handlers with cascade reset */
+  // Handlers with cascade reset
   const handleYearChange = (val) => {
     setYearFilter(val);
     setMonthFilter("");
@@ -239,8 +265,9 @@ const MastersHistory = () => {
   return (
     <section className="barbermastershistory">
       <MastersHistoryHeader
-        totalCount={filtered.length}
+        totalCount={totalCount}
         search={search}
+        ordering={ordering}
         statusFilter={statusFilter}
         viewMode={viewMode}
         employeeFilter={employeeFilter}
@@ -252,6 +279,7 @@ const MastersHistory = () => {
         monthOptions={monthOptions}
         dayOptions={dayOptions}
         onSearchChange={setSearch}
+        onOrderingChange={setOrdering}
         onStatusChange={setStatusFilter}
         onViewModeChange={setViewMode}
         onEmployeeChange={setEmployeeFilter}
@@ -266,15 +294,10 @@ const MastersHistory = () => {
       {!!err && <div className="barbermastershistory__alert">{err}</div>}
 
       <MastersHistoryList
-        records={rows}
-        employees={employees}
-        services={services}
-        clients={clients}
+        records={appointments}
         loading={loading}
         viewMode={viewMode}
       />
-
-      <Pager page={safePage} totalPages={totalPages} onChange={setPage} />
     </section>
   );
 };

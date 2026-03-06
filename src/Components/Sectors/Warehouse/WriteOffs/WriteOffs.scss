@@ -54,18 +54,17 @@
 .sklad-writeoff-table{
   border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;
 }
-.sklad-writeoff-table__head,
-.sklad-writeoff-table__row{
-  display:grid;align-items:center;
-  grid-template-columns:160px 260px 1fr;
-}
+.sklad-writeoff-table__table{width:100%;border-collapse:collapse;border-spacing:0}
 .sklad-writeoff-table__head{background:rgba(0,0,0,.03);font-weight:800}
-.sklad-writeoff-table__col{
-  padding:10px 14px;border-bottom:1px solid var(--border); line-height:1.35;
-  word-break:break-word;
+.sklad-writeoff-table__head .sklad-writeoff-table__col,
+.sklad-writeoff-table__row .sklad-writeoff-table__col{
+  padding:10px 14px;border-bottom:1px solid var(--border);line-height:1.35;word-break:break-word;text-align:left;
 }
 .sklad-writeoff-table__row:last-child .sklad-writeoff-table__col{border-bottom:none}
 .sklad-writeoff-table__empty{padding:14px;text-align:center;color:var(--muted)}
+.sklad-writeoff-table__table th:nth-child(1){width:140px}
+.sklad-writeoff-table__table th:nth-child(2){width:120px}
+.sklad-writeoff-table__table th:nth-child(3){min-width:120px}
 
 /* ====== Пагинация ====== */
 .sklad-writeoff__pager{display:flex;justify-content:center;margin-top:10px;flex-wrap:wrap}
@@ -124,11 +123,6 @@
 .sklad-writeoff__spacer{flex:1 1 auto}
 
 /* ===================== АДАПТАЦИЯ ===================== */
-@media (max-width:1024px){
-  .sklad-writeoff-table__head,
-  .sklad-writeoff-table__row{ grid-template-columns:150px 220px 1fr; }
-}
-
 @media (max-width:768px){
   .sklad-writeoff{ padding:16px; }
   .sklad-writeoff__title{ font-size:18px; }
@@ -137,24 +131,26 @@
   .sklad-writeoff__searchInput{ width:100%; }
   .sklad-writeoff__btn--primary{ width:100%; justify-content:center; }
 
-  .sklad-writeoff-table__head{ display:none; }
+  .sklad-writeoff-table thead{ display:none; }
 
   .sklad-writeoff-table__row{
-    grid-template-columns:1fr;
-    row-gap:6px;
+    display:block;
     padding:10px 12px;
     background:#fff;
-    border-bottom:1px solid var(--border); /* чёткая линия между карточками */
+    border-bottom:1px solid var(--border);
   }
-  .sklad-writeoff-table__row:nth-child(even){ background:#fafafa; } /* лёгкая зебра */
+  .sklad-writeoff-table__row:nth-child(even){ background:#fafafa; }
 
-  .sklad-writeoff-table__col{
+  .sklad-writeoff-table__row .sklad-writeoff-table__col{
     padding:0; border-bottom:0;
     display:flex; gap:10px; align-items:baseline;
   }
-  .sklad-writeoff-table__col:nth-child(1)::before{ content:"Дата"; }
-  .sklad-writeoff-table__col:nth-child(2)::before{ content:"Причина"; }
-  .sklad-writeoff-table__col:nth-child(3)::before{ content:"Комментарий"; }
+  .sklad-writeoff-table__col:nth-child(1)::before{ content:"Номер"; }
+  .sklad-writeoff-table__col:nth-child(2)::before{ content:"Дата"; }
+  .sklad-writeoff-table__col:nth-child(3)::before{ content:"Склад"; }
+  .sklad-writeoff-table__col:nth-child(4)::before{ content:"Сумма"; }
+  .sklad-writeoff-table__col:nth-child(5)::before{ content:"Статус"; }
+  .sklad-writeoff-table__col:nth-child(6)::before{ content:"Комментарий"; }
   .sklad-writeoff-table__col::before{
     flex:0 0 42%; color:var(--muted); font-weight:700; white-space:nowrap; font-size:13px;
   }

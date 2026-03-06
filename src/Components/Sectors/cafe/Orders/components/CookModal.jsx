@@ -87,8 +87,11 @@ const CookModal = ({
                         {/* Стол */}
                         <div className="cafeOrders__field">
                             <label className="cafeOrders__label">Стол</label>
-                            <span> {`Стол ${table.number}${table.places ? ` • ${table.places} мест` : ""
-                                }`}</span>
+                            <span>
+                                {form.table === null || form.table === undefined || form.table === ""
+                                    ? "С собой"
+                                    : `Стол ${table?.number ?? "—"}${table?.places ? ` • ${table.places} мест` : ""}`}
+                            </span>
 
                         </div>
 
@@ -172,7 +175,7 @@ const CookModal = ({
                         <button
                             type="submit"
                             className="cafeOrders__btn cafeOrders__btn--primary"
-                            disabled={saving || !form.table || !form.items.length}
+                            disabled={saving || !form.items.length}
                         >
                             Закрыть
                         </button>

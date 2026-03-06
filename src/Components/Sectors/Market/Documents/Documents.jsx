@@ -26,8 +26,12 @@ import ReceiptEditModal from "./components/ReceiptEditModal";
 import InvoicePreviewModal from "./components/InvoicePreviewModal";
 import InvoicePdfDocument from "./components/InvoicePdfDocument";
 import "./Documents.scss";
+import DataContainer from "../../../common/DataContainer/DataContainer";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const Documents = () => {
+  const alert = useAlert();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const {
@@ -72,7 +76,7 @@ const Documents = () => {
 
   // Функция для генерации порядкового номера чека/накладной
   // Используем фиксированный размер страницы (обычно API возвращает 20 элементов)
-  const PAGE_SIZE = 100;
+  const PAGE_SIZE = 50;
   const getDocumentNumber = (index, prefix = "ЧЕК") => {
     const sequentialNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
     return `${prefix}-${String(sequentialNumber).padStart(5, "0")}`;
@@ -172,15 +176,6 @@ const Documents = () => {
     }
   };
 
-  // Расчет пагинации
-  // Используем фиксированный размер страницы
-  // Если есть next или previous, значит есть еще страницы
-  const hasNextPage = !!documentsNext;
-  const hasPrevPage = !!documentsPrevious;
-
-  // Если есть следующая страница, значит текущая не последняя
-  // Если есть предыдущая страница, значит текущая не первая
-  // Рассчитываем общее количество страниц на основе count и размера страницы
   const totalPages =
     documentsCount && PAGE_SIZE ? Math.ceil(documentsCount / PAGE_SIZE) : 1;
 
@@ -215,15 +210,20 @@ const Documents = () => {
     });
   };
 
-  const handleSaved = () => {
+  const handleSaved = async () => {
     // Перезагружаем документы после сохранения
     if (activeTab === "receipts" || activeTab === "invoices") {
-      dispatch(
-        fetchDocuments({
-          page: currentPage,
-          search: debouncedSearchTerm,
-        })
-      );
+      try { 
+        await dispatch(
+          fetchDocuments({
+            page: currentPage,
+            search: debouncedSearchTerm,
+          })
+        ).unwrap();
+      } catch (error) {
+        const errorMessage = validateResErrors(error, "Ошибка при сохранении документа. ")
+        alert(errorMessage, true);
+      }
     }
   };
 
@@ -268,7 +268,8 @@ const Documents = () => {
 
         if (!isPrinterConnected) {
           alert(
-            "Принтер не подключен. Пожалуйста, подключите принтер перед печатью."
+            "Принтер не подключен. Пожалуйста, подключите принтер перед печатью.",
+            true
           );
           return;
         }
@@ -303,10 +304,8 @@ const Documents = () => {
         }
       }
     } catch (printError) {
-      console.error("Ошибка при печати:", printError);
-      alert(
-        "Ошибка при печати: " + (printError.message || "Неизвестная ошибка")
-      );
+      const errorMessage = validateResErrors(printError, "Ошибка при печати. ")
+      alert(errorMessage, true);
     }
   };
 
@@ -332,13 +331,13 @@ const Documents = () => {
           />
         </div>
         <div className="documents__header-actions">
-          <button
+          {/* <button
             className="documents__create-btn"
             onClick={() => navigate("/crm/market/documents/create")}
           >
             <Plus size={18} />
             Создать
-          </button>
+          </button> */}
           <button
             className="documents__filter-btn"
             onClick={() => setShowReconciliationModal(true)}
@@ -378,6 +377,8 @@ const Documents = () => {
       </div>
 
       {/* Table */}
+      <DataContainer>
+
       <div className="documents__table-wrapper">
         <table className="documents__table">
           <thead>
@@ -510,6 +511,7 @@ const Documents = () => {
           </tbody>
         </table>
       </div>
+      </DataContainer>
 
       {/* Пагинация для чеков и накладных */}
       {totalPages > 1 && (

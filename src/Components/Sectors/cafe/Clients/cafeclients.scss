@@ -64,20 +64,17 @@ html {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     min-width: 0;
   }
 
   &__search {
     position: relative;
-    flex: 1 1 420px;
-    min-width: 280px;
+    flex: 1 0 180px;
   }
 
   &__filter {
-    flex: 0 0 200px;
-    min-width: 180px;
-    max-width: 240px;
+    flex: 1 0 180px;
   }
 
   &__searchInput {
@@ -141,10 +138,21 @@ html {
     font-weight: 500;
     cursor: pointer;
     transition: 0.2s;
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     background: #fff;
     color: var(--text);
     white-space: nowrap;
+
+    &:hover {
+      background: #f9fafb;
+      border-color: #cbd5e1;
+    }
+
+    &:focus-visible {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.25);
+    }
 
     &:active {
       transform: translateY(1px);
@@ -153,6 +161,7 @@ html {
     &--primary {
       background: var(--primary);
       color: #111;
+      border-color: var(--primary-dark);
 
       &:hover {
         background: var(--primary-dark);
@@ -207,6 +216,13 @@ html {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
+  }
+
+  /* Кнопки действий в списках — компактнее */
+  &__rowActions .cafeclients__btn {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 9px;
   }
 
   &__rowClickable {
@@ -351,11 +367,17 @@ html {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 70;
+    z-index: 100;
     padding: 12px;
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    overscroll-behavior: contain;
+    overscroll-behavior: none;
+    overflow: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  &__modalWide &__modalOverlay {
+    z-index: 101;
   }
 
   /* ВАЖНО: НЕ 100vw — только 100% (иначе “лишняя ширина” при скролле и сдвиги) */
@@ -366,15 +388,16 @@ html {
     border-radius: 16px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
     width: min(720px, calc(100% - 24px));
-    max-height: min(90vh, 760px);
+    max-height: min(90dvh, 760px);
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
   }
 
   &__modalWide {
     width: min(980px, calc(100% - 24px));
-    max-height: min(92vh, 820px);
+    max-height: min(92dvh, 820px);
   }
 
   &__modalHeader {
@@ -401,6 +424,10 @@ html {
   &__modalTitle {
     font-size: 18px;
     font-weight: 550;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   &__iconBtn {
@@ -426,6 +453,9 @@ html {
     padding: 16px 20px;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+    flex: 1;
+    min-height: 0;
+    overscroll-behavior: contain;
 
     &--locked {
       overflow: hidden;
@@ -568,26 +598,26 @@ html {
       justify-content: flex-end;
     }
 
-    &__filters {
-      width: 100%;
-      justify-content: flex-end;
-    }
+    // &__filters {
+    //   width: 100%;
+    //   justify-content: flex-end;
+    // }
 
-    &__search {
-      flex: 1 1 420px;
-      min-width: 280px;
-    }
+    // &__search {
+    //   flex: 1 1 420px;
+    //   min-width: 280px;
+    // }
 
-    &__filter {
-      flex: 0 0 180px;
-      min-width: 160px;
-      max-width: 220px;
-    }
+    // &__filter {
+    //   flex: 0 0 180px;
+    //   min-width: 160px;
+    //   max-width: 220px;
+    // }
 
-    &__select {
-      flex: 0 0 260px;
-      min-width: 220px;
-    }
+    // &__select {
+    //   flex: 0 0 260px;
+    //   min-width: 220px;
+    // }
   }
 
   @media (max-width: 860px) {
@@ -631,21 +661,95 @@ html {
       max-width: 180px;
     }
 
+    /* Модалки на мобильных: по ширине экрана, высота по dvh, скролл только внутри body */
+    &__modalOverlay {
+      padding: 8px;
+      align-items: stretch;
+    }
+
+    &__modal,
+    &__modalWide {
+      width: 100%;
+      max-width: calc(100% - 16px);
+      max-height: calc(100dvh - 16px);
+      margin: auto;
+    }
+
+    &__modalHeader {
+      flex-shrink: 0;
+      padding: 12px 16px;
+    }
+
+    &__modalTitle {
+      font-size: 16px;
+    }
+
+    &__modalBody {
+      padding: 12px 16px;
+    }
+
     &__modalFooter {
       justify-content: stretch;
+      flex-shrink: 0;
+      padding-left: 16px;
+      padding-right: 16px;
     }
 
     &__modalFooter .cafeclients__btn {
       width: 100%;
     }
+
+    /* Карточка гостя: шапка и статистика в колонку */
+    &__cardHeader {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    &__stats {
+      justify-content: flex-start;
+    }
+
+    &__statBox {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    /* Таблица в модалке «Детали заказа» — горизонтальный скролл */
+    &__modalBody .cafeclients__tableWrap {
+      margin-left: -16px;
+      margin-right: -16px;
+      padding-left: 16px;
+      padding-right: 16px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    &__modalBody .cafeclients__table {
+      min-width: 320px;
+    }
   }
 
   @media (max-width: 480px) {
+    &__modalOverlay {
+      padding: 6px;
+    }
+
+    &__modal,
+    &__modalWide {
+      max-width: calc(100% - 12px);
+      max-height: calc(100dvh - 12px);
+    }
+
     &__modalHeader,
     &__modalBody,
     &__modalFooter {
-      padding-left: 16px;
-      padding-right: 16px;
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+
+    &__modalTitle {
+      font-size: 15px;
     }
   }
 

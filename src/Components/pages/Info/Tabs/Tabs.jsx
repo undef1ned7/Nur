@@ -64,7 +64,7 @@
 import React, { useMemo } from "react";
 import "./Tabs.scss";
 
-const allTabs = ["Моя компания", "Безопасность", "Токен для весов", "Интерфейс", "Онлайн"];
+const allTabs = ["Моя компания", "Безопасность", "Токен для весов", "Интерфейс", "Печать", "Онлайн"];
 
 const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
   const sectorName = useMemo(() => String(company?.sector?.name || "").toLowerCase().trim(), [company?.sector?.name]);
@@ -99,6 +99,7 @@ const Tabs = ({ activeTab, setActiveTab, company, profile }) => {
     return allTabs.filter((tab) => {
       if (tab === "Моя компания") return isOwner;
       if (tab === "Токен для весов") return isMarketSector;
+      if (tab === "Печать") return isCafeSector;
       if (tab === "Онлайн") return canViewOnline;
       // "Безопасность" и "Интерфейс" всегда видны
       return true;

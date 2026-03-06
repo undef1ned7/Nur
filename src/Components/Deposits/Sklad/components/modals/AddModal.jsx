@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { useClient } from "../../../../../store/slices/ClientSlice";
 import { useProducts } from "../../../../../store/slices/productSlice";
 import { useUser } from "../../../../../store/slices/userSlice";
+import "./AddModal.scss";
 // import {
 //   createProductAsync,
 //   fetchClientsAsync,
@@ -403,16 +404,13 @@ const AddModal = ({
             <button
               className="create-client"
               onClick={() => setShowInputs(!showInputs)}
+              type="button"
             >
               {showInputs ? "Отменить" : "Создать поставщика"}
             </button>
             {showInputs && (
               <form
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  rowGap: "10px",
-                }}
+                className="sklad-add-modal__subform"
                 onSubmit={onSubmit}
               >
                 <input
@@ -489,7 +487,7 @@ const AddModal = ({
                   onWheel={(e) => e.preventDefault()}
 
                 />
-                <div style={{ display: "flex", columnGap: "10px" }}>
+                <div className="sklad-add-modal__subformActions">
                   <button
                     className="create-client"
                     type="button"
@@ -497,56 +495,43 @@ const AddModal = ({
                   >
                     Отмена
                   </button>
-                  <button className="create-client">Создать</button>
+                  <button className="create-client" type="submit">
+                    Создать
+                  </button>
                 </div>
               </form>
             )}
           </div>
           <div className="add-modal__section">
             <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                cursor: "pointer",
-                marginBottom: showDebtForm ? "15px" : "0",
-              }}
+              className={`sklad-add-modal__checkboxRow ${
+                showDebtForm ? "sklad-add-modal__checkboxRow--expanded" : ""
+              }`}
             >
               <input
                 type="checkbox"
                 checked={showDebtForm}
                 onChange={(e) => setShowDebtForm(e.target.checked)}
-                style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                className="sklad-add-modal__checkbox"
                 onWheel={(e) => e.preventDefault()}
               />
-              <strong style={{ fontSize: "14px" }}>Добавить долг</strong>
+              <strong className="sklad-add-modal__checkboxText">
+                Добавить долг
+              </strong>
             </label>
 
             {/* Форма долга */}
             {showDebtForm && (
-              <div style={{ marginTop: "15px" }}>
+              <div className="sklad-add-modal__debtForm">
                 {!newItemData.client && (
-                  <p
-                    style={{
-                      margin: "5px 0",
-                      color: "#ff0000",
-                      fontSize: "13px",
-                    }}
-                  >
+                  <p className="sklad-add-modal__warning">
                     Выберите поставщика в форме выше!
                   </p>
                 )}
                 {company?.subscription_plan?.name === "Старт" &&
                   newItemData.client && (
                     <>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "5px",
-                          fontSize: "13px",
-                          fontWeight: "600",
-                        }}
-                      >
+                      <label className="sklad-add-modal__subLabel">
                         Телефон поставщика
                       </label>
                       <input
@@ -555,22 +540,8 @@ const AddModal = ({
                         name="phone"
                         value={debtState.phone}
                         className="add-modal__input"
-                        style={{
-                          width: "100%",
-                          padding: "8px",
-                          border: "1px solid #ccc",
-                          borderRadius: "4px",
-                          marginBottom: "10px",
-                        }}
                       />
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "5px",
-                          fontSize: "13px",
-                          fontWeight: "600",
-                        }}
-                      >
+                      <label className="sklad-add-modal__subLabel">
                         Дата оплаты
                       </label>
                       <input
@@ -579,37 +550,16 @@ const AddModal = ({
                         name="dueDate"
                         value={debtState.dueDate}
                         className="add-modal__input"
-                        style={{
-                          width: "100%",
-                          padding: "8px",
-                          border: "1px solid #ccc",
-                          borderRadius: "4px",
-                          marginBottom: "10px",
-                        }}
                       />
                     </>
                   )}
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "5px",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                  }}
-                >
+                <label className="sklad-add-modal__subLabel">
                   Тип оплаты
                 </label>
                 <select
                   value={debt}
                   onChange={(e) => setDebt(e.target.value)}
                   className="add-modal__input"
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    marginBottom: "10px",
-                  }}
                 >
                   <option value="">Тип оплаты</option>
                   <option value="Предоплата">Предоплата</option>
@@ -617,14 +567,7 @@ const AddModal = ({
                 </select>
                 {debt === "Предоплата" && (
                   <>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <label className="sklad-add-modal__subLabel">
                       Сумма предоплаты
                     </label>
                     <input
@@ -632,22 +575,8 @@ const AddModal = ({
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       className="add-modal__input"
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
                     />
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <label className="sklad-add-modal__subLabel">
                       Срок долга (мес.)
                     </label>
                     <input
@@ -655,26 +584,12 @@ const AddModal = ({
                       value={debtMonths}
                       onChange={(e) => setDebtMonths(e.target.value)}
                       className="add-modal__input"
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
                     />
                   </>
                 )}
                 {debt === "Долги" && (
                   <>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "5px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                      }}
-                    >
+                    <label className="sklad-add-modal__subLabel">
                       Срок долга (мес.)
                     </label>
                     <input
@@ -682,25 +597,12 @@ const AddModal = ({
                       value={debtMonths}
                       onChange={(e) => setDebtMonths(e.target.value)}
                       className="add-modal__input"
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginBottom: "10px",
-                      }}
                     />
                   </>
                 )}
                 {debt && newItemData.client && (
                   <div
-                    style={{
-                      marginTop: "10px",
-                      padding: "10px",
-                      backgroundColor: "#e8f5e9",
-                      borderRadius: "4px",
-                      fontSize: "13px",
-                    }}
+                    className="sklad-add-modal__summary"
                   >
                     <strong>Сумма долга:</strong>{" "}
                     {(
@@ -866,7 +768,7 @@ const AddModal = ({
   }, [newItemData.client, pickSupplier, company?.subscription_plan?.name]);
 
   return (
-    <div className="add-modal wareSklad">
+    <div className="add-modal wareSklad sklad-add-modal">
       <div className="add-modal__overlay" onClick={onClose} />
       <div className="add-modal__content">
         <div className="add-modal__header">
@@ -883,22 +785,29 @@ const AddModal = ({
         {company?.sector?.name === "Магазин" ||
         company?.subscription_plan?.name === "Старт" ? (
           <>
-            {tabs.map((tab, index) => (
-              <button
-                key={index}
-                className={`add-modal__button ${
-                  activeTab === index && isTabSelected
-                    ? "add-modal__button-active"
-                    : ""
-                }`}
-                onClick={() => handleTabClick(index)}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <div className="sklad-add-modal__tabs" role="tablist">
+              {tabs.map((tab, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  className={`add-modal__button sklad-add-modal__tab ${
+                    activeTab === index && isTabSelected
+                      ? "add-modal__button-active"
+                      : ""
+                  }`}
+                  onClick={() => handleTabClick(index)}
+                  role="tab"
+                  aria-selected={activeTab === index && isTabSelected}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
             {isTabSelected && activeTab !== null && (
-              <div className="vitrina__content">{tabs[activeTab].content}</div>
+              <div className="vitrina__content sklad-add-modal__tabContent">
+                {tabs[activeTab].content}
+              </div>
             )}
           </>
         ) : (

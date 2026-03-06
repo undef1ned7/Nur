@@ -7,6 +7,7 @@ import SearchSection from "./components/SearchSection";
 import WarehouseTable from "./components/WarehouseTable";
 import Pagination from "./components/Pagination";
 import CreateWarehouseModal from "./components/CreateWarehouseModal";
+import EditWarehouseModal from "./components/EditWarehouseModal";
 import { useSearch } from "./hooks/useSearch";
 import { usePagination } from "./hooks/usePagination";
 import { useWarehousesData } from "./hooks/useWarehousesData";
@@ -19,8 +20,10 @@ const Warehouses = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  // Состояние модального окна
+  // Состояния модальных окон
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState(null);
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
@@ -80,6 +83,11 @@ const Warehouses = () => {
     [navigate]
   );
 
+  const handleEditWarehouse = useCallback((warehouse) => {
+    setEditingWarehouse(warehouse);
+    setShowEditModal(true);
+  }, []);
+
   const handleCreateWarehouse = useCallback(() => {
     setShowCreateModal(true);
   }, []);
@@ -114,6 +122,7 @@ const Warehouses = () => {
           warehouses={warehouses}
           loading={loading}
           onOpenWarehouse={handleOpenWarehouse}
+          onEditWarehouse={handleEditWarehouse}
           getRowNumber={getRowNumber}
         />
 
@@ -132,6 +141,16 @@ const Warehouses = () => {
         <CreateWarehouseModal
           onClose={() => setShowCreateModal(false)}
           onCreate={handleCreateWarehouseSubmit}
+        />
+      )}
+
+      {showEditModal && editingWarehouse && (
+        <EditWarehouseModal
+          warehouse={editingWarehouse}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingWarehouse(null);
+          }}
         />
       )}
     </div>

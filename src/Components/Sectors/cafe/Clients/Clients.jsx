@@ -14,6 +14,8 @@ import "./cafeclients.scss";
 import SearchableCombobox from "../../../common/SearchableCombobox/SearchableCombobox";
 
 import { ClientForm, ClientCard, ConfirmDeleteModal } from "./components/ClientsModals";
+import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ===== helpers ===== */
 const fmtMoney = (v) =>
@@ -64,7 +66,7 @@ function useBodyScrollLock(active) {
       left: document.body.style.left,
       right: document.body.style.right,
       width: document.body.style.width,
-      overflowY: document.body.style.overflowY,
+      overflow: document.body.style.overflow,
       paddingRight: document.body.style.paddingRight,
     };
 
@@ -75,7 +77,7 @@ function useBodyScrollLock(active) {
     document.body.style.left = "0";
     document.body.style.right = "0";
     document.body.style.width = "100%";
-    document.body.style.overflowY = "scroll";
+    document.body.style.overflow = "hidden";
     if (scrollbarW > 0) document.body.style.paddingRight = `${scrollbarW}px`;
 
     return () => {
@@ -86,7 +88,7 @@ function useBodyScrollLock(active) {
       document.body.style.left = original.left;
       document.body.style.right = original.right;
       document.body.style.width = original.width;
-      document.body.style.overflowY = original.overflowY;
+      document.body.style.overflow = original.overflow;
       document.body.style.paddingRight = original.paddingRight;
 
       window.scrollTo(0, y);
@@ -162,10 +164,10 @@ const CafeClients = () => {
             const next = prev.map((c) =>
               String(c.id) === String(id)
                 ? {
-                    ...c,
-                    orders_count: stats.orders_count,
-                    updated_at_derived: stats.updated_at_derived,
-                  }
+                  ...c,
+                  orders_count: stats.orders_count,
+                  updated_at_derived: stats.updated_at_derived,
+                }
                 : c
             );
             return next.sort(
@@ -207,10 +209,10 @@ const CafeClients = () => {
         const arr = Array.isArray(c.orders) ? c.orders : [];
         const updated_at_derived = arr.length
           ? arr
-              .map((o) => o.created_at)
-              .filter(Boolean)
-              .sort()
-              .slice(-1)[0]
+            .map((o) => o.created_at)
+            .filter(Boolean)
+            .sort()
+            .slice(-1)[0]
           : null;
 
         return {
@@ -230,8 +232,8 @@ const CafeClients = () => {
 
       hydrateStats(augmented);
     } catch (e) {
-      console.error(e);
-      setErr("Не удалось загрузить гостей");
+      const errorMessage = validateResErrors(e, "Ошибка загрузки гостей");
+      setErr(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -272,15 +274,15 @@ const CafeClients = () => {
             prev.map((x) =>
               String(x.id) === String(c.id)
                 ? {
-                    ...x,
-                    orders_count: stats.orders_count,
-                    updated_at_derived: stats.updated_at_derived,
-                  }
+                  ...x,
+                  orders_count: stats.orders_count,
+                  updated_at_derived: stats.updated_at_derived,
+                }
                 : x
             )
           )
         )
-        .catch(() => {});
+        .catch(() => { });
     };
 
     window.addEventListener("clients:refresh", onClientsRefresh);
@@ -298,10 +300,10 @@ const CafeClients = () => {
         prev.map((c) =>
           String(c.id) === String(o.client)
             ? {
-                ...c,
-                orders_count: (Number(c.orders_count) || 0) + 1,
-                updated_at_derived: new Date().toISOString(),
-              }
+              ...c,
+              orders_count: (Number(c.orders_count) || 0) + 1,
+              updated_at_derived: new Date().toISOString(),
+            }
             : c
         )
       );
@@ -344,8 +346,8 @@ const CafeClients = () => {
       setConfirmId(null);
       await load();
     } catch (e) {
-      console.error(e);
-      setErr("Ошибка удаления гостя");
+      const errorMessage = validateResErrors(e, "Ошибка удаления гостя");
+      setErr(errorMessage);
     } finally {
       setConfirmBusy(false);
     }
@@ -490,6 +492,8 @@ const CafeClients = () => {
       {err && <div className="cafeclients__error">{err}</div>}
 
       {/* Desktop: table, Mobile: cards */}
+      <DataContainer>
+
       {!isNarrow ? (
         <div className="cafeclients__tableWrap">
           <table className="cafeclients__table">
@@ -559,65 +563,69 @@ const CafeClients = () => {
           </table>
         </div>
       ) : (
-        <div className="cafeclients__list">
-          {loading ? (
-            <div className="cafeclients__empty">Загрузка…</div>
-          ) : filtered.length ? (
-            filtered.map((c) => {
-              const updated = c.updated_at_derived || c.updated_at;
-              return (
-                <div key={c.id} className="cafeclients__listCard">
-                  <div className="cafeclients__listTop">
-                    <div className="cafeclients__listName" title={c.full_name}>
-                      {c.full_name || "—"}
-                    </div>
-                    <div className="cafeclients__listBadge">
-                      {c.orders_count ?? 0} заказ(ов)
-                    </div>
-                  </div>
 
-                  <div className="cafeclients__listMeta">
-                    <div>
-                      <span className="cafeclients__muted">Телефон:</span>{" "}
-                      {c.phone || "—"}
+          <div className="cafeclients__list">
+            {loading ? (
+              <div className="cafeclients__empty">Загрузка…</div>
+            ) : filtered.length ? (
+              filtered.map((c) => {
+                const updated = c.updated_at_derived || c.updated_at;
+                return (
+                  <div key={c.id} className="cafeclients__listCard">
+                    <div className="cafeclients__listTop">
+                      <div className="cafeclients__listName" title={c.full_name}>
+                        {c.full_name || "—"}
+                      </div>
+                      <div className="cafeclients__listBadge">
+                        {c.orders_count ?? 0} заказ(ов)
+                      </div>
                     </div>
-                    <div>
-                      <span className="cafeclients__muted">Обновлён:</span>{" "}
-                      {updated ? new Date(updated).toLocaleString() : "—"}
-                    </div>
-                  </div>
 
-                  <div className="cafeclients__rowActions">
-                    <button
-                      className="cafeclients__btn"
-                      onClick={() => onOpenCard(c.id)}
-                      type="button"
-                    >
-                      Открыть
-                    </button>
-                    <button
-                      className="cafeclients__btn"
-                      onClick={() => onEdit(c.id)}
-                      type="button"
-                    >
-                      Изм.
-                    </button>
-                    <button
-                      className="cafeclients__btn cafeclients__btn--secondary"
-                      onClick={() => askDelete(c.id)}
-                      type="button"
-                    >
-                      Удалить
-                    </button>
+                    <div className="cafeclients__listMeta">
+                      <div>
+                        <span className="cafeclients__muted">Телефон:</span>{" "}
+                        {c.phone || "—"}
+                      </div>
+                      <div>
+                        <span className="cafeclients__muted">Обновлён:</span>{" "}
+                        {updated ? new Date(updated).toLocaleString() : "—"}
+                      </div>
+                    </div>
+
+                    <div className="cafeclients__rowActions">
+                      <button
+                        className="cafeclients__btn"
+                        onClick={() => onOpenCard(c.id)}
+                        type="button"
+                      >
+                        Открыть
+                      </button>
+                      <button
+                        className="cafeclients__btn"
+                        onClick={() => onEdit(c.id)}
+                        type="button"
+                      >
+                        Изм.
+                      </button>
+                      <button
+                        className="cafeclients__btn cafeclients__btn--secondary"
+                        onClick={() => askDelete(c.id)}
+                        type="button"
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="cafeclients__empty">Ничего не найдено</div>
-          )}
-        </div>
+                );
+              })
+            ) : (
+              <div className="cafeclients__empty">Ничего не найдено</div>
+            )}
+          </div>
+
       )}
+        </DataContainer>
+
 
       {isFormOpen && (
         <ClientForm

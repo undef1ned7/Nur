@@ -153,6 +153,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     background: rgba(0, 0, 0, 0.35);
     z-index: 999;
   }
@@ -388,8 +389,25 @@
     width: 700px !important;
     max-width: 90%;
     max-height: 90vh;
+    max-height: 90dvh;
     overflow-y: auto;
     transition: all 0.5s;
+  }
+
+  @media screen and (max-width: 600px) {
+    &__content {
+      top: calc(env(safe-area-inset-top, 0px) + 12px);
+      transform: translateX(-50%);
+      max-width: calc(100vw - 24px);
+      max-height: calc(
+        100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
+          24px
+      );
+      max-height: calc(
+        100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
+          24px
+      );
+    }
   }
 
   &__header {

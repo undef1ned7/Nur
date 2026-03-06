@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   FaTimes,
   FaUser,
@@ -6,7 +6,8 @@ import {
   FaCalendarAlt,
   FaClock,
   FaComment,
-  FaCreditCard,
+  FaCheck,
+  FaSpinner,
 } from "react-icons/fa";
 
 const fmtMoney = (n) =>
@@ -34,19 +35,35 @@ const STATUS_LABELS = {
   spam: "Спам/Ошибка",
 };
 
-const PAYMENT_LABELS = {
-  cash: "Наличными",
-  card: "Картой",
-  transfer: "Перевод",
+const getMasterName = (request) => {
+  if (request.master_name) return request.master_name;
+  const m = request.master;
+  if (m && (m.full_name || m.first_name || m.last_name)) {
+    return m.full_name || [m.first_name, m.last_name].filter(Boolean).join(" ").trim() || "—";
+  }
+  return "—";
 };
 
-const RequestDetailModal = ({ request, onClose }) => {
+const RequestDetailModal = ({ request, onClose, onStatusChange }) => {
+  const [acceptLoading, setAcceptLoading] = useState(false);
+
   if (!request) return null;
 
   const statusKey = request.status || "new";
   const services = request.services || [];
   const totalDuration = request.total_duration_min || 
     services.reduce((sum, s) => sum + (s.duration_min || 0), 0);
+
+  const handleAccept = async () => {
+    if (!onStatusChange || acceptLoading) return;
+    setAcceptLoading(true);
+    try {
+      await onStatusChange(request.id, "confirmed");
+      onClose();
+    } finally {
+      setAcceptLoading(false);
+    }
+  };
 
   return (
     <>
@@ -71,23 +88,31 @@ const RequestDetailModal = ({ request, onClose }) => {
           </div>
 
           <div className="barberrequests__modalSection">
-            <h4 className="barberrequests__modalSectionTitle">Услуги</h4>
-            <div className="barberrequests__modalServices">
-              {services.map((service, idx) => (
-                <div key={idx} className="barberrequests__modalServiceRow">
-                  <span className="barberrequests__modalServiceName">{service.title}</span>
-                  <span className="barberrequests__modalServicePrice">{fmtMoney(service.price)} сом</span>
-                </div>
-              ))}
-              <div className="barberrequests__modalServiceTotal">
-                <div className="barberrequests__modalServiceRow barberrequests__modalServiceRow--total">
-                  <span>Итого:</span>
-                  <span className="barberrequests__modalTotalPrice">{fmtMoney(request.total_price)} сом</span>
-                </div>
-                <div className="barberrequests__modalDuration">
-                  Длительность: {totalDuration} мин
+            <h4 className="barberrequests__modalSectionTitle">
+              <FaUser className="barberrequests__modalSectionIcon" />
+              Информация о клиенте
+            </h4>
+            <div className="barberrequests__modalClientInfo">
+              <div className="barberrequests__modalClientRow">
+                <div className="barberrequests__modalClientLabel">Имя клиента</div>
+                <div className="barberrequests__modalClientValue">{request.client_name || "—"}</div>
+              </div>
+              <div className="barberrequests__modalClientRow">
+                <div className="barberrequests__modalClientLabel">Телефон</div>
+                <div className="barberrequests__modalClientValue">
+                  <FaPhone className="barberrequests__modalInlineIcon" />
+                  {request.client_phone || "—"}
                 </div>
               </div>
+              {request.client_comment && (
+                <div className="barberrequests__modalClientRow barberrequests__modalClientRow--full">
+                  <div className="barberrequests__modalClientLabel">Комментарий</div>
+                  <div className="barberrequests__modalClientComment">
+                    <FaComment className="barberrequests__modalInlineIcon" />
+                    {request.client_comment}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -98,7 +123,7 @@ const RequestDetailModal = ({ request, onClose }) => {
               </div>
               <div className="barberrequests__modalInfo">
                 <span className="barberrequests__modalLabel">Мастер</span>
-                <span className="barberrequests__modalValue">{request.master_name || "—"}</span>
+                <span className="barberrequests__modalValue">{getMasterName(request)}</span>
               </div>
             </div>
 
@@ -112,50 +137,68 @@ const RequestDetailModal = ({ request, onClose }) => {
               </div>
             </div>
 
-            <div className="barberrequests__modalItem">
+            <div className="barberrequests__modalItem barberrequests__modalItem--full">
               <div className="barberrequests__modalIcon">
                 <FaClock />
               </div>
               <div className="barberrequests__modalInfo">
-                <span className="barberrequests__modalLabel">Время</span>
+                <span className="barberrequests__modalLabel">Время записи</span>
                 <span className="barberrequests__modalValue">
                   {fmtTime(request.time_start)} - {fmtTime(request.time_end)}
-                </span>
-              </div>
-            </div>
-
-            <div className="barberrequests__modalItem">
-              <div className="barberrequests__modalIcon">
-                <FaCreditCard />
-              </div>
-              <div className="barberrequests__modalInfo">
-                <span className="barberrequests__modalLabel">Оплата</span>
-                <span className="barberrequests__modalValue barberrequests__modalValue--payment">
-                  {PAYMENT_LABELS[request.payment_method] || request.payment_method || "—"}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="barberrequests__modalSection">
-            <h4 className="barberrequests__modalSectionTitle">Клиент</h4>
-            <div className="barberrequests__modalClientInfo">
-              <div className="barberrequests__modalClientRow">
-                <FaUser className="barberrequests__modalClientIcon" />
-                <span>Имя: <strong>{request.client_name || "—"}</strong></span>
-              </div>
-              <div className="barberrequests__modalClientRow">
-                <FaPhone className="barberrequests__modalClientIcon" />
-                <span>Телефон: <strong>{request.client_phone || "—"}</strong></span>
-              </div>
-              {request.client_comment && (
-                <div className="barberrequests__modalClientRow">
-                  <FaComment className="barberrequests__modalClientIcon" />
-                  <span>Комментарий: <em>{request.client_comment}</em></span>
+            <h4 className="barberrequests__modalSectionTitle">
+              <FaClock className="barberrequests__modalSectionIcon" />
+              Услуги и стоимость
+            </h4>
+            <div className="barberrequests__modalServices">
+              {services.map((service, idx) => (
+                <div key={idx} className="barberrequests__modalServiceRow">
+                  <div className="barberrequests__modalServiceInfo">
+                    <span className="barberrequests__modalServiceName">{service.title}</span>
+                    {service.duration_min && (
+                      <span className="barberrequests__modalServiceDuration">
+                        {service.duration_min} мин
+                      </span>
+                    )}
+                  </div>
+                  <span className="barberrequests__modalServicePrice">{fmtMoney(service.price)} сом</span>
                 </div>
-              )}
+              ))}
+              <div className="barberrequests__modalServiceTotal">
+                <div className="barberrequests__modalServiceRow barberrequests__modalServiceRow--total">
+                  <div className="barberrequests__modalServiceInfo">
+                    <span className="barberrequests__modalServiceName">Итого</span>
+                    <span className="barberrequests__modalServiceDuration">
+                      {totalDuration} мин
+                    </span>
+                  </div>
+                  <span className="barberrequests__modalTotalPrice">{fmtMoney(request.total_price)} сом</span>
+                </div>
+              </div>
             </div>
           </div>
+          {statusKey === "new" && onStatusChange && (
+            <div className="barberrequests__modalFooter">
+              <button
+                type="button"
+                className="barberrequests__modalAcceptBtn"
+                disabled={acceptLoading}
+                onClick={handleAccept}
+              >
+                {acceptLoading ? (
+                  <FaSpinner className="barberrequests__modalAcceptBtnSpinner" />
+                ) : (
+                  <FaCheck className="barberrequests__modalAcceptBtnIcon" />
+                )}
+                Принять в запись
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>

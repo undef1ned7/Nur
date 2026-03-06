@@ -5,6 +5,7 @@ import { clearProducts } from "../../../store/slices/productSlice";
 import { sendProductsToScales } from "../../../store/creators/userCreators";
 import AlertModal from "../../common/AlertModal/AlertModal";
 import "./ScalesPage.scss";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 /**
  * Отдельная страница для работы с весами.
@@ -51,10 +52,7 @@ const ScalesPage = () => {
       );
       setShowSuccessAlert(true);
     } catch (err) {
-      const errorMessage =
-        err?.detail ||
-        err?.message ||
-        (typeof err === "string" ? err : "Не удалось отправить товары на весы");
+      const errorMessage = validateResErrors(err, "Ошибка при отправке товаров на весы");
       setAlertMessage(errorMessage);
       setShowErrorAlert(true);
     } finally {

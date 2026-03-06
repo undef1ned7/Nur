@@ -1202,30 +1202,37 @@
 
 // export default Settings;
 
-
-
-
-
-
-
-
 // src/Components/pages/Info/Settings/Settings.jsx
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import "./Settings.scss";
 import Tabs from "../Tabs/Tabs";
-import { getProfile, logoutUser, useUser } from "../../../../store/slices/userSlice";
+import {
+  getProfile,
+  logoutUser,
+  useUser,
+} from "../../../../store/slices/userSlice";
 import { useDispatch } from "react-redux";
-import { updateUserCompanyName, updateUserData, getScalesToken } from "../../../../store/creators/userCreators";
+import {
+  updateUserCompanyName,
+  updateUserData,
+  getScalesToken,
+} from "../../../../store/creators/userCreators";
 import { useNavigate } from "react-router-dom";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { ThemeModeContext } from "../../../../theme/ThemeModeProvider";
 import { IconButton } from "@mui/material";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import CafeReceiptPrinterSettings from "./CafeReceiptPrinterSettings";
+import CafeKitchenPrintersSettings from "./CafeKitchenPrintersSettings";
+import sleep from "../../../../../tools/sleep";
+import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* helpers */
 const phoneToWaDigits = (p) => String(p || "").replace(/[^\d]/g, "");
-const safeOrigin = () => (typeof window !== "undefined" ? window.location.origin : "");
+const safeOrigin = () =>
+  typeof window !== "undefined" ? window.location.origin : "";
 
 const Settings = () => {
   const dispatch = useDispatch();
@@ -1237,7 +1244,11 @@ const Settings = () => {
   const isMarketSector = useMemo(() => {
     if (!company?.sector?.name) return false;
     const sectorName = String(company.sector.name).toLowerCase().trim();
-    return sectorName === "магазин" || sectorName === "цветочный магазин" || sectorName.includes("магазин");
+    return (
+      sectorName === "магазин" ||
+      sectorName === "цветочный магазин" ||
+      sectorName.includes("магазин")
+    );
   }, [company?.sector?.name]);
 
   // Определяем, является ли пользователь владельцем
@@ -1281,21 +1292,41 @@ const Settings = () => {
     if (!isInitialized) return;
 
     if (activeTab === "Моя компания" && !isOwner) {
-      setActiveTab(isMarketSector ? "Токен для весов" : canViewOnline ? "Онлайн" : "Безопасность");
+      setActiveTab(
+        isMarketSector
+          ? "Токен для весов"
+          : canViewOnline
+            ? "Онлайн"
+            : "Безопасность"
+      );
     } else if (activeTab === "Токен для весов" && !isMarketSector) {
-      setActiveTab(isOwner ? "Моя компания" : canViewOnline ? "Онлайн" : "Безопасность");
+      setActiveTab(
+        isOwner ? "Моя компания" : canViewOnline ? "Онлайн" : "Безопасность"
+      );
     } else if (activeTab === "Онлайн" && !canViewOnline) {
-      setActiveTab(isOwner ? "Моя компания" : isMarketSector ? "Токен для весов" : "Безопасность");
+      setActiveTab(
+        isOwner
+          ? "Моя компания"
+          : isMarketSector
+            ? "Токен для весов"
+            : "Безопасность"
+      );
     }
   }, [isMarketSector, isOwner, activeTab, isInitialized, canViewOnline]);
 
   const [saving, setSaving] = useState(false);
 
   // --- AlertModal
-  const [alertModal, setAlertModal] = useState({ open: false, type: "success", message: "" });
+  const [alertModal, setAlertModal] = useState({
+    open: false,
+    type: "success",
+    message: "",
+  });
 
-  const showAlert = (type, message) => setAlertModal({ open: true, type, message });
-  const closeAlert = () => setAlertModal({ open: false, type: "success", message: "" });
+  const showAlert = (type, message) =>
+    setAlertModal({ open: true, type, message });
+  const closeAlert = () =>
+    setAlertModal({ open: false, type: "success", message: "" });
 
   // --- Настройки интерфейса (сайдбар)
   const [sidebarAutoClose, setSidebarAutoClose] = useState(() => {
@@ -1329,6 +1360,7 @@ const Settings = () => {
     score: company?.score || "",
     bik: company?.bik || "",
     address: company?.address || "",
+    phones_howcase: company?.phones_howcase || "",
   });
 
   useEffect(() => {
@@ -1340,6 +1372,7 @@ const Settings = () => {
       score: company?.score || "",
       bik: company?.bik || "",
       address: company?.address || "",
+      whatsapp_phone: company?.whatsapp_phone || "",
     });
   }, [company]);
 
@@ -1347,7 +1380,8 @@ const Settings = () => {
     dispatch(getProfile());
   }, [dispatch]);
 
-  const togglePasswordVisibility = (field) => setShowPassword((prev) => ({ ...prev, [field]: !prev[field] }));
+  const togglePasswordVisibility = (field) =>
+    setShowPassword((prev) => ({ ...prev, [field]: !prev[field] }));
 
   const handlePasswordInputChange = (e) => {
     const { name, value } = e.target;
@@ -1376,8 +1410,8 @@ const Settings = () => {
       await dispatch(updateUserCompanyName(companyState)).unwrap();
       showAlert("success", "Данные компании успешно сохранены");
     } catch (err) {
-      console.error("Failed to update company:", err);
-      showAlert("error", "Ошибка при сохранении данных компании");
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении данных компании");
+      showAlert("error", errorMessage);
     } finally {
       setSaving(false);
     }
@@ -1386,7 +1420,9 @@ const Settings = () => {
   const handleSavePassword = async (e) => {
     e.preventDefault();
 
-    const anyPasswordFilled = Object.values(formData).some((s) => s.trim() !== "");
+    const anyPasswordFilled = Object.values(formData).some(
+      (s) => s.trim() !== ""
+    );
     if (!anyPasswordFilled) {
       showAlert("warning", "Заполните поля для изменения пароля");
       return;
@@ -1401,10 +1437,14 @@ const Settings = () => {
     try {
       await dispatch(updateUserData(formData)).unwrap();
       showAlert("success", "Пароль успешно изменен");
-      setFormData({ current_password: "", new_password: "", new_password2: "" });
+      setFormData({
+        current_password: "",
+        new_password: "",
+        new_password2: "",
+      });
     } catch (err) {
-      console.error("Failed to update password:", err);
-      showAlert("error", "Ошибка при изменении пароля");
+      const errorMessage = validateResErrors(err, "Ошибка при изменении пароля");
+      showAlert("error", errorMessage);
     } finally {
       setSaving(false);
     }
@@ -1419,6 +1459,7 @@ const Settings = () => {
       score: company?.score || "",
       bik: company?.bik || "",
       address: company?.address || "",
+      whatsapp_phone: company?.whatsapp_phone || "",
     });
   };
 
@@ -1432,8 +1473,8 @@ const Settings = () => {
       localStorage.setItem("sidebarAutoClose", String(sidebarAutoClose));
       showAlert("success", "Настройки интерфейса успешно сохранены");
     } catch (err) {
-      console.error("Failed to save interface settings:", err);
-      showAlert("error", "Ошибка при сохранении настроек интерфейса");
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении настроек интерфейса");
+      showAlert("error", errorMessage);
     }
   };
 
@@ -1511,40 +1552,60 @@ const Settings = () => {
         if (e.target === modal) document.body.removeChild(modal);
       };
     } catch (err) {
-      console.error("Ошибка при создании токена:", err);
-      const errorMessage = err?.detail || err?.message || (typeof err === "string" ? err : "Не удалось создать токен");
-      showAlert("error", `Ошибка: ${errorMessage}`);
+      const errorMessage = validateResErrors(err, "Ошибка при создании токена");
+      showAlert("error", errorMessage);
+      // const errorMessage =
+      //   err?.detail ||
+      //   err?.message ||
+      //   (typeof err === "string" ? err : "Не удалось создать токен");
+      // showAlert("error", `Ошибка: ${errorMessage}`);
     }
   };
 
   const { mode, toggleMode } = React.useContext(ThemeModeContext);
 
   /* ===== Онлайн: ссылки ===== */
-  const sectorName = useMemo(() => String(company?.sector?.name || "").toLowerCase().trim(), [company?.sector?.name]);
-  
+  const sectorName = useMemo(
+    () =>
+      String(company?.sector?.name || "")
+        .toLowerCase()
+        .trim(),
+    [company?.sector?.name]
+  );
+
   const isBarberSector = useMemo(() => {
-    return sectorName === "барбершоп" || sectorName === "салон красоты" || sectorName.includes("барбер") || sectorName.includes("парикмахер");
+    return (
+      sectorName === "барбершоп" ||
+      sectorName === "салон красоты" ||
+      sectorName.includes("барбер") ||
+      sectorName.includes("парикмахер")
+    );
   }, [sectorName]);
 
   const isCafeSector = useMemo(() => {
-    return sectorName === "кафе" || sectorName.includes("кафе") || sectorName.includes("ресторан");
+    return (
+      sectorName === "кафе" ||
+      sectorName.includes("кафе") ||
+      sectorName.includes("ресторан")
+    );
   }, [sectorName]);
 
   const onlineMenuUrl = useMemo(() => {
     if (!company?.slug) return "";
-    
+
     // Определяем тип сектора
-    const isMarket = sectorName === "магазин" || 
-                     sectorName === "цветочный магазин" || 
-                     sectorName.includes("магазин");
-    
+    const isMarket =
+      sectorName === "магазин" ||
+      sectorName === "цветочный магазин" ||
+      sectorName.includes("магазин");
+
     // Генерируем URL в зависимости от типа сектора
     if (isMarket) {
       return `${safeOrigin()}/catalog/${company.slug}`;
     } else if (isCafeSector) {
       return `${safeOrigin()}/cafe/${company.slug}/menu`;
     }
-    
+
     // По умолчанию для кафе
     return `${safeOrigin()}/cafe/${company.slug}/menu`;
   }, [company?.slug, sectorName, isCafeSector]);
@@ -1554,16 +1615,15 @@ const Settings = () => {
     return `${safeOrigin()}/barber/${company.slug}/booking`;
   }, [company?.slug, isBarberSector]);
 
-
   const copyText = useCallback(
     async (text) => {
       if (!text) return;
       try {
         await navigator.clipboard.writeText(String(text));
         showAlert("success", "Скопировано");
-      } catch (e) {
-        console.error("Clipboard copy failed:", e);
-        showAlert("error", "Не удалось скопировать. Скопируйте вручную.");
+      } catch (e) { 
+        const errorMessage = validateResErrors(e, "Не удалось скопировать. Скопируйте вручную.");
+        showAlert("error", errorMessage);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1583,7 +1643,13 @@ const Settings = () => {
             {profile?.role === "owner" && (
               <div className="settings__section">
                 <h2 className="settings__section-title">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
                     <path
                       d="M20 7L10 17L5 12"
                       stroke="currentColor"
@@ -1610,7 +1676,13 @@ const Settings = () => {
                       onChange={handleCompanyChange}
                     />
                     <div className="settings__input-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
                         <path
                           d="M20 7L10 17L5 12"
                           stroke="currentColor"
@@ -1624,14 +1696,35 @@ const Settings = () => {
                 </div>
 
                 {[
-                  { id: "llc", label: "Название ООО", placeholder: "Введите название ООО" },
+                  {
+                    id: "llc",
+                    label: "Название ООО",
+                    placeholder: "Введите название ООО",
+                  },
                   { id: "inn", label: "ИНН", placeholder: "Введите ИНН" },
                   { id: "okpo", label: "ОКПО", placeholder: "Введите ОКПО" },
-                  { id: "score", label: "Расчетный счет", placeholder: "Введите расчетный счет" },
+                  {
+                    id: "score",
+                    label: "Расчетный счет",
+                    placeholder: "Введите расчетный счет",
+                  },
                   { id: "bik", label: "БИК", placeholder: "Введите БИК" },
-                  { id: "address", label: "Адрес", placeholder: "Введите адрес" },
+                  {
+                    id: "address",
+                    label: "Адрес",
+                    placeholder: "Введите адрес",
+                  },
+                  {
+                    id: "whatsapp_phone",
+                    label: "Телефоны для витрины (WhatsApp)",
+                    placeholder: "Введите телефоны для витрины (WhatsApp)",
+                  },
                 ].map((field) => (
-                  <div key={field.id} className="settings__form-group" style={{ marginTop: "15px" }}>
+                  <div
+                    key={field.id}
+                    className="settings__form-group"
+                    style={{ marginTop: "15px" }}
+                  >
                     <label className="settings__label" htmlFor={field.id}>
                       {field.label}
                     </label>
@@ -1653,8 +1746,18 @@ const Settings = () => {
 
             {profile?.role === "owner" && (
               <div className="settings__actions">
-                <button className="settings__btn settings__btn--primary" type="submit" disabled={saving}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <button
+                  className="settings__btn settings__btn--primary"
+                  type="submit"
+                  disabled={saving}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
                     <path
                       d="M20 7L10 17L5 12"
                       stroke="currentColor"
@@ -1666,7 +1769,12 @@ const Settings = () => {
                   {saving ? "Сохранение..." : "Сохранить изменения"}
                 </button>
 
-                <button className="settings__btn settings__btn--secondary" type="button" onClick={handleResetCompany} disabled={saving}>
+                <button
+                  className="settings__btn settings__btn--secondary"
+                  type="button"
+                  onClick={handleResetCompany}
+                  disabled={saving}
+                >
                   Отменить
                 </button>
               </div>
@@ -1679,7 +1787,13 @@ const Settings = () => {
           <form onSubmit={handleSavePassword} className="settings__tab-form">
             <div className="settings__section">
               <h2 className="settings__section-title">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
                   <path
                     d="M12 15V3M12 15L8 11M12 15L16 11M2 17L2.621 19.485C2.72915 19.9177 2.97882 20.3018 3.33033 20.5763C3.68184 20.8508 4.11501 20.9999 4.561 21H19.439C19.885 20.9999 20.3182 20.8508 20.6697 20.5763C21.0212 20.3018 21.2708 19.9177 21.379 19.485L22 17"
                     stroke="currentColor"
@@ -1693,8 +1807,13 @@ const Settings = () => {
 
               {/* Текущий пароль */}
               <div className="settings__form-group">
-                {!formData.current_password.trim() && errors?.current_password ? (
-                  <label style={{ color: "red" }} className="settings__label" htmlFor="currentPassword">
+                {!formData.current_password.trim() &&
+                  errors?.current_password ? (
+                  <label
+                    style={{ color: "red" }}
+                    className="settings__label"
+                    htmlFor="currentPassword"
+                  >
                     {errors.current_password[0]}
                   </label>
                 ) : (
@@ -1729,7 +1848,11 @@ const Settings = () => {
               {/* Новый пароль */}
               <div className="settings__form-group">
                 {!formData.new_password.trim() && errors?.new_password ? (
-                  <label style={{ color: "red" }} className="settings__label" htmlFor="newPassword">
+                  <label
+                    style={{ color: "red" }}
+                    className="settings__label"
+                    htmlFor="newPassword"
+                  >
                     {errors.new_password[0]}
                   </label>
                 ) : (
@@ -1762,19 +1885,22 @@ const Settings = () => {
                 <div className="settings__password-strength">
                   <div className="settings__strength-bar">
                     <div
-                      className={`settings__strength-fill ${
-                        formData.new_password.length > 8 ? "strong" : formData.new_password.length > 5 ? "medium" : "weak"
-                      }`}
+                      className={`settings__strength-fill ${formData.new_password.length > 8
+                          ? "strong"
+                          : formData.new_password.length > 5
+                            ? "medium"
+                            : "weak"
+                        }`}
                     />
                   </div>
                   <span className="settings__strength-text">
                     {formData.new_password.length === 0
                       ? "Введите пароль"
                       : formData.new_password.length < 6
-                      ? "Слабый"
-                      : formData.new_password.length < 9
-                      ? "Средний"
-                      : "Сильный"}
+                        ? "Слабый"
+                        : formData.new_password.length < 9
+                          ? "Средний"
+                          : "Сильный"}
                   </span>
                 </div>
               </div>
@@ -1782,7 +1908,11 @@ const Settings = () => {
               {/* Повтор пароля */}
               <div className="settings__form-group">
                 {!formData.new_password2.trim() && errors?.new_password2 ? (
-                  <label style={{ color: "red" }} className="settings__label" htmlFor="repeatPassword">
+                  <label
+                    style={{ color: "red" }}
+                    className="settings__label"
+                    htmlFor="repeatPassword"
+                  >
                     {errors.new_password2[0]}
                   </label>
                 ) : (
@@ -1796,7 +1926,8 @@ const Settings = () => {
                     id="repeatPassword"
                     name="new_password2"
                     type={showPassword.repeat ? "text" : "password"}
-                    className={`settings__input ${passwordsMismatch ? "error" : ""}`}
+                    className={`settings__input ${passwordsMismatch ? "error" : ""
+                      }`}
                     placeholder="Повторите новый пароль"
                     value={formData.new_password2}
                     onChange={handlePasswordInputChange}
@@ -1812,7 +1943,9 @@ const Settings = () => {
                   </button>
                 </div>
 
-                {passwordsMismatch && <p className="settings__error-text">Пароли не совпадают</p>}
+                {passwordsMismatch && (
+                  <p className="settings__error-text">Пароли не совпадают</p>
+                )}
               </div>
             </div>
 
@@ -1823,7 +1956,13 @@ const Settings = () => {
                 disabled={passwordsMismatch || saving}
                 title={passwordsMismatch ? "Пароли не совпадают" : undefined}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
                   <path
                     d="M20 7L10 17L5 12"
                     stroke="currentColor"
@@ -1835,7 +1974,12 @@ const Settings = () => {
                 {saving ? "Сохранение..." : "Сохранить изменения"}
               </button>
 
-              <button className="settings__btn settings__btn--secondary" type="button" onClick={handleResetPassword} disabled={saving}>
+              <button
+                className="settings__btn settings__btn--secondary"
+                type="button"
+                onClick={handleResetPassword}
+                disabled={saving}
+              >
                 Отменить
               </button>
             </div>
@@ -1847,15 +1991,21 @@ const Settings = () => {
           <div className="settings__tab-content">
             <div className="settings__section">
               <h2 className="settings__section-title">
-                <span className="settings__emoji">⚙️</span> Токен для доступа к весам
+                <span className="settings__emoji">⚙️</span> Токен для доступа к
+                весам
               </h2>
 
               <div className="settings__form-group">
                 <p className="settings__mutedText">
-                  Создайте токен для интеграции с весами. Токен будет показан один раз — сохраните его в безопасном месте.
+                  Создайте токен для интеграции с весами. Токен будет показан
+                  один раз — сохраните его в безопасном месте.
                 </p>
 
-                <button type="button" className="settings__btn settings__btn--primary" onClick={handleCreateScalesToken}>
+                <button
+                  type="button"
+                  className="settings__btn settings__btn--primary"
+                  onClick={handleCreateScalesToken}
+                >
                   Создать токен
                 </button>
               </div>
@@ -1865,7 +2015,10 @@ const Settings = () => {
 
       case "Интерфейс":
         return (
-          <form onSubmit={handleSaveInterfaceSettings} className="settings__tab-form">
+          <form
+            onSubmit={handleSaveInterfaceSettings}
+            className="settings__tab-form"
+          >
             <div className="settings__section">
               <h2 className="settings__section-title">
                 <span className="settings__emoji">🧩</span> Настройки интерфейса
@@ -1879,11 +2032,17 @@ const Settings = () => {
                     onChange={(e) => {
                       const newValue = e.target.checked;
                       setSidebarAutoClose(newValue);
-                      localStorage.setItem("sidebarAutoClose", String(newValue));
+                      localStorage.setItem(
+                        "sidebarAutoClose",
+                        String(newValue)
+                      );
                     }}
                     className="settings__checkbox"
                   />
-                  <span>Автоматически закрывать сайдбар при переходе на другую страницу</span>
+                  <span>
+                    Автоматически закрывать сайдбар при переходе на другую
+                    страницу
+                  </span>
                 </label>
 
                 <p className="settings__mutedText settings__mutedText--indent">
@@ -1896,145 +2055,201 @@ const Settings = () => {
               <div className="settings__form-group">
                 <h2 className="settings__smallTitle">Режим темы</h2>
                 <IconButton onClick={toggleMode} aria-label="toggle theme">
-                  {mode === "dark" ? <LightModeIcon className="text-black" /> : <DarkModeIcon className="text-black" />}
+                  {mode === "dark" ? (
+                    <LightModeIcon className="text-black" />
+                  ) : (
+                    <DarkModeIcon className="text-black" />
+                  )}
                 </IconButton>
               </div>
             </div>
 
             <div className="settings__actions">
-              <button className="settings__btn settings__btn--primary" type="submit" disabled={saving}>
+              <button
+                className="settings__btn settings__btn--primary"
+                type="submit"
+                disabled={saving}
+              >
                 {saving ? "Сохранение..." : "Сохранить изменения"}
               </button>
             </div>
           </form>
         );
 
-case "Онлайн":
-  return (
-    <div className="settings__tab-content">
-      <div className="settings__section">
-        <h2 className="settings__section-title">
-          <span className="settings__emoji">🌐</span> Онлайн
-        </h2>
+      case "Онлайн":
+        return (
+          <div className="settings__tab-content">
+            <div className="settings__section">
+              <h2 className="settings__section-title">
+                <span className="settings__emoji">🌐</span> Онлайн
+              </h2>
 
-        <div className="settings__onlineGrid">
-          {/* Онлайн-запись для барбершопа */}
-          {isBarberSector && (
-            <div className="settings__onlineCard">
-              <div className="settings__onlineHead">
-                <div className="settings__onlineTitle">📅 Онлайн-запись</div>
-                <div className="settings__onlineHint">Клиенты могут записаться онлайн по этой ссылке</div>
-              </div>
+              <div className="settings__onlineGrid">
+                {/* Онлайн-запись для барбершопа */}
+                {isBarberSector && (
+                  <div className="settings__onlineCard">
+                    <div className="settings__onlineHead">
+                      <div className="settings__onlineTitle">
+                        📅 Онлайн-запись
+                      </div>
+                      <div className="settings__onlineHint">
+                        Клиенты могут записаться онлайн по этой ссылке
+                      </div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">Slug</div>
-                <div className="settings__onlineValue">{company?.slug || "—"}</div>
-              </div>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Slug</div>
+                      <div className="settings__onlineValue">
+                        {company?.slug || "—"}
+                      </div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">URL</div>
-                <div className="settings__onlineLinkBox">
-                  <input className="settings__onlineInput" value={onlineBookingUrl || ""} readOnly />
-                  <div className="settings__onlineBtns">
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--secondary"
-                      onClick={() => copyText(onlineBookingUrl)}
-                      disabled={!onlineBookingUrl}
-                    >
-                      Копировать
-                    </button>
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--primary"
-                      onClick={() => openUrl(onlineBookingUrl)}
-                      disabled={!onlineBookingUrl}
-                    >
-                      Открыть
-                    </button>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">URL</div>
+                      <div className="settings__onlineLinkBox">
+                        <input
+                          className="settings__onlineInput"
+                          value={onlineBookingUrl || ""}
+                          readOnly
+                        />
+                        <div className="settings__onlineBtns">
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--secondary"
+                            onClick={() => copyText(onlineBookingUrl)}
+                            disabled={!onlineBookingUrl}
+                          >
+                            Копировать
+                          </button>
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--primary"
+                            onClick={() => openUrl(onlineBookingUrl)}
+                            disabled={!onlineBookingUrl}
+                          >
+                            Открыть
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!onlineBookingUrl && (
+                      <div className="settings__warnBox">
+                        Нет slug у компании — без него ссылку собрать нельзя.
+                        Обычно slug приходит из <code>/users/company/</code>.
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
+                )}
 
-              {!onlineBookingUrl && (
-                <div className="settings__warnBox">
-                  Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
-                </div>
-              )}
-            </div>
-          )}
+                {/* Онлайн-меню/каталог для кафе и магазинов */}
+                {(isCafeSector || isMarketSector) && (
+                  <div className="settings__onlineCard">
+                    <div className="settings__onlineHead">
+                      <div className="settings__onlineTitle">
+                        {isCafeSector ? "🍽️ Онлайн-меню" : "🛒 Онлайн-каталог"}
+                      </div>
+                      <div className="settings__onlineHint">
+                        У каждой компании своя ссылка по slug
+                      </div>
+                    </div>
 
-          {/* Онлайн-меню/каталог для кафе и магазинов */}
-          {(isCafeSector || isMarketSector) && (
-            <div className="settings__onlineCard">
-              <div className="settings__onlineHead">
-                <div className="settings__onlineTitle">{isCafeSector ? "🍽️ Онлайн-меню" : "🛒 Онлайн-каталог"}</div>
-                <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
-              </div>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Slug</div>
+                      <div className="settings__onlineValue">
+                        {company?.slug || "—"}
+                      </div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">Slug</div>
-                <div className="settings__onlineValue">{company?.slug || "—"}</div>
-              </div>
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">URL</div>
+                      <div className="settings__onlineLinkBox">
+                        <input
+                          className="settings__onlineInput"
+                          value={onlineMenuUrl || ""}
+                          readOnly
+                        />
+                        <div className="settings__onlineBtns">
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--secondary"
+                            onClick={() => copyText(onlineMenuUrl)}
+                            disabled={!onlineMenuUrl}
+                          >
+                            Копировать
+                          </button>
+                          <button
+                            type="button"
+                            className="settings__btnSmall settings__btnSmall--primary"
+                            onClick={() => openUrl(onlineMenuUrl)}
+                            disabled={!onlineMenuUrl}
+                          >
+                            Открыть
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">URL</div>
-                <div className="settings__onlineLinkBox">
-                  <input className="settings__onlineInput" value={onlineMenuUrl || ""} readOnly />
-                  <div className="settings__onlineBtns">
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--secondary"
-                      onClick={() => copyText(onlineMenuUrl)}
-                      disabled={!onlineMenuUrl}
-                    >
-                      Копировать
-                    </button>
-                    <button
-                      type="button"
-                      className="settings__btnSmall settings__btnSmall--primary"
-                      onClick={() => openUrl(onlineMenuUrl)}
-                      disabled={!onlineMenuUrl}
-                    >
-                      Открыть
-                    </button>
+                    {!onlineMenuUrl && (
+                      <div className="settings__warnBox">
+                        Нет slug у компании — без него ссылку собрать нельзя.
+                        Обычно slug приходит из <code>/users/company/</code>.
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
+                )}
 
-              {!onlineMenuUrl && (
-                <div className="settings__warnBox">
-                  Нет slug у компании — без него ссылку собрать нельзя. Обычно slug приходит из <code>/users/company/</code>.
-                </div>
-              )}
+                {/* Fallback если не определён тип сектора */}
+                {!isBarberSector && !isCafeSector && !isMarketSector && (
+                  <div className="settings__onlineCard">
+                    <div className="settings__onlineHead">
+                      <div className="settings__onlineTitle">
+                        Ссылка на онлайн
+                      </div>
+                      <div className="settings__onlineHint">
+                        У каждой компании своя ссылка по slug
+                      </div>
+                    </div>
+
+                    <div className="settings__onlineRow">
+                      <div className="settings__onlineLabel">Slug</div>
+                      <div className="settings__onlineValue">
+                        {company?.slug || "—"}
+                      </div>
+                    </div>
+
+                    {!company?.slug && (
+                      <div className="settings__warnBox">
+                        Нет slug у компании — без него ссылку собрать нельзя.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          </div>
+        );
 
-          {/* Fallback если не определён тип сектора */}
-          {!isBarberSector && !isCafeSector && !isMarketSector && (
-            <div className="settings__onlineCard">
-              <div className="settings__onlineHead">
-                <div className="settings__onlineTitle">Ссылка на онлайн</div>
-                <div className="settings__onlineHint">У каждой компании своя ссылка по slug</div>
+      case "Печать":
+        return (
+          <div className="settings__tab-content settings__tab-content--print">
+            {isCafeSector ? (
+              <DataContainer>
+                <CafeReceiptPrinterSettings showAlert={showAlert} />
+                <CafeKitchenPrintersSettings showAlert={showAlert} />
+              </DataContainer>
+            ) : (
+              <div className="settings__section">
+                <h2 className="settings__section-title">
+                  <span className="settings__emoji">🖨️</span> Печать
+                </h2>
+                <p className="settings__mutedText">
+                  Эти настройки доступны только для сектора кафе.
+                </p>
               </div>
-
-              <div className="settings__onlineRow">
-                <div className="settings__onlineLabel">Slug</div>
-                <div className="settings__onlineValue">{company?.slug || "—"}</div>
-              </div>
-
-              {!company?.slug && (
-                <div className="settings__warnBox">
-                  Нет slug у компании — без него ссылку собрать нельзя.
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
+            )}
+          </div>
+        );
 
       default:
         return null;
@@ -2046,10 +2261,18 @@ case "Онлайн":
       <div className="settings__header">
         <div className="settings__header-content">
           <h1 className="settings__main-title">Настройки</h1>
-          <p className="settings__subtitle">Управление настройками вашей компании</p>
+          <p className="settings__subtitle">
+            Управление настройками вашей компании
+          </p>
         </div>
         <div className="settings__header-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <path
               d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z"
               stroke="currentColor"
@@ -2068,7 +2291,12 @@ case "Онлайн":
         </div>
       </div>
 
-      <Tabs activeTab={activeTab} setActiveTab={setActiveTab} company={company} profile={profile} />
+      <Tabs
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        company={company}
+        profile={profile}
+      />
 
       <div className="settings__content">{renderTabContent()}</div>
 
@@ -2076,16 +2304,25 @@ case "Онлайн":
         <button
           className="settings__logout"
           type="button"
-          onClick={() => {
+          onClick={async () => {
             dispatch(logoutUser());
-            navigate("/");
+            navigate("/", {
+              replace: true,
+            });
+            window.location.reload();
           }}
         >
           Выйти из аккаунта
         </button>
       </div>
 
-      <AlertModal open={alertModal.open} type={alertModal.type} message={alertModal.message} onClose={closeAlert} okText="Ок" />
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        message={alertModal.message}
+        onClose={closeAlert}
+        okText="Ок"
+      />
     </div>
   );
 };

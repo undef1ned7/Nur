@@ -1,3 +1,15 @@
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import {
+  Search,
+  Plus,
+  Check,
+  X,
+  ChevronDown,
+  Pencil,
+  Folder,
+} from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
 import {
   fetchWarehouseCounterparties,
@@ -7,6 +19,7 @@ import {
 import { useCounterparty } from "../../../../store/slices/counterpartySlice";
 import { useAlert } from "../../../../hooks/useDialog";
 import { fetchProductsAsync } from "../../../../store/creators/productCreators";
+import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
 import { useCash } from "../../../../store/slices/cashSlice";
 import { useClient } from "../../../../store/slices/ClientSlice";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -135,6 +148,18 @@ const CreateSaleDocument = () => {
     () => (clients || []).filter((c) => c.type === "client"),
     [clients]
   );
+
+  // Получаем выбранного клиента
+  const selectedClient = useMemo(
+    () => filterClient.find((c) => c.id === clientId),
+    [filterClient, clientId]
+  );
+
+  // Получаем список контрагентов (используем клиентов как контрагентов)
+  const filteredCounterparties = filterClient;
+
+  // Список складов (пока пустой, так как не загружаются)
+  const warehouses = [];
 
   // Фильтрация товаров в документе
   const filteredDocumentItems = useMemo(() => {
@@ -393,14 +418,14 @@ const CreateSaleDocument = () => {
       const createdDocument = createResult.payload;
 
       // Получаем данные компании и контрагента
-      const selectedCounterparty = filteredCounterparties.find((c) => c.id === clientId);
+      const selectedCounterparty = selectedClient || filterClient.find((c) => c.id === clientId);
       const warehouseName = warehouse
-        ? warehouses.find((w) => w.id === warehouse)?.name ||
+        ? (warehouses.length > 0 ? warehouses.find((w) => w.id === warehouse)?.name : null) ||
         cashBoxes?.find((b) => b.id === warehouse)?.name ||
         warehouse
         : null;
       const warehouseToName = warehouseTo
-        ? warehouses.find((w) => w.id === warehouseTo)?.name ||
+        ? (warehouses.length > 0 ? warehouses.find((w) => w.id === warehouseTo)?.name : null) ||
         cashBoxes?.find((b) => b.id === warehouseTo)?.name ||
         warehouseTo
         : null;

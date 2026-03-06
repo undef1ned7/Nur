@@ -53,6 +53,9 @@ import { display, margin } from "@mui/system";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import { useDebouncedValue } from "../../../../hooks/useDebounce";
 import { useAlert } from "../../../../hooks/useDialog";
+import useResize from "../../../../hooks/useResize";
+import { useAgentCart } from "../../../../store/slices/agentCartSlice";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Моковые данные для демонстрации
 const mockProducts = [
@@ -836,14 +839,14 @@ const ProductDetailModal = ({
               >
                 {onAddToCartWithoutCart ? (
                   <>
-                    <button
+                    {/* <button
                       className="request-without-cart-btn-modal"
                       onClick={handleAddToCartWithoutCartClick}
                       disabled={!available || quantity <= 0}
                     >
                       <Send size={18} />
                       Без корзины ({quantity} шт.)
-                    </button>
+                    </button> */}
                     <button
                       className="request-with-cart-btn-modal"
                       onClick={handleAddToCartClick}
@@ -893,12 +896,18 @@ const ProductionCatalog = () => {
   // console.log(1, products);
 
   const cartItemsCount = useSelector(selectCartItemsCount);
-
+  const agentCart = useAgentCart()
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 400);
-  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState("cards"); // 'grid' or 'list'
+  const { isMobile } = useResize(({ isMobile }) => {
+    if (isMobile) {
+      setViewMode('cards')
+    }
+  })
+
   const [showFilters, setShowFilters] = useState(false);
   // const [showCart, setShowCart] = useState(false);
   const [isCartSectionOpen, setIsCartSectionOpen] = useState(false);
@@ -910,37 +919,31 @@ const ProductionCatalog = () => {
   const [alertMessage, setAlertMessage] = useState("");
   const [agentProducts, setAgentProducts] = useState([]);
   const [agentProductsMap, setAgentProductsMap] = useState(new Map());
+  const [isMobileView, setIsMobileView] = useState(false);
 
-  // Получаем массив продуктов из results
-  const rawProductsList = Array.isArray(products?.results)
-    ? products.results
-    : Array.isArray(products)
-      ? products
-      : [];
-
-  // Сортируем товары: сначала те, что в наличии
   const productsList = useMemo(() => {
-    return [...rawProductsList].sort((a, b) => {
-      // Проверяем наличие товара в агентских продуктах
-      const aHasInAgent = agentProductsMap.has(a.id);
-      const bHasInAgent = agentProductsMap.has(b.id);
+    const data = Array.isArray(products?.results)
+      ? products.results
+      : Array.isArray(products)
+        ? products
+        : []
+    return data.map(product => {
+      const hasInAgentProducts = agentProductsMap.has(product.id);
+      const agentQty = hasInAgentProducts
+        ? agentProductsMap.get(product.id) ?? 0
+        : 0;
 
-      // Получаем количество
-      const aQty = aHasInAgent ? agentProductsMap.get(a.id) ?? 0 : 0;
-      const bQty = bHasInAgent ? agentProductsMap.get(b.id) ?? 0 : 0;
+      const cartQty = agentCart?.items?.find(cartP => cartP.product === product.id)?.quantity || 0;
 
-      // Товар в наличии, если есть в агентских продуктах и количество > 0
-      const aInStock = aHasInAgent && aQty > 0;
-      const bInStock = bHasInAgent && bQty > 0;
-
-      // Сначала товары в наличии (true идет первым)
-      if (aInStock && !bInStock) return -1;
-      if (!aInStock && bInStock) return 1;
-
-      // Если оба в наличии или оба не в наличии, сохраняем исходный порядок
-      return 0;
-    });
-  }, [rawProductsList, agentProductsMap]);
+      const enrichedProduct = {
+        ...product,
+        quantity: agentQty - cartQty,
+        isAvailableInAgent: hasInAgentProducts,
+      };
+      return enrichedProduct
+    })
+      .filter(el => !!el.quantity)
+  }, [agentProductsMap, products, agentCart]);
 
   // Функция для получения товаров из корзины и обновления счетчика
   const refreshCartItems = useCallback(async () => {
@@ -963,7 +966,8 @@ const ProductionCatalog = () => {
         setAgentCartItemsCount(0);
       }
     } catch (error) {
-      console.error("Error fetching cart items:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при получении корзины");
+      alert(errorMessage, true);
       setAgentCartItemsCount(0);
     }
   }, [dispatch, agentCartId]);
@@ -984,7 +988,8 @@ const ProductionCatalog = () => {
         setAgentProductsMap(map);
       }
     } catch (error) {
-      console.error("Error refreshing agent products:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при получении агентских продуктов");
+      alert(errorMessage, true);
     }
   }, [dispatch]);
 
@@ -1024,75 +1029,37 @@ const ProductionCatalog = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearchQuery, filters]);
 
-  // Загружаем данные агентских продуктов для получения количества
-  useEffect(() => {
-    (async () => {
-      try {
-        const result = await dispatch(getMyAgentProductsAsync()).unwrap();
-        if (Array.isArray(result)) {
-          setAgentProducts(result);
-          // Создаем мапу product_id -> qty_on_hand
-          const map = new Map();
-          result.forEach((item) => {
-            if (item.product && item.qty_on_hand !== undefined) {
-              map.set(item.product, Number(item.qty_on_hand) || 0);
-            }
-          });
-          setAgentProductsMap(map);
-        }
-      } catch (error) {
-        console.error("Error loading agent products:", error);
-      }
-    })();
-  }, [dispatch]);
-
   // Загружаем смены и кассы при монтировании
   useEffect(() => {
     dispatch(fetchShiftsAsync());
     dispatch(getCashBoxes());
   }, [dispatch]);
 
-  // Ensure agent cart exists once per page load: if no id in localStorage, create
+  // Инициализация корзины агента (1 запрос на /cart/start/ вместо нескольких)
+  // ВАЖНО: `getAgentCart` и `startAgentCart` идут в один и тот же legacy endpoint
+  // `/main/agents/me/cart/start/`, поэтому на старте страницы достаточно вызвать `getAgentCart` один раз.
   useEffect(() => {
     (async () => {
       try {
-        const storedId = localStorage.getItem("agentCartId");
-        if (storedId) {
-          // Проверяем, существует ли корзина через getAgentCart
-          try {
-            const cart = await dispatch(
-              getAgentCart({ agent: null, order_discount_total: "0.00" })
-            ).unwrap();
-            if (cart?.id) {
-              setAgentCartId(cart.id);
-              // Обновляем счетчик товаров
-              await refreshCartItems();
-              return;
-            }
-          } catch (e) {
-            // Корзина не найдена, создадим новую
-            localStorage.removeItem("agentCartId");
-          }
-        }
-        // Создаем новую корзину
-        const created = await dispatch(
-          startAgentCart({
-            agent: null, // или можно передать ID агента, если доступен
-            order_discount_total: "0.00",
-          })
+        const cart = await dispatch(
+          getAgentCart({ agent: null, order_discount_total: "0.00" })
         ).unwrap();
-        const newId = created?.id || null;
-        if (newId) {
-          localStorage.setItem("agentCartId", newId);
-          setAgentCartId(newId);
-          setAgentCartItemsCount(0);
+
+        const id = cart?.id || null;
+        if (id) {
+          setAgentCartId(id);
+          localStorage.setItem("agentCartId", id);
+          setAgentCartItemsCount(
+            Array.isArray(cart?.items) ? cart.items.length : 0
+          );
         }
       } catch (e) {
         // ignore; will fallback to local cart until user retries
-        console.error("Error initializing agent cart:", e);
+        const errorMessage = validateResErrors(e, "Ошибка при инициализации корзины");
+        alert(errorMessage, true);
       }
     })();
-  }, [dispatch, refreshCartItems]);
+  }, [dispatch]);
 
   // Блокировка прокрутки фона при открытии корзины (только на десктопе)
   useEffect(() => {
@@ -1179,7 +1146,8 @@ const ProductionCatalog = () => {
       try {
         await dispatch(updateProductsOrder(productsOrder));
       } catch (error) {
-        console.error("Ошибка при обновлении порядка товаров:", error);
+        const errorMessage = validateResErrors(error, "Ошибка при обновлении порядка товаров");
+        alert(errorMessage, true);
       }
     }
   };
@@ -1286,8 +1254,8 @@ const ProductionCatalog = () => {
         dispatch(addToCart({ product, quantity, store: "Default Store" }));
       }
     } catch (error) {
-      alert(error?.data?.detail || 'Ошибка при добавлении в корзину!')
-      console.error("Error adding product to cart:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при добавлении в корзину");
+      alert(errorMessage, true);
       // Fallback to local cart on error
       if (error?.status >= 500) {
         dispatch(addToCart({ product, quantity, store: "Default Store" }));
@@ -1408,16 +1376,8 @@ const ProductionCatalog = () => {
       dispatch(fetchProducts());
       refreshAgentProducts();
     } catch (error) {
-      console.error("Error adding to cart without saving:", error);
-      const errorMessage =
-        error?.response?.data?.shift_id?.[0] ||
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось отправить заказ";
-      setAlertType("error");
-      setAlertMessage(errorMessage);
-      setAlertOpen(true);
+      const errorMessage = validateResErrors(error, "Ошибка при добавлении в корзину без сохранения");  
+      alert(errorMessage, true);
     }
   };
 
@@ -1444,7 +1404,8 @@ const ProductionCatalog = () => {
         await refreshCartItems();
       }
     } catch (e) {
-      console.error("Error opening cart:", e);
+      const errorMessage = validateResErrors(e, "Ошибка при открытии корзины");
+      alert(errorMessage, true);
       // keep null; component will fallback to local items
     } finally {
       setIsCartSectionOpen(true);
@@ -1518,30 +1479,37 @@ const ProductionCatalog = () => {
             Фильтры
           </button> */}
 
-          <button className="cart-btn" onClick={handleOpenCart}>
-            <ShoppingCart size={20} />
-            Корзина
-            {(agentCartItemsCount > 0 || cartItemsCount > 0) && (
-              <span className="cart-badge">
-                {agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount}
-              </span>
-            )}
-          </button>
+          {!isMobileView && (
+            <button className="cart-btn" onClick={handleOpenCart}>
+              <ShoppingCart size={20} />
+              Корзина
+              {(agentCartItemsCount > 0 || cartItemsCount > 0) && (
+                <span className="cart-badge">
+                  {agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount}
+                </span>
+              )}
+            </button>
+          )}
 
-          <div className="view-mode-toggle">
-            <button
-              className={`view-btn ${viewMode === "grid" ? "active" : ""}`}
-              onClick={() => setViewMode("grid")}
-            >
-              <Grid size={20} />
-            </button>
-            <button
-              className={`view-btn ${viewMode === "list" ? "active" : ""}`}
-              onClick={() => setViewMode("list")}
-            >
-              <List size={20} />
-            </button>
-          </div>
+          {
+            !isMobile && (
+              <div className="view-mode-toggle">
+                <button
+                  className={`view-btn ${viewMode === "cards" ? "active" : ""}`}
+                  onClick={() => setViewMode("cards")}
+                >
+                  <Grid size={20} />
+                </button>
+                <button
+                  className={`view-btn ${viewMode === "list" ? "active" : ""}`}
+                  onClick={() => setViewMode("list")}
+                >
+                  <List size={20} />
+                </button>
+              </div>
+            )
+          }
+
         </div>
       </div>
 
@@ -1611,38 +1579,33 @@ const ProductionCatalog = () => {
         <div className={`products-container ${viewMode}`}>
           {productsList.length === 0 ? (
             <div className="empty-state">
-              <p>Товары не найдены</p>
-              <button onClick={clearAllFilters}>Показать все товары</button>
+              <p>
+                {
+                  debouncedSearchQuery ? 'Товары не найдены' : 'Список товаров пуст'
+                }
+              </p>
+              {
+                debouncedSearchQuery && (
+                  <button onClick={clearAllFilters}>Показать все товары</button>
+                )
+              }
             </div>
           ) : (
             <div className={`products-grid ${viewMode}`}>
-              {productsList.map((product) => {
-                // Проверяем, есть ли товар в мапе агентских продуктов
-                const hasInAgentProducts = agentProductsMap.has(product.id);
-                // Получаем количество из мапы агентских продуктов
-                // Если товара нет в мапе, количество = 0 и он недоступен
-                const agentQty = hasInAgentProducts
-                  ? agentProductsMap.get(product.id) ?? 0
-                  : 0;
-                // Обогащаем продукт количеством из агентских продуктов
-                const enrichedProduct = {
-                  ...product,
-                  quantity: agentQty,
-                  isAvailableInAgent: hasInAgentProducts, // Флаг наличия в агентских продуктах
-                };
+              {productsList.map((enrichedProduct) => {
                 return (
                   <div
-                    key={product.id}
+                    key={enrichedProduct.id}
                     className="grid-item"
                     onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, product.id)}
+                    onDrop={(e) => handleDrop(e, enrichedProduct.id)}
                   >
                     <ProductCard
                       product={enrichedProduct}
                       onView={handleViewProduct}
-                      onDragStart={(e) => handleDragStart(e, product.id)}
+                      onDragStart={(e) => handleDragStart(e, enrichedProduct.id)}
                       onDragEnd={handleDragEnd}
-                      isDragging={draggedItem === product.id}
+                      isDragging={draggedItem === enrichedProduct.id}
                       onAddToCart={handleAddToCart}
                       onAddToCartWithoutCart={handleAddToCartWithoutCart}
                     />
@@ -1722,6 +1685,7 @@ const ProductionCatalog = () => {
 
       {/* Компонент корзины - всегда рендерится, но секция заказа открывается условно */}
       <Cart
+        productsList={productsList}
         agentCartId={agentCartId}
         onNotify={handleNotify}
         onClose={handleCloseCart}
@@ -1731,6 +1695,7 @@ const ProductionCatalog = () => {
         totalItemsCount={
           agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount
         }
+        onMobileViewChange={setIsMobileView}
       />
 
       <AlertModal

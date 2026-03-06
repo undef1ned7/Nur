@@ -746,7 +746,7 @@ const GROUPS_EP = "/education/groups/";
 const STUDENTS_EP = "/education/students/";
 
 /* ===== Константы ===== */
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 
 /* ===== Подписи ===== */
 const L = {

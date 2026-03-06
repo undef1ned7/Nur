@@ -1,115 +1,203 @@
-import React, { useMemo, useState } from "react";
+/**
+ * Аналитика владельца/админа склада.
+ *
+ * Ожидаемый ответ API (getOwnerAnalytics / getAgentMeAnalytics / getOwnerAgentAnalytics):
+ *
+ * GET /api/warehouse/owner/analytics/?period=custom&date_from=2026-01-01&date_to=2026-02-28
+ *
+ * {
+ *   "period": "custom",
+ *   "date_from": "2026-01-01",
+ *   "date_to": "2026-02-28",
+ *   "summary": {
+ *     "requests_approved": 10,
+ *     "items_approved": "31.000",
+ *     "sales_count": 1,
+ *     "sales_amount": "0.00",
+ *     "on_hand_qty": "26.000",
+ *     "on_hand_amount": "4707.080000"
+ *   },
+ *   "charts": {
+ *     "sales_by_date": [
+ *       { "date": "2026-02-20", "sales_count": 1, "sales_amount": "0.00" }
+ *     ]
+ *   },
+ *   "top_agents": {
+ *     "by_sales": [
+ *       { "agent_id": "...", "agent_name": "...", "sales_count": 1, "sales_amount": "0.00" }
+ *     ],
+ *     "by_received": [
+ *       { "agent_id": "...", "agent_name": "...", "items_approved": "16.000" }
+ *     ]
+ *   },
+ *   "details": {
+ *     "warehouses": [
+ *       {
+ *         "warehouse_id": "...",
+ *         "warehouse_name": "...",
+ *         "carts_approved": 5,
+ *         "items_approved": "8.000",
+ *         "sales_count": 0,
+ *         "sales_amount": "0.00",
+ *         "on_hand_qty": "8.000",
+ *         "on_hand_amount": "987.080000"
+ *       }
+ *     ],
+ *     "sales_by_product": [
+ *       { "product_id": "...", "product_name": "...", "qty": "5.000", "amount": "0.00000" }
+ *     ],
+ *     "sales_by_group": [
+ *       {
+ *         "group_id": null,
+ *         "group_name": "Без группы",
+ *         "docs_count": 1,
+ *         "qty": "2.000",
+ *         "amount": "2900.04"
+ *       }
+ *     ],
+ *     "top_sales_group": {
+ *       "group_id": null,
+ *       "group_name": "Без группы",
+ *       "docs_count": 1,
+ *       "qty": "2.000",
+ *       "amount": "2900.04"
+ *     }
+ *   }
+ * }
+ */
+import {
+  Check,
+  Package,
+  RefreshCw,
+  ShoppingCart,
+  ChevronDown,
+  Warehouse,
+} from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
+import { useUser } from "../../../../store/slices/userSlice";
+import {
+  getOwnerAnalytics,
+  getAgentMeAnalytics,
+  getOwnerAgentAnalytics,
+} from "../../../../api/warehouse";
 import "./Analytics.scss";
 
-/* ===== demo-данные (как у тебя) ===== */
-const PRODUCTS = [
-  { name: "Кофе зерновой 1 кг",   category: "Чай/Кофе", brand: "Acme",   unit: "шт", cost: 700, price: 950, initQty: 30 },
-  { name: "Чай зелёный 100 пак.", category: "Чай/Кофе", brand: "Sakura", unit: "уп", cost: 200, price: 320, initQty: 80 },
-  { name: "Какао 250 г",          category: "Чай/Кофе", brand: "Nordik", unit: "шт", cost: 120, price: 210, initQty: 40 },
-  { name: "Молоко UHT 1 л",       category: "Напитки",  brand: "Bosco",  unit: "шт", cost: 55,  price: 90,  initQty: 120 },
-  { name: "Сок яблочный 1 л",     category: "Напитки",  brand: "Acme",   unit: "шт", cost: 70,  price: 110, initQty: 60 },
-  { name: "Вода негаз. 0.5 л",    category: "Напитки",  brand: "Khan",   unit: "шт", cost: 12,  price: 25,  initQty: 300 },
-  { name: "Сироп ваниль 0.7 л",   category: "Сиропы",   brand: "Acme",   unit: "шт", cost: 180, price: 290, initQty: 25 },
-  { name: "Орехи миндаль 200 г",  category: "Снэки",    brand: "Nordik", unit: "уп", cost: 260, price: 420, initQty: 35 },
-];
-const priceOf = (n) => PRODUCTS.find(p => p.name === n)?.price ?? 0;
-const costOf  = (n) => PRODUCTS.find(p => p.name === n)?.cost ?? 0;
-const unitOf  = (n) => PRODUCTS.find(p => p.name === n)?.unit ?? "";
-
-const RECEIPTS = [
-  { date: "2025-09-01", supplier: "ООО «Альфа»", items: [
-    { product: "Кофе зерновой 1 кг", qty: 20, cost: costOf("Кофе зерновой 1 кг") },
-    { product: "Чай зелёный 100 пак.", qty: 40, cost: costOf("Чай зелёный 100 пак.") },
-  ]},
-  { date: "2025-09-05", supplier: "ИП Бета", items: [
-    { product: "Молоко UHT 1 л", qty: 100, cost: costOf("Молоко UHT 1 л") },
-    { product: "Вода негаз. 0.5 л", qty: 150, cost: costOf("Вода негаз. 0.5 л") },
-  ]},
-  { date: "2025-09-10", supplier: "ТОО «Гамма»", items: [
-    { product: "Орехи миндаль 200 г", qty: 20, cost: costOf("Орехи миндаль 200 г") },
-    { product: "Сироп ваниль 0.7 л",  qty: 10, cost: costOf("Сироп ваниль 0.7 л") },
-  ]},
-];
-const ISSUES = [
-  { date: "2025-09-02", customer: "Розница", items: [
-    { product: "Кофе зерновой 1 кг", qty: 6,  price: priceOf("Кофе зерновой 1 кг") },
-    { product: "Молоко UHT 1 л",    qty: 20, price: priceOf("Молоко UHT 1 л") },
-  ]},
-  { date: "2025-09-06", customer: "Компания «Дельта»", items: [
-    { product: "Чай зелёный 100 пак.", qty: 30, price: priceOf("Чай зелёный 100 пак.") },
-    { product: "Вода негаз. 0.5 л",   qty: 80, price: priceOf("Вода негаз. 0.5 л") },
-  ]},
-  { date: "2025-09-11", customer: "Розница", items: [
-    { product: "Орехи миндаль 200 г", qty: 10, price: priceOf("Орехи миндаль 200 г") },
-    { product: "Сироп ваниль 0.7 л",  qty: 6,  price: priceOf("Сироп ваниль 0.7 л") },
-  ]},
-];
-const RETURNS_TO_SUP = [
-  { date: "2025-09-07", supplier: "ООО «Альфа»", items: [
-    { product: "Чай зелёный 100 пак.", qty: 5, cost: costOf("Чай зелёный 100 пак.") },
-  ]},
-];
-const WRITEOFFS = [
-  { date: "2025-09-09", items: [
-    { product: "Молоко UHT 1 л", qty: -6 },
-  ]},
+const PERIODS = [
+  { value: "day", label: "День" },
+  { value: "week", label: "Неделя" },
+  { value: "month", label: "Месяц" },
+  { value: "custom", label: "Период" },
 ];
 
-/* ===== utils ===== */
-const parseISO   = (s) => new Date(s + "T00:00:00");
-const addDays    = (s, d) => new Date(parseISO(s).getTime() + d * 86400000).toISOString().slice(0,10);
-const daysBetween= (a, b) => Math.round((parseISO(b) - parseISO(a)) / 86400000);
-const sumBy      = (arr, f) => arr.reduce((acc, x) => acc + (f(x) || 0), 0);
-const money      = (n) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(Math.round(n));
-const clamp      = (x, a, b) => Math.max(a, Math.min(b, x));
-const percentDelta = (cur, prev) => {
-  if (!prev) return null;
-  const raw = ((cur - prev) / prev) * 100;
-  const v = Math.round(raw);
-  return Number.isFinite(v) ? (v === 0 ? 0 : v) : null;
+const formatNum = (v) => {
+  const n = Number(v);
+  if (v == null || Number.isNaN(n)) return "—";
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  }).format(n);
 };
 
-/* ===== универсальная таблица: динамические колонки, числовые выравниваем вправо ===== */
-const PaginatedTable = ({ head, rows, pageSize = 15, colTemplate, numeric = [] }) => {
+const formatShortDate = (s) => {
+  if (!s) return "—";
+  try {
+    return new Date(s).toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+    });
+  } catch {
+    return String(s);
+  }
+};
+
+const PaginatedTable = ({
+  head,
+  rows,
+  pageSize = 10,
+  colTemplate,
+  numeric = [],
+}) => {
   const [page, setPage] = useState(1);
   const total = Math.max(1, Math.ceil(rows.length / pageSize));
-  const cur = clamp(page, 1, total);
+  const cur = Math.max(1, Math.min(page, total));
   const slice = rows.slice((cur - 1) * pageSize, cur * pageSize);
 
-  const template = colTemplate || `repeat(${head.length}, minmax(120px, 1fr))`;
+  useEffect(() => {
+    if (page > total) setPage(total);
+  }, [page, total]);
+
+  // Optional fixed column sizes (we only support CSS lengths like 120px/20%/10rem).
+  const colSizes = (colTemplate || "")
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, head.length);
+  const getColStyle = (idx) => {
+    const s = colSizes[idx];
+    if (!s) return undefined;
+    if (/^\d+(\.\d+)?(px|%|rem|em|vw)$/.test(s)) return { width: s };
+    return undefined;
+  };
 
   return (
-    <div className="analytics-table" role="table">
-      <div className="analytics-table__head" role="row" style={{ gridTemplateColumns: template }}>
-        {head.map((h, i) => <div key={i} className="analytics-table__col" role="columnheader">{h}</div>)}
+    <div className="warehouse-analytics-tableWrap">
+      <div className="warehouse-analytics-tableScroll">
+        <table className="warehouse-analytics-table">
+          <colgroup>
+            {head.map((_, i) => (
+              <col key={i} style={getColStyle(i)} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {head.map((h, i) => (
+                <th key={i} scope="col">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {slice.map((r, i) => (
+              <tr key={i}>
+                {r.map((c, j) => (
+                  <td key={j} className={numeric.includes(j) ? "is-num" : ""}>
+                    {c}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {slice.map((r, i) => (
-        <div key={i} className="analytics-table__row" role="row" style={{ gridTemplateColumns: template }}>
-          {r.map((c, j) => (
-            <div
-              key={j}
-              className={`analytics-table__col ${numeric.includes(j) ? "is-num" : ""}`}
-              role="cell"
-            >
-              {c}
-            </div>
-          ))}
-        </div>
-      ))}
-
-      {!slice.length && <div className="analytics-table__empty">Нет данных.</div>}
+      {!slice.length && (
+        <div className="warehouse-analytics-table__empty">Нет данных.</div>
+      )}
 
       {rows.length > pageSize && (
-        <div className="analytics__pager" aria-label="Пагинация">
-          <ul className="analytics__pageList">
+        <div className="warehouse-analytics__pager" aria-label="Пагинация">
+          <ul className="warehouse-analytics__pageList">
             {Array.from({ length: total }).map((_, i) => {
               const p = i + 1;
               return (
                 <li key={p}>
                   <button
                     type="button"
-                    className={`analytics__pageBtn ${p === cur ? "is-active" : ""}`}
+                    className={`warehouse-analytics__pageBtn ${
+                      p === cur ? "is-active" : ""
+                    }`}
                     onClick={() => setPage(p)}
                     aria-current={p === cur ? "page" : undefined}
                   >
@@ -125,258 +213,560 @@ const PaginatedTable = ({ head, rows, pageSize = 15, colTemplate, numeric = [] }
   );
 };
 
-const WarehouseAnalytics = () => {
-  const [tab, setTab] = useState("overview");
-  const [range, setRange] = useState("30");
-
-  const allDates = [...RECEIPTS, ...ISSUES, ...RETURNS_TO_SUP, ...WRITEOFFS].map(d => d.date).sort();
-  const maxDate = allDates[allDates.length - 1] || "2025-09-14";
-  const minDate = allDates[0] || "2025-09-01";
-
-  const end = maxDate;
-  const start = (() => {
-    const days = Number(range);
-    const s = addDays(end, -(days - 1));
-    return s < minDate ? minDate : s;
-  })();
-
-  const prevEnd = addDays(start, -1);
-  const prevStart = addDays(prevEnd, -(Number(range) - 1));
-
-  const rec = RECEIPTS.filter(d => d.date >= start && d.date <= end);
-  const iss = ISSUES.filter(d => d.date >= start && d.date <= end);
-  const ret = RETURNS_TO_SUP.filter(d => d.date >= start && d.date <= end);
-  const wrt = WRITEOFFS.filter(d => d.date >= start && d.date <= end);
-
-  const recPrev = RECEIPTS.filter(d => d.date >= prevStart && d.date <= prevEnd);
-  const issPrev = ISSUES.filter(d => d.date >= prevStart && d.date <= prevEnd);
-  const retPrev = RETURNS_TO_SUP.filter(d => d.date >= prevStart && d.date <= prevEnd);
-  const wrtPrev = WRITEOFFS.filter(d => d.date >= prevStart && d.date <= prevEnd);
-
-  const purchases    = useMemo(() => sumBy(rec, d => sumBy(d.items, i => i.qty * i.cost)), [rec]);
-  const returnsSup   = useMemo(() => sumBy(ret, d => sumBy(d.items, i => i.qty * i.cost)), [ret]);
-  const revenue      = useMemo(() => sumBy(iss, d => sumBy(d.items, i => i.qty * i.price)), [iss]);
-  const cogs         = useMemo(() => sumBy(iss, d => sumBy(d.items, i => i.qty * costOf(i.product))), [iss]);
-  const writeoffCost = useMemo(() => sumBy(wrt, d => sumBy(d.items, i => Math.abs(i.qty) * costOf(i.product))), [wrt]);
-  const gross  = Math.max(0, revenue - cogs);
-  const margin = revenue ? Math.round((gross / revenue) * 100) : 0;
-
-  const purchasesPrev    = sumBy(recPrev, d => sumBy(d.items, i => i.qty * i.cost));
-  const returnsSupPrev   = sumBy(retPrev, d => sumBy(d.items, i => i.qty * i.cost));
-  const revenuePrev      = sumBy(issPrev, d => sumBy(d.items, i => i.qty * i.price));
-  const cogsPrev         = sumBy(issPrev, d => sumBy(d.items, i => i.qty * costOf(i.product)));
-  const writeoffCostPrev = sumBy(wrtPrev, d => sumBy(d.items, i => Math.abs(i.qty) * costOf(i.product)));
-  const grossPrev        = Math.max(0, revenuePrev - cogsPrev);
-
-  const days = daysBetween(start, end) + 1;
-  const orders = iss.length;
-  const soldQty = sumBy(iss, d => sumBy(d.items, i => i.qty));
-  const uniqueCustomers = new Set(iss.map(o => o.customer)).size;
-  const avgDailyRevenue = revenue / Math.max(1, days);
-  const avgCheck = revenue / Math.max(1, orders);
-
-  const revenueByCat = useMemo(() => {
-    const map = new Map();
-    iss.forEach(o => o.items.forEach(i => {
-      const cat = PRODUCTS.find(p => p.name === i.product)?.category || "Прочее";
-      map.set(cat, (map.get(cat) || 0) + i.qty * i.price);
-    }));
-    return Array.from(map, ([label, value]) => ({ label, value }));
-  }, [iss]);
-  const topCat = revenueByCat.slice().sort((a,b)=>b.value-a.value)[0]?.label || "—";
-
-  const topProducts = useMemo(() => {
-    const map = new Map();
-    iss.forEach(o => o.items.forEach(i => {
-      const row = map.get(i.product) || { qty: 0, sum: 0, unit: unitOf(i.product) };
-      row.qty += i.qty;
-      row.sum += i.qty * i.price;
-      map.set(i.product, row);
-    }));
-    const rows = Array.from(map, ([name, v]) => [name, `${v.qty} ${v.unit || ""}`.trim(), money(v.sum)]);
-    rows.sort((a, b) => Number(b[2].replace(/\s/g, "")) - Number(a[2].replace(/\s/g, "")));
-    return rows;
-  }, [iss]);
-
-  const topCustomers = useMemo(() => {
-    const map = new Map();
-    iss.forEach(o => {
-      const s = sumBy(o.items, i => i.qty * i.price);
-      map.set(o.customer, (map.get(o.customer) || 0) + s);
-    });
-    const rows = Array.from(map, ([cust, s]) => [cust, money(s)]);
-    rows.sort((a, b) => Number(b[1].replace(/\s/g, "")) - Number(a[1].replace(/\s/g, "")));
-    return rows;
-  }, [iss]);
-
-  const topSuppliers = useMemo(() => {
-    const map = new Map();
-    rec.forEach(o => {
-      const s = sumBy(o.items, i => i.qty * i.cost);
-      map.set(o.supplier, (map.get(o.supplier) || 0) + s);
-    });
-    const rows = Array.from(map, ([sup, s]) => [sup, money(s)]);
-    rows.sort((a, b) => Number(b[1].replace(/\s/g, "")) - Number(a[1].replace(/\s/g, "")));
-    return rows;
-  }, [rec]);
-
-  const endStock = useMemo(() => {
-    const map = new Map(PRODUCTS.map(p => [p.name, p.initQty]));
-    RECEIPTS.forEach(r => r.items.forEach(i => map.set(i.product, (map.get(i.product) || 0) + i.qty)));
-    RETURNS_TO_SUP.forEach(r => r.items.forEach(i => map.set(i.product, (map.get(i.product) || 0) - i.qty)));
-    ISSUES.forEach(r => r.items.forEach(i => map.set(i.product, (map.get(i.product) || 0) - i.qty)));
-    WRITEOFFS.forEach(r => r.items.forEach(i => map.set(i.product, (map.get(i.product) || 0) + i.qty)));
-    return PRODUCTS.map(p => {
-      const qty = Math.max(0, map.get(p.name) || 0);
-      return { ...p, qty, value: qty * p.cost };
-    });
-  }, []);
-  const stockValue = endStock.reduce((acc, x) => acc + x.value, 0);
-  const stockRows = endStock
-    .map(p => [p.name, p.category, p.brand, p.unit, p.qty, money(p.value)])
-    .sort((a, b) => b[4] - a[4]);
-
-  const journal = [
-    ...rec.map(r => ({ date: r.date, type: "Закупка", who: r.supplier, sum: sumBy(r.items, i => i.qty * i.cost) })),
-    ...iss.map(r => ({ date: r.date, type: "Продажа", who: r.customer, sum: sumBy(r.items, i => i.qty * i.price) })),
-    ...ret.map(r => ({ date: r.date, type: "Возврат пост.", who: r.supplier, sum: sumBy(r.items, i => i.qty * i.cost) })),
-    ...wrt.map(r => ({ date: r.date, type: "Списание", who: "Склад", sum: sumBy(r.items, i => Math.abs(i.qty) * costOf(i.product)) })),
-  ].sort((a,b)=> (a.date < b.date ? 1 : -1));
-  const journalRows = journal.map(j => [j.date, j.type, j.who, money(j.sum)]);
-
-  const Kpi = ({ label, value, prev, mode = "pos", note }) => {
-    const delta = percentDelta(value, prev);
-    let cls = "none", txt = "—";
-    if (delta === 0) { cls = "flat"; txt = "0%"; }
-    else if (delta !== null) {
-      const up = delta > 0;
-      const good = mode === "pos" ? up : mode === "neg" ? !up : false;
-      cls = up ? (good ? "up" : "down") : (!good ? "down" : "up");
-      txt = `${delta > 0 ? "+" : ""}${delta}%`;
-    }
-    return (
-      <div className="analytics__kpi">
-        <div className="analytics__kpiTop">
-          <div className="analytics__kpiLabel">{label}</div>
-          <span className={`analytics__delta analytics__delta--${cls}`}>{txt}</span>
-        </div>
-        <div className="analytics__kpiValue">{money(value)}</div>
-        {typeof note === "string" && <div className="analytics__kpiNote">{note}</div>}
+const KpiCard = ({ label, value, description, icon: Icon }) => (
+  <div className="warehouse-analytics__kpi">
+    {Icon && (
+      <div className="warehouse-analytics__kpiIcon">
+        <Icon size={24} strokeWidth={2} />
       </div>
-    );
-  };
+    )}
+    <div className="warehouse-analytics__kpiLabel">{label}</div>
+    <div className="warehouse-analytics__kpiValue">{value}</div>
+    {description && (
+      <div className="warehouse-analytics__kpiDesc">{description}</div>
+    )}
+  </div>
+);
+
+const AccordionItem = ({
+  id,
+  title,
+  icon: Icon,
+  badge,
+  defaultOpen = true,
+  children,
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = `${id}-panel`;
+  const btnId = `${id}-button`;
 
   return (
-    <div className="analytics">
-      {/* Header */}
-      <div className="analytics__header">
-        <h2 className="analytics__title">Аналитика</h2>
-        <div className="analytics__seg" role="tablist" aria-label="Период">
-          {["7","30","90"].map(r => (
-            <button
-              key={r}
-              type="button"
-              role="tab"
-              aria-selected={range === r}
-              className={`analytics__segBtn ${range === r ? "is-active" : ""}`}
-              onClick={() => setRange(r)}
-            >
-              {r} дн.
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className={`warehouse-analytics__accItem ${open ? "is-open" : ""}`}>
+      <button
+        id={btnId}
+        type="button"
+        className="warehouse-analytics__accBtn"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="warehouse-analytics__accLeft">
+          {Icon && (
+            <span className="warehouse-analytics__accIcon" aria-hidden="true">
+              <Icon size={18} />
+            </span>
+          )}
+          <span className="warehouse-analytics__accTitle">{title}</span>
+        </span>
 
-      {/* Tabs – сверху */}
-      <div className="analytics__tabs analytics__tabs--top" role="tablist" aria-label="Разделы">
-        <button className={`analytics__tab ${tab==="overview"?"is-active":""}`} onClick={()=>setTab("overview")}>Обзор</button>
-        <button className={`analytics__tab ${tab==="sales"?"is-active":""}`} onClick={()=>setTab("sales")}>Продажи</button>
-        <button className={`analytics__tab ${tab==="purchases"?"is-active":""}`} onClick={()=>setTab("purchases")}>Закупки</button>
-        <button className={`analytics__tab ${tab==="inventory"?"is-active":""}`} onClick={()=>setTab("inventory")}>Остатки</button>
-      </div>
-
-      {/* KPI */}
-      <div className="analytics__kpis">
-        <Kpi label="Выручка" value={revenue} prev={revenuePrev} mode="pos" />
-        <Kpi label="Закупки" value={purchases} prev={purchasesPrev} mode="neutral" />
-        <Kpi label="Валовая прибыль" value={gross} prev={grossPrev} mode="pos" note={`Маржа: ${margin}%`} />
-        <Kpi label="Возвраты поставщику" value={returnsSup} prev={returnsSupPrev} mode="neg" />
-        <Kpi label="Списание (себ-сть)" value={writeoffCost} prev={writeoffCostPrev} mode="neg" />
-        <Kpi label="Стоимость остатков" value={stockValue} prev={stockValue} mode="neutral" />
-      </div>
-
-      {/* Сводка + таблицы (компактно, без лишних полей) */}
-      <div className="analytics__grid">
-        <div className="analytics__card">
-          <div className="analytics__cardTitle">Сводка периода</div>
-          <ul className="analytics__statList">
-            <li><span>Дней в периоде</span><b>{days}</b></li>
-            <li><span>Заказы</span><b>{orders}</b></li>
-            <li><span>Товаров продано</span><b>{soldQty}</b></li>
-            <li><span>Уник. покупателей</span><b>{uniqueCustomers}</b></li>
-            <li><span>Средняя выручка/день</span><b>{money(avgDailyRevenue)}</b></li>
-            <li><span>Средний чек</span><b>{money(avgCheck)}</b></li>
-            <li><span>Топ-категория</span><b>{topCat}</b></li>
-          </ul>
-        </div>
-
-        <div className="analytics__card">
-          <div className="analytics__cardTitle">Журнал операций</div>
-          <PaginatedTable
-            head={["Дата", "Тип", "Контрагент", "Сумма"]}
-            rows={journalRows}
-            colTemplate={"120px 140px 1fr 120px"}
-            numeric={[3]}
+        <span className="warehouse-analytics__accRight">
+          {badge != null && badge !== "" && (
+            <span className="warehouse-analytics__accBadge">{badge}</span>
+          )}
+          <ChevronDown
+            size={18}
+            className="warehouse-analytics__accChevron"
+            aria-hidden="true"
           />
-        </div>
+        </span>
+      </button>
 
-        {(tab === "sales" || tab === "overview") && (
-          <>
-            <div className="analytics__card">
-              <div className="analytics__cardTitle">Топ товаров</div>
-              <PaginatedTable
-                head={["Товар", "Кол-во", "Сумма"]}
-                rows={topProducts}
-                colTemplate={"1fr 120px 120px"}
-                numeric={[1,2]}
-              />
-            </div>
-            <div className="analytics__card">
-              <div className="analytics__cardTitle">Топ покупателей</div>
-              <PaginatedTable
-                head={["Покупатель", "Сумма"]}
-                rows={topCustomers}
-                colTemplate={"1fr 140px"}
-                numeric={[1]}
-              />
-            </div>
-          </>
-        )}
-
-        {(tab === "purchases" || tab === "overview") && (
-          <div className="analytics__card">
-            <div className="analytics__cardTitle">Топ поставщиков</div>
-            <PaginatedTable
-              head={["Поставщик", "Сумма"]}
-              rows={topSuppliers}
-              colTemplate={"1fr 140px"}
-              numeric={[1]}
-            />
-          </div>
-        )}
-
-        {(tab === "inventory" || tab === "overview") && (
-          <div className="analytics__card analytics__card--span2">
-            <div className="analytics__cardTitle">Остатки (стоимость)</div>
-            <PaginatedTable
-              head={["Товар", "Категория", "Бренд", "Ед.", "Кол-во", "Стоимость"]}
-              rows={stockRows}
-              colTemplate={"1.6fr 1fr 1fr .7fr .8fr 1fr"}
-              numeric={[4,5]}
-            />
-          </div>
-        )}
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={btnId}
+        className="warehouse-analytics__accBody"
+        hidden={!open}
+      >
+        {children}
       </div>
+    </div>
+  );
+};
+
+const WarehouseAnalytics = () => {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const { profile } = useUser();
+  const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
+
+  const agentId = searchParams.get("agent_id") || null;
+  const agentName = location.state?.agentName || null;
+
+  const [period, setPeriod] = useState("month");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dateTo, setDateTo] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [data, setData] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const params = { period };
+    if (period === "custom") {
+      params.date_from = dateFrom;
+      params.date_to = dateTo;
+    } else {
+      params.date = date;
+    }
+    try {
+      let result;
+      if (agentId && isOwnerOrAdmin) {
+        result = await getOwnerAgentAnalytics(agentId, params);
+      } else if (isOwnerOrAdmin) {
+        result = await getOwnerAnalytics(params);
+      } else {
+        result = await getAgentMeAnalytics(params);
+      }
+      setData(result);
+    } catch (e) {
+      console.error(e);
+      setError(e?.detail || e?.message || "Не удалось загрузить аналитику");
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [isOwnerOrAdmin, period, date, dateFrom, dateTo, agentId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const summary = data?.summary || {};
+  const charts = data?.charts || {};
+  const topAgents = data?.top_agents || {};
+  const details = data?.details || {};
+  const salesByDate = Array.isArray(charts?.sales_by_date)
+    ? charts.sales_by_date
+    : [];
+  const bySales = Array.isArray(topAgents?.by_sales) ? topAgents.by_sales : [];
+  const byReceived = Array.isArray(topAgents?.by_received)
+    ? topAgents.by_received
+    : [];
+  const warehouses = Array.isArray(details?.warehouses)
+    ? details.warehouses
+    : [];
+  const salesByProduct = Array.isArray(details?.sales_by_product)
+    ? details.sales_by_product
+    : [];
+  const salesByGroup = Array.isArray(details?.sales_by_group)
+    ? details.sales_by_group
+    : [];
+
+  const totalSalesAmount = bySales.reduce(
+    (acc, a) => acc + Number(a.sales_amount ?? a.amount ?? 0),
+    0,
+  );
+  const totalReceivedItems = byReceived.reduce(
+    (acc, a) =>
+      acc +
+      Number(a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0),
+    0,
+  );
+
+  const bySalesRows = bySales.map((a, i) => {
+    const amount = Number(a.sales_amount ?? a.amount ?? 0);
+    const count = formatNum(a.sales_count ?? a.count);
+    const share =
+      totalSalesAmount > 0
+        ? `${Math.round((amount / totalSalesAmount) * 100)}%`
+        : "—";
+    return [
+      a.agent_name || a.name || a.agent_display || a.id || "—",
+      `${formatNum(amount)} сом`,
+      `${count} шт`,
+      share,
+    ];
+  });
+  const byReceivedRows = byReceived.map((a) => {
+    const items = Number(
+      a.items_approved ?? a.items_received ?? a.items ?? a.count ?? 0,
+    );
+    const share =
+      totalReceivedItems > 0
+        ? `${Math.round((items / totalReceivedItems) * 100)}%`
+        : "—";
+    return [
+      a.agent_name || a.name || a.agent_display || a.id || "—",
+      `${formatNum(items)} шт`,
+      share,
+    ];
+  });
+
+  const salesChartData = salesByDate.map((d) => ({
+    date: d.date ? formatShortDate(d.date) : d.label || "—",
+    sum: Number(d.sum ?? d.amount ?? d.sales_amount ?? 0),
+    count: Number(d.count ?? d.sales_count ?? 0),
+  }));
+
+  const requestsApproved = Number(summary.requests_approved ?? 0);
+  const itemsApproved = Number(summary.items_approved ?? 0);
+  const salesCount = Number(summary.sales_count ?? 0);
+  const salesAmount = Number(summary.sales_amount ?? 0);
+  const onHandQty = Number(summary.on_hand_qty ?? 0);
+  const onHandAmount = Number(summary.on_hand_amount ?? 0);
+
+  const isAgentView = !isOwnerOrAdmin && !agentId;
+
+  return (
+    <div className="warehouse-analytics">
+      <div className="warehouse-analytics__header">
+        <h2 className="warehouse-analytics__title">
+          {agentId && isOwnerOrAdmin
+            ? `Аналитика агента: ${agentName || agentId}`
+            : isOwnerOrAdmin
+              ? "Аналитика склада"
+              : "Моя аналитика"}
+        </h2>
+        <div className="warehouse-analytics__header-actions">
+          <button
+            type="button"
+            className="warehouse-analytics__refresh"
+            onClick={load}
+            disabled={loading}
+            title="Обновить"
+          >
+            <RefreshCw size={18} />
+            Обновить
+          </button>
+          <div
+            className="warehouse-analytics__seg"
+            role="tablist"
+            aria-label="Период"
+          >
+            {PERIODS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                role="tab"
+                aria-selected={period === p.value}
+                className={`warehouse-analytics__segBtn ${period === p.value ? "is-active" : ""}`}
+                onClick={() => setPeriod(p.value)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {period === "custom" && (
+        <div className="warehouse-analytics__range">
+          <label>
+            С
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="warehouse-analytics__input"
+            />
+          </label>
+          <label>
+            По
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="warehouse-analytics__input"
+            />
+          </label>
+        </div>
+      )}
+
+      {error && <div className="warehouse-analytics__error">{error}</div>}
+
+      {loading ? (
+        <div className="warehouse-analytics__loading">Загрузка…</div>
+      ) : data ? (
+        <>
+          <div className="warehouse-analytics__kpis">
+            <KpiCard
+              label="Одобрено заявок"
+              value={formatNum(requestsApproved)}
+              description="За период"
+              icon={Check}
+            />
+            <KpiCard
+              label="Одобрено позиций"
+              value={formatNum(itemsApproved)}
+              description="Товаров выдано"
+              icon={Package}
+            />
+            <KpiCard
+              label={
+                isAgentView ? "Количество моих продаж" : "Количество продаж агентов"
+              }
+              value={formatNum(salesCount)}
+              description="За период"
+              icon={ShoppingCart}
+            />
+            <KpiCard
+              label={isAgentView ? "Сумма моих продаж" : "Сумма продаж агентов"}
+              value={`${formatNum(salesAmount)} сом`}
+              icon={ShoppingCart}
+            />
+            <KpiCard
+              label="Остаток на руках, шт"
+              value={formatNum(onHandQty)}
+              icon={Package}
+            />
+            <KpiCard
+              label="Остаток на руках, сом"
+              value={`${formatNum(onHandAmount)} сом`}
+              icon={Package}
+            />
+          </div>
+
+          <div className="warehouse-analytics__chartsRow">
+            <div className="warehouse-analytics__card warehouse-analytics__card--chart">
+              <div className="warehouse-analytics__cardTitle">
+                {isAgentView ? "Динамика продаж" : "Динамика продаж агентов"}
+              </div>
+              <div className="warehouse-analytics__chartWrap">
+                {salesChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart
+                      data={salesChartData}
+                      margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="warehouseAnalyticsAreaFill"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="var(--wa-primary)"
+                            stopOpacity={0.4}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="var(--wa-primary)"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--wa-border)"
+                      />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) =>
+                          v && v.length > 6 ? v.slice(0, 6) : v
+                        }
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => formatNum(v)}
+                      />
+                      <Tooltip
+                        formatter={(value) => [
+                          formatNum(value),
+                          "Продажи (сом)",
+                        ]}
+                        labelFormatter={(l) => `Дата: ${l}`}
+                      />
+                      <Legend
+                        formatter={() => "Продажи (сом)"}
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 12 }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="sum"
+                        stroke="var(--wa-primary)"
+                        strokeWidth={2}
+                        fill="url(#warehouseAnalyticsAreaFill)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="warehouse-analytics__chartWrap--empty">
+                    Нет данных за период.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {isOwnerOrAdmin && (
+            <>
+              <div className="warehouse-analytics__accordion">
+                <AccordionItem
+                  id="wa-top-sales"
+                  title="Топ агентов по продажам"
+                  icon={ShoppingCart}
+                  badge={bySalesRows.length ? `${bySalesRows.length}` : "0"}
+                  defaultOpen
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {bySalesRows.length > 0 ? (
+                      <PaginatedTable
+                        head={["Агент", "Продажи", "Кол-во", "Доля"]}
+                        rows={bySalesRows}
+                        colTemplate="1fr 120px 90px 70px"
+                        numeric={[1, 2, 3]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет данных за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  id="wa-top-received"
+                  title="Топ агентов по полученным товарам"
+                  icon={Package}
+                  badge={
+                    byReceivedRows.length ? `${byReceivedRows.length}` : "0"
+                  }
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {byReceivedRows.length > 0 ? (
+                      <PaginatedTable
+                        head={["Агент", "Позиций", "Доля"]}
+                        rows={byReceivedRows}
+                        colTemplate="1fr 100px 70px"
+                        numeric={[1, 2]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет данных за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  id="wa-warehouses"
+                  title="Склады"
+                  icon={Warehouse}
+                  badge={warehouses.length ? `${warehouses.length}` : "0"}
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {warehouses.length > 0 ? (
+                      <PaginatedTable
+                        head={[
+                          "Склад",
+                          "Заявок одобрено",
+                          "Позиций одобрено",
+                          "Продаж",
+                          "Сумма продаж",
+                          "Остаток, шт",
+                          "Остаток, сом",
+                        ]}
+                        rows={warehouses.map((w) => [
+                          w.warehouse_name ?? w.name ?? "—",
+                          formatNum(
+                            w.carts_approved ?? w.requests_approved ?? 0,
+                          ),
+                          formatNum(w.items_approved ?? 0),
+                          formatNum(w.sales_count ?? 0),
+                          `${formatNum(w.sales_amount ?? 0)} сом`,
+                          formatNum(w.on_hand_qty ?? 0),
+                          `${formatNum(w.on_hand_amount ?? 0)} сом`,
+                        ])}
+                        colTemplate="1.2fr 130px 150px 90px 130px 110px 130px"
+                        numeric={[1, 2, 3, 4, 5, 6]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет данных по складам за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  id="wa-sales-by-product"
+                  title="Продажи по товарам"
+                  icon={ShoppingCart}
+                  badge={
+                    salesByProduct.length ? `${salesByProduct.length}` : "0"
+                  }
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {salesByProduct.length > 0 ? (
+                      <PaginatedTable
+                        head={["Товар", "Кол-во", "Сумма, сом"]}
+                        rows={salesByProduct.map((p) => [
+                          p.product_name ?? p.name ?? "—",
+                          formatNum(p.qty ?? p.quantity ?? 0),
+                          formatNum(p.amount ?? 0),
+                        ])}
+                        colTemplate="1fr 100px 120px"
+                        numeric={[1, 2]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет продаж по товарам за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem
+                  id="wa-sales-by-group"
+                  title="Продажи по группам"
+                  icon={ShoppingCart}
+                  badge={salesByGroup.length ? `${salesByGroup.length}` : "0"}
+                  defaultOpen={false}
+                >
+                  <div className="warehouse-analytics__card warehouse-analytics__accCard">
+                    {salesByGroup.length > 0 ? (
+                      <PaginatedTable
+                        head={["Группа", "Документов", "Кол-во", "Сумма, сом"]}
+                        rows={salesByGroup.map((g) => [
+                          g.group_name ?? "Без группы",
+                          formatNum(g.docs_count ?? 0),
+                          formatNum(g.qty ?? 0),
+                          formatNum(g.amount ?? 0),
+                        ])}
+                        colTemplate="1fr 120px 120px 120px"
+                        numeric={[1, 2, 3]}
+                      />
+                    ) : (
+                      <div className="warehouse-analytics-table__empty">
+                        Нет продаж по группам за период.
+                      </div>
+                    )}
+                  </div>
+                </AccordionItem>
+              </div>
+            </>
+          )}
+
+          {!isOwnerOrAdmin &&
+            !isAgentView &&
+            Object.keys(summary).length === 0 &&
+            !salesChartData.length && (
+              <div className="warehouse-analytics__card">
+                <div className="warehouse-analytics-table__empty">
+                  Нет данных за выбранный период.
+                </div>
+              </div>
+            )}
+        </>
+      ) : null}
     </div>
   );
 };

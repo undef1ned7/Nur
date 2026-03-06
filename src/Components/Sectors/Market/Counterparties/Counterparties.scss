@@ -1,5 +1,170 @@
-// Импортируем стили из Warehouse, так как дизайн должен быть одинаковым
-@use "../Warehouse/Warehouse.scss";
+// Контрагенты — стили страницы (переменные из Warehouse при необходимости)
+.counterparties-page {
+  --counterparties-tab-active: var(--primary, #f7d74f);
+  --counterparties-tab-text: var(--muted, #6b7280);
+  --counterparties-tab-text-active: var(--text, #0f172a);
+  --counterparties-border: var(--border, #e5e7eb);
+  --counterparties-surface: var(--surface, #ffffff);
+  --counterparties-radius: var(--radius, 12px);
+}
 
-// Дополнительные стили для контрагентов можно добавить здесь
+/* Панель с вкладками и фильтром по агенту */
+.counterparties-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
 
+.counterparties-type-tabs {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 4px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  border: 1px solid var(--counterparties-border);
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--counterparties-tab-text);
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+
+    &:hover {
+      color: var(--counterparties-tab-text-active);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    &--active {
+      color: var(--counterparties-tab-text-active);
+      background: var(--counterparties-tab-active);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+  }
+}
+
+/* Фильтр по агенту */
+.counterparties-agent-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 4px 0;
+
+  &__icon {
+    color: var(--counterparties-tab-text);
+    flex-shrink: 0;
+  }
+
+  &__label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--counterparties-tab-text);
+    white-space: nowrap;
+  }
+
+  &__select {
+    min-width: 160px;
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--counterparties-tab-text-active);
+    background: var(--counterparties-surface);
+    border: 1px solid var(--counterparties-border);
+    border-radius: 8px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+
+    &:focus {
+      outline: none;
+      border-color: var(--counterparties-tab-active);
+    }
+  }
+}
+
+/* Контейнер контента */
+.counterparties-content {
+  margin-top: 0.5rem;
+}
+
+.counterparties-table-wrap,
+.counterparties-cards-wrap {
+  margin-bottom: 0.5rem;
+}
+
+/* Состояние загрузки */
+.counterparties-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 2rem;
+  background: var(--counterparties-surface);
+  border: 1px solid var(--counterparties-border);
+  border-radius: var(--counterparties-radius);
+
+  &__spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--counterparties-border);
+    border-top-color: var(--counterparties-tab-active);
+    border-radius: 50%;
+    animation: counterparties-spin 0.8s linear infinite;
+  }
+
+  &__text {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--counterparties-tab-text);
+  }
+}
+
+@keyframes counterparties-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Пустой список */
+.counterparties-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  background: var(--counterparties-surface);
+  border: 1px dashed var(--counterparties-border);
+  border-radius: var(--counterparties-radius);
+
+  &__icon {
+    color: #cbd5e1;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--counterparties-tab-text-active);
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--counterparties-tab-text);
+    max-width: 320px;
+    line-height: 1.4;
+  }
+}

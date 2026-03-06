@@ -19,9 +19,13 @@ const ruStatusToKind = (ru) => {
   return "sale";
 };
 
-const toDecimalString = (n) => {
-  const num = Number(n || 0);
-  return num.toFixed(2);
+const toDecimalString = (v) => {
+  const s = String(v ?? "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/,/g, ".");
+  const num = Number(s);
+  return Number.isFinite(num) ? num.toFixed(2) : "0.00";
 };
 
 const hasPositiveNumber = (v) => Number.isFinite(Number(v)) && Number(v) > 0;
@@ -29,8 +33,18 @@ const hasPositiveNumber = (v) => Number.isFinite(Number(v)) && Number(v) > 0;
 // ===== POS продажи (товары) =====
 export const startSale = createAsyncThunk(
   "sale/start",
-  async ({ discount_total = 0, shift = null }, { rejectWithValue }) => {
+  async (args = {}, { rejectWithValue }) => {
     try {
+      // Нормализуем аргументы:
+      // - startSale() -> {}
+      // - startSale(10) / startSale("10") -> { discount_total: 10 }
+      // - startSale({ discount_total, shift }) -> как есть
+      const normalized =
+        typeof args === "number" || typeof args === "string"
+          ? { discount_total: Number(args) || 0 }
+          : args || {};
+
+      const { discount_total = 0, shift = null } = normalized;
       const payload = {
         order_discount_total: discount_total,
       };
@@ -43,6 +57,15 @@ export const startSale = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
+  },
+  {
+    // Защита от многократных параллельных вызовов startSale (частая причина пачки запросов при монтировании страницы)
+    condition: (args, { getState }) => {
+      const state = getState?.();
+      // если уже идет startSale — пропускаем повторный dispatch
+      if (state?.sale?.startSaleLoading) return false;
+      return true;
+    },
   }
 );
 
@@ -164,12 +187,15 @@ export const doSearch = createAsyncThunk(
 
 export const historySellProduct = createAsyncThunk(
   "products/historySellProduct",
-  async (search, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
       const { data } = await api.get(`/main/pos/sales/`, {
-        params: search,
+        params: {
+          page: params.page || 1,
+          search: params.search || "",
+        },
       });
-      return data.results;
+      return data; // Возвращаем полный объект с пагинацией
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
@@ -211,12 +237,15 @@ export const updateSellProduct = createAsyncThunk(
 
 export const historySellObjects = createAsyncThunk(
   "products/historySellObjects",
-  async (search, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
       const { data } = await api.get(`/main/object-sales/`, {
-        params: search,
+        params: {
+          page: params.page || 1,
+          search: params.search || "",
+        },
       });
-      return data.results;
+      return data; // Возвращаем полный объект с пагинацией
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }

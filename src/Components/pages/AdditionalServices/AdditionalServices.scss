@@ -11,11 +11,15 @@
     border-radius: 15px;
     color: #000;
     box-shadow: var(--shadow);
+    text-align: center;
 
     h1 {
       font-size: 2.5rem;
       margin-bottom: 15px;
       font-weight: 700;
+      @include ifmobile {
+        font-size: 1.5rem;
+      }
     }
 
     p {
@@ -471,10 +475,11 @@
       padding: 20px;
 
       h1 {
-        font-size: 2rem;
+        font-size: 1.5rem;
       }
 
       p {
+        text-align: center;
         font-size: 1rem;
       }
     }

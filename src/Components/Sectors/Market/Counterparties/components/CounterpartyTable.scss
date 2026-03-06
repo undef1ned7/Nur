@@ -1,3 +1,19 @@
 // Стили для CounterpartyTable компонента
 // Основные стили находятся в Counterparties.scss
 
+.warehouse-table__open-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #000;
+  background: #f7d74f;
+  border: 1px solid #f7d74f;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #f7d74f;
+    color: #000;
+  }
+}

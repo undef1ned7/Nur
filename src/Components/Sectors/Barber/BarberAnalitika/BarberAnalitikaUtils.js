@@ -3,16 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../../../../api";
 
 /* ─── helpers ─── */
-export const toNum = (v) =>
-  Number.isFinite(Number(v)) ? Number(v) : 0;
+export const toNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 export const fmt = (x) =>
-  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(
-    toNum(x)
-  );
+  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(toNum(x));
 
-export const fmtInt = (n) =>
-  Number(n || 0).toLocaleString("ru-RU");
+export const fmtInt = (n) => Number(n || 0).toLocaleString("ru-RU");
 
 export const fmtMoney = (n) => `${fmt(n)} c`;
 
@@ -48,6 +44,14 @@ export const monthRange = (year, monthIdx) => {
   const start = new Date(year, monthIdx, 1, 0, 0, 0, 0);
   const end = new Date(year, monthIdx + 1, 1, 0, 0, 0, 0);
   return { startTs: start.getTime(), endTs: end.getTime() - 1 };
+};
+
+// Форматирование даты в формат YYYY-MM-DD для API
+export const formatDateForAPI = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 /* для записей берём start_at */
@@ -102,7 +106,7 @@ export const usePaged = (rows, pageSize) => {
 
   const slice = useMemo(
     () => rows.slice((page - 1) * pageSize, page * pageSize),
-    [rows, page, pageSize]
+    [rows, page, pageSize],
   );
 
   return { page, pages, setPage, slice };

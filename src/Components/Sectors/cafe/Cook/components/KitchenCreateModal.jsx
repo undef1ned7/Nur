@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaPlus, FaPrint, FaSyncAlt, FaTimes } from "react-icons/fa";
+import { FaCheck, FaPlus, FaPrint, FaSyncAlt, FaTimes, FaUsb, FaWifi } from "react-icons/fa";
 import api from "../../../../../api";
 import {
   listAuthorizedPrinters,
@@ -7,8 +7,11 @@ import {
   getSavedPrinters,
   getActivePrinterKey,
   setActivePrinterByKey,
+  formatPrinterBinding,
 } from "../../Orders/OrdersPrintService";
 import "./KitchenCreateModal.scss";
+import { useAlert } from "../../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
 
 const safeName = (p) => p?.name || "USB Printer";
 const shortKey = (k) => String(k || "").split(":").slice(0, 2).join(":");
@@ -27,12 +30,15 @@ const readKitchenPrinterMap = () => {
 const writeKitchenPrinterMap = (obj) => {
   try {
     localStorage.setItem("kitchen_printer_map", JSON.stringify(obj || {}));
-  } catch {}
+  } catch { }
 };
 
 const KitchenCreateModal = ({ open, onClose, onCreated }) => {
+  const alert = useAlert();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [printerDevice, setPrinterDevice] = useState('usb');
+  const [ipPrinter, setIpPrinter] = useState('')
 
   const [title, setTitle] = useState("");
   const [authorized, setAuthorized] = useState([]);
@@ -58,7 +64,8 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       setActiveKey(a);
       setSelectedKey((prev) => prev || a);
     } catch (e) {
-      console.error("KitchenCreateModal refresh error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка обновления списка принтеров");
+      alert(errorMessage, true);
     } finally {
       setLoading(false);
     }
@@ -67,6 +74,7 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
   useEffect(() => {
     if (!open) return;
     setTitle("");
+    setIpPrinter("");
     refresh();
   }, [open, refresh]);
 
@@ -76,7 +84,8 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       await choosePrinterByDialog();
       await refresh();
     } catch (e) {
-      console.error("KitchenCreateModal choose printer error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка выбора принтера");
+      alert(errorMessage, true);
     } finally {
       setLoading(false);
     }
@@ -90,7 +99,8 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
       const a = getActivePrinterKey();
       setActiveKey(a);
     } catch (e) {
-      console.error("KitchenCreateModal set active error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка установки активного принтера");
+      alert(errorMessage, true);
     } finally {
       setLoading(false);
     }
@@ -109,31 +119,35 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
   const createKitchen = async () => {
     const t = title.trim();
-    if (!t || !selectedKey) return;
+    if (!t) return;
+    if (printerDevice === "usb" && !selectedKey) return;
+    if (printerDevice === "wifi" && !ipPrinter.trim()) return;
 
     setSaving(true);
     try {
       const nextNumber = await computeNextKitchenNumber();
 
       let created = null;
-
+      const data = {
+        title: t,
+        number: nextNumber,
+      }
+      if (printerDevice === 'usb' && selectedKey) {
+        data['printer'] = formatPrinterBinding({ kind: "usb", usbKey: selectedKey })
+      } else if (printerDevice === 'wifi' && ipPrinter) {
+        data['printer'] = formatPrinterBinding({ kind: "ip", ipPort: ipPrinter })
+      }
       try {
-        const r = await api.post("/cafe/kitchens/", {
-          title: t,
-          printer_key: selectedKey,
-        });
+        const r = await api.post("/cafe/kitchens/", data);
         created = r?.data || null;
       } catch (e1) {
         try {
-          const r2 = await api.post("/cafe/kitchens/", {
-            title: t,
-            number: nextNumber,
-          });
+          const r2 = await api.post("/cafe/kitchens/", data);
           created = r2?.data || null;
 
           if (created?.id) {
             const map = readKitchenPrinterMap();
-            map[String(created.id)] = selectedKey;
+            if (data?.printer) map[String(created.id)] = data.printer;
             writeKitchenPrinterMap(map);
           }
         } catch (e2) {
@@ -141,17 +155,23 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
         }
       }
 
+      // local fallback mapping (used when backend does not return/store printer field)
+      if (created?.id && data?.printer) {
+        const map = readKitchenPrinterMap();
+        map[String(created.id)] = data.printer;
+        writeKitchenPrinterMap(map);
+      }
+
       onCreated?.(created);
       onClose?.();
     } catch (e) {
-      console.error("Kitchen create error:", e);
+      const errorMessage = validateResErrors(e, "Ошибка создания кухни");
+      alert(errorMessage, true);
     } finally {
       setSaving(false);
     }
   };
-
   if (!open) return null;
-
   return (
     <div
       className="cafeCookKitchenModal"
@@ -195,53 +215,89 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
 
           <div className="cafeCookKitchenModal__field">
             <div className="cafeCookKitchenModal__label">Чековый аппарат</div>
-
-            <div className="cafeCookKitchenModal__printerRow">
-              <select
-                className="cafeCookKitchenModal__select"
-                value={selectedKey || ""}
-                onChange={(e) => setSelectedKey(e.target.value)}
-                disabled={loading || saving}
-                title="Выберите принтер"
-              >
-                <option value="">— Выберите принтер —</option>
-                {merged.map((p) => (
-                  <option key={p.key} value={p.key}>
-                    {safeName(p)} ({shortKey(p.key)}){p.key === activeKey ? " • активный" : ""}
-                  </option>
-                ))}
-              </select>
-
+            <div className="flex gap-2">
               <button
                 type="button"
-                className="cafeCookKitchenModal__iconBtn"
-                onClick={refresh}
-                disabled={loading || saving}
+                className={`cafeCookKitchenModal__iconBtn ${printerDevice == 'usb' ? 'bg-green-300!' : ''}`}
+                onClick={() => setPrinterDevice('usb')}
+                // disabled={loading || saving}
                 title="Обновить список"
               >
-                <FaSyncAlt />
+                <FaUsb />
               </button>
-
               <button
                 type="button"
-                className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
-                onClick={onPickByDialog}
-                disabled={loading || saving}
-                title="Открыть диалог WebUSB и выбрать принтер"
+                className={`cafeCookKitchenModal__iconBtn ${printerDevice !== 'usb' ? 'bg-green-300!' : ''}`}
+                onClick={() => setPrinterDevice('wifi')}
+                // disabled={loading || saving}
+                title="Обновить список"
               >
-                <FaPrint /> Выбрать
-              </button>
-
-              <button
-                type="button"
-                className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost"
-                onClick={onSetActive}
-                disabled={loading || saving || !selectedKey}
-                title="Сделать выбранный принтер активным"
-              >
-                Активный
+                <FaWifi />
               </button>
             </div>
+            {
+              printerDevice == 'usb' ? (
+                <div className="cafeCookKitchenModal__printerRow">
+                  <select
+                    className="cafeCookKitchenModal__select"
+                    value={selectedKey || ""}
+                    onChange={(e) => setSelectedKey(e.target.value)}
+                    disabled={loading || saving}
+                    title="Выберите принтер"
+                  >
+                    <option value="">— Выберите принтер —</option>
+                    {merged.map((p) => (
+                      <option key={p.key} value={p.key}>
+                        {safeName(p)} ({shortKey(p.key)}){p.key === activeKey ? " • активный" : ""}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    className="cafeCookKitchenModal__iconBtn"
+                    onClick={refresh}
+                    // disabled={loading || saving}
+                    title="Обновить список"
+                  >
+                    <FaSyncAlt />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
+                    onClick={onPickByDialog}
+                    disabled={loading || saving}
+                    title="Открыть диалог WebUSB и выбрать принтер"
+                  >
+                    <FaPrint /> Выбрать
+                  </button>
+
+                  <button
+                    key={selectedKey}
+                    type="button"
+                    className={`cafeCookKitchenModal__btn cafeCookKitchenModal__btn--ghost ${(saving || selectedKey) ? 'active' : ''}`}
+                    onClick={onSetActive}
+                    disabled={loading || saving || !selectedKey}
+                    title="Сделать выбранный принтер активным"
+                  >
+                    <FaCheck />
+                  </button>
+                </div>
+              ) : (
+                <div className="cafeCookKitchenModal__printerRow w-full!">
+                  <input
+                    className="cafeCookKitchenModal__input w-full!"
+                    placeholder="IP:порт (например 192.168.1.200:9100)"
+                    value={ipPrinter}
+                    onChange={(e) => setIpPrinter(e.target.value)}
+                    disabled={saving}
+                    autoComplete="off"
+                  />
+                </div>
+              )
+            }
+
           </div>
         </div>
 
@@ -259,7 +315,11 @@ const KitchenCreateModal = ({ open, onClose, onCreated }) => {
             type="button"
             className="cafeCookKitchenModal__btn cafeCookKitchenModal__btn--primary"
             onClick={createKitchen}
-            disabled={saving || !title.trim() || !selectedKey}
+            disabled={
+              saving ||
+              !title.trim() ||
+              (printerDevice === "usb" ? !selectedKey : !ipPrinter.trim())
+            }
           >
             <FaPlus /> {saving ? "Создаём…" : "Создать"}
           </button>

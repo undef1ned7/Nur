@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Download } from "lucide-react";
 import { pdf } from "@react-pdf/renderer";
-import api from "../../../../../api";
+import warehouseAPI from "../../../../../api/warehouse";
 import "./ReconciliationModal.scss";
 import ReconciliationPdfDocument from "./ReconciliationPdfDocument";
 
@@ -21,35 +21,35 @@ export default function ReconciliationModal({ open, onClose }) {
   const [filters, setFilters] = useState({
     start: "",
     end: "",
-    clientId: "",
-    source: "both",
+    counterpartyId: "",
     currency: "KGS",
   });
   const [loading, setLoading] = useState(false);
+  const [loadingPdf, setLoadingPdf] = useState(false);
   const [err, setErr] = useState("");
-  const [clients, setClients] = useState([]);
-  const [clientsLoading, setClientsLoading] = useState(false);
+  const [counterparties, setCounterparties] = useState([]);
+  const [counterpartiesLoading, setCounterpartiesLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
-      loadClients();
+      loadCounterparties();
     }
   }, [open]);
 
-  const loadClients = async () => {
-    setClientsLoading(true);
+  const loadCounterparties = async () => {
+    setCounterpartiesLoading(true);
     try {
-      const res = await api.get("/main/clients/");
-      const list = Array.isArray(res?.data?.results)
-        ? res.data.results
-        : Array.isArray(res?.data)
-        ? res.data
+      const data = await warehouseAPI.listCounterparties({ page_size: 500 });
+      const list = Array.isArray(data?.results)
+        ? data.results
+        : Array.isArray(data)
+        ? data
         : [];
-      setClients(list);
+      setCounterparties(list);
     } catch (e) {
-      console.error("Ошибка при загрузке клиентов:", e);
+      console.error("Ошибка при загрузке контрагентов:", e);
     } finally {
-      setClientsLoading(false);
+      setCounterpartiesLoading(false);
     }
   };
 
@@ -83,8 +83,12 @@ export default function ReconciliationModal({ open, onClose }) {
   };
 
   const fetchReconciliation = async () => {
-    if (!filters.clientId) {
-      setErr("Выберите клиента");
+    if (!filters.counterpartyId) {
+      setErr("Выберите контрагента");
+      return;
+    }
+    if (!filters.start || !filters.end) {
+      setErr("Укажите период (дата с и дата по)");
       return;
     }
 
@@ -92,29 +96,25 @@ export default function ReconciliationModal({ open, onClose }) {
     setErr("");
 
     try {
-      const params = {};
-      if (filters.start) params.start = filters.start;
-      if (filters.end) params.end = filters.end;
-      params.source = filters.source || "both";
-      params.currency = filters.currency || "KGS";
+      const params = {
+        start: filters.start,
+        end: filters.end,
+        currency: filters.currency || "KGS",
+      };
 
-      // Новый эндпойнт "классического" акта сверки:
-      // GET /api/main/clients/{client_id}/reconciliation/classic/?start=...&end=...&source=...&currency=KGS
-      const res = await api.get(
-        `/main/clients/${filters.clientId}/reconciliation/json/`,
-        { params, headers: { Accept: "application/json" } }
+      const data = await warehouseAPI.getReconciliationJson(
+        filters.counterpartyId,
+        params
       );
 
-      const data = res?.data;
-
-      const client = clients.find(
-        (c) => String(c.id) === String(filters.clientId)
+      const counterparty = counterparties.find(
+        (c) => String(c.id) === String(filters.counterpartyId)
       );
-      const clientName =
-        client?.full_name ||
-        client?.fio ||
-        client?.name ||
-        `Клиент ${filters.clientId}`;
+      const counterpartyName =
+        counterparty?.name ||
+        counterparty?.full_name ||
+        counterparty?.fio ||
+        `Контрагент ${filters.counterpartyId}`;
 
       const blob = await pdf(
         <ReconciliationPdfDocument
@@ -123,12 +123,12 @@ export default function ReconciliationModal({ open, onClose }) {
             start: filters.start,
             end: filters.end,
             currency: filters.currency,
-            clientName,
+            counterpartyName,
           }}
         />
       ).toBlob();
 
-      const filename = `reconciliation_${filters.clientId}_${
+      const filename = `reconciliation_${filters.counterpartyId}_${
         filters.start || ""
       }_${filters.end || ""}.pdf`;
       downloadBlob(blob, filename);
@@ -140,6 +140,33 @@ export default function ReconciliationModal({ open, onClose }) {
     }
   };
 
+  const fetchReconciliationPdfFromServer = async () => {
+    if (!filters.counterpartyId || !filters.start || !filters.end) {
+      setErr("Выберите контрагента и укажите период");
+      return;
+    }
+    setLoadingPdf(true);
+    setErr("");
+    try {
+      const params = {
+        start: filters.start,
+        end: filters.end,
+        currency: filters.currency || "KGS",
+      };
+      const blob = await warehouseAPI.getReconciliationPdf(
+        filters.counterpartyId,
+        params
+      );
+      const filename = `reconciliation_${filters.counterpartyId}_${filters.start}_${filters.end}.pdf`;
+      downloadBlob(blob, filename);
+    } catch (e) {
+      console.error(e);
+      setErr(msgFromError(e, "Не удалось скачать PDF с сервера"));
+    } finally {
+      setLoadingPdf(false);
+    }
+  };
+
   return (
     <div className="reconciliation-modal-overlay" onClick={onClose}>
       <div
@@ -147,7 +174,9 @@ export default function ReconciliationModal({ open, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="reconciliation-modal__header">
-          <h2 className="reconciliation-modal__title">Акт сверки с клиентом</h2>
+          <h2 className="reconciliation-modal__title">
+            Акт сверки с контрагентом
+          </h2>
           <button className="reconciliation-modal__close" onClick={onClose}>
             <X size={24} />
           </button>
@@ -157,22 +186,25 @@ export default function ReconciliationModal({ open, onClose }) {
           {err && <div className="reconciliation-modal__error">{err}</div>}
 
           <div className="reconciliation-modal__form-group">
-            <label className="reconciliation-modal__label">Клиент</label>
+            <label className="reconciliation-modal__label">Контрагент</label>
             <select
               className="reconciliation-modal__input"
-              value={filters.clientId}
+              value={filters.counterpartyId}
               onChange={(e) =>
-                setFilters((prev) => ({ ...prev, clientId: e.target.value }))
+                setFilters((prev) => ({
+                  ...prev,
+                  counterpartyId: e.target.value,
+                }))
               }
-              disabled={clientsLoading}
+              disabled={counterpartiesLoading}
             >
-              <option value="">Выберите клиента</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.full_name ||
-                    client.fio ||
-                    client.name ||
-                    `Клиент ${client.id}`}
+              <option value="">Выберите контрагента</option>
+              {counterparties.map((counterparty) => (
+                <option key={counterparty.id} value={counterparty.id}>
+                  {counterparty.name ||
+                    counterparty.full_name ||
+                    counterparty.fio ||
+                    `Контрагент ${counterparty.id}`}
                 </option>
               ))}
             </select>
@@ -205,20 +237,6 @@ export default function ReconciliationModal({ open, onClose }) {
 
           <div className="reconciliation-modal__form-row">
             <div className="reconciliation-modal__form-group">
-              <label className="reconciliation-modal__label">Источник</label>
-              <select
-                className="reconciliation-modal__input"
-                value={filters.source}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, source: e.target.value }))
-                }
-              >
-                <option value="both">Оба</option>
-                <option value="sales">Продажи</option>
-                <option value="deals">Сделки</option>
-              </select>
-            </div>
-            <div className="reconciliation-modal__form-group">
               <label className="reconciliation-modal__label">Валюта</label>
               <select
                 className="reconciliation-modal__input"
@@ -246,10 +264,30 @@ export default function ReconciliationModal({ open, onClose }) {
           <button
             className="reconciliation-modal__download-btn"
             onClick={fetchReconciliation}
-            disabled={loading || !filters.clientId}
+            disabled={
+              loading ||
+              loadingPdf ||
+              !filters.counterpartyId ||
+              !filters.start ||
+              !filters.end
+            }
           >
             <Download size={18} />
-            {loading ? "Загрузка..." : "Загрузить акт"}
+            {loading ? "Загрузка…" : "Акт (сформировать PDF)"}
+          </button>
+          <button
+            className="reconciliation-modal__download-btn reconciliation-modal__download-btn--secondary"
+            onClick={fetchReconciliationPdfFromServer}
+            disabled={
+              loadingPdf ||
+              loading ||
+              !filters.counterpartyId ||
+              !filters.start ||
+              !filters.end
+            }
+          >
+            <Download size={18} />
+            {loadingPdf ? "Загрузка…" : "Скачать PDF с сервера"}
           </button>
         </div>
       </div>

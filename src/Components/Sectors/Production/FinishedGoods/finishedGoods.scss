@@ -36,6 +36,25 @@
   min-height: 100vh;
 }
 
+/* Link-like button to open detail page */
+.finished-goods__detailLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #111827;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.finished-goods__detailLink:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
 /* Header */
 .warehouse-header {
   display: flex;
@@ -1027,6 +1046,8 @@
   @media (max-width: 480px) {
     padding: 0;
     align-items: flex-end;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
@@ -1069,7 +1090,12 @@
   }
 
   @media (max-width: 480px) {
-    max-height: 100vh;
+    max-height: calc(
+      100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    );
+    max-height: calc(
+      100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    );
     border-radius: 20px 20px 0 0;
     animation: slideUpMobile 0.3s ease-out;
   }
@@ -1189,7 +1215,7 @@
   padding: 12px 16px;
   border: 2px solid var(--fg-border-soft);
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 16px;
   background: var(--fg-bg);
   color: var(--fg-text);
   transition: all 0.2s ease;
@@ -1197,7 +1223,6 @@
 
   @media (max-width: 480px) {
     padding: 10px 14px;
-    font-size: 14px;
     border-radius: 8px;
   }
 
@@ -1418,6 +1443,8 @@
   @media (max-width: 480px) {
     padding: 0;
     align-items: flex-end;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   &__overlay {
@@ -1436,7 +1463,7 @@
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     max-width: 800px;
     width: 100%;
-    max-height: 90vh;
+    max-height: 90dvh;
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
@@ -1450,9 +1477,15 @@
     }
 
     @media (max-width: 480px) {
-      max-height: 100vh;
       border-radius: 20px 20px 0 0;
       animation: slideUpMobile 0.3s ease-out;
+      max-height: calc(
+        100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+      ); 
+      max-height: calc(
+        100dvh - env(safe-area-inset-top, 0px) -
+          env(safe-area-inset-bottom, 0px)
+      );
     }
   }
 
@@ -1899,16 +1932,6 @@
 }
 
 .finished-goods-add-modal__section {
-  margin-bottom: 20px;
-
-  @media (max-width: 768px) {
-    margin-bottom: 16px;
-  }
-
-  @media (max-width: 480px) {
-    margin-bottom: 14px;
-  }
-
   &:last-of-type {
     margin-bottom: 0;
   }

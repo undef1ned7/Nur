@@ -1,0 +1,157 @@
+.sklad-add-product-modal {
+  --sap-bg: var(--panel-bg, #ffffff);
+  --sap-text: var(--text, #111827);
+  --sap-muted: var(--c-muted, #6b7280);
+  --sap-border: var(--c-border, #e5e7eb);
+  --sap-soft: var(--c-bg-soft, #f9fafb);
+  --sap-accent: var(--fg-accent, #ffd400);
+  --sap-accent-hover: var(--fg-accent-darker, #e6c530);
+
+  color: var(--sap-text);
+
+  .add-modal__content {
+    background: var(--sap-bg);
+    width: min(520px, calc(100vw - 24px));
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .add-modal__header {
+    margin-bottom: 12px;
+
+    h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+  }
+
+  .add-modal__close-icon {
+    cursor: pointer;
+    color: var(--sap-muted);
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+
+  .add-modal__close-icon:hover {
+    color: var(--sap-text);
+    transform: scale(1.05);
+  }
+
+  // Улучшаем базовые секции add-modal в рамках этой модалки
+  .add-modal__section label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--sap-text);
+  }
+
+  .add-modal__input {
+    padding: 10px 12px;
+    border: 1px solid var(--sap-border);
+    border-radius: 10px;
+    font-size: 14px;
+    background: var(--c-input-bg, #ffffff);
+    color: var(--sap-text);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .add-modal__input:focus {
+    border-color: rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  }
+}
+
+.sklad-add-product-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sklad-add-product-modal__card {
+  border: 1px solid var(--sap-border);
+  background: var(--sap-soft);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.sklad-add-product-modal__title {
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.sklad-add-product-modal__titleName {
+  font-weight: 800;
+}
+
+.sklad-add-product-modal__meta {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--sap-muted);
+}
+
+.sklad-add-product-modal__meta b {
+  color: var(--sap-text);
+  font-weight: 800;
+}
+
+.sklad-add-product-modal__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.sklad-add-product-modal__summary {
+  border: 1px dashed var(--sap-border);
+  background: var(--sap-soft);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--sap-muted);
+}
+
+.sklad-add-product-modal__summary b {
+  color: var(--sap-text);
+  font-weight: 800;
+}
+
+.sklad-add-product-modal__error {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.sklad-add-product-modal__save {
+  width: 100%;
+  margin-top: 4px;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  background: var(--sap-accent);
+  color: #000;
+  transition: background-color 0.15s ease, transform 0.05s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 8px 18px rgba(247, 215, 79, 0.18);
+}
+
+.sklad-add-product-modal__save:hover:not(:disabled) {
+  background: var(--sap-accent-hover);
+}
+
+.sklad-add-product-modal__save:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+@media (max-width: 520px) {
+  .sklad-add-product-modal__grid {
+    grid-template-columns: 1fr;
+  }
+}
+

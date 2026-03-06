@@ -34,6 +34,8 @@ import {
   deleteWarehouseDocument,
   postWarehouseDocument,
   unpostWarehouseDocument,
+  cashApproveWarehouseDocument,
+  cashRejectWarehouseDocument,
   fetchWarehouseProducts,
   fetchWarehouseCounterparties,
 } from "../creators/warehouseThunk";
@@ -42,6 +44,8 @@ const initialState = {
   start: null, // POS-продажа (товары)
   startObject: null, // Object-продажа (строительные)
   loading: false,
+  // отдельный флаг именно для startSale (чтобы не плодить параллельные /start/ запросы)
+  startSaleLoading: false,
   cart: null,
   error: null,
   barcode: null,
@@ -49,12 +53,18 @@ const initialState = {
   foundProduct: [],
   checkout: null,
   history: [],
+  historyCount: 0,
+  historyNext: null,
+  historyPrevious: null,
   historyDetail: null,
   pdf: null,
   objects: [], // список object-items
   cartObject: null,
   lastDeal: null,
   historyObjects: [],
+  historyObjectsCount: 0,
+  historyObjectsNext: null,
+  historyObjectsPrevious: null,
   historyObjectDetail: null,
   // Состояние для документов
   documents: [],
@@ -70,20 +80,34 @@ const ensureError = (action) =>
 const saleSlice = createSlice({
   name: "sale",
   initialState,
-  reducers: {},
+  reducers: {
+    resetPosSale: (state) => {
+      // Сбрасываем активную POS-продажу и связанные ошибки/данные,
+      // например при закрытии смены
+      state.start = null;
+      state.cart = null;
+      state.checkout = null;
+      state.error = null;
+      state.barcode = null;
+      state.barcodeError = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       // POS
       .addCase(startSale.pending, (state) => {
         state.loading = true;
+        state.startSaleLoading = true;
       })
       .addCase(startSale.fulfilled, (state, { payload }) => {
         state.start = payload;
         state.loading = false;
+        state.startSaleLoading = false;
       })
       .addCase(startSale.rejected, (state, action) => {
         state.error = ensureError(action);
         state.loading = false;
+        state.startSaleLoading = false;
       })
       .addCase(getSale.pending, (state) => {
         state.loading = true;
@@ -253,7 +277,10 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(historySellProduct.fulfilled, (state, { payload }) => {
-        state.history = payload;
+        state.history = payload?.results || (Array.isArray(payload) ? payload : []);
+        state.historyCount = payload?.count || payload?.length || 0;
+        state.historyNext = payload?.next || null;
+        state.historyPrevious = payload?.previous || null;
         state.loading = false;
       })
       .addCase(historySellProduct.rejected, (state, action) => {
@@ -265,7 +292,10 @@ const saleSlice = createSlice({
         state.loading = true;
       })
       .addCase(historySellObjects.fulfilled, (state, { payload }) => {
-        state.historyObjects = payload;
+        state.historyObjects = payload?.results || (Array.isArray(payload) ? payload : []);
+        state.historyObjectsCount = payload?.count || payload?.length || 0;
+        state.historyObjectsNext = payload?.next || null;
+        state.historyObjectsPrevious = payload?.previous || null;
         state.loading = false;
       })
       .addCase(historySellObjects.rejected, (state, action) => {
@@ -365,9 +395,20 @@ const saleSlice = createSlice({
         }
       })
       .addCase(unpostWarehouseDocument.fulfilled, (state, { payload }) => {
-        // Обновляем документ после отмены проведения
         const index = state.documents.findIndex((doc) => doc.id === payload.id);
         if (index !== -1) {
+          state.documents[index] = payload;
+        }
+      })
+      .addCase(cashApproveWarehouseDocument.fulfilled, (state, { payload }) => {
+        const index = state.documents.findIndex((doc) => doc.id === payload?.id);
+        if (index !== -1 && payload) {
+          state.documents[index] = payload;
+        }
+      })
+      .addCase(cashRejectWarehouseDocument.fulfilled, (state, { payload }) => {
+        const index = state.documents.findIndex((doc) => doc.id === payload?.id);
+        if (index !== -1 && payload) {
           state.documents[index] = payload;
         }
       })
@@ -431,5 +472,6 @@ const saleSlice = createSlice({
   },
 });
 
+export const { resetPosSale } = saleSlice.actions;
 export const useSale = () => useSelector((state) => state.sale);
 export default saleSlice.reducer;

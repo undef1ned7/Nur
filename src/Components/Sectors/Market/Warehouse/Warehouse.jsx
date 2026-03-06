@@ -24,6 +24,8 @@ import {
 import { STORAGE_KEY, VIEW_MODES } from "./constants";
 import { formatDeleteMessage } from "./utils";
 import ReactPortal from "../../../common/Portal/ReactPortal";
+import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const Warehouse = () => {
   const dispatch = useDispatch();
@@ -176,11 +178,8 @@ const Warehouse = () => {
       setSelectedRows(new Set());
       dispatch(fetchProductsAsync(requestParams));
     } catch (e) {
-      console.error("Ошибка при удалении товаров:", e);
-      alert(
-        "Не удалось удалить товары: " +
-        (e?.message || e?.detail || "Неизвестная ошибка")
-      );
+      const errorMessage = validateResErrors(e, "Ошибка при удалении товаров");
+      alert(errorMessage, true);
     } finally {
       setBulkDeleting(false);
     }
@@ -228,42 +227,43 @@ const Warehouse = () => {
         onBulkDelete={handleBulkDelete}
         isDeleting={bulkDeleting}
       />
+      <DataContainer>
+        <div className="warehouse-table-container w-full">
+          {viewMode === VIEW_MODES.TABLE ? (
+            <ProductTable
+              products={products}
+              loading={loading}
+              selectedRows={selectedRows}
+              isAllSelected={isAllSelected}
+              onRowSelect={handleRowSelect}
+              onSelectAll={handleSelectAll}
+              onProductClick={handleProductClick}
+              getRowNumber={getRowNumber}
+            />
+          ) : (
+            <ProductCards
+              products={products}
+              loading={loading}
+              selectedRows={selectedRows}
+              isAllSelected={isAllSelected}
+              onRowSelect={handleRowSelect}
+              onSelectAll={handleSelectAll}
+              onProductClick={handleProductClick}
+              getRowNumber={getRowNumber}
+            />
+          )}
 
-      <div className="warehouse-table-container w-full">
-        {viewMode === VIEW_MODES.TABLE ? (
-          <ProductTable
-            products={products}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            count={count}
             loading={loading}
-            selectedRows={selectedRows}
-            isAllSelected={isAllSelected}
-            onRowSelect={handleRowSelect}
-            onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
-            getRowNumber={getRowNumber}
+            hasNextPage={hasNextPage}
+            hasPrevPage={hasPrevPage}
+            onPageChange={handlePageChange}
           />
-        ) : (
-          <ProductCards
-            products={products}
-            loading={loading}
-            selectedRows={selectedRows}
-            isAllSelected={isAllSelected}
-            onRowSelect={handleRowSelect}
-            onSelectAll={handleSelectAll}
-            onProductClick={handleProductClick}
-            getRowNumber={getRowNumber}
-          />
-        )}
-
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          count={count}
-          loading={loading}
-          hasNextPage={hasNextPage}
-          hasPrevPage={hasPrevPage}
-          onPageChange={handlePageChange}
-        />
-      </div>
+        </div>
+      </DataContainer>
 
       {showFilterModal && (
         <ReactPortal modalId="warehouse-filter-modal">

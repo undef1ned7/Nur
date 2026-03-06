@@ -36,6 +36,7 @@ import { useBulkSelection } from "./hooks/useBulkSelection";
 import { useSkladFilters } from "./hooks/useSkladFilters";
 import { useSkladPagination } from "./hooks/useSkladPagination";
 import { useBulkDelete } from "./hooks/useBulkDelete";
+import DataContainer from "../../common/DataContainer/DataContainer";
 
 export default function Sklad() {
   const dispatch = useDispatch();
@@ -303,6 +304,7 @@ export default function Sklad() {
     {
       label: "Склад",
       content: (
+        <DataContainer>
         <SkladTab
           products={products}
           loading={loading}
@@ -342,6 +344,8 @@ export default function Sklad() {
           bulkDeleting={bulkDeleting}
           showHeader={true}
         />
+        </DataContainer>
+
       ),
     },
     {
@@ -626,6 +630,7 @@ export default function Sklad() {
                 onResetFilters={handleResetAllFiltersWithReset}
                 onShowFilterModal={() => setShowFilterModal(true)}
               />
+              
               {/* Контент активного таба (без заголовка) */}
               {tabs[activeTab].content}
             </>
@@ -634,6 +639,7 @@ export default function Sklad() {
           )}
         </>
       ) : (
+        
         <>{tabs[0].content}</>
       )}
 

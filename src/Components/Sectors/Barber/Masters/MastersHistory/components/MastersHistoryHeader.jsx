@@ -12,9 +12,17 @@ const STATUS_OPTIONS = [
   { value: "no_show", label: "Не пришёл" },
 ];
 
+const SORT_OPTIONS = [
+  { value: "newest", label: "Сначала новые" },
+  { value: "oldest", label: "Сначала старые" },
+  { value: "price_desc", label: "Цена ↓" },
+  { value: "price_asc", label: "Цена ↑" },
+];
+
 const MastersHistoryHeader = ({
   totalCount,
   search,
+  ordering,
   statusFilter,
   viewMode,
   employeeFilter,
@@ -26,6 +34,7 @@ const MastersHistoryHeader = ({
   monthOptions,
   dayOptions,
   onSearchChange,
+  onOrderingChange,
   onStatusChange,
   onViewModeChange,
   onEmployeeChange,
@@ -38,7 +47,7 @@ const MastersHistoryHeader = ({
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Считаем количество активных фильтров (все кроме поиска)
+  // Считаем количество активных фильтров (все кроме поиска и сортировки)
   const activeFiltersCount = [
     statusFilter && statusFilter !== "all" ? statusFilter : null,
     employeeFilter,
@@ -86,6 +95,16 @@ const MastersHistoryHeader = ({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               aria-label="Поиск"
+            />
+          </div>
+
+          {/* Сортировка */}
+          <div className="barbermastershistory__filter">
+            <BarberSelect
+              value={ordering}
+              onChange={onOrderingChange}
+              options={SORT_OPTIONS}
+              placeholder="Сортировка"
             />
           </div>
 

@@ -134,14 +134,75 @@ const SECTOR_ACCESS_TYPES = {
     },
   ],
   "Строительная компания": [
+    // Основной модуль Building
     {
-      value: "Процесс работы",
-      label: "Процесс работы",
+      value: "Аналитика",
+      label: "Аналитика",
+      backendKey: "can_view_building_analytics",
+    },
+    {
+      value: "Касса",
+      label: "Касса",
+      backendKey: "can_view_building_cash_register",
+    },
+    {
+        value: "Клиенты",
+      label: "Клиенты",
+      backendKey: "can_view_building_clients",
+    },
+    {
+      value: "Отделы",
+      label: "Отделы",
+      backendKey: "can_view_building_department",
+    },
+    {
+      value: "Сотрудники",
+      label: "Сотрудники",
+      backendKey: "can_view_building_employess",
+    },
+    {
+      value: "Напоминания",
+      label: "Напоминания",
+      backendKey: "can_view_building_notification",
+    },
+    {
+      value: "Закупки",
+      label: "Закупки",
+      backendKey: "can_view_building_procurement",
+    },
+    {
+      value: "ЖК",
+      label: "ЖК",
+      backendKey: "can_view_building_projects",
+    },
+    {
+      value: "Зарплата",
+      label: "Зарплата",
+      backendKey: "can_view_building_salary",
+    },
+    {
+      value: "Продажи",
+      label: "Продажи",
+      backendKey: "can_view_building_sell",
+    },
+    {
+      value: "Склад",
+      label: "Склад",
+      backendKey: "can_view_building_stock",
+    },
+    {
+      value: "Договора",
+      label: "Договора",
+      backendKey: "can_view_building_treaty",
+    },
+    {
+      value: "Процесс работ",
+      label: "Процесс работ",
       backendKey: "can_view_building_work_process",
     },
     {
-      value: "Квартиры",
-      label: "Квартиры",
+      value: "Квартиры/объекты",
+      label: "Квартиры/объекты",
       backendKey: "can_view_building_objects",
     },
   ],
@@ -192,7 +253,11 @@ const SECTOR_ACCESS_TYPES = {
 
   // 🔹 Новый сектор Warehouse
   Склад: [
-    { value: "Контрагенты", label: "Контрагенты", backendKey: "can_view_clients" },
+    {
+      value: "Контрагенты",
+      label: "Контрагенты",
+      backendKey: "can_view_clients",
+    },
     {
       value: "Аналитика",
       label: "Аналитика",
@@ -200,6 +265,11 @@ const SECTOR_ACCESS_TYPES = {
     },
     { value: "Товары", label: "Товары", backendKey: "can_view_products" },
     { value: "Документы", label: "Документы", backendKey: "can_view_document" },
+    // {
+    //   value: "Контрагенты",
+    //   label: "Контрагенты",
+    //   backendKey: "can_view_clients",
+    // },
   ],
 
   Производство: [
@@ -240,12 +310,12 @@ const getAllAccessTypes = (sectorName, tariff = null) => {
     ];
 
     basicAccess = basicAccess.filter((access) =>
-      startTariffPermissions.includes(access.backendKey)
+      startTariffPermissions.includes(access.backendKey),
     );
 
     console.log(
       "getAllAccessTypes - Start tariff, filtered basicAccess:",
-      basicAccess
+      basicAccess,
     );
 
     // Для тарифа "Старт" не показываем секторные permissions
@@ -274,7 +344,7 @@ const InlineAccessList = ({
 }) => {
   const isChecked = useCallback(
     (label) => selectedLabels.includes(label),
-    [selectedLabels]
+    [selectedLabels],
   );
 
   const toggle = (label) => {
@@ -359,7 +429,7 @@ const DepartmentDetails = () => {
       });
       return labelsArray;
     },
-    [company?.sector?.name]
+    [company?.sector?.name],
   );
 
   const convertLabelsToBackendAccesses = useCallback(
@@ -374,7 +444,7 @@ const DepartmentDetails = () => {
       });
       return backendAccessObject;
     },
-    [company?.sector?.name]
+    [company?.sector?.name],
   );
 
   const fetchDepartmentDetails = useCallback(async () => {
@@ -389,13 +459,13 @@ const DepartmentDetails = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${AUTH_TOKEN}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.detail || "Не удалось получить данные отдела"
+          errorData.detail || "Не удалось получить данные отдела",
         );
       }
 
@@ -432,7 +502,7 @@ const DepartmentDetails = () => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.detail || "Не удалось получить список сотрудников"
+          errorData.detail || "Не удалось получить список сотрудников",
         );
       }
 
@@ -536,7 +606,7 @@ const DepartmentDetails = () => {
     try {
       // Защита на случай, если по какой-то причине в форме оказался владелец
       const selected = allAvailableEmployees.find(
-        (u) => String(u.id) === String(employeeForm.employee_id)
+        (u) => String(u.id) === String(employeeForm.employee_id),
       );
       if (isOwner(selected)) {
         setError("Нельзя добавлять владельца в отдел.");
@@ -545,7 +615,7 @@ const DepartmentDetails = () => {
       }
 
       const accessesPayload = convertLabelsToBackendAccesses(
-        employeeForm.accesses
+        employeeForm.accesses,
       );
 
       // Фильтруем секторные permissions - они должны быть только у владельца
@@ -558,8 +628,8 @@ const DepartmentDetails = () => {
               .filter(
                 (type) =>
                   !BASIC_ACCESS_TYPES.some(
-                    (basic) => basic.backendKey === type.backendKey
-                  )
+                    (basic) => basic.backendKey === type.backendKey,
+                  ),
               )
               .map((type) => type.backendKey)
           : [];
@@ -572,7 +642,7 @@ const DepartmentDetails = () => {
           "Filtered out sector permissions for tariff/role:",
           tariff,
           profile?.role_display,
-          sectorPermissions
+          sectorPermissions,
         );
       }
 
@@ -590,7 +660,7 @@ const DepartmentDetails = () => {
             Authorization: `Bearer ${AUTH_TOKEN}`,
           },
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -598,7 +668,7 @@ const DepartmentDetails = () => {
         throw new Error(
           errorData.detail ||
             JSON.stringify(errorData) ||
-            "Не удалось добавить сотрудника в отдел"
+            "Не удалось добавить сотрудника в отдел",
         );
       }
 
@@ -613,7 +683,7 @@ const DepartmentDetails = () => {
               Authorization: `Bearer ${AUTH_TOKEN}`,
             },
             body: JSON.stringify(filteredAccessesPayload),
-          }
+          },
         );
       } catch (_) {
         // игнорируем, всё равно ниже обновим список
@@ -642,7 +712,7 @@ const DepartmentDetails = () => {
             Authorization: `Bearer ${AUTH_TOKEN}`,
           },
           body: JSON.stringify(newAccessesPayload),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -650,7 +720,7 @@ const DepartmentDetails = () => {
         throw new Error(
           errorData.detail ||
             JSON.stringify(errorData) ||
-            "Не удалось обновить доступы сотрудника"
+            "Не удалось обновить доступы сотрудника",
         );
       }
 
@@ -666,7 +736,7 @@ const DepartmentDetails = () => {
   const handleRemoveEmployee = async (employeeId) => {
     if (
       !window.confirm(
-        "Вы уверены, что хотите удалить этого сотрудника из отдела?"
+        "Вы уверены, что хотите удалить этого сотрудника из отдела?",
       )
     ) {
       return;
@@ -686,7 +756,7 @@ const DepartmentDetails = () => {
             Authorization: `Bearer ${AUTH_TOKEN}`,
           },
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -694,7 +764,7 @@ const DepartmentDetails = () => {
         throw new Error(
           errorData.detail ||
             JSON.stringify(errorData) ||
-            "Не удалось удалить сотрудника из отдела"
+            "Не удалось удалить сотрудника из отдела",
         );
       }
 
@@ -710,7 +780,7 @@ const DepartmentDetails = () => {
   const handleDeleteDepartment = async () => {
     if (
       !window.confirm(
-        `Вы уверены, что хотите удалить отдел "${department.name}"? Это действие необратимо.`
+        `Вы уверены, что хотите удалить отдел "${department.name}"? Это действие необратимо.`,
       )
     ) {
       return;
@@ -724,7 +794,7 @@ const DepartmentDetails = () => {
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${AUTH_TOKEN}` },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -763,7 +833,7 @@ const DepartmentDetails = () => {
         updateEmployees({
           id,
           data: { first_name: first_name.trim(), last_name: last_name.trim() },
-        })
+        }),
       ).unwrap();
       fetchDepartmentDetails();
       handleCloseEditEmployeeModal();
@@ -858,7 +928,7 @@ const DepartmentDetails = () => {
                           onSaveAccesses={(newAccessesPayload) =>
                             handleSaveEmployeeAccesses(
                               employee.id,
-                              newAccessesPayload
+                              newAccessesPayload,
                             )
                           }
                           sectorName={company?.sector?.name}
@@ -930,7 +1000,7 @@ const DepartmentDetails = () => {
             options={allAvailableEmployees
               .filter((emp) => !isOwner(emp)) // владельцев не показываем
               .filter(
-                (emp) => !employees.some((deptEmp) => deptEmp.id === emp.id)
+                (emp) => !employees.some((deptEmp) => deptEmp.id === emp.id),
               )
               .map((emp) => ({
                 value: emp.id,

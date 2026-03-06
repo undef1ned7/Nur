@@ -1006,7 +1006,7 @@ const ENDPOINT_GROUPS = "/education/groups/";
 const STUDENT_ATT = (id) => `/education/students/${id}/attendance/`;
 
 /* ==== константы ==== */
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 
 /* ==== helpers ==== */
 const asArray = (d) =>

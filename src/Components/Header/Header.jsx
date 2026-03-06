@@ -1,8 +1,13 @@
-import { useState, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { Bell, Menu, ShoppingCart } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { Bell, Menu, ShoppingCart, Building2, Check, X } from "lucide-react";
 import { useUser } from "../../store/slices/userSlice";
+import { fetchBuildingProjects } from "../../store/creators/building/projectsCreators";
+import {
+  setSelectedBuildingProjectId,
+  useBuildingProjects,
+} from "../../store/slices/building/projectsSlice";
 import NotificationModal from "../NotificationModal/NotificationModal";
 import "./Header.scss";
 
@@ -24,6 +29,7 @@ const pageTitles = {
   // --- добавлено ---
   // Базовые
   "/crm/sell": "Продажа",
+  "/crm/sell/start": "Продажа",
   "/crm/kassa": "Касса",
   "/crm/clients": "Клиенты",
   "/crm/departments": "Отделы",
@@ -67,6 +73,7 @@ const pageTitles = {
   "/crm/cafe/analytics": "Аналитика выплат",
   "/crm/cafe/menu": "Меню",
   "/crm/cafe/orders": "Заказы",
+  "/crm/cafe/orders/history": "Заказы",
   "/crm/cafe/payroll": "Зарплата",
   "/crm/cafe/purchasing": "Закупки",
   "/crm/cafe/reports": "Отчёты",
@@ -84,18 +91,28 @@ const pageTitles = {
   "/crm/documents": "Документы",
   // ВНИМАНИЕ: один и тот же путь для WhatsApp и Telegram
   "/crm/": "Каналы",
+  "/crm/building/projects": "Жилые комплексы",
 };
 
 const Header = ({ toggleSidebar, isSidebarOpen }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const title = pageTitles[location.pathname] || "NurCRM";
+  const dispatch = useDispatch();
 
   const { list: notifications } = useSelector((state) => state.notification);
   const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
   const { company, profile: userProfile } = useUser();
+  const {
+    items: buildingProjects,
+    selectedProjectId,
+    loading: buildingProjectsLoading,
+    loaded: buildingProjectsLoaded,
+  } = useBuildingProjects();
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProjectDrawer, setShowProjectDrawer] = useState(false);
   // const [profile, setProfile] = useState(null);
 
   // Проверяем, является ли сектор маркетом
@@ -112,8 +129,9 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   // Проверяем разрешение на просмотр интерфейса кассира (can_view_cashier)
   const showCashierButton = useMemo(() => {
     if (!userProfile) return false;
+    if (company?.subscription_plan?.name == "Старт") return false;
     return userProfile.can_view_cashier === true;
-  }, [userProfile]);
+  }, [userProfile, company]);
 
   // const fetchProfile = async () => {
   //   try {
@@ -144,8 +162,73 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
   const usernameToDisplay = userProfile
     ? `${userProfile.first_name || ""} ${userProfile.last_name || ""}`.trim() ||
-    userProfile.email
+      userProfile.email
     : "Гость";
+
+  const isBuildingRoute = useMemo(() => {
+    return location.pathname.startsWith("/crm/building");
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isBuildingRoute) return;
+    if (buildingProjectsLoading) return;
+    if (buildingProjectsLoaded) return;
+    if (Array.isArray(buildingProjects) && buildingProjects.length > 0) return;
+    dispatch(fetchBuildingProjects());
+  }, [
+    dispatch,
+    isBuildingRoute,
+    buildingProjects,
+    buildingProjectsLoading,
+    buildingProjectsLoaded,
+  ]);
+
+  const handleProjectChange = (e) => {
+    const v = e.target.value;
+    dispatch(setSelectedBuildingProjectId(v || null));
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (v) next.set("residential_complex", v);
+        else next.delete("residential_complex");
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  // Синхронизация URL ?residential_complex= с Redux при загрузке/переходе по ссылке
+  useEffect(() => {
+    if (!isBuildingRoute) return;
+    const fromUrl = searchParams.get("residential_complex");
+    if (fromUrl && String(selectedProjectId ?? "") !== fromUrl) {
+      dispatch(setSelectedBuildingProjectId(fromUrl));
+    }
+  }, [isBuildingRoute, searchParams, dispatch]);
+
+  // При первой загрузке списка проектов: если в Redux есть выбранный проект, но в URL нет — добавить в URL
+  useEffect(() => {
+    if (!isBuildingRoute || !buildingProjectsLoaded) return;
+    const fromUrl = searchParams.get("residential_complex");
+    if (selectedProjectId && !fromUrl) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("residential_complex", selectedProjectId);
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [
+    isBuildingRoute,
+    buildingProjectsLoaded,
+    selectedProjectId,
+    searchParams,
+    setSearchParams,
+  ]);
+
+  const projectsList = Array.isArray(buildingProjects) ? buildingProjects : [];
 
   return (
     <div className="header">
@@ -156,6 +239,41 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
         <h2 className="header__title">{title}</h2>
       </div>
       <div className="header__right">
+        {isBuildingRoute && (
+          <div className="header__project">
+            <div className="header__project-label">ЖК</div>
+            <select
+              className="header__project-select"
+              value={selectedProjectId ?? ""}
+              onChange={handleProjectChange}
+            >
+              <option value="" disabled>
+                {buildingProjectsLoading ? "Загрузка..." : "Выберите ЖК"}
+              </option>
+              {projectsList.map((p, idx) => {
+                const id = String(p?.id ?? p?.uuid ?? idx);
+                return (
+                  <option key={id} value={id}>
+                    {p?.name || "—"}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
+
+        {isBuildingRoute && (
+          <button
+            type="button"
+            className="header__project-iconBtn"
+            onClick={() => setShowProjectDrawer(true)}
+            title="Выбрать проект"
+            aria-label="Выбрать проект"
+          >
+            <Building2 size={20} />
+          </button>
+        )}
+
         {showCashierButton && (
           <button
             className="header__cashier-btn"
@@ -178,7 +296,14 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
             <span className="header__notification-count">{unreadCount}</span>
           )}
         </div>
-        <div className="header__profile">
+        <div
+          onClick={() => {
+            if (!userProfile) return;
+            navigate("/crm/set");
+          }}
+          aria-disabled={!userProfile}
+          className={`header__profile ${userProfile ? "cursor-pointer" : ""}`}
+        >
           <div className="header__avatar">
             {usernameToDisplay
               ? usernameToDisplay.charAt(0).toUpperCase()
@@ -190,6 +315,77 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
       {showNotifications && (
         <NotificationModal onClose={() => setShowNotifications(false)} />
+      )}
+
+      {showProjectDrawer && isBuildingRoute && (
+        <div
+          className="header__projectDrawerOverlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowProjectDrawer(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="header__projectDrawer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="header__projectDrawerHeader">
+              <div className="header__projectDrawerTitle">Проекты</div>
+              <button
+                type="button"
+                className="header__projectDrawerClose"
+                onClick={() => setShowProjectDrawer(false)}
+                aria-label="Закрыть"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="header__projectDrawerBody">
+              {buildingProjectsLoading && (
+                <div className="header__projectDrawerState">Загрузка...</div>
+              )}
+
+              {!buildingProjectsLoading && projectsList.length === 0 && (
+                <div className="header__projectDrawerState">Нет проектов</div>
+              )}
+
+              {!buildingProjectsLoading &&
+                projectsList.map((p, idx) => {
+                  const id = String(p?.id ?? p?.uuid ?? idx);
+                  const active = String(selectedProjectId ?? "") === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={
+                        "header__projectDrawerItem " +
+                        (active ? "is-active" : "")
+                      }
+                      onClick={() => {
+                        dispatch(setSelectedBuildingProjectId(id));
+                        setSearchParams(
+                          (prev) => {
+                            const next = new URLSearchParams(prev);
+                            next.set("residential_complex", id);
+                            return next;
+                          },
+                          { replace: true },
+                        );
+                        setShowProjectDrawer(false);
+                      }}
+                    >
+                      <span className="header__projectDrawerItemName">
+                        {p?.name || "—"}
+                      </span>
+                      {active && <Check size={16} />}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

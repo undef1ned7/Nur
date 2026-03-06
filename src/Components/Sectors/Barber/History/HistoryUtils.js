@@ -1,5 +1,5 @@
 // HistoryUtils.js
-export const PAGE_SIZE = 12;
+export const PAGE_SIZE = 50;
 
 export const pad = (n) => String(n).padStart(2, "0");
 

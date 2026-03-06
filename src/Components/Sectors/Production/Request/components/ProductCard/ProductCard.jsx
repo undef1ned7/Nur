@@ -116,7 +116,17 @@ const ProductCard = ({
             <span className="price-discount-label">С акцией</span>
           )}
         </div>
-
+        <div
+          className="product-quantity-info"
+          style={{
+            marginTop: "4px",
+            fontSize: "0.9rem",
+            color: product.quantity > 0 ? "#4CAF50" : "#f44336",
+            fontWeight: "500",
+          }}
+        >
+          В наличии: {product.quantity} шт.
+        </div>
         {!isOwner && (
           <>
             {!available ? (

@@ -2,6 +2,8 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { FaSearch, FaPlus, FaTimes, FaEdit, FaTrash, FaChair, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import SearchableCombobox from "../../../../common/SearchableCombobox/SearchableCombobox";
+import { useAlert } from "../../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../../tools/validateResErrors";
 // SearchableCombobox используется в модалке создания/редактирования стола
 
 const asKey = (v) => (v === null || v === undefined ? "" : String(v));
@@ -57,7 +59,7 @@ const TablesHall = ({
   advancedFilters = { zone: "", status: "", places: "", sort: "number_asc" },
 }) => {
   const [query, setQuery] = useState("");
-
+  const alert = useAlert();
   // ✅ раскрытие блюд по столам: key = tableId (string)
   const [expandedByTable, setExpandedByTable] = useState(() => ({}));
 
@@ -206,6 +208,9 @@ const TablesHall = ({
     try {
       const ok = editId ? await updateTable(editId, payload) : await createTable(payload);
       if (ok) closeModal();
+    } catch (e) {
+      const errorMessage = validateResErrors(e, "Ошибка сохранения стола");
+      alert(errorMessage, true);
     } finally {
       setSaving(false);
     }

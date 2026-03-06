@@ -15,6 +15,9 @@ import ProductsGrid from "./components/ProductsGrid/ProductsGrid";
 import RequestCart from "./RequestCart";
 import AlertModal from "../../../common/AlertModal/AlertModal";
 import "./ProductionRequest.scss";
+import useResize from "../../../../hooks/useResize";
+import DataContainer from "../../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const ProductionRequest = () => {
   const dispatch = useDispatch();
@@ -55,6 +58,7 @@ const ProductionRequest = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+
   // Блокировка прокрутки фона при открытии корзины (только на десктопе)
   useEffect(() => {
     // Проверяем, десктоп ли это
@@ -89,6 +93,22 @@ const ProductionRequest = () => {
     };
   }, [isCartSectionOpen]);
 
+  const filteredProduts = useMemo(() => {
+    const cartItemQtyMap = new Map(cartItems?.map(el => [el.product, el.quantity_requested]) ?? [])
+    const data = products.map(el => {
+      const productQty = el.quantity;
+      const itemQty = parseFloat(cartItemQtyMap.get(el.id) ?? '0')
+      return {
+        ...el,
+        quantity: productQty - itemQty
+      }
+    }).filter(el => !!el.quantity)
+    return data
+  }, [cartItems, products])
+  const detailProduct = useMemo(() => {
+    const findedEl = filteredProduts.find(el => el?.id == selectedProduct?.id)
+    return findedEl;
+  }, [filteredProduts, selectedProduct])
   // Debounce для поиска
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -164,7 +184,7 @@ const ProductionRequest = () => {
         const { updateAgentCartItemById } = await import(
           "../../../../api/agentCarts"
         );
-        const newQuantity = (existingItem.quantity_requested || 0) + quantity;
+        const newQuantity = (+existingItem.quantity_requested || 0) + quantity;
         await updateAgentCartItemById(existingItem.id, {
           quantity_requested: newQuantity,
         });
@@ -178,7 +198,7 @@ const ProductionRequest = () => {
       }
 
       // Обновляем данные корзины
-      await refreshCart();
+      await refreshCart(cartId);
 
       // Показываем уведомление об успешном добавлении
       setAlertType("success");
@@ -196,12 +216,7 @@ const ProductionRequest = () => {
         }, 200);
       }
     } catch (error) {
-      console.error("Error adding product to cart:", error);
-      const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось добавить товар в запрос";
+      const errorMessage = validateResErrors(error, 'Не удалось добавить товар в запрос')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
@@ -238,11 +253,7 @@ const ProductionRequest = () => {
       await loadOrCreateCart();
     } catch (error) {
       console.error("Error requesting without cart:", error);
-      const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось отправить запрос";
+      const errorMessage = validateResErrors(error, 'Не удалось отправить запрос')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
@@ -299,11 +310,7 @@ const ProductionRequest = () => {
       await refreshCart();
     } catch (error) {
       console.error("Error updating item quantity:", error);
-      const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось обновить количество";
+      const errorMessage = validateResErrors(error, 'Не удалось обновить количество')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
@@ -323,17 +330,14 @@ const ProductionRequest = () => {
       await refreshCart();
     } catch (error) {
       console.error("Error removing item:", error);
-      const errorMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Не удалось удалить товар";
+      const errorMessage = validateResErrors(error, 'Не удалось удалить товар')
       setAlertType("error");
       setAlertMessage(errorMessage);
       setAlertOpen(true);
     }
   };
 
+  const { isMobile } = useResize()
   return (
     <div className="production-request">
       <CatalogControls
@@ -347,6 +351,7 @@ const ProductionRequest = () => {
         onViewModeChange={setViewMode}
         onOpenCart={handleOpenCart}
         totalItemsCount={totalItemsCount}
+        hideCartButton={isMobile}
       />
 
       {loading && (
@@ -361,24 +366,25 @@ const ProductionRequest = () => {
           <p>Ошибка: {error}</p>
         </div>
       )}
-
-      {!loading && !error && (
-        <ProductsGrid
-          products={products || []}
-          viewMode={viewMode}
-          onViewProduct={handleViewProduct}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          draggedItem={draggedItem}
-          onRequestWithCart={handleRequestWithCart}
-          onRequestWithoutCart={handleRequestWithoutCart}
-          onClearSearch={handleClearSearch}
-          isOwner={isOwner}
-        />
-      )}
+      <DataContainer>
+        {!loading && !error && (
+          <ProductsGrid
+            products={filteredProduts || []}
+            viewMode={viewMode}
+            onViewProduct={handleViewProduct}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            draggedItem={draggedItem}
+            onRequestWithCart={handleRequestWithCart}
+            onRequestWithoutCart={handleRequestWithoutCart}
+            onClearSearch={handleClearSearch}
+            isOwner={isOwner}
+          />
+        )}
+      </DataContainer>
 
       <ProductDetailModal
-        product={selectedProduct}
+        product={detailProduct}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onRequestWithCart={handleRequestWithCart}
@@ -397,6 +403,7 @@ const ProductionRequest = () => {
         isOpen={isCartSectionOpen}
         onOpenChange={setIsCartSectionOpen}
         totalItemsCount={totalItemsCount}
+        isHiddenCart={isOwner}
       />
 
       <AlertModal

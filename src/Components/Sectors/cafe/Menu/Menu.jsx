@@ -1,5 +1,6 @@
 // src/Components/Sectors/cafe/Menu/Menu.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FaListUl, FaThLarge } from "react-icons/fa";
 import api from "../../../../api";
 import "./Menu.scss";
@@ -9,9 +10,14 @@ import MenuItemsTab from "./components/MenuItemsTab";
 import MenuCategoriesTab from "./components/MenuCategoriesTab";
 import MenuItemModal from "./components/MenuItemModal";
 import MenuCategoryModal from "./components/MenuCategoryModal";
+import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
+import { useDebouncedValue } from "../../../../hooks/useDebounce";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 // Утилиты
 const getListFromResponse = (res) => res?.data?.results || res?.data || [];
+
+const PAGE_SIZE = 50;
 
 const toNumber = (value) => {
   if (value === null || value === undefined) return 0;
@@ -33,6 +39,10 @@ const normalizeDecimalValue = (value) => {
 };
 
 const Menu = () => {
+  const confirm = useConfirm()
+  const alert = useAlert()
+  const [searchParams, setSearchParams] = useSearchParams();
+  
   // Основное состояние
   const [activeTab, setActiveTab] = useState("items");
   const [viewMode, setViewMode] = useState("cards");
@@ -42,6 +52,15 @@ const Menu = () => {
   const [kitchens, setKitchens] = useState([]);
   const [warehouse, setWarehouse] = useState([]);
   const [items, setItems] = useState([]);
+  
+  // Данные пагинации
+  const [itemsCount, setItemsCount] = useState(0);
+  const [itemsNext, setItemsNext] = useState(null);
+  const [itemsPrevious, setItemsPrevious] = useState(null);
+  
+  // Refs для отслеживания изменений данных
+  const isInitialMountRef = useRef(true);
+  const prevItemsRef = useRef([]);
 
   // Состояние загрузки
   const [loadingItems, setLoadingItems] = useState(true);
@@ -49,8 +68,24 @@ const Menu = () => {
 
   // Фильтры и поиск
   const [queryItems, setQueryItems] = useState("");
+  const debouncedItemSearch = useDebouncedValue(queryItems, 400);
   const [queryCats, setQueryCats] = useState("");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("");
+  
+  // Получаем текущую страницу из URL
+  const currentPage = useMemo(
+    () => parseInt(searchParams.get("page") || "1", 10),
+    [searchParams]
+  );
+  
+  // Расчет общего количества страниц
+  const totalPages = useMemo(
+    () => (itemsCount && PAGE_SIZE ? Math.ceil(itemsCount / PAGE_SIZE) : 1),
+    [itemsCount]
+  );
+  
+  const hasNextPage = !!itemsNext;
+  const hasPrevPage = !!itemsPrevious;
 
   // Модал для блюд
   const [modalOpen, setModalOpen] = useState(false);
@@ -71,11 +106,6 @@ const Menu = () => {
   const [catEditId, setCatEditId] = useState(null);
   const [catTitle, setCatTitle] = useState("");
 
-  // Модал подтверждения удаления
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmKind, setConfirmKind] = useState(""); // "item" | "cat"
-  const [confirmId, setConfirmId] = useState(null);
-
   // Memoized maps для быстрого поиска
   const categoriesMap = useMemo(() => {
     const map = new Map();
@@ -88,9 +118,8 @@ const Menu = () => {
     kitchens.forEach((kitchen) => {
       const title = kitchen.title || kitchen.name || kitchen.kitchen_title || "Кухня";
       const number = kitchen.number ?? kitchen.kitchen_number;
-      const label = `${title}${
-        number !== undefined && number !== null && number !== "" ? ` №${number}` : ""
-      }`;
+      const label = `${title}${number !== undefined && number !== null && number !== "" ? ` №${number}` : ""
+        }`;
       map.set(kitchen.id, label);
     });
     return map;
@@ -103,41 +132,53 @@ const Menu = () => {
   }, [warehouse]);
 
   // Вспомогательные функции для получения данных по ID
-  const getCategoryTitle = (id) => categoriesMap.get(id) || "Без категории";
-  const getKitchenTitle = (id) => kitchensMap.get(id) || "";
-  const getProductTitle = (id) => warehouseMap.get(id)?.title || id || "";
-  const getProductUnit = (id) => warehouseMap.get(id)?.unit || "";
+  const getCategoryTitle = useCallback((id) => categoriesMap.get(id) || "Без категории", [categoriesMap]);
+  // const getKitchenTitle = useCallback((id) => kitchensMap.get(id) || "", [kitchensMap]);
+  // const getProductTitle = useCallback((id) => warehouseMap.get(id)?.title || id || "", [warehouseMap]);
+  // const getProductUnit = useCallback((id) => warehouseMap.get(id)?.unit || "", [warehouseMap]);
 
   // API методы для загрузки данных
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     const res = await api.get("/cafe/categories/");
     setCategories(getListFromResponse(res));
-  };
+  }, []);
 
-  const fetchKitchens = async () => {
+  const fetchKitchens = useCallback(async () => {
     const res = await api.get("/cafe/kitchens/");
     setKitchens(getListFromResponse(res));
-  };
+  }, []);
 
-  const fetchWarehouse = async () => {
+  const fetchWarehouse = useCallback(async () => {
     const res = await api.get("/cafe/warehouse/");
     setWarehouse(getListFromResponse(res));
-  };
+  }, []);
 
-  const fetchMenuItems = async () => {
-    const res = await api.get("/cafe/menu-items/");
-    setItems(getListFromResponse(res));
-  };
+  const fetchMenuItems = useCallback(async (params = {}) => {
+    const res = await api.get("/cafe/menu-items/", {
+      params: {
+        page: params.page || 1,
+        search: params.search || "",
+        category: params.category || null,
+      }
+    });
+    const data = res?.data || {};
+    setItems(data?.results || (Array.isArray(data) ? data : []));
+    setItemsCount(data?.count || data?.length || 0);
+    setItemsNext(data?.next || null);
+    setItemsPrevious(data?.previous || null);
+  }, []);
 
-  const fetchMenuItemDetail = async (id) => {
+  const fetchMenuItemDetail = useCallback(async (id) => {
     if (!id) return null;
     try {
       const res = await api.get(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
       return res?.data || null;
     } catch (err) {
+      const errorMessage = validateResErrors(err, "Ошибка при загрузке блюда");
+      alert(errorMessage, true);
       return null;
     }
-  };
+  }, []);
 
   // Загрузка категорий при монтировании
   useEffect(() => {
@@ -157,6 +198,8 @@ const Menu = () => {
       try {
         await fetchKitchens();
       } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка при загрузке кухонь");
+        alert(errorMessage, true);
         // Ошибка загрузки кухонь - продолжаем работу
       }
     })();
@@ -168,22 +211,99 @@ const Menu = () => {
       try {
         await fetchWarehouse();
       } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка при загрузке склада");
+        alert(errorMessage, true);
         // Ошибка загрузки склада - продолжаем работу
       }
     })();
   }, []);
 
-  // Загрузка блюд при монтировании
+  // Синхронизация URL с состоянием страницы
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    } else {
+      params.delete("page");
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [currentPage, searchParams, setSearchParams]);
+
+  // Обработчик смены страницы
+  const handlePageChange = useCallback((newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    const params = new URLSearchParams(searchParams);
+    if (newPage > 1) {
+      params.set("page", newPage.toString());
+    } else {
+      params.delete("page");
+    }
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams, totalPages]);
+
+  // Сброс на первую страницу при изменении поиска или фильтра
+  useEffect(() => {
+    if (currentPage > 1) {
+      const params = new URLSearchParams(searchParams);
+      params.delete("page");
+      setSearchParams(params, { replace: true });
+    }
+  }, [debouncedItemSearch, selectedCategoryFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Загрузка блюд при монтировании и изменении параметров
   useEffect(() => {
     (async () => {
       try {
         setLoadingItems(true);
-        await fetchMenuItems();
+        await fetchMenuItems({
+          page: currentPage,
+          search: debouncedItemSearch,
+          category: selectedCategoryFilter || null
+        });
       } finally {
         setLoadingItems(false);
       }
     })();
-  }, []);
+  }, [fetchMenuItems, currentPage, debouncedItemSearch, selectedCategoryFilter]);
+
+  // Плавно прокручиваем страницу вверх при изменении данных блюд
+  useEffect(() => {
+    if (loadingItems) return;
+    // Пропускаем первый рендер
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      prevItemsRef.current = items || [];
+      return;
+    }
+
+    // Проверяем, что блюда изменились (новый запрос)
+    const prevItems = prevItemsRef.current;
+    const currentItems = items || [];
+
+    // Сравниваем первые блюда - если они разные, значит новый запрос
+    const isNewData =
+      prevItems.length > 0 &&
+      currentItems.length > 0 &&
+      prevItems[0]?.id !== currentItems[0]?.id;
+
+    if (isNewData) {
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        rootElement.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      } else {
+        // Fallback на window, если root не найден
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+    prevItemsRef.current = currentItems;
+  }, [items, loadingItems]);
 
   // Очистка URL при размонтировании
   useEffect(() => {
@@ -195,29 +315,29 @@ const Menu = () => {
   }, [imagePreview]);
 
   // Фильтрованные списки
-  const filteredItems = useMemo(() => {
-    let filtered = items;
+  // const filteredItems = useMemo(() => {
+  //   let filtered = items;
 
-    // Фильтр по категории
-    if (selectedCategoryFilter) {
-      filtered = filtered.filter(
-        (item) => String(item?.category || "") === String(selectedCategoryFilter)
-      );
-    }
+  //   // Фильтр по категории
+  //   // if (selectedCategoryFilter) {
+  //   //   filtered = filtered.filter(
+  //   //     (item) => String(item?.category || "") === String(selectedCategoryFilter)
+  //   //   );
+  //   // }
 
-    // Фильтр по поисковому запросу
-    const query = queryItems.trim().toLowerCase();
-    if (query) {
-      filtered = filtered.filter((item) => {
-        const title = (item.title || "").toLowerCase();
-        const category = getCategoryTitle(item.category).toLowerCase();
-        const kitchen = getKitchenTitle(item.kitchen).toLowerCase();
-        return title.includes(query) || category.includes(query) || kitchen.includes(query);
-      });
-    }
+  //   // Фильтр по поисковому запросу
+  //   // const query = queryItems.trim().toLowerCase();
+  //   // if (query) {
+  //   //   filtered = filtered.filter((item) => {
+  //   //     const title = (item.title || "").toLowerCase();
+  //   //     const category = getCategoryTitle(item.category).toLowerCase();
+  //   //     const kitchen = getKitchenTitle(item.kitchen).toLowerCase();
+  //   //     return title.includes(query) || category.includes(query) || kitchen.includes(query);
+  //   //   });
+  //   // }
 
-    return filtered;
-  }, [items, queryItems, selectedCategoryFilter, categoriesMap, kitchensMap]);
+  //   return filtered;
+  // }, [items, categoriesMap, kitchensMap]);
 
   const filteredCategories = useMemo(() => {
     const query = queryCats.trim().toLowerCase();
@@ -260,9 +380,9 @@ const Menu = () => {
       is_active: !!fullItem.is_active,
       ingredients: Array.isArray(fullItem.ingredients)
         ? fullItem.ingredients.map((ing) => ({
-            product: ing.product,
-            amount: String(ing.amount ?? "").replace(",", "."),
-          }))
+          product: ing.product,
+          amount: String(ing.amount ?? "").replace(",", "."),
+        }))
         : [],
     });
 
@@ -393,55 +513,40 @@ const Menu = () => {
       setImageFile(null);
       setImagePreview("");
     } catch (err) {
+      alert(validateResErrors(err, 'Произошла ошибка при сохранении блюда'), true)
       // Ошибка сохранения
     }
   };
 
-  // Открыть модал подтверждения удаления блюда
-  const openConfirmDeleteItem = (id) => {
-    setConfirmKind("item");
-    setConfirmId(id);
-    setConfirmOpen(true);
-  };
+  const handleDeleteItemSubmit = useCallback((id) => {
+    confirm('Вы действительно хотите удалить позицию?', async (result) => {
+      if (result) {
+        try {
+          await api.delete(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
+          setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
+        } catch (err) {
+          const errorMessage = validateResErrors(err, "Ошибка при удалении блюда");
+          alert(errorMessage, true);
+        }
+      }
+    })
+  }, [])
 
   // Открыть модал подтверждения удаления категории
-  const openConfirmDeleteCategory = (id) => {
-    setConfirmKind("cat");
-    setConfirmId(id);
-    setConfirmOpen(true);
-  };
-
-  // Закрыть модал подтверждения
-  const closeConfirmModal = () => {
-    setConfirmOpen(false);
-    setConfirmKind("");
-    setConfirmId(null);
-  };
-
-  // Выполнить удаление
-  const confirmDelete = async () => {
-    const id = confirmId;
-    const kind = confirmKind;
-
-    closeConfirmModal();
-    if (!id || !kind) return;
-
-    try {
-      if (kind === "item") {
-        await api.delete(`/cafe/menu-items/${encodeURIComponent(String(id))}/`);
-        setItems((prev) => prev.filter((m) => String(m.id) !== String(id)));
-        return;
+  const openConfirmDeleteCategory = useCallback((id) => {
+    confirm('Вы действительно хотите удалить категорию?\nУбедитесь, что в этой категории нет блюд', async (result) => {
+      if (result) {
+        try {
+          await api.delete(`/cafe/categories/${encodeURIComponent(String(id))}/`);
+          setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
+        } catch (err) {
+          const errorMessage = validateResErrors(err, "Ошибка при удалении категории");
+          alert(errorMessage, true);
+        }
       }
+    })
 
-      if (kind === "cat") {
-        await api.delete(`/cafe/categories/${encodeURIComponent(String(id))}/`);
-        setCategories((prev) => prev.filter((c) => String(c.id) !== String(id)));
-      }
-    } catch (err) {
-      // Ошибка удаления
-    }
-  };
-
+  });
   // Управление ингредиентами
   const addIngredientRow = () =>
     setForm((f) => ({
@@ -503,7 +608,8 @@ const Menu = () => {
       }
       setCatModalOpen(false);
     } catch (err) {
-      // Ошибка сохранения категории
+      const errorMessage = validateResErrors(err, "Ошибка при сохранении категории");
+      alert(errorMessage, true);
     }
   };
 
@@ -544,7 +650,7 @@ const Menu = () => {
       {isItemsTab && (
         <MenuItemsTab
           loadingItems={loadingItems}
-          filteredItems={filteredItems}
+          filteredItems={items}
           queryItems={queryItems}
           setQueryItems={setQueryItems}
           categories={categories}
@@ -552,12 +658,18 @@ const Menu = () => {
           setSelectedCategoryFilter={setSelectedCategoryFilter}
           onCreate={openCreateItemModal}
           onEdit={openEditItemModal}
-          onDelete={openConfirmDeleteItem}
+          onDelete={handleDeleteItemSubmit}
           hasCategories={!!categories.length}
           categoryTitle={getCategoryTitle}
           formatMoney={formatMoney}
           toNumber={toNumber}
           viewMode={viewMode}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          itemsCount={itemsCount}
+          hasNextPage={hasNextPage}
+          hasPrevPage={hasPrevPage}
+          onPageChange={handlePageChange}
         />
       )}
 
@@ -602,38 +714,6 @@ const Menu = () => {
         setCatTitle={setCatTitle}
         onSubmit={saveCategoryToAPI}
       />
-
-      {/* Модал подтверждения удаления */}
-      {confirmOpen && (
-        <div className="cafeMenuconfirm__overlay" onClick={closeConfirmModal}>
-          <div className="cafeMenuconfirm__card" onClick={(e) => e.stopPropagation()}>
-            <h3 className="cafeMenuconfirm__title">
-              {confirmKind === "item" ? "Удалить позицию меню?" : "Удалить категорию?"}
-            </h3>
-            <p className="cafeMenuconfirm__message">
-              {confirmKind === "item"
-                ? "Это действие невозможно будет отменить"
-                : "Убедитесь, что в этой категории нет блюд"}
-            </p>
-            <div className="cafeMenuconfirm__actions">
-              <button
-                type="button"
-                className="cafeMenu__btn cafeMenu__btn--secondary"
-                onClick={closeConfirmModal}
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                className="cafeMenu__btn cafeMenu__btn--danger"
-                onClick={confirmDelete}
-              >
-                Удалить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 };

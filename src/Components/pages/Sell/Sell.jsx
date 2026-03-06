@@ -1,6 +1,7 @@
-import { Plus, Search, Trash } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Plus, Search } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch } from "react-redux";
+import { useNavigate, useSearchParams } from "react-router-dom";
 // import "./Sklad.scss";
 
 import api from "../../../api";
@@ -24,6 +25,8 @@ import SellDetail from "./SellDetail";
 import SellModal from "./SellModal";
 import SellMainStart from "./SellMainStart";
 import "./sell.scss";
+import { useAlert } from "../../../hooks/useDialog";
+import DataContainer from "../../common/DataContainer/DataContainer";
 
 /**
  * Создание долга для клиента.
@@ -42,12 +45,16 @@ export async function createDebt({
   amount,
   debtMonths = 0,
   firstDueDate = null,
+  phone = '',
+  name = "",
   note = "",
 }) {
   const payload = {
     client: clientId,
     kind: "debt",
     title,
+    name,
+    phone,
     note: note || "",
     amount, // "30.00" или число — как у тебя принято
     debt_months: Number(debtMonths ?? 0), // <-- всегда отправляем, минимум 0
@@ -69,12 +76,46 @@ const STATUSES = [
 ];
 
 export const DEAL_STATUS_RU = ["Продажа", "Долги", "Предоплата"];
+const kindTranslate = {
+  new: "Новый",
+  paid: "Оплаченный",
+  canceled: "возвращенный",
+  debt: "Долг",
+};
+
+const paymentMethodTranslate = {
+  cash: "Наличные",
+  card: "Карта",
+  transfer: "Перевод",
+  debt: "Долг",
+};
+const PAGE_SIZE = 50;
 
 const Sell = () => {
+  const navigate = useNavigate();
+  const alert = useAlert();
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
-  const { history, start, historyObjects } = useSale();
+  const {
+    history,
+    start,
+    historyObjects,
+    historyCount,
+    historyNext,
+    historyPrevious,
+    historyObjectsCount,
+    historyObjectsNext,
+    historyObjectsPrevious,
+    loading
+  } = useSale();
+
+  // Получаем текущую страницу из URL
+  const currentPage = useMemo(
+    () => parseInt(searchParams.get("page") || "1", 10),
+    [searchParams]
+  );
 
   const [showDetailSell, setShowDetailSell] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
@@ -89,6 +130,7 @@ const Sell = () => {
   const [itemId, setItemId] = useState({});
   const [showRefundModal, setShowRefundModal] = useState(false);
   const [error, setError] = useState(null);
+  const [historyView, setHistoryView] = useState("table"); // table | cards (по умолчанию таблица)
 
   const [newCashbox, setNewCashbox] = useState({
     name: "",
@@ -99,6 +141,8 @@ const Sell = () => {
 
   // выбор строк
   const [selectedIds, setSelectedIds] = useState(new Set());
+  // оптимистическое скрытие после возврата (чтобы карточка исчезала сразу)
+  const [hiddenIds, setHiddenIds] = useState(new Set());
   const isSelected = (id) => selectedIds.has(id);
   const toggleRow = (id) =>
     setSelectedIds((prev) => {
@@ -115,27 +159,138 @@ const Sell = () => {
     });
   const clearSelection = () => setSelectedIds(new Set());
 
-  const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
-  const planName = company?.subscription_plan?.name?.trim().toLowerCase() ?? "";
-  const isBuildingCompany = sectorName === "строительная компания";
-  const isStartPlan = planName === "старт";
+  const hideSaleId = (id) => {
+    const sid = String(id || "");
+    if (!sid) return;
+    setHiddenIds((prev) => new Set(prev).add(sid));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(sid);
+      return next;
+    });
+  };
 
-  const filterSell = history.filter((item) => item.status !== "canceled");
+  // если данные перезагрузились — чистим "скрытые" id, которых уже нет в выдаче
+  useEffect(() => {
+    const all = new Set([
+      ...(Array.isArray(history) ? history.map((x) => String(x.id)) : []),
+      ...(Array.isArray(historyObjects)
+        ? historyObjects.map((x) => String(x.id))
+        : []),
+    ]);
+    setHiddenIds((prev) => {
+      if (!prev || prev.size === 0) return prev;
+      const next = new Set();
+      for (const id of prev) {
+        if (all.has(String(id))) next.add(String(id));
+      }
+      return next;
+    });
+  }, [history, historyObjects]);
 
-  const filterField = isBuildingCompany ? historyObjects : filterSell;
+  // смена страницы/поиска — можно безопасно сбросить локальные скрытия
+  useEffect(() => {
+    setHiddenIds(new Set());
+  }, [currentPage]);
+
+  const {
+    isBuildingCompany,
+    filterField,
+    count,
+    totalPages,
+    hasNextPage,
+    hasPrevPage
+  } = useMemo(() => {
+    const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
+    const isBuildingCompany = sectorName === "строительная компания";
+    const hidden = hiddenIds;
+    const filterSell = (Array.isArray(history) ? history : []).filter(
+      (item) =>
+        item.status !== "canceled" && !hidden.has(String(item?.id ?? ""))
+    );
+    const filterObjects = (Array.isArray(historyObjects) ? historyObjects : []).filter(
+      (item) => !hidden.has(String(item?.id ?? ""))
+    );
+    const filterField = isBuildingCompany ? filterObjects : filterSell;
+    const count = isBuildingCompany ? historyObjectsCount : historyCount;
+    const next = isBuildingCompany ? historyObjectsNext : historyNext;
+    const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
+    const totalPages = count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1
+    return {
+      sectorName,
+      isBuildingCompany,
+      filterSell,
+      filterField,
+      count,
+      next,
+      previous,
+      totalPages,
+      hasNextPage: !!next,
+      hasPrevPage: !!previous
+    }
+  }, [
+    company,
+    history,
+    historyObjects,
+    hiddenIds,
+    historyObjectsCount,
+    historyObjectsNext,
+    historyObjectsPrevious,
+    historyPrevious,
+    historyCount,
+    historyNext,
+  ])
+  // Синхронизация URL с состоянием страницы
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (currentPage > 1) {
+      params.set("page", currentPage.toString());
+    } else {
+      params.delete("page");
+    }
+    const newSearchString = params.toString();
+    const currentSearchString = searchParams.toString();
+    if (newSearchString !== currentSearchString) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [currentPage, searchParams, setSearchParams]);
+
+  // Обработчик смены страницы
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (totalPages && newPage > totalPages)) return;
+    const params = new URLSearchParams(searchParams);
+    if (newPage > 1) {
+      params.set("page", newPage.toString());
+    } else {
+      params.delete("page");
+    }
+    setSearchParams(params, { replace: true });
+    // Плавно прокручиваем страницу вверх при смене страницы
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // поиск по истории (дебаунс)
   const debouncedSearch = useDebounce((v) => {
-    dispatch(historySellProduct({ search: v }));
-    dispatch(historySellObjects({ search: v }));
+    dispatch(historySellProduct({ search: v, page: 1 }));
+    dispatch(historySellObjects({ search: v, page: 1 }));
+    // Сбрасываем на первую страницу при поиске
+    const params = new URLSearchParams(searchParams);
+    params.delete("page");
+    setSearchParams(params, { replace: true });
   }, 600);
   const onChange = (e) => debouncedSearch(e.target.value);
 
   useEffect(() => {
     if (showSellMainStart) return;
-    dispatch(historySellProduct({ search: "" }));
-    dispatch(historySellObjects({ search: "" }));
-  }, [dispatch, showSellMainStart]);
+    dispatch(historySellProduct({ search: "", page: currentPage }));
+    dispatch(historySellObjects({ search: "", page: currentPage }));
+  }, [dispatch, showSellMainStart, currentPage]);
+
+  // Плавно прокручиваем страницу вверх при изменении страницы
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   useEffect(() => {
     if (showSellModal) dispatch(startSale({ discount_total: 0 }));
@@ -179,16 +334,63 @@ const Sell = () => {
     setShowRefundModal(true);
   };
 
-  const kindTranslate = {
-    new: "Новый",
-    paid: "Оплаченный",
-    canceled: "возвращенный",
+
+
+  const formatMoney = (v) => {
+    const s = String(v ?? "").trim().replace(/,/g, ".");
+    const n = Number(s);
+    if (!Number.isFinite(n)) return String(v ?? "-");
+    return n.toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   };
 
-  const paymentMethodTranslate = {
-    cash: "Наличные",
-    card: "Карта",
-    transfer: "Перевод",
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "-";
+    try {
+      const d = new Date(dateString);
+      return d.toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return String(dateString);
+    }
+  };
+
+  const getSaleThumb = (sale) => {
+    return (
+      sale?.first_item_image_url ||
+      sale?.first_item_image ||
+      sale?.primary_image_url ||
+      sale?.first_item?.primary_image_url ||
+      sale?.items?.[0]?.primary_image_url ||
+      sale?.products?.[0]?.primary_image_url ||
+      sale?.products?.[0]?.image_url ||
+      "/images/placeholder.avif"
+    );
+  };
+
+  const getItemsCount = (sale) => {
+    const v =
+      sale?.items_count ??
+      sale?.products_count ??
+      (Array.isArray(sale?.items) ? sale.items.length : null) ??
+      (Array.isArray(sale?.products) ? sale.products.length : null);
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+
+  const getStatusVariant = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "paid") return "paid";
+    if (s === "canceled" || s === "cancelled") return "canceled";
+    if (s === "debt") return "debt";
+    return "new";
   };
 
   const translatePaymentMethod = (method) => {
@@ -237,8 +439,8 @@ const Sell = () => {
       if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
       clearSelection();
       alert("Выбранные записи удалены");
-      dispatch(historySellProduct({ search: "" }));
-      dispatch(historySellObjects({ search: "" }));
+      dispatch(historySellProduct({ search: "", page: currentPage }));
+      dispatch(historySellObjects({ search: "", page: currentPage }));
     } catch (e) {
       alert("Не удалось удалить: " + e.message);
     } finally {
@@ -270,8 +472,12 @@ const Sell = () => {
       if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
       clearSelection();
       alert("История удалена");
-      dispatch(historySellProduct({ search: "" }));
-      dispatch(historySellObjects({ search: "" }));
+      // После удаления всех записей возвращаемся на первую страницу
+      const params = new URLSearchParams(searchParams);
+      params.delete("page");
+      setSearchParams(params, { replace: true });
+      dispatch(historySellProduct({ search: "", page: 1 }));
+      dispatch(historySellObjects({ search: "", page: 1 }));
     } catch (e) {
       alert("Не удалось очистить историю: " + e.message);
     } finally {
@@ -316,138 +522,324 @@ const Sell = () => {
 
   return (
     <div>
-      {showSellMainStart ? (
-        <SellMainStart
-          show={showSellMainStart}
-          setShow={setShowSellMainStart}
-        />
-      ) : (
-        <>
-          <div className="sell__header">
-            <div className="sell__header-left">
-              <div className="sell__header-input">
-                <input className="w-full" onChange={onChange} type="text" placeholder="Поиск" />
-                <span>
-                  <Search size={15} color="#91929E" />
-                </span>
-              </div>
+      <>
+        <div className="sell__header">
+          <div className="sell__header-left">
+            <div className="sell__header-input">
+              <input className="w-full" onChange={onChange} type="text" placeholder="Поиск" />
+              <span>
+                <Search size={15} color="#91929E" />
+              </span>
             </div>
-            <div className="sell__header-left">
-              {selectedIds.size > 0 ? (
-                <SelectionActions pageItems={filterField} />
+          </div>
+          <button className="sell__header-btn " onClick={() => navigate("start")}>Начать продажу</button>
+          {selectedIds.size > 0 ? (
+            <SelectionActions pageItems={filterField} />
+          ) : (
+            <>
+              {isBuildingCompany ? (
+                <button
+                  className="sklad__add"
+                  onClick={() => setShowBuilding(true)}
+                >
+                  <Plus size={16} style={{ marginRight: 4 }} /> Продать
+                  квартиру
+                </button>
               ) : (
                 <>
-                  {isBuildingCompany ? (
-                    <button
-                      className="sklad__add"
-                      onClick={() => setShowBuilding(true)}
-                    >
-                      <Plus size={16} style={{ marginRight: 4 }} /> Продать
-                      квартиру
-                    </button>
-                  ) : (
-                    <>
-                      {sectorName !== "магазин" && (
-                        <button
-                          className="sell__header-btn"
-                          onClick={() => {
-                            dispatch(startSale({ discount_total: 0 }));
-                            setShowSellMainStart(true);
-                          }}
-                        >
-                          Продать
-                        </button>
-                      )}
-                      <button
-                        className="sell__header-btn"
-                        onClick={() => setShowAddCashboxModal(true)}
-                      >
-                        Прочие расходы
-                      </button>
-                    </>
-                  )}
+                  <button
+                    className="sell__header-btn"
+                    onClick={() => setShowAddCashboxModal(true)}
+                  >
+                    Прочие расходы
+                  </button>
                 </>
               )}
+            </>
+          )}
+
+        </div>
+        <div className="sell__history">
+          <div className="sell__history-toolbar">
+            <label className="sell__selectAll">
+              <input
+                type="checkbox"
+                checked={
+                  filterField.length > 0 &&
+                  filterField.every((i) => selectedIds.has(i.id))
+                }
+                onChange={() => toggleSelectAllOnPage(filterField)}
+              />
+              <span>Выбрать все на странице</span>
+            </label>
+
+            <div className="sell__history-toolbarRight">
+              <div className="sell__viewToggle" role="group" aria-label="Вид списка">
+                <button
+                  type="button"
+                  className={`sell__viewBtn ${
+                    historyView === "table" ? "sell__viewBtn--active" : ""
+                  }`}
+                  onClick={() => setHistoryView("table")}
+                >
+                  Таблица
+                </button>
+                <button
+                  type="button"
+                  className={`sell__viewBtn ${
+                    historyView === "cards" ? "sell__viewBtn--active" : ""
+                  }`}
+                  onClick={() => setHistoryView("cards")}
+                >
+                  Карточки
+                </button>
+              </div>
+
+              <div className="sell__history-meta">
+                <span>Показано: {filterField.length}</span>
+                <span>Всего: {count || 0}</span>
+              </div>
             </div>
           </div>
-          <div className="sell__wrappper">
-            <table className="sell__table">
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={
-                        filterField.length > 0 &&
-                        filterField.every((i) => selectedIds.has(i.id))
-                      }
-                      onChange={() => toggleSelectAllOnPage(filterField)}
-                    />
-                  </th>
-                  <th>№</th>
-                  <th>Клиент</th>
-                  <th>Товар</th>
-                  <th>Метод оплаты</th>
-                  <th>Цена</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((item, idx) => {
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => {
-                        setSellId(item.id);
-                        setShowDetailSell(true);
-                      }}
-                    >
-                      <td onClick={(e) => e.stopPropagation()} data-label="">
-                        <input
-                          type="checkbox"
-                          checked={isSelected(item.id)}
-                          onChange={() => toggleRow(item.id)}
-                        />
-                      </td>
-                      <td data-label="№">{idx + 1}</td>
-                      <td data-label="Клиент">{item.client_name || "-"}</td>
-                      <td data-label="Товар">
-                        {/* {item.products
-                          .map((product) => product.name)
-                          .join(", ")} */}
-                        {item.first_item_name || "-"}
-                      </td>
-                      <td data-label="Метод оплаты">
-                        {translatePaymentMethod(item.payment_method)}
-                      </td>
-                      <td data-label="Цена">{item.total}</td>
-                      <td data-label="Статус">
-                        {kindTranslate[item.status] || item.status}
-                      </td>
-                      <td data-label="Дата">
-                        {new Date(item.created_at).toLocaleDateString()}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()} data-label="">
-                        {company.sector.name === "Магазин" && (
-                          <button
-                            className="sell__table-refund"
-                            onClick={() => handleOpen(item)}
-                          >
-                            Возврат
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
 
+          {filterField.length === 0 ? (
+            <div className="sell__empty">Ничего не найдено</div>
+          ) : (
+            <DataContainer>
+              {historyView === "table" ? (
+                <div className="sellTable__wrap">
+                  <table className="sellTable">
+                    <thead>
+                      <tr>
+                        <th />
+                        <th>№</th>
+                        <th>Статус</th>
+                        <th>Товар</th>
+                        <th>Оплата</th>
+                        <th>Сумма</th>
+                        <th>Позиции</th>
+                        <th>Дата</th>
+                        <th>Клиент</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filterField.map((item, idx) => {
+                        const itemsCount = getItemsCount(item);
+                        const statusLabel =
+                          kindTranslate[item.status] || item.status || "-";
+                        const statusVariant = getStatusVariant(item.status);
+                        const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
+                        return (
+                          <tr
+                            key={item.id}
+                            className="sellTable__row"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              setSellId(item.id);
+                              setShowDetailSell(true);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                setSellId(item.id);
+                                setShowDetailSell(true);
+                              }
+                            }}
+                          >
+                            <td
+                              className="sellTable__check"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected(item.id)}
+                                onChange={() => toggleRow(item.id)}
+                              />
+                            </td>
+                            <td className="sellTable__no">№ {saleNo}</td>
+                            <td>
+                              <span
+                                className={`sellBadge sellBadge--${statusVariant}`}
+                              >
+                                {statusLabel}
+                              </span>
+                            </td>
+                        
+                            <td className="sellTable__title">
+                              {item.first_item_name || item.title || "—"}
+                            </td>
+                           
+                            <td>{translatePaymentMethod(item.payment_method)}</td>
+                            <td className="">
+                              {formatMoney(item.total)} сом
+                            </td>
+                            <td className="sellTable__count">
+                              {itemsCount !== null ? itemsCount : "—"}
+                            </td>
+                            <td className="sellTable__date">
+                              {formatDateTime(item.created_at)}
+                            </td>
+                            <td className="sellTable__client">
+                              {item.client_name || "-"}
+                            </td>
+                            <td
+                              className="sellTable__actions"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {company?.sector?.name === "Магазин" && (
+                                <button
+                                  type="button"
+                                  className="sellTable__refund"
+                                  onClick={() => handleOpen(item)}
+                                >
+                                  Возврат
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="sell__cards">
+                  {filterField.map((item, idx) => {
+                    const itemsCount = getItemsCount(item);
+                    const statusLabel =
+                      kindTranslate[item.status] || item.status || "-";
+                    const statusVariant = getStatusVariant(item.status);
+                    const saleNo = (currentPage - 1) * PAGE_SIZE + idx + 1;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="sellCard"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setSellId(item.id);
+                          setShowDetailSell(true);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            setSellId(item.id);
+                            setShowDetailSell(true);
+                          }
+                        }}
+                      >
+                        <div className="sellCard__top">
+                          <label
+                            className="sellCard__check"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected(item.id)}
+                              onChange={() => toggleRow(item.id)}
+                            />
+                            <span className="sellCard__no">№ {saleNo}</span>
+                          </label>
+                          <div className="sellCard__right">
+                            <span
+                              className={`sellBadge sellBadge--${statusVariant}`}
+                            >
+                              {statusLabel}
+                            </span>
+                            <span className="sellCard__date">
+                              {formatDateTime(item.created_at)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="sellCard__body">
+                          <div className="sellCard__main">
+                            <div className="sellCard__title">
+                              {item.first_item_name || item.title || "—"}
+                            </div>
+                            <div className="sellCard__subtitle">
+                              Клиент: <b>{item.client_name || "-"}</b>
+                              {itemsCount !== null && itemsCount > 1 && (
+                                <span className="sellCard__count">
+                                  + ещё {itemsCount - 1}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="sellCard__grid">
+                              <div className="sellCard__kv">
+                                <span>Оплата</span>
+                                <b>
+                                  {translatePaymentMethod(item.payment_method)}
+                                </b>
+                              </div>
+                              <div className="sellCard__kv">
+                                <span>Сумма</span>
+                                <b>{formatMoney(item.total)} сом</b>
+                              </div>
+                              <div className="sellCard__kv">
+                                <span>Документ</span>
+                                <b>#{String(item.id).slice(0, 8)}</b>
+                              </div>
+                              <div className="sellCard__kv">
+                                <span>Позиции</span>
+                                <b>{itemsCount !== null ? itemsCount : "—"}</b>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            className="sellCard__actions"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {company?.sector?.name === "Магазин" && (
+                              <button
+                                type="button"
+                                className="sellCard__refund"
+                                onClick={() => handleOpen(item)}
+                              >
+                                Возврат
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </DataContainer>
+
+          )}
+        </div>
+
+        {/* Пагинация */}
+        {totalPages > 1 && (
+          <div className="sell__pagination">
+            <button
+              type="button"
+              className="sell__pagination-btn"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading || !hasPrevPage}
+            >
+              Назад
+            </button>
+            <span className="sell__pagination-info">
+              Страница {currentPage} из {totalPages}
+              {count ? ` (${count} записей)` : ""}
+            </span>
+            <button
+              type="button"
+              className="sell__pagination-btn"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={loading || !hasNextPage || (totalPages && currentPage >= totalPages)}
+            >
+              Вперед
+            </button>
+          </div>
+        )}
+      </>
       {showAddCashboxModal && (
         <AddCashFlowsModal onClose={() => setShowAddCashboxModal(false)} />
       )}
@@ -463,7 +855,12 @@ const Sell = () => {
         <RefundPurchase
           item={itemId}
           onClose={() => setShowRefundModal(false)}
-          onChanged={() => dispatch(historySellProduct())}
+          onChanged={() => {
+            hideSaleId(itemId?.id);
+            setShowRefundModal(false);
+            dispatch(historySellProduct({ search: "", page: currentPage }));
+            dispatch(historySellObjects({ search: "", page: currentPage }));
+          }}
         />
       )}
       {showBuilding && (

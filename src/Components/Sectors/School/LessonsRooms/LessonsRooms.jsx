@@ -838,7 +838,7 @@ const EMPLOYEES_EP = "/users/employees/";
 const LESSON_ATT   = (id) => `/education/lessons/${id}/attendance/`;
 
 /* ===== constants ===== */
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50;
 
 /* ===== helpers ===== */
 const asArray = (data) =>

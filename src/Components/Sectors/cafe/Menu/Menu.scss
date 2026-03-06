@@ -1,5 +1,4 @@
 /* src/Components/Sectors/cafe/Menu/Menu.scss */
-@use "../variables.scss";
 
 /* ===== Блок CAFE-MENU (изоляция) ===== */
 .cafeMenu {
@@ -1393,23 +1392,25 @@
     background: rgba(15, 23, 42, 0.45);
     display: grid;
     place-items: center;
-    z-index: 70;
+    z-index: 100;
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
     animation: modal-in 0.18s ease-out both;
     padding: 12px;
-    overflow: auto;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   &__card {
     background: #fff;
     border-radius: 16px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
-    width: min(760px, calc(100vw - 24px));
-    max-height: min(90vh, 760px);
-    overflow: auto;
+    width: min(760px, calc(100% - 24px));
+    max-height: min(90dvh, 760px);
+    overflow: hidden;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
     animation: modal-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) 0.04s both;
   }
@@ -1468,6 +1469,10 @@
   &__card .cafeMenu__form {
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
     box-sizing: border-box;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   &__grid {
@@ -1555,8 +1560,8 @@
 
   @media (max-width: 480px) {
     &__card {
-      width: calc(100vw - 16px);
-      max-height: 85vh;
+      width: calc(100% - 16px);
+      max-height: calc(100dvh - 16px);
       border-radius: 12px;
     }
 
@@ -1608,8 +1613,8 @@
 
   @media (max-width: 320px) {
     &__card {
-      width: 100vw;
-      max-height: 100vh;
+      width: 100%;
+      max-height: 100dvh;
       border-radius: 8px 8px 0 0;
     }
 
@@ -1694,7 +1699,7 @@
     border-radius: 16px;
     box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
     padding: 24px;
-    width: min(420px, calc(100vw - 24px));
+    width: min(420px, calc(100% - 24px));
     animation: confirm-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   }
 
@@ -1721,7 +1726,7 @@
 
   @media (max-width: 480px) {
     &__card {
-      width: calc(100vw - 16px);
+      width: calc(100% - 16px);
       padding: 16px;
       border-radius: 12px;
     }
@@ -1762,7 +1767,7 @@
 
   @media (max-width: 320px) {
     &__card {
-      width: 100vw;
+      width: 100%;
       padding: 12px;
       border-radius: 8px 8px 0 0;
     }
@@ -2071,5 +2076,83 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ===== Пагинация ===== */
+.cafeMenu__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px 24px;
+  margin-top: 20px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+
+  &-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: "Montserrat", sans-serif;
+    min-width: 100px;
+
+    &:hover:not(:disabled) {
+      background: #f9fafb;
+      border-color: #3b82f6;
+      color: #1f2937;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: #f9fafb;
+      color: #9ca3af;
+    }
+  }
+
+  &-info {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f2937;
+    white-space: nowrap;
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cafeMenu__pagination {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px;
+
+    &-btn {
+      min-width: 80px;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    &-info {
+      font-size: 13px;
+      width: 100%;
+      text-align: center;
+      padding: 0;
+    }
   }
 }

@@ -15,9 +15,11 @@ import { useUser } from "../../../../store/slices/userSlice";
 import CustomerModal from "./components/CustomerModal";
 import SuccessPaymentModal from "./components/SuccessPaymentModal";
 import AlertModal from "../../../common/AlertModal/AlertModal";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 import {
   handleCheckoutResponseForPrinting,
   checkPrinterConnection,
+  ensurePrinterConnectedInteractively,
 } from "../../../pages/Sell/services/printService";
 import api from "../../../../api";
 import "./PaymentPage.scss";
@@ -40,6 +42,13 @@ const PaymentPage = ({
   const [amountReceived, setAmountReceived] = useState(
     total ? total.toFixed(2) : "0.00"
   );
+  const [withoutCheck, setWithoutCheck] = useState(() => {
+    try {
+      return localStorage.getItem("market_withoutCheck") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [debtMonths, setDebtMonths] = useState(1); // Количество месяцев для рассрочки
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(customer);
@@ -192,6 +201,30 @@ const PaymentPage = ({
     .filter((bill) => bill >= total)
     .slice(0, 3);
 
+  const printReceiptSmart = async (payload) => {
+    try {
+      await handleCheckoutResponseForPrinting(payload, { interactive: false });
+      return true;
+    } catch (err) {
+      console.warn(
+        "[PaymentPage] Печать не удалась, запрашиваем выбор USB-принтера:",
+        err
+      );
+      const connected = await ensurePrinterConnectedInteractively({
+        forceChoose: true,
+      });
+      if (!connected) return false;
+
+      try {
+        await handleCheckoutResponseForPrinting(payload, { interactive: false });
+        return true;
+      } catch (err2) {
+        console.warn("[PaymentPage] Повторная печать не удалась:", err2);
+        return false;
+      }
+    }
+  };
+
   const handleAcceptPayment = async () => {
     if (!saleId) {
       showAlert("error", "Ошибка", "Продажа не найдена");
@@ -251,15 +284,21 @@ const PaymentPage = ({
         paymentMethodApi = "debt"; // Отправляем как долг
       }
 
-      // Проверяем подключение принтера ДО выполнения checkout
-      const isPrinterConnected = await checkPrinterConnection();
+      // ВАЖНО: перед оплатой НЕ показываем окно выбора USB-принтера.
+      // Пытаемся подключиться автоматически к ранее выбранному принтеру (если разрешение уже есть).
+      // Окно выбора будет показано только если печать реально не удалась.
+      // Если включено "Без чека" — не проверяем принтер, не печатаем и не показываем запросы печати.
+      const shouldPrintReceipt = !withoutCheck;
+      const isPrinterConnected = shouldPrintReceipt
+        ? await checkPrinterConnection()
+        : false;
 
       // Выполняем checkout
       // Передаем bool: true только если принтер подключен
       const result = await dispatch(
         productCheckout({
           id: saleId,
-          bool: isPrinterConnected, // print_receipt - только если принтер подключен
+          bool: isPrinterConnected, // print_receipt - только если принтер подключен (или false при "Без чека")
           clientId: selectedCustomer?.id || null,
           payment_method: paymentMethodApi,
           cash_received:
@@ -280,7 +319,7 @@ const PaymentPage = ({
               const dueDate = new Date(
                 currentDate.getFullYear(),
                 currentDate.getMonth() +
-                  (typeof debtMonths === "number" ? debtMonths : 1),
+                (typeof debtMonths === "number" ? debtMonths : 1),
                 currentDate.getDate()
               );
               const dueDateString = dueDate.toISOString().split("T")[0]; // Формат YYYY-MM-DD
@@ -303,15 +342,14 @@ const PaymentPage = ({
                   "Ошибка при создании долга для тарифа Старт:",
                   startDebtError
                 );
+                const errorMessage = validateResErrors(startDebtError, "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. ")
                 // Не блокируем успешную оплату, если ошибка с долгом
                 showAlert(
                   "warning",
                   "Предупреждение",
-                  "Оплата оформлена, но не удалось создать запись о долге для тарифа Старт. " +
-                    (startDebtError?.response?.data?.detail ||
-                      startDebtError?.message ||
-                      "Проверьте данные клиента.")
+                  errorMessage
                 );
+                return;
               }
             }
 
@@ -319,11 +357,10 @@ const PaymentPage = ({
             await dispatch(
               createDeal({
                 clientId: selectedCustomer.id,
-                title: `Долг ${
-                  selectedCustomer.full_name ||
+                title: `Долг ${selectedCustomer.full_name ||
                   selectedCustomer.name ||
                   "Клиент"
-                }`,
+                  }`,
                 statusRu: "Долги",
                 amount: total,
                 debtMonths: typeof debtMonths === "number" ? debtMonths : 1, // Количество месяцев для рассрочки
@@ -332,12 +369,12 @@ const PaymentPage = ({
             ).unwrap();
           } catch (debtError) {
             console.warn("Ошибка при создании долга:", debtError);
+            const errorMessage = validateResErrors(debtError, "Оплата оформлена, но не удалось создать запись о долге. ")
             // Не блокируем успешную оплату, если ошибка с долгом
             showAlert(
               "warning",
               "Предупреждение",
-              "Оплата оформлена, но не удалось создать запись о долге. " +
-                (debtError?.message || "Проверьте данные клиента.")
+              errorMessage
             );
           }
         }
@@ -370,31 +407,33 @@ const PaymentPage = ({
         const saleIdForReceipt =
           result.payload?.sale_id || result.payload?.id || saleId;
 
-        // Пытаемся автоматически распечатать чек только если принтер подключен
-        if (isPrinterConnected) {
+        if (!withoutCheck) {
+          // Пытаемся автоматически распечатать чек:
+          // - сначала "тихо" на сохранённый/разрешённый принтер
+          // - если печать не удалась — показываем окно выбора USB‑принтера и повторяем попытку
           try {
             const receiptResult = await dispatch(
               getProductCheckout(saleIdForReceipt)
             );
 
-            if (
-              receiptResult.type === "products/getProductCheckout/fulfilled"
-            ) {
-              try {
-                await handleCheckoutResponseForPrinting(receiptResult.payload);
-              } catch (printError) {
-                // Ошибка печати не блокирует продажу
-                console.warn("Печать чека не удалась:", printError);
-                // Не показываем ошибку пользователю, только логируем
+            if (receiptResult.type === "products/getProductCheckout/fulfilled") {
+              const ok = await printReceiptSmart(receiptResult.payload);
+              if (!ok) {
+                showAlert(
+                  "warning",
+                  "Печать",
+                  "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
+                );
               }
             } else if (result.payload) {
               // Если не удалось получить чек отдельно, пытаемся использовать данные из checkout
-              try {
-                await handleCheckoutResponseForPrinting(result.payload);
-              } catch (printError) {
-                // Ошибка печати не блокирует продажу
-                console.warn("Печать чека не удалась:", printError);
-                // Не показываем ошибку пользователю, только логируем
+              const ok = await printReceiptSmart(result.payload);
+              if (!ok) {
+                showAlert(
+                  "warning",
+                  "Печать",
+                  "Не удалось распечатать чек. Вы можете выбрать принтер и распечатать из окна успешной оплаты."
+                );
               }
             }
           } catch (receiptError) {
@@ -413,20 +452,20 @@ const PaymentPage = ({
           checkoutResponse: result.payload,
         });
       } else {
+        const errorMessage = validateResErrors(result.payload, "Ошибка при оформлении оплаты. ")
         showAlert(
           "error",
           "Ошибка",
-          "Ошибка при оформлении оплаты: " +
-            (result.payload?.message || "Неизвестная ошибка")
+          errorMessage
         );
       }
     } catch (error) {
       console.error("Ошибка при оформлении оплаты:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при оформлении оплаты. ")
       showAlert(
         "error",
         "Ошибка",
-        "Ошибка при оформлении оплаты: " +
-          (error.message || "Неизвестная ошибка")
+        errorMessage
       );
     }
   };
@@ -443,18 +482,6 @@ const PaymentPage = ({
       return;
     }
 
-    // Сначала проверяем, подключен ли принтер
-    const isPrinterConnected = await checkPrinterConnection();
-
-    if (!isPrinterConnected) {
-      showAlert(
-        "warning",
-        "Принтер не подключен",
-        "Пожалуйста, подключите принтер перед печатью чека"
-      );
-      return;
-    }
-
     setPrinting(true);
     try {
       // Пытаемся получить чек с сервера
@@ -463,11 +490,24 @@ const PaymentPage = ({
       );
 
       if (receiptResult.type === "products/getProductCheckout/fulfilled") {
-        // Используем сервис печати для обработки ответа
-        await handleCheckoutResponseForPrinting(receiptResult.payload);
+        const ok = await printReceiptSmart(receiptResult.payload);
+        if (!ok) {
+          showAlert(
+            "error",
+            "Ошибка печати",
+            "Не удалось распечатать чек. Проверьте принтер и повторите."
+          );
+        }
       } else if (receiptData.checkoutResponse) {
         // Если не удалось получить чек, пытаемся использовать данные из checkout
-        await handleCheckoutResponseForPrinting(receiptData.checkoutResponse);
+        const ok = await printReceiptSmart(receiptData.checkoutResponse);
+        if (!ok) {
+          showAlert(
+            "error",
+            "Ошибка печати",
+            "Не удалось распечатать чек. Проверьте принтер и повторите."
+          );
+        }
       } else {
         showAlert(
           "error",
@@ -477,10 +517,11 @@ const PaymentPage = ({
       }
     } catch (error) {
       console.error("Ошибка при печати чека:", error);
+      const errorMessage = validateResErrors(error, "Ошибка при печати чека. ")
       showAlert(
         "error",
         "Ошибка печати",
-        error.message || "Не удалось распечатать чек"
+        errorMessage
       );
     } finally {
       setPrinting(false);
@@ -624,11 +665,10 @@ const PaymentPage = ({
               {paymentMethods.map((method) => (
                 <button
                   key={method.id}
-                  className={`payment-page__method ${
-                    paymentMethod === method.id
-                      ? "payment-page__method--active"
-                      : ""
-                  }`}
+                  className={`payment-page__method ${paymentMethod === method.id
+                    ? "payment-page__method--active"
+                    : ""
+                    }`}
                   onClick={() => setPaymentMethod(method.id)}
                 >
                   <div className="payment-page__method-content">
@@ -654,11 +694,10 @@ const PaymentPage = ({
                 {banks.map((bank) => (
                   <button
                     key={bank.id}
-                    className={`payment-page__bank ${
-                      selectedBank === bank.id
-                        ? "payment-page__bank--active"
-                        : ""
-                    }`}
+                    className={`payment-page__bank ${selectedBank === bank.id
+                      ? "payment-page__bank--active"
+                      : ""
+                      }`}
                     onClick={() => setSelectedBank(bank.id)}
                     title={bank.name}
                   >
@@ -866,24 +905,24 @@ const PaymentPage = ({
                 <div className="payment-page__quick-select-buttons">
                   {quickSelectAmounts.length > 0
                     ? quickSelectAmounts.map((amount) => (
-                        <button
-                          key={amount}
-                          className="payment-page__quick-select-btn"
-                          onClick={() => handleQuickSelect(amount)}
-                        >
-                          {amount.toFixed(0)}
-                        </button>
-                      ))
+                      <button
+                        key={amount}
+                        className="payment-page__quick-select-btn"
+                        onClick={() => handleQuickSelect(amount)}
+                      >
+                        {amount.toFixed(0)}
+                      </button>
+                    ))
                     : // Если сумма очень большая, показываем ближайшие купюры
-                      kyrgyzstanBills.slice(-3).map((amount) => (
-                        <button
-                          key={amount}
-                          className="payment-page__quick-select-btn"
-                          onClick={() => handleQuickSelect(amount)}
-                        >
-                          {amount.toFixed(0)}
-                        </button>
-                      ))}
+                    kyrgyzstanBills.slice(-3).map((amount) => (
+                      <button
+                        key={amount}
+                        className="payment-page__quick-select-btn"
+                        onClick={() => handleQuickSelect(amount)}
+                      >
+                        {amount.toFixed(0)}
+                      </button>
+                    ))}
                 </div>
               </div>
 
@@ -900,6 +939,21 @@ const PaymentPage = ({
           )}
 
           <div className="payment-page__actions">
+            <label className="flex items-center gap-2" htmlFor="withoutCheck">
+              Без чека
+              <input
+                id="withoutCheck"
+                type="checkbox"
+                checked={withoutCheck}
+                onChange={(e) => {
+                  setWithoutCheck(e.target.checked);
+                  localStorage.setItem(
+                    "market_withoutCheck",
+                    String(e.target.checked)
+                  );
+                }}
+              />
+            </label>
             <button
               className="payment-page__accept-btn"
               onClick={handleAcceptPayment}

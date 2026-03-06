@@ -1,5 +1,4 @@
 /* src/.../Orders.scss */
-@use "../variables.scss";
 
 .cafeOrders {
   --radius: 12px;
@@ -138,10 +137,10 @@
   }
 
   &__list {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    flex-wrap: wrap;
+    // grid-template-columns: repeat(3, 1fr);
     gap: 16px;
-    align-items: stretch;
   }
 
   &__receipt {
@@ -150,11 +149,10 @@
     padding: 18px;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
     border: 1px solid #e5e7eb;
-
+    flex: 1 0 300px;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    height: 100%;
     min-height: 220px;
   }
 
@@ -541,6 +539,7 @@
       grid-template-columns: 1fr;
     }
   }
+ 
 
   @media (max-width: 560px) {
     padding: 18px;
@@ -582,10 +581,11 @@
     display: flex;
     align-items: center; /* центр */
     justify-content: center;
-    z-index: 70;
-    overflow: auto;
+    z-index: 100;
+    overflow: hidden; /* не скроллить фон на мобильных при скролле модалки/панели блюд */
     padding: 22px 12px;
-    overscroll-behavior: contain;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* если экран низкий — слегка вверх, чтобы не резало */
@@ -598,17 +598,26 @@
   &__shell {
     position: relative;
     width: min(760px, 96vw);
+    max-height: min(90dvh, 860px);
+    overflow-y: auto;
+    overflow-x: visible; /* нужно для правой панели "Добавить блюда" на десктопе */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   &__card {
     background: #fff;
     border-radius: 16px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.16), 0 4px 16px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.16),
+      0 4px 16px rgba(0, 0, 0, 0.06);
     width: 100%;
     overflow: hidden;
+    max-height: 100%;
   }
 
   &__header {
+
     padding: 14px 16px;
     border-bottom: 1px solid #e5e7eb;
     display: flex;
@@ -803,10 +812,10 @@
 .cafeOrdersRpanel {
   position: absolute;
   top: 0;
-  right: -380px;
+  right: 0;
   width: 360px;
   max-width: 92vw;
-  height: 100%;
+  height: 100%; /* на десктопе — по родителю; на мобильных ниже переопределено на dvh */
   border-radius: 16px;
   border: 1px solid rgba(15, 23, 42, 0.1);
   background: #fff;
@@ -871,7 +880,6 @@
   border: 1px solid var(--border);
   outline: none;
   min-height: 48px;
-
   &:focus {
     border-color: var(--primary-dark);
     box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.2);
@@ -882,28 +890,46 @@
   padding: 10px;
   overflow: auto; /* скролл видимый */
   flex: 1;
+  flex-wrap: wrap;
+  display: flex;
+  overscroll-behavior: contain; /* на мобильных при скролле списка блюд не скроллить задний фон */
+  -webkit-overflow-scrolling: touch;
+  min-height: 0; /* чтобы flex-ребёнок мог скроллиться */
 }
 
 .cafeOrdersRpanel__item {
   width: 100%;
-  display: grid;
-  grid-template-columns: 44px 1fr 40px;
+  display: flex;
   gap: 10px;
+  justify-content: space-between;
   align-items: center;
   padding: 10px;
   border-radius: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #fff;
+  background: #ffffff7e;
+  overflow: hidden;
   cursor: pointer;
   text-align: left;
+  flex: 1 0 150px;
   margin-bottom: 8px;
+  position: relative;
 
   &:hover {
-    background: #fafafa;
     border-color: rgba(15, 23, 42, 0.14);
   }
 }
+.cafeOrdersRpanel__image {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 
+}
 .cafeOrdersRpanel__thumb {
   width: 44px;
   height: 44px;
@@ -932,11 +958,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @include ifmobile {
+    font-size: 14px;
+  }
 }
 
 .cafeOrdersRpanel__price {
   font-size: 13px;
-  color: var(--muted);
+  // color: var(--muted);
+  color: black;
   font-weight: 500;
 }
 
@@ -958,6 +989,61 @@
   font-weight: 500;
 }
 
+.cafeOrdersRpanel__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  background: #fff;
+  flex-wrap: wrap;
+
+  &-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1f2937;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: "Montserrat", sans-serif;
+    min-width: 80px;
+
+    &:hover:not(:disabled) {
+      background: #f9fafb;
+      border-color: #3b82f6;
+      color: #1f2937;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: #f9fafb;
+      color: #9ca3af;
+    }
+  }
+
+  &-info {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f2937;
+    white-space: nowrap;
+    padding: 0 8px;
+  }
+}
+
 .cafeOrdersRpanel__footer {
   padding: 12px;
   border-top: 1px solid rgba(15, 23, 42, 0.06);
@@ -973,7 +1059,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: min(760px, 96vw);
-    height: calc(100vh - 36px);
+    height: calc(100dvh - 36px);
     max-width: 96vw;
     border-radius: 18px;
     animation: rpanel-in-mobile 0.18s ease-out forwards;

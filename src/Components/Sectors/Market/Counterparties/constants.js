@@ -1,11 +1,29 @@
 // Константы для компонента Counterparties
 export const STORAGE_KEY = "counterparties_view_mode";
-export const PAGE_SIZE = 100;
+export const PAGE_SIZE = 50;
 export const DEBOUNCE_DELAY = 300;
 
 export const VIEW_MODES = {
   TABLE: "table",
   CARDS: "cards",
+};
+
+/** Вкладки по типу контрагента: клиент / поставщик */
+export const TYPE_TABS = {
+  CLIENT: "client",
+  SUPPLIER: "supplier",
+};
+
+export const TYPE_TAB_LABELS = {
+  [TYPE_TABS.CLIENT]: "Клиент",
+  [TYPE_TABS.SUPPLIER]: "Поставщик",
+};
+
+/** Типы контрагента в API */
+export const COUNTERPARTY_TYPES = {
+  CLIENT: "CLIENT",
+  SUPPLIER: "SUPPLIER",
+  BOTH: "BOTH",
 };
 
 export const getInitialViewMode = () => {

@@ -22,7 +22,7 @@ const GlobalAlertModal = ({ isError, message, isOpen, onConfirm }) => {
 
     return (
         <ReactPortal wrapperId='modal'>
-            <div className='fixed top-0 left-0 flex w-full h-full justify-center items-center z-100'>
+            <div className='fixed top-0 left-0 flex w-full h-full justify-center items-center z-1000'>
                 <div ref={modalRef} className='modal-content max-w-100px p-5'>
                     <div className='max-h-75 overflow-y-auto'>
                         <div className="mx-auto flex mt-2.5 p-2.25 w-13.75 h-13.75  justify-center items-center rounded-full bg-[#e4e6e7]">

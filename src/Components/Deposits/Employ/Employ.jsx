@@ -19,13 +19,17 @@ import "./Employ.scss";
 import { useUser } from "../../../store/slices/userSlice";
 import AccessList from "../../DepartmentDetails/AccessList";
 import { ALL_ACCESS_TYPES_MAPPING } from "../../DepartmentDetails/DepartmentDetails";
+import { useAlert, useConfirm } from "@/hooks/useDialog";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 const BASE_URL = "https://app.nurcrm.kg/api";
 const AUTH_TOKEN = localStorage.getItem("accessToken");
 
 const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
+  const alert = useAlert();
+  const confirm = useConfirm();
   const dispatch = useDispatch();
   const { updating, updateError, deleting, deleteError } = useSelector(
-    (state) => state.employee
+    (state) => state.employee,
   );
 
   const [editedEmployee, setEditedEmployee] = useState(() => {
@@ -71,60 +75,53 @@ const EditModal = ({ employee, onClose, onSaveSuccess, onDeleteConfirm }) => {
 
     try {
       await dispatch(
-        updateEmployeeAsync({ employeeId: employee.id, updatedData: payload })
+        updateEmployeeAsync({ employeeId: employee.id, updatedData: payload }),
       ).unwrap();
       onClose();
       onSaveSuccess();
     } catch (err) {
       console.error("Failed to update employee:", err);
-      alert(
-        `Ошибка при обновлении сотрудника: ${
-          err.message || JSON.stringify(err)
-        }`
+      const errorMessage = validateResErrors(
+        err,
+        "Ошибка при обновлении сотрудника. ",
       );
+      alert(errorMessage, true);
     }
   };
 
-  const handleDelete = async () => {
-    if (
-      window.confirm(
-        `Вы уверены, что хотите удалить сотрудника ${employee?.name}?`
-      )
-    ) {
-      try {
-        await dispatch(deleteEmployeeAsync(employee.id)).unwrap();
-        onClose();
-        onDeleteConfirm();
-      } catch (err) {
-        console.error("Failed to delete employee:", err);
-        alert(
-          `Ошибка при удалении сотрудника: ${
-            err.message || JSON.stringify(err)
-          }`
-        );
-      }
-    }
+  const handleDelete = () => {
+    confirm(
+      `Вы уверены, что хотите удалить сотрудника ${employee?.name}?`,
+      async (ok) => {
+        if (ok) {
+          try {
+            await dispatch(deleteEmployeeAsync(employee.id)).unwrap();
+            onClose();
+            onDeleteConfirm();
+          } catch (err) {
+            console.error("Failed to delete employee:", err);
+            const errorMessage = validateResErrors(
+              err,
+              "Ошибка при удалении сотрудника. ",
+            );
+            alert(errorMessage, true);
+          }
+        }
+      },
+    );
   };
 
   const availableDepts = ["Склад", "Маркетинг", "Продажи", "HR", "Бухгалтерия"];
-  const availableRoles = [
-    {
-      value: "admin",
-      label: "Администратор",
-    },
-    {
-      value: "manager",
-      label: "Менеджер",
-    },
-    {
-      value: "user",
-      label: "Пользователь",
-    },
-    {
-      value: "owner",
-      label: "Владелец",
-    },
+  const allRoles = [
+    { value: "admin", label: "Администратор" },
+    { value: "manager", label: "Менеджер" },
+    { value: "user", label: "Пользователь" },
+    { value: "owner", label: "Владелец" },
   ];
+  // При редактировании нельзя назначить владельца (показываем владельца только если сотрудник уже владелец)
+  const availableRoles = allRoles.filter(
+    (r) => r.value !== "owner" || editedEmployee.role === "owner",
+  );
 
   return (
     <div className="edit-modal">
@@ -394,7 +391,7 @@ const AddModal = ({ onClose, onSaveSuccess }) => {
       alert(
         `Ошибка при добавлении сотрудника: ${
           err.message || JSON.stringify(err)
-        }`
+        }`,
       );
     }
   };
@@ -552,7 +549,7 @@ export default function EmployeeTable() {
     department,
     deleteError,
   } = useSelector((state) => state.employee);
-  const { company: profile } = useUser();
+  const { company, profile, tariff, sector } = useUser();
   // console.log("====================================");
   // console.log(employees);
   // console.log("====================================");
@@ -734,7 +731,7 @@ export default function EmployeeTable() {
             Authorization: `Bearer ${AUTH_TOKEN}`,
           },
           body: JSON.stringify(newAccessesPayload),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -742,7 +739,7 @@ export default function EmployeeTable() {
         throw new Error(
           errorData.detail ||
             JSON.stringify(errorData) ||
-            "Не удалось обновить доступы сотрудника"
+            "Не удалось обновить доступы сотрудника",
         );
       }
     } catch (err) {
@@ -844,6 +841,10 @@ export default function EmployeeTable() {
                           onSaveAccesses={(newAccessesPayload) =>
                             handleSaveEmployeeAccesses(e.id, newAccessesPayload)
                           }
+                          company={company}
+                          tariff={tariff}
+                          sectorName={sector || company?.sector?.name}
+                          profile={profile}
                         />
                       ) : (
                         <span>

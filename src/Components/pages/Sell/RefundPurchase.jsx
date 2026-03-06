@@ -168,10 +168,9 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
         addCashFlows({
           cashbox: selectCashBox,
           type: "expense",
-          name: `Возврат товаров: ${
-            currentItem?.client_name ||
+          name: `Возврат товаров: ${currentItem?.client_name ||
             new Date(currentItem.created_at).toLocaleDateString()
-          }`,
+            }`,
           source_cashbox_flow_id: currentItem.id,
           source_business_operation_id: "Продажа",
           amount: currentItem.total,
@@ -253,7 +252,6 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
                   Статус продажи будет изменён на <b>canceled</b>.
                 </div> */}
               </div>
-
               {/* касса автоматически выбирается - скрыто от пользователя */}
 
               {error && (
@@ -261,7 +259,6 @@ const RefundPurchase = ({ onClose, onChanged, item }) => {
                   {error}
                 </div>
               )}
-
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                 <button
                   type="button"

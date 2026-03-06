@@ -8,11 +8,12 @@ import SearchSection from "../../Market/Warehouse/components/SearchSection";
 import BulkActionsBar from "../../Market/Warehouse/components/BulkActionsBar";
 import Pagination from "../../Market/Warehouse/components/Pagination";
 import BrandTable from "../Brands/components/BrandTable";
-import BrandCards from "../Brands/components/BrandCards";
 import CategoryTable from "../Categories/components/CategoryTable";
-import CategoryCards from "../Categories/components/CategoryCards";
 import CreateBrandModal from "../Brands/components/CreateBrandModal";
 import CreateCategoryModal from "../Categories/components/CreateCategoryModal";
+import CreatePaymentCategoryModal from "./components/CreatePaymentCategoryModal";
+import PaymentCategoryTable from "./components/PaymentCategoryTable";
+import warehouseAPI from "../../../../api/warehouse";
 import {
   fetchWarehouseBrandsAsync,
   bulkDeleteWarehouseBrandsAsync,
@@ -22,11 +23,11 @@ import {
 import { useSearch } from "../../Market/Warehouse/hooks/useSearch";
 import { usePagination } from "../../Market/Warehouse/hooks/usePagination";
 import { useProductSelection } from "../../Market/Warehouse/hooks/useProductSelection";
-import { STORAGE_KEY, VIEW_MODES } from "../../Market/Warehouse/constants";
 
 const TABS = {
   BRANDS: "brands",
   CATEGORIES: "categories",
+  PAYMENT_CATEGORIES: "payment_categories",
 };
 
 const BrandCategoryPage = () => {
@@ -37,38 +38,35 @@ const BrandCategoryPage = () => {
 
   // Определяем активную вкладку из URL пути
   const activeTab = useMemo(() => {
-    // Если путь содержит "categories", открываем таб категорий
+    if (location.pathname.includes("/payment_categories")) {
+      return TABS.PAYMENT_CATEGORIES;
+    }
     if (location.pathname.includes("/categories")) {
       return TABS.CATEGORIES;
     }
-    // По умолчанию - бренды
     return TABS.BRANDS;
   }, [location.pathname]);
 
   const setActiveTab = useCallback(
     (tab) => {
-      // Сохраняем параметры пагинации и поиска
       const newParams = new URLSearchParams(searchParams);
       const page = newParams.get("page");
       const search = newParams.get("search");
-      
-      // Формируем новый URL с сохранением параметров
       const params = new URLSearchParams();
-      if (page && page !== "1") {
-        params.set("page", page);
-      }
-      if (search) {
-        params.set("search", search);
-      }
-      
+      if (page && page !== "1") params.set("page", page);
+      if (search) params.set("search", search);
       const queryString = params.toString();
-      const basePath = tab === TABS.BRANDS 
-        ? "/crm/warehouse/brands" 
-        : "/crm/warehouse/categories";
-      
-      navigate(`${basePath}${queryString ? `?${queryString}` : ""}`, { replace: true });
+      const basePath =
+        tab === TABS.BRANDS
+          ? "/crm/warehouse/brands"
+          : tab === TABS.PAYMENT_CATEGORIES
+            ? "/crm/warehouse/payment_categories"
+            : "/crm/warehouse/categories";
+      navigate(`${basePath}${queryString ? `?${queryString}` : ""}`, {
+        replace: true,
+      });
     },
-    [navigate, searchParams]
+    [navigate, searchParams],
   );
 
   // Redux state для брендов
@@ -96,22 +94,20 @@ const BrandCategoryPage = () => {
   const [editingBrand, setEditingBrand] = useState(null);
   const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [showCreatePaymentCategoryModal, setShowCreatePaymentCategoryModal] =
+    useState(false);
+  const [editingPaymentCategory, setEditingPaymentCategory] = useState(null);
+  const [paymentCategories, setPaymentCategories] = useState([]);
+  const [loadingPaymentCategories, setLoadingPaymentCategories] =
+    useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
-
-  const [viewMode, setViewMode] = useState(() => {
-    if (typeof window === "undefined") return VIEW_MODES.TABLE;
-    const saved = localStorage.getItem(`${STORAGE_KEY}_brand_category`);
-    if (saved === VIEW_MODES.TABLE || saved === VIEW_MODES.CARDS) return saved;
-    const isSmall = window.matchMedia("(max-width: 1199px)").matches;
-    return isSmall ? VIEW_MODES.CARDS : VIEW_MODES.TABLE;
-  });
 
   // Хуки для управления данными
   const { searchTerm, debouncedSearchTerm, setSearchTerm } = useSearch();
   const currentPageFromUrl = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
+    [searchParams],
   );
 
   // Параметры запроса
@@ -125,14 +121,28 @@ const BrandCategoryPage = () => {
     return params;
   }, [currentPageFromUrl, debouncedSearchTerm]);
 
+  const loadPaymentCategories = useCallback(async () => {
+    setLoadingPaymentCategories(true);
+    try {
+      const data = await warehouseAPI.listMoneyCategories();
+      setPaymentCategories(data?.results ?? (Array.isArray(data) ? data : []));
+    } catch {
+      setPaymentCategories([]);
+    } finally {
+      setLoadingPaymentCategories(false);
+    }
+  }, []);
+
   // Загрузка данных в зависимости от активной вкладки
   React.useEffect(() => {
     if (activeTab === TABS.BRANDS) {
       dispatch(fetchWarehouseBrandsAsync(requestParams));
-    } else {
+    } else if (activeTab === TABS.CATEGORIES) {
       dispatch(fetchWarehouseCategoriesAsync(requestParams));
+    } else if (activeTab === TABS.PAYMENT_CATEGORIES) {
+      loadPaymentCategories();
     }
-  }, [dispatch, requestParams, activeTab]);
+  }, [dispatch, requestParams, activeTab, loadPaymentCategories]);
 
   // Хук для пагинации (зависит от активной вкладки)
   const currentData = useMemo(() => {
@@ -144,15 +154,23 @@ const BrandCategoryPage = () => {
         loading: brandsLoading,
         deleting: deletingBrand,
       };
-    } else {
+    }
+    if (activeTab === TABS.PAYMENT_CATEGORIES) {
       return {
-        count: categoriesCount,
-        next: categoriesNext,
-        previous: categoriesPrevious,
-        loading: categoriesLoading,
-        deleting: deletingCategory,
+        count: paymentCategories.length,
+        next: null,
+        previous: null,
+        loading: loadingPaymentCategories,
+        deleting: false,
       };
     }
+    return {
+      count: categoriesCount,
+      next: categoriesNext,
+      previous: categoriesPrevious,
+      loading: categoriesLoading,
+      deleting: deletingCategory,
+    };
   }, [
     activeTab,
     brandsCount,
@@ -165,6 +183,8 @@ const BrandCategoryPage = () => {
     categoriesPrevious,
     categoriesLoading,
     deletingCategory,
+    paymentCategories.length,
+    loadingPaymentCategories,
   ]);
 
   const {
@@ -186,8 +206,10 @@ const BrandCategoryPage = () => {
 
   // Данные для текущей вкладки
   const currentItems = useMemo(() => {
-    return activeTab === TABS.BRANDS ? brands : categories;
-  }, [activeTab, brands, categories]);
+    if (activeTab === TABS.BRANDS) return brands;
+    if (activeTab === TABS.PAYMENT_CATEGORIES) return paymentCategories;
+    return categories;
+  }, [activeTab, brands, categories, paymentCategories]);
 
   // Хук для выбора элементов
   const {
@@ -200,32 +222,28 @@ const BrandCategoryPage = () => {
     setSelectedRows,
   } = useProductSelection(currentItems);
 
-  // Сохранение режима просмотра
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`${STORAGE_KEY}_brand_category`, viewMode);
-    }
-  }, [viewMode]);
-
   // Обработчики событий
   const handleItemClick = useCallback(
     (item) => {
       if (activeTab === TABS.BRANDS) {
         setEditingBrand(item);
         setShowCreateBrandModal(true);
+      } else if (activeTab === TABS.PAYMENT_CATEGORIES) {
+        setEditingPaymentCategory(item);
+        setShowCreatePaymentCategoryModal(true);
       } else {
         setEditingCategory(item);
         setShowCreateCategoryModal(true);
       }
     },
-    [activeTab]
+    [activeTab],
   );
 
   const handlePageChange = useCallback(
     (newPage) => {
       handlePageChangeBase(newPage, () => setSelectedRows(new Set()));
     },
-    [handlePageChangeBase, setSelectedRows]
+    [handlePageChangeBase, setSelectedRows],
   );
 
   const handleBulkDelete = useCallback(() => {
@@ -243,7 +261,7 @@ const BrandCategoryPage = () => {
             ids: Array.from(selectedRows),
             soft: true,
             require_all: false,
-          })
+          }),
         ).unwrap();
         dispatch(fetchWarehouseBrandsAsync(requestParams));
       } else {
@@ -252,17 +270,20 @@ const BrandCategoryPage = () => {
             ids: Array.from(selectedRows),
             soft: true,
             require_all: false,
-          })
+          }),
         ).unwrap();
         dispatch(fetchWarehouseCategoriesAsync(requestParams));
       }
 
       setSelectedRows(new Set());
     } catch (e) {
-      console.error(`Ошибка при удалении ${activeTab === TABS.BRANDS ? "брендов" : "категорий"}:`, e);
+      console.error(
+        `Ошибка при удалении ${activeTab === TABS.BRANDS ? "брендов" : "категорий"}:`,
+        e,
+      );
       alert(
         `Не удалось удалить ${activeTab === TABS.BRANDS ? "бренды" : "категории"}: ` +
-          (e?.message || e?.detail || "Неизвестная ошибка")
+          (e?.message || e?.detail || "Неизвестная ошибка"),
       );
     } finally {
       setBulkDeleting(false);
@@ -273,15 +294,14 @@ const BrandCategoryPage = () => {
     if (activeTab === TABS.BRANDS) {
       setEditingBrand(null);
       setShowCreateBrandModal(true);
+    } else if (activeTab === TABS.PAYMENT_CATEGORIES) {
+      setEditingPaymentCategory(null);
+      setShowCreatePaymentCategoryModal(true);
     } else {
       setEditingCategory(null);
       setShowCreateCategoryModal(true);
     }
   }, [activeTab]);
-
-  const handleViewModeChange = useCallback((mode) => {
-    setViewMode(mode);
-  }, []);
 
   const handleBrandModalClose = useCallback(() => {
     setShowCreateBrandModal(false);
@@ -301,13 +321,23 @@ const BrandCategoryPage = () => {
     dispatch(fetchWarehouseCategoriesAsync(requestParams));
   }, [dispatch, requestParams]);
 
+  const handlePaymentCategoryModalClose = useCallback(() => {
+    setShowCreatePaymentCategoryModal(false);
+    setEditingPaymentCategory(null);
+  }, []);
+
+  const handlePaymentCategorySaved = useCallback(() => {
+    loadPaymentCategories();
+  }, [loadPaymentCategories]);
+
   // Фильтрация элементов по поисковому запросу
   const filteredItems = useMemo(() => {
     if (!debouncedSearchTerm?.trim()) return currentItems;
     const searchLower = debouncedSearchTerm.toLowerCase();
-    return currentItems.filter((item) =>
-      item.name?.toLowerCase().includes(searchLower)
-    );
+    return currentItems.filter((item) => {
+      const name = item.name ?? item.title ?? "";
+      return String(name).toLowerCase().includes(searchLower);
+    });
   }, [currentItems, debouncedSearchTerm]);
 
   // Мемоизация сообщения для модального окна удаления
@@ -322,26 +352,35 @@ const BrandCategoryPage = () => {
   }, [selectedCount, activeTab]);
 
   const getTitle = () => {
-    return activeTab === TABS.BRANDS ? "Бренды" : "Категории";
+    if (activeTab === TABS.BRANDS) return "Бренды";
+    if (activeTab === TABS.PAYMENT_CATEGORIES) return "Категории платежей";
+    return "Категории";
   };
 
   const getSubtitle = () => {
-    return activeTab === TABS.BRANDS
-      ? "Управление брендами склада"
-      : "Управление категориями склада";
+    if (activeTab === TABS.BRANDS) return "Управление брендами склада";
+    if (activeTab === TABS.PAYMENT_CATEGORIES)
+      return "Управление категориями платежей (приход/расход)";
+    return "Управление категориями склада";
   };
 
   const getCreateButtonText = () => {
-    return activeTab === TABS.BRANDS ? "Создать бренд" : "Создать категорию";
+    if (activeTab === TABS.BRANDS) return "Создать бренд";
+    if (activeTab === TABS.PAYMENT_CATEGORIES) return "Создать категорию";
+    return "Создать категорию";
   };
 
   return (
-    <div className="warehouse-page">
+    <div className="warehouse-page brand-category-page">
       <div className="warehouse-header">
         <div className="warehouse-header__left">
           <div className="warehouse-header__icon">
             <div className="warehouse-header__icon-box">
-              {activeTab === TABS.BRANDS ? "🏷️" : "📁"}
+              {activeTab === TABS.BRANDS
+                ? "🏷️"
+                : activeTab === TABS.PAYMENT_CATEGORIES
+                  ? "💰"
+                  : "📁"}
             </div>
           </div>
           <div className="warehouse-header__title-section">
@@ -349,10 +388,7 @@ const BrandCategoryPage = () => {
             <p className="warehouse-header__subtitle">{getSubtitle()}</p>
           </div>
         </div>
-        <button
-          className="warehouse-header__create-btn"
-          onClick={handleCreate}
-        >
+        <button className="warehouse-header__create-btn" onClick={handleCreate}>
           <Plus size={16} />
           {getCreateButtonText()}
         </button>
@@ -378,52 +414,46 @@ const BrandCategoryPage = () => {
         >
           Категории
         </button>
+        <button
+          className={`brand-category-tabs__tab ${
+            activeTab === TABS.PAYMENT_CATEGORIES
+              ? "brand-category-tabs__tab--active"
+              : ""
+          }`}
+          onClick={() => setActiveTab(TABS.PAYMENT_CATEGORIES)}
+        >
+          Категории платежей
+        </button>
       </div>
 
       <SearchSection
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        viewMode={viewMode}
-        onViewModeChange={handleViewModeChange}
         onOpenFilters={null}
         count={currentData.count}
         foundCount={filteredItems.length}
+        showViewModeToggle={false}
       />
 
-      <BulkActionsBar
-        selectedCount={selectedCount}
-        onClearSelection={clearSelection}
-        onBulkDelete={handleBulkDelete}
-        isDeleting={bulkDeleting || currentData.deleting}
-      />
+      {activeTab !== TABS.PAYMENT_CATEGORIES && (
+        <BulkActionsBar
+          selectedCount={selectedCount}
+          onClearSelection={clearSelection}
+          onBulkDelete={handleBulkDelete}
+          isDeleting={bulkDeleting || currentData.deleting}
+        />
+      )}
 
       <div className="warehouse-table-container w-full">
-        {viewMode === VIEW_MODES.TABLE ? (
-          activeTab === TABS.BRANDS ? (
-            <BrandTable
-              brands={filteredItems}
-              loading={currentData.loading}
-              selectedRows={selectedRows}
-              isAllSelected={isAllSelected}
-              onRowSelect={handleRowSelect}
-              onSelectAll={handleSelectAll}
-              onBrandClick={handleItemClick}
-              getRowNumber={getRowNumber}
-            />
-          ) : (
-            <CategoryTable
-              categories={filteredItems}
-              loading={currentData.loading}
-              selectedRows={selectedRows}
-              isAllSelected={isAllSelected}
-              onRowSelect={handleRowSelect}
-              onSelectAll={handleSelectAll}
-              onCategoryClick={handleItemClick}
-              getRowNumber={getRowNumber}
-            />
-          )
+        {activeTab === TABS.PAYMENT_CATEGORIES ? (
+          <PaymentCategoryTable
+            categories={filteredItems}
+            loading={loadingPaymentCategories}
+            onCategoryClick={handleItemClick}
+            getRowNumber={(index) => index + 1}
+          />
         ) : activeTab === TABS.BRANDS ? (
-          <BrandCards
+          <BrandTable
             brands={filteredItems}
             loading={currentData.loading}
             selectedRows={selectedRows}
@@ -434,7 +464,7 @@ const BrandCategoryPage = () => {
             getRowNumber={getRowNumber}
           />
         ) : (
-          <CategoryCards
+          <CategoryTable
             categories={filteredItems}
             loading={currentData.loading}
             selectedRows={selectedRows}
@@ -446,15 +476,17 @@ const BrandCategoryPage = () => {
           />
         )}
 
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          count={currentData.count}
-          loading={currentData.loading}
-          hasNextPage={hasNextPage}
-          hasPrevPage={hasPrevPage}
-          onPageChange={handlePageChange}
-        />
+        {activeTab !== TABS.PAYMENT_CATEGORIES && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            count={currentData.count}
+            loading={currentData.loading}
+            hasNextPage={hasNextPage}
+            hasPrevPage={hasPrevPage}
+            onPageChange={handlePageChange}
+          />
+        )}
       </div>
 
       {showCreateBrandModal && (
@@ -473,6 +505,14 @@ const BrandCategoryPage = () => {
         />
       )}
 
+      {showCreatePaymentCategoryModal && (
+        <CreatePaymentCategoryModal
+          onClose={handlePaymentCategoryModalClose}
+          category={editingPaymentCategory}
+          onSaved={handlePaymentCategorySaved}
+        />
+      )}
+
       <AlertModal
         open={showDeleteConfirmModal}
         type="warning"
@@ -487,4 +527,3 @@ const BrandCategoryPage = () => {
 };
 
 export default BrandCategoryPage;
-

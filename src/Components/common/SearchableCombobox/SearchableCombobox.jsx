@@ -50,7 +50,6 @@ const SearchableCombobox = ({
   const filteredOptions = useMemo(() => {
     const searchQuery = safeStr(query).toLowerCase();
     if (!searchQuery) return opts;
-
     return opts.filter((opt) =>
       safeStr(opt?.label).toLowerCase().includes(searchQuery)
     );
@@ -182,9 +181,8 @@ const SearchableCombobox = ({
                   <button
                     key={`${optValue}-${optLabel}`}
                     type="button"
-                    className={`${baseClass}__item${
-                      isActive ? ` ${baseClass}__item--active` : ""
-                    }`}
+                    className={`${baseClass}__item${isActive ? ` ${baseClass}__item--active` : ""
+                      }`}
                     onClick={() => selectOption(optValue)}
                   >
                     {optLabel}

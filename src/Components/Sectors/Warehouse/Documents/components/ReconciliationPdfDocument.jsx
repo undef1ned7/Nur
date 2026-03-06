@@ -11,21 +11,26 @@ const s = StyleSheet.create({
   },
   header: {
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   title: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "bold",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   subtitle: {
     fontSize: 8,
-    marginTop: 2,
+    marginTop: 1,
+  },
+  parties: {
+    marginTop: 6,
+    marginBottom: 8,
+    fontSize: 8,
+    lineHeight: 1.25,
   },
   contractInfo: {
     fontSize: 8,
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 2,
   },
   // Таблица в стиле классического акта сверки
   table: { borderWidth: 1, borderColor: "#000" },
@@ -33,23 +38,24 @@ const s = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#000",
-    minHeight: 16,
+    minHeight: 14,
   },
   rowLast: { borderBottomWidth: 0 },
   head: { backgroundColor: "#f5f5f5", fontWeight: "bold" },
   cell: {
     borderRightWidth: 1,
     borderRightColor: "#000",
-    padding: 4,
+    padding: 3,
     justifyContent: "center",
   },
   cellLast: { borderRightWidth: 0 },
-  // Колонки: № | Содержание | Company (Дт | Кт) | Client (Дт | Кт)
-  cNum: { width: "4%" },
-  cContent: { width: "28%" },
-  cMoney: { width: "8.5%" },
+  // Колонки: Date | Doc | Debit | Credit (по 2 блока)
+  cDate: { width: "9%" },
+  cDoc: { width: "20%" },
+  cMoney: { width: "9%" },
   // Служебные строки
   sectionRow: { backgroundColor: "#f5f5f5", fontWeight: "bold" },
+  sectionCell: { padding: 3, fontWeight: "bold" },
   right: { textAlign: "right" },
   center: { textAlign: "center" },
   summary: {
@@ -58,7 +64,7 @@ const s = StyleSheet.create({
     lineHeight: 1.4,
   },
   signatures: {
-    marginTop: 20,
+    marginTop: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 40,
@@ -67,8 +73,8 @@ const s = StyleSheet.create({
   signLine: {
     borderBottomWidth: 1,
     borderBottomColor: "#000",
-    minHeight: 18,
-    marginTop: 12,
+    minHeight: 16,
+    marginTop: 10,
   },
 });
 
@@ -483,6 +489,55 @@ function numberToWords(num) {
   return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
+function resolvePartyLabel(label, { companyName, counterpartyName }) {
+  if (label === null || label === undefined || label === "") return "";
+  const normalized = String(label).trim();
+  if (!normalized) return "";
+  const lower = normalized.toLowerCase();
+  if (
+    [
+      "контрагент",
+      "counterparty",
+      "client",
+      "buyer",
+      "supplier",
+    ].includes(lower)
+  ) {
+    return counterpartyName;
+  }
+  if (
+    ["компания", "company", "seller", "organization", "организация"].includes(
+      lower
+    )
+  ) {
+    return companyName;
+  }
+  return normalized;
+}
+
+function normalizeText(value) {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "object") return "";
+  return String(value).trim();
+}
+
+function labelValue(label, value) {
+  const v = normalizeText(value);
+  return v ? `${label}: ${v}` : "";
+}
+
+function joinInfo(parts) {
+  return parts.filter(Boolean).join(", ");
+}
+
+function getCounterpartyTypeLabel(type) {
+  const t = normalizeText(type).toUpperCase();
+  if (t === "CLIENT") return "Клиент";
+  if (t === "SUPPLIER") return "Поставщик";
+  if (t === "BOTH") return "Клиент/Поставщик";
+  return normalizeText(type);
+}
+
 export default function ReconciliationPdfDocument({ data, meta }) {
   registerPdfFonts();
   const lines = extractLines(data);
@@ -496,14 +551,36 @@ export default function ReconciliationPdfDocument({ data, meta }) {
         meta?.companyName
       )
   );
-  const clientName = safe(
-    data?.client?.name ??
+  const counterpartyName = safe(
+    data?.counterparty?.name ??
       pick(
         data,
-        ["client_name", "client", "buyer", "counterparty"],
-        meta?.clientName
+        ["counterparty_name", "counterparty", "client_name", "client", "buyer"],
+        meta?.counterpartyName ?? meta?.clientName
       )
   );
+  const companyInfo = data?.company ?? {};
+  const counterpartyInfo = data?.counterparty ?? {};
+  const companyDetails = joinInfo([
+    labelValue("ИНН", companyInfo?.inn),
+    labelValue("ОКПО", companyInfo?.okpo),
+    labelValue("р/с", companyInfo?.score),
+    labelValue("БИК", companyInfo?.bik),
+    labelValue("Адрес", companyInfo?.address),
+    labelValue("Тел.", companyInfo?.phone),
+    labelValue("Email", companyInfo?.email),
+  ]);
+  const counterpartyTypeLabel = getCounterpartyTypeLabel(counterpartyInfo?.type);
+  const counterpartyDetails = joinInfo([
+    labelValue("Тип", counterpartyTypeLabel),
+    labelValue("ИНН", counterpartyInfo?.inn),
+    labelValue("ОКПО", counterpartyInfo?.okpo),
+    labelValue("р/с", counterpartyInfo?.score),
+    labelValue("БИК", counterpartyInfo?.bik),
+    labelValue("Адрес", counterpartyInfo?.address),
+    labelValue("Тел.", counterpartyInfo?.phone),
+    labelValue("Email", counterpartyInfo?.email),
+  ]);
 
   // Извлекаем период из новой структуры
   const start =
@@ -593,7 +670,7 @@ export default function ReconciliationPdfDocument({ data, meta }) {
   );
   // В новой структуре opening_balance - это сальдо для компании (a)
   const openingCompany = openingBalance;
-  const openingClient = -openingBalance; // Для клиента противоположное значение
+  const openingClient = -openingBalance; // Для контрагента противоположное значение
 
   // Сальдо конечное из API или вычисляем
   const closingBalanceFromAPI = data?.closing_balance
@@ -613,9 +690,11 @@ export default function ReconciliationPdfDocument({ data, meta }) {
     ? getNumber(debtInfo.amount)
     : Math.abs(closingClient);
   const debtor =
-    debtInfo?.debtor ?? (closingClient > 0 ? clientName : companyName);
+    resolvePartyLabel(debtInfo?.debtor, { companyName, counterpartyName }) ||
+    (closingClient > 0 ? counterpartyName : companyName);
   const creditor =
-    debtInfo?.creditor ?? (closingClient > 0 ? companyName : clientName);
+    resolvePartyLabel(debtInfo?.creditor, { companyName, counterpartyName }) ||
+    (closingClient > 0 ? companyName : counterpartyName);
 
   return (
     <Document>
@@ -631,64 +710,85 @@ export default function ReconciliationPdfDocument({ data, meta }) {
           <Text style={s.subtitle}>Валюта: {currency}</Text>
         </View>
 
+        <View style={s.parties}>
+          <Text>
+            Организация: {companyName}
+            {companyDetails ? `, ${companyDetails}` : ""}
+          </Text>
+          <Text>
+            Контрагент: {counterpartyName}
+            {counterpartyDetails ? `, ${counterpartyDetails}` : ""}
+          </Text>
+          <Text>
+            Мы, нижеподписавшиеся, {companyName}, с одной стороны, и{" "}
+            {counterpartyName}, с другой стороны, составили настоящий акт сверки
+            о состоянии взаимных расчетов по данным учета следующим образом:
+          </Text>
+        </View>
+
         <View style={s.table}>
-          {/* Заголовок таблицы - первая строка с названиями компаний */}
+          {/* Заголовок: две части как в 1С */}
           <View style={[s.row, s.head]}>
-            <View style={[s.cell, s.cNum]}>
-              <Text style={s.center}>№</Text>
+            <View style={[s.cell, { width: "47%" }]}>
+              <Text style={s.center}>По данным {companyName}</Text>
             </View>
-            <View style={[s.cell, s.cContent]}>
-              <Text style={s.center}>Содержание записи</Text>
-            </View>
-            <View style={[s.cell, { width: "17%", borderRightWidth: 0 }]}>
-              <Text style={s.center}>{companyName}</Text>
-            </View>
-            <View style={[s.cell, s.cMoney]}>
-              <Text />
-            </View>
-            <View style={[s.cell, { width: "17%", borderRightWidth: 0 }]}>
-              <Text style={s.center}>{clientName}</Text>
-            </View>
-            <View style={[s.cell, s.cMoney, s.cellLast]}>
-              <Text />
+            <View style={[s.cell, { width: "53%" }, s.cellLast]}>
+              <Text style={s.center}>По данным {counterpartyName}</Text>
             </View>
           </View>
 
-          {/* Подзаголовок с Дт и Кт */}
+          {/* Заголовок колонок */}
           <View style={[s.row, s.head]}>
-            <View style={[s.cell, s.cNum]}>
-              <Text />
+            <View style={[s.cell, s.cDate]}>
+              <Text style={s.center}>Дата</Text>
             </View>
-            <View style={[s.cell, s.cContent]}>
-              <Text />
-            </View>
-            <View style={[s.cell, s.cMoney]}>
-              <Text style={s.center}>Дт</Text>
+            <View style={[s.cell, s.cDoc]}>
+              <Text style={s.center}>Документ</Text>
             </View>
             <View style={[s.cell, s.cMoney]}>
-              <Text style={s.center}>Кт</Text>
+              <Text style={s.center}>Дебет</Text>
             </View>
             <View style={[s.cell, s.cMoney]}>
-              <Text style={s.center}>Дт</Text>
+              <Text style={s.center}>Кредит</Text>
+            </View>
+            <View style={[s.cell, s.cDate]}>
+              <Text style={s.center}>Дата</Text>
+            </View>
+            <View style={[s.cell, s.cDoc]}>
+              <Text style={s.center}>Документ</Text>
+            </View>
+            <View style={[s.cell, s.cMoney]}>
+              <Text style={s.center}>Дебет</Text>
             </View>
             <View style={[s.cell, s.cMoney, s.cellLast]}>
-              <Text style={s.center}>Кт</Text>
+              <Text style={s.center}>Кредит</Text>
             </View>
           </View>
 
           {/* Сальдо начальное */}
           <View style={[s.row, s.sectionRow]}>
-            <View style={[s.cell, s.cNum]}>
+            <View style={[s.cell, { width: "100%" }, s.cellLast]}>
+              <Text>Сальдо начальное</Text>
+            </View>
+          </View>
+          <View style={s.row}>
+            <View style={[s.cell, s.cDate]}>
               <Text />
             </View>
-            <View style={[s.cell, s.cContent]}>
-              <Text>Сальдо начальное</Text>
+            <View style={[s.cell, s.cDoc]}>
+              <Text />
             </View>
             {renderSaldoCells(openingCompany, {
               TextComp: Text,
               styles: s,
               showZero: true,
             })}
+            <View style={[s.cell, s.cDate]}>
+              <Text />
+            </View>
+            <View style={[s.cell, s.cDoc]}>
+              <Text />
+            </View>
             {renderSaldoCells(openingClient, {
               TextComp: Text,
               styles: s,
@@ -699,7 +799,7 @@ export default function ReconciliationPdfDocument({ data, meta }) {
 
           {/* Операции */}
           {lines.map((r, idx) => {
-            // Используем новую структуру: a_debit/a_credit для компании, b_debit/b_credit для клиента
+            // Используем новую структуру: a_debit/a_credit для компании, b_debit/b_credit для контрагента
             const companyDebit = getNumber(
               r?.a_debit ??
                 r?.company_debit ??
@@ -728,14 +828,15 @@ export default function ReconciliationPdfDocument({ data, meta }) {
                 r?.client_kt ??
                 0
             );
+            const date = pickDate(r);
             const description = formatDocDescription(r);
 
             return (
               <View key={idx} style={s.row}>
-                <View style={[s.cell, s.cNum]}>
-                  <Text style={s.center}>{idx + 1}</Text>
+                <View style={[s.cell, s.cDate]}>
+                  <Text>{date ? fmtDate(date) : ""}</Text>
                 </View>
-                <View style={[s.cell, s.cContent]}>
+                <View style={[s.cell, s.cDoc]}>
                   <Text>{description}</Text>
                 </View>
                 <View style={[s.cell, s.cMoney]}>
@@ -747,6 +848,12 @@ export default function ReconciliationPdfDocument({ data, meta }) {
                   <Text style={s.right}>
                     {companyCredit ? n2(companyCredit) : ""}
                   </Text>
+                </View>
+                <View style={[s.cell, s.cDate]}>
+                  <Text>{date ? fmtDate(date) : ""}</Text>
+                </View>
+                <View style={[s.cell, s.cDoc]}>
+                  <Text>{description}</Text>
                 </View>
                 <View style={[s.cell, s.cMoney]}>
                   <Text style={s.right}>
@@ -762,19 +869,30 @@ export default function ReconciliationPdfDocument({ data, meta }) {
             );
           })}
 
-          {/* Итого обороты */}
+          {/* Обороты за период */}
           <View style={[s.row, s.sectionRow]}>
-            <View style={[s.cell, s.cNum]}>
+            <View style={[s.cell, { width: "100%" }, s.cellLast]}>
+              <Text>Обороты за период</Text>
+            </View>
+          </View>
+          <View style={s.row}>
+            <View style={[s.cell, s.cDate]}>
               <Text />
             </View>
-            <View style={[s.cell, s.cContent]}>
-              <Text>Итого обороты:</Text>
+            <View style={[s.cell, s.cDoc]}>
+              <Text />
             </View>
             <View style={[s.cell, s.cMoney]}>
               <Text style={s.right}>{n2(totalCompanyDebit)}</Text>
             </View>
             <View style={[s.cell, s.cMoney]}>
               <Text style={s.right}>{n2(totalCompanyCredit)}</Text>
+            </View>
+            <View style={[s.cell, s.cDate]}>
+              <Text />
+            </View>
+            <View style={[s.cell, s.cDoc]}>
+              <Text />
             </View>
             <View style={[s.cell, s.cMoney]}>
               <Text style={s.right}>{n2(totalClientDebit)}</Text>
@@ -785,14 +903,25 @@ export default function ReconciliationPdfDocument({ data, meta }) {
           </View>
 
           {/* Сальдо конечное */}
-          <View style={[s.row, s.sectionRow, s.rowLast]}>
-            <View style={[s.cell, s.cNum]}>
+          <View style={[s.row, s.sectionRow]}>
+            <View style={[s.cell, { width: "100%" }, s.cellLast]}>
+              <Text>Сальдо конечное</Text>
+            </View>
+          </View>
+          <View style={[s.row, s.rowLast]}>
+            <View style={[s.cell, s.cDate]}>
               <Text />
             </View>
-            <View style={[s.cell, s.cContent]}>
-              <Text>Сальдо конечное:</Text>
+            <View style={[s.cell, s.cDoc]}>
+              <Text />
             </View>
             {renderSaldoCells(closingCompany, { TextComp: Text, styles: s })}
+            <View style={[s.cell, s.cDate]}>
+              <Text />
+            </View>
+            <View style={[s.cell, s.cDoc]}>
+              <Text />
+            </View>
             {renderSaldoCells(closingClient, {
               TextComp: Text,
               styles: s,
@@ -821,12 +950,16 @@ export default function ReconciliationPdfDocument({ data, meta }) {
         {/* Подписи */}
         <View style={s.signatures}>
           <View style={s.signCol}>
-            <Text>{companyName}</Text>
+            <Text>От {companyName}</Text>
+            <Text style={{ marginTop: 8 }}>Руководитель:</Text>
+            <View style={s.signLine} />
             <Text style={{ marginTop: 8 }}>Главный бухгалтер:</Text>
             <View style={s.signLine} />
           </View>
           <View style={s.signCol}>
-            <Text>{clientName}</Text>
+            <Text>От {counterpartyName}</Text>
+            <Text style={{ marginTop: 8 }}>Руководитель:</Text>
+            <View style={s.signLine} />
             <Text style={{ marginTop: 8 }}>Главный бухгалтер:</Text>
             <View style={s.signLine} />
           </View>

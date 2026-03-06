@@ -70,10 +70,9 @@ const RecordaServicesPicker = ({
 
   const filtered = useMemo(() => {
     const text = qTrim.toLowerCase();
-
-    const base = (items || []).filter((it) =>
-      isSingle ? true : !already.has(String(it.id))
-    );
+    const base = isSingle
+      ? (items || []).filter((it) => !already.has(String(it.id)))
+      : (items || []);
 
     if (!text) return base;
 
@@ -81,12 +80,20 @@ const RecordaServicesPicker = ({
       String(it.search || it.label || "").toLowerCase().includes(text)
     );
   }, [items, qTrim, already, isSingle]);
+  // console.log('312', filtered);
+  
 
   // закрытие по клику вне и по Esc
   useEffect(() => {
     const onDoc = (e) => {
       if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target)) setOpen(false);
+      // Игнорируем клики внутри карточек услуг и кнопок удаления
+      if (e.target?.closest?.(".barberrecorda__svcCard")) return;
+      if (e.target?.closest?.(".barberrecorda__svcCardDel")) return;
+      // Закрываем дропдаун только если клик был вне компонента
+      if (!wrapRef.current.contains(e.target)) {
+        setOpen(false);
+      }
     };
     const onEsc = (e) => {
       if (e.key === "Escape") setOpen(false);
@@ -121,20 +128,19 @@ const RecordaServicesPicker = ({
   const handlePickMulti = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
-    const sid = String(id);
-    if (!already.has(sid)) onChange?.([...safeSelected, sid]);
+    onChange?.([...safeSelected, String(id)]);
     setQ("");
     setOpen(false);
     resetCreateSignals();
   };
 
-  const handleRemoveMulti = (e, sid) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = safeSelected.filter((x) => String(x) !== String(sid));
+  const handleRemoveMulti = (e, index) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const next = safeSelected.filter((_, i) => i !== index);
     onChange?.(next);
-    setOpen(false);
-    resetCreateSignals();
   };
 
   /* ===========================
@@ -217,6 +223,7 @@ const RecordaServicesPicker = ({
     <div className="barberrecorda__svcField" ref={wrapRef}>
       <div className={`barberrecorda__svcSearchWrap ${open ? "is-open" : ""}`}>
         <div className="barberrecorda__svcSearch" onClick={() => setOpen(true)}>
+          
           <FaSearch className="barberrecorda__svcSearchIcon" />
           <input
             ref={inputRef}
@@ -271,6 +278,7 @@ const RecordaServicesPicker = ({
               <div className="barberrecorda__svcSummaryCol">
                 <span className="barberrecorda__svcSummaryValue">{summary.count}</span>
                 <span className="barberrecorda__svcSummaryLabel">услуг</span>
+                
               </div>
               <div className="barberrecorda__svcSummaryCol">
                 <span className="barberrecorda__svcSummaryValue">{summary.totalMinutes}</span>
@@ -292,7 +300,7 @@ const RecordaServicesPicker = ({
               const price = it.price;
 
               return (
-                <div key={id} className="barberrecorda__svcCard" title={name}>
+                <div key={`${id}-${idx}`} className="barberrecorda__svcCard" title={name}>
                   <div className="barberrecorda__svcCardIndex">{idx + 1}</div>
                   <div className="barberrecorda__svcCardMain">
                     <div className="barberrecorda__svcCardTitle">{name}</div>
@@ -305,7 +313,7 @@ const RecordaServicesPicker = ({
                     type="button"
                     className="barberrecorda__svcCardDel"
                     aria-label="Убрать услугу"
-                    onClick={(e) => handleRemoveMulti(e, id)}
+                    onClick={(e) => handleRemoveMulti(e, idx)}
                   >
                     <FaTimes />
                   </button>

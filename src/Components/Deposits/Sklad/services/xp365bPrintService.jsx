@@ -1,447 +1,194 @@
+import JsBarcode from "jsbarcode";
+
 /**
- * Xprinter XP-365B Print Service (TSPL)
- * Печать штрих-кодовых этикеток через WebUSB + кириллица через транслитерацию
+ * XPrinter XP-350B / XP-365B — TSPL • 203 DPI
+ *
+ * Цель: стабильная печать кириллицы без "карябязи".
+ * По умолчанию используем:
+ * - TSPL: CODEPAGE WPC1251
+ * - Encoding: Windows-1251 (CP1251)
+ *
+ * При необходимости можно переключить:
+ * - CP866: localStorage.setItem("xp365b_codepage", "866")
+ * - PC936 (GBK, китайский): localStorage.setItem("xp365b_codepage", "936")
+ *
+ * Примечание: названия CODEPAGE в TSPL зависят от прошивки.
+ * Тут для 1251 отправляем строго WPC1251 (как вы просили).
  */
 
-// ===== Глобальное состояние USB =====
+const LS_CODEPAGE = "xp365b_codepage"; // "WPC1251" | "1251" | "866" | "936"
+const LS_ORIENTATION = "xp365b_orientation"; // "normal" | "rotated"
+const LS_RENDER_MODE = "xp365b_render_mode"; // "raster" | "tspl"
+const RASTER_FONT_FAMILY_LS = "xp365b_raster_font_family";
+const RASTER_INVERT_LS = "xp365b_raster_invert";
+
+const DEFAULT_CODEPAGE = 1251;
+const DEFAULT_CODEPAGE_TOKEN = "WPC1251";
+const DEFAULT_ORIENTATION = "normal";
+const DEFAULT_RENDER_MODE = "raster";
+const DEFAULT_FONT_ID = "1";
+
+// Базовые настройки под этикетку 30x20 (203dpi ~ 8 dots/mm).
+// На более крупных размерах эти значения должны масштабироваться,
+// иначе рамка растёт, а текст остаётся мелким.
+const DEFAULT_LABEL_PRESET = {
+  lineGap: 22,
+  gapAfterTitle: 7,
+  gapAfterPrice: 4,
+  barcodeRaise: 3,
+  barcodeHeight: 44,
+  barcodeBarWidth: 2,
+};
+
+/* ====================== USB STATE ====================== */
+
 const usbState = {
   dev: null,
   outEP: null,
-  opening: null,
+  intfNum: null,
 };
 
-// Разбиение буфера на куски
+let usbListenersAttached = false;
+let sendQueue = Promise.resolve(); // serialize writes to avoid interleaving TSPL
+
+/* ====================== UTILS ====================== */
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const chunkBytes = (u8, size = 4096) => {
   const out = [];
   for (let i = 0; i < u8.length; i += size) out.push(u8.subarray(i, i + size));
   return out;
 };
 
-// Энкодер TSPL (ASCII → bytes; фактически UTF-8, но мы шлём только ASCII)
-const tsplEncoder = new TextEncoder();
-const encodeTspl = (s) => tsplEncoder.encode(s);
-
-/* ====================== util: перенос строки ====================== */
-function wrap(text = "", width = 24) {
-  const words = String(text || "").split(/\s+/);
-  let line = "";
-  const out = [];
-  for (const w of words) {
-    const next = line ? line + " " + w : w;
-    if (next.length <= width) {
-      line = next;
-    } else {
-      if (line) out.push(line);
-      line = w;
-    }
-  }
-  if (line) out.push(line);
-  return out;
+function normalizeCodepage(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return DEFAULT_CODEPAGE;
+  if (/^wpc\s*1251$/i.test(raw)) return 1251;
+  if (/^cp\s*1251$/i.test(raw)) return 1251;
+  if (/^1251$/i.test(raw)) return 1251;
+  if (/^866$/i.test(raw)) return 866;
+  if (/^pc\s*936$/i.test(raw)) return 936;
+  if (/^cp\s*936$/i.test(raw)) return 936;
+  if (/^936$/i.test(raw)) return 936;
+  return DEFAULT_CODEPAGE;
 }
 
-/* ====================== простая транслитерация RU/KG → LAT ====================== */
-
-const TRANSLIT_MAP = {
-  а: "a",
-  б: "b",
-  в: "v",
-  г: "g",
-  д: "d",
-  е: "e",
-  ё: "yo",
-  ж: "zh",
-  з: "z",
-  и: "i",
-  й: "y",
-  к: "k",
-  л: "l",
-  м: "m",
-  н: "n",
-  о: "o",
-  п: "p",
-  р: "r",
-  с: "s",
-  т: "t",
-  у: "u",
-  ф: "f",
-  х: "kh",
-  ц: "ts",
-  ч: "ch",
-  ш: "sh",
-  щ: "shch",
-  ы: "y",
-  э: "e",
-  ю: "yu",
-  я: "ya",
-  ъ: "",
-  ь: "",
-  // кыргызские
-  ө: "o",
-  ү: "u",
-  ң: "ng",
-};
-
-function translitToAscii(str = "") {
-  let res = "";
-  for (const ch of String(str)) {
-    const lower = ch.toLowerCase();
-    if (TRANSLIT_MAP[lower]) {
-      const tr = TRANSLIT_MAP[lower];
-      if (lower !== ch) {
-        res += tr.charAt(0).toUpperCase() + tr.slice(1);
-      } else {
-        res += tr;
-      }
-    } else {
-      res += ch;
-    }
-  }
-  return res;
-}
-
-/* ====================== WebUSB helpers ====================== */
-
-function saveVidPidToLS(dev) {
+export function getXp365bCodepage() {
   try {
-    localStorage.setItem("xp365b_vid", dev.vendorId.toString(16));
-    localStorage.setItem("xp365b_pid", dev.productId.toString(16));
+    return normalizeCodepage(localStorage.getItem(LS_CODEPAGE));
+  } catch {
+    return DEFAULT_CODEPAGE;
+  }
+}
+
+export function setXp365bCodepage(cp) {
+  try {
+    localStorage.setItem(LS_CODEPAGE, String(cp));
   } catch {}
 }
 
-async function tryUsbAutoConnect() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
-  }
-
-  const savedVid = parseInt(localStorage.getItem("xp365b_vid") || "", 16);
-  const savedPid = parseInt(localStorage.getItem("xp365b_pid") || "", 16);
-
-  const devs = await navigator.usb.getDevices();
-  const dev =
-    devs.find(
-      (d) =>
-        (!savedVid || d.vendorId === savedVid) &&
-        (!savedPid || d.productId === savedPid)
-    ) || null;
-
-  return dev;
+function getTsplCodepageToken() {
+  const cp = getXp365bCodepage();
+  // Requested: WPC1251
+  if (cp === 1251) return DEFAULT_CODEPAGE_TOKEN;
+  if (cp === 866) return "866";
+  if (cp === 936) return "936"; // PC936 / GBK
+  return DEFAULT_CODEPAGE_TOKEN;
 }
 
-// запрос устройства через диалог
-async function requestUsbDevice() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
-  }
-
-  // по классу принтера
-  const filters = [{ classCode: 0x07 }];
-  return await navigator.usb.requestDevice({ filters });
-}
-
-/* ====================== спец. команды для кириллицы ====================== */
-/**
- * Отправка сервисных команд:
- *  1F 1B 1F FE 01
- *  1F 1B 1F FE 11
- * которые в конфигураторе рекомендуют для включения кириллицы.
- * (мы сейчас шлём только ASCII, но команды не мешают)
- */
-async function sendXp365bKyrillicInit(dev, outEP) {
+function getOrientation() {
   try {
-    const cmd1 = new Uint8Array([0x1f, 0x1b, 0x1f, 0xfe, 0x01]);
-    const cmd2 = new Uint8Array([0x1f, 0x1b, 0x1f, 0xfe, 0x11]);
-
-    await dev.transferOut(outEP, cmd1);
-    await new Promise((r) => setTimeout(r, 5));
-    await dev.transferOut(outEP, cmd2);
-    await new Promise((r) => setTimeout(r, 5));
-
-    console.log(
-      "XP-365B: кириллические init-команды отправлены (1F 1B 1F FE 01/11)"
-    );
-  } catch (e) {
-    console.warn("XP-365B: не удалось отправить кириллический init:", e);
-  }
-}
-
-/* ====================== openUsbDevice ====================== */
-
-/**
- * Открытие устройства и поиск bulk OUT endpoint,
- * + отправка init-команд для кириллицы.
- */
-async function openUsbDevice(dev) {
-  if (!dev) throw new Error("USB устройство не найдено");
-
-  if (!dev.opened) {
-    await dev.open();
-  }
-
-  if (dev.configuration === null) {
-    // пробуем первую конфигурацию
-    await dev.selectConfiguration(1).catch(() => {});
-  }
-
-  const cfg = dev.configuration;
-  if (!cfg) throw new Error("Нет конфигурации у принтера");
-
-  console.log("XP-365B config:", cfg);
-
-  let outEP = null;
-  let chosenInterface = null;
-  let chosenAlt = null;
-
-  for (const intf of cfg.interfaces) {
-    for (const alt of intf.alternates) {
-      const endpoints = alt.endpoints || [];
-      console.log(
-        "Interface",
-        intf.interfaceNumber,
-        "alt",
-        alt.alternateSetting,
-        "endpoints:",
-        endpoints
-      );
-
-      const out = endpoints.find(
-        (e) => e.direction === "out" && e.type === "bulk"
-      );
-      if (out) {
-        chosenInterface = intf.interfaceNumber;
-        chosenAlt = alt.alternateSetting || 0;
-        outEP = out.endpointNumber;
-        break;
-      }
-    }
-    if (outEP != null) break;
-  }
-
-  if (outEP == null) {
-    throw new Error("Bulk OUT endpoint не найден");
-  }
-
-  await dev.claimInterface(chosenInterface);
-  if (dev.selectAlternateInterface) {
-    await dev.selectAlternateInterface(chosenInterface, chosenAlt);
-  }
-
-  console.log(
-    "Используем интерфейс",
-    chosenInterface,
-    "alt",
-    chosenAlt,
-    "OUT EP",
-    outEP
-  );
-
-  await sendXp365bKyrillicInit(dev, outEP);
-
-  return { outEP };
-}
-
-/**
- * ensureUsbReadyAuto:
- *  - пробует автоконнект по сохранённым VID/PID
- *  - не показывает диалог пользователю (для статуса)
- */
-async function ensureUsbReadyAuto() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("WebUSB не поддерживается");
-  }
-
-  if (usbState.dev && usbState.outEP != null) {
-    return usbState;
-  }
-
-  if (!usbState.opening) {
-    usbState.opening = (async () => {
-      const dev = await tryUsbAutoConnect();
-      if (!dev) return null;
-      const { outEP } = await openUsbDevice(dev);
-      usbState.dev = dev;
-      usbState.outEP = outEP;
-      return usbState;
-    })().finally(() => {
-      usbState.opening = null;
-    });
-  }
-
-  const res = await usbState.opening;
-  return res;
-}
-
-/**
- * Явное подключение с диалогом (для кнопки "Подключить принтер")
- */
-export async function connectXp365bManually() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
-  }
-
-  let dev = usbState.dev;
-
-  if (!dev) {
-    dev = await requestUsbDevice();
-    saveVidPidToLS(dev);
-  }
-
-  const { outEP } = await openUsbDevice(dev);
-  usbState.dev = dev;
-  usbState.outEP = outEP;
-}
-
-/**
- * Слушатели connect/disconnect
- */
-export function attachXp365bUsbListenersOnce() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) return;
-  if (attachXp365bUsbListenersOnce._did) return;
-  attachXp365bUsbListenersOnce._did = true;
-
-  navigator.usb.addEventListener("connect", async (e) => {
-    try {
-      const savedVid = parseInt(localStorage.getItem("xp365b_vid") || "", 16);
-      const savedPid = parseInt(localStorage.getItem("xp365b_pid") || "", 16);
-      if (!savedVid || !savedPid) return;
-      if (e.device.vendorId !== savedVid || e.device.productId !== savedPid)
-        return;
-
-      const { outEP } = await openUsbDevice(e.device);
-      usbState.dev = e.device;
-      usbState.outEP = outEP;
-    } catch (err) {
-      console.warn("XP-365B auto-connect failed:", err);
-      usbState.dev = null;
-      usbState.outEP = null;
-    }
-  });
-
-  navigator.usb.addEventListener("disconnect", (e) => {
-    if (usbState.dev && e.device === usbState.dev) {
-      usbState.dev = null;
-      usbState.outEP = null;
-    }
-  });
-}
-
-/**
- * Проверка статуса подключения (без показа диалога)
- */
-export async function checkXp365bConnection() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) return false;
-  try {
-    const st = await ensureUsbReadyAuto();
-    return !!(st && st.dev && st.outEP != null);
+    const v = String(localStorage.getItem(LS_ORIENTATION) || "")
+      .trim()
+      .toLowerCase();
+    return v === "rotated" ? "rotated" : DEFAULT_ORIENTATION;
   } catch {
-    return false;
+    return DEFAULT_ORIENTATION;
   }
 }
 
-/* ====================== TSPL: этикетка (ASCII + транслит) ====================== */
-
-// ВАЖНО: сделан на основе testXp365bSimple (который печатает HELLO)
-function buildTsplLabel({ title, barcode, widthMm = 58, heightMm = 40 }) {
-  // транслитеруем кириллицу → латиница, чтобы были чистые ASCII-байты
-  const latinName = translitToAscii(title || "Test product").trim();
-  const code = (barcode || "123456789012").trim();
-
-  // делим название на 1–2 строки
-  const nameLines = wrap(latinName, 18);
-
-  let y = 20;
-  const cmds = [];
-
-  // те же базовые команды, что и в testXp365bSimple
-  cmds.push(`SIZE ${widthMm} mm,${heightMm} mm`);
-  cmds.push("GAP 3 mm,0 mm");
-  cmds.push("DIRECTION 1");
-  cmds.push("REFERENCE 0,0");
-  cmds.push("CLS");
-
-  // БЕЗ CODEPAGE — только ASCII, как в HELLO
-  // cmds.push("CODEPAGE 866");
-
-  // первая строка — крупный шрифт
-  cmds.push(
-    `TEXT 20,${y},"TSS24.BF2",0,1,1,"${(nameLines[0] || "")
-      .replace(/"/g, "")
-      .slice(0, 18)}"`
-  );
-
-  // вторая строка (если есть) — ниже, меньшим шрифтом
-  if (nameLines[1]) {
-    y += 28;
-    cmds.push(
-      `TEXT 20,${y},"TSS16.BF2",0,1,1,"${nameLines[1]
-        .replace(/"/g, "")
-        .slice(0, 18)}"`
+export function setXp365bOrientation(v) {
+  try {
+    localStorage.setItem(
+      LS_ORIENTATION,
+      v === "rotated" ? "rotated" : "normal"
     );
-  }
-
-  // чуть ниже — штрихкод
-  y += 50;
-  cmds.push(`BARCODE 20,${y},"128",60,1,0,2,4,"${code.replace(/"/g, "")}"`);
-
-  cmds.push("PRINT 1");
-  cmds.push(""); // финальный \r\n
-
-  const tsplStr = cmds.join("\r\n");
-  console.log("TSPL label string:\n", tsplStr);
-
-  return encodeTspl(tsplStr);
+  } catch {}
 }
 
-/* ====================== Печать этикетки со штрих-кодом ====================== */
-
-export async function printXp365bBarcodeLabel(params) {
-  if (!params || !params.barcode) {
-    throw new Error("Не передан штрих-код для печати");
-  }
-
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
-  }
-
-  if (!usbState.dev || usbState.outEP == null) {
-    const st = await ensureUsbReadyAuto();
-    if (!st || !st.dev) {
-      await connectXp365bManually();
-    }
-  }
-
-  const dev = usbState.dev;
-  const outEP = usbState.outEP;
-
-  if (!dev || outEP == null) {
-    throw new Error("Принтер XP-365B не подключён");
-  }
-
-  const buf = buildTsplLabel({
-    title: params.title || "Товар",
-    barcode: params.barcode,
-    widthMm: params.widthMm ?? 58,
-    heightMm: params.heightMm ?? 40,
-  });
-
-  console.log("Печатаем этикетку XP-365B (TSPL + translit):", {
-    barcode: params.barcode,
-    title: params.title,
-    latin: translitToAscii(params.title || "Товар"),
-  });
-
-  for (const part of chunkBytes(buf)) {
-    await dev.transferOut(outEP, part);
-    await new Promise((r) => setTimeout(r, 5));
-  }
-
-  console.log("Команда на печать отправлена");
+function getRenderMode(requested) {
+  if (requested === "raster" || requested === "tspl") return requested;
+  try {
+    const raw = String(localStorage.getItem(LS_RENDER_MODE) || "")
+      .trim()
+      .toLowerCase();
+    if (raw === "raster" || raw === "tspl") return raw;
+  } catch {}
+  return DEFAULT_RENDER_MODE;
 }
 
-/* ====================== Кодировки CP866 / CP1251 (для тестов) ====================== */
+export function setXp365bRenderMode(mode) {
+  try {
+    localStorage.setItem(LS_RENDER_MODE, mode === "tspl" ? "tspl" : "raster");
+  } catch {}
+}
 
-function encodeCP1251(s = "") {
+function getRasterFontFamily() {
+  try {
+    const raw = String(
+      localStorage.getItem(RASTER_FONT_FAMILY_LS) || ""
+    ).trim();
+    return raw || "Arial";
+  } catch {
+    return "Arial";
+  }
+}
+
+export function setXp365bRasterFontFamily(name) {
+  try {
+    localStorage.setItem(RASTER_FONT_FAMILY_LS, String(name || "Arial"));
+  } catch {}
+}
+
+function getRasterInvert() {
+  try {
+    const raw = String(localStorage.getItem(RASTER_INVERT_LS) || "")
+      .trim()
+      .toLowerCase();
+    if (raw === "0" || raw === "false" || raw === "no") return false;
+  } catch {}
+  // Default to true because many TSPL firmwares treat 0 as black.
+  return true;
+}
+
+export function setXp365bRasterInvert(v) {
+  try {
+    localStorage.setItem(RASTER_INVERT_LS, v ? "true" : "false");
+  } catch {}
+}
+
+/* ====================== ENCODING: CP866 / CP1251 / PC936 (GBK) ====================== */
+
+function encodeCP866(str = "") {
   const out = [];
-  for (const ch of s) {
+  for (const ch of String(str)) {
+    const c = ch.codePointAt(0);
+    if (c <= 0x7f) out.push(c);
+    else if (c >= 0x0410 && c <= 0x042f) out.push(0x80 + (c - 0x0410)); // А-Я
+    else if (c >= 0x0430 && c <= 0x043f) out.push(0xa0 + (c - 0x0430)); // а-п
+    else if (c >= 0x0440 && c <= 0x044f) out.push(0xe0 + (c - 0x0440)); // р-я
+    else if (c === 0x0401) out.push(0xf0); // Ё
+    else if (c === 0x0451) out.push(0xf1); // ё
+    else if (c === 0x2116) out.push(0xfc); // №
+    else out.push(0x3f);
+  }
+  return new Uint8Array(out);
+}
+
+function encodeCP1251(str = "") {
+  const out = [];
+  for (const ch of String(str)) {
     const c = ch.codePointAt(0);
     if (c <= 0x7f) out.push(c);
     else if (c === 0x0401) out.push(0xa8); // Ё
@@ -449,198 +196,854 @@ function encodeCP1251(s = "") {
     else if (c >= 0x0410 && c <= 0x042f) out.push(0xc0 + (c - 0x0410)); // А-Я
     else if (c >= 0x0430 && c <= 0x044f) out.push(0xe0 + (c - 0x0430)); // а-я
     else if (c === 0x2116) out.push(0xb9); // №
-    else out.push(0x3f); // ?
+    else out.push(0x3f);
   }
   return new Uint8Array(out);
 }
 
-function encodeCP866(s = "") {
-  const out = [];
-  for (const ch of s) {
-    const c = ch.codePointAt(0);
-    if (c <= 0x7f) out.push(c);
-    else if (c >= 0x0410 && c <= 0x042f) out.push(0x80 + (c - 0x0410)); // А-Я
-    else if (c >= 0x0430 && c <= 0x044f) out.push(0xa0 + (c - 0x0430)); // а-я
-    else if (c === 0x0401) out.push(0xf0); // Ё
-    else if (c === 0x0451) out.push(0xf1); // ё
-    else if (c === 0x2116) out.push(0xfc); // №
-    else out.push(0x3f); // ?
-  }
-  return new Uint8Array(out);
-}
-
-/* ====================== Тест кодировки (графика + кириллица) ====================== */
-
-export async function testXp365bEncodingPrint() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
-  }
-
-  if (!usbState.dev || usbState.outEP == null) {
-    const st = await ensureUsbReadyAuto();
-    if (!st || !st.dev) {
-      await connectXp365bManually();
+/**
+ * Encode string to GBK (CP936) for browser. Uses native TextEncoder('gbk') when
+ * available (e.g. Chrome on Windows), otherwise falls back to ASCII + ? for non-ASCII.
+ */
+function encodeGBK(str = "") {
+  const s = String(str);
+  try {
+    const enc = new TextEncoder("gbk");
+    return new Uint8Array(enc.encode(s));
+  } catch {
+    // Fallback: ASCII as-is, other code points as 0x3f (?) for browser compatibility
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) {
+      const c = s.codePointAt(i);
+      out[i] = c <= 0x7f ? c : 0x3f;
     }
+    return out;
   }
-
-  const dev = usbState.dev;
-  const outEP = usbState.outEP;
-  if (!dev || outEP == null) {
-    throw new Error("Принтер XP-365B не подключён");
-  }
-
-  await sendXp365bKyrillicInit(dev, outEP);
-
-  const tspl = [
-    "SIZE 58 mm,40 mm",
-    "GAP 2 mm,0 mm",
-    "DIRECTION 1",
-    "REFERENCE 0,0",
-    "CLS",
-    "SET DENSITY 10",
-    "SET DARKNESS 10",
-    "BOX 10,10,440,260,4",
-    "CODEPAGE 866",
-    'TEXT 30,30,"TSS24.BF2",0,1,1,"HELLO 123"',
-    'TEXT 30,70,"TSS16.BF2",0,1,1,"CP866: Привет 123"',
-    "CODEPAGE 1251",
-    'TEXT 30,110,"TSS16.BF2",0,1,1,"CP1251: Привет 123"',
-    "PRINT 1",
-    "",
-  ].join("\r\n");
-
-  console.log("TSPL encoding + graphics test:\n", tspl);
-
-  const buf = encodeTspl(tspl);
-
-  for (const part of chunkBytes(buf)) {
-    await dev.transferOut(outEP, part);
-    await new Promise((r) => setTimeout(r, 5));
-  }
-
-  console.log("Тест кодировки + графики отправлен");
 }
 
-// Тест кодовых страниц принтера (866 и 1251)
-export async function printXp365bCodepageTest() {
+function encodeForPrinter(str = "") {
+  const cp = getXp365bCodepage();
+  if (cp === 866) return encodeCP866(str);
+  if (cp === 936) return encodeGBK(str);
+  return encodeCP1251(str);
+}
+
+/* ====================== WEBUSB CONNECT ====================== */
+
+async function requestUsbDevice() {
   if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
+    throw new Error("WebUSB не поддерживается (нужен Chrome/Edge)");
+  }
+  return navigator.usb.requestDevice({
+    // Some XPrinters use vendor-specific class; keep broad enough
+    filters: [{ classCode: 0x07 }, { classCode: 0xff }],
+  });
+}
+
+async function openUsbDevice(dev) {
+  await dev.open();
+  if (!dev.configuration) await dev.selectConfiguration(1).catch(() => {});
+
+  const cfg = dev.configuration;
+  if (!cfg) throw new Error("Нет активной USB-конфигурации");
+
+  let outEP = null;
+  let intfNum = null;
+
+  for (const intf of cfg.interfaces) {
+    for (const alt of intf.alternates) {
+      const ep = (alt.endpoints || []).find(
+        (e) => e.direction === "out" && e.type === "bulk"
+      );
+      if (!ep) continue;
+
+      try {
+        await dev.claimInterface(intf.interfaceNumber);
+      } catch {
+        continue;
+      }
+
+      const needAlt = alt.alternateSetting ?? 0;
+      try {
+        await dev.selectAlternateInterface(intf.interfaceNumber, needAlt);
+      } catch {
+        try {
+          await dev.releaseInterface(intf.interfaceNumber);
+        } catch {}
+        continue;
+      }
+
+      outEP = ep.endpointNumber;
+      intfNum = intf.interfaceNumber;
+      break;
+    }
+    if (outEP != null) break;
   }
 
-  const ascii = (s) =>
-    new Uint8Array(
-      [...s].map((ch) => {
-        const c = ch.charCodeAt(0);
-        return c >= 0x20 && c <= 0x7e ? c : 0x3f;
-      })
+  if (outEP == null || intfNum == null) {
+    throw new Error(
+      "Bulk OUT endpoint не найден (проверь WinUSB/Zadig и что принтер не занят)"
     );
-
-  const enc866 = (s) => encodeCP866(s);
-  const enc1251 = (s) => encodeCP1251(s);
-
-  if (!usbState.dev || usbState.outEP == null) {
-    const st = await ensureUsbReadyAuto();
-    if (!st || !st.dev) {
-      await connectXp365bManually();
-    }
   }
 
-  const dev = usbState.dev;
-  const outEP = usbState.outEP;
-  if (!dev || outEP == null) {
-    throw new Error("Принтер XP-365B не подключён");
-  }
-
-  const chunks = [];
-
-  chunks.push(ascii("SIZE 58 mm,40 mm\r\n"));
-  chunks.push(ascii("GAP 2 mm,0 mm\r\n"));
-  chunks.push(ascii("DIRECTION 1\r\n"));
-  chunks.push(ascii("REFERENCE 0,0\r\n"));
-  chunks.push(ascii("CLS\r\n"));
-  chunks.push(ascii("SET DENSITY 10\r\n"));
-  chunks.push(ascii("SET DARKNESS 10\r\n"));
-  chunks.push(ascii("BOX 10,10,440,260,4\r\n"));
-
-  chunks.push(ascii("CODEPAGE 866\r\n"));
-  chunks.push(ascii('TEXT 30,20,"TSS24.BF2",0,1,1,"HELLO 123"\r\n'));
-
-  chunks.push(ascii('TEXT 30,60,"TSS16.BF2",0,1,1,"'));
-  chunks.push(enc866("CP866: Привет 123"));
-  chunks.push(ascii('"\r\n'));
-
-  chunks.push(ascii("CODEPAGE 1251\r\n"));
-  chunks.push(ascii('TEXT 30,100,"TSS16.BF2",0,1,1,"'));
-  chunks.push(enc1251("CP1251: Привет 123"));
-  chunks.push(ascii('"\r\n'));
-
-  chunks.push(ascii("PRINT 1\r\n"));
-
-  let totalLen = 0;
-  for (const c of chunks) totalLen += c.length;
-  const buf = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const c of chunks) {
-    buf.set(c, offset);
-    offset += c.length;
-  }
-
-  console.log("Отправляем тест кодовых страниц XP-365B...");
-  const SLICE = 4096;
-  for (let i = 0; i < buf.length; i += SLICE) {
-    const part = buf.subarray(i, Math.min(i + SLICE, buf.length));
-    await dev.transferOut(outEP, part);
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  console.log("Тест кодовых страниц отправлен");
+  usbState.dev = dev;
+  usbState.outEP = outEP;
+  usbState.intfNum = intfNum;
 }
 
-/* ====================== Простой тест (HELLO) ====================== */
+/* ====================== SEND TSPL (QUEUED) ====================== */
 
-export async function testXp365bSimple() {
-  if (typeof navigator === "undefined" || !("usb" in navigator)) {
-    throw new Error("Браузер не поддерживает WebUSB");
-  }
+function ensureCrLf(s) {
+  const v = String(s ?? "");
+  return v.endsWith("\r\n") ? v : v + "\r\n";
+}
 
-  if (!usbState.dev || usbState.outEP == null) {
-    const st = await ensureUsbReadyAuto();
-    if (!st || !st.dev) {
-      await connectXp365bManually();
+async function sendTsplQueued(tspl) {
+  sendQueue = sendQueue.then(async () => {
+    if (!usbState.dev || usbState.outEP == null || !usbState.dev.opened) {
+      throw new Error("Принтер не подключен");
     }
+
+    const payload = ensureCrLf(tspl);
+    const buf = encodeForPrinter(payload);
+
+    for (const part of chunkBytes(buf)) {
+      await usbState.dev.transferOut(usbState.outEP, part);
+      await sleep(5);
+    }
+  });
+  return sendQueue;
+}
+
+async function sendBytesQueued(bytes) {
+  sendQueue = sendQueue.then(async () => {
+    if (!usbState.dev || usbState.outEP == null || !usbState.dev.opened) {
+      throw new Error("Принтер не подключен");
+    }
+    for (const part of chunkBytes(bytes)) {
+      await usbState.dev.transferOut(usbState.outEP, part);
+      await sleep(5);
+    }
+  });
+  return sendQueue;
+}
+
+/* ====================== INIT ====================== */
+
+async function initPrinter() {
+  const cmds = [
+    `CODEPAGE ${getTsplCodepageToken()}`,
+    "SET GAP ON",
+    "SET BLINE OFF",
+    "\r\n",
+  ].join("\r\n");
+  await sendTsplQueued(cmds);
+}
+
+export async function connectXprinter() {
+  if (usbState.dev && usbState.outEP != null && usbState.dev.opened) {
+    // Re-apply settings to avoid "random" codepage after power cycle
+    await initPrinter().catch(() => {});
+    return;
   }
 
-  const dev = usbState.dev;
-  const outEP = usbState.outEP;
-  if (!dev || outEP == null) {
-    throw new Error("Принтер XP-365B не подключён");
-  }
+  const dev = await requestUsbDevice();
+  await openUsbDevice(dev);
+  await initPrinter();
+}
+
+export const connectXp365bManually = connectXprinter;
+
+/* ====================== LISTENERS / HEALTH ====================== */
+
+export function attachXp365bUsbListenersOnce() {
+  if (usbListenersAttached) return;
+  usbListenersAttached = true;
+
+  if (typeof navigator === "undefined" || !navigator.usb?.addEventListener)
+    return;
+
+  navigator.usb.addEventListener("disconnect", (event) => {
+    if (usbState.dev && event?.device === usbState.dev) {
+      usbState.dev = null;
+      usbState.outEP = null;
+      usbState.intfNum = null;
+    }
+  });
+}
+
+export async function checkXp365bConnection() {
+  return !!(usbState.dev && usbState.outEP != null && usbState.dev.opened);
+}
+
+/* ====================== CALIBRATION ====================== */
+
+export async function calibrateXprinter({
+  widthMm = 30,
+  heightMm = 20,
+  gapMm = 2,
+} = {}) {
+  await connectXprinter();
+  const orientation = getOrientation();
+  const w = orientation === "rotated" ? heightMm : widthMm;
+  const h = orientation === "rotated" ? widthMm : heightMm;
 
   const tspl = [
-    "SIZE 58 mm,40 mm",
-    "GAP 3 mm,0 mm",
-    "DIRECTION 1",
-    "REFERENCE 0,0",
+    `SIZE ${w} mm,${h} mm`,
+    `GAP ${gapMm} mm,0 mm`,
     "CLS",
-    'TEXT 20,20,"TSS24.BF2",0,1,1,"HELLO"',
     "PRINT 1",
-    "",
+    "\r\n",
   ].join("\r\n");
 
-  const buf = encodeTspl(tspl);
-
-  console.log("Отправляем простой TSPL тест...");
-  for (const part of chunkBytes(buf)) {
-    await dev.transferOut(outEP, part);
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  console.log("Простой TSPL тест отправлен");
+  await sendTsplQueued(tspl);
 }
 
-/* ====================== Повесим тесты на window для DevTools ====================== */
+/* ====================== LABEL BUILD ====================== */
+
+function safeTsplText(s) {
+  // TSPL TEXT uses "...", so remove quotes and control chars
+  return String(s ?? "")
+    .replace(/"/g, "")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatPrice(value) {
+  const num = Number(String(value ?? "").replace(",", "."));
+  if (!Number.isFinite(num)) return "";
+  return Math.round(num).toString();
+}
+
+function wrap(text = "", width = 16, maxLines = 2) {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  const out = [];
+  let line = "";
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (next.length <= width) line = next;
+    else {
+      if (line) out.push(line);
+      line = w;
+    }
+  }
+  if (line) out.push(line);
+  return out.slice(0, maxLines);
+}
+
+function wrapByPixelWidth(ctx, text, maxPx, maxLines = 2) {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  const out = [];
+  let line = "";
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    const width = ctx.measureText(next).width;
+    if (width <= maxPx || !line) {
+      line = next;
+    } else {
+      out.push(line);
+      line = w;
+      if (out.length >= maxLines) break;
+    }
+  }
+  if (line && out.length < maxLines) out.push(line);
+  return out.slice(0, maxLines);
+}
+
+function drawFullWidthText(
+  ctx,
+  text,
+  x,
+  y,
+  width,
+  fontSize,
+  fontFamily,
+  fontWeight = "normal",
+  boldOffset = 0
+) {
+  const str = String(text || "");
+  if (!str) return;
+  let size = Math.max(6, Math.round(fontSize));
+  let widths = [];
+  let totalWidth = 0;
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    ctx.font = `${fontWeight} ${size}px ${fontFamily}`;
+    widths = Array.from(str).map((ch) => ctx.measureText(ch).width);
+    totalWidth = widths.reduce((s, w) => s + w, 0);
+    if (totalWidth <= width || size <= 6) break;
+    size = Math.max(6, Math.floor(size * 0.9));
+  }
+
+  const gap =
+    str.length > 1 ? Math.max(0, (width - totalWidth) / (str.length - 1)) : 0;
+  let cursor = x;
+  for (let i = 0; i < str.length; i += 1) {
+    ctx.fillText(str[i], cursor, y);
+    if (boldOffset) ctx.fillText(str[i], cursor + boldOffset, y);
+    cursor += widths[i] + gap;
+  }
+}
+
+function normalizeEan13(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length === 13) return digits;
+  if (digits.length !== 12) return "";
+  let sum = 0;
+  for (let i = 0; i < 12; i += 1) {
+    const d = Number(digits[i] || 0);
+    sum += i % 2 === 0 ? d : d * 3;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return digits + String(check);
+}
+
+function normalizeEan8(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length === 8) return digits;
+  if (digits.length !== 7) return "";
+  let sum = 0;
+  for (let i = 0; i < 7; i += 1) {
+    const d = Number(digits[i] || 0);
+    sum += (i % 2 === 0 ? 3 : 1) * d;
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return digits + String(check);
+}
+
+/** Возвращает { code, format: "EAN13" | "EAN8" | "CODE128" } */
+function normalizeBarcode(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) throw new Error("Пустой штрих-код");
+  // EAN-13: 12 или 13 цифр
+  if (digits.length === 12 || digits.length === 13) {
+    const code = normalizeEan13(raw);
+    if (code) return { code, format: "EAN13" };
+  }
+  // EAN-8: 7 или 8 цифр
+  if (digits.length === 7 || digits.length === 8) {
+    const code = normalizeEan8(raw);
+    if (code) return { code, format: "EAN8" };
+  }
+  // 10 или 11 цифр — дополняем нулями слева до 12 и печатаем как EAN-13
+  if (digits.length === 10 || digits.length === 11) {
+    const padded = digits.padStart(12, "0");
+    const code = normalizeEan13(padded);
+    if (code) return { code, format: "EAN13" };
+  }
+  // Любая другая длина (1–6, 9, 14+ цифр) — CODE128
+  if (digits.length >= 1 && digits.length <= 32)
+    return { code: digits, format: "CODE128" };
+  throw new Error(
+    "Штрих-код слишком длинный (макс. 32 символа для CODE128). Сейчас: " +
+      digits.length +
+      " цифр."
+  );
+}
+
+function buildLabel({
+  title,
+  barcode,
+  price,
+  copies = 1,
+  widthMm = 30,
+  heightMm = 20,
+  gapMm = 2,
+  fontId = DEFAULT_FONT_ID,
+  textScale = 1,
+  lineGap = 7,
+  gapAfterTitle = 7,
+  gapAfterPrice = 4,
+  barcodeRaise = 3,
+  barcodeHeight = 44,
+  barcodeBarWidth = 2,
+}) {
+  const t0 = safeTsplText(title || "ТОВАР");
+  const rawCode = safeTsplText(barcode || "");
+  const { code, format: bcType } = normalizeBarcode(rawCode);
+
+  const priceText =
+    price !== undefined && price !== null && String(price).trim() !== ""
+      ? safeTsplText(`Цена: ${formatPrice(price)} с`)
+      : "";
+
+  const font = String(fontId || DEFAULT_FONT_ID);
+  const textScaleInt = Math.max(1, Math.round(Number(textScale) || 1));
+  const lineGapDots = Math.max(1, Math.round(Number(lineGap) || 7));
+  const gapAfterTitleDots = Math.max(0, Math.round(Number(gapAfterTitle) || 0));
+  const gapAfterPriceDots = Math.max(0, Math.round(Number(gapAfterPrice) || 0));
+  const barcodeRaiseDots = Math.max(0, Math.round(Number(barcodeRaise) || 0));
+  const barcodeHeightFactor = 0.8; // slightly taller
+  const barcodeHeightDots = Math.max(
+    1,
+    Math.round((Number(barcodeHeight) || 44) * barcodeHeightFactor)
+  );
+  const barcodeDensityFactor = 1.1; // slightly thicker
+  const barcodeBarWidthDots = Math.max(
+    1,
+    Math.round((Number(barcodeBarWidth) || 2) * barcodeDensityFactor)
+  );
+  const fontBaseMap = {
+    1: 4,
+    2: 5,
+    3: 6,
+    4: 7,
+    5: 8,
+  };
+  const fontBase = fontBaseMap[Number(font)] ?? 6;
+  const charWidth = fontBase * textScaleInt;
+
+  const orientation = getOrientation();
+  const w = orientation === "rotated" ? heightMm : widthMm;
+  const h = orientation === "rotated" ? widthMm : heightMm;
+
+  const mmToDots = (mm) => Math.max(1, Math.round(Number(mm) * 8)); // 203dpi ~ 8 dots/mm
+  const W = mmToDots(w);
+  const H = mmToDots(h);
+  const shiftX = Math.round(W * 0.05);
+  const shiftContentX = -shiftX;
+  const sx = (v) => Math.max(0, Math.round(v));
+
+  // safe zone
+  const margin = 6;
+  const thick = 2;
+  const safePad = margin + thick;
+  const safeLeft = safePad + shiftContentX;
+  const safeTop = safePad;
+  const safeW = W - safePad * 2;
+  const safeH = H - safePad * 2;
+
+  // dashed border
+  const dash = 10;
+  const space = 6;
+  const leftX = sx(margin + shiftContentX);
+  const rightX = sx(W - margin - thick + shiftContentX);
+  const topY = margin;
+  const botY = H - margin - thick;
+  const border = [];
+  for (let x = leftX; x < rightX; x += dash + space) {
+    const bw = Math.min(dash, rightX - x);
+    border.push(`BAR ${x},${topY},${bw},${thick}`);
+    border.push(`BAR ${x},${botY},${bw},${thick}`);
+  }
+  for (let y = topY; y < botY; y += dash + space) {
+    const bh = Math.min(dash, botY - y);
+    border.push(`BAR ${leftX},${y},${thick},${bh}`);
+    border.push(`BAR ${rightX},${y},${thick},${bh}`);
+  }
+
+  const wrapWidth = Math.max(6, Math.round(16 / textScaleInt));
+  const lines = wrap(t0, wrapWidth, 2);
+  const lineCount = Math.max(1, lines.filter(Boolean).length);
+  const lineWidth = (line) => (line ? line.length * charWidth : 0);
+
+  // TSPL: EAN13/EAN8 как есть, CODE128 → "128"
+  const tsplBcType = bcType === "CODE128" ? "128" : bcType;
+  // estimate barcode width to center it
+  const getBarcodeModuleCount = (value) => {
+    const codeValue = String(value || "");
+    if (/^\d{13}$/.test(codeValue)) return 95 + 20;
+    if (/^\d{8}$/.test(codeValue)) return 67 + 20;
+    if (/^\d{12}$/.test(codeValue)) return 95 + 20;
+    return 11 * codeValue.length + 55;
+  };
+  const barcodeModules = getBarcodeModuleCount(code);
+  const barcodeWidthDots = Math.round(barcodeModules * barcodeBarWidthDots);
+
+  const textBlockHeight = lineGapDots * lineCount;
+  const priceBlockHeight = priceText ? gapAfterTitleDots + lineGapDots : 0;
+  const gapToBarcode = priceText ? gapAfterPriceDots : gapAfterTitleDots;
+  const barcodeBottomGap = 2;
+  const barcodeBlockHeight =
+    gapToBarcode + barcodeHeightDots + barcodeBottomGap;
+  const contentHeight = textBlockHeight + priceBlockHeight + barcodeBlockHeight;
+  const startY = safeTop + Math.max(0, Math.round((safeH - contentHeight) / 2));
+
+  const titleY = startY;
+  const desiredPriceY = priceText
+    ? titleY + textBlockHeight + gapAfterTitleDots
+    : null;
+  const desiredBarcodeY =
+    titleY +
+    textBlockHeight +
+    priceBlockHeight +
+    gapToBarcode -
+    barcodeRaiseDots;
+
+  const maxBarcodeY = safeTop + safeH - barcodeHeightDots - barcodeBottomGap;
+  const bcY = Math.min(desiredBarcodeY, maxBarcodeY);
+
+  const maxPriceY = bcY - gapAfterPriceDots - lineGapDots;
+  const priceY = priceText ? Math.min(desiredPriceY, maxPriceY) : null;
+
+  const titleX1 = sx(
+    safeLeft + Math.max(0, Math.round((safeW - lineWidth(lines[0])) / 2))
+  );
+  const titleX2 = sx(
+    safeLeft + Math.max(0, Math.round((safeW - lineWidth(lines[1])) / 2))
+  );
+  const priceX = sx(
+    safeLeft + Math.max(0, Math.round((safeW - lineWidth(priceText)) / 2))
+  );
+  const barcodeShiftX = Math.round(W * 0.03);
+  // Barcode centered, then shifted a bit left
+  const bcX = sx(
+    Math.max(0, Math.round((W - barcodeWidthDots) / 2) - barcodeShiftX)
+  );
+
+  const narrow = barcodeBarWidthDots;
+  const wide = barcodeBarWidthDots;
+  const copiesInt = Math.max(1, Math.min(100, Math.round(Number(copies) || 1)));
+
+  return [
+    `SIZE ${w} mm,${h} mm`,
+    `GAP ${gapMm} mm,0 mm`,
+    "SPEED 4",
+    "DENSITY 6",
+    "DIRECTION 1",
+    "REFERENCE 0,0",
+    "OFFSET 0",
+    "CLS",
+    `CODEPAGE ${getTsplCodepageToken()}`,
+    ...border,
+    `TEXT ${titleX1},${titleY},"${font}",0,${textScaleInt},${textScaleInt},"${
+      lines[0] || ""
+    }"`,
+    lines[1]
+      ? `TEXT ${titleX2},${
+          titleY + lineGapDots
+        },"${font}",0,${textScaleInt},${textScaleInt},"${lines[1]}"`
+      : "",
+    priceText && priceY != null
+      ? `TEXT ${priceX},${priceY},"${font}",0,${textScaleInt},${textScaleInt},"${priceText}"`
+      : "",
+    priceText && priceY != null
+      ? `TEXT ${
+          priceX + 1
+        },${priceY},"${font}",0,${textScaleInt},${textScaleInt},"${priceText}"`
+      : "",
+    `BARCODE ${bcX},${bcY},"${tsplBcType}",${barcodeHeightDots},1,0,${narrow},${wide},"${code}"`,
+    `PRINT ${copiesInt}`,
+    "\r\n",
+  ]
+    .filter(Boolean)
+    .join("\r\n");
+}
+
+function bytesFromAscii(str) {
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(str);
+  const out = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i += 1) out[i] = str.charCodeAt(i) & 0xff;
+  return out;
+}
+
+function canvasToMonoRaster(canvas, threshold = 180, invert = false) {
+  const w = canvas.width;
+  const h = canvas.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const img = ctx.getImageData(0, 0, w, h).data;
+  const bytesPerLine = Math.ceil(w / 8);
+  const raster = new Uint8Array(bytesPerLine * h);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      const r = img[i];
+      const g = img[i + 1];
+      const b = img[i + 2];
+      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      if (lum < threshold) {
+        raster[y * bytesPerLine + (x >> 3)] |= 0x80 >> (x & 7);
+      }
+    }
+  }
+  if (invert) {
+    for (let i = 0; i < raster.length; i += 1) {
+      raster[i] = ~raster[i] & 0xff;
+    }
+  }
+  return { raster, bytesPerLine, width: w, height: h };
+}
+
+async function buildRasterLabelBytes({
+  title,
+  barcode,
+  price,
+  copies = 1,
+  widthMm = 30,
+  heightMm = 20,
+  gapMm = 2,
+  textScale = 1,
+  lineGap = 7,
+  gapAfterTitle = 7,
+  gapAfterPrice = 4,
+  barcodeRaise = 3,
+  barcodeHeight = 44,
+  barcodeBarWidth = 2,
+}) {
+  const t0 = safeTsplText(title || "ТОВАР");
+  const rawCode = safeTsplText(barcode || "");
+  const { code, format: barcodeFormat } = normalizeBarcode(rawCode);
+
+  const priceText =
+    price !== undefined && price !== null && String(price).trim() !== ""
+      ? safeTsplText(`Цена: ${formatPrice(price)} с`)
+      : "";
+
+  const textScaleInt = Math.max(1, Math.round(Number(textScale) || 1));
+  const lineGapDots = Math.max(1, Math.round(Number(lineGap) || 7));
+  const gapAfterTitleDots = Math.max(0, Math.round(Number(gapAfterTitle) || 0));
+  const gapAfterPriceDots = Math.max(0, Math.round(Number(gapAfterPrice) || 0));
+  const barcodeRaiseDots = Math.max(0, Math.round(Number(barcodeRaise) || 0));
+  const barcodeHeightFactor = 0.8; // slightly taller
+  const barcodeHeightDots = Math.max(
+    1,
+    Math.round((Number(barcodeHeight) || 44) * barcodeHeightFactor)
+  );
+  const barcodeDensityFactor = 1.1; // slightly thicker
+  const barcodeBarWidthDots = Math.max(
+    1,
+    Math.round((Number(barcodeBarWidth) || 2) * barcodeDensityFactor)
+  );
+  const drawBarcodeText = true;
+  const barcodeTextSize = Math.max(8, Math.round(lineGapDots * 0.72));
+  const barcodeTextMargin = 12;
+  const barcodeTextHeight = drawBarcodeText
+    ? barcodeTextSize + barcodeTextMargin + 2
+    : 0;
+
+  const orientation = getOrientation();
+  const w = orientation === "rotated" ? heightMm : widthMm;
+  const h = orientation === "rotated" ? widthMm : heightMm;
+
+  const mmToDots = (mm) => Math.max(1, Math.round(Number(mm) * 8));
+  const W = mmToDots(w);
+  const H = mmToDots(h);
+  const shiftX = Math.round(W * 0.05);
+  const shiftContentX = -shiftX;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#000000";
+  ctx.textBaseline = "top";
+
+  const fontFamily = getRasterFontFamily();
+  const fontSize = Math.max(8, Math.round(lineGapDots * 0.85 * textScaleInt));
+  const normalFont = `${fontSize}px ${fontFamily}`;
+  const boldFont = `bold ${fontSize}px ${fontFamily}`;
+  ctx.font = normalFont;
+
+  const margin = 6;
+  const thick = 2;
+  const safePad = margin + thick;
+  const safeLeft = Math.max(0, safePad + shiftContentX);
+  const safeTop = safePad;
+  const safeW = W - safePad * 2;
+  const safeH = H - safePad * 2;
+
+  // dashed border
+  const dash = 10;
+  const space = 6;
+  const leftX = Math.max(0, margin + shiftContentX);
+  const rightX = Math.max(
+    leftX + 1,
+    Math.min(W - thick, W - margin - thick + shiftContentX)
+  );
+  const topY = margin;
+  const botY = H - margin - thick;
+  for (let x = leftX; x < rightX; x += dash + space) {
+    const bw = Math.min(dash, rightX - x);
+    ctx.fillRect(x, topY, bw, thick);
+    ctx.fillRect(x, botY, bw, thick);
+  }
+  for (let y = topY; y < botY; y += dash + space) {
+    const bh = Math.min(dash, botY - y);
+    ctx.fillRect(leftX, y, thick, bh);
+    ctx.fillRect(rightX, y, thick, bh);
+  }
+
+  const lines = wrapByPixelWidth(ctx, t0, safeW, 2);
+  const lineCount = Math.max(1, lines.length);
+  const textBlockHeight = lineGapDots * lineCount;
+  const priceBlockHeight = priceText ? gapAfterTitleDots + lineGapDots : 0;
+  const gapToBarcode = priceText ? gapAfterPriceDots : gapAfterTitleDots;
+  const barcodeBottomGap = 2;
+  const barcodeBlockHeight =
+    gapToBarcode + barcodeHeightDots + barcodeTextHeight + barcodeBottomGap;
+  const contentHeight = textBlockHeight + priceBlockHeight + barcodeBlockHeight;
+  const startY = safeTop + Math.max(0, Math.round((safeH - contentHeight) / 2));
+
+  const titleY = startY;
+  lines.forEach((line, i) => {
+    const w = ctx.measureText(line).width;
+    const textX = Math.max(0, safeLeft + Math.round((safeW - w) / 2));
+    ctx.fillText(line, textX, titleY + i * lineGapDots);
+  });
+
+  const desiredPriceY = priceText
+    ? titleY + textBlockHeight + gapAfterTitleDots
+    : null;
+  const desiredBarcodeY =
+    titleY +
+    textBlockHeight +
+    priceBlockHeight +
+    gapToBarcode -
+    barcodeRaiseDots;
+
+  const maxBarcodeY =
+    safeTop +
+    safeH -
+    (barcodeHeightDots + barcodeTextHeight) -
+    barcodeBottomGap;
+  const bcY = Math.min(desiredBarcodeY, maxBarcodeY);
+
+  const maxPriceY = bcY - gapAfterPriceDots - lineGapDots;
+  const priceY = priceText ? Math.min(desiredPriceY, maxPriceY) : null;
+  if (priceText && priceY != null) {
+    ctx.font = boldFont;
+    const priceW = ctx.measureText(priceText).width;
+    const priceX = Math.max(0, safeLeft + Math.round((safeW - priceW) / 2));
+    ctx.fillText(priceText, priceX, priceY);
+    ctx.font = normalFont;
+  }
+
+  // barcode: draw on temp canvas
+  const barcodeCanvas = document.createElement("canvas");
+
+  JsBarcode(barcodeCanvas, code, {
+    format: barcodeFormat,
+    width: Math.max(1, barcodeBarWidthDots),
+    height: Math.max(1, barcodeHeightDots),
+    displayValue: false,
+    margin: 0,
+    background: "#ffffff",
+    lineColor: "#000000",
+  });
+
+  const barcodeShiftX = Math.round(W * 0.03);
+  const bcX = Math.max(
+    0,
+    Math.round((W - barcodeCanvas.width) / 2) - barcodeShiftX
+  );
+  ctx.drawImage(barcodeCanvas, bcX, bcY);
+  // make bars a bit bolder
+  ctx.drawImage(barcodeCanvas, bcX + 1, bcY);
+  if (drawBarcodeText) {
+    const textY = bcY + barcodeHeightDots + barcodeTextMargin;
+    drawFullWidthText(
+      ctx,
+      code,
+      bcX,
+      textY,
+      barcodeCanvas.width,
+      barcodeTextSize,
+      fontFamily,
+      "600",
+      0
+    );
+  }
+
+  const { raster, bytesPerLine, height } = canvasToMonoRaster(
+    canvas,
+    180,
+    getRasterInvert()
+  );
+  const header = [
+    `SIZE ${w} mm,${h} mm`,
+    `GAP ${gapMm} mm,0 mm`,
+    "SPEED 4",
+    "DENSITY 6",
+    "DIRECTION 1",
+    "REFERENCE 0,0",
+    "OFFSET 0",
+    "CLS",
+    `BITMAP 0,0,${bytesPerLine},${height},0,`,
+  ].join("\r\n");
+  const copiesInt = Math.max(1, Math.min(100, Math.round(Number(copies) || 1)));
+  const footer = `\r\nPRINT ${copiesInt}\r\n`;
+
+  const headerBytes = bytesFromAscii(header);
+  const footerBytes = bytesFromAscii(footer);
+  const total = new Uint8Array(
+    headerBytes.length + raster.length + footerBytes.length
+  );
+  total.set(headerBytes, 0);
+  total.set(raster, headerBytes.length);
+  total.set(footerBytes, headerBytes.length + raster.length);
+  return total;
+}
+
+/* ====================== MAIN API ====================== */
+
+export async function printXp365bBarcodeLabel(opts) {
+  const options = { ...(opts || {}) };
+  await connectXprinter();
+
+  const mode = getRenderMode(options?.renderMode);
+  const fontId = String(options?.fontId || "");
+  const preferRaster = mode === "raster" || fontId === "__RASTER__";
+  const copies = Math.max(1, Math.min(100, Math.round(Number(options?.copies) || 1)));
+  options.copies = copies;
+
+  // Auto-scale defaults by label size if caller didn't pass tuning params.
+  // Goal: on bigger labels not only border/geometry grows, but fonts too.
+  const heightMm = Number(options?.heightMm || 20);
+  const factor = Math.max(0.75, (Number.isFinite(heightMm) ? heightMm : 20) / 20);
+  const scaled = (v) => Math.round(Number(v || 0) * factor);
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+  if (options.lineGap == null)
+    options.lineGap = clamp(scaled(DEFAULT_LABEL_PRESET.lineGap), 16, 64);
+  if (options.gapAfterTitle == null)
+    options.gapAfterTitle = clamp(scaled(DEFAULT_LABEL_PRESET.gapAfterTitle), 0, 40);
+  if (options.gapAfterPrice == null)
+    options.gapAfterPrice = clamp(scaled(DEFAULT_LABEL_PRESET.gapAfterPrice), 0, 40);
+  if (options.barcodeRaise == null)
+    options.barcodeRaise = clamp(scaled(DEFAULT_LABEL_PRESET.barcodeRaise), 0, 40);
+  if (options.barcodeHeight == null)
+    options.barcodeHeight = clamp(scaled(DEFAULT_LABEL_PRESET.barcodeHeight), 20, 200);
+  if (options.barcodeBarWidth == null)
+    options.barcodeBarWidth = DEFAULT_LABEL_PRESET.barcodeBarWidth;
+
+  // textScale: for TSPL it controls font size; for raster we keep it 1 by default
+  // to avoid quadratic scaling inside raster renderer.
+  if (options.textScale == null) {
+    options.textScale = preferRaster ? 1 : clamp(Math.round(factor), 1, 3);
+  }
+
+  if (preferRaster) {
+    const bytes = await buildRasterLabelBytes(options);
+    await sendBytesQueued(bytes);
+    return;
+  }
+
+  const tspl = buildLabel(options);
+  await sendTsplQueued(tspl);
+}
+
+export async function testPrint() {
+  await printXp365bBarcodeLabel({
+    title: "ТЕСТ: Кириллица Ёё №",
+    barcode: "2000533006751",
+    price: 250,
+    widthMm: 30,
+    heightMm: 20,
+    gapMm: 2,
+  });
+}
+
+/* ====================== DEVTOOLS ====================== */
 
 if (typeof window !== "undefined") {
-  window.testXp365bEncodingPrint = testXp365bEncodingPrint;
-  window.printXp365bCodepageTest = printXp365bCodepageTest;
-  window.testXp365bSimple = testXp365bSimple;
-  window.printXp365bBarcodeLabel = printXp365bBarcodeLabel;
+  window.printLabel = printXp365bBarcodeLabel;
+  window.testPrint = testPrint;
+  window.calibrateXprinter = calibrateXprinter;
+  window.setXp365bCodepage = setXp365bCodepage;
+  window.setXp365bOrientation = setXp365bOrientation;
+  window.setXp365bRenderMode = setXp365bRenderMode;
+  window.setXp365bRasterFontFamily = setXp365bRasterFontFamily;
 }

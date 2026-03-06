@@ -111,6 +111,38 @@ export const unpostWarehouseDocument = createAsyncThunk(
   }
 );
 
+// Подтвердить кассовый запрос (документ CASH_PENDING → POSTED)
+export const cashApproveWarehouseDocument = createAsyncThunk(
+  "warehouse/cashApproveDocument",
+  async ({ id, note }, { rejectWithValue }) => {
+    try {
+      const data = await warehouseAPI.cashDocumentApprove(
+        id,
+        note != null && note !== "" ? { note } : {}
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+// Отклонить кассовый запрос (склад откатывается, документ → REJECTED)
+export const cashRejectWarehouseDocument = createAsyncThunk(
+  "warehouse/cashRejectDocument",
+  async ({ id, note }, { rejectWithValue }) => {
+    try {
+      const data = await warehouseAPI.cashDocumentReject(
+        id,
+        note != null && note !== "" ? { note } : {}
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
 // Загрузка товаров склада
 export const fetchWarehouseProducts = createAsyncThunk(
   "warehouse/fetchProducts",
@@ -220,6 +252,25 @@ export const bulkDeleteWarehouseCounterparties = createAsyncThunk(
         return rejectWithValue({ failed });
       }
       return ids;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  }
+);
+
+// ==================== ПРОДАЖА ПО ЗАЯВКЕ АГЕНТА ====================
+
+/**
+ * Создать документ продажи по одобренной заявке агента
+ * POST /api/warehouse/agent-carts/{id}/create-sale/
+ * Возвращает созданный документ (Document).
+ */
+export const createSaleFromAgentCartAsync = createAsyncThunk(
+  "warehouse/createSaleFromAgentCart",
+  async ({ cartId, payload }, { rejectWithValue }) => {
+    try {
+      const document = await warehouseAPI.createSaleFromCart(cartId, payload);
+      return document;
     } catch (error) {
       return rejectWithValue(error);
     }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Plus } from "lucide-react";
 import { fetchEmployeesAsync } from "../../../store/creators/employeeCreators";
 import { useSelector, useDispatch } from "react-redux";
+import { useAlert } from "../../../hooks/useDialog";
 const days = [
   { label: "Понедельник", shortLabel: "Пон", date: "13" },
   { label: "Вторник", shortLabel: "Втор", date: "14" },
@@ -13,6 +14,7 @@ const days = [
 ];
 
 const AddModal = ({ onClose, onSave, isLoading, error }) => {
+  const alert = useAlert()
   const [title, setTitle] = useState("");
   const [datetime, setDatetime] = useState("");
   const [selectedDayLabel, setSelectedDayLabel] = useState("");
@@ -22,7 +24,7 @@ const AddModal = ({ onClose, onSave, isLoading, error }) => {
 
   const handleSubmit = () => {
     if (!title || !datetime) {
-      alert("Пожалуйста, заполните все обязательные поля.");
+      alert("Пожалуйста, заполните все обязательные поля.", true);
       return;
     }
 
@@ -86,7 +88,7 @@ const AddModal = ({ onClose, onSave, isLoading, error }) => {
             onChange={(e) => setSelectedDayLabel(e.target.value)}
           /> */}
 
-          <select>
+          <select className="add-modal__input">
             <option value="">Выберите сотрудника</option>
             {employees?.map((employee) => (
               <option key={employee.id} value={employee.id}>

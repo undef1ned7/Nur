@@ -10,6 +10,7 @@ import {
 } from "../../../../pages/Sell/services/printService";
 import ReceiptPdfDocument from "./ReceiptPdfDocument";
 import "./ReceiptPreviewModal.scss";
+import { useAlert, useConfirm } from "../../../../../hooks/useDialog";
 
 const ReceiptPreviewModal = ({
   receiptId,
@@ -18,6 +19,8 @@ const ReceiptPreviewModal = ({
   onClose,
   onEdit,
 }) => {
+  const alert = useAlert();
+  const confirm = useConfirm(); 
   const dispatch = useDispatch();
   const { company, profile: userProfile } = useUser();
   const [receiptData, setReceiptData] = useState(initialReceiptData);
@@ -246,7 +249,8 @@ const ReceiptPreviewModal = ({
       console.error("Ошибка при скачивании PDF:", downloadError);
       alert(
         "Ошибка при скачивании PDF: " +
-          (downloadError.message || "Неизвестная ошибка")
+          (downloadError.message || "Неизвестная ошибка"),
+          true
       );
     } finally {
       setDownloadingPdf(false);

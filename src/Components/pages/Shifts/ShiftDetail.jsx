@@ -27,6 +27,8 @@ import {
   fetchShiftSalesAsync,
 } from "../../../store/creators/shiftThunk";
 import "./ShiftDetail.scss";
+import DataContainer from "../../common/DataContainer/DataContainer";
+import { validateResErrors } from "../../../../tools/validateResErrors";
 
 const ShiftDetail = () => {
   const { id } = useParams();
@@ -162,7 +164,8 @@ const ShiftDetail = () => {
         setMoneyMovements(movements);
       } catch (error) {
         console.error("Ошибка при загрузке движения денег:", error);
-        setMoneyError("Не удалось загрузить движение денег");
+        const errorMessage = validateResErrors(error, "Ошибка при загрузке движения денег. ")
+        setMoneyError(errorMessage);
         setMoneyMovements([]);
       } finally {
         setMoneyLoading(false);
@@ -524,13 +527,12 @@ const ShiftDetail = () => {
                     Расхождение
                   </div>
                   <div
-                    className={`shift-detail-page__detail-value ${
-                      parseFloat(shift.cash_diff || 0) === 0
+                    className={`shift-detail-page__detail-value ${parseFloat(shift.cash_diff || 0) === 0
                         ? "shift-detail-page__detail-value--green"
                         : parseFloat(shift.cash_diff || 0) > 0
-                        ? "shift-detail-page__detail-value--green"
-                        : "shift-detail-page__detail-value--red"
-                    }`}
+                          ? "shift-detail-page__detail-value--green"
+                          : "shift-detail-page__detail-value--red"
+                      }`}
                   >
                     {parseFloat(shift.cash_diff || 0) === 0 ? (
                       <>
@@ -602,17 +604,15 @@ const ShiftDetail = () => {
         </h2>
         <div className="shift-detail-page__tabs">
           <button
-            className={`shift-detail-page__tab ${
-              activeTab === "products" ? "shift-detail-page__tab--active" : ""
-            }`}
+            className={`shift-detail-page__tab ${activeTab === "products" ? "shift-detail-page__tab--active" : ""
+              }`}
             onClick={() => setActiveTab("products")}
           >
             Движение товара
           </button>
           <button
-            className={`shift-detail-page__tab ${
-              activeTab === "money" ? "shift-detail-page__tab--active" : ""
-            }`}
+            className={`shift-detail-page__tab ${activeTab === "money" ? "shift-detail-page__tab--active" : ""
+              }`}
             onClick={() => setActiveTab("money")}
           >
             Движение денег
@@ -694,63 +694,66 @@ const ShiftDetail = () => {
             )}
 
             {/* Список продаж */}
-            {!salesLoading && !salesError && (
-              <>
-                {productMovements.length === 0 ? (
-                  <div className="shift-detail-page__empty-message">
-                    Продажи не найдены
-                  </div>
-                ) : (
-                  productMovements.map((movement, idx) => (
-                    <div
-                      key={movement.id}
-                      className="shift-detail-page__operation"
-                    >
-                      <div className="shift-detail-page__operation-indicator shift-detail-page__operation-indicator--blue" />
-                      <div className="shift-detail-page__operation-content">
-                        <div className="shift-detail-page__operation-title">
-                          Продажа #{idx + 1}
-                          {movement.docNumber || movement.id.slice(0, 8)}
-                        </div>
-                        <div className="shift-detail-page__operation-info">
-                          Магазин {movement.store} &gt; клиент {movement.client}
-                        </div>
-                        <div className="shift-detail-page__operation-info">
-                          {movement.cashier}, {formatDate(movement.date)}
-                        </div>
-                        <div
-                          className={`shift-detail-page__operation-status shift-detail-page__operation-status--${
-                            movement.status === "paid" ? "paid" : "unpaid"
-                          }`}
-                        >
-                          {movement.status === "paid" ? (
-                            <>
-                              <CheckCircle size={16} />
-                              <span>Документ оплачен</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle size={16} />
-                              <span>Документ не оплачен</span>
-                            </>
-                          )}
-                        </div>
-                        <div className="shift-detail-page__operation-positions">
-                          {movement.positions} позиции
-                        </div>
-                      </div>
-                      <div className="shift-detail-page__operation-amount">
-                        {movement.amount.toFixed(2)} сом
-                      </div>
-                      <ChevronDown
-                        size={20}
-                        className="shift-detail-page__operation-expand"
-                      />
+            <DataContainer className="gap-2 flex flex-col">
+
+              {!salesLoading && !salesError && (
+                <>
+                  {productMovements.length === 0 ? (
+                    <div className="shift-detail-page__empty-message">
+                      Продажи не найдены
                     </div>
-                  ))
-                )}
-              </>
-            )}
+                  ) : (
+                    productMovements.map((movement, idx) => (
+                      <div
+                        key={movement.id}
+                        className="shift-detail-page__operation"
+                      >
+                        <div className="shift-detail-page__operation-indicator shift-detail-page__operation-indicator--blue" />
+                        <div className="shift-detail-page__operation-content">
+                          <div className="shift-detail-page__operation-title">
+                            Продажа #{idx + 1}
+                            {movement.docNumber || movement.id.slice(0, 8)}
+                          </div>
+                          <div className="shift-detail-page__operation-info">
+                            Магазин {movement.store} &gt; клиент {movement.client}
+                          </div>
+                          <div className="shift-detail-page__operation-info">
+                            {movement.cashier}, {formatDate(movement.date)}
+                          </div>
+                          <div
+                            className={`shift-detail-page__operation-status shift-detail-page__operation-status--${movement.status === "paid" ? "paid" : "unpaid"
+                              }`}
+                          >
+                            {movement.status === "paid" ? (
+                              <>
+                                <CheckCircle size={16} />
+                                <span>Документ оплачен</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle size={16} />
+                                <span>Документ не оплачен</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="shift-detail-page__operation-positions">
+                            {movement.positions} позиции
+                          </div>
+                        </div>
+                        <div className="shift-detail-page__operation-amount">
+                          {movement.amount.toFixed(2)} сом
+                        </div>
+                        <ChevronDown
+                          size={20}
+                          className="shift-detail-page__operation-expand"
+                        />
+                      </div>
+                    ))
+                  )}
+                </>
+              )}
+            </DataContainer>
+
           </div>
         )}
 

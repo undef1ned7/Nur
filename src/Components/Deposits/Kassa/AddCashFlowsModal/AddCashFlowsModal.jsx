@@ -6,9 +6,14 @@ import {
   useCash,
 } from "../../../../store/slices/cashSlice";
 import { useDispatch } from "react-redux";
+import { useUser } from "../../../../store/slices/userSlice";
+import { useAlert } from "../../../../hooks/useDialog";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const AddCashFlowsModal = ({ onClose }) => {
+  const alert = useAlert();
   const dispatch = useDispatch();
+  const { profile } = useUser();
   const { list: cashBoxes } = useCash();
   const [newCashbox, setNewCashbox] = useState({
     name: "",
@@ -17,7 +22,6 @@ const AddCashFlowsModal = ({ onClose }) => {
     // is_consumption: true,
     type: "expense", // Дефолтный тип для новой операции
   });
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     dispatch(getCashBoxes());
@@ -36,15 +40,17 @@ const AddCashFlowsModal = ({ onClose }) => {
 
   const handleAddCashbox = async () => {
     try {
-      dispatch(addCashFlows(newCashbox));
-
+      const response = await dispatch(addCashFlows({ ...newCashbox, status: profile.role === 'owner' ? 'approved' : 'pending' }))
+      if (response.error) {
+        const errorMessage = validateResErrors(response.payload, "Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз.")
+        alert(errorMessage, true)
+        return
+      }
       onClose();
       setNewCashbox({ name: "", amount: 0, type: "expense", cashbox: "" });
     } catch (err) {
-      console.error("Failed to add cashflow:", err);
-      setError(
-        "Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз."
-      );
+      const errorMessage = validateResErrors(err, "Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз.")
+      alert(errorMessage, true)
     }
   };
 

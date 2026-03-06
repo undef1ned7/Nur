@@ -923,6 +923,18 @@ const BranchDetails = () => {
       return dateString;
     }
   };
+  const formatDateTable = (dateString) => {
+    if (!dateString) return "—";
+    try {
+      return new Date(dateString).toLocaleString("ru-RU", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+      });
+    } catch {
+      return dateString;
+    }
+  };
 
   const formatCurrency = (amount) => {
     if (amount === null || amount === undefined) return "0";
@@ -1101,7 +1113,7 @@ const BranchDetails = () => {
                   <tbody>
                     {filteredSales.map((item) => (
                       <tr key={item.id}>
-                        <td>{formatDate(item.created_at)}</td>
+                        <td className="table-cell--date">{formatDateTable(item.created_at)}</td>
                         <td>{formatCurrency(item.total || item.amount)}</td>
                         <td>{item.status || "—"}</td>
                         <td>

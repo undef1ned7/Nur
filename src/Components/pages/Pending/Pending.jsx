@@ -413,7 +413,18 @@ const Pending = () => {
           </div>
         </div>
       )}
-
+      {filteredPending.length > 0 && (
+        <div className="pending-footer">
+          <button
+            className="pending-footer__refresh-btn"
+            onClick={() => dispatch(getCashFlows(apiParams))}
+            disabled={processing}
+          >
+            <RefreshCw size={16} />
+            Обновить список
+          </button>
+        </div>
+      )}
       {/* Content */}
       <div className="pending-table-container w-full">
         {/* ===== TABLE ===== */}
@@ -635,18 +646,6 @@ const Pending = () => {
       </div>
 
       {/* Footer Actions */}
-      {filteredPending.length > 0 && (
-        <div className="pending-footer">
-          <button
-            className="pending-footer__refresh-btn"
-            onClick={() => dispatch(getCashFlows(apiParams))}
-            disabled={processing}
-          >
-            <RefreshCw size={16} />
-            Обновить список
-          </button>
-        </div>
-      )}
     </div>
   );
 };

@@ -114,6 +114,96 @@
     border-top: 1px solid #ffe066;
   }
 
+  &__supplier-row {
+    .add-product-barcode__supplier-select-wrap {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    select {
+      flex: 1;
+      min-width: 200px;
+    }
+  }
+
+  &__create-supplier-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1a1a;
+    background: #fff3cd;
+    border: 1px solid #ffd400;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s, border-color 0.2s;
+
+    &:hover {
+      background: #ffd400;
+      border-color: #e6c200;
+    }
+  }
+
+  &__supplier-form {
+    margin-top: 16px;
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+
+    input.add-product-barcode__input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+
+      &:focus {
+        outline: none;
+        border-color: #ffd400;
+      }
+    }
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__supplier-form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  &__input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1a1a1a;
+    background: white;
+
+    &:focus {
+      outline: none;
+      border-color: #ffd400;
+    }
+  }
+
+  &__select {
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1a1a1a;
+    background: white;
+  }
+
   &__error-message {
     color: #ff5a5a;
     font-size: 13px;

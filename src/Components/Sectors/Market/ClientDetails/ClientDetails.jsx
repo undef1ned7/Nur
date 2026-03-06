@@ -226,6 +226,47 @@ export default function MarketClientDetails() {
     return { ...agg, amount: agg.sale };
   }, [deals]);
 
+  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
+  const getDebtProgress = (deal) => {
+    const total = Number(deal?.debt_amount ?? deal?.amount ?? 0);
+    const remainingRaw = deal?.remaining_debt;
+    const remaining = remainingRaw === "" || remainingRaw == null ? NaN : Number(remainingRaw);
+
+    let paid = 0;
+    if (Number.isFinite(remaining)) {
+      paid = total - remaining;
+    } else if (deal?.prepayment != null && deal?.prepayment !== "") {
+      paid = Number(deal.prepayment) || 0;
+    }
+
+    if (!Number.isFinite(total) || total <= 0) {
+      return { percent: 0, paid: 0, total: 0, remaining: 0 };
+    }
+
+    const safePaid = clamp(Number.isFinite(paid) ? paid : 0, 0, total);
+    const safeRemaining = clamp(total - safePaid, 0, total);
+    const percent = clamp(Math.round((safePaid / total) * 100), 0, 100);
+
+    // Цвет: красный(0%) -> зелёный(100%)
+    const hue = (percent / 100) * 120;
+    const fill = `hsl(${hue}deg, 85%, 45%)`;
+    const bg = `hsl(${hue}deg, 85%, 94%)`;
+    const border = `hsl(${hue}deg, 65%, 75%)`;
+    const glow = `0 0 0 3px hsla(${hue}deg, 85%, 55%, 0.22)`;
+
+    return {
+      percent,
+      paid: safePaid,
+      total,
+      remaining: safeRemaining,
+      fill,
+      bg,
+      border,
+      glow,
+    };
+  };
+
   const handleClientUpdated = (updatedClient) => {
     persistClient(updatedClient);
   };
@@ -456,6 +497,13 @@ export default function MarketClientDetails() {
         )}
 
         {filteredDeals.map((deal) => (
+          (() => {
+            const isDebt = deal.kind === "debt";
+            const debtProgress = isDebt ? getDebtProgress(deal) : null;
+            const debtStatusLabel =
+              isDebt && Number(deal.prepayment || 0) !== 0 ? "Предоплата" : "Долг";
+
+            return (
           <div
             key={deal.id}
             onClick={() => {
@@ -469,10 +517,47 @@ export default function MarketClientDetails() {
             <span className="client-details__deal-amount deal-budget">
               {Number(deal.amount || 0).toFixed(2)}
             </span>
-            <span className="client-details__deal-status deal-status">
-              {deal.kind === "debt" && Number(deal.prepayment || 0) !== 0
-                ? "Предоплата"
-                : kindLabel(deal.kind)}
+            <span
+              className={`client-details__deal-status deal-status ${isDebt ? "is-debt" : ""}`}
+              style={
+                isDebt
+                  ? {
+                      background: debtProgress.bg,
+                      border: `1px solid ${debtProgress.border}`,
+                      color: "var(--text)",
+                      boxShadow: debtProgress.glow,
+                    }
+                  : undefined
+              }
+              title={
+                isDebt
+                  ? `Оплачено ${debtProgress.paid.toFixed(2)} из ${debtProgress.total.toFixed(
+                      2
+                    )} (${debtProgress.percent}%)`
+                  : undefined
+              }
+            >
+              {isDebt ? (
+                <span className="client-details__debtProgress">
+                  <span className="client-details__debtText">
+                    {debtStatusLabel} •{" "}
+                    <span className="client-details__debtPercent">
+                      {debtProgress.percent}%
+                    </span>
+                  </span>
+                  <span className="client-details__battery" aria-hidden="true">
+                    <span
+                      className="client-details__batteryFill"
+                      style={{
+                        width: `${debtProgress.percent}%`,
+                        backgroundColor: debtProgress.fill,
+                      }}
+                    />
+                  </span>
+                </span>
+              ) : (
+                kindLabel(deal.kind)
+              )}
             </span>
             <span className="client-details__deal-tasks deal-tasks">
               Нет задач
@@ -486,12 +571,15 @@ export default function MarketClientDetails() {
               </button>
             </div>
           </div>
+            );
+          })()
         ))}
       </div>
 
       {showDebtModal && (
         <DebtModal
           id={selectedRowId}
+          clientType={client?.type}
           onClose={() => setShowDebtModal(false)}
           onChanged={() => client?.id && loadDeals(client.id)}
         />

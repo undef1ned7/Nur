@@ -1,19 +1,23 @@
 // src/components/Education/Masters.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  FaCheck,
-  FaCopy,
-  FaEdit,
-  FaPlus,
-  FaSearch,
-  FaTimes,
-  FaTrash,
-} from "react-icons/fa";
+import { FaEdit, FaLock, FaPlus, FaSearch, FaTrash } from "react-icons/fa";
 import api from "../../../../api";
+import {
+  createCompanyMembership,
+  listWarehouses,
+} from "../../../../api/warehouse";
 import { useUser } from "../../../../store/slices/userSlice";
-import AccessList from "../../../DepartmentDetails/AccessList";
+import RoleCreateModal from "./modals/RoleCreateModal";
+import RoleEditModal from "./modals/RoleEditModal";
+import EmployeeCreateModal from "./modals/EmployeeCreateModal";
+import EmployeeEditModal from "./modals/EmployeeEditModal";
+import NewEmployeeCredentialsModal from "./modals/NewEmployeeCredentialsModal";
+import DeleteRoleModal from "./modals/DeleteRoleModal";
+import DeleteEmployeeModal from "./modals/DeleteEmployeeModal";
+import EmployeeAccessModal from "./modals/EmployeeAccessModal";
 import "./Masters.scss";
+import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 /* ===================== API endpoints ===================== */
 const EMPLOYEES_LIST_URL = "/users/employees/";
@@ -26,7 +30,7 @@ const ROLE_ITEM_URL = (id) => `/users/roles/custom/${id}/`;
 
 /* ===================== Helpers ===================== */
 const SYSTEM_ROLES = ["owner", "admin"];
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 50;
 
 const asArray = (d) =>
   Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
@@ -258,6 +262,19 @@ const Masters = () => {
   const [accessModalEmployee, setAccessModalEmployee] = useState(null);
   const [accessModalAccesses, setAccessModalAccesses] = useState([]);
 
+  // Назначение агента склада (Warehouse Agents)
+  const [warehouseAgentModalOpen, setWarehouseAgentModalOpen] = useState(false);
+  const [warehouseAgentEmployee, setWarehouseAgentEmployee] = useState(null);
+  const [warehouseAgentCommonEnabled, setWarehouseAgentCommonEnabled] =
+    useState(false);
+  const [warehouseAgentCommonWarehouse, setWarehouseAgentCommonWarehouse] =
+    useState("");
+  const [warehouseAgentSaving, setWarehouseAgentSaving] = useState(false);
+  const [warehouseAgentError, setWarehouseAgentError] = useState("");
+  const [warehouseAgentWarehouses, setWarehouseAgentWarehouses] = useState([]);
+  const [warehouseAgentWarehousesLoading, setWarehouseAgentWarehousesLoading] =
+    useState(false);
+
   const copyToClipboard = async (text, key) => {
     if (!text) return;
     try {
@@ -268,6 +285,11 @@ const Masters = () => {
   };
 
   /* ========= Fetch ========= */
+  // TODO: Implement server-side mode for employees and roles
+  // - Add query params: ?search=&ordering=&page=
+  // - Add debounce for search (400ms)
+  // - Remove client-side filter/sort (lines 341-413)
+  // - Use {count, next, previous, results} for pagination
   const fetchEmployees = useCallback(async () => {
     const res = await api.get(EMPLOYEES_LIST_URL);
     setEmployees(asArray(res.data).map(normalizeEmployee));
@@ -294,8 +316,9 @@ const Masters = () => {
         setLoading(true);
         setError("");
         await Promise.all([fetchEmployees(), fetchRoles(), fetchBranches()]);
-      } catch {
-        setError("Не удалось загрузить данные.");
+      } catch (err) {
+        const errorMessage = validateResErrors(err, "Ошибка загрузки данных. ");
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -335,9 +358,11 @@ const Masters = () => {
       ...roleOptions,
       { key: "NONE", label: "Без роли" },
     ],
-    [roleOptions]
+    [roleOptions],
   );
 
+  // TODO: Remove client-side filtering - should be done on backend
+  // Backend should support: ?search=&role=&custom_role=&page=
   const filteredEmployees = useMemo(() => {
     const t = q.trim().toLowerCase();
     let base = employees;
@@ -358,10 +383,12 @@ const Masters = () => {
     return base.filter((e) =>
       [fullName(e), e.email, e.role_display, ruLabelSys(e.role)]
         .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(t))
+        .some((v) => String(v).toLowerCase().includes(t)),
     );
   }, [employees, q, filterRole]);
 
+  // TODO: Remove client-side filtering/sorting - should be done on backend
+  // Backend should support: ?search=&ordering=name&page=
   const rolesForList = useMemo(() => {
     const sys = SYSTEM_ROLES.map((code) => ({
       id: `sys:${code}`,
@@ -381,7 +408,7 @@ const Masters = () => {
       }
     }
     const base = [...sys, ...dedup].sort((a, b) =>
-      a.name.localeCompare(b.name, "ru")
+      a.name.localeCompare(b.name, "ru"),
     );
     const t = q.trim().toLowerCase();
     if (!t) return base;
@@ -393,23 +420,26 @@ const Masters = () => {
     setPageRole(1);
   }, [q, tab, filteredEmployees.length, rolesForList.length, filterRole]);
 
+  // TODO: Remove client-side pagination - should use backend pagination
+  // Use count from API response instead of .length
+  // Remove .slice() - backend should return only current page
   const totalPagesEmp = Math.max(
     1,
-    Math.ceil(filteredEmployees.length / PAGE_SIZE)
+    Math.ceil(filteredEmployees.length / PAGE_SIZE),
   );
   const totalPagesRole = Math.max(
     1,
-    Math.ceil(rolesForList.length / PAGE_SIZE)
+    Math.ceil(rolesForList.length / PAGE_SIZE),
   );
   const pageSafeEmp = Math.min(pageEmp, totalPagesEmp);
   const pageSafeRole = Math.min(pageRole, totalPagesRole);
   const empRows = filteredEmployees.slice(
     (pageSafeEmp - 1) * PAGE_SIZE,
-    pageSafeEmp * PAGE_SIZE
+    pageSafeEmp * PAGE_SIZE,
   );
   const roleRows = rolesForList.slice(
     (pageSafeRole - 1) * PAGE_SIZE,
-    pageSafeRole * PAGE_SIZE
+    pageSafeRole * PAGE_SIZE,
   );
 
   /* ========= Validation ========= */
@@ -434,7 +464,8 @@ const Masters = () => {
       alerts.push("Email указан неверно.");
     } else {
       const exists = employees.some(
-        (u) => normalizeEmail(u.email) === email && (!isEdit || u.id !== editId)
+        (u) =>
+          normalizeEmail(u.email) === email && (!isEdit || u.id !== editId),
       );
       if (exists) {
         errs.email = true;
@@ -472,7 +503,7 @@ const Masters = () => {
     if (sysCodeFromName(name))
       return setRoleCreateErr("Это имя занято системной ролью.");
     const dup = roles.some(
-      (r) => normalizeRoleName(r.name) === normalizeRoleName(name)
+      (r) => normalizeRoleName(r.name) === normalizeRoleName(name),
     );
     if (dup) return setRoleCreateErr("Роль с таким названием уже существует.");
 
@@ -508,7 +539,7 @@ const Masters = () => {
     const dup = roles.some(
       (r) =>
         r.id !== roleEditId &&
-        normalizeRoleName(r.name) === normalizeRoleName(name)
+        normalizeRoleName(r.name) === normalizeRoleName(name),
     );
     if (dup) return setRoleEditErr("Роль с таким названием уже существует.");
 
@@ -608,8 +639,8 @@ const Masters = () => {
     const roleChoice = u.role
       ? `sys:${u.role}`
       : u.custom_role
-      ? `cus:${u.custom_role}`
-      : "";
+        ? `cus:${u.custom_role}`
+        : "";
     // Берем первый филиал из массива branches или используем branch
     const branchValue =
       Array.isArray(u.branches) && u.branches.length > 0
@@ -870,13 +901,73 @@ const Masters = () => {
         ],
         "Строительная компания": [
           {
-            value: "Процесс работы",
-            label: "Процесс работы",
+            value: "Аналитика",
+            label: "Аналитика",
+            backendKey: "can_view_building_analytics",
+          },
+          {
+            value: "Касса",
+            label: "Касса",
+            backendKey: "can_view_building_cash_register",
+          },
+          {
+            value: "Клиенты",
+            label: "Клиенты",
+            backendKey: "can_view_building_clients",
+          },
+          {
+            value: "Отделы",
+            label: "Отделы",
+            backendKey: "can_view_building_department",
+          },
+          {
+            value: "Сотрудники",
+            label: "Сотрудники",
+            backendKey: "can_view_building_employess",
+          },
+          {
+            value: "Напоминания",
+            label: "Напоминания",
+            backendKey: "can_view_building_notification",
+          },
+          {
+            value: "Закупки",
+            label: "Закупки",
+            backendKey: "can_view_building_procurement",
+          },
+          {
+            value: "ЖК",
+            label: "ЖК",
+            backendKey: "can_view_building_projects",
+          },
+          {
+            value: "Зарплата",
+            label: "Зарплата",
+            backendKey: "can_view_building_salary",
+          },
+          {
+            value: "Продажи",
+            label: "Продажи",
+            backendKey: "can_view_building_sell",
+          },
+          {
+            value: "Склад",
+            label: "Склад",
+            backendKey: "can_view_building_stock",
+          },
+          {
+            value: "Договора",
+            label: "Договора",
+            backendKey: "can_view_building_treaty",
+          },
+          {
+            value: "Процесс работ",
+            label: "Процесс работ",
             backendKey: "can_view_building_work_process",
           },
           {
-            value: "Квартиры",
-            label: "Квартиры",
+            value: "Квартиры/объекты",
+            label: "Квартиры/объекты",
             backendKey: "can_view_building_objects",
           },
         ],
@@ -930,14 +1021,28 @@ const Masters = () => {
           { value: "Услуги", label: "Услуги", backendKey: "can_view_services" },
         ],
         Склад: [
-          { value: "Контрагенты", label: "Контрагенты", backendKey: "can_view_clients" },
+          {
+            value: "Контрагенты",
+            label: "Контрагенты",
+            backendKey: "can_view_clients",
+          },
           {
             value: "Аналитика",
             label: "Аналитика",
             backendKey: "can_view_analytics",
           },
           { value: "Товары", label: "Товары", backendKey: "can_view_products" },
-          { value: "Документы", label: "Документы", backendKey: "can_view_document" },
+          {
+            value: "Документы",
+            label: "Документы",
+            backendKey: "can_view_document",
+          },
+          { value: "Агенты", label: "Агенты", backendKey: "can_view_agent" },
+          // {
+          //   value: "Контрагенты",
+          //   label: "Контрагенты",
+          //   backendKey: "can_view_clients",
+          // },
         ],
         Производство: [
           {
@@ -982,7 +1087,7 @@ const Masters = () => {
       });
       return labelsArray;
     },
-    [company?.sector?.name]
+    [company?.sector?.name],
   );
 
   const openAccessModal = async (employee) => {
@@ -998,7 +1103,7 @@ const Masters = () => {
     } catch (err) {
       console.error("Ошибка при открытии модального окна доступов:", err);
       setPageNotice(
-        pickApiError(err, "Не удалось загрузить доступы сотрудника.")
+        pickApiError(err, "Не удалось загрузить доступы сотрудника."),
       );
     }
   };
@@ -1010,7 +1115,7 @@ const Masters = () => {
     try {
       await api.patch(
         EMPLOYEE_ITEM_URL(accessModalEmployee.id),
-        newAccessesPayload
+        newAccessesPayload,
       );
       await fetchEmployees();
       setAccessModalOpen(false);
@@ -1018,10 +1123,81 @@ const Masters = () => {
       setAccessModalAccesses([]);
     } catch (err) {
       setPageNotice(
-        pickApiError(err, "Не удалось обновить доступы сотрудника.")
+        pickApiError(err, "Не удалось обновить доступы сотрудника."),
       );
     } finally {
       setEmpSaving(false);
+    }
+  };
+
+  /* ========= Warehouse: assign as warehouse agent (company membership) ========= */
+  const openWarehouseAgentModal = (employee) => {
+    if (!employee?.id) return;
+    setWarehouseAgentEmployee(employee);
+    setWarehouseAgentCommonEnabled(false);
+    setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentError("");
+    setWarehouseAgentModalOpen(true);
+
+    if (
+      company?.sector?.name === "Склад" &&
+      !warehouseAgentWarehousesLoading &&
+      warehouseAgentWarehouses.length === 0
+    ) {
+      (async () => {
+        try {
+          setWarehouseAgentWarehousesLoading(true);
+          const res = await listWarehouses({ page_size: 1000 });
+          const list = Array.isArray(res?.results) ? res.results : res || [];
+          setWarehouseAgentWarehouses(list);
+        } catch (err) {
+          console.error("Не удалось загрузить склады для выбора:", err);
+          setWarehouseAgentError(
+            pickApiError(err, "Не удалось загрузить список складов."),
+          );
+        } finally {
+          setWarehouseAgentWarehousesLoading(false);
+        }
+      })();
+    }
+  };
+
+  const closeWarehouseAgentModal = () => {
+    if (warehouseAgentSaving) return;
+    setWarehouseAgentModalOpen(false);
+    setWarehouseAgentEmployee(null);
+    setWarehouseAgentCommonEnabled(false);
+    setWarehouseAgentCommonWarehouse("");
+    setWarehouseAgentError("");
+  };
+
+  const submitWarehouseAgent = async (e) => {
+    e?.preventDefault?.();
+    if (!warehouseAgentEmployee?.id || warehouseAgentSaving) return;
+    if (warehouseAgentCommonEnabled && !warehouseAgentCommonWarehouse.trim()) {
+      setWarehouseAgentError("Укажите UUID склада для общего прайса.");
+      return;
+    }
+    setWarehouseAgentSaving(true);
+    setWarehouseAgentError("");
+    setPageNotice("");
+    try {
+      const payload = {
+        user: warehouseAgentEmployee.id,
+      };
+      if (warehouseAgentCommonEnabled) {
+        payload.common_access_enabled = true;
+        payload.common_warehouse = warehouseAgentCommonWarehouse.trim();
+      }
+      await createCompanyMembership(payload);
+      setPageNotice("Сотрудник назначен агентом склада.");
+      closeWarehouseAgentModal();
+    } catch (err) {
+      setWarehouseAgentError(
+        pickApiError(err, "Не удалось назначить сотрудника агентом склада."),
+      );
+    } finally {
+      setWarehouseAgentSaving(false);
     }
   };
 
@@ -1086,16 +1262,16 @@ const Masters = () => {
             {loading
               ? "Загрузка…"
               : tab === "roles"
-              ? `${rolesForList.length} ролей${
-                  rolesForList.length > PAGE_SIZE
-                    ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
-                    : ""
-                }`
-              : `${filteredEmployees.length} сотрудников${
-                  filteredEmployees.length > PAGE_SIZE
-                    ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
-                    : ""
-                }`}
+                ? `${rolesForList.length} ролей${
+                    rolesForList.length > PAGE_SIZE
+                      ? ` · стр. ${pageSafeRole}/${totalPagesRole}`
+                      : ""
+                  }`
+                : `${filteredEmployees.length} сотрудников${
+                    filteredEmployees.length > PAGE_SIZE
+                      ? ` · стр. ${pageSafeEmp}/${totalPagesEmp}`
+                      : ""
+                  }`}
           </span>
         </div>
 
@@ -1249,8 +1425,8 @@ const Masters = () => {
               const roleLabel = u.role
                 ? ruLabelSys(u.role)
                 : roles.length
-                ? roleById.get(u.custom_role)?.name || u.role_display || "—"
-                : u.role_display || "—";
+                  ? roleById.get(u.custom_role)?.name || u.role_display || "—"
+                  : u.role_display || "—";
               return (
                 <article key={u.id} className="barbermasters__card">
                   <div className="barbermasters__cardLeft">
@@ -1291,12 +1467,44 @@ const Masters = () => {
                           </span>
                         </button>
                       )}
+                    {company?.sector?.name === "Склад" &&
+                      (u.role === "agent" ||
+                        roleLabel?.toLowerCase().includes("агент")) && (
+                        <button
+                          className="barbermasters__btn barbermasters__btn--secondary"
+                          onClick={() =>
+                            navigate(
+                              `/crm/warehouse/analytics?agent_id=${u.id}`,
+                              { state: { agentName: fullName(u) } },
+                            )
+                          }
+                          title="Аналитика склада (агент)"
+                        >
+                          <span className="barbermasters__btnText">
+                            📊 Аналитика
+                          </span>
+                        </button>
+                      )}
+                    {company?.sector?.name === "Склад" &&
+                      (profile?.role === "owner" ||
+                        profile?.role === "admin") && (
+                        <button
+                          className="barbermasters__btn barbermasters__btn--secondary"
+                          onClick={() => openWarehouseAgentModal(u)}
+                          title="Назначить агентом склада (модуль агентов)"
+                        >
+                          <span className="barbermasters__btnText">
+                            🧑‍💼 Агент склада
+                          </span>
+                        </button>
+                      )}
                     <button
                       className="barbermasters__btn barbermasters__btn--secondary"
                       onClick={() => openAccessModal(u)}
                       title="Управление доступами"
                       disabled={u.role === "owner"}
                     >
+                      <FaLock />
                       <span className="barbermasters__btnText">Доступы</span>
                     </button>
                     <button
@@ -1332,885 +1540,216 @@ const Masters = () => {
         </>
       )}
 
-      {/* ===== Roles: create ===== */}
-      {roleCreateOpen && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
-        >
-          <div
-            className="barbermasters__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">Новая роль</h3>
+      <RoleCreateModal
+        roleCreateOpen={roleCreateOpen}
+        roleCreateSaving={roleCreateSaving}
+        setRoleCreateOpen={setRoleCreateOpen}
+        submitRoleCreate={submitRoleCreate}
+        roleCreateName={roleCreateName}
+        setRoleCreateName={setRoleCreateName}
+        roleCreateErr={roleCreateErr}
+      />
+      <RoleEditModal
+        roleEditOpen={roleEditOpen}
+        roleEditSaving={roleEditSaving}
+        setRoleEditOpen={setRoleEditOpen}
+        submitRoleEdit={submitRoleEdit}
+        roleEditName={roleEditName}
+        setRoleEditName={setRoleEditName}
+        roleEditErr={roleEditErr}
+      />
+      <EmployeeCreateModal
+        empCreateOpen={empCreateOpen}
+        empSaving={empSaving}
+        setEmpCreateOpen={setEmpCreateOpen}
+        empAlerts={empAlerts}
+        empFieldErrors={empFieldErrors}
+        empForm={empForm}
+        setEmpForm={setEmpForm}
+        submitEmployeeCreate={submitEmployeeCreate}
+        company={company}
+        roleOptions={roleOptions}
+        showBranchSelect={showBranchSelect}
+        branches={branches}
+        RoleSelect={RoleSelect}
+      />
+      <EmployeeEditModal
+        empEditOpen={empEditOpen}
+        empSaving={empSaving}
+        setEmpEditOpen={setEmpEditOpen}
+        empAlerts={empAlerts}
+        empFieldErrors={empFieldErrors}
+        empForm={empForm}
+        setEmpForm={setEmpForm}
+        submitEmployeeEdit={submitEmployeeEdit}
+        company={company}
+        roleOptions={roleOptions}
+        showBranchSelect={showBranchSelect}
+        branches={branches}
+        RoleSelect={RoleSelect}
+      />
+      <NewEmployeeCredentialsModal
+        openLogin={openLogin}
+        setOpenLogin={setOpenLogin}
+        employData={employData}
+        copied={copied}
+        copyToClipboard={copyToClipboard}
+      />
+      <DeleteRoleModal
+        roleToDelete={roleToDelete}
+        setRoleToDelete={setRoleToDelete}
+        doRemoveRole={doRemoveRole}
+        roleDeletingIds={roleDeletingIds}
+      />
+      <DeleteEmployeeModal
+        empToDelete={empToDelete}
+        setEmpToDelete={setEmpToDelete}
+        doRemoveEmployee={doRemoveEmployee}
+        empDeletingIds={empDeletingIds}
+        fullName={fullName}
+      />
+      <EmployeeAccessModal
+        accessModalOpen={accessModalOpen}
+        setAccessModalOpen={setAccessModalOpen}
+        accessModalEmployee={accessModalEmployee}
+        accessModalAccesses={accessModalAccesses}
+        handleSaveEmployeeAccesses={handleSaveEmployeeAccesses}
+        profile={profile}
+        tariff={tariff}
+        company={company}
+        empSaving={empSaving}
+      />
+
+      {warehouseAgentModalOpen && warehouseAgentEmployee && (
+        <div className="barbermasters__overlay" role="dialog" aria-modal="true">
+          <div className="barbermasters__modal">
+            <header className="barbermasters__modalHeader">
+              <h3 className="barbermasters__modalTitle">Агент склада</h3>
               <button
+                type="button"
                 className="barbermasters__iconBtn"
-                onClick={() => !roleCreateSaving && setRoleCreateOpen(false)}
+                onClick={closeWarehouseAgentModal}
                 aria-label="Закрыть"
               >
-                <FaTimes />
+                ×
               </button>
-            </div>
-
+            </header>
             <form
               className="barbermasters__form"
-              onSubmit={submitRoleCreate}
-              noValidate
+              onSubmit={submitWarehouseAgent}
             >
-              <div className="barbermasters__grid">
-                <label className="barbermasters__field barbermasters__field--full">
-                  <span className="barbermasters__label">
-                    Название роли <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    className="barbermasters__input"
-                    placeholder="Например: Контент-менеджер"
-                    value={roleCreateName}
-                    onChange={(e) => setRoleCreateName(e.target.value)}
-                    required
-                  />
-                </label>
-              </div>
-
-              {!!roleCreateErr && (
-                <div className="barbermasters__alert barbermasters__alert--inModal">
-                  {roleCreateErr}
+              <div className="barbermasters__content">
+                <div className="barbermasters__field barbermasters__field--full">
+                  <div className="barbermasters__employeeCard">
+                    <div className="barbermasters__employeeAvatar">
+                      {(
+                        fullName(warehouseAgentEmployee) ||
+                        warehouseAgentEmployee.email ||
+                        "•"
+                      )
+                        .trim()
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                    <div className="barbermasters__employeeInfo">
+                      <div className="barbermasters__employeeName">
+                        {fullName(warehouseAgentEmployee) || "Без имени"}
+                      </div>
+                      <div className="barbermasters__employeeMeta">
+                        {warehouseAgentEmployee.email ||
+                          warehouseAgentEmployee.id}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              <div className="barbermasters__footer">
-                <span className="barbermasters__spacer" />
-                <div className="barbermasters__footerRight">
-                  <button
-                    type="button"
-                    className="barbermasters__btn barbermasters__btn--secondary"
-                    onClick={() => setRoleCreateOpen(false)}
-                    disabled={roleCreateSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="barbermasters__btn barbermasters__btn--primary"
-                    disabled={roleCreateSaving}
-                  >
-                    {roleCreateSaving ? "Сохранение…" : "Создать роль"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Roles: edit ===== */}
-      {roleEditOpen && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => !roleEditSaving && setRoleEditOpen(false)}
-        >
-          <div
-            className="barbermasters__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">Изменить роль</h3>
-              <button
-                className="barbermasters__iconBtn"
-                onClick={() => !roleEditSaving && setRoleEditOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            {!!roleEditErr && (
-              <div className="barbermasters__alert barbermasters__alert--inModal">
-                {roleEditErr}
-              </div>
-            )}
-
-            <form
-              className="barbermasters__form"
-              onSubmit={submitRoleEdit}
-              noValidate
-            >
-              <div className="barbermasters__grid">
-                <label className="barbermasters__field barbermasters__field--full">
-                  <span className="barbermasters__label">
-                    Название роли <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    className="barbermasters__input"
-                    placeholder="Название роли"
-                    value={roleEditName}
-                    onChange={(e) => setRoleEditName(e.target.value)}
-                    required
-                  />
-                </label>
-              </div>
-
-              <div className="barbermasters__footer">
-                <span className="barbermasters__spacer" />
-                <div className="barbermasters__footerRight">
-                  <button
-                    type="button"
-                    className="barbermasters__btn barbermasters__btn--secondary"
-                    onClick={() => setRoleEditOpen(false)}
-                    disabled={roleEditSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="barbermasters__btn barbermasters__btn--primary"
-                    disabled={roleEditSaving}
-                  >
-                    {roleEditSaving ? "Сохранение…" : "Сохранить изменения"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Employees: create ===== */}
-      {empCreateOpen && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => !empSaving && setEmpCreateOpen(false)}
-        >
-          <div
-            className="barbermasters__modal barbermasters__modal--taller"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">Новый сотрудник</h3>
-              <button
-                className="barbermasters__iconBtn"
-                onClick={() => !empSaving && setEmpCreateOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            {empAlerts.length > 0 && (
-              <div className="barbermasters__alert barbermasters__alert--inModal">
-                {empAlerts.length === 1 ? (
-                  empAlerts[0]
-                ) : (
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {empAlerts.map((m, i) => (
-                      <li key={i}>{m}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <form
-              className="barbermasters__form"
-              onSubmit={submitEmployeeCreate}
-              noValidate
-            >
-              <div className="barbermasters__grid">
-                <label
-                  className={`barbermasters__field ${
-                    empFieldErrors.email ? "barbermasters__field--invalid" : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Email <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="email"
-                    type="email"
-                    className={`barbermasters__input ${
-                      empFieldErrors.email
-                        ? "barbermasters__input--invalid"
-                        : ""
-                    }`}
-                    placeholder="user@mail.com"
-                    value={empForm.email}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label
-                  className={`barbermasters__field ${
-                    empFieldErrors.first_name
-                      ? "barbermasters__field--invalid"
-                      : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Имя <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="first_name"
-                    className={`barbermasters__input ${
-                      empFieldErrors.first_name
-                        ? "barbermasters__input--invalid"
-                        : ""
-                    }`}
-                    placeholder="Имя"
-                    value={empForm.first_name}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, first_name: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label
-                  className={`barbermasters__field ${
-                    empFieldErrors.last_name
-                      ? "barbermasters__field--invalid"
-                      : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Фамилия <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="last_name"
-                    className={`barbermasters__input ${
-                      empFieldErrors.last_name
-                        ? "barbermasters__input--invalid"
-                        : ""
-                    }`}
-                    placeholder="Фамилия"
-                    value={empForm.last_name}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, last_name: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                {company?.sector?.name === "Пилорама" && (
-                  <>
-                    <label
-                      className={`barbermasters__field ${
-                        empFieldErrors.track_number
-                          ? "barbermasters__field--invalid"
-                          : ""
+                <div className="barbermasters__field barbermasters__field--full">
+                  <label className="barbermasters__label">
+                    Доступ к складу
+                  </label>
+                  <div className="barbermasters__seg">
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        !warehouseAgentCommonEnabled ? "is-active" : ""
                       }`}
+                      onClick={() => setWarehouseAgentCommonEnabled(false)}
+                      disabled={warehouseAgentSaving}
                     >
-                      <span className="barbermasters__label">
-                        Номер машины <b className="barbermasters__req">*</b>
-                      </span>
-                      <input
-                        className={`barbermasters__input ${
-                          empFieldErrors.track_number
-                            ? "barbermasters__input--invalid"
-                            : ""
-                        }`}
-                        placeholder="Номер машины"
-                        value={empForm.track_number}
-                        onChange={(e) =>
-                          setEmpForm((p) => ({
-                            ...p,
-                            track_number: e.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                    <label
-                      className={`barbermasters__field barbermasters__field--full ${
-                        empFieldErrors.phone_number
-                          ? "barbermasters__field--invalid"
-                          : ""
+                      Только свои остатки
+                    </button>
+                    <button
+                      type="button"
+                      className={`barbermasters__segBtn ${
+                        warehouseAgentCommonEnabled ? "is-active" : ""
                       }`}
+                      onClick={() => setWarehouseAgentCommonEnabled(true)}
+                      disabled={warehouseAgentSaving}
                     >
-                      <span className="barbermasters__label">
-                        Номер телефона <b className="barbermasters__req">*</b>
-                      </span>
-                      <input
-                        className={`barbermasters__input ${
-                          empFieldErrors.phone_number
-                            ? "barbermasters__input--invalid"
-                            : ""
-                        }`}
-                        placeholder="Номер телефона"
-                        value={empForm.phone_number}
-                        onChange={(e) =>
-                          setEmpForm((p) => ({
-                            ...p,
-                            phone_number: e.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                  </>
-                )}
-
-                <div
-                  className={`barbermasters__field barbermasters__field--full ${
-                    empFieldErrors.roleChoice
-                      ? "barbermasters__field--invalid"
-                      : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Роль <b className="barbermasters__req">*</b>
-                  </span>
-                  <RoleSelect
-                    options={roleOptions}
-                    value={empForm.roleChoice}
-                    onChange={(key) =>
-                      setEmpForm((p) => ({ ...p, roleChoice: key }))
-                    }
-                    placeholder="Выберите роль"
-                    className="barbermasters__roleSelect"
-                  />
-                  <input
-                    name="roleChoice"
-                    value={empForm.roleChoice}
-                    hidden
-                    readOnly
-                  />
+                      Общий прайс склада
+                    </button>
+                  </div>
                 </div>
 
-                {showBranchSelect && (
-                  <div
-                    className={`barbermasters__field barbermasters__field--full ${
-                      empFieldErrors.branch
-                        ? "barbermasters__field--invalid"
-                        : ""
-                    }`}
-                  >
-                    <span className="barbermasters__label">Филиал</span>
-                    <RoleSelect
-                      options={[
-                        { key: "", label: "Не выбран" },
-                        ...branches.map((b) => ({
-                          key: b.id,
-                          label: b.name || "Без названия",
-                        })),
-                      ]}
-                      value={empForm.branch || ""}
-                      onChange={(key) =>
-                        setEmpForm((p) => ({ ...p, branch: key }))
+                {warehouseAgentCommonEnabled && (
+                  <div className="barbermasters__field barbermasters__field--full">
+                    <label className="barbermasters__label">
+                      Склад общего прайса{" "}
+                      <span className="barbermasters__req">*</span>
+                    </label>
+                    <select
+                      className="barbermasters__input"
+                      value={warehouseAgentCommonWarehouse}
+                      onChange={(e) =>
+                        setWarehouseAgentCommonWarehouse(e.target.value)
                       }
-                      placeholder="Выберите филиал"
-                      className="barbermasters__roleSelect"
-                    />
+                      disabled={
+                        warehouseAgentSaving || warehouseAgentWarehousesLoading
+                      }
+                    >
+                      <option value="">
+                        {warehouseAgentWarehousesLoading
+                          ? "Загрузка складов…"
+                          : "Выберите склад"}
+                      </option>
+                      {warehouseAgentWarehouses.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name || w.title || w.id}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="barbermasters__help">
+                      Выберите склад, из которого агент будет видеть общий
+                      прайс‑лист.
+                    </div>
+                  </div>
+                )}
+
+                {warehouseAgentError && (
+                  <div className="barbermasters__alert barbermasters__alert--inModal">
+                    {warehouseAgentError}
                   </div>
                 )}
               </div>
 
-              <div className="barbermasters__footer">
-                <span className="barbermasters__spacer" />
-                <div className="barbermasters__footerRight">
-                  <button
-                    type="button"
-                    className="barbermasters__btn barbermasters__btn--secondary"
-                    onClick={() => setEmpCreateOpen(false)}
-                    disabled={empSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="barbermasters__btn barbermasters__btn--primary"
-                    disabled={empSaving}
-                  >
-                    {empSaving ? "Сохранение…" : "Создать сотрудника"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Employees: edit ===== */}
-      {empEditOpen && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => !empSaving && setEmpEditOpen(false)}
-        >
-          <div
-            className="barbermasters__modal barbermasters__modal--taller"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">
-                Редактировать сотрудника
-              </h3>
-              <button
-                className="barbermasters__iconBtn"
-                onClick={() => !empSaving && setEmpEditOpen(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            {empAlerts.length > 0 && (
-              <div className="barbermasters__alert barbermasters__alert--inModal">
-                {empAlerts.length === 1 ? (
-                  empAlerts[0]
-                ) : (
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {empAlerts.map((m, i) => (
-                      <li key={i}>{m}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <form
-              className="barbermasters__form"
-              onSubmit={submitEmployeeEdit}
-              noValidate
-            >
-              <div className="barbermasters__grid">
-                <label
-                  className={`barbermasters__field ${
-                    empFieldErrors.email ? "barbermasters__field--invalid" : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Email <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="email"
-                    type="email"
-                    className={`barbermasters__input ${
-                      empFieldErrors.email
-                        ? "barbermasters__input--invalid"
-                        : ""
-                    }`}
-                    placeholder="user@mail.com"
-                    value={empForm.email}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, email: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label
-                  className={`barbermasters__field ${
-                    empFieldErrors.first_name
-                      ? "barbermasters__field--invalid"
-                      : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Имя <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="first_name"
-                    className={`barbermasters__input ${
-                      empFieldErrors.first_name
-                        ? "barbermasters__input--invalid"
-                        : ""
-                    }`}
-                    placeholder="Имя"
-                    value={empForm.first_name}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, first_name: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                <label
-                  className={`barbermasters__field ${
-                    empFieldErrors.last_name
-                      ? "barbermasters__field--invalid"
-                      : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Фамилия <b className="barbermasters__req">*</b>
-                  </span>
-                  <input
-                    name="last_name"
-                    className={`barbermasters__input ${
-                      empFieldErrors.last_name
-                        ? "barbermasters__input--invalid"
-                        : ""
-                    }`}
-                    placeholder="Фамилия"
-                    value={empForm.last_name}
-                    onChange={(e) =>
-                      setEmpForm((p) => ({ ...p, last_name: e.target.value }))
-                    }
-                    required
-                  />
-                </label>
-
-                {company?.sector?.name === "Пилорама" && (
-                  <>
-                    <label
-                      className={`barbermasters__field ${
-                        empFieldErrors.track_number
-                          ? "barbermasters__field--invalid"
-                          : ""
-                      }`}
-                    >
-                      <span className="barbermasters__label">
-                        Номер машины <b className="barbermasters__req">*</b>
-                      </span>
-                      <input
-                        className={`barbermasters__input ${
-                          empFieldErrors.track_number
-                            ? "barbermasters__input--invalid"
-                            : ""
-                        }`}
-                        placeholder="Номер машины"
-                        value={empForm.track_number}
-                        onChange={(e) =>
-                          setEmpForm((p) => ({
-                            ...p,
-                            track_number: e.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                    <label
-                      className={`barbermasters__field ${
-                        empFieldErrors.phone_number
-                          ? "barbermasters__field--invalid"
-                          : ""
-                      }`}
-                    >
-                      <span className="barbermasters__label">
-                        Номер телефона <b className="barbermasters__req">*</b>
-                      </span>
-                      <input
-                        className={`barbermasters__input ${
-                          empFieldErrors.phone_number
-                            ? "barbermasters__input--invalid"
-                            : ""
-                        }`}
-                        placeholder="Номер телефона"
-                        value={empForm.phone_number}
-                        onChange={(e) =>
-                          setEmpForm((p) => ({
-                            ...p,
-                            phone_number: e.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </label>
-                  </>
-                )}
-
-                <div
-                  className={`barbermasters__field barbermasters__field--full ${
-                    empFieldErrors.roleChoice
-                      ? "barbermasters__field--invalid"
-                      : ""
-                  }`}
-                >
-                  <span className="barbermasters__label">
-                    Роль <b className="barbermasters__req">*</b>
-                  </span>
-                  <RoleSelect
-                    options={roleOptions}
-                    value={empForm.roleChoice}
-                    onChange={(key) =>
-                      setEmpForm((p) => ({ ...p, roleChoice: key }))
-                    }
-                    placeholder="Выберите роль"
-                    className="barbermasters__roleSelect"
-                  />
-                  <input
-                    name="roleChoice"
-                    value={empForm.roleChoice}
-                    hidden
-                    readOnly
-                  />
-                </div>
-
-                {showBranchSelect && (
-                  <div
-                    className={`barbermasters__field barbermasters__field--full ${
-                      empFieldErrors.branch
-                        ? "barbermasters__field--invalid"
-                        : ""
-                    }`}
-                  >
-                    <span className="barbermasters__label">Филиал</span>
-                    <RoleSelect
-                      options={[
-                        { key: "", label: "Не выбран" },
-                        ...branches.map((b) => ({
-                          key: b.id,
-                          label: b.name || "Без названия",
-                        })),
-                      ]}
-                      value={empForm.branch || ""}
-                      onChange={(key) =>
-                        setEmpForm((p) => ({ ...p, branch: key }))
-                      }
-                      placeholder="Выберите филиал"
-                      className="barbermasters__roleSelect"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="barbermasters__footer">
-                <span className="barbermasters__spacer" />
-                <div className="barbermasters__footerRight">
-                  <button
-                    type="button"
-                    className="barbermasters__btn barbermasters__btn--secondary"
-                    onClick={() => setEmpEditOpen(false)}
-                    disabled={empSaving}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="barbermasters__btn barbermasters__btn--primary"
-                    disabled={empSaving}
-                  >
-                    {empSaving ? "Сохранение…" : "Сохранить изменения"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===== New employee credentials ===== */}
-      {openLogin && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => setOpenLogin(false)}
-        >
-          <div
-            className="barbermasters__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">Логин сотрудника</h3>
-              <button
-                className="barbermasters__iconBtn"
-                onClick={() => setOpenLogin(false)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="barbermasters__content">
-              <p className="barbermasters__label flex justify-between">
-                <b>Логин: {employData?.email}</b>
+              <div className="barbermasters__modalFooter pl-5 pb-5 flex gap-3">
                 <button
-                  className="barbermasters__iconBtn barbermasters__copyBtn"
-                  onClick={() =>
-                    copyToClipboard(employData?.email || "", "email")
-                  }
-                  aria-label="Скопировать логин"
-                  title={copied === "email" ? "Скопировано!" : "Скопировать"}
+                  type="submit"
+                  className="barbermasters__btn barbermasters__btn--primary"
+                  disabled={warehouseAgentSaving}
                 >
-                  {copied === "email" ? <FaCheck /> : <FaCopy />}
+                  {warehouseAgentSaving ? "Назначение…" : "Назначить агентом"}
                 </button>
-              </p>
-
-              <p className="barbermasters__label flex justify-between">
-                <b>Пароль: {employData?.generated_password}</b>
                 <button
-                  className="barbermasters__iconBtn barbermasters__copyBtn"
-                  onClick={() =>
-                    copyToClipboard(
-                      employData?.generated_password || "",
-                      "password"
-                    )
-                  }
-                  aria-label="Скопировать пароль"
-                  title={copied === "password" ? "Скопировано!" : "Скопировать"}
-                >
-                  {copied === "password" ? <FaCheck /> : <FaCopy />}
-                </button>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Delete role ===== */}
-      {roleToDelete && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => setRoleToDelete(null)}
-        >
-          <div
-            className="barbermasters__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">Удалить роль</h3>
-              <button
-                className="barbermasters__iconBtn"
-                onClick={() => setRoleToDelete(null)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="barbermasters__content">
-              Вы действительно хотите удалить роль «{roleToDelete.name || "—"}»?
-              Действие необратимо.
-            </div>
-            <div className="barbermasters__footer">
-              <span className="barbermasters__spacer" />
-              <div className="barbermasters__footerRight">
-                <button
+                  type="button"
                   className="barbermasters__btn barbermasters__btn--secondary"
-                  onClick={() => setRoleToDelete(null)}
+                  onClick={closeWarehouseAgentModal}
+                  disabled={warehouseAgentSaving}
                 >
                   Отмена
                 </button>
-                <button
-                  className="barbermasters__btn barbermasters__btn--danger"
-                  onClick={doRemoveRole}
-                  disabled={roleDeletingIds.has(roleToDelete.id)}
-                >
-                  {roleDeletingIds.has(roleToDelete.id)
-                    ? "Удаление…"
-                    : "Удалить"}
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Delete employee ===== */}
-      {empToDelete && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => setEmpToDelete(null)}
-        >
-          <div
-            className="barbermasters__modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="barbermasters__modalHeader">
-              <h3 className="barbermasters__modalTitle">Удалить сотрудника</h3>
-              <button
-                className="barbermasters__iconBtn"
-                onClick={() => setEmpToDelete(null)}
-                aria-label="Закрыть"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="barbermasters__content">
-              Удалить «{fullName(empToDelete) || empToDelete.email || "—"}»?
-              Действие необратимо.
-            </div>
-            <div className="barbermasters__footer">
-              <span className="barbermasters__spacer" />
-              <div className="barbermasters__footerRight">
-                <button
-                  className="barbermasters__btn barbermasters__btn--secondary"
-                  onClick={() => setEmpToDelete(null)}
-                >
-                  Отмена
-                </button>
-                <button
-                  className="barbermasters__btn barbermasters__btn--danger"
-                  onClick={doRemoveEmployee}
-                  disabled={empDeletingIds.has(empToDelete.id)}
-                >
-                  {empDeletingIds.has(empToDelete.id) ? "Удаление…" : "Удалить"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Employee Access Modal ===== */}
-      {accessModalOpen && accessModalEmployee && (
-        <div
-          className="barbermasters__overlay"
-          onClick={() => !empSaving && setAccessModalOpen(false)}
-          style={{ zIndex: 1000 }}
-        >
-          <div
-            className="barbermasters__modal barbermasters__modal--taller"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              zIndex: 1001,
-              maxWidth: "800px",
-              width: "90%",
-              maxHeight: "90vh",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              className="barbermasters__modalHeader"
-              style={{
-                borderBottom: "1px solid #e0e0e0",
-                paddingBottom: "16px",
-                marginBottom: "0",
-              }}
-            >
-              <h3
-                className="barbermasters__modalTitle"
-                style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}
-              >
-                Управление доступами:{" "}
-                {accessModalEmployee.first_name && accessModalEmployee.last_name
-                  ? `${accessModalEmployee.first_name} ${accessModalEmployee.last_name}`
-                  : accessModalEmployee.email || "Сотрудник"}
-              </h3>
-              <button
-                className="barbermasters__iconBtn"
-                onClick={() => !empSaving && setAccessModalOpen(false)}
-                aria-label="Закрыть"
-                style={{
-                  position: "absolute",
-                  top: "16px",
-                  right: "16px",
-                }}
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            <div
-              className="barbermasters__form"
-              style={{
-                padding: "24px",
-                maxHeight: "70vh",
-                overflowY: "auto",
-              }}
-            >
-              <AccessList
-                employeeAccesses={accessModalAccesses}
-                onSaveAccesses={handleSaveEmployeeAccesses}
-                role={accessModalEmployee.role}
-                sectorName={company?.sector?.name}
-                profile={profile}
-                tariff={tariff || company?.subscription_plan?.name}
-                company={company}
-                isModalMode={true}
-              />
-            </div>
+            </form>
           </div>
         </div>
       )}

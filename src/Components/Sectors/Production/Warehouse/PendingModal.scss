@@ -108,7 +108,7 @@
 
     @media (max-width: 480px) {
       padding: 8px;
-      
+
       svg {
         width: 20px;
         height: 20px;
@@ -253,7 +253,7 @@
     @media (max-width: 768px) {
       max-height: 400px;
       border-radius: 6px;
-      visibility: block ;
+      visibility: block;
     }
 
     @media (max-width: 480px) {
@@ -307,7 +307,9 @@
       }
 
       @media (max-width: 480px) {
-        display: block;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         padding: 8px 12px;
         border-bottom: none;
         border-left: 3px solid #f7d617;
@@ -464,7 +466,7 @@
 
   &__expanded-row {
     background: #f9fafb;
-    
+
     td {
       padding: 0;
       border-top: 2px solid #e5e7eb;
@@ -603,4 +605,3 @@
     }
   }
 }
-
