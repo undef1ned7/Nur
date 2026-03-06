@@ -70,10 +70,9 @@ const RecordaServicesPicker = ({
 
   const filtered = useMemo(() => {
     const text = qTrim.toLowerCase();
-
-    const base = (items || []).filter((it) =>
-      isSingle ? true : !already.has(String(it.id))
-    );
+    const base = isSingle
+      ? (items || []).filter((it) => !already.has(String(it.id)))
+      : (items || []);
 
     if (!text) return base;
 
@@ -129,33 +128,19 @@ const RecordaServicesPicker = ({
   const handlePickMulti = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
-    const sid = String(id);
-    if (!already.has(sid)) onChange?.([...safeSelected, sid]);
+    onChange?.([...safeSelected, String(id)]);
     setQ("");
     setOpen(false);
     resetCreateSignals();
   };
 
-  const handleRemoveMulti = (e, serviceId) => {
-    // Останавливаем всплытие события
+  const handleRemoveMulti = (e, index) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    
-    // Получаем текущий список выбранных услуг
-    const currentIds = Array.isArray(selectedIds) 
-      ? [...selectedIds].map(String) 
-      : [];
-    
-    // Удаляем услугу из списка
-    const serviceIdStr = String(serviceId);
-    const next = currentIds.filter((id) => String(id) !== serviceIdStr);
-    
-    // Обновляем состояние через onChange
-    if (onChange) {
-      onChange(next);
-    }
+    const next = safeSelected.filter((_, i) => i !== index);
+    onChange?.(next);
   };
 
   /* ===========================
@@ -315,7 +300,7 @@ const RecordaServicesPicker = ({
               const price = it.price;
 
               return (
-                <div key={id} className="barberrecorda__svcCard" title={name}>
+                <div key={`${id}-${idx}`} className="barberrecorda__svcCard" title={name}>
                   <div className="barberrecorda__svcCardIndex">{idx + 1}</div>
                   <div className="barberrecorda__svcCardMain">
                     <div className="barberrecorda__svcCardTitle">{name}</div>
@@ -328,11 +313,7 @@ const RecordaServicesPicker = ({
                     type="button"
                     className="barberrecorda__svcCardDel"
                     aria-label="Убрать услугу"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleRemoveMulti(e, id);
-                    }}
+                    onClick={(e) => handleRemoveMulti(e, idx)}
                   >
                     <FaTimes />
                   </button>
