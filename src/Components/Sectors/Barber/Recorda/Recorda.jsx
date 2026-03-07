@@ -232,12 +232,18 @@ const Recorda = () => {
     if (Array.isArray(r.services_names) && r.services_names.length) {
       return r.services_names.join(", ");
     }
+    if (Array.isArray(r.services_public) && r.services_public.length) {
+      const names = r.services_public.map((s) => s?.name || s?.title || "").filter(Boolean);
+      if (names.length) return names.join(", ");
+    }
     if (Array.isArray(r.services) && r.services.length) {
-      const names = r.services.map(
-        (id) =>
-          services.find((s) => String(s.id) === String(id))?.name || id
-      );
-      return names.join(", ");
+      const names = r.services.map((item) => {
+        if (typeof item === "object" && item !== null) {
+          return item?.name ?? item?.title ?? item?.service?.name ?? "";
+        }
+        return services.find((s) => String(s.id) === String(item))?.name || "";
+      }).filter(Boolean);
+      if (names.length) return names.join(", ");
     }
     return r.service_name || "—";
   };

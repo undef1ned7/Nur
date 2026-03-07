@@ -83,7 +83,11 @@ const RecordaModal = ({
       const rec = currentRecord;
       setSelClient(rec.client ? String(rec.client) : "");
       const recSvcs = Array.isArray(rec.services)
-        ? rec.services.map(String)
+        ? rec.services.map((s) =>
+            typeof s === "object" && s !== null
+              ? String(s?.service_id ?? s?.service ?? s?.id ?? "")
+              : String(s)
+          ).filter(Boolean)
         : rec.service
         ? [String(rec.service)]
         : [];
