@@ -36,8 +36,9 @@ const pageTitles = {
   "/crm/brand-category": "Бренд и Категория",
 
   // Строительная сфера
-  "/crm/building/work": "Процесс работы",
+  "/crm/building/work": "Строительный отдел",
   "/crm/building/objects": "Квартиры",
+  "/crm/building/employees": "Сотрудники",
 
   // Барбершоп
   "/crm/barber/clients": "Клиенты",

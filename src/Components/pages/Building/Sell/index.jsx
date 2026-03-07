@@ -500,13 +500,7 @@ export default function BuildingSell() {
             )}
           </p>
         </div>
-        <button
-          type="button"
-          className="sell-header__btn"
-          onClick={() => navigate("/crm/building/treaty")}
-        >
-          Список договоров
-        </button>
+       
       </header>
 
       {!selectedProjectId && (

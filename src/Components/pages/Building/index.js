@@ -1,9 +1,9 @@
 import BuildingLayout from "./BuildingLayout";
 import BuildingAnalytics from "./Analytics";
 import BuildingCashRegister from "./CashRegister";
+import BuildingCashRegisterTreatyDetail from "./CashRegister/TreatyDetail";
 import BuildingClients from "./Clients";
 import BuildingClientDetail from "./Clients/Detail";
-import BuildingDepartment from "./Department";
 import BuildingNotification from "./Notification";
 import BuildingTaskDetail from "./Notification/Detail";
 import BuildingProcurement from "./Procurement";
@@ -24,13 +24,14 @@ import BuildingWorkProcess from "./Work";
 import BuildingWorkProcessDetail from "./Work/Detail";
 import BuildingProjectDetail from "./Projects/Detail";
 import BuildingDrawings from "./Drawings";
+import BuildingEmployees from "./Employess";
 
 export {
   BuildingAnalytics,
   BuildingCashRegister,
+  BuildingCashRegisterTreatyDetail,
   BuildingClients,
   BuildingClientDetail,
-  BuildingDepartment,
   BuildingNotification,
   BuildingTaskDetail,
   BuildingProcurement,
@@ -51,6 +52,7 @@ export {
   BuildingWorkProcess,
   BuildingWorkProcessDetail,
   BuildingDrawings,
+  BuildingEmployees,
 };
 
 export default BuildingLayout;

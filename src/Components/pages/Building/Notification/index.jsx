@@ -273,13 +273,14 @@ export default function BuildingNotification() {
                 </div>
               ) : (
                 <FullCalendar
+                
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView="dayGridMonth"
                   locale="ru"
                   headerToolbar={{
                     left: "prev,next today",
                     center: "title",
-                    right: "dayGridMonth,dayGridWeek",
+                    right: "dayGridDay,dayGridWeek,dayGridMonth",
                   }}
                   events={calendarEvents}
                   dateClick={handleCalendarDateClick}

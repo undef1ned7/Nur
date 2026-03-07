@@ -1,0 +1,2724 @@
+/* Masters.scss */
+:root {
+  --primary: #f7d74f;
+  --primary-dark: #d4b800;
+  --primary-light: #fef3c7;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+  --success: #10b981;
+  --danger: #ef4444;
+  --danger-light: #fee2e2;
+}
+
+.barbermasters,
+.barbermasters * {
+  box-sizing: border-box;
+}
+
+/* ====== Контейнер ====== */
+.barbermasters {
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --padX: 20px;
+
+  background: #ffffff;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  // max-height: 100dvh;
+  overflow: auto;
+  min-height: 50dvh;
+  /* ====== Хедер ====== */
+  &__header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: end;
+    padding: 20px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  &__titleWrap {
+    display: grid;
+    gap: 4px;
+  }
+
+  &__title {
+    margin: 0;
+    color: var(--text);
+    font-weight: 800;
+    font-size: 20px;
+  }
+
+  &__subtitle {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* Действия */
+  &__actions {
+    display: grid;
+    grid-template-columns: auto minmax(220px, 260px) minmax(240px, 1fr) 44px;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  &__tabs {
+    display: flex;
+    gap: 8px;
+  }
+
+  /* Кнопки */
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    line-height: 1;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: #ffffff;
+    color: var(--text);
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+    }
+
+    &.is-active {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+      font-weight: 600;
+    }
+
+    &--primary {
+      background: var(--primary);
+      color: #111827;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+
+      &:hover:not(:disabled) {
+        background: var(--primary-dark);
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+        transform: translateY(-1px);
+      }
+    }
+
+    &--secondary {
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+
+      &:hover:not(:disabled) {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+        transform: translateY(-1px);
+      }
+    }
+
+    &--danger {
+      border: 1px solid #fee2e2;
+      color: #dc2626;
+      background: #ffffff;
+
+      &:hover {
+        background: #fee2e2;
+      }
+    }
+
+    &:active {
+      transform: translateY(1px);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__btnText {
+    display: inline;
+  }
+
+  /* Поиск */
+  &__search {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+
+  &__searchInput {
+    width: 100%;
+    height: 40px;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    background: #ffffff;
+    transition: all 0.15s ease;
+
+    &::placeholder {
+      color: #9ca3af;
+    }
+
+    &:hover {
+      border-color: #9ca3af;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+    }
+  }
+
+  &__searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* ====== Лист и карточки ====== */
+  &__list {
+    display: grid;
+    gap: 0;
+    // max-height: clamp(340px, 64dvh, 720px);
+    // overflow: auto;
+    padding: 0 20px;
+
+    // &::-webkit-scrollbar {
+    //   width: 6px;
+    //   height: 6px;
+    // }
+
+    // &::-webkit-scrollbar-track {
+    //   background: #f3f4f6;
+    // }
+
+    // &::-webkit-scrollbar-thumb {
+    //   background: #d1d5db;
+    //   border-radius: 3px;
+
+    //   &:hover {
+    //     background: #9ca3af;
+    //   }
+    // }
+  }
+
+  &__card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+    padding: 16px 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    transition: background 0.15s;
+    border-bottom: 1px solid #f3f4f6;
+
+    &:hover {
+      background: #fafafa;
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__cardLeft {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  &__avatar {
+    min-width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #111827;
+    font-weight: 700;
+    font-size: 14px;
+    display: grid;
+    place-items: center;
+    box-shadow: none;
+  }
+
+  &__nameRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  &__name {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+
+    .bm-item {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .bm-item + .bm-item::before {
+      content: "•";
+      margin: 0 8px;
+      color: var(--muted);
+    }
+  }
+
+  &__cardActions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    min-width: fit-content;
+  }
+
+  /* Кнопка копирования в модалке логина */
+  &__copyBtn {
+    margin-left: 8px;
+  }
+
+  /* ====== Алерты ====== */
+  &__alert {
+    padding: 12px 20px;
+    border-radius: 0;
+    border: none;
+    border-left: 3px solid #dc2626;
+    background: #fee2e2;
+    color: #dc2626;
+    margin: 0;
+
+    &--inModal {
+      margin: 12px 20px 0;
+      border-radius: 6px;
+    }
+  }
+
+  /* ====== Пагинация списков ====== */
+  &__pager {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 0;
+    padding: 16px 20px;
+    flex-wrap: wrap;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  &__pageList {
+    display: flex;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  &__pageBtn {
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: #f9fafb;
+      border-color: #d1d5db;
+    }
+
+    &.is-active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #111827;
+      font-weight: 600;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  &__dots {
+    color: var(--muted);
+    align-self: flex-end;
+    padding-bottom: 2px;
+  }
+
+  /* ====== Overlay & Modal ====== */
+  &__overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: saturate(140%) blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 70;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  &__modal {
+    position: relative;
+    width: min(640px, 96vw);
+    max-height: min(94dvh, 820px);
+    margin: 0;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+
+    &--taller {
+      max-height: min(94dvh, 860px);
+    }
+  }
+
+  /* Заголовок модалки */
+  &__modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px var(--padX);
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__modalTitle {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  &__iconBtn {
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font-size: 18px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  /* Тело модалки */
+  &__content {
+    padding: 16px var(--padX);
+    display: flex;
+    flex-direction: column;
+    row-gap: 12px;
+  }
+
+  /* Форма и поля */
+  &__form {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    min-height: 0;
+  }
+
+  &__grid {
+    padding: 16px var(--padX);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+    overflow: auto;
+    min-height: 0;
+  }
+
+  &__field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+
+    &--full {
+      grid-column: 1 / -1;
+    }
+
+    &--invalid .barbermasters__input {
+      border-color: #dc2626;
+    }
+  }
+
+  /* Модалка "Агент склада" */
+  &__employeeCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #f9fafb;
+  }
+
+  &__employeeAvatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: #111827;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  &__employeeInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__employeeName {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  &__employeeMeta {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  &__seg {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  &__segBtn {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+    &.is-active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: #111827;
+    }
+  }
+
+  &__label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  &__req {
+    color: #ef4444;
+  }
+
+  &__input {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 14px;
+    background: #fff;
+
+    &::placeholder {
+      color: var(--muted);
+      opacity: 0.85;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    &--invalid {
+      border-color: #dc2626;
+    }
+  }
+
+  /* Футер модалки */
+  &__footer {
+    border-top: 1px solid var(--border);
+    padding: 12px var(--padX);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    background: #fff;
+  }
+
+  &__spacer {
+    flex: 1 1 auto;
+  }
+
+  &__footerRight {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  /* ====== Кастомный Select ====== */
+  &__select {
+    position: relative;
+    min-width: 220px;
+  }
+
+  &__selectControl {
+    width: 100%;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    padding: 0 34px 0 12px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__selectValue {
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    &.is-placeholder {
+      color: var(--muted);
+    }
+  }
+
+  &__selectCaret {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #9ca3af;
+  }
+
+  &__selectMenu {
+    position: absolute;
+    z-index: 120;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.12);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+  }
+
+  &__selectSearch {
+    position: relative;
+    padding: 10px;
+  }
+
+  &__selectSearchInput {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px 10px 34px;
+    font-size: 14px;
+    background: #fff;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+  }
+
+  &__selectSearchIcon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 14px;
+  }
+
+  &__selectList {
+    max-height: 240px;
+    overflow: auto;
+    padding: 6px 0;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #e2e8f0;
+      border-radius: 8px;
+    }
+  }
+
+  &__selectItem {
+    width: 100%;
+    background: #fff;
+    border: 0;
+    text-align: left;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+
+    &:hover {
+      background: #f9fafb;
+    }
+
+    &.is-active {
+      background: rgba(247, 215, 79, 0.25);
+    }
+  }
+
+  &__selectEmpty {
+    padding: 12px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(
+      90deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+}
+
+/* ====== Хедер ====== */
+.barbermasters__header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: end;
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(247, 215, 79, 0.2);
+  margin-bottom: 4px;
+}
+.barbermasters__titleWrap {
+  display: grid;
+  gap: 6px;
+}
+.barbermasters__title {
+  margin: 0;
+  color: var(--text);
+  font-weight: 900;
+  font-size: 24px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--text) 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.barbermasters__subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: inline-block;
+  }
+}
+
+/* Действия */
+.barbermasters__actions {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 260px) minmax(240px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+
+  // Фиксируем кнопку с иконкой
+  > .barbermasters__btn--primary {
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    padding: 0;
+    justify-content: center;
+    justify-self: end;
+  }
+}
+.barbermasters__tabs {
+  display: flex;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+  flex-wrap: nowrap;
+  min-width: 0;
+
+  .barbermasters__btn {
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 14px;
+  }
+}
+
+/* Кнопки */
+.barbermasters__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  line-height: 1;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: #fff;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: visible;
+  visibility: visible;
+  opacity: 1;
+  z-index: 1;
+
+  &::before {
+  }
+
+  &:hover::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+    width: 130px;
+    height: 60px;
+    transition-duration: 2s;
+  }
+}
+.barbermasters__btn svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease;
+}
+.barbermasters__btn:hover svg {
+  transform: scale(1.1);
+}
+.barbermasters__btn:active {
+  transform: scale(0.98);
+}
+.barbermasters__btn--primary {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  color: #111;
+  box-shadow: 0 4px 12px rgba(247, 215, 79, 0.3);
+  width: fit-content;
+  min-width: 44px;
+
+  &:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #b89400 100%);
+    box-shadow: 0 6px 16px rgba(247, 215, 79, 0.4);
+    transform: translateY(-2px);
+  }
+}
+.barbermasters__btn--secondary {
+  border: 1px solid var(--border);
+  background: #fff;
+
+  &:hover {
+    background: linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+}
+.barbermasters__btn--danger {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: #fff;
+
+  &:hover {
+    background: linear-gradient(135deg, var(--danger-light) 0%, #fecaca 100%);
+    border-color: var(--danger);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+  }
+}
+.barbermasters__btn.is-active {
+  background: linear-gradient(135deg, var(--primary-light) 0%, #fde68a 100%);
+  border-color: var(--primary);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(247, 215, 79, 0.2);
+}
+.barbermasters__btnText {
+  display: inline;
+  position: relative;
+  z-index: 1;
+  visibility: visible;
+  opacity: 1;
+  white-space: nowrap;
+}
+
+/* Поиск */
+.barbermasters__search {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.barbermasters__searchInput {
+  width: 100%;
+  height: 44px;
+  padding: 10px 16px 10px 42px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+    background: #fff;
+  }
+
+  &:hover:not(:focus) {
+    border-color: #cbd5e1;
+  }
+}
+.barbermasters__searchInput::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.barbermasters__searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 16px;
+  transition: color 0.3s ease;
+  z-index: 1;
+}
+.barbermasters__searchInput:focus + .barbermasters__searchIcon,
+.barbermasters__search:hover .barbermasters__searchIcon {
+  color: var(--primary);
+}
+
+/* ====== Лист и карточки ====== */
+.barbermasters__list {
+  display: grid;
+  gap: 12px;
+  padding-right: 8px;
+  padding-top: 4px;
+}
+.barbermasters__list::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.barbermasters__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.barbermasters__list::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  border-radius: 8px;
+
+  &:hover {
+    background: linear-gradient(180deg, var(--primary-dark) 0%, #b89400 100%);
+  }
+}
+
+.barbermasters__card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(
+      180deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+  }
+
+  &:hover {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+    &::before {
+      transform: scaleY(1);
+    }
+  }
+}
+.barbermasters__cardLeft {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.barbermasters__avatar {
+  min-width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  color: #fff;
+  font-weight: 900;
+  font-size: 16px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(247, 215, 79, 0.4);
+  transition: all 0.3s ease;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: linear-gradient(
+      135deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+  }
+}
+.barbermasters__card:hover .barbermasters__avatar {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(247, 215, 79, 0.5);
+
+  &::after {
+    opacity: 0.3;
+  }
+}
+.barbermasters__nameRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.barbermasters__name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.barbermasters__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.barbermasters__meta .bm-item {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.barbermasters__meta .bm-item + .bm-item::before {
+  content: "•";
+  margin: 0 10px;
+  color: var(--muted);
+  opacity: 0.6;
+}
+.barbermasters__cardActions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  min-width: fit-content;
+  flex-wrap: wrap;
+  visibility: visible;
+  opacity: 1;
+  z-index: 1;
+  position: relative;
+}
+
+/* Кнопка копирования в модалке логина */
+.barbermasters__copyBtn {
+  margin-left: 8px;
+}
+
+/* ====== Алерты ====== */
+.barbermasters__alert {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 2px solid rgba(231, 76, 60, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(231, 76, 60, 0.1) 0%,
+    rgba(231, 76, 60, 0.05) 100%
+  );
+  color: #e74c3c;
+  font-weight: 500;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.barbermasters__alert--inModal {
+  margin: 16px var(--padX) 0;
+}
+
+/* ====== Пагинация списков ====== */
+.barbermasters__pager {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+.barbermasters__pageList {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.barbermasters__pageBtn {
+  border: 2px solid var(--border);
+  background: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 44px;
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+.barbermasters__pageBtn.is-active {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  border-color: var(--primary);
+  color: #111;
+  box-shadow: 0 4px 12px rgba(247, 215, 79, 0.3);
+  font-weight: 700;
+}
+.barbermasters__pageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+.barbermasters__dots {
+  color: var(--muted);
+  align-self: center;
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+/* ====== Overlay & Modal ====== */
+.barbermasters__overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.7) 0%,
+    rgba(15, 23, 42, 0.5) 100%
+  );
+  backdrop-filter: blur(8px) saturate(180%);
+  -webkit-backdrop-filter: blur(8px) saturate(180%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 70;
+  min-height: 100dvh;
+  overflow: auto;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.barbermasters__modal {
+  position: relative;
+  width: min(640px, 96vw);
+  max-height: min(94dvh, 820px);
+  margin: 0;
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  animation: modalSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.barbermasters__modal--taller {
+  max-height: min(94dvh, 860px);
+}
+
+/* Заголовок модалки */
+.barbermasters__modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px var(--padX);
+  border-bottom: 2px solid rgba(247, 215, 79, 0.2);
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+  }
+}
+.barbermasters__modalTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--text) 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.barbermasters__iconBtn {
+  background: rgba(0, 0, 0, 0.05);
+  border: 0;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: var(--text);
+    background: rgba(0, 0, 0, 0.1);
+    transform: rotate(90deg);
+  }
+}
+
+/* Тело модалки */
+.barbermasters__content {
+  padding: 16px var(--padX);
+  display: flex;
+  flex-direction: column;
+  row-gap: 12px;
+}
+
+/* Форма и поля */
+.barbermasters__form {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 0;
+}
+.barbermasters__grid {
+  padding: 16px var(--padX);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  overflow: auto;
+  min-height: 0;
+}
+.barbermasters__field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.barbermasters__field--full {
+  grid-column: 1 / -1;
+}
+.barbermasters__label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.2px;
+
+  b {
+    color: var(--danger);
+    font-weight: 800;
+  }
+}
+.barbermasters__req {
+  color: var(--danger);
+  font-weight: 800;
+}
+.barbermasters__input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+  }
+
+  &:hover:not(:focus) {
+    border-color: #cbd5e1;
+  }
+}
+.barbermasters__input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+.barbermasters__input--invalid {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+.barbermasters__field--invalid .barbermasters__input {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+/* Футер модалки */
+.barbermasters__footer {
+  border-top: 2px solid rgba(247, 215, 79, 0.2);
+  padding: 16px var(--padX);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      var(--primary) 0%,
+      var(--primary-dark) 100%
+    );
+  }
+}
+.barbermasters__spacer {
+  flex: 1 1 auto;
+}
+.barbermasters__footerRight {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ====== Кастомный Select ====== */
+.barbermasters__select {
+  position: relative;
+  min-width: 220px;
+}
+.barbermasters__selectControl {
+  width: 100%;
+  height: 44px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0 40px 0 16px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+
+  &:hover {
+    border-color: #cbd5e1;
+  }
+}
+.barbermasters__select.is-open .barbermasters__selectControl {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+}
+.barbermasters__selectValue {
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.barbermasters__selectValue.is-placeholder {
+  color: var(--muted);
+}
+.barbermasters__selectCaret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #9ca3af;
+  transition: all 0.3s ease;
+}
+.barbermasters__select.is-open .barbermasters__selectCaret {
+  border-top-color: var(--primary);
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.barbermasters__selectMenu {
+  position: absolute;
+  z-index: 120;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  animation: selectSlideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 320px; // Ограничиваем общую высоту меню
+}
+
+@keyframes selectSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.barbermasters__selectSearch {
+  position: relative;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.barbermasters__selectSearchInput {
+  width: 100%;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 10px 36px;
+  font-size: 14px;
+  background: #fff;
+  transition: all 0.3s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(247, 215, 79, 0.1);
+  }
+}
+.barbermasters__selectSearchIcon {
+  position: absolute;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+.barbermasters__selectSearchInput:focus + .barbermasters__selectSearchIcon,
+.barbermasters__selectSearch:hover .barbermasters__selectSearchIcon {
+  color: var(--primary);
+}
+
+.barbermasters__selectList {
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 0;
+  min-height: 0; // Позволяет списку сжиматься
+}
+.barbermasters__selectList::-webkit-scrollbar {
+  width: 8px;
+}
+.barbermasters__selectList::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
+  border-radius: 8px;
+}
+.barbermasters__selectItem {
+  width: 100%;
+  background: #fff;
+  border: 0;
+  text-align: left;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+
+  &:hover {
+    background: linear-gradient(135deg, #f9fafb 0%, #f1f5f9 100%);
+    padding-left: 20px;
+  }
+}
+.barbermasters__selectItem.is-active {
+  background: linear-gradient(
+    135deg,
+    rgba(247, 215, 79, 0.2) 0%,
+    rgba(247, 215, 79, 0.1) 100%
+  );
+  color: var(--text);
+  font-weight: 600;
+  border-left: 3px solid var(--primary);
+}
+.barbermasters__selectEmpty {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  font-weight: 500;
+  min-height: auto; // Не растягиваем пустое состояние
+  max-height: none;
+}
+
+/* ====== Адаптив ====== */
+@media (max-width: 1300px) {
+  .barbermasters {
+    &__header {
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    &__actions {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "tabs"
+        "role"
+        "search"
+        "plus";
+      gap: 12px;
+    }
+
+    &__tabs {
+      grid-area: tabs;
+      width: 100%;
+      justify-content: center;
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 0 10px;
+        font-size: 13px;
+        height: 38px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    &__roleFilter {
+      grid-area: role;
+      width: 100%;
+      min-width: 100%;
+    }
+
+    &__select {
+      grid-area: role;
+      width: 100%;
+      min-width: 100%;
+    }
+
+    &__search {
+      grid-area: search;
+      width: 100%;
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      grid-area: plus;
+      justify-self: stretch;
+      width: 100%;
+      max-width: 100%;
+      height: 40px;
+      min-width: 40px;
+    }
+  }
+}
+
+@media (max-width: 1200px) {
+  .barbermasters {
+    &__tabs {
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        padding: 0 10px;
+        font-size: 13px;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      height: 40px;
+    }
+  }
+}
+
+@media (max-width: 1024px) {
+  .barbermasters {
+    padding: 20px;
+    gap: 18px;
+
+    &__header {
+      gap: 14px;
+    }
+
+    &__title {
+      font-size: 22px;
+    }
+
+    &__subtitle {
+      font-size: 13px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__tabs {
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        padding: 0 10px;
+        font-size: 13px;
+        height: 38px;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      height: 40px;
+    }
+
+    &__card {
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 16px 18px;
+    }
+
+    &__cardActions {
+      width: 100%;
+      justify-content: flex-start;
+      margin-left: 0;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    &__modal {
+      width: min(90vw, 600px);
+    }
+
+    &__content {
+      padding: 14px var(--padX);
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .barbermasters {
+    padding: 18px;
+    gap: 16px;
+
+    &__header {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    &__title {
+      font-size: 21px;
+    }
+
+    &__subtitle {
+      font-size: 13px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__tabs {
+      gap: 4px;
+      padding: 3px;
+
+      .barbermasters__btn {
+        padding: 0 10px;
+        font-size: 13px;
+        height: 38px;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      height: 40px;
+    }
+
+    &__list {
+      // max-height: 60dvh;
+      gap: 10px;
+    }
+
+    &__card {
+      padding: 14px 16px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    &__cardLeft {
+      width: 100%;
+      gap: 12px;
+    }
+
+    &__cardActions {
+      width: 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    &__cardActions .barbermasters__btn {
+      flex: 1 1 auto;
+      min-width: 120px;
+      justify-content: center;
+
+      &Text {
+        display: inline !important;
+      }
+    }
+
+    &__pager {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    &__pageList {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    &__modal {
+      width: min(95vw, 600px);
+      max-height: 90dvh;
+      border-radius: 16px;
+    }
+
+    &__modalHeader {
+      padding: 18px var(--padX);
+    }
+
+    &__grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 12px var(--padX);
+    }
+
+    &__content {
+      padding: 14px var(--padX);
+    }
+
+    &__overlay {
+      padding: 12px;
+    }
+
+    &__selectMenu {
+      max-height: 300px;
+    }
+  }
+}
+
+@media (max-width: 720px) {
+  .barbermasters {
+    padding: 16px;
+    border-radius: 12px;
+    gap: 14px;
+
+    &__title {
+      font-size: 20px;
+    }
+
+    &__subtitle {
+      font-size: 13px;
+    }
+
+    &__btn {
+      height: 40px;
+      padding: 0 14px;
+      font-size: 13px;
+      min-width: 44px;
+      visibility: visible;
+      opacity: 1;
+
+      // Всегда показываем текст кнопок
+      &Text {
+        display: inline !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+    }
+
+    // В карточках действий всегда показываем текст
+    &__cardActions .barbermasters__btn {
+      &Text {
+        display: inline !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+    }
+
+    &__tabs {
+      gap: 4px;
+      padding: 3px;
+      width: 100%;
+
+      .barbermasters__btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 0 10px;
+        font-size: 12px;
+        height: 38px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 40px;
+      min-width: 40px;
+    }
+
+    &__searchInput {
+      height: 40px;
+      font-size: 14px;
+      padding: 8px 14px 8px 38px;
+    }
+
+    &__list {
+      // max-height: 55dvh;
+      gap: 8px;
+    }
+
+    &__card {
+      padding: 12px 14px;
+      border-radius: 12px;
+    }
+
+    &__avatar {
+      min-width: 40px;
+      height: 40px;
+      font-size: 14px;
+    }
+
+    &__name {
+      font-size: 16px;
+    }
+
+    &__meta {
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    &__meta .bm-item {
+      font-size: 12px;
+    }
+
+    &__cardActions {
+      gap: 6px;
+    }
+
+    &__btn {
+      height: 36px;
+      padding: 0 12px;
+      font-size: 12px;
+      min-width: auto;
+      flex: 0 1 auto;
+    }
+
+    &__modal {
+      width: 96vw;
+      max-height: 92dvh;
+      border-radius: 14px;
+    }
+
+    &__modalHeader {
+      padding: 16px;
+    }
+
+    &__modalTitle {
+      font-size: 18px;
+    }
+
+    &__grid {
+      padding: 12px 16px;
+      gap: 12px;
+    }
+
+    &__input {
+      height: 42px;
+      font-size: 14px;
+      padding: 0 14px;
+    }
+
+    &__selectControl {
+      height: 42px;
+      font-size: 14px;
+    }
+
+    &__footer {
+      padding: 12px 16px;
+      flex-direction: column-reverse;
+    }
+
+    &__footerRight {
+      width: 100%;
+      flex-direction: column;
+    }
+
+    &__footer .barbermasters__btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    &__pager {
+      gap: 4px;
+      padding: 10px 0;
+    }
+
+    &__pageBtn {
+      padding: 8px 12px;
+      font-size: 13px;
+      min-width: 36px;
+    }
+
+    &__select {
+      min-width: 100%;
+    }
+
+    &__selectMenu {
+      max-height: 280px;
+    }
+
+    &__selectSearch {
+      padding: 10px;
+    }
+
+    &__selectSearchInput {
+      padding: 8px 10px 8px 32px;
+      font-size: 13px;
+    }
+
+    &__selectSearchIcon {
+      left: 20px;
+      font-size: 13px;
+    }
+
+    &__selectItem {
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .barbermasters {
+    &__actions {
+      gap: 10px;
+    }
+
+    &__btn {
+      height: 40px;
+      padding: 0 14px;
+      font-size: 13px;
+    }
+
+    &__searchInput {
+      height: 40px;
+      padding: 8px 14px 8px 38px;
+    }
+
+    &__selectControl {
+      height: 40px;
+      font-size: 13px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .barbermasters {
+    padding: 12px;
+    gap: 12px;
+
+    &__title {
+      font-size: 18px;
+    }
+
+    &__subtitle {
+      font-size: 12px;
+    }
+
+    &__actions {
+      gap: 10px;
+    }
+
+    &__tabs {
+      gap: 4px;
+      padding: 2px;
+
+      .barbermasters__btn {
+        padding: 0 8px;
+        font-size: 12px;
+        height: 36px;
+        min-width: 0;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 38px;
+      min-width: 38px;
+    }
+
+    &__btn {
+      height: 38px;
+      padding: 0 12px;
+    }
+
+    &__card {
+      padding: 10px 12px;
+    }
+
+    &__cardActions {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    &__cardActions .barbermasters__btn {
+      width: 100%;
+      justify-content: center;
+      min-width: auto;
+
+      &Text {
+        display: inline !important;
+      }
+    }
+
+    &__modal {
+      width: 98vw;
+      max-height: 95dvh;
+      border-radius: 12px;
+    }
+
+    &__modalHeader {
+      padding: 12px;
+    }
+
+    &__modalTitle {
+      font-size: 16px;
+    }
+
+    &__grid {
+      padding: 10px 12px;
+      gap: 10px;
+    }
+
+    &__input {
+      height: 40px;
+      font-size: 14px;
+      padding: 0 12px;
+    }
+
+    &__label {
+      font-size: 13px;
+    }
+
+    &__footer {
+      padding: 10px 12px;
+    }
+
+    &__pager {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__pageList {
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    &__pageBtn {
+      flex: 1 1 auto;
+      min-width: 40px;
+    }
+
+    &__selectMenu {
+      max-height: 250px;
+      border-radius: 12px;
+    }
+
+    &__selectSearch {
+      padding: 8px;
+    }
+
+    &__selectSearchInput {
+      padding: 8px 10px 8px 30px;
+      font-size: 13px;
+    }
+
+    &__selectSearchIcon {
+      left: 18px;
+      font-size: 12px;
+    }
+
+    &__selectItem {
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    &__content {
+      padding: 12px var(--padX);
+      row-gap: 10px;
+    }
+
+    &__iconBtn {
+      width: 32px;
+      height: 32px;
+      font-size: 16px;
+    }
+  }
+}
+
+@media (max-width: 380px) {
+  .barbermasters {
+    padding: 10px;
+    gap: 10px;
+
+    &__title {
+      font-size: 16px;
+    }
+
+    &__subtitle {
+      font-size: 11px;
+    }
+
+    &__tabs {
+      gap: 3px;
+      padding: 2px;
+
+      .barbermasters__btn {
+        padding: 0 6px;
+        font-size: 11px;
+        height: 34px;
+        min-width: 0;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 36px;
+      min-width: 36px;
+    }
+
+    &__btn {
+      height: 36px;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+
+    &__card {
+      padding: 8px 10px;
+    }
+
+    &__avatar {
+      min-width: 36px;
+      height: 36px;
+      font-size: 12px;
+    }
+
+    &__name {
+      font-size: 14px;
+    }
+
+    &__meta .bm-item {
+      font-size: 11px;
+    }
+
+    &__input {
+      height: 38px;
+      font-size: 13px;
+      padding: 0 10px;
+    }
+
+    &__selectControl {
+      height: 38px;
+      font-size: 13px;
+      padding: 0 32px 0 12px;
+    }
+
+    &__modal {
+      width: 100vw;
+      max-height: 100dvh;
+      border-radius: 0;
+    }
+
+    &__overlay {
+      padding: 0;
+    }
+
+    &__selectMenu {
+      max-height: 220px;
+      border-radius: 10px;
+    }
+
+    &__selectSearch {
+      padding: 6px;
+    }
+
+    &__selectSearchInput {
+      padding: 6px 8px 6px 28px;
+      font-size: 12px;
+    }
+
+    &__selectSearchIcon {
+      left: 16px;
+      font-size: 11px;
+    }
+
+    &__selectItem {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    &__selectList {
+      max-height: 180px;
+    }
+  }
+}
+
+@media (max-width: 320px) {
+  .barbermasters {
+    padding: 8px;
+    gap: 8px;
+
+    &__title {
+      font-size: 15px;
+    }
+
+    &__input {
+      font-size: 13px;
+      padding: 0 8px;
+      height: 36px;
+    }
+
+    &__tabs {
+      gap: 2px;
+      padding: 2px;
+
+      .barbermasters__btn {
+        padding: 0 4px;
+        font-size: 10px;
+        height: 32px;
+        min-width: 0;
+      }
+    }
+
+    &__actions > .barbermasters__btn--primary {
+      width: 100%;
+      max-width: 100%;
+      height: 34px;
+      min-width: 34px;
+    }
+
+    &__btn {
+      height: 34px;
+      padding: 0 8px;
+      font-size: 11px;
+    }
+
+    &__footer .barbermasters__btn {
+      flex: 1 1 100%;
+      width: 100%;
+    }
+
+    &__pageBtn {
+      padding: 6px 10px;
+      font-size: 12px;
+      min-width: 32px;
+    }
+
+    &__selectMenu {
+      max-height: 200px;
+      border-radius: 8px;
+    }
+
+    &__selectSearch {
+      padding: 4px;
+    }
+
+    &__selectSearchInput {
+      padding: 6px 8px 6px 26px;
+      font-size: 12px;
+    }
+
+    &__selectSearchIcon {
+      left: 14px;
+      font-size: 11px;
+    }
+
+    &__selectItem {
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    &__selectList {
+      max-height: 160px;
+      padding: 4px 0;
+    }
+
+    &__selectEmpty {
+      padding: 12px;
+      font-size: 12px;
+    }
+  }
+}
+
+/* Дополнительные адаптивные улучшения для модального окна доступов */
+@media (max-width: 900px) {
+  .barbermasters__modal--taller {
+    max-height: 92dvh;
+    width: 95vw !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 16px var(--padX) !important;
+  }
+
+  .barbermasters__form {
+    padding: 16px var(--padX) !important;
+    max-height: calc(92dvh - 100px) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .barbermasters__modal--taller {
+    max-height: 90dvh;
+    width: 96vw !important;
+    max-width: 96vw !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 14px var(--padX) !important;
+  }
+
+  .barbermasters__modalTitle {
+    font-size: 18px !important;
+    line-height: 1.3;
+  }
+
+  .barbermasters__form {
+    padding: 14px var(--padX) !important;
+    max-height: calc(90dvh - 90px) !important;
+  }
+
+  .barbermasters__iconBtn {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 16px !important;
+    top: 12px !important;
+    right: 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .barbermasters__modal--taller {
+    max-height: 95dvh;
+    width: 98vw !important;
+    max-width: 98vw !important;
+    border-radius: 12px !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 12px var(--padX) !important;
+  }
+
+  .barbermasters__modalTitle {
+    font-size: 16px !important;
+    padding-right: 40px;
+  }
+
+  .barbermasters__form {
+    padding: 12px var(--padX) !important;
+    max-height: calc(95dvh - 80px) !important;
+  }
+
+  .barbermasters__iconBtn {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 14px !important;
+    top: 10px !important;
+    right: 10px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .barbermasters__modal--taller {
+    max-height: 100dvh;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    border-radius: 0 !important;
+  }
+
+  .barbermasters__modalHeader {
+    padding: 10px var(--padX) !important;
+  }
+
+  .barbermasters__modalTitle {
+    font-size: 15px !important;
+    padding-right: 36px;
+  }
+
+  .barbermasters__form {
+    padding: 10px var(--padX) !important;
+    max-height: calc(100dvh - 70px) !important;
+  }
+
+  .barbermasters__iconBtn {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 13px !important;
+    top: 8px !important;
+    right: 8px !important;
+  }
+}
+
+/* Улучшения для скролла на мобильных устройствах */
+@media (max-width: 900px) {
+  .barbermasters {
+    &__list {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    &__grid {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    &__selectList {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    &__form {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+  }
+}
+
+/* Дополнительные улучшения для таблиц и контента */
+@media (max-width: 768px) {
+  .barbermasters {
+    &__titleWrap {
+      gap: 4px;
+    }
+
+    &__subtitle {
+      flex-wrap: wrap;
+    }
+
+    &__meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+
+      .bm-item + .bm-item::before {
+        display: none;
+      }
+    }
+
+    &__avatar {
+      flex-shrink: 0;
+    }
+
+    &__name {
+      word-break: break-word;
+    }
+  }
+}
+
+/* Улучшения для горизонтальной ориентации на мобильных */
+@media (max-width: 900px) and (orientation: landscape) {
+  .barbermasters {
+    &__modal {
+      max-height: 85dvh;
+    }
+
+    &__modal--taller {
+      max-height: 85dvh !important;
+    }
+
+    &__form {
+      max-height: calc(85dvh - 100px) !important;
+    }
+  }
+}
+
+/* Улучшения для очень маленьких экранов в альбомной ориентации */
+@media (max-width: 600px) and (orientation: landscape) {
+  .barbermasters {
+    &__modal {
+      max-height: 80dvh;
+    }
+
+    &__modal--taller {
+      max-height: 80dvh !important;
+    }
+
+    &__form {
+      max-height: calc(80dvh - 80px) !important;
+    }
+  }
+}
+
+/* Улучшения для touch-устройств */
+@media (hover: none) and (pointer: coarse) {
+  .barbermasters {
+    &__btn {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    &__cardActions .barbermasters__btn {
+      min-height: 44px;
+    }
+
+    &__pageBtn {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    &__selectItem {
+      min-height: 44px;
+      padding: 12px 16px;
+    }
+
+    &__iconBtn {
+      min-width: 44px;
+      min-height: 44px;
+    }
+  }
+}
+
+/* Улучшения для высоких экранов */
+@media (min-height: 900px) {
+  .barbermasters {
+    &__list {
+      max-height: 70dvh;
+    }
+  }
+}
+
+/* Улучшения для низких экранов */
+@media (max-height: 600px) {
+  .barbermasters {
+    &__modal {
+      max-height: 85dvh;
+    }
+
+    &__modal--taller {
+      max-height: 85dvh !important;
+    }
+
+    &__form {
+      max-height: calc(85dvh - 100px) !important;
+    }
+  }
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .barbermasters {
+    &__btn {
+      transition: none !important;
+    }
+    .barbermasters__btn {
+      transition: none !important;
+    }
+
+    &__card {
+      transition: none !important;
+    }
+
+    &__modal {
+      animation: none !important;
+    }
+
+    &__overlay {
+      animation: none !important;
+    }
+
+    &__selectMenu {
+      animation: none !important;
+    }
+  }
+}

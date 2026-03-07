@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert } from "@/hooks/useDialog";
-import { useCash, getCashBoxes } from "@/store/slices/cashSlice";
+import { getBuildingCashboxes } from "@/api/building";
 import { useBuildingTreatyInstallments } from "@/store/slices/building/treatyInstallmentsSlice";
 import { createBuildingInstallmentPayment } from "@/store/creators/building/treatyInstallmentsCreators";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -16,7 +16,8 @@ export default function InstallmentPaymentCreateModal({
 }) {
   const dispatch = useDispatch();
   const alert = useAlert();
-  const { list: cashboxes, loading: cashLoading } = useCash();
+  const [cashboxes, setCashboxes] = useState([]);
+  const [cashLoading, setCashLoading] = useState(false);
   const installmentsState = useBuildingTreatyInstallments();
 
   const installmentId = installment?.id ?? installment?.uuid ?? null;
@@ -51,23 +52,25 @@ export default function InstallmentPaymentCreateModal({
     setLocalError(null);
     setAmount("");
     setPaidAt("");
-    if (!cashboxes || cashboxes.length === 0) {
-      dispatch(getCashBoxes());
-    } else if (!cashbox) {
-      const first = cashboxes[0];
-      const firstId = first?.id ?? first?.uuid ?? "";
-      if (firstId) setCashbox(firstId);
-    }
-  }, [open, cashboxes, cashbox, dispatch]);
-
-  useEffect(() => {
-    if (!open || cashbox) return;
-    if (cashboxes && cashboxes.length > 0) {
-      const first = cashboxes[0];
-      const firstId = first?.id ?? first?.uuid ?? "";
-      if (firstId) setCashbox(firstId);
-    }
-  }, [open, cashboxes, cashbox]);
+    let cancelled = false;
+    setCashLoading(true);
+    getBuildingCashboxes()
+      .then((list) => {
+        if (!cancelled) {
+          setCashboxes(Array.isArray(list) ? list : []);
+          const first = Array.isArray(list) ? list[0] : null;
+          const firstId = first?.id ?? first?.uuid ?? "";
+          if (firstId) setCashbox(firstId);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCashboxes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCashLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [open]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -95,6 +98,7 @@ export default function InstallmentPaymentCreateModal({
     const payload = {
       amount: value.toFixed(2),
       cashbox,
+      shift: null, // смены пока не обязательны
     };
     if (paidAt && String(paidAt).trim() !== "") {
       const base = String(paidAt).trim(); // YYYY-MM-DDTHH:MM
