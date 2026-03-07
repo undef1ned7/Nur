@@ -265,6 +265,7 @@ const RecordaCalendar = ({
 
                   {layout.map((it) => {
                     const r = it.r;
+                    const svc = serviceNamesFromRecord(r);
                     const cl = clientName(r);
                     const phone = clientPhone(r);
 
@@ -274,7 +275,7 @@ const RecordaCalendar = ({
                         className="barberrecorda__event"
                         style={it.style}
                         onClick={() => onRecordClick(r)}
-                        title={cl}
+                        title={`${svc}${cl ? ` · ${cl}` : ""}`}
                       >
                         <div className="barberrecorda__eventHeader">
                           <div className="barberrecorda__eventTime">
@@ -289,6 +290,9 @@ const RecordaCalendar = ({
                             <span className="barberrecorda__badgeFull">{STATUS_LABELS[r.status] || r.status}</span>
                             <span className="barberrecorda__badgeShort">{STATUS_LABELS_SHORT[r.status] || r.status}</span>
                           </span>
+                        </div>
+                        <div className="barberrecorda__eventSvc">
+                          {svc}
                         </div>
                         <div className="barberrecorda__eventClient">
                           {cl}
