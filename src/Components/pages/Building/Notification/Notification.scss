@@ -1,0 +1,63 @@
+@import "../CashRegister/CashRegister.scss";
+
+/* Календарь напоминаний */
+.building-notification-calendar {
+  padding: 16px 0;
+  min-height: 480px;
+
+  .building-notification-calendar__fc {
+    --fc-border-color: #e2e8f0;
+    --fc-button-bg-color: #0f172a;
+    --fc-button-border-color: #0f172a;
+    --fc-button-hover-bg-color: #1e293b;
+    --fc-button-hover-border-color: #1e293b;
+    --fc-today-bg-color: #f0f9ff;
+    --fc-event-bg-color: #0284c7;
+    --fc-event-border-color: #0284c7;
+  }
+
+  .fc {
+    font-family: inherit;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .fc .fc-button {
+    padding: 0.4em 0.8em;
+    font-weight: 500;
+    border-radius: 8px;
+  }
+
+  .fc .fc-daygrid-day-number {
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+    background: #0284c7;
+    color: #fff;
+  }
+
+  .fc-event {
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 0.8125rem;
+  }
+
+  .fc-event:hover {
+    opacity: 0.9;
+  }
+
+  .warehouse-table__empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: #64748b;
+    background: #f8fafc;
+    border-radius: 12px;
+  }
+}

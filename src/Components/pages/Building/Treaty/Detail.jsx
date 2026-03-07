@@ -15,6 +15,7 @@ import { useBuildingTreaties } from "../../../../store/slices/building/treatiesS
 import { useBuildingClients } from "../../../../store/slices/building/clientsSlice";
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
 import { useBuildingApartments } from "../../../../store/slices/building/apartmentsSlice";
+import InstallmentPaymentsModal from "./InstallmentPaymentsModal";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
 const STATUS_LABELS = {
@@ -32,6 +33,12 @@ const OPERATION_TYPE_LABELS = {
 const PAYMENT_TYPE_LABELS = {
   full: "Полная оплата",
   installment: "Рассрочка",
+};
+
+const FORM_GRID_STYLE = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+  gap: 12,
 };
 
 const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
@@ -120,6 +127,9 @@ export default function BuildingTreatyDetail() {
   const [fileUploadError, setFileUploadError] = useState(null);
   const [fileUploading, setFileUploading] = useState(false);
   const [fileModalOpen, setFileModalOpen] = useState(false);
+
+  const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
+  const [paymentsModalInstallment, setPaymentsModalInstallment] = useState(null);
 
   const selectedProjectName = useMemo(() => {
     if (!selectedProjectId) return "—";
@@ -449,6 +459,12 @@ export default function BuildingTreatyDetail() {
 
   const files = Array.isArray(current?.files) ? current.files : [];
 
+  const openInstallmentPayments = (installment) => {
+    if (!installment) return;
+    setPaymentsModalInstallment(installment);
+    setPaymentsModalOpen(true);
+  };
+
   const handleDownloadSchedulePdf = () => {
     if (!installments.length) {
       alert("Нет графика рассрочки для выгрузки", true);
@@ -563,280 +579,434 @@ export default function BuildingTreatyDetail() {
           <div className="building-page__muted">Загрузка договора...</div>
         ) : (
           <form className="building-page" onSubmit={handleSubmit}>
-            <label>
-              <div className="building-page__label">ЖК *</div>
-              <select
-                className="building-page__select"
-                value={form.residential_complex}
-                onChange={handleFormChange("residential_complex")}
-                required
-              >
-                <option value="">Выберите ЖК</option>
-                {complexesOptions.map((c) => (
-                  <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
-                    {c.name || "—"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Клиент *</div>
-              <select
-                className="building-page__select"
-                value={form.client}
-                onChange={handleFormChange("client")}
-                required
-              >
-                <option value="">Выберите клиента</option>
-                {clientsOptions.map((c) => (
-                  <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
-                    {c.name || "—"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Номер договора</div>
-              <input
-                className="building-page__input"
-                value={form.number}
-                onChange={handleFormChange("number")}
-                placeholder="ДГ-001"
-                disabled
-              />
-            </label>
-            <label>
-              <div className="building-page__label">Наименование *</div>
-              <input
-                className="building-page__input"
-                value={form.title}
-                onChange={handleFormChange("title")}
-                placeholder="Договор подряда"
-                required
-              />
-            </label>
-            <label>
-              <div className="building-page__label">Описание</div>
-              <textarea
-                className="building-page__textarea"
-                rows={3}
-                value={form.description}
-                onChange={handleFormChange("description")}
-                placeholder="Условия договора..."
-              />
-            </label>
-            <label>
-              <div className="building-page__label">Квартира</div>
-              <select
-                className="building-page__select"
-                value={form.apartment}
-                onChange={handleFormChange("apartment")}
-              >
-                <option value="">Без выбора квартиры</option>
-                {apartmentsOptions.map((a) => (
-                  <option key={a.id ?? a.uuid} value={a.id ?? a.uuid}>
-                    {a.number || "Квартира"}
-                    {a.floor != null ? `, этаж ${a.floor}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Тип операции</div>
-              <select
-                className="building-page__select"
-                value={form.operation_type}
-                onChange={handleFormChange("operation_type")}
-              >
-                {Object.entries(OPERATION_TYPE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Тип оплаты</div>
-              <select
-                className="building-page__select"
-                value={form.payment_type}
-                onChange={handleFormChange("payment_type")}
-              >
-                {Object.entries(PAYMENT_TYPE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Сумма</div>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className="building-page__input"
-                value={form.amount}
-                onChange={handleFormChange("amount")}
-                placeholder="150000.00"
-              />
-            </label>
-            {form.payment_type === "installment" && (
-              <label>
-                <div className="building-page__label">Первоначальный взнос</div>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="building-page__input"
-                  value={form.down_payment}
-                  onChange={handleFormChange("down_payment")}
-                  placeholder="30000.00"
-                />
-              </label>
-            )}
-            <label>
-              <div className="building-page__label">Условия оплаты</div>
-              <textarea
-                className="building-page__textarea"
-                rows={2}
-                value={form.payment_terms}
-                onChange={handleFormChange("payment_terms")}
-                placeholder="Рассрочка на 12 месяцев..."
-              />
-            </label>
-            <label>
-              <div className="building-page__label">Статус</div>
-              <select
-                className="building-page__select"
-                value={form.status}
-                onChange={handleFormChange("status")}
-              >
-                {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={form.auto_create_in_erp}
-                onChange={handleFormChange("auto_create_in_erp")}
-              />
-              <span className="building-page__label">
-                Создавать договор в ERP автоматически
-              </span>
-            </label>
-
-            {form.payment_type === "installment" && (
-              <div>
-                <div className="building-page__label" style={{ marginTop: 8 }}>
-                  График рассрочки
-                </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Основная информация */}
+              <section>
                 <div
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    marginBottom: 8,
-                    flexWrap: "wrap",
-                  }}
+                  className="building-page__label"
+                  style={{ marginBottom: 8, fontWeight: 600 }}
                 >
-                  <label style={{ flex: "0 0 220px" }}>
-                    <div className="building-page__label">
-                      Дата первого платежа *
-                    </div>
+                  Основная информация
+                </div>
+                <div style={FORM_GRID_STYLE}>
+                  <label>
+                    <div className="building-page__label">ЖК *</div>
+                    <select
+                      className="building-page__select"
+                      value={form.residential_complex}
+                      onChange={handleFormChange("residential_complex")}
+                      required
+                    >
+                      <option value="">Выберите ЖК</option>
+                      {complexesOptions.map((c) => (
+                        <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                          {c.name || "—"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <div className="building-page__label">Клиент *</div>
+                    <select
+                      className="building-page__select"
+                      value={form.client}
+                      onChange={handleFormChange("client")}
+                      required
+                    >
+                      <option value="">Выберите клиента</option>
+                      {clientsOptions.map((c) => (
+                        <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                          {c.name || "—"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <div className="building-page__label">Номер договора</div>
                     <input
-                      type="date"
                       className="building-page__input"
-                      value={firstInstallmentDate}
-                      onChange={(e) => setFirstInstallmentDate(e.target.value)}
+                      value={form.number}
+                      onChange={handleFormChange("number")}
+                      placeholder="ДГ-001"
+                      disabled
                     />
                   </label>
-                  <label style={{ flex: "0 0 220px" }}>
-                    <div className="building-page__label">
-                      Количество платежей
-                    </div>
+                  <label>
+                    <div className="building-page__label">Статус</div>
+                    <select
+                      className="building-page__select"
+                      value={form.status}
+                      onChange={handleFormChange("status")}
+                    >
+                      {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              {/* Объект и описание */}
+              <section>
+                <div
+                  className="building-page__label"
+                  style={{ marginBottom: 8, fontWeight: 600 }}
+                >
+                  Объект и описание
+                </div>
+                <div style={FORM_GRID_STYLE}>
+                  <label>
+                    <div className="building-page__label">Квартира</div>
+                    <select
+                      className="building-page__select"
+                      value={form.apartment}
+                      onChange={handleFormChange("apartment")}
+                    >
+                      <option value="">Без выбора квартиры</option>
+                      {apartmentsOptions.map((a) => (
+                        <option key={a.id ?? a.uuid} value={a.id ?? a.uuid}>
+                          {a.number || "Квартира"}
+                          {a.floor != null ? `, этаж ${a.floor}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <div className="building-page__label">Тип операции</div>
+                    <select
+                      className="building-page__select"
+                      value={form.operation_type}
+                      onChange={handleFormChange("operation_type")}
+                    >
+                      {Object.entries(OPERATION_TYPE_LABELS).map(
+                        ([key, label]) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    <div className="building-page__label">Наименование *</div>
+                    <input
+                      className="building-page__input"
+                      value={form.title}
+                      onChange={handleFormChange("title")}
+                      placeholder="Договор подряда"
+                      required
+                    />
+                  </label>
+                  <label style={{ gridColumn: "1 / -1" }}>
+                    <div className="building-page__label">Описание</div>
+                    <textarea
+                      className="building-page__textarea"
+                      rows={3}
+                      value={form.description}
+                      onChange={handleFormChange("description")}
+                      placeholder="Условия договора..."
+                    />
+                  </label>
+                </div>
+              </section>
+
+              {/* Оплата */}
+              <section>
+                <div
+                  className="building-page__label"
+                  style={{ marginBottom: 8, fontWeight: 600 }}
+                >
+                  Оплата
+                </div>
+                <div style={FORM_GRID_STYLE}>
+                  <label>
+                    <div className="building-page__label">Тип оплаты</div>
+                    <select
+                      className="building-page__select"
+                      value={form.payment_type}
+                      onChange={handleFormChange("payment_type")}
+                    >
+                      {Object.entries(PAYMENT_TYPE_LABELS).map(
+                        ([key, label]) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <label>
+                    <div className="building-page__label">Сумма</div>
                     <input
                       type="number"
-                      min="1"
-                      step="1"
+                      min="0"
+                      step="0.01"
                       className="building-page__input"
-                      value={installmentMonths}
-                      onChange={(e) =>
-                        setInstallmentMonths(
-                          Number(e.target.value) > 0
-                            ? Number(e.target.value)
-                            : 1,
-                        )
-                      }
+                      value={form.amount}
+                      onChange={handleFormChange("amount")}
+                      placeholder="150000.00"
                     />
                   </label>
+                  {form.payment_type === "installment" && (
+                    <label>
+                      <div className="building-page__label">
+                        Первоначальный взнос
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="building-page__input"
+                        value={form.down_payment}
+                        onChange={handleFormChange("down_payment")}
+                        placeholder="30000.00"
+                      />
+                    </label>
+                  )}
+                  <label style={{ gridColumn: "1 / -1" }}>
+                    <div className="building-page__label">Условия оплаты</div>
+                    <textarea
+                      className="building-page__textarea"
+                      rows={2}
+                      value={form.payment_terms}
+                      onChange={handleFormChange("payment_terms")}
+                      placeholder="Рассрочка на 12 месяцев..."
+                    />
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      gridColumn: "1 / -1",
+                      marginTop: 4,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.auto_create_in_erp}
+                      onChange={handleFormChange("auto_create_in_erp")}
+                    />
+                    <span className="building-page__label">
+                      Создавать договор в ERP автоматически
+                    </span>
+                  </label>
                 </div>
-                {installments.length === 0 ? (
-                  <div className="building-page__muted">
-                    Укажите сумму договора, первоначальный взнос и дату первого
-                    платежа, чтобы увидеть график рассрочки.
+              </section>
+
+              {/* График рассрочки */}
+              {form.payment_type === "installment" && (
+                <section>
+                  <div
+                    className="building-page__label"
+                    style={{ marginTop: 8, marginBottom: 8, fontWeight: 600 }}
+                  >
+                    График рассрочки
                   </div>
-                ) : (
-                  <div className="building-table building-table--shadow">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Дата платежа</th>
-                          <th>Сумма</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {installments.map((row, idx) => (
-                          <tr key={idx}>
-                            <td>{row.order ?? idx + 1}</td>
-                            <td>{row.due_date}</td>
-                            <td>{row.amount}</td>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      marginBottom: 8,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <label style={{ flex: "0 0 220px" }}>
+                      <div className="building-page__label">
+                        Дата первого платежа *
+                      </div>
+                      <input
+                        type="date"
+                        className="building-page__input"
+                        value={firstInstallmentDate}
+                        onChange={(e) =>
+                          setFirstInstallmentDate(e.target.value)
+                        }
+                      />
+                    </label>
+                    <label style={{ flex: "0 0 220px" }}>
+                      <div className="building-page__label">
+                        Количество платежей
+                      </div>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="building-page__input"
+                        value={installmentMonths}
+                        onChange={(e) =>
+                          setInstallmentMonths(
+                            Number(e.target.value) > 0
+                              ? Number(e.target.value)
+                              : 1,
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                  {installments.length === 0 ? (
+                    <div className="building-page__muted">
+                      Укажите сумму договора, первоначальный взнос и дату
+                      первого платежа, чтобы увидеть график рассрочки.
+                    </div>
+                  ) : (
+                    <div className="building-table building-table--shadow">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Дата платежа</th>
+                            <th>Сумма</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
+                        </thead>
+                        <tbody>
+                          {installments.map((row, idx) => (
+                            <tr key={idx}>
+                              <td>{row.order ?? idx + 1}</td>
+                              <td>{row.due_date}</td>
+                              <td>{row.amount}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )}
 
-            {formError && (
-              <div className="building-page__error" style={{ marginTop: 8 }}>
-                {String(formError)}
-              </div>
-            )}
+              {formError && (
+                <div className="building-page__error" style={{ marginTop: 8 }}>
+                  {String(formError)}
+                </div>
+              )}
 
-            <div className="building-page__actions" style={{ marginTop: 12 }}>
-              <button
-                type="button"
-                className="building-btn"
-                onClick={() => navigate("/crm/building/treaty")}
-              >
-                Отмена
-              </button>
-              <button
-                type="submit"
-                className="building-btn building-btn--primary"
-              >
-                Сохранить
-              </button>
-              {form.payment_type === "installment" && installments.length > 0 && (
+              <div className="building-page__actions" style={{ marginTop: 12 }}>
                 <button
                   type="button"
                   className="building-btn"
-                  onClick={handleDownloadSchedulePdf}
+                  onClick={() => navigate("/crm/building/treaty")}
                 >
-                  Скачать график (PDF)
+                  Отмена
                 </button>
-              )}
+                <button
+                  type="submit"
+                  className="building-btn building-btn--primary"
+                >
+                  Сохранить
+                </button>
+                {form.payment_type === "installment" &&
+                  installments.length > 0 && (
+                    <button
+                      type="button"
+                      className="building-btn"
+                      onClick={handleDownloadSchedulePdf}
+                    >
+                      Скачать график (PDF)
+                    </button>
+                  )}
+              </div>
             </div>
           </form>
         )}
       </div>
+
+      {!isNew &&
+        current?.payment_type === "installment" &&
+        Array.isArray(current?.installments) &&
+        current.installments.length > 0 && (
+          <div className="building-page__card" style={{ marginTop: 16 }}>
+            <div className="building-page__header" style={{ marginBottom: 8 }}>
+              <h2 className="building-page__title" style={{ fontSize: 18 }}>
+                Рассрочка по договору
+              </h2>
+            </div>
+            <div className="building-table building-table--shadow">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Дата платежа</th>
+                    <th>Сумма</th>
+                    <th>Оплачено</th>
+                    <th>Остаток</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {current.installments.map((it, idx) => {
+                    const total = Number(it.amount || 0);
+                    const paid = Number(it.paid_amount || 0);
+                    const remain = Number.isFinite(total - paid)
+                      ? Math.max(0, total - paid)
+                      : 0;
+                    const status = it.status || (remain <= 0 ? "paid" : "planned");
+                    const isPaid = status === "paid";
+                    return (
+                      <tr key={it.id ?? it.uuid ?? idx}>
+                        <td>{it.order ?? idx + 1}</td>
+                        <td>{it.due_date || "—"}</td>
+                        <td>{it.amount ?? "0.00"}</td>
+                        <td>{it.paid_amount ?? "0.00"}</td>
+                        <td>{remain.toFixed(2)}</td>
+                        <td>
+                          {isPaid ? (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                fontSize: 12,
+                                backgroundColor: "#dcfce7",
+                                color: "#166534",
+                              }}
+                            >
+                              Оплачен
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                fontSize: 12,
+                                backgroundColor: "#fef3c7",
+                                color: "#92400e",
+                              }}
+                            >
+                              Запланирован
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {!isPaid && remain > 0 ? (
+                            <button
+                              type="button"
+                              className="building-btn building-btn--primary"
+                              onClick={() => openInstallmentPayments(it)}
+                            >
+                              Оплатить
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="building-btn"
+                              onClick={() => openInstallmentPayments(it)}
+                            >
+                              Платежи
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
       {!isNew && (
         <div className="building-page__card" style={{ marginTop: 16 }}>
@@ -1008,6 +1178,15 @@ export default function BuildingTreatyDetail() {
           </div>
         </form>
       </Modal>
+
+      {!isNew && paymentsModalInstallment && (
+        <InstallmentPaymentsModal
+          open={paymentsModalOpen}
+          onClose={() => setPaymentsModalOpen(false)}
+          installment={paymentsModalInstallment}
+          treaty={current}
+        />
+      )}
     </div>
   );
 }
