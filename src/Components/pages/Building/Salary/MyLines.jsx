@@ -16,21 +16,16 @@ export default function BuildingSalaryMyLines() {
 
   return (
     <div className="building-page__card">
-      <h2 className="building-page__title" style={{ fontSize: 18 }}>
+      {/* <h2 className="building-page__title" style={{ fontSize: 18 }}>
         Мои начисления
-      </h2>
+      </h2> */}
       {loading && (
-        <div className="building-page__muted">
-          Загрузка ваших начислений...
-        </div>
+        <div className="building-page__muted">Загрузка ваших начислений...</div>
       )}
       {error && (
         <div className="building-page__error">
           {String(
-            validateResErrors(
-              error,
-              "Не удалось загрузить ваши начисления",
-            ),
+            validateResErrors(error, "Не удалось загрузить ваши начисления"),
           )}
         </div>
       )}
@@ -49,11 +44,7 @@ export default function BuildingSalaryMyLines() {
             <tbody>
               {(list || []).map((line) => (
                 <tr key={line.id ?? line.uuid}>
-                  <td>
-                    {line.payroll_title ||
-                      line.period_title ||
-                      "—"}
-                  </td>
+                  <td>{line.payroll_title || line.period_title || "—"}</td>
                   <td>{line.base_amount ?? "—"}</td>
                   <td>{line.net_to_pay ?? "—"}</td>
                   <td>{line.paid_total ?? "—"}</td>
@@ -74,4 +65,3 @@ export default function BuildingSalaryMyLines() {
     </div>
   );
 }
-

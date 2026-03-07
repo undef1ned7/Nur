@@ -1,19 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, ClipboardList } from "lucide-react";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
-import {
-  useBuildingWorkEntries,
-} from "@/store/slices/building/workEntriesSlice";
+import { useBuildingWorkEntries } from "@/store/slices/building/workEntriesSlice";
 import {
   fetchBuildingWorkEntryById,
   createBuildingWorkEntryPhoto,
 } from "@/store/creators/building/workEntriesCreators";
 import { asDateTime } from "../shared/constants";
 import { Copy } from "lucide-react";
+import "./Detail.scss";
 
 const CATEGORY_LABELS = {
   note: "Заметка",
@@ -31,11 +31,7 @@ export default function BuildingWorkProcessDetail() {
   const alert = useAlert();
 
   const { selectedProjectId, items: projects } = useBuildingProjects();
-  const {
-    current,
-    currentLoading,
-    currentError,
-  } = useBuildingWorkEntries();
+  const { current, currentLoading, currentError } = useBuildingWorkEntries();
 
   const [openPhotoModal, setOpenPhotoModal] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
@@ -55,18 +51,19 @@ export default function BuildingWorkProcessDetail() {
     if (!selectedProjectId) return "—";
     const list = Array.isArray(projects) ? projects : [];
     const found = list.find(
-      (p) => String(p?.id ?? p?.uuid) === String(selectedProjectId)
+      (p) => String(p?.id ?? p?.uuid) === String(selectedProjectId),
     );
     return found?.name || "—";
   }, [selectedProjectId, projects]);
 
-  const entry = current && String(current.id ?? current.uuid) === entryId
-    ? current
-    : current;
+  const entry =
+    current && String(current.id ?? current.uuid) === entryId
+      ? current
+      : current;
 
   const photos = useMemo(
     () => (Array.isArray(entry?.photos) ? entry.photos : []),
-    [entry]
+    [entry],
   );
 
   const handleBack = () => {
@@ -131,7 +128,7 @@ export default function BuildingWorkProcessDetail() {
           id: entryId,
           image: photoFile,
           caption: photoCaption,
-        })
+        }),
       );
       if (res.meta.requestStatus === "fulfilled") {
         alert("Фото добавлено");
@@ -148,59 +145,55 @@ export default function BuildingWorkProcessDetail() {
         setPhotoError(
           validateResErrors(
             res.payload || res.error,
-            "Не удалось загрузить фото"
-          )
+            "Не удалось загрузить фото",
+          ),
         );
       }
     } catch (err) {
-      setPhotoError(
-        validateResErrors(err, "Не удалось загрузить фото")
-      );
+      setPhotoError(validateResErrors(err, "Не удалось загрузить фото"));
     } finally {
       setPhotoUploading(false);
     }
   };
 
   return (
-    <div className="building-page">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">
-            Запись процесса работ
-          </h1>
-          <p className="building-page__subtitle">
-            ЖК: <b>{selectedProjectName}</b>{" "}
-            {entry?.category && (
-              <>
-                • {CATEGORY_LABELS[entry.category] || entry.category}
-              </>
-            )}
-          </p>
-          {currentLoading && (
-            <div className="building-page__muted">Загрузка записи...</div>
-          )}
-          {currentError && (
-            <div className="building-page__error">
-              {String(
-                validateResErrors(
-                  currentError,
-                  "Не удалось загрузить запись"
-                )
+    <div className="add-product-page work-detail">
+      <div className="add-product-page__header">
+        <button
+          type="button"
+          className="add-product-page__back"
+          onClick={handleBack}
+        >
+          <ArrowLeft size={18} />
+          К списку записей
+        </button>
+        <div className="add-product-page__title-section">
+          <div className="add-product-page__icon">
+            <ClipboardList size={24} />
+          </div>
+          <div>
+            <h1 className="add-product-page__title">
+              Запись процесса работ
+            </h1>
+            <p className="add-product-page__subtitle">
+              ЖК: <b>{selectedProjectName}</b>
+              {entry?.category && (
+                <> • {CATEGORY_LABELS[entry.category] || entry.category}</>
               )}
-            </div>
-          )}
+            </p>
+          </div>
         </div>
-        <div className="building-page__actions">
+        <div className="work-detail__section-actions" style={{ marginTop: 16 }}>
           <button
             type="button"
-            className="building-btn"
+            className="add-product-page__cancel-btn"
             onClick={handleBack}
           >
             Назад к списку
           </button>
           <button
             type="button"
-            className="building-btn building-btn--primary"
+            className="add-product-page__submit-btn"
             onClick={() => setOpenPhotoModal(true)}
             disabled={!entry}
           >
@@ -209,97 +202,122 @@ export default function BuildingWorkProcessDetail() {
         </div>
       </div>
 
-      {entry && (
-        <div className="building-page__card">
-          <h3 className="building-page__cardTitle">Детали записи</h3>
-          <div className="building-page__row">
-            <div>
-              <div className="building-page__label">Название</div>
-              <div className="building-page__value" style={{ textAlign: "left" }}>
-                {entry.title || "—"}
-              </div>
-            </div>
-          </div>
-          <div className="building-page__row">
-            <div>
-              <div className="building-page__label">Описание</div>
-              <div className="building-page__value" style={{ textAlign: "left" }}>
-                {entry.description || "—"}
-              </div>
-            </div>
-          </div>
-          <div className="building-page__row">
-            <div>
-              <div className="building-page__label">Автор</div>
-              <div className="building-page__value">
-                {entry.created_by_display || "—"}
-              </div>
-            </div>
-            <div>
-              <div className="building-page__label">Когда произошло</div>
-              <div className="building-page__value">
-                {asDateTime(entry.occurred_at || entry.created_at)}
-              </div>
-            </div>
-          </div>
+      {currentLoading && (
+        <div className="work-detail__muted">Загрузка записи...</div>
+      )}
+      {currentError && (
+        <div className="add-product-page__error" style={{ marginBottom: 16 }}>
+          {String(
+            validateResErrors(currentError, "Не удалось загрузить запись"),
+          )}
         </div>
       )}
 
-      <div className="building-page__card">
-        <h3 className="building-page__cardTitle">Фотоотчёт</h3>
-        {photos.length === 0 && (
-          <div className="building-page__muted">
-            Фото пока нет. Добавьте первые фото, используя кнопку выше.
-          </div>
-        )}
-        {photos.length > 0 && (
-          <div className="building-work-gallery">
-            {photos.map((photo) => {
-              const pid = photo?.id ?? photo?.uuid;
-              const src =
-                photo?.image_url ||
-                photo?.image ||
-                photo?.url ||
-                photo?.file ||
-                "";
-              if (!src) return null;
-              return (
-                <div
-                  key={pid}
-                  className="building-work-gallery__item"
-                  onClick={() => {
-                    setPreviewPhoto({
-                      src,
-                      caption: photo?.caption,
-                      created_at: photo?.created_at,
-                    });
-                    setOpenPreviewModal(true);
-                  }}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div className="building-work-gallery__imageWrapper">
-                    <img
-                      src={src}
-                      alt={photo?.caption || "Фото"}
-                      className="building-work-gallery__image"
-                    />
-                  </div>
-                  <div className="building-work-gallery__meta">
-                    {photo?.caption && (
-                      <div className="building-work-gallery__caption">
-                        {photo.caption}
-                      </div>
-                    )}
-                    <div className="building-work-gallery__date">
-                      {asDateTime(photo?.created_at)}
-                    </div>
-                  </div>
+      {entry && (
+        <div className="add-product-page__content">
+          <div className="add-product-page__section">
+            <div className="add-product-page__section-header">
+              <div className="add-product-page__section-number">1</div>
+              <h3 className="add-product-page__section-title">
+                Детали записи
+              </h3>
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Название</label>
+              <div className="work-detail__value">{entry.title || "—"}</div>
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Описание</label>
+              <div
+                className="work-detail__value"
+                style={{ whiteSpace: "pre-wrap" }}
+              >
+                {entry.description || "—"}
+              </div>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 16,
+              }}
+            >
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Автор</label>
+                <div className="work-detail__value">
+                  {entry.created_by_display || "—"}
                 </div>
-              );
-            })}
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">
+                  Когда произошло
+                </label>
+                <div className="work-detail__value">
+                  {asDateTime(entry.occurred_at || entry.created_at)}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+
+          <div className="add-product-page__section" style={{ marginTop: 24 }}>
+            <div className="add-product-page__section-header">
+              <div className="add-product-page__section-number">2</div>
+              <h3 className="add-product-page__section-title">Фотоотчёт</h3>
+            </div>
+            {photos.length === 0 ? (
+              <div className="work-detail__muted">
+                Фото пока нет. Добавьте первые фото, используя кнопку выше.
+              </div>
+            ) : (
+              <div className="building-work-gallery">
+                {photos.map((photo) => {
+                  const pid = photo?.id ?? photo?.uuid;
+                  const src =
+                    photo?.image_url ||
+                    photo?.image ||
+                    photo?.url ||
+                    photo?.file ||
+                    "";
+                  if (!src) return null;
+                  return (
+                    <div
+                      key={pid}
+                      className="building-work-gallery__item"
+                      onClick={() => {
+                        setPreviewPhoto({
+                          src,
+                          caption: photo?.caption,
+                          created_at: photo?.created_at,
+                        });
+                        setOpenPreviewModal(true);
+                      }}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div className="building-work-gallery__imageWrapper">
+                        <img
+                          src={src}
+                          alt={photo?.caption || "Фото"}
+                          className="building-work-gallery__image"
+                        />
+                      </div>
+                      <div className="building-work-gallery__meta">
+                        {photo?.caption && (
+                          <div className="building-work-gallery__caption">
+                            {photo.caption}
+                          </div>
+                        )}
+                        <div className="building-work-gallery__date">
+                          {asDateTime(photo?.created_at)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <Modal
         open={openPhotoModal}
@@ -315,27 +333,32 @@ export default function BuildingWorkProcessDetail() {
         }}
         title="Добавить фото"
       >
-        <form className="building-page" onSubmit={handlePhotoSubmit}>
-          <label>
-            <div className="building-page__label">Файл изображения</div>
+        <form
+          className="add-product-page add-product-page--modal-form"
+          onSubmit={handlePhotoSubmit}
+        >
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Файл изображения</label>
             <input
               type="file"
               accept="image/*"
-              className="building-page__input"
+              className="add-product-page__input"
               onChange={handleFileChange}
             />
-          </label>
-          <label>
-            <div className="building-page__label">Подпись (необязательно)</div>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">
+              Подпись (необязательно)
+            </label>
             <input
-              className="building-page__input"
+              className="add-product-page__input"
               value={photoCaption}
               onChange={(e) => setPhotoCaption(e.target.value)}
             />
-          </label>
+          </div>
           {photoPreview && (
-            <div>
-              <div className="building-page__label">Предпросмотр</div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Предпросмотр</label>
               <div className="building-work-gallery__imageWrapper">
                 <img
                   src={photoPreview}
@@ -346,14 +369,12 @@ export default function BuildingWorkProcessDetail() {
             </div>
           )}
           {photoError && (
-            <div className="building-page__error">
-              {String(photoError)}
-            </div>
+            <div className="add-product-page__error">{String(photoError)}</div>
           )}
-          <div className="building-page__actions">
+          <div className="add-product-page__actions">
             <button
               type="button"
-              className="building-btn"
+              className="add-product-page__cancel-btn"
               onClick={() => {
                 setOpenPhotoModal(false);
                 setPhotoFile(null);
@@ -370,7 +391,7 @@ export default function BuildingWorkProcessDetail() {
             </button>
             <button
               type="submit"
-              className="building-btn building-btn--primary"
+              className="add-product-page__submit-btn"
               disabled={photoUploading}
             >
               {photoUploading ? "Загрузка..." : "Загрузить"}
@@ -387,7 +408,7 @@ export default function BuildingWorkProcessDetail() {
         title="Просмотр фото"
       >
         {previewPhoto && (
-          <div className="building-page">
+          <div className="add-product-page add-product-page--modal-form">
             <div className="building-work-gallery__imageWrapper">
               <img
                 src={previewPhoto.src}
@@ -396,17 +417,23 @@ export default function BuildingWorkProcessDetail() {
               />
             </div>
             {previewPhoto.caption && (
-              <div className="building-work-gallery__caption" style={{ marginTop: 8 }}>
+              <div
+                className="building-work-gallery__caption"
+                style={{ marginTop: 8 }}
+              >
                 {previewPhoto.caption}
               </div>
             )}
-            <div className="building-work-gallery__date" style={{ marginTop: 4 }}>
+            <div
+              className="building-work-gallery__date"
+              style={{ marginTop: 4 }}
+            >
               {asDateTime(previewPhoto.created_at)}
             </div>
-            <div className="building-page__actions" style={{ marginTop: 10 }}>
+            <div className="add-product-page__actions" style={{ marginTop: 10 }}>
               <button
                 type="button"
-                className="building-btn"
+                className="add-product-page__cancel-btn"
                 onClick={handleCopyPreviewLink}
                 aria-label="Скопировать ссылку"
               >
@@ -419,4 +446,3 @@ export default function BuildingWorkProcessDetail() {
     </div>
   );
 }
-

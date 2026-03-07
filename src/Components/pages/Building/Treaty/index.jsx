@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import { FileText, LayoutGrid, Table2 } from "lucide-react";
+import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import {
@@ -19,6 +21,10 @@ import { useBuildingApartments } from "../../../../store/slices/building/apartme
 import { fetchBuildingApartments } from "../../../../store/creators/building/apartmentsCreators";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import BuildingActionsMenu from "../shared/ActionsMenu";
+import "./treaty.scss";
+
+const VIEW_MODES = { TABLE: "table", CARDS: "cards" };
+const STORAGE_KEY = "building_treaty_view_mode";
 
 const STATUS_LABELS = {
   draft: "Черновик",
@@ -103,6 +109,13 @@ export default function BuildingTreaty() {
 
   const [installments, setInstallments] = useState([]);
 
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window === "undefined") return VIEW_MODES.TABLE;
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved === VIEW_MODES.TABLE || saved === VIEW_MODES.CARDS) return saved;
+    return VIEW_MODES.TABLE;
+  });
+
   const selectedProjectName = useMemo(() => {
     if (!selectedProjectId) return "—";
     const listProjects = Array.isArray(projects) ? projects : [];
@@ -142,6 +155,11 @@ export default function BuildingTreaty() {
     }),
     [selectedProjectId, search, statusFilter, erpFilter, operationFilter, paymentFilter],
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEY, viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -474,36 +492,57 @@ export default function BuildingTreaty() {
     );
   };
 
+  const totalTreaties = Array.isArray(list) ? list.length : 0;
+  const filteredCount = Array.isArray(effectiveList) ? effectiveList.length : 0;
+
   return (
-    <div className="building-page building-page--treaties">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">Договоры строительства</h1>
-          <p className="building-page__subtitle">
-            ЖК: <b>{selectedProjectName}</b>. Реестр договоров с фильтрами и
-            ERP-синхронизацией.
-          </p>
+    <div className="warehouse-page building-page building-page--treaties">
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon-box">
+            <FileText size={24} />
+          </div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">Договоры строительства</h1>
+            <p className="warehouse-header__subtitle">
+              {selectedProjectId ? (
+                <>
+                  ЖК: <b>{selectedProjectName}</b>. Реестр договоров с фильтрами
+                  и ERP-синхронизацией.
+                </>
+              ) : (
+                "Выберите жилой комплекс в шапке раздела."
+              )}
+            </p>
+          </div>
         </div>
         <button
           type="button"
-          className="building-btn building-btn--primary"
+          className="warehouse-header__create-btn"
           disabled={!selectedProjectId}
-          onClick={() => navigate("/crm/building/sell")}
+          onClick={openCreate}
         >
           Новый договор
         </button>
       </div>
 
-      <div className="building-page__card">
-        <div className="building-page__filters building-page__filters--3">
+      <div className="warehouse-search-section">
+        <div className="warehouse-search">
           <input
-            className="building-page__input"
+            className="warehouse-search__input"
             value={search}
             placeholder="Поиск по номеру, названию, описанию, клиенту, ЖК"
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+        <div className="warehouse-search__info flex flex-wrap items-center gap-2">
+          <span>
+            {selectedProjectId
+              ? `Найдено ${filteredCount} из ${totalTreaties} договоров`
+              : "Выберите жилой комплекс в шапке раздела."}
+          </span>
           <select
-            className="building-page__select"
+            className="warehouse-filter-modal__select-small"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -515,7 +554,7 @@ export default function BuildingTreaty() {
             ))}
           </select>
           <select
-            className="building-page__select"
+            className="warehouse-filter-modal__select-small"
             value={erpFilter}
             onChange={(e) => setErpFilter(e.target.value)}
           >
@@ -526,10 +565,8 @@ export default function BuildingTreaty() {
               </option>
             ))}
           </select>
-        </div>
-        <div className="building-page__filters" style={{ marginTop: 8 }}>
           <select
-            className="building-page__select"
+            className="warehouse-filter-modal__select-small"
             value={operationFilter}
             onChange={(e) => setOperationFilter(e.target.value)}
           >
@@ -541,44 +578,57 @@ export default function BuildingTreaty() {
             ))}
           </select>
           <select
-            className="building-page__select"
+            className="warehouse-filter-modal__select-small"
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
           >
-            <option value="">Тип оплаты: все</option>
+            <option value="">Оплата: все</option>
             {Object.entries(PAYMENT_TYPE_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
               </option>
             ))}
           </select>
+          <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
+            <button
+              type="button"
+              onClick={() => setViewMode(VIEW_MODES.TABLE)}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                viewMode === VIEW_MODES.TABLE
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <Table2 size={16} />
+              Таблица
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode(VIEW_MODES.CARDS)}
+              className={`warehouse-view-btn inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                viewMode === VIEW_MODES.CARDS
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <LayoutGrid size={16} />
+              Карточки
+            </button>
+          </div>
         </div>
-        {error && (
-          <div className="building-page__error">
-            {String(validateResErrors(error, "Не удалось загрузить договоры"))}
-          </div>
-        )}
-        {erpError && (
-          <div className="building-page__error">
-            ERP: {String(validateResErrors(erpError, "Ошибка ERP"))}
-          </div>
-        )}
       </div>
 
-      <div className="building-page__card">
-        {(!selectedProjectId || loading) && (
-          <div className="building-page__muted">
-            {!selectedProjectId
-              ? "Выберите жилой комплекс в шапке раздела."
-              : "Загрузка..."}
-          </div>
-        )}
-        {selectedProjectId && !loading && effectiveList.length === 0 && (
-          <div className="building-page__muted">Договоров пока нет.</div>
-        )}
-        {selectedProjectId && !loading && effectiveList.length > 0 && (
-          <div className="building-table building-table--shadow">
-            <table>
+      {(error || erpError) && (
+        <div className="mt-2 text-sm text-red-500">
+          {error && String(validateResErrors(error, "Не удалось загрузить договоры"))}
+          {erpError && ` ERP: ${String(validateResErrors(erpError, "Ошибка ERP"))}`}
+        </div>
+      )}
+
+      <DataContainer>
+        <div className="warehouse-table-container w-full">
+          {viewMode === VIEW_MODES.TABLE ? (
+            <table className="warehouse-table w-full">
               <thead>
                 <tr>
                   <th>Номер</th>
@@ -595,110 +645,218 @@ export default function BuildingTreaty() {
                 </tr>
               </thead>
               <tbody>
-                {effectiveList.map((t) => {
+                {!selectedProjectId ? (
+                  <tr>
+                    <td colSpan={11} className="warehouse-table__empty">
+                      Выберите жилой комплекс в шапке раздела.
+                    </td>
+                  </tr>
+                ) : loading && effectiveList.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="warehouse-table__loading">
+                      Загрузка...
+                    </td>
+                  </tr>
+                ) : !loading && effectiveList.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="warehouse-table__empty">
+                      Договоров пока нет.
+                    </td>
+                  </tr>
+                ) : (
+                  effectiveList.map((t) => {
+                    const id = t?.id ?? t?.uuid;
+                    const erpBusy = id != null && erpCreatingId === id;
+                    const busyUpdate = id != null && updatingId === id;
+                    const busyDelete = id != null && deletingId === id;
+                    const busy = erpBusy || busyUpdate || busyDelete;
+                    const erpStatus = t?.erp_sync_status || "none";
+                    return (
+                      <tr
+                        key={id}
+                        onClick={() =>
+                          id && navigate(`/crm/building/treaty/${id}`)
+                        }
+                        style={{ cursor: "pointer" }}
+                      >
+                        <td>{t?.number || "—"}</td>
+                        <td>{t?.title || "—"}</td>
+                        <td>
+                          {t?.residential_complex_name ||
+                            t?.residential_complex ||
+                            "—"}
+                        </td>
+                        <td>{t?.client_name || t?.client || "—"}</td>
+                        <td>
+                          {t?.apartment_number ||
+                            (t?.apartment_floor != null
+                              ? `Этаж ${t.apartment_floor}`
+                              : t?.apartment) ||
+                            "—"}
+                        </td>
+                        <td>
+                          {OPERATION_TYPE_LABELS[t?.operation_type] ||
+                            t?.operation_type ||
+                            "—"}
+                        </td>
+                        <td>
+                          {PAYMENT_TYPE_LABELS[t?.payment_type] ||
+                            t?.payment_type ||
+                            "—"}
+                        </td>
+                        <td>{t?.amount ?? "—"}</td>
+                        <td>
+                          <span className="building-page__status">
+                            {STATUS_LABELS[t?.status] || t?.status || "—"}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={`building-page__status ${
+                              erpStatus === "success"
+                                ? "is-success"
+                                : erpStatus === "error"
+                                  ? "is-danger"
+                                  : erpStatus === "pending"
+                                    ? "is-warning"
+                                    : ""
+                            }`}
+                          >
+                            {ERP_LABELS[t?.erp_sync_status] || "—"}
+                          </span>
+                        </td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <BuildingActionsMenu
+                            actions={[
+                              {
+                                label: "Изменить",
+                                onClick: () => openEdit(t),
+                                disabled: busy,
+                              },
+                              {
+                                label: "Прикрепить файл",
+                                onClick: () => openFileModal(t),
+                                disabled: busy,
+                              },
+                              {
+                                label: "В ERP",
+                                onClick: () => handleErpCreate(t),
+                                disabled: busy || erpBusy,
+                              },
+                              {
+                                label: "Удалить",
+                                onClick: () => handleDelete(t),
+                                disabled: busy,
+                                danger: true,
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 p-4">
+              {!selectedProjectId ? (
+                <div className="warehouse-table__empty">
+                  Выберите жилой комплекс в шапке раздела.
+                </div>
+              ) : loading && effectiveList.length === 0 ? (
+                <div className="warehouse-table__loading">Загрузка...</div>
+              ) : !loading && effectiveList.length === 0 ? (
+                <div className="warehouse-table__empty">
+                  Договоров пока нет.
+                </div>
+              ) : (
+                effectiveList.map((t) => {
                   const id = t?.id ?? t?.uuid;
                   const erpBusy = id != null && erpCreatingId === id;
-                  const busyUpdate = id != null && updatingId === id;
-                  const busyDelete = id != null && deletingId === id;
-                  const busy = erpBusy || busyUpdate || busyDelete;
+                  const busy =
+                    erpBusy ||
+                    (id != null && updatingId === id) ||
+                    (id != null && deletingId === id);
                   const erpStatus = t?.erp_sync_status || "none";
                   return (
-                    <tr
+                    <div
                       key={id}
-                      onClick={() => id && navigate(`/crm/building/treaty/${id}`)}
-                      style={{ cursor: "pointer" }}
+                      className="warehouse-table__row warehouse-card cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-px hover:shadow-md"
+                      onClick={() =>
+                        id && navigate(`/crm/building/treaty/${id}`)
+                      }
                     >
-                      <td>{t?.number || "—"}</td>
-                      <td>{t?.title || "—"}</td>
-                      <td>
-                        {t?.residential_complex_name ||
-                          t?.residential_complex ||
-                          "—"}
-                      </td>
-                      <td>{t?.client_name || t?.client || "—"}</td>
-                      <td>
-                        {t?.apartment_number ||
-                          (t?.apartment_floor != null
-                            ? `Этаж ${t.apartment_floor}`
-                            : t?.apartment) ||
-                          "—"}
-                      </td>
-                      <td>
-                        {OPERATION_TYPE_LABELS[t?.operation_type] ||
-                          t?.operation_type ||
-                          "—"}
-                      </td>
-                      <td>
-                        {PAYMENT_TYPE_LABELS[t?.payment_type] ||
-                          t?.payment_type ||
-                          "—"}
-                      </td>
-                      <td>{t?.amount ?? "—"}</td>
-                      <td>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-slate-900 truncate">
+                            {t?.number || "—"} · {t?.title || "—"}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-600">
+                            {t?.client_name || "—"} · {t?.residential_complex_name || "—"}
+                          </div>
+                        </div>
                         <span className="building-page__status">
                           {STATUS_LABELS[t?.status] || t?.status || "—"}
                         </span>
-                      </td>
-                      <td>
-                        <span
-                          className={`building-page__status ${
-                            erpStatus === "success"
-                              ? "is-success"
-                              : erpStatus === "error"
-                                ? "is-danger"
-                                : erpStatus === "pending"
-                                  ? "is-warning"
-                                  : ""
-                          }`}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">Сумма</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {t?.amount ?? "—"}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 p-2">
+                          <div className="text-slate-500">ERP</div>
+                          <div className="mt-0.5 font-semibold text-slate-900">
+                            {ERP_LABELS[t?.erp_sync_status] || "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          type="button"
+                          className="px-3 py-2 flex-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                          disabled={busy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(t);
+                          }}
                         >
-                          {ERP_LABELS[t?.erp_sync_status] || "—"}
-                        </span>
-                      </td>
-                      <td>
-                        <BuildingActionsMenu
-                          actions={[
-                            {
-                              label: "Изменить",
-                              onClick: () => openEdit(t),
-                              disabled: busy,
-                            },
-                            {
-                              label: "Прикрепить файл",
-                              onClick: () => openFileModal(t),
-                              disabled: busy,
-                            },
-                            {
-                              label: "В ERP",
-                              onClick: () => handleErpCreate(t),
-                              disabled: busy || erpBusy,
-                            },
-                            {
-                              label: "Удалить",
-                              onClick: () => handleDelete(t),
-                              disabled: busy,
-                              danger: true,
-                            },
-                          ]}
-                        />
-                      </td>
-                    </tr>
+                          Изменить
+                        </button>
+                        <button
+                          type="button"
+                          className="px-3 py-2 flex-1 rounded-lg bg-red-500 text-xs font-semibold text-white hover:bg-red-600"
+                          disabled={busy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(t);
+                          }}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {(createError || updatingError) && (
-          <div className="building-page__error" style={{ marginTop: 8 }}>
-            {String(
-              validateResErrors(
-                createError || updatingError,
-                "Ошибка при сохранении договора",
-              ),
-            )}
-          </div>
-        )}
-      </div>
+                })
+              )}
+            </div>
+          )}
+
+          {(createError || updatingError) && (
+            <div className="building-page__error" style={{ marginTop: 12 }}>
+              {String(
+                validateResErrors(
+                  createError || updatingError,
+                  "Ошибка при сохранении договора",
+                ),
+              )}
+            </div>
+          )}
+        </div>
+      </DataContainer>
 
       <Modal
         open={openModal}

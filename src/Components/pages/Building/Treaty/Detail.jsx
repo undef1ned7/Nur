@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, FileText } from "lucide-react";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import {
@@ -17,6 +18,7 @@ import { useBuildingProjects } from "../../../../store/slices/building/projectsS
 import { useBuildingApartments } from "../../../../store/slices/building/apartmentsSlice";
 import InstallmentPaymentsModal from "./InstallmentPaymentsModal";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import "./Detail.scss";
 
 const STATUS_LABELS = {
   draft: "Черновик",
@@ -43,7 +45,7 @@ const FORM_GRID_STYLE = {
 
 const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
 
-const getFileUrl = (file) => String(file?.file_url || file?.file || "" );
+const getFileUrl = (file) => String(file?.file_url || file?.file || "");
 
 const getFileExtension = (url) => {
   if (!url) return "";
@@ -129,7 +131,8 @@ export default function BuildingTreatyDetail() {
   const [fileModalOpen, setFileModalOpen] = useState(false);
 
   const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
-  const [paymentsModalInstallment, setPaymentsModalInstallment] = useState(null);
+  const [paymentsModalInstallment, setPaymentsModalInstallment] =
+    useState(null);
 
   const selectedProjectName = useMemo(() => {
     if (!selectedProjectId) return "—";
@@ -161,8 +164,7 @@ export default function BuildingTreatyDetail() {
   );
 
   const isReadOnly =
-    !isNew &&
-    (current?.status === "signed" || current?.status === "cancelled");
+    !isNew && (current?.status === "signed" || current?.status === "cancelled");
 
   useEffect(() => {
     if (!isNew && id) {
@@ -178,7 +180,9 @@ export default function BuildingTreatyDetail() {
 
   useEffect(() => {
     const complexId =
-      form.residential_complex || current?.residential_complex || selectedProjectId;
+      form.residential_complex ||
+      current?.residential_complex ||
+      selectedProjectId;
     if (!complexId) return;
     dispatch(fetchBuildingClients({ residential_complex: complexId }));
     dispatch(
@@ -236,8 +240,7 @@ export default function BuildingTreatyDetail() {
     if (key === "status" && !isNew && current && value !== form.status) {
       const fromLabel =
         STATUS_LABELS[form.status] || form.status || "неизвестен";
-      const toLabel =
-        STATUS_LABELS[value] || value || "неизвестен";
+      const toLabel = STATUS_LABELS[value] || value || "неизвестен";
       confirm(
         `Изменить статус договора c «${fromLabel}» на «${toLabel}»?`,
         async (ok) => {
@@ -263,10 +266,7 @@ export default function BuildingTreatyDetail() {
             }
           } catch (err) {
             alert(
-              validateResErrors(
-                err,
-                "Не удалось обновить статус договора",
-              ),
+              validateResErrors(err, "Не удалось обновить статус договора"),
               true,
             );
           }
@@ -327,7 +327,13 @@ export default function BuildingTreatyDetail() {
       });
     }
     setInstallments(rows);
-  }, [form.payment_type, form.amount, form.down_payment, firstInstallmentDate, installmentMonths]);
+  }, [
+    form.payment_type,
+    form.amount,
+    form.down_payment,
+    firstInstallmentDate,
+    installmentMonths,
+  ]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -380,9 +386,10 @@ export default function BuildingTreatyDetail() {
 
     const payload = {
       ...form,
-      number: form.number && String(form.number).trim()
-        ? String(form.number).trim()
-        : generateTreatyNumber(),
+      number:
+        form.number && String(form.number).trim()
+          ? String(form.number).trim()
+          : generateTreatyNumber(),
       amount: form.amount ? String(form.amount) : undefined,
       down_payment: form.down_payment ? String(form.down_payment) : undefined,
       installments:
@@ -529,37 +536,41 @@ export default function BuildingTreatyDetail() {
   };
 
   return (
-    <div className="building-page building-page--treaty-detail">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">
-            {isNew ? "Новый договор" : "Договор строительства"}
-          </h1>
-          <p className="building-page__subtitle">
-            ЖК: <b>{selectedProjectName}</b>
-          </p>
-        </div>
+    <div className="add-product-page treaty-detail">
+      <div className="add-product-page__header">
         <button
           type="button"
-          className="building-btn"
+          className="add-product-page__back"
           onClick={() => navigate("/crm/building/treaty")}
         >
-          ← К списку договоров
+          <ArrowLeft size={18} />К списку договоров
         </button>
+        <div className="add-product-page__title-section">
+          <div className="add-product-page__icon">
+            <FileText size={24} />
+          </div>
+          <div>
+            <h1 className="add-product-page__title">
+              {isNew ? "Новый договор" : "Договор строительства"}
+            </h1>
+            <p className="add-product-page__subtitle">
+              ЖК: <b>{selectedProjectName}</b>
+            </p>
+          </div>
+        </div>
       </div>
 
       {!isNew && isReadOnly && (
-        <div
-          className="building-page__card"
-          style={{ marginBottom: 12, borderLeft: "4px solid #f87171" }}
-        >
-          <div className="building-page__label" style={{ marginBottom: 4 }}>
+        <div className="treaty-detail__readonly-warn">
+          <div className="add-product-page__label" style={{ marginBottom: 4 }}>
             Внимание
           </div>
-          <div className="building-page__muted">
+          <div className="treaty-detail__muted">
             Этот договор имеет статус{" "}
             <b>
-              {STATUS_LABELS[current?.status] || current?.status || "неизвестен"}
+              {STATUS_LABELS[current?.status] ||
+                current?.status ||
+                "неизвестен"}
             </b>
             . Изменение данных недоступно.
           </div>
@@ -567,346 +578,349 @@ export default function BuildingTreatyDetail() {
       )}
 
       {currentError && !isNew && (
-        <div className="building-page__error" style={{ marginBottom: 12 }}>
+        <div className="add-product-page__error" style={{ marginBottom: 12 }}>
           {String(
             validateResErrors(currentError, "Не удалось загрузить договор"),
           )}
         </div>
       )}
 
-      <div className="building-page__card">
+      <div className="add-product-page__content">
         {currentLoading && !isNew ? (
-          <div className="building-page__muted">Загрузка договора...</div>
+          <div className="treaty-detail__muted">Загрузка договора...</div>
         ) : (
-          <form className="building-page" onSubmit={handleSubmit}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Основная информация */}
-              <section>
-                <div
-                  className="building-page__label"
-                  style={{ marginBottom: 8, fontWeight: 600 }}
-                >
+          <form onSubmit={handleSubmit}>
+            <div className="add-product-page__section">
+              <div className="add-product-page__section-header mt-4">
+                <div className="add-product-page__section-number">1</div>
+                <h3 className="add-product-page__section-title">
                   Основная информация
+                </h3>
+              </div>
+              <div style={FORM_GRID_STYLE}>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">ЖК *</label>
+                  <select
+                    className="add-product-page__input"
+                    value={form.residential_complex}
+                    onChange={handleFormChange("residential_complex")}
+                    required
+                  >
+                    <option value="">Выберите ЖК</option>
+                    {complexesOptions.map((c) => (
+                      <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                        {c.name || "—"}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div style={FORM_GRID_STYLE}>
-                  <label>
-                    <div className="building-page__label">ЖК *</div>
-                    <select
-                      className="building-page__select"
-                      value={form.residential_complex}
-                      onChange={handleFormChange("residential_complex")}
-                      required
-                    >
-                      <option value="">Выберите ЖК</option>
-                      {complexesOptions.map((c) => (
-                        <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
-                          {c.name || "—"}
-                        </option>
-                      ))}
-                    </select>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">Клиент *</label>
+                  <select
+                    className="add-product-page__input"
+                    value={form.client}
+                    onChange={handleFormChange("client")}
+                    required
+                  >
+                    <option value="">Выберите клиента</option>
+                    {clientsOptions.map((c) => (
+                      <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                        {c.name || "—"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">
+                    Номер договора
                   </label>
-                  <label>
-                    <div className="building-page__label">Клиент *</div>
-                    <select
-                      className="building-page__select"
-                      value={form.client}
-                      onChange={handleFormChange("client")}
-                      required
-                    >
-                      <option value="">Выберите клиента</option>
-                      {clientsOptions.map((c) => (
-                        <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
-                          {c.name || "—"}
-                        </option>
-                      ))}
-                    </select>
+                  <input
+                    className="add-product-page__input"
+                    value={form.number}
+                    onChange={handleFormChange("number")}
+                    placeholder="ДГ-001"
+                    disabled
+                  />
+                </div>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">Статус</label>
+                  <select
+                    className="add-product-page__input"
+                    value={form.status}
+                    onChange={handleFormChange("status")}
+                  >
+                    {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="add-product-page__section">
+              <div className="add-product-page__section-header mt-4">
+                <div className="add-product-page__section-number">2</div>
+                <h3 className="add-product-page__section-title">
+                  Объект и описание
+                </h3>
+              </div>
+              <div style={FORM_GRID_STYLE}>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">Квартира</label>
+                  <select
+                    className="add-product-page__input"
+                    value={form.apartment}
+                    onChange={handleFormChange("apartment")}
+                  >
+                    <option value="">Без выбора квартиры</option>
+                    {apartmentsOptions.map((a) => (
+                      <option key={a.id ?? a.uuid} value={a.id ?? a.uuid}>
+                        {a.number || "Квартира"}
+                        {a.floor != null ? `, этаж ${a.floor}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">
+                    Тип операции
                   </label>
-                  <label>
-                    <div className="building-page__label">Номер договора</div>
-                    <input
-                      className="building-page__input"
-                      value={form.number}
-                      onChange={handleFormChange("number")}
-                      placeholder="ДГ-001"
-                      disabled
-                    />
-                  </label>
-                  <label>
-                    <div className="building-page__label">Статус</div>
-                    <select
-                      className="building-page__select"
-                      value={form.status}
-                      onChange={handleFormChange("status")}
-                    >
-                      {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                  <select
+                    className="add-product-page__input"
+                    value={form.operation_type}
+                    onChange={handleFormChange("operation_type")}
+                  >
+                    {Object.entries(OPERATION_TYPE_LABELS).map(
+                      ([key, label]) => (
                         <option key={key} value={key}>
                           {label}
                         </option>
-                      ))}
-                    </select>
-                  </label>
+                      ),
+                    )}
+                  </select>
                 </div>
-              </section>
-
-              {/* Объект и описание */}
-              <section>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">
+                    Наименование *
+                  </label>
+                  <input
+                    className="add-product-page__input"
+                    value={form.title}
+                    onChange={handleFormChange("title")}
+                    placeholder="Договор подряда"
+                    required
+                  />
+                </div>
                 <div
-                  className="building-page__label"
-                  style={{ marginBottom: 8, fontWeight: 600 }}
+                  className="add-product-page__form-group"
+                  style={{ gridColumn: "1 / -1" }}
                 >
-                  Объект и описание
+                  <label className="add-product-page__label">Описание</label>
+                  <textarea
+                    className="add-product-page__input"
+                    rows={3}
+                    value={form.description}
+                    onChange={handleFormChange("description")}
+                    placeholder="Условия договора..."
+                    style={{ resize: "vertical", minHeight: 80 }}
+                  />
                 </div>
-                <div style={FORM_GRID_STYLE}>
-                  <label>
-                    <div className="building-page__label">Квартира</div>
-                    <select
-                      className="building-page__select"
-                      value={form.apartment}
-                      onChange={handleFormChange("apartment")}
-                    >
-                      <option value="">Без выбора квартиры</option>
-                      {apartmentsOptions.map((a) => (
-                        <option key={a.id ?? a.uuid} value={a.id ?? a.uuid}>
-                          {a.number || "Квартира"}
-                          {a.floor != null ? `, этаж ${a.floor}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <div className="building-page__label">Тип операции</div>
-                    <select
-                      className="building-page__select"
-                      value={form.operation_type}
-                      onChange={handleFormChange("operation_type")}
-                    >
-                      {Object.entries(OPERATION_TYPE_LABELS).map(
-                        ([key, label]) => (
-                          <option key={key} value={key}>
-                            {label}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </label>
-                  <label>
-                    <div className="building-page__label">Наименование *</div>
-                    <input
-                      className="building-page__input"
-                      value={form.title}
-                      onChange={handleFormChange("title")}
-                      placeholder="Договор подряда"
-                      required
-                    />
-                  </label>
-                  <label style={{ gridColumn: "1 / -1" }}>
-                    <div className="building-page__label">Описание</div>
-                    <textarea
-                      className="building-page__textarea"
-                      rows={3}
-                      value={form.description}
-                      onChange={handleFormChange("description")}
-                      placeholder="Условия договора..."
-                    />
-                  </label>
-                </div>
-              </section>
+              </div>
+            </div>
 
-              {/* Оплата */}
-              <section>
-                <div
-                  className="building-page__label"
-                  style={{ marginBottom: 8, fontWeight: 600 }}
-                >
-                  Оплата
+            <div className="add-product-page__section">
+              <div className="add-product-page__section-header mt-4">
+                <div className="add-product-page__section-number">3</div>
+                <h3 className="add-product-page__section-title">Оплата</h3>
+              </div>
+              <div style={FORM_GRID_STYLE}>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">Тип оплаты</label>
+                  <select
+                    className="add-product-page__input"
+                    value={form.payment_type}
+                    onChange={handleFormChange("payment_type")}
+                  >
+                    {Object.entries(PAYMENT_TYPE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div style={FORM_GRID_STYLE}>
-                  <label>
-                    <div className="building-page__label">Тип оплаты</div>
-                    <select
-                      className="building-page__select"
-                      value={form.payment_type}
-                      onChange={handleFormChange("payment_type")}
-                    >
-                      {Object.entries(PAYMENT_TYPE_LABELS).map(
-                        ([key, label]) => (
-                          <option key={key} value={key}>
-                            {label}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </label>
-                  <label>
-                    <div className="building-page__label">Сумма</div>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">Сумма</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="add-product-page__input"
+                    value={form.amount}
+                    onChange={handleFormChange("amount")}
+                    placeholder="150000.00"
+                  />
+                </div>
+                {form.payment_type === "installment" && (
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Первоначальный взнос
+                    </label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className="building-page__input"
-                      value={form.amount}
-                      onChange={handleFormChange("amount")}
-                      placeholder="150000.00"
+                      className="add-product-page__input"
+                      value={form.down_payment}
+                      onChange={handleFormChange("down_payment")}
+                      placeholder="30000.00"
                     />
-                  </label>
-                  {form.payment_type === "installment" && (
-                    <label>
-                      <div className="building-page__label">
-                        Первоначальный взнос
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="building-page__input"
-                        value={form.down_payment}
-                        onChange={handleFormChange("down_payment")}
-                        placeholder="30000.00"
-                      />
-                    </label>
-                  )}
-                  <label style={{ gridColumn: "1 / -1" }}>
-                    <div className="building-page__label">Условия оплаты</div>
-                    <textarea
-                      className="building-page__textarea"
-                      rows={2}
-                      value={form.payment_terms}
-                      onChange={handleFormChange("payment_terms")}
-                      placeholder="Рассрочка на 12 месяцев..."
-                    />
-                  </label>
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      gridColumn: "1 / -1",
-                      marginTop: 4,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={form.auto_create_in_erp}
-                      onChange={handleFormChange("auto_create_in_erp")}
-                    />
-                    <span className="building-page__label">
-                      Создавать договор в ERP автоматически
-                    </span>
-                  </label>
-                </div>
-              </section>
-
-              {/* График рассрочки */}
-              {form.payment_type === "installment" && (
-                <section>
-                  <div
-                    className="building-page__label"
-                    style={{ marginTop: 8, marginBottom: 8, fontWeight: 600 }}
-                  >
-                    График рассрочки
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 12,
-                      marginBottom: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <label style={{ flex: "0 0 220px" }}>
-                      <div className="building-page__label">
-                        Дата первого платежа *
-                      </div>
-                      <input
-                        type="date"
-                        className="building-page__input"
-                        value={firstInstallmentDate}
-                        onChange={(e) =>
-                          setFirstInstallmentDate(e.target.value)
-                        }
-                      />
-                    </label>
-                    <label style={{ flex: "0 0 220px" }}>
-                      <div className="building-page__label">
-                        Количество платежей
-                      </div>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        className="building-page__input"
-                        value={installmentMonths}
-                        onChange={(e) =>
-                          setInstallmentMonths(
-                            Number(e.target.value) > 0
-                              ? Number(e.target.value)
-                              : 1,
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-                  {installments.length === 0 ? (
-                    <div className="building-page__muted">
-                      Укажите сумму договора, первоначальный взнос и дату
-                      первого платежа, чтобы увидеть график рассрочки.
-                    </div>
-                  ) : (
-                    <div className="building-table building-table--shadow">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Дата платежа</th>
-                            <th>Сумма</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {installments.map((row, idx) => (
-                            <tr key={idx}>
-                              <td>{row.order ?? idx + 1}</td>
-                              <td>{row.due_date}</td>
-                              <td>{row.amount}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {formError && (
-                <div className="building-page__error" style={{ marginTop: 8 }}>
-                  {String(formError)}
+                )}
+                <div
+                  className="add-product-page__form-group"
+                  style={{ gridColumn: "1 / -1" }}
+                >
+                  <label className="add-product-page__label">
+                    Условия оплаты
+                  </label>
+                  <textarea
+                    className="add-product-page__input"
+                    rows={2}
+                    value={form.payment_terms}
+                    onChange={handleFormChange("payment_terms")}
+                    placeholder="Рассрочка на 12 месяцев..."
+                    style={{ resize: "vertical", minHeight: 60 }}
+                  />
                 </div>
-              )}
-
-              <div className="building-page__actions" style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="building-btn"
-                  onClick={() => navigate("/crm/building/treaty")}
+                <div
+                  className="add-product-page__checkbox-label"
+                  style={{ gridColumn: "1 / -1" }}
                 >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="building-btn building-btn--primary"
-                >
-                  Сохранить
-                </button>
-                {form.payment_type === "installment" &&
-                  installments.length > 0 && (
-                    <button
-                      type="button"
-                      className="building-btn"
-                      onClick={handleDownloadSchedulePdf}
-                    >
-                      Скачать график (PDF)
-                    </button>
-                  )}
+                  <input
+                    type="checkbox"
+                    checked={form.auto_create_in_erp}
+                    onChange={handleFormChange("auto_create_in_erp")}
+                  />
+                  <span>Создавать договор в ERP автоматически</span>
+                </div>
               </div>
+            </div>
+
+            {form.payment_type === "installment" && (
+              <div className="add-product-page__section">
+                <div className="add-product-page__section-header mt-4">
+                  <div className="add-product-page__section-number">4</div>
+                  <h3 className="add-product-page__section-title">
+                    График рассрочки
+                  </h3>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    marginBottom: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div
+                    className="add-product-page__form-group"
+                    style={{ flex: "0 0 220px" }}
+                  >
+                    <label className="add-product-page__label">
+                      Дата первого платежа *
+                    </label>
+                    <input
+                      type="date"
+                      className="add-product-page__input"
+                      value={firstInstallmentDate}
+                      onChange={(e) => setFirstInstallmentDate(e.target.value)}
+                    />
+                  </div>
+                  <div
+                    className="add-product-page__form-group"
+                    style={{ flex: "0 0 220px" }}
+                  >
+                    <label className="add-product-page__label">
+                      Количество платежей
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      className="add-product-page__input"
+                      value={installmentMonths}
+                      onChange={(e) =>
+                        setInstallmentMonths(
+                          Number(e.target.value) > 0
+                            ? Number(e.target.value)
+                            : 1,
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                {installments.length === 0 ? (
+                  <div className="treaty-detail__muted">
+                    Укажите сумму договора, первоначальный взнос и дату первого
+                    платежа, чтобы увидеть график рассрочки.
+                  </div>
+                ) : (
+                  <div className="treaty-detail__table-wrap">
+                    <table className="treaty-detail__table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Дата платежа</th>
+                          <th>Сумма</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {installments.map((row, idx) => (
+                          <tr key={idx}>
+                            <td>{row.order ?? idx + 1}</td>
+                            <td>{row.due_date}</td>
+                            <td>{row.amount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {formError && (
+              <div className="add-product-page__error" style={{ marginTop: 8 }}>
+                {String(formError)}
+              </div>
+            )}
+
+            <div
+              className="add-product-page__actions"
+              style={{ marginTop: 24 }}
+            >
+              <button
+                type="button"
+                className="add-product-page__cancel-btn"
+                onClick={() => navigate("/crm/building/treaty")}
+              >
+                Отмена
+              </button>
+              <button type="submit" className="add-product-page__submit-btn">
+                Сохранить
+              </button>
+              {form.payment_type === "installment" &&
+                installments.length > 0 && (
+                  <button
+                    type="button"
+                    className="add-product-page__cancel-btn"
+                    onClick={handleDownloadSchedulePdf}
+                  >
+                    Скачать график (PDF)
+                  </button>
+                )}
             </div>
           </form>
         )}
@@ -916,209 +930,214 @@ export default function BuildingTreatyDetail() {
         current?.payment_type === "installment" &&
         Array.isArray(current?.installments) &&
         current.installments.length > 0 && (
-          <div className="building-page__card" style={{ marginTop: 16 }}>
-            <div className="building-page__header" style={{ marginBottom: 8 }}>
-              <h2 className="building-page__title" style={{ fontSize: 18 }}>
-                Рассрочка по договору
-              </h2>
-            </div>
-            <div className="building-table building-table--shadow">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Дата платежа</th>
-                    <th>Сумма</th>
-                    <th>Оплачено</th>
-                    <th>Остаток</th>
-                    <th>Статус</th>
-                    <th>Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {current.installments.map((it, idx) => {
-                    const total = Number(it.amount || 0);
-                    const paid = Number(it.paid_amount || 0);
-                    const remain = Number.isFinite(total - paid)
-                      ? Math.max(0, total - paid)
-                      : 0;
-                    const status = it.status || (remain <= 0 ? "paid" : "planned");
-                    const isPaid = status === "paid";
-                    return (
-                      <tr key={it.id ?? it.uuid ?? idx}>
-                        <td>{it.order ?? idx + 1}</td>
-                        <td>{it.due_date || "—"}</td>
-                        <td>{it.amount ?? "0.00"}</td>
-                        <td>{it.paid_amount ?? "0.00"}</td>
-                        <td>{remain.toFixed(2)}</td>
-                        <td>
-                          {isPaid ? (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "2px 8px",
-                                borderRadius: 999,
-                                fontSize: 12,
-                                backgroundColor: "#dcfce7",
-                                color: "#166534",
-                              }}
-                            >
-                              Оплачен
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "2px 8px",
-                                borderRadius: 999,
-                                fontSize: 12,
-                                backgroundColor: "#fef3c7",
-                                color: "#92400e",
-                              }}
-                            >
-                              Запланирован
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {!isPaid && remain > 0 ? (
-                            <button
-                              type="button"
-                              className="building-btn building-btn--primary"
-                              onClick={() => openInstallmentPayments(it)}
-                            >
-                              Оплатить
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="building-btn"
-                              onClick={() => openInstallmentPayments(it)}
-                            >
-                              Платежи
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="add-product-page__content" style={{ marginTop: 24 }}>
+            <div className="add-product-page__section">
+              <div className="add-product-page__section-header !mb-0">
+                <h3 className="add-product-page__section-title">
+                  Рассрочка по договору
+                </h3>
+              </div>
+              <div className="treaty-detail__table-wrap">
+                <table className="treaty-detail__table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Дата платежа</th>
+                      <th>Сумма</th>
+                      <th>Оплачено</th>
+                      <th>Остаток</th>
+                      <th>Статус</th>
+                      <th>Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {current.installments.map((it, idx) => {
+                      const total = Number(it.amount || 0);
+                      const paid = Number(it.paid_amount || 0);
+                      const remain = Number.isFinite(total - paid)
+                        ? Math.max(0, total - paid)
+                        : 0;
+                      const status =
+                        it.status || (remain <= 0 ? "paid" : "planned");
+                      const isPaid = status === "paid";
+                      return (
+                        <tr key={it.id ?? it.uuid ?? idx}>
+                          <td>{it.order ?? idx + 1}</td>
+                          <td>{it.due_date || "—"}</td>
+                          <td>{it.amount ?? "0.00"}</td>
+                          <td>{it.paid_amount ?? "0.00"}</td>
+                          <td>{remain.toFixed(2)}</td>
+                          <td>
+                            {isPaid ? (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  padding: "2px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 12,
+                                  backgroundColor: "#dcfce7",
+                                  color: "#166534",
+                                }}
+                              >
+                                Оплачен
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  padding: "2px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 12,
+                                  backgroundColor: "#fef3c7",
+                                  color: "#92400e",
+                                }}
+                              >
+                                Запланирован
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            {!isPaid && remain > 0 ? (
+                              <button
+                                type="button"
+                                className="add-product-page__submit-btn"
+                                onClick={() => openInstallmentPayments(it)}
+                              >
+                                Оплатить
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="add-product-page__cancel-btn"
+                                onClick={() => openInstallmentPayments(it)}
+                              >
+                                Платежи
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
 
       {!isNew && (
-        <div className="building-page__card" style={{ marginTop: 16 }}>
-          <div className="building-page__header" style={{ marginBottom: 8 }}>
-            <h2 className="building-page__title" style={{ fontSize: 18 }}>
-              Файлы договора
-            </h2>
-            <button
-              type="button"
-              className="building-btn building-btn--primary"
-              onClick={() => setFileModalOpen(true)}
-            >
-              Прикрепить файл
-            </button>
+        <div className="add-product-page__content" style={{ marginTop: 24 }}>
+          <div className="add-product-page__section">
+            <div className="treaty-detail__section-actions">
+              <h3 className="treaty-detail__section-title-inline">
+                Файлы договора
+              </h3>
+              <button
+                type="button"
+                className="add-product-page__submit-btn"
+                onClick={() => setFileModalOpen(true)}
+              >
+                Прикрепить файл
+              </button>
+            </div>
+            {files.length === 0 ? (
+              <div className="treaty-detail__muted">
+                Файлы ещё не прикреплены.
+              </div>
+            ) : (
+              <div className="treaty-detail__table-wrap">
+                <table className="treaty-detail__table">
+                  <thead>
+                    <tr>
+                      <th>Название</th>
+                      <th>Файл</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {files.map((f) => {
+                      const key = f.id ?? f.uuid ?? f.file;
+                      const url = getFileUrl(f);
+                      const ext = getFileExtension(url);
+                      const isImage = IMAGE_EXTENSIONS.includes(ext);
+                      const iconLabel = getFileTypeLabel(ext);
+                      const title = f.title || "Файл";
+                      return (
+                        <tr key={key}>
+                          <td>{title}</td>
+                          <td>
+                            {url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  display: "inline-block",
+                                  textDecoration: "none",
+                                  color: "inherit",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 72,
+                                    height: 72,
+                                    borderRadius: 4,
+                                    overflow: "hidden",
+                                    border: "1px solid #d9d9d9",
+                                    backgroundColor: isImage
+                                      ? "#f0f2f5"
+                                      : "#e5e7eb",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  {isImage ? (
+                                    <img
+                                      src={url}
+                                      alt={title}
+                                      style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                      }}
+                                    />
+                                  ) : (
+                                    <span
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        color: "#111827",
+                                      }}
+                                    >
+                                      {iconLabel}
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    maxWidth: 140,
+                                    fontSize: 12,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {title}
+                                </div>
+                              </a>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          {files.length === 0 ? (
-            <div className="building-page__muted">
-              Файлы ещё не прикреплены.
-            </div>
-          ) : (
-            <div className="building-table building-table--shadow">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Название</th>
-                    <th>Файл</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {files.map((f) => {
-                    const key = f.id ?? f.uuid ?? f.file;
-                    const url = getFileUrl(f);
-                    const ext = getFileExtension(url);
-                    const isImage = IMAGE_EXTENSIONS.includes(ext);
-                    const iconLabel = getFileTypeLabel(ext);
-                    const title = f.title || "Файл";
-                    return (
-                      <tr key={key}>
-                        <td>{title}</td>
-                        <td>
-                          {url ? (
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                display: "inline-block",
-                                textDecoration: "none",
-                                color: "inherit",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 72,
-                                  height: 72,
-                                  borderRadius: 4,
-                                  overflow: "hidden",
-                                  border: "1px solid #d9d9d9",
-                                  backgroundColor: isImage
-                                    ? "#f0f2f5"
-                                    : "#e5e7eb",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                {isImage ? (
-                                  <img
-                                    src={url}
-                                    alt={title}
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                    }}
-                                  />
-                                ) : (
-                                  <span
-                                    style={{
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                      color: "#111827",
-                                    }}
-                                  >
-                                    {iconLabel}
-                                  </span>
-                                )}
-                              </div>
-                              <div
-                                style={{
-                                  marginTop: 4,
-                                  maxWidth: 140,
-                                  fontSize: 12,
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {title}
-                              </div>
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       )}
 
@@ -1127,12 +1146,15 @@ export default function BuildingTreatyDetail() {
         onClose={() => setFileModalOpen(false)}
         title="Прикрепить файл к договору"
       >
-        <form className="building-page" onSubmit={handleFileSubmit}>
-          <label>
-            <div className="building-page__label">Файл *</div>
+        <form
+          className="add-product-page add-product-page--modal-form"
+          onSubmit={handleFileSubmit}
+        >
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Файл *</label>
             <input
               type="file"
-              className="building-page__input"
+              className="add-product-page__input"
               onChange={(e) =>
                 setFileForm((prev) => ({
                   ...prev,
@@ -1141,28 +1163,30 @@ export default function BuildingTreatyDetail() {
               }
               required
             />
-          </label>
-          <label>
-            <div className="building-page__label">Название (необязательно)</div>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">
+              Название (необязательно)
+            </label>
             <input
               type="text"
-              className="building-page__input"
+              className="add-product-page__input"
               value={fileForm.title}
               onChange={(e) =>
                 setFileForm((prev) => ({ ...prev, title: e.target.value }))
               }
               placeholder="Например: Скан договора"
             />
-          </label>
+          </div>
           {fileUploadError && (
-            <div className="building-page__error">
+            <div className="add-product-page__error">
               {String(fileUploadError)}
             </div>
           )}
-          <div className="building-page__actions">
+          <div className="add-product-page__actions">
             <button
               type="button"
-              className="building-btn"
+              className="add-product-page__cancel-btn"
               onClick={() => setFileModalOpen(false)}
               disabled={fileUploading}
             >
@@ -1170,7 +1194,7 @@ export default function BuildingTreatyDetail() {
             </button>
             <button
               type="submit"
-              className="building-btn building-btn--primary"
+              className="add-product-page__submit-btn"
               disabled={fileUploading || !fileForm.file}
             >
               {fileUploading ? "Загрузка..." : "Прикрепить"}
@@ -1190,4 +1214,3 @@ export default function BuildingTreatyDetail() {
     </div>
   );
 }
-

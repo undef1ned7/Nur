@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
+import { ArrowLeft, Package } from "lucide-react";
 import Modal from "@/Components/common/Modal/Modal";
+import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import "./Stock.scss";
 import {
   acceptBuildingWarehouseTransfer,
   fetchBuildingWarehouseTransfers,
@@ -23,9 +26,7 @@ import BuildingPagination from "../shared/Pagination";
 import BuildingActionsMenu from "../shared/ActionsMenu";
 import { useBuildingTransfers } from "@/store/slices/building/transfersSlice";
 import { useBuildingStock } from "@/store/slices/building/stockSlice";
-import {
-  fetchBuildingWarehouseById,
-} from "@/store/creators/building/warehousesCreators";
+import { fetchBuildingWarehouseById } from "@/store/creators/building/warehousesCreators";
 import { useBuildingWarehouses } from "@/store/slices/building/warehousesSlice";
 
 const DECISION_INITIAL = {
@@ -78,7 +79,7 @@ export default function BuildingStockDetail() {
 
   const totalPages = useMemo(
     () => getPageCount(transfersCount, DEFAULT_PAGE_SIZE),
-    [transfersCount]
+    [transfersCount],
   );
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export default function BuildingStockDetail() {
         search: search || undefined,
         page,
         page_size: DEFAULT_PAGE_SIZE,
-      })
+      }),
     );
   }, [dispatch, incomingOnly, page, search, warehouseId]);
 
@@ -106,14 +107,14 @@ export default function BuildingStockDetail() {
         warehouse: warehouseId,
         page: 1,
         page_size: 10,
-      })
+      }),
     );
     dispatch(
       fetchBuildingWarehouseStockMoves({
         warehouse: warehouseId,
         page: 1,
         page_size: 10,
-      })
+      }),
     );
   }, [dispatch, warehouseId]);
 
@@ -130,14 +131,16 @@ export default function BuildingStockDetail() {
   };
 
   const isSubmitting = useMemo(() => {
-    const transferId = decisionModal.transfer?.id ?? decisionModal.transfer?.uuid;
+    const transferId =
+      decisionModal.transfer?.id ?? decisionModal.transfer?.uuid;
     if (!transferId) return false;
     return decidingIds?.[transferId] === true;
   }, [decisionModal.transfer, decidingIds]);
 
   const submitDecision = async (e) => {
     e.preventDefault();
-    const transferId = decisionModal.transfer?.id ?? decisionModal.transfer?.uuid;
+    const transferId =
+      decisionModal.transfer?.id ?? decisionModal.transfer?.uuid;
     if (!transferId) return;
     if (
       decisionModal.mode === "reject" &&
@@ -154,19 +157,32 @@ export default function BuildingStockDetail() {
             acceptBuildingWarehouseTransfer({
               transferId,
               payload: { note: String(decisionModal.note || "").trim() },
-            })
+            }),
           );
-          if (res.meta.requestStatus === "fulfilled") alert("Передача принята складом");
-          else alert(validateResErrors(res.payload || res.error, "Не удалось принять"), true);
+          if (res.meta.requestStatus === "fulfilled")
+            alert("Передача принята складом");
+          else
+            alert(
+              validateResErrors(res.payload || res.error, "Не удалось принять"),
+              true,
+            );
         } else {
           const res = await dispatch(
             rejectBuildingWarehouseTransfer({
               transferId,
               payload: { reason: String(decisionModal.note || "").trim() },
-            })
+            }),
           );
-          if (res.meta.requestStatus === "fulfilled") alert("Передача отклонена складом");
-          else alert(validateResErrors(res.payload || res.error, "Не удалось отклонить"), true);
+          if (res.meta.requestStatus === "fulfilled")
+            alert("Передача отклонена складом");
+          else
+            alert(
+              validateResErrors(
+                res.payload || res.error,
+                "Не удалось отклонить",
+              ),
+              true,
+            );
         }
         closeDecisionModal();
         if (warehouseId) {
@@ -177,21 +193,21 @@ export default function BuildingStockDetail() {
               search: search || undefined,
               page,
               page_size: DEFAULT_PAGE_SIZE,
-            })
+            }),
           );
           dispatch(
             fetchBuildingWarehouseStockItems({
               warehouse: warehouseId,
               page: 1,
               page_size: 10,
-            })
+            }),
           );
           dispatch(
             fetchBuildingWarehouseStockMoves({
               warehouse: warehouseId,
               page: 1,
               page_size: 10,
-            })
+            }),
           );
         }
       } catch (err) {
@@ -201,30 +217,49 @@ export default function BuildingStockDetail() {
   };
 
   return (
-    <div className="building-page">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">
-            Склад: {warehouse?.name || "—"}
-          </h1>
-          <p className="building-page__subtitle">
-            ЖК: {warehouse?.residential_complex_name || "—"}
-          </p>
-          {currentLoading && (
-            <div className="building-page__muted">Загрузка склада...</div>
-          )}
-          {currentError && (
-            <div className="building-page__error">
-              {String(validateResErrors(currentError, "Не удалось загрузить склад"))}
-            </div>
-          )}
+    <div className="warehouse-page building-page building-page--stock-detail">
+      <button
+        type="button"
+        className="warehouse-header__back w-max"
+        onClick={() => navigate("/crm/building/stock")}
+        aria-label="Назад"
+      >
+        <ArrowLeft size={20} />
+        Назад к складам
+      </button>
+
+      <div className="warehouse-header">
+        <div className="warehouse-header__left">
+          <div className="warehouse-header__icon-box">
+            <Package size={24} />
+          </div>
+          <div className="warehouse-header__title-section">
+            <h1 className="warehouse-header__title">
+              Склад: {warehouse?.name || "—"}
+            </h1>
+            <p className="warehouse-header__subtitle">
+              ЖК: {warehouse?.residential_complex_name || "—"}
+            </p>
+            {currentLoading && (
+              <span className="warehouse-search__info" style={{ marginTop: 4 }}>
+                Загрузка склада...
+              </span>
+            )}
+            {currentError && (
+              <div className="building-page__error" style={{ marginTop: 4 }}>
+                {String(
+                  validateResErrors(currentError, "Не удалось загрузить склад"),
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="building-page__card">
-        <div className="building-page__filters">
+      <div className="warehouse-search-section">
+        <div className="warehouse-search">
           <input
-            className="building-page__input"
+            className="warehouse-search__input"
             value={search}
             placeholder="Поиск по передаче/комментарию"
             onChange={(e) => {
@@ -232,8 +267,11 @@ export default function BuildingStockDetail() {
               setSearch(e.target.value);
             }}
           />
+        </div>
+        <div className="warehouse-search__info flex flex-wrap items-center gap-2">
           <select
-            className="building-page__select"
+            className="warehouse-filter-modal__select-small"
+            style={{ minWidth: 200 }}
             value={incomingOnly ? "incoming" : "all"}
             onChange={(e) => {
               setPage(1);
@@ -244,23 +282,32 @@ export default function BuildingStockDetail() {
             <option value="all">Все передачи</option>
           </select>
         </div>
-        {error && <div className="building-page__error">{String(error)}</div>}
-        {decisionError && (
-          <div className="building-page__error">
-            {String(validateResErrors(decisionError, "Ошибка"))}
-          </div>
-        )}
       </div>
 
-      <div className="building-page__card">
-        <h3 className="building-page__cardTitle">Передачи на склад</h3>
-        {loading && <div className="building-page__muted">Загрузка...</div>}
-        {!loading && transfers.length === 0 && (
-          <div className="building-page__muted">Передач пока нет.</div>
-        )}
-        {!loading && transfers.length > 0 && (
-          <div className="building-table building-table--shadow">
-            <table>
+      {(error || decisionError) && (
+        <div className="mt-2 text-sm text-red-500">
+          {error && String(error)}
+          {decisionError && String(validateResErrors(decisionError, "Ошибка"))}
+        </div>
+      )}
+
+      <DataContainer>
+        <h3
+          className="warehouse-header__title"
+          style={{ fontSize: 18, marginBottom: 12 }}
+        >
+          Передачи на склад
+        </h3>
+        <div
+          className="warehouse-table-container w-full"
+          style={{ marginBottom: 24 }}
+        >
+          {loading ? (
+            <div className="warehouse-table__loading">Загрузка...</div>
+          ) : transfers.length === 0 ? (
+            <div className="warehouse-table__empty">Передач пока нет.</div>
+          ) : (
+            <table className="warehouse-table w-full">
               <thead>
                 <tr>
                   <th>Закупка</th>
@@ -281,7 +328,10 @@ export default function BuildingStockDetail() {
                       <td>{transfer?.procurement_title || "Передача"}</td>
                       <td>
                         <span className={transferStatusClass(transfer?.status)}>
-                          {statusLabel(transfer?.status, TRANSFER_STATUS_LABELS)}
+                          {statusLabel(
+                            transfer?.status,
+                            TRANSFER_STATUS_LABELS,
+                          )}
                         </span>
                       </td>
                       <td>{asDateTime(transfer?.created_at)}</td>
@@ -293,17 +343,19 @@ export default function BuildingStockDetail() {
                               label: "Подробнее",
                               onClick: () =>
                                 navigate(
-                                  `/crm/building/stock/${warehouseId}/transfer/${transferId}`
+                                  `/crm/building/stock/${warehouseId}/transfer/${transferId}`,
                                 ),
                             },
                             isPending && {
                               label: "Принять",
-                              onClick: () => openDecisionModal("accept", transfer),
+                              onClick: () =>
+                                openDecisionModal("accept", transfer),
                               disabled: deciding,
                             },
                             isPending && {
                               label: "Отклонить",
-                              onClick: () => openDecisionModal("reject", transfer),
+                              onClick: () =>
+                                openDecisionModal("reject", transfer),
                               disabled: deciding,
                               danger: true,
                             },
@@ -315,34 +367,40 @@ export default function BuildingStockDetail() {
                 })}
               </tbody>
             </table>
+          )}
+          <div className="flex justify-center mt-4">
+            <BuildingPagination
+              page={page}
+              totalPages={totalPages}
+              disabled={loading}
+              onChange={setPage}
+            />
           </div>
-        )}
-        <BuildingPagination
-          page={page}
-          totalPages={totalPages}
-          disabled={loading}
-          onChange={setPage}
-        />
-      </div>
-
-      <div className="building-page__card">
-        <h3 className="building-page__cardTitle">Остатки склада</h3>
-        {itemsLoading && (
-          <div className="building-page__muted">Загрузка остатков...</div>
-        )}
-        {itemsError && (
-          <div className="building-page__error">
-            {String(
-              validateResErrors(itemsError, "Не удалось загрузить остатки")
-            )}
-          </div>
-        )}
-        {!itemsLoading && !itemsError && stockItems.length === 0 && (
-          <div className="building-page__muted">Нет данных по остаткам.</div>
-        )}
-        {!itemsLoading && !itemsError && stockItems.length > 0 && (
-          <div className="building-table building-table--shadow">
-            <table>
+        </div>
+        <h3
+          className="warehouse-header__title"
+          style={{ fontSize: 18, marginBottom: 12 }}
+        >
+          Остатки склада
+        </h3>
+        <div className="warehouse-table-container w-full">
+          {itemsLoading && (
+            <div className="warehouse-table__loading">Загрузка остатков...</div>
+          )}
+          {itemsError && (
+            <div className="building-page__error" style={{ marginBottom: 8 }}>
+              {String(
+                validateResErrors(itemsError, "Не удалось загрузить остатки"),
+              )}
+            </div>
+          )}
+          {!itemsLoading && !itemsError && stockItems.length === 0 && (
+            <div className="warehouse-table__empty">
+              Нет данных по остаткам.
+            </div>
+          )}
+          {!itemsLoading && !itemsError && stockItems.length > 0 && (
+            <table className="warehouse-table w-full">
               <thead>
                 <tr>
                   <th>Наименование</th>
@@ -362,15 +420,17 @@ export default function BuildingStockDetail() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </DataContainer>
 
       <Modal
         open={Boolean(decisionModal.transfer)}
         onClose={closeDecisionModal}
         title={
-          decisionModal.mode === "accept" ? "Принять передачу" : "Отклонить передачу"
+          decisionModal.mode === "accept"
+            ? "Принять передачу"
+            : "Отклонить передачу"
         }
       >
         <form className="building-page" onSubmit={submitDecision}>
@@ -419,4 +479,3 @@ export default function BuildingStockDetail() {
     </div>
   );
 }
-
