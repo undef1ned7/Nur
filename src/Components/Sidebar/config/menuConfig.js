@@ -133,10 +133,10 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
-        label: "Строительные Отделы",
-        to: "/crm/building/department",
-        icon: menuIcons.users,
-        permission: "can_view_building_department",
+        label: "Сотрудники",
+        to: "/crm/building/employees",
+        icon: menuIcons.user,
+        permission: "can_view_employees", 
         implemented: true,
       },
       {
@@ -196,7 +196,7 @@ export const MENU_CONFIG = {
         implemented: true,
       },
       {
-        label: "Процесс работ",
+        label: "Строительные отделы",
         to: "/crm/building/work",
         icon: menuIcons.clipboard,
         permission: "can_view_building_work_process",

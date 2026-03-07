@@ -61,3 +61,23 @@
     border-radius: 12px;
   }
 }
+
+/* Форма создания/редактирования напоминания: 2 поля в строку */
+.building-notification-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+}
+
+.building-notification-form-grid .building-notification-form-grid__full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .building-notification-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .building-notification-form-grid .building-notification-form-grid__full {
+    grid-column: 1;
+  }
+}

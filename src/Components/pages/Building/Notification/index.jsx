@@ -115,7 +115,9 @@ export default function BuildingNotification() {
   const handleCalendarDateClick = (info) => {
     if (!selectedProjectId) return;
     const dateStr = info.dateStr;
-    const dueAt = dateStr.includes("T") ? dateStr.slice(0, 16) : `${dateStr}T09:00`;
+    const dueAt = dateStr.includes("T")
+      ? dateStr.slice(0, 16)
+      : `${dateStr}T09:00`;
     navigate("/crm/building/notification/new", { state: { due_at: dueAt } });
   };
 
@@ -271,13 +273,14 @@ export default function BuildingNotification() {
                 </div>
               ) : (
                 <FullCalendar
+                
                   plugins={[dayGridPlugin, interactionPlugin]}
                   initialView="dayGridMonth"
                   locale="ru"
                   headerToolbar={{
                     left: "prev,next today",
                     center: "title",
-                    right: "dayGridMonth,dayGridWeek",
+                    right: "dayGridDay,dayGridWeek,dayGridMonth",
                   }}
                   events={calendarEvents}
                   dateClick={handleCalendarDateClick}

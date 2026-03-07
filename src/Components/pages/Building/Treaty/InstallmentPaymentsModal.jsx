@@ -12,6 +12,19 @@ const STATUS_LABELS = {
   paid: "Оплачен",
 };
 
+function formatPaymentDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function InstallmentPaymentsModal({
   open,
   onClose,
@@ -98,7 +111,7 @@ export default function InstallmentPaymentsModal({
               {installment.paid_at && (
                 <>
                   {" "}
-                  (оплачен {installment.paid_at})
+                  (оплачен {formatPaymentDate(installment.paid_at)})
                 </>
               )}
             </div>
@@ -119,8 +132,6 @@ export default function InstallmentPaymentsModal({
                       <th>#</th>
                       <th>Дата оплаты</th>
                       <th>Сумма</th>
-                      <th>Касса</th>
-                      <th>Смена</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -128,22 +139,12 @@ export default function InstallmentPaymentsModal({
                       const key =
                         p.id ?? p.uuid ?? `${installmentKey}-${idx}`;
                       const paidAt =
-                        p.paid_at || p.created_at || p.created || "—";
-                      const cashboxName =
-                        p.cashbox_display ||
-                        p.cashbox_name ||
-                        p.cashbox_title ||
-                        p.cashbox ||
-                        "—";
-                      const shiftDisplay =
-                        p.shift_display || p.shift || "—";
+                        p.paid_at || p.created_at || p.created || "";
                       return (
                         <tr key={key}>
                           <td>{idx + 1}</td>
-                          <td>{paidAt}</td>
+                          <td>{formatPaymentDate(paidAt)}</td>
                           <td>{p.amount ?? "0.00"}</td>
-                          <td>{cashboxName}</td>
-                          <td>{shiftDisplay}</td>
                         </tr>
                       );
                     })}

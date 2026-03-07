@@ -750,121 +750,123 @@ export default function BuildingTaskDetail() {
           <div className="building-page__muted">Загрузка напоминания...</div>
         ) : (
           <form className="building-page" onSubmit={handleSubmit}>
-            <label>
-              <div className="building-page__label">ЖК</div>
-              <select
-                className="building-page__select"
-                value={form.residential_complex}
-                onChange={handleFormChange("residential_complex")}
-              >
-                <option value="">Не выбран</option>
-                {complexesOptions.map((c) => (
-                  <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
-                    {c.name || "—"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Клиент</div>
-              <select
-                className="building-page__select"
-                value={form.client}
-                onChange={handleFormChange("client")}
-              >
-                <option value="">Не выбран</option>
-                {clientsOptions.map((c) => (
-                  <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
-                    {c.name || c.display || "—"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Договор</div>
-              <select
-                className="building-page__select"
-                value={form.treaty}
-                onChange={handleFormChange("treaty")}
-              >
-                <option value="">Не выбран</option>
-                {treatiesOptions.map((t) => (
-                  <option key={t.id ?? t.uuid} value={t.id ?? t.uuid}>
-                    {t.number || t.title || "—"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Название *</div>
-              <input
-                className="building-page__input"
-                value={form.title}
-                onChange={handleFormChange("title")}
-                placeholder="Например: Позвонить клиенту"
-                required
-              />
-            </label>
-            <label>
-              <div className="building-page__label">Описание</div>
-              <textarea
-                className="building-page__textarea"
-                rows={3}
-                value={form.description}
-                onChange={handleFormChange("description")}
-                placeholder="Дополнительные детали задачи..."
-              />
-            </label>
-            <label>
-              <div className="building-page__label">Статус</div>
-              <select
-                className="building-page__select"
-                value={form.status}
-                onChange={handleFormChange("status")}
-              >
-                {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <div className="building-page__label">Срок</div>
-              <input
-                type="datetime-local"
-                className="building-page__input"
-                value={form.due_at}
-                onChange={handleFormChange("due_at")}
-              />
-            </label>
-            <label>
-              <div className="building-page__label">Исполнители</div>
-              <MultipleSearchSelect
-                value={form.assignee_ids}
-                onChange={(vals) =>
-                  setForm((prev) => ({ ...prev, assignee_ids: vals }))
-                }
-                options={(employees || []).map((e) => {
-                  const fullName =
-                    [e.first_name, e.last_name].filter(Boolean).join(" ") ||
-                    e.display ||
-                    e.name ||
-                    e.email ||
-                    "Без имени";
-                  return {
-                    value: e.id ?? e.uuid,
-                    label: fullName,
-                    searchText: `${fullName}`.trim(),
-                  };
-                })}
-                placeholder={
-                  employeesLoading
-                    ? "Загрузка сотрудников..."
-                    : "Выберите сотрудников"
-                }
-              />
-            </label>
+            <div className="building-notification-form-grid">
+              <label>
+                <div className="building-page__label">ЖК</div>
+                <select
+                  className="building-page__select"
+                  value={form.residential_complex}
+                  onChange={handleFormChange("residential_complex")}
+                >
+                  <option value="">Не выбран</option>
+                  {complexesOptions.map((c) => (
+                    <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                      {c.name || "—"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <div className="building-page__label">Клиент</div>
+                <select
+                  className="building-page__select"
+                  value={form.client}
+                  onChange={handleFormChange("client")}
+                >
+                  <option value="">Не выбран</option>
+                  {clientsOptions.map((c) => (
+                    <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                      {c.name || c.display || "—"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <div className="building-page__label">Договор</div>
+                <select
+                  className="building-page__select"
+                  value={form.treaty}
+                  onChange={handleFormChange("treaty")}
+                >
+                  <option value="">Не выбран</option>
+                  {treatiesOptions.map((t) => (
+                    <option key={t.id ?? t.uuid} value={t.id ?? t.uuid}>
+                      {t.number || t.title || "—"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <div className="building-page__label">Название *</div>
+                <input
+                  className="building-page__input"
+                  value={form.title}
+                  onChange={handleFormChange("title")}
+                  placeholder="Например: Позвонить клиенту"
+                  required
+                />
+              </label>
+              <label className="building-notification-form-grid__full">
+                <div className="building-page__label">Описание</div>
+                <textarea
+                  className="building-page__textarea"
+                  rows={3}
+                  value={form.description}
+                  onChange={handleFormChange("description")}
+                  placeholder="Дополнительные детали задачи..."
+                />
+              </label>
+              <label>
+                <div className="building-page__label">Статус</div>
+                <select
+                  className="building-page__select"
+                  value={form.status}
+                  onChange={handleFormChange("status")}
+                >
+                  {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <div className="building-page__label">Срок</div>
+                <input
+                  type="datetime-local"
+                  className="building-page__input"
+                  value={form.due_at}
+                  onChange={handleFormChange("due_at")}
+                />
+              </label>
+              <label className="building-notification-form-grid__full">
+                <div className="building-page__label">Исполнители</div>
+                <MultipleSearchSelect
+                  value={form.assignee_ids}
+                  onChange={(vals) =>
+                    setForm((prev) => ({ ...prev, assignee_ids: vals }))
+                  }
+                  options={(employees || []).map((e) => {
+                    const fullName =
+                      [e.first_name, e.last_name].filter(Boolean).join(" ") ||
+                      e.display ||
+                      e.name ||
+                      e.email ||
+                      "Без имени";
+                    return {
+                      value: e.id ?? e.uuid,
+                      label: fullName,
+                      searchText: `${fullName}`.trim(),
+                    };
+                  })}
+                  placeholder={
+                    employeesLoading
+                      ? "Загрузка сотрудников..."
+                      : "Выберите сотрудников"
+                  }
+                />
+              </label>
+            </div>
 
             {formError && (
               <div className="building-page__error" style={{ marginTop: 8 }}>

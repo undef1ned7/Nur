@@ -11,6 +11,8 @@ import {
   fetchBuildingProcurements,
   submitBuildingProcurementToCash,
 } from "@/store/creators/building/procurementsCreators";
+import { fetchBuildingWarehouses } from "@/store/creators/building/warehousesCreators";
+import { useBuildingWarehouses } from "@/store/slices/building/warehousesSlice";
 import { useDispatch } from "react-redux";
 import { getPageCount, DEFAULT_PAGE_SIZE } from "../shared/api";
 import {
@@ -98,10 +100,21 @@ export default function BuildingProcurement() {
     creatingTransferIds,
     actionError,
   } = useBuildingProcurements();
+  const {
+    list: warehouses,
+    loading: warehousesLoading,
+    error: warehousesError,
+  } = useBuildingWarehouses();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "", status: "" });
   const [openCreate, setOpenCreate] = useState(false);
   const [createForm, setCreateForm] = useState(CREATE_INITIAL);
+  const [transferModal, setTransferModal] = useState({
+    open: false,
+    procurement: null,
+    warehouseId: "",
+    note: "",
+  });
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -202,33 +215,69 @@ export default function BuildingProcurement() {
     });
   };
 
-  const onCreateTransfer = (procurement) => {
+  const openTransferModal = (procurement) => {
+    setTransferModal({
+      open: true,
+      procurement,
+      warehouseId: "",
+      note: "",
+    });
+    const rcId =
+      procurement?.residential_complex ?? selectedProjectId;
+    if (rcId) {
+      dispatch(
+        fetchBuildingWarehouses({
+          residential_complex: rcId,
+          is_active: true,
+          page_size: 100,
+        }),
+      );
+    }
+  };
+
+  const closeTransferModal = () => {
+    setTransferModal({ open: false, procurement: null, warehouseId: "", note: "" });
+  };
+
+  const submitTransfer = async (e) => {
+    e.preventDefault();
+    const procurement = transferModal.procurement;
     const procurementId = procurement?.id ?? procurement?.uuid;
-    if (!procurementId) return;
-    confirm("Создать передачу на склад по этой закупке?", async (ok) => {
-      if (!ok) return;
-      try {
-        const res = await dispatch(
-          createBuildingTransferFromProcurement({
-            procurementId,
-            payload: { note: "" },
+    if (!procurementId || !String(transferModal.warehouseId || "").trim()) {
+      alert("Выберите склад", true);
+      return;
+    }
+    try {
+      const res = await dispatch(
+        createBuildingTransferFromProcurement({
+          procurementId,
+          payload: {
+            note: String(transferModal.note || "").trim(),
+            warehouse: transferModal.warehouseId,
+          },
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Передача на склад создана");
+        closeTransferModal();
+        dispatch(
+          fetchBuildingProcurements({
+            residential_complex: selectedProjectId,
+            status: filters.status || undefined,
+            search: filters.search || undefined,
+            page,
+            page_size: DEFAULT_PAGE_SIZE,
           }),
         );
-        if (res.meta.requestStatus === "fulfilled") {
-          alert("Передача на склад создана");
-        } else {
-          alert(
-            validateResErrors(
-              res.payload || res.error,
-              "Не удалось создать передачу",
-            ),
-            true,
-          );
-        }
-      } catch (err) {
-        alert(validateResErrors(err, "Не удалось создать передачу"), true);
+      } else {
+        alert(
+          validateResErrors(res.payload || res.error, "Не удалось создать передачу"),
+          true,
+        );
       }
-    });
+    } catch (err) {
+      alert(validateResErrors(err, "Не удалось создать передачу"), true);
+    }
   };
 
   const renderActions = (procurement) => {
@@ -253,10 +302,10 @@ export default function BuildingProcurement() {
         <button
           type="button"
           className="building-btn building-btn--primary !py-2"
-          onClick={() => onCreateTransfer(procurement)}
+          onClick={() => openTransferModal(procurement)}
           disabled={busy}
         >
-          {busy ? "Создание..." : "Создать передачу"}
+          {busy ? "Создание..." : "Отправить на склад"}
         </button>
       );
     }
@@ -519,6 +568,75 @@ export default function BuildingProcurement() {
           )}
         </div>
       </DataContainer>
+
+      <Modal
+        open={transferModal.open}
+        onClose={closeTransferModal}
+        title="Отправить на склад"
+      >
+        <form className="building-page" onSubmit={submitTransfer}>
+          <div className="building-page__muted" style={{ marginBottom: 8 }}>
+            {transferModal.procurement?.title || "Закупка"}
+          </div>
+          <label>
+            <div className="building-page__label">Склад *</div>
+            <select
+              className="building-page__select"
+              value={transferModal.warehouseId}
+              onChange={(e) =>
+                setTransferModal((prev) => ({
+                  ...prev,
+                  warehouseId: e.target.value,
+                }))
+              }
+              disabled={warehousesLoading}
+              required
+            >
+              <option value="">
+                {warehousesLoading ? "Загрузка складов..." : "Выберите склад"}
+              </option>
+              {warehousesError && (
+                <option value="" disabled>
+                  {String(warehousesError)}
+                </option>
+              )}
+              {warehouses.map((w) => (
+                <option key={w.id ?? w.uuid} value={w.id ?? w.uuid}>
+                  {w.name || "Без названия"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <div className="building-page__label">Комментарий (необязательно)</div>
+            <textarea
+              rows={3}
+              className="building-page__textarea"
+              value={transferModal.note}
+              onChange={(e) =>
+                setTransferModal((prev) => ({ ...prev, note: e.target.value }))
+              }
+              placeholder="Примечание к передаче"
+            />
+          </label>
+          <div className="building-page__actions">
+            <button
+              type="button"
+              className="building-btn"
+              onClick={closeTransferModal}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="building-btn building-btn--primary"
+              disabled={!transferModal.warehouseId || creatingTransferIds?.[transferModal.procurement?.id ?? transferModal.procurement?.uuid]}
+            >
+              Создать передачу
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         open={openCreate}

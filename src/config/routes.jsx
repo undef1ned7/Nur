@@ -133,7 +133,6 @@ import ConsultingReports from "../Components/Sectors/Consulting/Kassa/Reports/Re
 import WarehouseAnalytics from "../Components/Sectors/Warehouse/Analytics/Analytics";
 import WarehouseAgentAnalytics from "../Components/Sectors/Warehouse/Analytics/AgentAnalytics";
 import WarehouseClients from "../Components/Sectors/Warehouse/Clients/Clients";
-import WarehouseDirectories from "../Components/Sectors/Warehouse/Directories/Directories";
 import WarehouseMovements from "../Components/Sectors/Warehouse/Movements/Movements";
 import WarehouseProducts from "../Components/Sectors/Warehouse/Products/Products";
 import WarehouseProductDetail from "../Components/Sectors/Warehouse/Products/WarehouseProductDetail";
@@ -176,9 +175,9 @@ import SellCashierPage from "../Components/pages/Sell/Cashier/SellCashierPage";
 import BuildingLayout, {
   BuildingAnalytics,
   BuildingCashRegister,
+  BuildingCashRegisterTreatyDetail,
   BuildingClients,
   BuildingClientDetail,
-  BuildingDepartment,
   BuildingNotification,
   BuildingTaskDetail,
   BuildingProcurement,
@@ -198,6 +197,7 @@ import BuildingLayout, {
   BuildingWorkProcess,
   BuildingWorkProcessDetail,
   BuildingDrawings,
+  BuildingEmployees,
 } from "../Components/pages/Building";
 
 /**
@@ -425,7 +425,7 @@ export const crmRoutes = (profile) => [
 
   // Barber routes
   createProtectedRoute("barber/services", BarberServices),
-  createProtectedRoute("barber/warehouse", Sklad),
+  createProtectedRoute("barber/warehouse", Sklad),  
   createProtectedRoute("barber/masters", MastersTabs),
   createProtectedRoute("barber/history", BarberHistory),
   createProtectedRoute("documents", BarberDocuments),
@@ -470,9 +470,10 @@ export const crmRoutes = (profile) => [
     {[
       createProtectedRoute("analytics", BuildingAnalytics),
       createProtectedRoute("cash-register", BuildingCashRegister),
+      createProtectedRoute("cash-register/treaty/:treatyId", BuildingCashRegisterTreatyDetail),
       createProtectedRoute("clients", BuildingClients),
       createProtectedRoute("clients/:id", BuildingClientDetail),
-      createProtectedRoute("department", BuildingDepartment),
+      createProtectedRoute("employees", BuildingEmployees),
       createProtectedRoute("notification", BuildingNotification),
       createProtectedRoute("notification/new", BuildingTaskDetail),
       createProtectedRoute("notification/:id", BuildingTaskDetail),
