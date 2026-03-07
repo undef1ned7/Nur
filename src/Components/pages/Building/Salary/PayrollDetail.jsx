@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, CalendarDays } from "lucide-react";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { useBuildingSalary } from "../../../../store/slices/building/salarySlice";
@@ -19,6 +20,7 @@ import {
 import { fetchBuildingProjects } from "@/store/creators/building/projectsCreators";
 import Modal from "@/Components/common/Modal/Modal";
 import BuildingActionsMenu from "../shared/ActionsMenu";
+import "./Detail.scss";
 
 export default function BuildingSalaryPayrollDetail() {
   const dispatch = useDispatch();
@@ -27,14 +29,21 @@ export default function BuildingSalaryPayrollDetail() {
   const confirm = useConfirm();
   const { id } = useParams();
 
-  const { employees, payrolls, linesByPayrollId, payrollsLoading, paymentsByLineId } =
-    useBuildingSalary();
-  const { items: residentialComplexes, selectedProjectId } = useBuildingProjects();
+  const {
+    employees,
+    payrolls,
+    linesByPayrollId,
+    payrollsLoading,
+    paymentsByLineId,
+  } = useBuildingSalary();
+  const { items: residentialComplexes, selectedProjectId } =
+    useBuildingProjects();
 
   const [newLineEmployee, setNewLineEmployee] = useState("");
   const [newLineAmount, setNewLineAmount] = useState("");
   const [newLineComment, setNewLineComment] = useState("");
-  const [newLineResidentialComplex, setNewLineResidentialComplex] = useState("");
+  const [newLineResidentialComplex, setNewLineResidentialComplex] =
+    useState("");
 
   const [isCreateLineModalOpen, setIsCreateLineModalOpen] = useState(false);
   const [expandedLineId, setExpandedLineId] = useState(null);
@@ -69,11 +78,7 @@ export default function BuildingSalaryPayrollDetail() {
 
   const payroll = useMemo(() => {
     if (!id || !Array.isArray(payrolls)) return null;
-    return (
-      payrolls.find(
-        (p) => String(p.id ?? p.uuid) === String(id),
-      ) || null
-    );
+    return payrolls.find((p) => String(p.id ?? p.uuid) === String(id)) || null;
   }, [payrolls, id]);
 
   const PAYROLL_STATUS_LABELS = {
@@ -90,10 +95,10 @@ export default function BuildingSalaryPayrollDetail() {
 
   const payrollLinesBucket = id
     ? linesByPayrollId?.[String(id)] || {
-      list: [],
-      loading: false,
-      error: null,
-    }
+        list: [],
+        loading: false,
+        error: null,
+      }
     : { list: [], loading: false, error: null };
 
   const employeesById = useMemo(() => {
@@ -117,10 +122,10 @@ export default function BuildingSalaryPayrollDetail() {
 
   const paymentsBucket = activePaymentsLineId
     ? paymentsByLineId?.[String(activePaymentsLineId)] || {
-      list: [],
-      loading: false,
-      error: null,
-    }
+        list: [],
+        loading: false,
+        error: null,
+      }
     : { list: [], loading: false, error: null };
   const handleApprove = async () => {
     if (!id || !payroll) return;
@@ -179,129 +184,129 @@ export default function BuildingSalaryPayrollDetail() {
   const title = payroll?.title || "Период начислений";
 
   return (
-    <div className="building-page building-page--salary-detail">
-      <div className="building-page__header">
-        <div>
-          <h1 className="building-page__title">{title}</h1>
-          <p className="building-page__subtitle">
-            Детальная информация по периоду начислений и его строкам.
-          </p>
-        </div>
+    <div className="add-product-page salary-detail">
+      <div className="add-product-page__header">
         <button
           type="button"
-          className="building-btn"
+          className="add-product-page__back"
           onClick={() => navigate("/crm/building/salary")}
         >
-          ← К периодам
+          <ArrowLeft size={18} />К периодам
         </button>
+        <div className="add-product-page__title-section">
+          <div className="add-product-page__icon">
+            <CalendarDays size={24} />
+          </div>
+          <div>
+            <h1 className="add-product-page__title">{title}</h1>
+            <p className="add-product-page__subtitle">
+              Детальная информация по периоду начислений и его строкам.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="building-page__card" style={{ marginBottom: 16 }}>
+      <div className="add-product-page__content">
         {payrollsLoading && !payroll && (
-          <div className="building-page__muted">
+          <div className="salary-detail__muted">
             Загрузка информации о периоде...
           </div>
         )}
         {!payrollsLoading && !payroll && (
-          <div className="building-page__error">
+          <div className="add-product-page__error">
             Не удалось найти период.
           </div>
         )}
+
         {payroll && (
-          <div className="building-page">
-            <div>
-              <div className="building-page__label">Название</div>
-              <div>{payroll.title || "—"}</div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">Период</div>
-              <div>
-                {payroll.period_start} — {payroll.period_end}
+          <>
+            <div className="add-product-page__section">
+              <div className="add-product-page__section-header">
+                <div className="add-product-page__section-number">1</div>
+                <h3 className="add-product-page__section-title">
+                  Информация о периоде
+                </h3>
               </div>
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <div className="building-page__label">Статус</div>
-              <div>
-                {PAYROLL_STATUS_LABELS[payroll.status] ||
-                  PAYROLL_STATUS_LABELS.draft}
-              </div>
-            </div>
-            {payroll.status === "draft" && (
-              <div className="building-page__actions" style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="building-btn building-btn--primary"
-                  onClick={handleApprove}
+              <dl className="salary-detail__info-grid">
+                <dt className="salary-detail__info-label">Название:</dt>
+                <dd className="salary-detail__info-value">
+                  {payroll.title || "—"}
+                </dd>
+                <dt className="salary-detail__info-label">Период:</dt>
+                <dd className="salary-detail__info-value">
+                  {payroll.period_start} — {payroll.period_end}
+                </dd>
+                <dt className="salary-detail__info-label">Статус:</dt>
+                <dd className="salary-detail__info-value">
+                  {PAYROLL_STATUS_LABELS[payroll.status] ??
+                    PAYROLL_STATUS_LABELS.draft}
+                </dd>
+              </dl>
+              {payroll.status === "draft" && (
+                <div
+                  className="add-product-page__actions"
+                  style={{ marginTop: 16 }}
                 >
-                  Утвердить период
-                </button>
+                  <button
+                    type="button"
+                    className="add-product-page__submit-btn"
+                    onClick={handleApprove}
+                  >
+                    Утвердить период
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {payroll.status !== "approved" && (
+              <div className="add-product-page__section my-5 !gap-0">
+                <div className="add-product-page__section-header !mb-0">
+                  <div className="add-product-page__section-number">2</div>
+                  <h3 className="add-product-page__section-title">Выплаты</h3>
+                </div>
+                <p className="salary-detail__muted">
+                  Выплаты создаются по конкретным строкам начислений. Откройте
+                  строку и выберите действие <b>«Выплаты»</b>, чтобы увидеть
+                  список выплат и добавить новую.
+                </p>
               </div>
             )}
-          </div>
-        )}
-      </div>
 
-      {payroll?.status !== "approved" && (
-        <div className="building-page__card">
-          <details>
-            <summary
-              className="building-page__cardTitle"
-              style={{ cursor: "pointer" }}
-            >
-              Выплаты
-            </summary>
-            <div className="building-page__muted" style={{ marginTop: 8 }}>
-              Выплаты создаются по конкретным строкам начислений. Откройте
-              строку и выберите действие <b>«Выплаты»</b>, чтобы увидеть список
-              выплат и добавить новую.
-            </div>
-          </details>
-        </div>
-      )}
-
-      <div className="building-page__card">
-        <details open>
-          <summary
-            className="building-page__cardTitle"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              cursor: "pointer",
-            }}
-          >
-            <span>Строки начислений</span>
-            {id && payroll?.status === "draft" && (
-              <button
-                type="button"
-                className="building-btn building-btn--primary"
-                style={{ padding: "2px 10px", fontSize: 12 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsCreateLineModalOpen(true);
-                }}
-              >
-                + Добавить
-              </button>
-            )}
-          </summary>
-
-          {!id && (
-            <div className="building-page__muted" style={{ marginTop: 8 }}>
-              Идентификатор периода не указан.
-            </div>
-          )}
-
-          {id && (
-            <>
-              {payrollLinesBucket.loading && (
-                <div className="building-page__muted" style={{ marginTop: 8 }}>
+            <div className="add-product-page__section">
+              <div className="add-product-page__section-header salary-detail__section-header-row">
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div className="add-product-page__section-number">
+                    {payroll.status !== "approved" ? "3" : "2"}
+                  </div>
+                  <h3 className="add-product-page__section-title">
+                    Строки начислений
+                  </h3>
+                </div>
+                {id && payroll?.status === "draft" && (
+                  <button
+                    type="button"
+                    className="add-product-page__submit-btn"
+                    onClick={() => setIsCreateLineModalOpen(true)}
+                  >
+                    + Добавить строку
+                  </button>
+                )}
+              </div>
+              {!id && (
+                <div className="salary-detail__muted">
+                  Идентификатор периода не указан.
+                </div>
+              )}
+              {id && payrollLinesBucket.loading && (
+                <div className="salary-detail__muted">
                   Загрузка строк начислений...
                 </div>
               )}
-              {payrollLinesBucket.error && (
-                <div className="building-page__error" style={{ marginTop: 8 }}>
+              {id && payrollLinesBucket.error && (
+                <div
+                  className="add-product-page__error"
+                  style={{ marginTop: 8 }}
+                >
                   {String(
                     validateResErrors(
                       payrollLinesBucket.error,
@@ -310,12 +315,9 @@ export default function BuildingSalaryPayrollDetail() {
                   )}
                 </div>
               )}
-              {!payrollLinesBucket.loading && (
-                <div
-                  className="building-table building-table--shadow"
-                  style={{ marginTop: 8 }}
-                >
-                  <table>
+              {id && !payrollLinesBucket.loading && (
+                <div className="salary-detail__table-wrap">
+                  <table className="salary-detail__table">
                     <thead>
                       <tr>
                         <th>Сотрудник</th>
@@ -330,12 +332,9 @@ export default function BuildingSalaryPayrollDetail() {
                         const lid = line.id ?? line.uuid;
                         const emp =
                           employeesById[String(line.employee)] || null;
-
-
                         return (
                           <tr
                             key={lid}
-                            data-clickable="true"
                             onClick={() =>
                               navigate(
                                 `/crm/building/salary/payroll/${id}/line/${lid}`,
@@ -352,19 +351,23 @@ export default function BuildingSalaryPayrollDetail() {
                       })}
                       {(!payrollLinesBucket.list ||
                         payrollLinesBucket.list.length === 0) && (
-                          <tr>
-                            <td colSpan={7} style={{ textAlign: "center" }}>
-                              Строки начислений пока не добавлены.
-                            </td>
-                          </tr>
-                        )}
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="salary-detail__muted"
+                            style={{ textAlign: "center", padding: 24 }}
+                          >
+                            Строки начислений пока не добавлены.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
               )}
-            </>
-          )}
-        </details>
+            </div>
+          </>
+        )}
       </div>
 
       {isPaymentsModalOpen && activePaymentsLineId && (
@@ -390,30 +393,31 @@ export default function BuildingSalaryPayrollDetail() {
               ) || null;
             const hasSalaryCashbox = !!rc?.salary_cashbox;
             return (
-              <div className="building-page">
+              <div className="add-product-page add-product-page--modal-form">
                 {!hasSalaryCashbox && rcId && (
                   <div
-                    className="building-page__card"
+                    className="add-product-page__error"
                     style={{
                       marginBottom: 12,
+                      padding: 12,
                       borderLeft: "4px solid #f97316",
+                      background: "#fff8f0",
                     }}
                   >
                     <div
-                      className="building-page__label"
+                      className="add-product-page__label"
                       style={{ marginBottom: 4 }}
                     >
                       Внимание
                     </div>
-                    <div className="building-page__muted" style={{ marginBottom: 8 }}>
-                      Для ЖК{" "}
-                      <b>{rc?.name || rcId}</b> не настроена касса для выплат
-                      зарплаты. Укажите поле <b>Касса для ЗП по ЖК</b> в
+                    <p style={{ margin: "0 0 8px 0", fontSize: 14 }}>
+                      Для ЖК <b>{rc?.name || rcId}</b> не настроена касса для
+                      выплат зарплаты. Укажите поле <b>Касса для ЗП по ЖК</b> в
                       настройках ЖК, чтобы создавать выплаты по этой строке.
-                    </div>
+                    </p>
                     <button
                       type="button"
-                      className="building-btn building-btn--primary"
+                      className="add-product-page__submit-btn"
                       onClick={() => {
                         setIsPaymentsModalOpen(false);
                         setActivePaymentsLineId(null);
@@ -428,7 +432,6 @@ export default function BuildingSalaryPayrollDetail() {
                 )}
 
                 <form
-                  className="building-page"
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (!activePaymentsLineId) return;
@@ -470,26 +473,23 @@ export default function BuildingSalaryPayrollDetail() {
                   }}
                   style={{ marginBottom: 12 }}
                 >
-                  <label>
-                    <div className="building-page__label">Сумма *</div>
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">Сумма *</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className="building-page__input"
+                      className="add-product-page__input"
                       value={payAmount}
                       onChange={(e) => setPayAmount(e.target.value)}
                       placeholder="10000.00"
                       disabled={!hasSalaryCashbox}
                     />
-                  </label>
-                  <div
-                    className="building-page__actions"
-                    style={{ marginTop: 8 }}
-                  >
+                  </div>
+                  <div className="add-product-page__actions">
                     <button
                       type="button"
-                      className="building-btn"
+                      className="add-product-page__cancel-btn"
                       onClick={() => {
                         setIsPaymentsModalOpen(false);
                         setActivePaymentsLineId(null);
@@ -501,8 +501,7 @@ export default function BuildingSalaryPayrollDetail() {
                     </button>
                     <button
                       type="submit"
-                      className="building-btn building-btn--primary"
-                      style={{ marginLeft: 8 }}
+                      className="add-product-page__submit-btn"
                       disabled={!hasSalaryCashbox}
                     >
                       Создать выплату
@@ -511,12 +510,10 @@ export default function BuildingSalaryPayrollDetail() {
                 </form>
 
                 {paymentsBucket.loading && (
-                  <div className="building-page__muted">
-                    Загрузка выплат...
-                  </div>
+                  <div className="salary-detail__muted">Загрузка выплат...</div>
                 )}
                 {paymentsBucket.error && (
-                  <div className="building-page__error">
+                  <div className="add-product-page__error">
                     {String(
                       validateResErrors(
                         paymentsBucket.error,
@@ -526,8 +523,11 @@ export default function BuildingSalaryPayrollDetail() {
                   </div>
                 )}
                 {!paymentsBucket.loading && (
-                  <div className="building-table building-table--shadow">
-                    <table>
+                  <div
+                    className="salary-detail__table-wrap"
+                    style={{ marginTop: 12 }}
+                  >
+                    <table className="salary-detail__table">
                       <thead>
                         <tr>
                           <th>Сумма</th>
@@ -540,21 +540,19 @@ export default function BuildingSalaryPayrollDetail() {
                         {(paymentsBucket.list || []).map((pmt) => (
                           <tr key={pmt.id ?? pmt.uuid}>
                             <td>{pmt.amount}</td>
-                            <td>
-                              {pmt.cashbox_display || pmt.cashbox || "—"}
-                            </td>
+                            <td>{pmt.cashbox_display || pmt.cashbox || "—"}</td>
                             <td>{pmt.shift || "—"}</td>
                             <td>{pmt.paid_at || "—"}</td>
                           </tr>
                         ))}
                         {(!paymentsBucket.list ||
                           paymentsBucket.list.length === 0) && (
-                            <tr>
-                              <td colSpan={4} style={{ textAlign: "center" }}>
-                                Выплаты по этой строке ещё не создавались.
-                              </td>
-                            </tr>
-                          )}
+                          <tr>
+                            <td colSpan={4} style={{ textAlign: "center" }}>
+                              Выплаты по этой строке ещё не создавались.
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -574,26 +572,21 @@ export default function BuildingSalaryPayrollDetail() {
           {(() => {
             const line =
               (payrollLinesBucket.list || []).find(
-                (l) =>
-                  String(l.id ?? l.uuid) === String(expandedLineId),
+                (l) => String(l.id ?? l.uuid) === String(expandedLineId),
               ) || null;
             const adjustments = Array.isArray(line?.adjustments)
               ? line.adjustments
               : [];
             return (
-              <div>
-                <div
-                  style={{
-                    marginBottom: 8,
-                    fontSize: 13,
-                    color: "rgba(0,0,0,0.65)",
-                  }}
+              <div className="add-product-page add-product-page--modal-form">
+                <p
+                  className="add-product-page__subtitle"
+                  style={{ marginBottom: 12 }}
                 >
                   База: <b>{line?.base_amount ?? "—"}</b>, комментарий:{" "}
                   <b>{line?.comment || "—"}</b>
-                </div>
+                </p>
                 <form
-                  className="building-page"
                   onSubmit={async (e) => {
                     e.preventDefault();
                     if (!expandedLineId) return;
@@ -626,17 +619,12 @@ export default function BuildingSalaryPayrollDetail() {
                       );
                     }
                   }}
-                  style={{ marginBottom: 8 }}
+                  style={{ marginBottom: 12 }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">Тип</label>
                     <select
-                      className="building-page__select"
+                      className="add-product-page__input"
                       value={adjType}
                       onChange={(e) => setAdjType(e.target.value)}
                     >
@@ -644,33 +632,41 @@ export default function BuildingSalaryPayrollDetail() {
                       <option value="deduction">Удержание</option>
                       <option value="advance">Аванс</option>
                     </select>
+                  </div>
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">Сумма</label>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className="building-page__input"
-                      style={{ maxWidth: 140 }}
+                      className="add-product-page__input"
                       value={adjAmount}
                       onChange={(e) => setAdjAmount(e.target.value)}
                       placeholder="1000.00"
                     />
+                  </div>
+                  <div className="add-product-page__form-group">
+                    <label className="add-product-page__label">
+                      Комментарий
+                    </label>
                     <input
-                      className="building-page__input"
-                      style={{ flex: 1, minWidth: 120 }}
+                      className="add-product-page__input"
                       value={adjComment}
                       onChange={(e) => setAdjComment(e.target.value)}
                       placeholder="Комментарий"
                     />
+                  </div>
+                  <div className="add-product-page__actions">
                     <button
                       type="submit"
-                      className="building-btn building-btn--primary"
+                      className="add-product-page__submit-btn"
                     >
                       Добавить
                     </button>
                   </div>
                 </form>
-                <div className="building-table">
-                  <table>
+                <div className="salary-detail__table-wrap">
+                  <table className="salary-detail__table">
                     <thead>
                       <tr>
                         <th>Тип</th>
@@ -736,11 +732,14 @@ export default function BuildingSalaryPayrollDetail() {
           onClose={() => setIsCreateLineModalOpen(false)}
           title="Добавить строку начислений"
         >
-          <form className="building-page" onSubmit={handleCreateLine}>
-            <label>
-              <div className="building-page__label">Сотрудник *</div>
+          <form
+            className="add-product-page add-product-page--modal-form"
+            onSubmit={handleCreateLine}
+          >
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Сотрудник *</label>
               <select
-                className="building-page__select"
+                className="add-product-page__input"
                 value={newLineEmployee}
                 onChange={(e) => setNewLineEmployee(e.target.value)}
               >
@@ -751,11 +750,13 @@ export default function BuildingSalaryPayrollDetail() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label>
-              <div className="building-page__label">Жилой комплекс *</div>
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">
+                Жилой комплекс *
+              </label>
               <select
-                className="building-page__select"
+                className="add-product-page__input"
                 value={newLineResidentialComplex}
                 onChange={(e) => setNewLineResidentialComplex(e.target.value)}
               >
@@ -766,41 +767,37 @@ export default function BuildingSalaryPayrollDetail() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label>
-              <div className="building-page__label">Сумма</div>
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Сумма</label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                className="building-page__input"
+                className="add-product-page__input"
                 value={newLineAmount}
                 onChange={(e) => setNewLineAmount(e.target.value)}
                 placeholder="45000.00"
               />
-            </label>
-            <label>
-              <div className="building-page__label">Комментарий</div>
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Комментарий</label>
               <input
-                className="building-page__input"
+                className="add-product-page__input"
                 value={newLineComment}
                 onChange={(e) => setNewLineComment(e.target.value)}
                 placeholder="Например: Оклад за месяц"
               />
-            </label>
-            <div className="building-page__actions" style={{ marginTop: 8 }}>
+            </div>
+            <div className="add-product-page__actions">
               <button
                 type="button"
-                className="building-btn"
+                className="add-product-page__cancel-btn"
                 onClick={() => setIsCreateLineModalOpen(false)}
               >
                 Отмена
               </button>
-              <button
-                type="submit"
-                className="building-btn building-btn--primary"
-                style={{ marginLeft: 8 }}
-              >
+              <button type="submit" className="add-product-page__submit-btn">
                 Добавить
               </button>
             </div>
@@ -810,4 +807,3 @@ export default function BuildingSalaryPayrollDetail() {
     </div>
   );
 }
-

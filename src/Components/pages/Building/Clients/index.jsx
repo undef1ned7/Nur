@@ -27,8 +27,8 @@ const FORM_INITIAL = {
 };
 
 const VIEW_MODES = {
-  TABLE: "table",
   CARDS: "cards",
+  TABLE: "table",
 };
 
 const STORAGE_KEY = "building_clients_view_mode";
@@ -299,7 +299,9 @@ export default function BuildingClients() {
 
           {error && (
             <div className="building-page__error" style={{ marginBottom: 12 }}>
-              {String(validateResErrors(error, "Не удалось загрузить клиентов"))}
+              {String(
+                validateResErrors(error, "Не удалось загрузить клиентов"),
+              )}
             </div>
           )}
 
@@ -345,9 +347,7 @@ export default function BuildingClients() {
                         <td>{c?.email || "—"}</td>
                         <td>{c?.inn || "—"}</td>
                         <td>{c?.address || "—"}</td>
-                        <td
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <td onClick={(e) => e.stopPropagation()}>
                           {c?.is_active ? (
                             <span className="clients-table__status clients-table__status--active">
                               Активен

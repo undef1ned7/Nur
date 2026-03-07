@@ -1,0 +1,50 @@
+@import "../CashRegister/CashRegister.scss";
+
+/* Табы в стиле warehouse-view-buttons */
+.salary-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.salary-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: white;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: var(--primary);
+  }
+
+  &--active {
+    background: var(--text);
+    color: white;
+    border-color: var(--text);
+  }
+}
+
+.salary-toolbar__select {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: white;
+  font-size: 14px;
+  color: var(--text);
+  min-width: 160px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+}

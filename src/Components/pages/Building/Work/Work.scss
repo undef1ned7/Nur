@@ -1,0 +1,10 @@
+@import "../../../../assets/scss/variables";
+@import "../CashRegister/CashRegister.scss";
+@import "../../../Deposits/Sklad/AddProductPage.scss";
+
+.add-product-page--modal-form {
+  min-height: auto;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+}
