@@ -14,7 +14,6 @@ import {
   createBuildingPayrollLineAdjustment,
   deleteBuildingPayrollAdjustment,
   fetchBuildingPayrollLinePayments,
-  createBuildingPayrollLinePayment,
 } from "../../../../store/creators/building/salaryCreators";
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import { fetchBuildingProjects } from "@/store/creators/building/projectsCreators";
@@ -36,21 +35,10 @@ export default function BuildingSalaryLineDetail() {
   } = useBuildingSalary();
   const { items: residentialComplexes, selectedProjectId } =
     useBuildingProjects();
-  const cashboxId = useMemo(() => {
-    const list = Array.isArray(residentialComplexes)
-      ? residentialComplexes
-      : [];
-    const rc = list.find(
-      (item) => String(item.id ?? item.uuid) === String(selectedProjectId),
-    );
-    return rc?.salary_cashbox || null;
-  }, [selectedProjectId, residentialComplexes]);
   const [adjType, setAdjType] = useState("bonus");
   const [adjAmount, setAdjAmount] = useState("");
   const [adjComment, setAdjComment] = useState("");
-  const [payAmount, setPayAmount] = useState("");
   const [isAdjModalOpen, setIsAdjModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   useEffect(() => {
     dispatch(fetchBuildingSalaryEmployees());
@@ -95,6 +83,18 @@ export default function BuildingSalaryLineDetail() {
     return arr.find((l) => String(l.id ?? l.uuid) === String(lineId)) || null;
   }, [linesByPayrollId, payrollId, lineId]);
 
+  /** Касса для аванса: приоритет — ЖК строки (line.residential_complex), иначе выбранный ЖК */
+  const advanceCashboxId = useMemo(() => {
+    const list = Array.isArray(residentialComplexes)
+      ? residentialComplexes
+      : [];
+    const rcId = line?.residential_complex ?? selectedProjectId;
+    const rc = list.find(
+      (item) => String(item.id ?? item.uuid) === String(rcId),
+    );
+    return rc?.salary_cashbox || null;
+  }, [residentialComplexes, line?.residential_complex, selectedProjectId]);
+
   const employee =
     line && employeesById[String(line.employee)]
       ? employeesById[String(line.employee)]
@@ -109,7 +109,6 @@ export default function BuildingSalaryLineDetail() {
   const isPayrollApproved = payroll?.status === "approved";
   const isPayrollPaid = payroll?.status === "paid";
   const canEditAdjustments = payroll?.status === "draft";
-  const canCreatePayments = isPayrollApproved;
 
   const netToPay = useMemo(() => {
     const v = Number(line?.net_to_pay ?? 0);
@@ -157,6 +156,17 @@ export default function BuildingSalaryLineDetail() {
       amount: String(adjAmount),
       comment: adjComment || "",
     };
+    if (adjType === "advance") {
+      if (!advanceCashboxId) {
+        alert(
+          "Для аванса укажите кассу. Настройте кассу для ЗП в карточке ЖК (вкладка «Касса»).",
+          true,
+        );
+        return;
+      }
+      payload.cashbox = advanceCashboxId;
+      payload.paid_at = new Date().toISOString();
+    }
     const res = await dispatch(
       createBuildingPayrollLineAdjustment({ lineId, payload }),
     );
@@ -191,41 +201,6 @@ export default function BuildingSalaryLineDetail() {
           validateResErrors(
             res.payload || res.error,
             "Не удалось удалить корректировку",
-          ),
-          true,
-        );
-      }
-    });
-  };
-
-  const handleCreatePayment = async (e) => {
-    e.preventDefault();
-    if (!lineId) return;
-    if (!payAmount) {
-      alert("Укажите сумму выплаты", true);
-      return;
-    }
-    confirm(`Создать выплату на сумму ${payAmount}?`, async (ok) => {
-      if (!ok) return;
-      const payload = {
-        amount: String(payAmount),
-        cashbox: cashboxId,
-      };
-      const res = await dispatch(
-        createBuildingPayrollLinePayment({ lineId, payload }),
-      );
-      if (res.meta.requestStatus === "fulfilled") {
-        setPayAmount("");
-        dispatch(fetchBuildingPayrollLinePayments(lineId));
-        if (payrollId) {
-          dispatch(fetchBuildingPayrollLines(payrollId));
-        }
-        setIsPaymentModalOpen(false);
-      } else {
-        alert(
-          validateResErrors(
-            res.payload || res.error,
-            "Не удалось создать выплату",
           ),
           true,
         );
@@ -439,21 +414,7 @@ export default function BuildingSalaryLineDetail() {
                   <div className="add-product-page__section-number">3</div>
                   <h3 className="add-product-page__section-title">Выплаты</h3>
                 </div>
-                {canCreatePayments && (
-                  <button
-                    type="button"
-                    className="add-product-page__submit-btn"
-                    onClick={() => setIsPaymentModalOpen(true)}
-                  >
-                    Создать выплату
-                  </button>
-                )}
               </div>
-              {!canCreatePayments && (
-                <p className="salary-detail__muted">
-                  Выплаты можно создавать только после утверждения периода.
-                </p>
-              )}
               {paymentsBucket.loading && (
                 <div className="salary-detail__muted">
                   Загрузка выплат...
@@ -576,52 +537,6 @@ export default function BuildingSalaryLineDetail() {
         </Modal>
       )}
 
-      {isPaymentModalOpen && (
-        <Modal
-          open={isPaymentModalOpen}
-          onClose={() => setIsPaymentModalOpen(false)}
-          title="Создать выплату"
-        >
-          <form
-            className="add-product-page add-product-page--modal-form"
-            onSubmit={handleCreatePayment}
-          >
-            <div className="add-product-page__form-group">
-              <label className="add-product-page__label">Сумма *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className="add-product-page__input"
-                value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
-                placeholder="10000.00"
-              />
-              <span className="add-product-page__hint">
-                Доступно к выплате:{" "}
-                <b>
-                  {remainingToPay != null ? remainingToPay.toFixed(2) : "—"}
-                </b>
-              </span>
-            </div>
-            <div className="add-product-page__actions">
-              <button
-                type="button"
-                className="add-product-page__cancel-btn"
-                onClick={() => setIsPaymentModalOpen(false)}
-              >
-                Отмена
-              </button>
-              <button
-                type="submit"
-                className="add-product-page__submit-btn"
-              >
-                Создать выплату
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
     </div>
   );
 }

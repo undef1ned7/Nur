@@ -11,6 +11,8 @@ import {
   approveBuildingPayroll,
   fetchBuildingPayrollLines,
   createBuildingPayrollLine,
+  updateBuildingPayrollLine,
+  deleteBuildingPayrollLine,
   fetchBuildingPayrollLineAdjustments,
   createBuildingPayrollLineAdjustment,
   deleteBuildingPayrollAdjustment,
@@ -220,6 +222,47 @@ const buildingSalarySlice = createSlice({
         if (!payrollId || !line) return;
         const bucket = ensureLinesBucket(state, payrollId);
         bucket.list = upsertById(bucket.list, line);
+      })
+      .addCase(updateBuildingPayrollLine.fulfilled, (state, action) => {
+        const line = action.payload?.data;
+        const lineId = action.payload?.lineId;
+        if (!line) return;
+        const payrollId = line?.payroll;
+        if (payrollId) {
+          const bucket = ensureLinesBucket(state, payrollId);
+          bucket.list = upsertById(bucket.list, line);
+          return;
+        }
+        for (const pid of Object.keys(state.linesByPayrollId || {})) {
+          const bucket = state.linesByPayrollId[pid];
+          if (bucket?.list) {
+            const idx = bucket.list.findIndex(
+              (l) => String(l?.id ?? l?.uuid) === String(lineId),
+            );
+            if (idx >= 0) {
+              bucket.list = upsertById(bucket.list, line);
+              break;
+            }
+          }
+        }
+      })
+      .addCase(deleteBuildingPayrollLine.fulfilled, (state, action) => {
+        const { lineId, payrollId } = action.payload || {};
+        if (!lineId) return;
+        const pid = payrollId ?? Object.keys(state.linesByPayrollId || {}).find(
+          (k) => {
+            const bucket = state.linesByPayrollId[k];
+            return bucket?.list?.some(
+              (l) => String(l?.id ?? l?.uuid) === String(lineId),
+            );
+          },
+        );
+        if (pid) {
+          const bucket = ensureLinesBucket(state, pid);
+          bucket.list = (bucket.list || []).filter(
+            (l) => String(l?.id ?? l?.uuid) !== String(lineId),
+          );
+        }
       })
 
       .addCase(

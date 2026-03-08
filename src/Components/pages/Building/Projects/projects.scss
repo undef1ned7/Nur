@@ -219,3 +219,121 @@
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+
+/* Таб «Сотрудники» на детальной странице ЖК */
+.building-project-employees {
+  margin-bottom: 20px;
+}
+
+.building-project-employees__empty {
+  padding: 20px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(11, 42, 60, 0.6);
+  background: rgba(11, 42, 60, 0.03);
+  border-radius: 12px;
+  border: 1px dashed rgba(11, 42, 60, 0.12);
+}
+
+.building-project-employees__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.building-project-employees__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid rgba(11, 42, 60, 0.1);
+  border-radius: 12px;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 1px 3px rgba(2, 8, 23, 0.04);
+}
+
+.building-project-employees__item:hover {
+  background: rgba(11, 42, 60, 0.02);
+  border-color: rgba(11, 42, 60, 0.16);
+  box-shadow: 0 2px 8px rgba(2, 8, 23, 0.06);
+}
+
+.building-project-employees__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0b2344;
+  letter-spacing: 0.01em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.building-project-employees__remove {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b02a37;
+  background: rgba(220, 53, 69, 0.08);
+  border: 1px solid rgba(220, 53, 69, 0.22);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.building-project-employees__remove:hover {
+  background: rgba(220, 53, 69, 0.14);
+  border-color: rgba(220, 53, 69, 0.35);
+  color: #842029;
+}
+
+.building-project-employees__remove:active {
+  background: rgba(220, 53, 69, 0.2);
+}
+
+.building-project-employees__form {
+  padding-top: 16px;
+  border-top: 1px solid rgba(11, 42, 60, 0.08);
+}
+
+.building-project-employees__form .building-page__label {
+  margin-bottom: 6px;
+}
+
+.building-project-employees__form-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .building-project-employees__item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    text-align: center;
+  }
+
+  .building-project-employees__name {
+    white-space: normal;
+    text-align: center;
+  }
+
+  .building-project-employees__remove {
+    align-self: center;
+  }
+}

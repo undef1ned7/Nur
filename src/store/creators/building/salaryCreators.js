@@ -121,6 +121,30 @@ export const createBuildingPayrollLine = createAsyncThunk(
   },
 );
 
+export const updateBuildingPayrollLine = createAsyncThunk(
+  "buildingSalary/updatePayrollLine",
+  async ({ lineId, payload }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.patch(`${LINES_BASE}/${lineId}/`, payload);
+      return { lineId, data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
+export const deleteBuildingPayrollLine = createAsyncThunk(
+  "buildingSalary/deletePayrollLine",
+  async ({ lineId, payrollId }, { rejectWithValue }) => {
+    try {
+      await api.delete(`${LINES_BASE}/${lineId}/`);
+      return { lineId, payrollId };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  },
+);
+
 export const fetchBuildingPayrollLineAdjustments = createAsyncThunk(
   "buildingSalary/fetchPayrollLineAdjustments",
   async (lineId, { rejectWithValue }) => {

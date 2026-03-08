@@ -53,9 +53,39 @@ export default function BuildingSalary() {
 
   const [payrollStatusFilter, setPayrollStatusFilter] = useState("");
   const [isCreatePeriodModalOpen, setIsCreatePeriodModalOpen] = useState(false);
+  const [payrollViewMode, setPayrollViewMode] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "cards" : "table",
+  );
+
+  const getMonthPeriod = (monthOffset) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + monthOffset);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    const pad = (n) => String(n).padStart(2, "0");
+    const start = `${first.getFullYear()}-${pad(first.getMonth() + 1)}-${pad(first.getDate())}`;
+    const end = `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
+    const monthNames = [
+      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+    ];
+    const monthLabel = `${monthNames[month]} ${year}`;
+    const title = `ЗП за ${monthNames[month].toLowerCase()} ${year}`;
+    return { start, end, title, monthLabel };
+  };
+
+  const applyMonthPeriod = (monthOffset) => {
+    const { start, end, title } = getMonthPeriod(monthOffset);
+    setNewPeriodStart(start);
+    setNewPeriodEnd(end);
+    setNewPeriodTitle(title);
+  };
 
   const SALARY_TYPE_LABELS = {
     monthly: "Месячный оклад",
+    monthly_pct: "Оклад + % от продаж",
     daily: "Дневная ставка",
     hourly: "Почасовая ставка",
   };
@@ -81,10 +111,15 @@ export default function BuildingSalary() {
       alert("Заполните название и даты периода", true);
       return;
     }
+    if (!selectedProjectId) {
+      alert("Выберите ЖК в фильтре выше", true);
+      return;
+    }
     const payload = {
       title: newPeriodTitle.trim(),
       period_start: newPeriodStart,
       period_end: newPeriodEnd,
+      residential_complex: selectedProjectId,
     };
     const res = await dispatch(createBuildingPayroll(payload));
     if (res.meta.requestStatus === "fulfilled") {
@@ -103,21 +138,24 @@ export default function BuildingSalary() {
     }
   };
 
-  const handleApprovePayroll = async (payroll) => {
+  const handleApprovePayroll = (payroll) => {
     const id = payroll?.id ?? payroll?.uuid;
     if (!id) return;
-    const res = await dispatch(approveBuildingPayroll(id));
-    if (res.meta.requestStatus === "fulfilled") {
-      alert("Период утвержден");
-    } else {
-      alert(
-        validateResErrors(
-          res.payload || res.error,
-          "Не удалось утвердить период",
-        ),
-        true,
-      );
-    }
+    confirm("Утвердить период начислений? После утверждения можно будет создавать выплаты.", async (ok) => {
+      if (!ok) return;
+      const res = await dispatch(approveBuildingPayroll(id));
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Период утвержден");
+      } else {
+        alert(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось утвердить период",
+          ),
+          true,
+        );
+      }
+    });
   };
 
   const handleDeletePayroll = async (payroll) => {
@@ -197,18 +235,38 @@ export default function BuildingSalary() {
             </button>
           </div>
           {activeTab === "payrolls" && (
-            <select
-              className="salary-toolbar__select"
-              value={payrollStatusFilter}
-              onChange={(e) => setPayrollStatusFilter(e.target.value)}
-            >
-              <option value="">Все статусы</option>
-              {Object.entries(PAYROLL_STATUS_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                className="salary-toolbar__select"
+                value={payrollStatusFilter}
+                onChange={(e) => setPayrollStatusFilter(e.target.value)}
+              >
+                <option value="">Все статусы</option>
+                {Object.entries(PAYROLL_STATUS_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <div className="salary-view-toggle">
+                <button
+                  type="button"
+                  className={`salary-tab${payrollViewMode === "cards" ? " salary-tab--active" : ""}`}
+                  onClick={() => setPayrollViewMode("cards")}
+                  title="Карточки"
+                >
+                  Карточки
+                </button>
+                <button
+                  type="button"
+                  className={`salary-tab${payrollViewMode === "table" ? " salary-tab--active" : ""}`}
+                  onClick={() => setPayrollViewMode("table")}
+                  title="Таблица"
+                >
+                  Таблица
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -317,7 +375,87 @@ export default function BuildingSalary() {
             </table>
           )}
 
-          {activeTab === "payrolls" && (
+          {activeTab === "payrolls" && payrollViewMode === "cards" && (
+            <div className="salary-cards">
+              {payrollsLoading ? (
+                <div className="salary-cards__loading">Загрузка периодов...</div>
+              ) : payrollsError ? (
+                <div className="salary-cards__error">
+                  {String(
+                    validateResErrors(
+                      payrollsError,
+                      "Не удалось загрузить периоды",
+                    ),
+                  )}
+                </div>
+              ) : !payrolls || payrolls.length === 0 ? (
+                <div className="salary-cards__empty">
+                  Периодов начислений пока нет. Создайте первый.
+                </div>
+              ) : (
+                (payrolls || []).map((p) => {
+                  const id = p.id ?? p.uuid;
+                  return (
+                    <div
+                      key={id}
+                      className="salary-card"
+                      onClick={() => navigate(`/crm/building/salary/payroll/${id}`)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/crm/building/salary/payroll/${id}`);
+                        }
+                      }}
+                    >
+                      <div className="salary-card__main">
+                        <div className="salary-card__title">{p.title || "—"}</div>
+                        <div className="salary-card__period">
+                          {p.period_start} — {p.period_end}
+                        </div>
+                        <span className={`salary-card__status salary-card__status--${p.status || "draft"}`}>
+                          {PAYROLL_STATUS_LABELS[p.status] || PAYROLL_STATUS_LABELS.draft}
+                        </span>
+                      </div>
+                      <div
+                        className="salary-card__actions"
+                        onClick={(ev) => ev.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="salary-card__btn salary-card__btn--primary"
+                          onClick={() => navigate(`/crm/building/salary/payroll/${id}`)}
+                        >
+                          Детали
+                        </button>
+                        {p.status === "draft" && (
+                          <>
+                            <button
+                              type="button"
+                              className="salary-card__btn salary-card__btn--success"
+                              onClick={() => handleApprovePayroll(p)}
+                            >
+                              Утвердить
+                            </button>
+                            <button
+                              type="button"
+                              className="salary-card__btn salary-card__btn--danger"
+                              onClick={() => handleDeletePayroll(p)}
+                            >
+                              Удалить
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {activeTab === "payrolls" && payrollViewMode === "table" && (
             <table className="warehouse-table w-full">
               <thead>
                 <tr>
@@ -378,7 +516,6 @@ export default function BuildingSalary() {
                               display: "flex",
                               gap: 8,
                               justifyContent: "center",
-                              // flexWrap: "wrap",
                             }}
                           >
                             <button
@@ -450,6 +587,7 @@ export default function BuildingSalary() {
               }
             }}
           >
+          
             <label>
               <div className="building-page__label">Название периода *</div>
               <input
@@ -459,6 +597,35 @@ export default function BuildingSalary() {
                 placeholder="Например: ЗП за март 2026"
               />
             </label>
+            <div className="building-page__form-group" style={{ marginBottom: 12 }}>
+              <div className="building-page__label">Быстрый выбор периода</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button
+                  type="button"
+                  className="building-btn"
+                  onClick={() => applyMonthPeriod(0)}
+                >
+                  {getMonthPeriod(0).monthLabel}
+                </button>
+                <button
+                  type="button"
+                  className="building-btn"
+                  onClick={() => applyMonthPeriod(1)}
+                >
+                  {getMonthPeriod(1).monthLabel}
+                </button>
+                <button
+                  type="button"
+                  className="building-btn"
+                  onClick={() => applyMonthPeriod(2)}
+                >
+                  {getMonthPeriod(2).monthLabel}
+                </button>
+              </div>
+              <div className="building-page__muted" style={{ marginTop: 6, fontSize: 12 }}>
+                Либо укажите даты вручную ниже.
+              </div>
+            </div>
             <label>
               <div className="building-page__label">Дата начала *</div>
               <input
@@ -488,7 +655,7 @@ export default function BuildingSalary() {
               <button
                 type="submit"
                 className="building-btn building-btn--primary"
-                disabled={payrollsCreating}
+                disabled={payrollsCreating || !selectedProjectId}
                 style={{ marginLeft: 8 }}
               >
                 {payrollsCreating ? "Создание..." : "Создать"}

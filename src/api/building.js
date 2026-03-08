@@ -178,6 +178,40 @@ export const bulkStatusBuildingCashFlows = async (payload) => {
   return data;
 };
 
+/**
+ * Заявки на аванс (для кассы).
+ * GET /api/building/salary/advance-requests/
+ * Фильтры: cashbox, residential_complex, payroll
+ */
+export const getBuildingAdvanceRequests = async (params = {}) => {
+  const { data } = await api.get("/building/salary/advance-requests/", {
+    params,
+  });
+  const list = data?.results ?? data;
+  return Array.isArray(list) ? list : [];
+};
+
+/**
+ * Одобрить заявку на аванс. POST /api/building/salary/advance-requests/{id}/approve/
+ */
+export const approveBuildingAdvanceRequest = async (id, payload = {}) => {
+  const { data } = await api.post(
+    `/building/salary/advance-requests/${id}/approve/`,
+    payload,
+  );
+  return data;
+};
+
+/**
+ * Отклонить заявку на аванс. POST /api/building/salary/advance-requests/{id}/reject/
+ */
+export const rejectBuildingAdvanceRequest = async (id) => {
+  const { data } = await api.post(
+    `/building/salary/advance-requests/${id}/reject/`,
+  );
+  return data;
+};
+
 export default {
   getInstallmentPayments,
   createInstallmentPayment,
@@ -193,5 +227,8 @@ export default {
   updateBuildingCashFlow,
   deleteBuildingCashFlow,
   bulkStatusBuildingCashFlows,
+  getBuildingAdvanceRequests,
+  approveBuildingAdvanceRequest,
+  rejectBuildingAdvanceRequest,
 };
 

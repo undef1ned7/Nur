@@ -81,9 +81,10 @@ const buildingTreatiesSlice = createSlice({
         state.currentLoading = false;
         state.currentLoaded = true;
         state.currentError = null;
-        state.current = action.payload || null;
-        if (action.payload) {
-          state.list = upsertById(state.list || [], action.payload);
+        const payload = action.payload?.data ?? action.payload;
+        state.current = payload || null;
+        if (payload) {
+          state.list = upsertById(state.list || [], payload);
         }
       })
       .addCase(fetchBuildingTreatyById.rejected, (state, action) => {
