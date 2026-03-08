@@ -2,6 +2,7 @@ import BuildingLayout from "./BuildingLayout";
 import BuildingAnalytics from "./Analytics";
 import BuildingCashRegister from "./CashRegister";
 import BuildingCashRegisterTreatyDetail from "./CashRegister/TreatyDetail";
+import BuildingCashRegisterSalaryPayrollPaymentsPage from "./CashRegister/SalaryPayrollPaymentsPage";
 import BuildingClients from "./Clients";
 import BuildingClientDetail from "./Clients/Detail";
 import BuildingNotification from "./Notification";
@@ -30,6 +31,7 @@ export {
   BuildingAnalytics,
   BuildingCashRegister,
   BuildingCashRegisterTreatyDetail,
+  BuildingCashRegisterSalaryPayrollPaymentsPage,
   BuildingClients,
   BuildingClientDetail,
   BuildingNotification,

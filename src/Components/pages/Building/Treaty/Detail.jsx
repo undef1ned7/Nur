@@ -143,25 +143,73 @@ export default function BuildingTreatyDetail() {
     return found?.name || "—";
   }, [selectedProjectId, projects]);
 
-  const complexesOptions = useMemo(
-    () => (Array.isArray(projects) ? projects : []),
-    [projects],
-  );
-  const clientsOptions = useMemo(
-    () => (Array.isArray(clientsList) ? clientsList : []),
-    [clientsList],
-  );
+  const complexesOptions = useMemo(() => {
+    const list = Array.isArray(projects) ? projects : [];
+    if (!current?.residential_complex) return list;
+    const has = list.some(
+      (c) => String(c?.id ?? c?.uuid) === String(current.residential_complex),
+    );
+    if (has) return list;
+    return [
+      {
+        id: current.residential_complex,
+        uuid: current.residential_complex,
+        name: current.residential_complex_name || current.residential_complex,
+      },
+      ...list,
+    ];
+  }, [projects, current?.residential_complex, current?.residential_complex_name]);
 
-  const apartmentsOptions = useMemo(
-    () =>
-      (Array.isArray(apartmentsList) ? apartmentsList : []).filter((a) =>
+  const clientsOptions = useMemo(() => {
+    const list = Array.isArray(clientsList) ? clientsList : [];
+    if (!current?.client) return list;
+    const has = list.some(
+      (c) => String(c?.id ?? c?.uuid) === String(current.client),
+    );
+    if (has) return list;
+    return [
+      {
+        id: current.client,
+        uuid: current.client,
+        name: current.client_name || current.client,
+      },
+      ...list,
+    ];
+  }, [clientsList, current?.client, current?.client_name]);
+
+  const apartmentsOptions = useMemo(() => {
+    const base = (Array.isArray(apartmentsList) ? apartmentsList : []).filter(
+      (a) =>
         form.residential_complex
           ? String(a?.residential_complex) === String(form.residential_complex)
           : !selectedProjectId ||
             String(a?.residential_complex) === String(selectedProjectId),
-      ),
-    [apartmentsList, form.residential_complex, selectedProjectId],
-  );
+    );
+    if (!current?.apartment) return base;
+    const has = base.some(
+      (a) => String(a?.id ?? a?.uuid) === String(current.apartment),
+    );
+    if (has) return base;
+    const label = [current.apartment_number, current.apartment_floor != null ? `эт. ${current.apartment_floor}` : null]
+      .filter(Boolean)
+      .join(", ") || current.apartment;
+    return [
+      {
+        id: current.apartment,
+        uuid: current.apartment,
+        number: current.apartment_number || label,
+        floor: current.apartment_floor,
+      },
+      ...base,
+    ];
+  }, [
+    apartmentsList,
+    form.residential_complex,
+    selectedProjectId,
+    current?.apartment,
+    current?.apartment_number,
+    current?.apartment_floor,
+  ]);
 
   const isReadOnly =
     !isNew && (current?.status === "signed" || current?.status === "cancelled");
@@ -201,37 +249,38 @@ export default function BuildingTreatyDetail() {
   ]);
 
   useEffect(() => {
-    if (!isNew && current) {
-      setForm({
-        residential_complex: current?.residential_complex || "",
-        client: current?.client || "",
-        number: current?.number || "",
-        title: current?.title || "",
-        description: current?.description || "",
-        amount: current?.amount || "",
-        operation_type: current?.operation_type || "sale",
-        payment_type: current?.payment_type || "full",
-        apartment: current?.apartment || "",
-        down_payment: current?.down_payment || "",
-        payment_terms: current?.payment_terms || "",
-        status: current?.status || "draft",
-        auto_create_in_erp: current?.auto_create_in_erp ?? false,
-      });
-      setInstallments(
-        Array.isArray(current?.installments)
-          ? current.installments.map((it, idx) => ({
-              order: it.order ?? idx + 1,
-              due_date: it.due_date ?? "",
-              amount: it.amount ?? "",
-            }))
-          : [],
-      );
-      if (Array.isArray(current?.installments) && current.installments.length) {
-        setFirstInstallmentDate(current.installments[0].due_date || "");
-        setInstallmentMonths(current.installments.length);
-      }
+    if (isNew || !current) return;
+    const currentId = current?.id ?? current?.uuid;
+    if (id && currentId && String(currentId) !== String(id)) return;
+    setForm({
+      residential_complex: current?.residential_complex || "",
+      client: current?.client || "",
+      number: current?.number || "",
+      title: current?.title || "",
+      description: current?.description || "",
+      amount: current?.amount || "",
+      operation_type: current?.operation_type || "sale",
+      payment_type: current?.payment_type || "full",
+      apartment: current?.apartment || "",
+      down_payment: current?.down_payment ?? "",
+      payment_terms: current?.payment_terms || "",
+      status: current?.status || "draft",
+      auto_create_in_erp: current?.auto_create_in_erp ?? false,
+    });
+    setInstallments(
+      Array.isArray(current?.installments)
+        ? current.installments.map((it, idx) => ({
+            order: it.order ?? idx + 1,
+            due_date: it.due_date ?? "",
+            amount: it.amount ?? "",
+          }))
+        : [],
+    );
+    if (Array.isArray(current?.installments) && current.installments.length) {
+      setFirstInstallmentDate(current.installments[0].due_date || "");
+      setInstallmentMonths(current.installments.length);
     }
-  }, [isNew, current]);
+  }, [isNew, current, id]);
 
   const handleFormChange = (key) => (e) => {
     const value =

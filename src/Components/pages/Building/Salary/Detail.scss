@@ -88,19 +88,214 @@
     max-width: 480px;
   }
 
+  &__info-block {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 20px;
+    align-items: center;
+    padding: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    max-width: 100%;
+  }
+
   &__info-row {
     display: contents;
+  }
+
+  &__info-row--full {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    grid-column: 1 / -1;
   }
 
   &__info-label {
     font-size: 13px;
     font-weight: 600;
-    color: #666;
+    color: #64748b;
   }
 
   &__info-value {
     font-size: 15px;
-    color: #1a1a1a;
+    color: #1e293b;
     font-weight: 500;
+  }
+
+  &__comment-edit {
+    display: flex;
+    flex: 1;
+    min-width: 200px;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  &__comment-input {
+    flex: 1;
+    min-width: 160px;
+  }
+
+  &__section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+    margin: 16px 0 8px;
+  }
+
+  &__modal-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+  }
+}
+
+/* Переключатель вида строк начислений (карточки / таблица) */
+.salary-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.salary-view-toggle .salary-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.salary-view-toggle .salary-tab:hover {
+  background: #f9fafb;
+  border-color: #d4b800;
+}
+
+.salary-view-toggle .salary-tab--active {
+  background: #0f172a;
+  color: white;
+  border-color: #0f172a;
+}
+
+/* Карточки строк начислений */
+.salary-lines-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.salary-lines-cards__empty {
+  grid-column: 1 / -1;
+  padding: 24px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.salary-line-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.salary-line-card:hover {
+  border-color: #d4b800;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.salary-line-card__main {
+  flex: 1;
+}
+
+.salary-line-card__title {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+
+.salary-line-card__row {
+  font-size: 13px;
+  color: #374151;
+  display: flex;
+  gap: 6px;
+}
+
+.salary-line-card__label {
+  color: #6b7280;
+  min-width: 90px;
+}
+
+.salary-line-card__comment {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.salary-line-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.salary-line-card__btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.salary-line-card__btn--primary {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: white;
+}
+
+.salary-line-card__btn--primary:hover {
+  opacity: 0.9;
+}
+
+.salary-line-card__btn--danger {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: white;
+}
+
+.salary-line-card__btn--danger:hover {
+  opacity: 0.9;
+}
+
+.salary-line-card__btn--secondary:hover {
+  background: #f3f4f6;
+}
+
+@media (max-width: 767px) {
+  .salary-lines-cards {
+    grid-template-columns: 1fr;
   }
 }

@@ -171,10 +171,16 @@ export default function BuildingProcurement() {
         }),
       );
       if (res.meta.requestStatus === "fulfilled") {
+        const created = res.payload;
+        const newId = created?.id ?? created?.uuid;
         setCreateForm(CREATE_INITIAL);
         setOpenCreate(false);
         alert("Закупка успешно создана");
-        setPage(1);
+        if (newId) {
+          navigate(`/crm/building/procurement/${newId}`);
+        } else {
+          setPage(1);
+        }
       } else {
         alert(
           validateResErrors(

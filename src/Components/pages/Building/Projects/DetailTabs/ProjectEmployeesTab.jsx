@@ -125,13 +125,13 @@ export default function ProjectEmployeesTab({ residentialId }) {
       )}
       {!membersLoading && !membersError && (
         <>
-          <div style={{ marginBottom: 8 }}>
+          <div className="building-project-employees">
             {members.length === 0 ? (
-              <div className="building-page__muted">
+              <div className="building-project-employees__empty">
                 Пока никто не назначен на этот ЖК.
               </div>
             ) : (
-              <ul className="building-page__list">
+              <ul className="building-project-employees__list">
                 {members.map((m) => {
                   const emp =
                     employees.find(
@@ -147,19 +147,13 @@ export default function ProjectEmployeesTab({ residentialId }) {
                     m.user_display ||
                     "Сотрудник";
                   return (
-                    <li
-                      key={m.user}
-                      className="building-page__list-item"
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <span>{fullName}</span>
+                    <li key={m.user} className="building-project-employees__item">
+                      <span className="building-project-employees__name">
+                        {fullName}
+                      </span>
                       <button
                         type="button"
-                        className="building-btn"
+                        className="building-project-employees__remove"
                         onClick={() => handleRemove(m)}
                       >
                         Снять
@@ -170,7 +164,7 @@ export default function ProjectEmployeesTab({ residentialId }) {
               </ul>
             )}
           </div>
-          <form className="building-page" onSubmit={handleAdd}>
+          <form className="building-page building-project-employees__form" onSubmit={handleAdd}>
             <label>
               <div className="building-page__label">
                 Назначить сотрудника на ЖК
@@ -198,10 +192,7 @@ export default function ProjectEmployeesTab({ residentialId }) {
                 })}
               </select>
             </label>
-            <div
-              className="building-page__actions"
-              style={{ marginTop: 8 }}
-            >
+            <div className="building-project-employees__form-actions">
               <button
                 type="submit"
                 className="building-btn building-btn--primary"

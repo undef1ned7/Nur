@@ -48,3 +48,142 @@
     border-color: var(--primary);
   }
 }
+
+.salary-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Карточки периодов */
+.salary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.salary-cards__loading,
+.salary-cards__error,
+.salary-cards__empty {
+  grid-column: 1 / -1;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.salary-cards__error {
+  color: #dc2626;
+}
+
+.salary-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  }
+}
+
+.salary-card__main {
+  flex: 1;
+}
+
+.salary-card__title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.salary-card__period {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.salary-card__status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+
+  &--draft {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  &--approved {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  &--paid {
+    background: #e0e7ff;
+    color: #3730a3;
+  }
+}
+
+.salary-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.salary-card__btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+
+  &--primary {
+    border-color: var(--text);
+    background: var(--text);
+    color: white;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &--success {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #15803d;
+
+    &:hover {
+      background: rgba(34, 197, 94, 0.2);
+    }
+  }
+
+  &--danger {
+    border-color: rgba(220, 53, 69, 0.4);
+    color: #b02a37;
+    background: rgba(220, 53, 69, 0.05);
+
+    &:hover {
+      background: rgba(220, 53, 69, 0.1);
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .salary-cards {
+    grid-template-columns: 1fr;
+  }
+}

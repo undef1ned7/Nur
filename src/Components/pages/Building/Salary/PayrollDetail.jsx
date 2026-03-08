@@ -11,11 +11,13 @@ import {
   fetchBuildingPayrolls,
   fetchBuildingPayrollLines,
   createBuildingPayrollLine,
+  updateBuildingPayrollLine,
   approveBuildingPayroll,
   createBuildingPayrollLineAdjustment,
   deleteBuildingPayrollAdjustment,
+  fetchBuildingPayrollLineAdjustments,
   fetchBuildingPayrollLinePayments,
-  createBuildingPayrollLinePayment,
+  deleteBuildingPayrollLine,
 } from "../../../../store/creators/building/salaryCreators";
 import { fetchBuildingProjects } from "@/store/creators/building/projectsCreators";
 import Modal from "@/Components/common/Modal/Modal";
@@ -35,6 +37,7 @@ export default function BuildingSalaryPayrollDetail() {
     linesByPayrollId,
     payrollsLoading,
     paymentsByLineId,
+    adjustmentsByLineId,
   } = useBuildingSalary();
   const { items: residentialComplexes, selectedProjectId } =
     useBuildingProjects();
@@ -54,9 +57,12 @@ export default function BuildingSalaryPayrollDetail() {
   const [adjComment, setAdjComment] = useState("");
 
   const [activePaymentsLineId, setActivePaymentsLineId] = useState(null);
-  const [payAmount, setPayAmount] = useState("");
-  const [payShift, setPayShift] = useState("");
   const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
+  const [detailLineId, setDetailLineId] = useState(null);
+  const [detailLineCommentEdit, setDetailLineCommentEdit] = useState("");
+  const [linesViewMode, setLinesViewMode] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "cards" : "table",
+  );
 
   useEffect(() => {
     dispatch(fetchBuildingSalaryEmployees());
@@ -69,6 +75,13 @@ export default function BuildingSalaryPayrollDetail() {
       dispatch(fetchBuildingPayrollLines(id));
     }
   }, [dispatch, id]);
+
+  useEffect(() => {
+    if (detailLineId) {
+      dispatch(fetchBuildingPayrollLineAdjustments(detailLineId));
+      dispatch(fetchBuildingPayrollLinePayments(detailLineId));
+    }
+  }, [dispatch, detailLineId]);
 
   useEffect(() => {
     if (!newLineResidentialComplex && selectedProjectId) {
@@ -101,6 +114,17 @@ export default function BuildingSalaryPayrollDetail() {
       }
     : { list: [], loading: false, error: null };
 
+  const detailLine = useMemo(() => {
+    if (!detailLineId || !payrollLinesBucket?.list) return null;
+    return payrollLinesBucket.list.find(
+      (l) => String(l?.id ?? l?.uuid) === String(detailLineId),
+    ) ?? null;
+  }, [detailLineId, payrollLinesBucket?.list]);
+
+  useEffect(() => {
+    setDetailLineCommentEdit(detailLine?.comment ?? "");
+  }, [detailLineId, detailLine?.comment]);
+
   const employeesById = useMemo(() => {
     const map = {};
     (employees || []).forEach((e) => {
@@ -114,10 +138,29 @@ export default function BuildingSalaryPayrollDetail() {
   const openPayments = (lineId) => {
     if (!lineId) return;
     setActivePaymentsLineId(lineId);
-    setPayAmount("");
-    setPayShift("");
     setIsPaymentsModalOpen(true);
     dispatch(fetchBuildingPayrollLinePayments(lineId));
+  };
+
+  const handleDeleteLine = (lineId) => {
+    if (!id || !lineId) return;
+    confirm("Удалить строку начисления?", async (ok) => {
+      if (!ok) return;
+      const res = await dispatch(
+        deleteBuildingPayrollLine({ lineId, payrollId: id }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        if (detailLineId === lineId) setDetailLineId(null);
+      } else {
+        alert(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось удалить строку",
+          ),
+          true,
+        );
+      }
+    });
   };
 
   const paymentsBucket = activePaymentsLineId
@@ -127,20 +170,23 @@ export default function BuildingSalaryPayrollDetail() {
         error: null,
       }
     : { list: [], loading: false, error: null };
-  const handleApprove = async () => {
+  const handleApprove = () => {
     if (!id || !payroll) return;
-    const res = await dispatch(approveBuildingPayroll(id));
-    if (res.meta.requestStatus === "fulfilled") {
-      alert("Период утвержден");
-    } else {
-      alert(
-        validateResErrors(
-          res.payload || res.error,
-          "Не удалось утвердить период",
-        ),
-        true,
-      );
-    }
+    confirm("Утвердить период начислений? После утверждения можно будет создавать выплаты.", async (ok) => {
+      if (!ok) return;
+      const res = await dispatch(approveBuildingPayroll(id));
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Период утвержден");
+      } else {
+        alert(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось утвердить период",
+          ),
+          true,
+        );
+      }
+    });
   };
 
   const handleCreateLine = async (e) => {
@@ -282,15 +328,33 @@ export default function BuildingSalaryPayrollDetail() {
                     Строки начислений
                   </h3>
                 </div>
-                {id && payroll?.status === "draft" && (
-                  <button
-                    type="button"
-                    className="add-product-page__submit-btn"
-                    onClick={() => setIsCreateLineModalOpen(true)}
-                  >
-                    + Добавить строку
-                  </button>
-                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <div className="salary-view-toggle">
+                    <button
+                      type="button"
+                      className={`salary-tab${linesViewMode === "cards" ? " salary-tab--active" : ""}`}
+                      onClick={() => setLinesViewMode("cards")}
+                    >
+                      Карточки
+                    </button>
+                    <button
+                      type="button"
+                      className={`salary-tab${linesViewMode === "table" ? " salary-tab--active" : ""}`}
+                      onClick={() => setLinesViewMode("table")}
+                    >
+                      Таблица
+                    </button>
+                  </div>
+                  {id && payroll?.status === "draft" && (
+                    <button
+                      type="button"
+                      className="add-product-page__submit-btn"
+                      onClick={() => setIsCreateLineModalOpen(true)}
+                    >
+                      + Добавить строку
+                    </button>
+                  )}
+                </div>
               </div>
               {!id && (
                 <div className="salary-detail__muted">
@@ -315,7 +379,95 @@ export default function BuildingSalaryPayrollDetail() {
                   )}
                 </div>
               )}
-              {id && !payrollLinesBucket.loading && (
+              {id && !payrollLinesBucket.loading && linesViewMode === "cards" && (
+                <div className="salary-lines-cards">
+                  {(!payrollLinesBucket.list || payrollLinesBucket.list.length === 0) ? (
+                    <div className="salary-lines-cards__empty">
+                      Строки начислений пока не добавлены.
+                    </div>
+                  ) : (
+                    (payrollLinesBucket.list || []).map((line) => {
+                      const lid = line.id ?? line.uuid;
+                      const emp = employeesById[String(line.employee)] || null;
+                      const isApproved = payroll?.status === "approved";
+                      const isDraft = payroll?.status === "draft";
+                      return (
+                        <div
+                          key={lid}
+                          className="salary-line-card"
+                          onClick={() => setDetailLineId(lid)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setDetailLineId(lid);
+                            }
+                          }}
+                        >
+                          <div className="salary-line-card__main">
+                            <div className="salary-line-card__title">
+                              {emp?.display || emp?.name || "—"}
+                            </div>
+                            <div className="salary-line-card__row">
+                              <span className="salary-line-card__label">База:</span>
+                              <span>{line.base_amount ?? "—"}</span>
+                            </div>
+                            <div className="salary-line-card__row">
+                              <span className="salary-line-card__label">К выплате:</span>
+                              <span>{line.net_to_pay ?? "—"}</span>
+                            </div>
+                            <div className="salary-line-card__row">
+                              <span className="salary-line-card__label">Выплачено:</span>
+                              <span>{line.paid_total ?? "—"}</span>
+                            </div>
+                            {line.comment && (
+                              <div className="salary-line-card__comment">
+                                {line.comment}
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            className="salary-line-card__actions"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              className="salary-line-card__btn salary-line-card__btn--secondary"
+                              onClick={() => setDetailLineId(lid)}
+                            >
+                              Подробнее
+                            </button>
+                            {isApproved && (
+                              <button
+                                type="button"
+                                className="salary-line-card__btn salary-line-card__btn--primary"
+                                onClick={() => openPayments(lid)}
+                              >
+                                Выплаты
+                              </button>
+                            )}
+                            {isDraft && (
+                              <button
+                                type="button"
+                                className="salary-line-card__btn salary-line-card__btn--danger"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteLine(lid);
+                                }}
+                              >
+                                Удалить
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {id && !payrollLinesBucket.loading && linesViewMode === "table" && (
                 <div className="salary-detail__table-wrap">
                   <table className="salary-detail__table">
                     <thead>
@@ -325,6 +477,7 @@ export default function BuildingSalaryPayrollDetail() {
                         <th>К выплате</th>
                         <th>Выплачено</th>
                         <th>Комментарий</th>
+                        <th style={{ width: 200 }}>Действия</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -332,20 +485,56 @@ export default function BuildingSalaryPayrollDetail() {
                         const lid = line.id ?? line.uuid;
                         const emp =
                           employeesById[String(line.employee)] || null;
+                        const isApproved = payroll?.status === "approved";
+                        const isDraft = payroll?.status === "draft";
                         return (
-                          <tr
-                            key={lid}
-                            onClick={() =>
-                              navigate(
-                                `/crm/building/salary/payroll/${id}/line/${lid}`,
-                              )
-                            }
-                          >
+                          <tr key={lid}>
                             <td>{emp?.display || emp?.name || "—"}</td>
                             <td>{line.base_amount}</td>
                             <td>{line.net_to_pay ?? "—"}</td>
                             <td>{line.paid_total ?? "—"}</td>
                             <td>{line.comment || ""}</td>
+                            <td>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                <button
+                                  type="button"
+                                  className="building-btn"
+                                  style={{ padding: "6px 12px", fontSize: 13 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDetailLineId(lid);
+                                  }}
+                                >
+                                  Подробнее
+                                </button>
+                                {isApproved && (
+                                  <button
+                                    type="button"
+                                    className="building-btn building-btn--primary"
+                                    style={{ padding: "6px 12px", fontSize: 13 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openPayments(lid);
+                                    }}
+                                  >
+                                    Выплаты
+                                  </button>
+                                )}
+                                {isDraft && (
+                                  <button
+                                    type="button"
+                                    className="building-btn building-btn--danger"
+                                    style={{ padding: "6px 12px", fontSize: 13 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteLine(lid);
+                                    }}
+                                  >
+                                    Удалить
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
@@ -353,7 +542,7 @@ export default function BuildingSalaryPayrollDetail() {
                         payrollLinesBucket.list.length === 0) && (
                         <tr>
                           <td
-                            colSpan={5}
+                            colSpan={6}
                             className="salary-detail__muted"
                             style={{ textAlign: "center", padding: 24 }}
                           >
@@ -376,139 +565,12 @@ export default function BuildingSalaryPayrollDetail() {
           onClose={() => {
             setIsPaymentsModalOpen(false);
             setActivePaymentsLineId(null);
-            setPayAmount("");
-            setPayShift("");
           }}
           title="Выплаты по строке"
         >
           {(() => {
-            const line =
-              (payrollLinesBucket.list || []).find(
-                (l) => String(l.id ?? l.uuid) === String(activePaymentsLineId),
-              ) || null;
-            const rcId = line?.residential_complex;
-            const rc =
-              (residentialComplexes || []).find(
-                (p) => String(p.id ?? p.uuid) === String(rcId),
-              ) || null;
-            const hasSalaryCashbox = !!rc?.salary_cashbox;
             return (
               <div className="add-product-page add-product-page--modal-form">
-                {!hasSalaryCashbox && rcId && (
-                  <div
-                    className="add-product-page__error"
-                    style={{
-                      marginBottom: 12,
-                      padding: 12,
-                      borderLeft: "4px solid #f97316",
-                      background: "#fff8f0",
-                    }}
-                  >
-                    <div
-                      className="add-product-page__label"
-                      style={{ marginBottom: 4 }}
-                    >
-                      Внимание
-                    </div>
-                    <p style={{ margin: "0 0 8px 0", fontSize: 14 }}>
-                      Для ЖК <b>{rc?.name || rcId}</b> не настроена касса для
-                      выплат зарплаты. Укажите поле <b>Касса для ЗП по ЖК</b> в
-                      настройках ЖК, чтобы создавать выплаты по этой строке.
-                    </p>
-                    <button
-                      type="button"
-                      className="add-product-page__submit-btn"
-                      onClick={() => {
-                        setIsPaymentsModalOpen(false);
-                        setActivePaymentsLineId(null);
-                        navigate(
-                          `/crm/building/projects/${rcId}?from=salary-payroll&payrollId=${id}`,
-                        );
-                      }}
-                    >
-                      Откройте настройки ЖК
-                    </button>
-                  </div>
-                )}
-
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!activePaymentsLineId) return;
-                    if (!payAmount) {
-                      alert("Укажите сумму выплаты", true);
-                      return;
-                    }
-                    confirm(
-                      `Создать выплату на сумму ${payAmount}?`,
-                      async (ok) => {
-                        if (!ok) return;
-                        const payload = {
-                          amount: String(payAmount),
-                        };
-                        const res = await dispatch(
-                          createBuildingPayrollLinePayment({
-                            lineId: activePaymentsLineId,
-                            payload,
-                          }),
-                        );
-                        if (res.meta.requestStatus === "fulfilled") {
-                          setPayAmount("");
-                          dispatch(
-                            fetchBuildingPayrollLinePayments(
-                              activePaymentsLineId,
-                            ),
-                          );
-                        } else {
-                          alert(
-                            validateResErrors(
-                              res.payload || res.error,
-                              "Не удалось создать выплату",
-                            ),
-                            true,
-                          );
-                        }
-                      },
-                    );
-                  }}
-                  style={{ marginBottom: 12 }}
-                >
-                  <div className="add-product-page__form-group">
-                    <label className="add-product-page__label">Сумма *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="add-product-page__input"
-                      value={payAmount}
-                      onChange={(e) => setPayAmount(e.target.value)}
-                      placeholder="10000.00"
-                      disabled={!hasSalaryCashbox}
-                    />
-                  </div>
-                  <div className="add-product-page__actions">
-                    <button
-                      type="button"
-                      className="add-product-page__cancel-btn"
-                      onClick={() => {
-                        setIsPaymentsModalOpen(false);
-                        setActivePaymentsLineId(null);
-                        setPayAmount("");
-                        setPayShift("");
-                      }}
-                    >
-                      Отмена
-                    </button>
-                    <button
-                      type="submit"
-                      className="add-product-page__submit-btn"
-                      disabled={!hasSalaryCashbox}
-                    >
-                      Создать выплату
-                    </button>
-                  </div>
-                </form>
-
                 {paymentsBucket.loading && (
                   <div className="salary-detail__muted">Загрузка выплат...</div>
                 )}
@@ -531,8 +593,6 @@ export default function BuildingSalaryPayrollDetail() {
                       <thead>
                         <tr>
                           <th>Сумма</th>
-                          <th>Касса</th>
-                          <th>Смена</th>
                           <th>Дата</th>
                         </tr>
                       </thead>
@@ -540,15 +600,13 @@ export default function BuildingSalaryPayrollDetail() {
                         {(paymentsBucket.list || []).map((pmt) => (
                           <tr key={pmt.id ?? pmt.uuid}>
                             <td>{pmt.amount}</td>
-                            <td>{pmt.cashbox_display || pmt.cashbox || "—"}</td>
-                            <td>{pmt.shift || "—"}</td>
-                            <td>{pmt.paid_at || "—"}</td>
+                            <td>{pmt.paid_at ? new Date(pmt.paid_at).toLocaleString() : "—"}</td>
                           </tr>
                         ))}
                         {(!paymentsBucket.list ||
                           paymentsBucket.list.length === 0) && (
                           <tr>
-                            <td colSpan={4} style={{ textAlign: "center" }}>
+                            <td colSpan={2} style={{ textAlign: "center" }}>
                               Выплаты по этой строке ещё не создавались.
                             </td>
                           </tr>
@@ -563,10 +621,230 @@ export default function BuildingSalaryPayrollDetail() {
         </Modal>
       )}
 
+      {detailLineId && (
+        <Modal
+          wrapperId="payroll-line-detail-modal"
+          open={!!detailLineId}
+          onClose={() => setDetailLineId(null)}
+          title="Строка начисления"
+        >
+          {(() => {
+            const line =
+              (payrollLinesBucket.list || []).find(
+                (l) => String(l?.id ?? l?.uuid) === String(detailLineId),
+              ) ?? null;
+            const emp = line ? employeesById[String(line.employee)] : null;
+            const empName =
+              emp?.display ||
+              [emp?.first_name, emp?.last_name].filter(Boolean).join(" ") ||
+              emp?.name ||
+              line?.employee_display ||
+              "—";
+            const adjBucket = detailLineId
+              ? adjustmentsByLineId?.[String(detailLineId)] ?? { list: [], loading: false, error: null }
+              : { list: [], loading: false, error: null };
+            const payBucket = detailLineId
+              ? paymentsByLineId?.[String(detailLineId)] ?? { list: [], loading: false, error: null }
+              : { list: [], loading: false, error: null };
+            const adjustments = Array.isArray(adjBucket.list) ? adjBucket.list : [];
+            const payments = Array.isArray(payBucket.list) ? payBucket.list : [];
+            const remaining =
+              line != null && line.net_to_pay != null && line.paid_total != null
+                ? Math.max(0, Number(line.net_to_pay) - Number(line.paid_total))
+                : null;
+            return (
+              <div className="add-product-page add-product-page--modal-form">
+                {!line ? (
+                  <p className="salary-detail__muted">Строка не найдена.</p>
+                ) : (
+                  <>
+                    <div className="salary-detail__info-block">
+                      <div className="salary-detail__info-row">
+                        <span className="salary-detail__info-label">Сотрудник</span>
+                        <span className="salary-detail__info-value">
+                          {empName}
+                        </span>
+                      </div>
+                      <div className="salary-detail__info-row">
+                        <span className="salary-detail__info-label">База</span>
+                        <span className="salary-detail__info-value">{line.base_amount ?? "—"}</span>
+                      </div>
+                      <div className="salary-detail__info-row">
+                        <span className="salary-detail__info-label">Начислено к выплате</span>
+                        <span className="salary-detail__info-value">{line.net_to_pay ?? "—"}</span>
+                      </div>
+                      <div className="salary-detail__info-row">
+                        <span className="salary-detail__info-label">Выплачено</span>
+                        <span className="salary-detail__info-value">{line.paid_total ?? "—"}</span>
+                      </div>
+                      <div className="salary-detail__info-row">
+                        <span className="salary-detail__info-label">Остаток к выплате</span>
+                        <span className="salary-detail__info-value">
+                          {remaining != null ? remaining.toFixed(2) : "—"}
+                        </span>
+                      </div>
+                      <div className="salary-detail__info-row salary-detail__info-row--full">
+                        <span className="salary-detail__info-label">Комментарий</span>
+                        <div className="salary-detail__comment-edit">
+                          <input
+                            type="text"
+                            className="add-product-page__input salary-detail__comment-input"
+                            value={detailLineCommentEdit}
+                            onChange={(e) => setDetailLineCommentEdit(e.target.value)}
+                            placeholder="Комментарий"
+                          />
+                          <button
+                            type="button"
+                            className="add-product-page__submit-btn"
+                            style={{ padding: "6px 14px", fontSize: 13 }}
+                            onClick={async () => {
+                              if (!detailLineId) return;
+                              const comment = String(detailLineCommentEdit ?? "").trim();
+                              const res = await dispatch(
+                                updateBuildingPayrollLine({
+                                  lineId: detailLineId,
+                                  payload: { comment },
+                                }),
+                              );
+                              if (res.meta.requestStatus === "fulfilled") {
+                                dispatch(fetchBuildingPayrollLines(id));
+                              } else {
+                                alert(
+                                  validateResErrors(
+                                    res.payload || res.error,
+                                    "Не удалось сохранить комментарий",
+                                  ),
+                                  true,
+                                );
+                              }
+                            }}
+                          >
+                            Сохранить
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <h4 className="salary-detail__section-title">
+                      Корректировки
+                    </h4>
+                    {adjBucket.loading && (
+                      <div className="salary-detail__muted">Загрузка...</div>
+                    )}
+                    {!adjBucket.loading && (
+                      <div className="salary-detail__table-wrap" style={{ marginBottom: 16 }}>
+                        <table className="salary-detail__table">
+                          <thead>
+                            <tr>
+                              <th>Тип</th>
+                              <th>Сумма</th>
+                              <th>Комментарий</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {adjustments.map((adj) => (
+                              <tr key={adj.id ?? adj.uuid}>
+                                <td>{ADJUSTMENT_TYPE_LABELS[adj.type] || adj.type || "—"}</td>
+                                <td>{adj.amount}</td>
+                                <td>{adj.comment || ""}</td>
+                              </tr>
+                            ))}
+                            {adjustments.length === 0 && (
+                              <tr>
+                                <td colSpan={3} style={{ textAlign: "center" }}>
+                                  Нет корректировок
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <h4 className="salary-detail__section-title">
+                      Выплаты
+                    </h4>
+                    {payBucket.loading && (
+                      <div className="salary-detail__muted">Загрузка...</div>
+                    )}
+                    {!payBucket.loading && (
+                      <div className="salary-detail__table-wrap">
+                        <table className="salary-detail__table">
+                          <thead>
+                            <tr>
+                              <th>Сумма</th>
+                              <th>Дата</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {payments.map((pmt) => (
+                              <tr key={pmt.id ?? pmt.uuid}>
+                                <td>{pmt.amount}</td>
+                                <td>{pmt.paid_at ? new Date(pmt.paid_at).toLocaleString() : "—"}</td>
+                              </tr>
+                            ))}
+                            {payments.length === 0 && (
+                              <tr>
+                                <td colSpan={2} style={{ textAlign: "center" }}>
+                                  Выплат пока нет
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="salary-detail__modal-actions">
+                      {payroll?.status === "draft" && (
+                        <button
+                          type="button"
+                          className="add-product-page__submit-btn"
+                          onClick={() => {
+                            setExpandedLineId(detailLineId);
+                            setDetailLineId(null);
+                            setIsAdjustmentsModalOpen(true);
+                          }}
+                        >
+                          Добавить корректировку
+                        </button>
+                      )}
+                      {payroll?.status === "approved" && (
+                        <button
+                          type="button"
+                          className="add-product-page__submit-btn"
+                          onClick={() => {
+                            setDetailLineId(null);
+                            openPayments(detailLineId);
+                          }}
+                        >
+                          Выплаты
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="add-product-page__cancel-btn"
+                        onClick={() => setDetailLineId(null)}
+                      >
+                        Закрыть
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+        </Modal>
+      )}
+
       {isAdjustmentsModalOpen && expandedLineId && (
         <Modal
           open={isAdjustmentsModalOpen}
-          onClose={() => setIsAdjustmentsModalOpen(false)}
+          onClose={() => {
+            setIsAdjustmentsModalOpen(false);
+            setDetailLineId(expandedLineId);
+            setExpandedLineId(null);
+          }}
           title="Корректировки строки"
         >
           {(() => {
@@ -574,9 +852,8 @@ export default function BuildingSalaryPayrollDetail() {
               (payrollLinesBucket.list || []).find(
                 (l) => String(l.id ?? l.uuid) === String(expandedLineId),
               ) || null;
-            const adjustments = Array.isArray(line?.adjustments)
-              ? line.adjustments
-              : [];
+            const adjBucket = adjustmentsByLineId?.[String(expandedLineId)] ?? { list: [] };
+            const adjustments = Array.isArray(adjBucket.list) ? adjBucket.list : [];
             return (
               <div className="add-product-page add-product-page--modal-form">
                 <p
@@ -599,6 +876,22 @@ export default function BuildingSalaryPayrollDetail() {
                       amount: String(adjAmount),
                       comment: adjComment || "",
                     };
+                    if (adjType === "advance") {
+                      const rcId = line?.residential_complex ?? selectedProjectId;
+                      const rc = (residentialComplexes || []).find(
+                        (p) => String(p.id ?? p.uuid) === String(rcId),
+                      );
+                      const cashboxId = rc?.salary_cashbox;
+                      if (!cashboxId) {
+                        alert(
+                          "Для аванса укажите кассу. Настройте кассу для ЗП в карточке ЖК (вкладка «Касса»).",
+                          true,
+                        );
+                        return;
+                      }
+                      payload.cashbox = cashboxId;
+                      payload.paid_at = new Date().toISOString();
+                    }
                     const res = await dispatch(
                       createBuildingPayrollLineAdjustment({
                         lineId: expandedLineId,
@@ -608,7 +901,11 @@ export default function BuildingSalaryPayrollDetail() {
                     if (res.meta.requestStatus === "fulfilled") {
                       setAdjAmount("");
                       setAdjComment("");
+                      dispatch(fetchBuildingPayrollLineAdjustments(expandedLineId));
                       dispatch(fetchBuildingPayrollLines(id));
+                      setIsAdjustmentsModalOpen(false);
+                      setDetailLineId(expandedLineId);
+                      setExpandedLineId(null);
                     } else {
                       alert(
                         validateResErrors(
@@ -656,7 +953,18 @@ export default function BuildingSalaryPayrollDetail() {
                       placeholder="Комментарий"
                     />
                   </div>
-                  <div className="add-product-page__actions">
+                  <div className="add-product-page__actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="add-product-page__cancel-btn"
+                      onClick={() => {
+                        setIsAdjustmentsModalOpen(false);
+                        setDetailLineId(expandedLineId);
+                        setExpandedLineId(null);
+                      }}
+                    >
+                      Отмена
+                    </button>
                     <button
                       type="submit"
                       className="add-product-page__submit-btn"

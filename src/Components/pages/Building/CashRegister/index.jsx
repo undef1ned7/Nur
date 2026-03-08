@@ -1,15 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import ProcurementsTab from "./ProcurementsTab";
 import InstallmentsTab from "./InstallmentsTab";
+import SalaryPaymentsTab from "./SalaryPaymentsTab";
+import AdvanceRequestsTab from "./AdvanceRequestsTab";
 import "./CashRegister.scss";
 
 const TAB_PROCUREMENTS = "procurements";
 const TAB_INSTALLMENTS = "installments";
+const TAB_ADVANCES = "advances";
+const TAB_SALARY = "salary";
+
+const SUBTITLES = {
+  [TAB_PROCUREMENTS]:
+    "Закупки со статусом «На согласовании кассы» для выбранного ЖК.",
+  [TAB_INSTALLMENTS]:
+    "Подписанные договора на рассрочку для приёма платежей.",
+  [TAB_ADVANCES]:
+    "Заявки на аванс сотрудникам. Одобрение или отклонение.",
+  [TAB_SALARY]:
+    "Утверждённые периоды зарплаты по выбранному ЖК — переход к выплатам сотрудникам.",
+};
 
 export default function BuildingCashRegister() {
+  const location = useLocation();
   const { selectedProjectId } = useBuildingProjects();
   const [activeTab, setActiveTab] = useState(TAB_PROCUREMENTS);
+
+  useEffect(() => {
+    if (location.state?.tab === "salary") {
+      setActiveTab(TAB_SALARY);
+    }
+  }, [location.state?.tab]);
 
   return (
     <div className="warehouse-page">
@@ -19,9 +42,7 @@ export default function BuildingCashRegister() {
           <div className="warehouse-header__title-section">
             <h1 className="warehouse-header__title">Касса</h1>
             <p className="warehouse-header__subtitle">
-              {activeTab === TAB_PROCUREMENTS
-                ? "Закупки со статусом «На согласовании кассы» для выбранного ЖК."
-                : "Подписанные договора на рассрочку для приёма платежей."}
+              {SUBTITLES[activeTab] ?? ""}
             </p>
           </div>
         </div>
@@ -29,7 +50,7 @@ export default function BuildingCashRegister() {
 
       <div
         className="cash-register-tabs"
-        style={{ display: "flex", gap: 8, marginBottom: 16 }}
+        style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}
       >
         <button
           type="button"
@@ -65,6 +86,40 @@ export default function BuildingCashRegister() {
         >
           Выплаты по рассрочкам
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab(TAB_ADVANCES)}
+          className={
+            activeTab === TAB_ADVANCES
+              ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
+              : "warehouse-view-btn bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }
+          style={{
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: "1px solid",
+            fontWeight: 500,
+          }}
+        >
+          Заявки на аванс
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab(TAB_SALARY)}
+          className={
+            activeTab === TAB_SALARY
+              ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
+              : "warehouse-view-btn bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }
+          style={{
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: "1px solid",
+            fontWeight: 500,
+          }}
+        >
+          Выплаты зарплат
+        </button>
       </div>
 
       {activeTab === TAB_PROCUREMENTS && (
@@ -72,6 +127,12 @@ export default function BuildingCashRegister() {
       )}
       {activeTab === TAB_INSTALLMENTS && (
         <InstallmentsTab selectedProjectId={selectedProjectId} />
+      )}
+      {activeTab === TAB_ADVANCES && (
+        <AdvanceRequestsTab selectedProjectId={selectedProjectId} />
+      )}
+      {activeTab === TAB_SALARY && (
+        <SalaryPaymentsTab selectedProjectId={selectedProjectId} />
       )}
     </div>
   );

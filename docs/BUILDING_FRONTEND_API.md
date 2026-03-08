@@ -381,7 +381,11 @@
 ### Сотрудники
 
 - `GET /salary/employees/`
-- `PATCH /salary/employees/{user_id}/compensation/` — оклад: `salary_type`, `base_salary`, `is_active`, `notes`
+- `PATCH /salary/employees/{user_id}/compensation/` — настройки ЗП: `salary_type`, `base_salary`, `sale_commission_type`, `sale_commission_value`, `is_active`, `notes`
+
+**Типы оплаты (`salary_type`):** `monthly` (оклад месяц), `monthly_pct` (оклад + % от продаж), `daily` (ставка день), `hourly` (ставка час).
+
+**Оклад + % (`monthly_pct`):** при выборе указывайте `sale_commission_type` = `percent` и `sale_commission_value` (например `2.5` для 2.5%). При подписании договора продажи автоматически создаётся премия в строке начисления ответственного.
 
 ### Периоды
 
@@ -398,6 +402,7 @@
 
 ### Корректировки
 
+- `GET /salary/payroll-lines/{id}/adjustments/` — список корректировок
 - `POST /salary/payroll-lines/{id}/adjustments/` — типы: `bonus`, `deduction`, `advance`
 - `DELETE /salary/payroll-adjustments/{id}/`
 
@@ -435,6 +440,16 @@
 ### Мои начисления
 
 - `GET /salary/my/lines/` — сотрудник видит только свои строки
+
+### Заявки на аванс (для кассы)
+
+Оператор кассы (`can_view_building_cash_register`) просматривает и обрабатывает заявки на аванс.
+
+- `GET /salary/advance-requests/` — список заявок со статусом `pending`
+  - Фильтры: `?cashbox=uuid`, `?residential_complex=uuid`, `?payroll=uuid`
+- `POST /salary/advance-requests/{id}/approve/` — одобрить (сумма снимается с net_to_pay, движение кассы проводится)
+  - Тело (опционально): `{"paid_at": "2026-03-10T14:00:00+06:00"}`
+- `POST /salary/advance-requests/{id}/reject/` — отклонить
 
 ---
 
@@ -482,10 +497,13 @@
 | | POST | `/salary/payrolls/{id}/approve/` |
 | | GET/POST | `/salary/payrolls/{id}/lines/` |
 | | GET/PATCH/DELETE | `/salary/payroll-lines/{id}/` |
-| | POST | `/salary/payroll-lines/{id}/adjustments/` |
+| | GET/POST | `/salary/payroll-lines/{id}/adjustments/` |
 | | DELETE | `/salary/payroll-adjustments/{id}/` |
 | | GET/POST | `/salary/payroll-lines/{id}/payments/` |
 | | GET | `/salary/my/lines/` |
+| | GET | `/salary/advance-requests/` |
+| | POST | `/salary/advance-requests/{id}/approve/` |
+| | POST | `/salary/advance-requests/{id}/reject/` |
 | **Задачи** | GET/POST | `/tasks/` |
 | | GET/PATCH/DELETE | `/tasks/{id}/` |
 | | POST | `/tasks/{id}/checklist-items/` |
