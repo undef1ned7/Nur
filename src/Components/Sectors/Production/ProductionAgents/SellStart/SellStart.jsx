@@ -65,11 +65,11 @@ const DOTS_PER_LINE = Number(localStorage.getItem("escpos_dpl") || 576);
 const FONT = (localStorage.getItem("escpos_font") || "B").toUpperCase();
 const CHAR_DOT_WIDTH = FONT === "B" ? 9 : 12;
 const LINE_DOT_HEIGHT = Number(
-  localStorage.getItem("escpos_line") || (FONT === "B" ? 22 : 24)
+  localStorage.getItem("escpos_line") || (FONT === "B" ? 22 : 24),
 );
 const CHARS_PER_LINE = Number(
   localStorage.getItem("escpos_cpl") ||
-    Math.floor(DOTS_PER_LINE / CHAR_DOT_WIDTH)
+    Math.floor(DOTS_PER_LINE / CHAR_DOT_WIDTH),
 );
 
 // Быстрые тюнеры (на всякий)
@@ -133,8 +133,8 @@ const getEncoder = (n) =>
   CP866_CODES.has(n)
     ? encodeCP866
     : CP1251_CODES.has(n)
-    ? encodeCP1251
-    : encodeCP1251;
+      ? encodeCP1251
+      : encodeCP1251;
 
 /* ---------- PDF → растер ---------- */
 async function ensurePdfJs() {
@@ -202,7 +202,7 @@ function buildEscPosForRaster(raster, bytesPerLine, h) {
       alignLeft.length +
       header.length +
       raster.length +
-      feedAndCut.length
+      feedAndCut.length,
   );
   let o = 0;
   total.set(init, o);
@@ -244,7 +244,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
 
   const subtotal = items.reduce(
     (s, it) => s + Number(it.qty || 0) * Number(it.price || 0),
-    0
+    0,
   );
   const total = subtotal - discount + tax;
 
@@ -269,7 +269,7 @@ function buildReceiptFromJSON(payload, opts = {}) {
     const price = Number(it.price || 0);
     chunks.push(enc(name + "\n"));
     chunks.push(
-      enc(lr(`${qty} x ${money(price)}`, money(qty * price), width) + "\n")
+      enc(lr(`${qty} x ${money(price)}`, money(qty * price), width) + "\n"),
     );
   }
 
@@ -381,7 +381,7 @@ async function tryUsbAutoConnect() {
     devs.find(
       (d) =>
         (!savedVid || d.vendorId === savedVid) &&
-        (!savedPid || d.productId === savedPid)
+        (!savedPid || d.productId === savedPid),
     ) || null
   );
 }
@@ -406,7 +406,7 @@ async function openUsbDevice(dev) {
   for (const intf of cfg.interfaces) {
     for (const alt of intf.alternates) {
       const out = (alt.endpoints || []).find(
-        (e) => e.direction === "out" && e.type === "bulk"
+        (e) => e.direction === "out" && e.type === "bulk",
       );
       if (!out) continue;
 
@@ -432,7 +432,7 @@ async function openUsbDevice(dev) {
     }
   }
   throw new Error(
-    "Не удалось захватить интерфейс с bulk OUT. На Windows установите WinUSB (Zadig) и закройте другие приложения принтера."
+    "Не удалось захватить интерфейс с bulk OUT. На Windows установите WinUSB (Zadig) и закройте другие приложения принтера.",
   );
 }
 async function ensureUsbReadyAuto() {
@@ -595,13 +595,13 @@ const SellStart = ({ show, setShow }) => {
   const filterClient = useMemo(
     () =>
       (Array.isArray(clients) ? clients : []).filter(
-        (c) => c.type === "client"
+        (c) => c.type === "client",
       ),
-    [clients]
+    [clients],
   );
   const pickClient = useMemo(
     () => filterClient.find((x) => String(x.id) === String(clientId)),
-    [filterClient, clientId]
+    [filterClient, clientId],
   );
 
   const [qty, setQty] = useState("");
@@ -618,7 +618,7 @@ const SellStart = ({ show, setShow }) => {
           cartId: agentCart.currentCart?.id,
           itemId: selectedItem.id,
           discount_total: v,
-        })
+        }),
       );
     } else {
       dispatch(
@@ -627,7 +627,7 @@ const SellStart = ({ show, setShow }) => {
           productId: selectedItem.id,
           discount_total: v,
           quantity: 2,
-        })
+        }),
       );
     }
   }, 600);
@@ -649,7 +649,7 @@ const SellStart = ({ show, setShow }) => {
     if (isPilorama) {
       if (selectedAgent) {
         dispatch(
-          getAgentCart({ agent: selectedAgent, order_discount_total: "0.00" })
+          getAgentCart({ agent: selectedAgent, order_discount_total: "0.00" }),
         );
       }
     } else {
@@ -671,12 +671,15 @@ const SellStart = ({ show, setShow }) => {
         startAgentCart({
           agent: tempSelectedAgent,
           order_discount_total: "0.00",
-        })
+        }),
       ).unwrap();
       setSelectedAgent(tempSelectedAgent);
       setShowAgentModal(false);
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при создании корзины агента");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при создании корзины агента",
+      );
       setAlert({
         open: true,
         type: "error",
@@ -709,12 +712,15 @@ const SellStart = ({ show, setShow }) => {
           barcode: barcodeInput.trim(),
           quantity: 1,
           agent: selectedAgent,
-        })
+        }),
       ).unwrap();
       setBarcodeInput("");
       onRefresh();
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при сканировании товара");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при сканировании товара",
+      );
       setAlert({
         open: true,
         type: "error",
@@ -747,7 +753,7 @@ const SellStart = ({ show, setShow }) => {
           name: customItem.name.trim(),
           price: customItem.price.trim(),
           quantity: Number(customItem.quantity) || 1,
-        })
+        }),
       ).unwrap();
       setCustomItem({ name: "", price: "", quantity: "1" });
       setShowCustomItemModal(false);
@@ -758,7 +764,10 @@ const SellStart = ({ show, setShow }) => {
         message: "Кастомная позиция добавлена в корзину",
       });
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при добавлении кастомной позиции");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при добавлении кастомной позиции",
+      );
       setAlert({
         open: true,
         type: "error",
@@ -794,7 +803,10 @@ const SellStart = ({ show, setShow }) => {
       .get("/main/owners/agents/products/")
       .then(({ data }) => setAgentListProducts(data))
       .catch((e) => {
-        const errorMessage = validateResErrors(e, "Ошибка при загрузке товаров агента");
+        const errorMessage = validateResErrors(
+          e,
+          "Ошибка при загрузке товаров агента",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -809,7 +821,10 @@ const SellStart = ({ show, setShow }) => {
         .get("/main/owners/agents/products/")
         .then(({ data }) => setAgents(data))
         .catch((e) => {
-          const errorMessage = validateResErrors(e, "Ошибка при загрузке товаров агента");
+          const errorMessage = validateResErrors(
+            e,
+            "Ошибка при загрузке товаров агента",
+          );
           setAlert({
             open: true,
             type: "error",
@@ -839,11 +854,14 @@ const SellStart = ({ show, setShow }) => {
             cartId: agentCart.currentCart.id,
             itemId: item.id,
             quantity: (Number(item.quantity) || 0) + 1,
-          })
+          }),
         ).unwrap();
         onRefresh();
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при увеличении количества");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при увеличении количества",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -857,11 +875,14 @@ const SellStart = ({ show, setShow }) => {
           manualFillingInAgent({
             id: start.id,
             productId: item.product || item.id,
-          })
+          }),
         ).unwrap();
         onRefresh();
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при уменьшении количества");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при уменьшении количества",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -886,11 +907,14 @@ const SellStart = ({ show, setShow }) => {
             cartId: agentCart.currentCart.id,
             itemId: item.id,
             quantity: next,
-          })
+          }),
         ).unwrap();
         onRefresh();
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при уменьшении количества");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при уменьшении количества",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -907,11 +931,14 @@ const SellStart = ({ show, setShow }) => {
             id: start.id,
             productId: item.id,
             quantity: next,
-          })
+          }),
         ).unwrap();
         onRefresh();
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при уменьшении количества");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при уменьшении количества",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -929,14 +956,17 @@ const SellStart = ({ show, setShow }) => {
           removeItemFromAgentCart({
             cartId: agentCart.currentCart.id,
             itemId: item.id,
-          })
+          }),
         ).unwrap();
         onRefresh();
         if (selectedId === item.id) {
           setSelectedId(null);
         }
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при удалении товара");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при удалении товара",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -952,14 +982,17 @@ const SellStart = ({ show, setShow }) => {
             id: start.id,
             productId: item.id,
             quantity: 0,
-          })
+          }),
         ).unwrap();
         onRefresh();
         if (selectedId === item.id) {
           setSelectedId(null);
         }
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при удалении товара");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при удалении товара",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -1002,11 +1035,14 @@ const SellStart = ({ show, setShow }) => {
             cartId: agentCart.currentCart.id,
             itemId: item.id,
             quantity: qtyNum,
-          })
+          }),
         ).unwrap();
         onRefresh();
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при обновлении количества");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при обновлении количества",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -1036,11 +1072,14 @@ const SellStart = ({ show, setShow }) => {
             id: start.id,
             productId: item.id,
             quantity: qtyNum,
-          })
+          }),
         ).unwrap();
         onRefresh();
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при обновлении количества");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при обновлении количества",
+        );
         setAlert({
           open: true,
           type: "error",
@@ -1062,11 +1101,11 @@ const SellStart = ({ show, setShow }) => {
           cartId: agentCart.currentCart?.id,
           itemId: selectedItem.id,
           quantity: newQty,
-        })
+        }),
       );
     } else {
       dispatch(
-        manualFillingInAgent({ id: start.id, productId: selectedItem.product })
+        manualFillingInAgent({ id: start.id, productId: selectedItem.product }),
       );
     }
     onRefresh();
@@ -1083,7 +1122,7 @@ const SellStart = ({ show, setShow }) => {
           removeItemFromAgentCart({
             cartId: agentCart.currentCart?.id,
             itemId: selectedItem.id,
-          })
+          }),
         );
       } else {
         dispatch(
@@ -1091,7 +1130,7 @@ const SellStart = ({ show, setShow }) => {
             cartId: agentCart.currentCart?.id,
             itemId: selectedItem.id,
             quantity: next,
-          })
+          }),
         );
       }
     } else {
@@ -1100,7 +1139,7 @@ const SellStart = ({ show, setShow }) => {
           id: start.id,
           productId: selectedItem.id,
           quantity: next,
-        })
+        }),
       );
     }
     onRefresh();
@@ -1275,7 +1314,7 @@ const SellStart = ({ show, setShow }) => {
               debt === "Долги" || debt === "Предоплата"
                 ? Number(debtMonths)
                 : undefined,
-          })
+          }),
         ).unwrap();
       }
 
@@ -1287,7 +1326,7 @@ const SellStart = ({ show, setShow }) => {
             print_receipt: withReceipt,
             client_id: clientId,
             agent: selectedAgent,
-          })
+          }),
         );
       } else {
         result = await run(
@@ -1295,7 +1334,7 @@ const SellStart = ({ show, setShow }) => {
             id: start?.id,
             bool: withReceipt,
             clientId: clientId,
-          })
+          }),
         );
       }
 
@@ -1303,8 +1342,8 @@ const SellStart = ({ show, setShow }) => {
         debt === "Предоплата"
           ? amount
           : isPilorama
-          ? currentTotal
-          : start.total;
+            ? currentTotal
+            : start.total;
 
       if (debt !== "Долги") {
         await run(
@@ -1313,7 +1352,7 @@ const SellStart = ({ show, setShow }) => {
             name: cashData.name === "" ? "Продажа" : cashData.name,
             amount: amountForCash,
             source_cashbox_flow_id: result?.id,
-          })
+          }),
         );
       }
 
@@ -1325,10 +1364,9 @@ const SellStart = ({ show, setShow }) => {
           const resp = await run(getProductCheckout(result.sale_id));
           await handleCheckoutResponseForPrinting(resp);
         } catch (e) {
-          
           console.error("Печать чека не удалась:", e);
           alert(
-            "Не удалось распечатать чек. Проверьте WinUSB и формат ответа (JSON/PDF)."
+            "Не удалось распечатать чек. Проверьте WinUSB и формат ответа (JSON/PDF).",
           );
         }
       }
@@ -1414,12 +1452,12 @@ const SellStart = ({ show, setShow }) => {
               <span style={{ fontWeight: "bold" }}>
                 {
                   agents.find(
-                    (agentData) => agentData.agent.id === selectedAgent
+                    (agentData) => agentData.agent.id === selectedAgent,
                   )?.agent.first_name
                 }{" "}
                 {
                   agents.find(
-                    (agentData) => agentData.agent.id === selectedAgent
+                    (agentData) => agentData.agent.id === selectedAgent,
                   )?.agent.last_name
                 }
               </span>
@@ -1640,7 +1678,7 @@ const SellStart = ({ show, setShow }) => {
                       key={product.product}
                       className={cx(
                         "start__products-add",
-                        selectedItem?.product === product.product && "active"
+                        selectedItem?.product === product.product && "active",
                       )}
                       onClick={async () => {
                         await dispatch(
@@ -1649,7 +1687,7 @@ const SellStart = ({ show, setShow }) => {
                             product_id: product.product,
                             quantity: 1,
                             agent: selectedAgent,
-                          })
+                          }),
                         ).unwrap();
                         onRefresh();
                       }}
@@ -1663,7 +1701,7 @@ const SellStart = ({ show, setShow }) => {
                     key={product.product}
                     className={cx(
                       "start__products-add",
-                      selectedItem?.product === product.product && "active"
+                      selectedItem?.product === product.product && "active",
                     )}
                     onClick={async () => {
                       if (isPilorama) {
@@ -1673,7 +1711,7 @@ const SellStart = ({ show, setShow }) => {
                             product_id: product.product,
                             quantity: 1,
                             agent: selectedAgent,
-                          })
+                          }),
                         ).unwrap();
                         onRefresh();
                       } else {
@@ -1681,7 +1719,7 @@ const SellStart = ({ show, setShow }) => {
                           manualFillingInAgent({
                             id: start.id,
                             productId: product.product,
-                          })
+                          }),
                         ).unwrap();
                         dispatch(startSaleInAgent());
                       }
@@ -1767,7 +1805,7 @@ const SellStart = ({ show, setShow }) => {
                   "sell__header-input",
                   (touched.full_name || submitTried) &&
                     errors.full_name &&
-                    "error"
+                    "error",
                 )}
                 onChange={handleChange}
                 onBlur={handleBlur}
@@ -1859,7 +1897,7 @@ const SellStart = ({ show, setShow }) => {
               <input
                 className={cx(
                   "sell__header-input",
-                  (touched.phone || submitTried) && errors.phone && "error"
+                  (touched.phone || submitTried) && errors.phone && "error",
                 )}
                 onChange={handleChange}
                 onBlur={handleBlur}
