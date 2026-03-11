@@ -62,7 +62,7 @@
 | `can_view_building_cash_register` | Касса (выплаты ЗП, рассрочки) |
 | `can_view_building_procurement` | Закупки |
 | `can_view_building_stock` | Склад |
-| `can_view_building_employess` | Сотрудники ЖК |
+| `can_view_building_employees` | Сотрудники ЖК |
 
 `owner` / `admin` / `superuser` имеют расширенные права.
 
@@ -354,6 +354,7 @@
 - `GET /procurements/`, `POST /procurements/`
 - `GET /procurements/{id}/`, `PATCH /procurements/{id}/`, `DELETE /procurements/{id}/`
 - `POST /procurements/{id}/submit-to-cash/` — отправить в кассу
+- `POST /procurements/{id}/files/` — загрузить файл (multipart: `file`, `title`)
 
 ### Позиции закупки
 
@@ -398,6 +399,8 @@
 ---
 
 ## 7) Процесс работ (BuildingWorkEntry)
+
+> Дополнительные поля и эндпоинты (подрядчик, заявки на склад, акт сверки, оплата подрядчику) — см. `building_cash_register_backend_spec.md`, разделы 8–10.
 
 - `GET /work-entries/`
 - `POST /work-entries/`
@@ -525,6 +528,20 @@
 
 ---
 
+## 11) Планируемые эндпоинты (по спецификации)
+
+По `building_cash_register_backend_spec.md` — в разработке:
+
+| Модуль | Эндпоинты | Описание |
+|--------|-----------|----------|
+| **Подрядчики** | `GET/POST /contractors/`, `GET/PATCH/DELETE /contractors/{id}/`, `POST /contractors/{id}/files/`, `GET /contractors/{id}/work-history/` | Справочник подрядчиков, специализации, оборудование |
+| **Поставщики** | `GET/POST /suppliers/`, `GET/PATCH/DELETE /suppliers/{id}/`, `POST /suppliers/{id}/files/`, `GET /suppliers/{id}/purchase-history/` | Справочник поставщиков, материалы |
+| **Приёмка на склад** | `POST /warehouse-receipts/{id}/files/` | Файлы к документу приёмки |
+| **Процесс работ** | `POST /work-entries/{id}/warehouse-requests/`, `POST /work-entries/{id}/reconciliation-act/` | Заявки на материалы, акт сверки |
+| **Склад** | `POST /warehouse-movements/write-off/`, `POST /warehouse-movements/transfer-to-contractor/`, `POST /warehouse-movements/transfer-to-work-entry/`, `POST /warehouse-movements/{id}/files/` | Списание, передача, файлы к движениям |
+
+---
+
 ## Сводная таблица эндпоинтов
 
 | Раздел | Метод | Путь |
@@ -580,3 +597,26 @@
 | | GET/PATCH/DELETE | `/work-entries/{id}/` |
 | | POST | `/work-entries/{id}/photos/` |
 | | POST | `/work-entries/{id}/files/` |
+| **Закупки** | GET/POST | `/procurements/` |
+| | GET/PATCH/DELETE | `/procurements/{id}/` |
+| | POST | `/procurements/{id}/submit-to-cash/` |
+| | POST | `/procurements/{id}/files/` |
+| | GET/POST | `/procurement-items/` |
+| | GET/PATCH/DELETE | `/procurement-items/{id}/` |
+| | GET | `/cash/procurements/pending/` |
+| | POST | `/cash/procurements/{id}/approve/` |
+| | POST | `/cash/procurements/{id}/reject/` |
+| | POST | `/procurements/{id}/transfers/create/` |
+| | GET | `/warehouse-transfers/` |
+| | GET | `/warehouse-transfers/{id}/` |
+| | POST | `/warehouse-transfers/{id}/accept/` |
+| | POST | `/warehouse-transfers/{id}/reject/` |
+| | GET/POST | `/documents/purchase/` |
+| | GET/PATCH/DELETE | `/documents/purchase/{id}/` |
+| | POST | `/documents/purchase/{id}/cash/approve/` |
+| | POST | `/documents/purchase/{id}/cash/reject/` |
+| | GET/POST | `/products/` |
+| | GET/PATCH/DELETE | `/products/{id}/` |
+| | GET | `/warehouse-stock/items/` |
+| | GET | `/warehouse-stock/moves/` |
+| | GET | `/workflow-events/` |

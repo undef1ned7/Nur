@@ -1614,6 +1614,53 @@
   margin-top: 0;
 }
 
+.client-detail__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.client-detail__tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(11, 35, 68, 0.16);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(11, 35, 68, 0.8);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.client-detail__tab--active {
+  border-color: $building-primary;
+  background: rgba($building-primary, 0.12);
+  color: #0b2344;
+}
+
+.client-detail__treaties {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.client-detail__treatiesToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.client-detail__treatiesFilters {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+}
+
 .client-detail__details {
   display: block;
 }

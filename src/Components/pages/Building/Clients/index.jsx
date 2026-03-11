@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { LayoutGrid, Table2 } from "lucide-react";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
@@ -11,9 +11,22 @@ import {
   deleteBuildingClient,
 } from "../../../../store/creators/building/clientsCreators";
 import { useBuildingClients } from "../../../../store/slices/building/clientsSlice";
+import {
+  fetchBuildingSuppliers,
+  deleteBuildingSupplier,
+} from "@/store/creators/building/suppliersCreators";
+import {
+  fetchBuildingContractors,
+  deleteBuildingContractor,
+} from "@/store/creators/building/contractorsCreators";
+import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
+import { useBuildingContractors } from "@/store/slices/building/contractorsSlice";
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import BuildingActionsMenu from "../shared/ActionsMenu";
+import ClientsTab from "./ClientsTab";
+import SuppliersTab from "./SuppliersTab";
+import ContractorsTab from "./ContractorsTab";
 import "./Clients.scss";
 
 const FORM_INITIAL = {
@@ -31,6 +44,10 @@ const VIEW_MODES = {
   TABLE: "table",
 };
 
+const MAIN_TAB_CLIENTS = "clients";
+const MAIN_TAB_SUPPLIERS = "suppliers";
+const MAIN_TAB_CONTRACTORS = "contractors";
+
 const STORAGE_KEY = "building_clients_view_mode";
 
 export default function BuildingClients() {
@@ -38,6 +55,7 @@ export default function BuildingClients() {
   const navigate = useNavigate();
   const alert = useAlert();
   const confirm = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { selectedProjectId, items: projects } = useBuildingProjects();
   const {
     list,
@@ -49,6 +67,18 @@ export default function BuildingClients() {
     updatingError,
     deletingId,
   } = useBuildingClients();
+
+  const {
+    list: suppliers,
+    loading: suppliersLoading,
+    error: suppliersError,
+  } = useBuildingSuppliers();
+
+  const {
+    list: contractors,
+    loading: contractorsLoading,
+    error: contractorsError,
+  } = useBuildingContractors();
 
   const [search, setSearch] = useState("");
   const [onlyActive, setOnlyActive] = useState(true);
@@ -72,13 +102,36 @@ export default function BuildingClients() {
     return found?.name || "—";
   }, [selectedProjectId, projects]);
 
+  const initialMainTab = (() => {
+    const t = searchParams.get("tab");
+    if (t === MAIN_TAB_SUPPLIERS || t === MAIN_TAB_CONTRACTORS) return t;
+    return MAIN_TAB_CLIENTS;
+  })();
+  const [mainTab, setMainTab] = useState(initialMainTab);
+
+  const handleMainTabChange = (nextTab) => {
+    setMainTab(nextTab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextTab === MAIN_TAB_CLIENTS) {
+          next.delete("tab");
+        } else {
+          next.set("tab", nextTab);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEY, viewMode);
   }, [viewMode]);
 
   useEffect(() => {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId || mainTab !== MAIN_TAB_CLIENTS) return;
     dispatch(
       fetchBuildingClients({
         residential_complex: selectedProjectId,
@@ -86,7 +139,17 @@ export default function BuildingClients() {
         is_active: onlyActive ? true : undefined,
       }),
     );
-  }, [dispatch, selectedProjectId, search, onlyActive]);
+  }, [dispatch, selectedProjectId, search, onlyActive, mainTab]);
+
+  useEffect(() => {
+    if (mainTab !== MAIN_TAB_SUPPLIERS) return;
+    dispatch(fetchBuildingSuppliers());
+  }, [dispatch, mainTab]);
+
+  useEffect(() => {
+    if (mainTab !== MAIN_TAB_CONTRACTORS) return;
+    dispatch(fetchBuildingContractors());
+  }, [dispatch, mainTab]);
 
   const openCreate = () => {
     if (!selectedProjectId) {
@@ -209,41 +272,110 @@ export default function BuildingClients() {
       const hay =
         `${c.name || ""} ${c.phone || ""} ${c.email || ""} ${c.inn || ""}`
           .toLowerCase()
-          .trim();
+          .trim();  
       return hay.includes(search.toLowerCase().trim());
     });
   }, [list, search, onlyActive]);
-
-  const totalClients = Array.isArray(list) ? list.length : 0;
-  const filteredCount = Array.isArray(effectiveList) ? effectiveList.length : 0;
 
   return (
     <div className="building-page building-page--clients">
       <header className="sell-header">
         <div className="sell-header__content">
-          <h1 className="sell-header__title">Клиенты</h1>
+          <h1 className="sell-header__title">
+            {mainTab === MAIN_TAB_SUPPLIERS
+              ? "Поставщики"
+              : mainTab === MAIN_TAB_CONTRACTORS
+              ? "Подрядчики"
+              : "Клиенты"}
+          </h1>
           <p className="sell-header__subtitle">
-            {selectedProjectId ? (
-              <>
-                ЖК <strong>{selectedProjectName}</strong> · Поиск и список
-                клиентов по объекту
-              </>
+            {mainTab === MAIN_TAB_CLIENTS ? (
+              selectedProjectId ? (
+                <>
+              Список
+                  клиентов по объекту
+                </>
+              ) : (
+                "Выберите жилой комплекс в шапке раздела"
+              )
+            ) : mainTab === MAIN_TAB_SUPPLIERS ? (
+              "Список поставщиков строительного модуля."
             ) : (
-              "Выберите жилой комплекс в шапке раздела"
+              "Список подрядчиков и субподрядчиков."
             )}
           </p>
         </div>
-        <button
-          type="button"
-          className="sell-header__btn"
-          disabled={!selectedProjectId}
-          onClick={openCreate}
-        >
-          Добавить клиента
-        </button>
+        {mainTab === MAIN_TAB_CLIENTS && (
+          <button
+            type="button"
+            className="sell-header__btn"
+            disabled={!selectedProjectId}
+            onClick={openCreate}
+          >
+            Добавить клиента
+          </button>
+        )}
+        {mainTab === MAIN_TAB_SUPPLIERS && (
+          <button
+            type="button"
+            className="sell-header__btn"
+            onClick={() => navigate("/crm/building/clients/suppliers/new")}
+          >
+            Добавить поставщика
+          </button>
+        )}
+        {mainTab === MAIN_TAB_CONTRACTORS && (
+          <button
+            type="button"
+            className="sell-header__btn"
+            onClick={() =>
+              navigate("/crm/building/clients/contractors/new")
+            }
+          >
+            Добавить подрядчика
+          </button>
+        )}
       </header>
 
-      {!selectedProjectId && (
+      <div className="client-detail__tabs">
+        <button
+          type="button"
+          className={
+            mainTab === MAIN_TAB_CLIENTS
+              ? "client-detail__tab client-detail__tab--active"
+              : "client-detail__tab"
+          }
+          onClick={() => handleMainTabChange(MAIN_TAB_CLIENTS)}
+        >
+          Клиенты
+        </button>
+        <button
+          type="button"
+          className={
+            mainTab === MAIN_TAB_SUPPLIERS
+              ? "client-detail__tab client-detail__tab--active"
+              : "client-detail__tab"
+          }
+          onClick={() => handleMainTabChange(MAIN_TAB_SUPPLIERS)}
+        >
+          Поставщики
+        </button>
+        <button
+          type="button"
+          className={
+            mainTab === MAIN_TAB_CONTRACTORS
+              ? "client-detail__tab client-detail__tab--active"
+              : "client-detail__tab"
+          }
+          onClick={() => handleMainTabChange(MAIN_TAB_CONTRACTORS)}
+        >
+          Подрядчики
+        </button>
+      </div>
+
+      {mainTab === MAIN_TAB_CLIENTS && <ClientsTab />}
+
+      {false && mainTab === MAIN_TAB_CLIENTS && !selectedProjectId && (
         <div className="sell-empty-hint">
           <span className="sell-empty-hint__icon">👥</span>
           <p className="sell-empty-hint__text">
@@ -253,235 +385,9 @@ export default function BuildingClients() {
         </div>
       )}
 
-      {selectedProjectId && (
-        <div className="sell-card clients-card">
-          <div className="sell-toolbar clients-toolbar">
-            <div className="clients-toolbar__search-wrap">
-              <input
-                className="clients-toolbar__search"
-                value={search}
-                placeholder="Поиск по имени, телефону, email, ИНН"
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="clients-toolbar__meta">
-              <span className="clients-toolbar__count">
-                {filteredCount} из {totalClients} клиентов
-              </span>
-              <div className="clients-toolbar__view">
-                <button
-                  type="button"
-                  className={`clients-toolbar__viewBtn${viewMode === VIEW_MODES.TABLE ? " clients-toolbar__viewBtn--active" : ""}`}
-                  onClick={() => setViewMode(VIEW_MODES.TABLE)}
-                >
-                  <Table2 size={16} />
-                  Таблица
-                </button>
-                <button
-                  type="button"
-                  className={`clients-toolbar__viewBtn${viewMode === VIEW_MODES.CARDS ? " clients-toolbar__viewBtn--active" : ""}`}
-                  onClick={() => setViewMode(VIEW_MODES.CARDS)}
-                >
-                  <LayoutGrid size={16} />
-                  Карточки
-                </button>
-              </div>
-              <label className="clients-toolbar__check">
-                <input
-                  type="checkbox"
-                  checked={onlyActive}
-                  onChange={(e) => setOnlyActive(e.target.checked)}
-                />
-                Только активные
-              </label>
-            </div>
-          </div>
-
-          {error && (
-            <div className="building-page__error" style={{ marginBottom: 12 }}>
-              {String(
-                validateResErrors(error, "Не удалось загрузить клиентов"),
-              )}
-            </div>
-          )}
-
-          {loading && effectiveList.length === 0 ? (
-            <div className="sell-loading">
-              <div className="sell-loading__spinner" />
-              <p className="sell-loading__text">Загрузка клиентов...</p>
-            </div>
-          ) : !loading && effectiveList.length === 0 ? (
-            <div className="sell-empty">
-              <p className="sell-empty__text">Клиентов пока нет.</p>
-            </div>
-          ) : viewMode === VIEW_MODES.TABLE ? (
-            <div className="clients-table-wrap">
-              <table className="clients-table">
-                <thead>
-                  <tr>
-                    <th>Имя / название</th>
-                    <th>Телефон</th>
-                    <th>Email</th>
-                    <th>ИНН</th>
-                    <th>Адрес</th>
-                    <th>Статус</th>
-                    <th className="clients-table__actionsCol">Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {effectiveList.map((c) => {
-                    const id = c?.id ?? c?.uuid;
-                    const busyDelete = id != null && deletingId === id;
-                    const busyUpdate = id != null && updatingId === id;
-                    const busy = busyDelete || busyUpdate;
-                    return (
-                      <tr
-                        key={id}
-                        className="clients-table__row"
-                        onClick={() =>
-                          id && navigate(`/crm/building/clients/${id}`)
-                        }
-                      >
-                        <td>{c?.name || "—"}</td>
-                        <td>{c?.phone || "—"}</td>
-                        <td>{c?.email || "—"}</td>
-                        <td>{c?.inn || "—"}</td>
-                        <td>{c?.address || "—"}</td>
-                        <td onClick={(e) => e.stopPropagation()}>
-                          {c?.is_active ? (
-                            <span className="clients-table__status clients-table__status--active">
-                              Активен
-                            </span>
-                          ) : (
-                            <span className="clients-table__status clients-table__status--inactive">
-                              Отключён
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          className="clients-table__actionsCol"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <BuildingActionsMenu
-                            actions={[
-                              {
-                                label: "Изменить",
-                                onClick: () => openEdit(c),
-                                disabled: busy,
-                              },
-                              {
-                                label: "Удалить",
-                                onClick: () => handleDelete(c),
-                                disabled: busy,
-                                danger: true,
-                              },
-                            ]}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="clients-grid">
-              {effectiveList.map((c) => {
-                const id = c?.id ?? c?.uuid;
-                const busyDelete = id != null && deletingId === id;
-                const busyUpdate = id != null && updatingId === id;
-                const busy = busyDelete || busyUpdate;
-                return (
-                  <div
-                    key={id}
-                    className="clients-grid__card"
-                    onClick={() =>
-                      id && navigate(`/crm/building/clients/${id}`)
-                    }
-                  >
-                    <div className="clients-grid__cardHead">
-                      <div className="clients-grid__cardName">
-                        {c?.name || "—"}
-                      </div>
-                      <div
-                        className="clients-grid__cardMeta"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {c?.is_active ? (
-                          <span className="clients-table__status clients-table__status--active">
-                            Активен
-                          </span>
-                        ) : (
-                          <span className="clients-table__status clients-table__status--inactive">
-                            Отключён
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="clients-grid__cardBody">
-                      <div className="clients-grid__cardRow">
-                        <span className="clients-grid__cardLabel">Телефон</span>
-                        {c?.phone || "—"}
-                      </div>
-                      <div className="clients-grid__cardRow">
-                        <span className="clients-grid__cardLabel">Email</span>
-                        {c?.email || "—"}
-                      </div>
-                      {c?.inn && (
-                        <div className="clients-grid__cardRow">
-                          <span className="clients-grid__cardLabel">ИНН</span>
-                          {c.inn}
-                        </div>
-                      )}
-                      {c?.address && (
-                        <div className="clients-grid__cardRow clients-grid__cardRow--address">
-                          <span className="clients-grid__cardLabel">Адрес</span>
-                          {c.address}
-                        </div>
-                      )}
-                      {c?.notes && (
-                        <p className="clients-grid__cardNotes">{c.notes}</p>
-                      )}
-                    </div>
-                    <div
-                      className="clients-grid__cardActions"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        className="clients-grid__cardBtn"
-                        disabled={busy}
-                        onClick={() => openEdit(c)}
-                      >
-                        Изменить
-                      </button>
-                      <button
-                        type="button"
-                        className="clients-grid__cardBtn clients-grid__cardBtn--danger"
-                        disabled={busy}
-                        onClick={() => handleDelete(c)}
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {(createError || updatingError) && (
-            <div className="building-page__error" style={{ marginTop: 12 }}>
-              {String(
-                validateResErrors(
-                  createError || updatingError,
-                  "Ошибка при сохранении клиента",
-                ),
-              )}
-            </div>
-          )}
-        </div>
-      )}
+   
+      {mainTab === MAIN_TAB_SUPPLIERS && <SuppliersTab />}
+      {mainTab === MAIN_TAB_CONTRACTORS && <ContractorsTab />}
 
       <Modal
         open={openModal}

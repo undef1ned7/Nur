@@ -583,16 +583,18 @@ export default function BuildingTreatyDetail() {
     win.focus();
     win.print();
   };
-
+  const disabled = useMemo(() => {
+    return !isNew && (current?.status === "signed" || current?.status === "cancelled");
+  }, [isNew, current?.status]);
   return (
     <div className="add-product-page treaty-detail">
       <div className="add-product-page__header">
         <button
           type="button"
           className="add-product-page__back"
-          onClick={() => navigate("/crm/building/treaty")}
+          onClick={() => navigate(-1)}
         >
-          <ArrowLeft size={18} />К списку договоров
+          <ArrowLeft size={18} />Назад
         </button>
         <div className="add-product-page__title-section">
           <div className="add-product-page__icon">
@@ -654,6 +656,7 @@ export default function BuildingTreatyDetail() {
                     value={form.residential_complex}
                     onChange={handleFormChange("residential_complex")}
                     required
+                    disabled={disabled}
                   >
                     <option value="">Выберите ЖК</option>
                     {complexesOptions.map((c) => (
@@ -670,6 +673,7 @@ export default function BuildingTreatyDetail() {
                     value={form.client}
                     onChange={handleFormChange("client")}
                     required
+                    disabled={disabled}
                   >
                     <option value="">Выберите клиента</option>
                     {clientsOptions.map((c) => (
@@ -688,7 +692,7 @@ export default function BuildingTreatyDetail() {
                     value={form.number}
                     onChange={handleFormChange("number")}
                     placeholder="ДГ-001"
-                    disabled
+                    disabled={disabled}
                   />
                 </div>
                 <div className="add-product-page__form-group">
@@ -697,6 +701,7 @@ export default function BuildingTreatyDetail() {
                     className="add-product-page__input"
                     value={form.status}
                     onChange={handleFormChange("status")}
+                    disabled={disabled}
                   >
                     {Object.entries(STATUS_LABELS).map(([key, label]) => (
                       <option key={key} value={key}>
@@ -722,6 +727,7 @@ export default function BuildingTreatyDetail() {
                     className="add-product-page__input"
                     value={form.apartment}
                     onChange={handleFormChange("apartment")}
+                    disabled={disabled}
                   >
                     <option value="">Без выбора квартиры</option>
                     {apartmentsOptions.map((a) => (
@@ -740,6 +746,7 @@ export default function BuildingTreatyDetail() {
                     className="add-product-page__input"
                     value={form.operation_type}
                     onChange={handleFormChange("operation_type")}
+                    disabled={disabled}
                   >
                     {Object.entries(OPERATION_TYPE_LABELS).map(
                       ([key, label]) => (
@@ -760,6 +767,7 @@ export default function BuildingTreatyDetail() {
                     onChange={handleFormChange("title")}
                     placeholder="Договор подряда"
                     required
+                    disabled={disabled}
                   />
                 </div>
                 <div
@@ -774,6 +782,7 @@ export default function BuildingTreatyDetail() {
                     onChange={handleFormChange("description")}
                     placeholder="Условия договора..."
                     style={{ resize: "vertical", minHeight: 80 }}
+                    disabled={disabled}
                   />
                 </div>
               </div>
@@ -791,6 +800,7 @@ export default function BuildingTreatyDetail() {
                     className="add-product-page__input"
                     value={form.payment_type}
                     onChange={handleFormChange("payment_type")}
+                    disabled={disabled}
                   >
                     {Object.entries(PAYMENT_TYPE_LABELS).map(([key, label]) => (
                       <option key={key} value={key}>
@@ -809,6 +819,7 @@ export default function BuildingTreatyDetail() {
                     value={form.amount}
                     onChange={handleFormChange("amount")}
                     placeholder="150000.00"
+                    disabled={disabled}
                   />
                 </div>
                 {form.payment_type === "installment" && (
@@ -824,6 +835,7 @@ export default function BuildingTreatyDetail() {
                       value={form.down_payment}
                       onChange={handleFormChange("down_payment")}
                       placeholder="30000.00"
+                      disabled={disabled}
                     />
                   </div>
                 )}
@@ -841,6 +853,7 @@ export default function BuildingTreatyDetail() {
                     onChange={handleFormChange("payment_terms")}
                     placeholder="Рассрочка на 12 месяцев..."
                     style={{ resize: "vertical", minHeight: 60 }}
+                    disabled={disabled}
                   />
                 </div>
                 <div
@@ -851,6 +864,7 @@ export default function BuildingTreatyDetail() {
                     type="checkbox"
                     checked={form.auto_create_in_erp}
                     onChange={handleFormChange("auto_create_in_erp")}
+                    disabled={disabled}
                   />
                   <span>Создавать договор в ERP автоматически</span>
                 </div>
@@ -950,16 +964,13 @@ export default function BuildingTreatyDetail() {
               className="add-product-page__actions"
               style={{ marginTop: 24 }}
             >
-              <button
-                type="button"
-                className="add-product-page__cancel-btn"
-                onClick={() => navigate("/crm/building/treaty")}
-              >
-                Отмена
-              </button>
-              <button type="submit" className="add-product-page__submit-btn">
-                Сохранить
-              </button>
+              {
+                !disabled && (
+                  <button type="submit" className="add-product-page__submit-btn">
+                    Сохранить
+                  </button>
+                )
+              }
               {form.payment_type === "installment" &&
                 installments.length > 0 && (
                   <button

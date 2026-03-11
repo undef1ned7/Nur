@@ -685,43 +685,49 @@ export default function BuildingSalaryPayrollDetail() {
                       </div>
                       <div className="salary-detail__info-row salary-detail__info-row--full">
                         <span className="salary-detail__info-label">Комментарий</span>
-                        <div className="salary-detail__comment-edit">
-                          <input
-                            type="text"
-                            className="add-product-page__input salary-detail__comment-input"
-                            value={detailLineCommentEdit}
-                            onChange={(e) => setDetailLineCommentEdit(e.target.value)}
-                            placeholder="Комментарий"
-                          />
-                          <button
-                            type="button"
-                            className="add-product-page__submit-btn"
-                            style={{ padding: "6px 14px", fontSize: 13 }}
-                            onClick={async () => {
-                              if (!detailLineId) return;
-                              const comment = String(detailLineCommentEdit ?? "").trim();
-                              const res = await dispatch(
-                                updateBuildingPayrollLine({
-                                  lineId: detailLineId,
-                                  payload: { comment },
-                                }),
-                              );
-                              if (res.meta.requestStatus === "fulfilled") {
-                                dispatch(fetchBuildingPayrollLines(id));
-                              } else {
-                                alert(
-                                  validateResErrors(
-                                    res.payload || res.error,
-                                    "Не удалось сохранить комментарий",
-                                  ),
-                                  true,
+                        {payroll?.status === "draft" ? (
+                          <div className="salary-detail__comment-edit">
+                            <input
+                              type="text"
+                              className="add-product-page__input salary-detail__comment-input"
+                              value={detailLineCommentEdit}
+                              onChange={(e) => setDetailLineCommentEdit(e.target.value)}
+                              placeholder="Комментарий"
+                            />
+                            <button
+                              type="button"
+                              className="add-product-page__submit-btn"
+                              style={{ padding: "6px 14px", fontSize: 13 }}
+                              onClick={async () => {
+                                if (!detailLineId) return;
+                                const comment = String(detailLineCommentEdit ?? "").trim();
+                                const res = await dispatch(
+                                  updateBuildingPayrollLine({
+                                    lineId: detailLineId,
+                                    payload: { comment },
+                                  }),
                                 );
-                              }
-                            }}
-                          >
-                            Сохранить
-                          </button>
-                        </div>
+                                if (res.meta.requestStatus === "fulfilled") {
+                                  dispatch(fetchBuildingPayrollLines(id));
+                                } else {
+                                  alert(
+                                    validateResErrors(
+                                      res.payload || res.error,
+                                      "Не удалось сохранить комментарий",
+                                    ),
+                                    true,
+                                  );
+                                }
+                              }}
+                            >
+                              Сохранить
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="salary-detail__info-value">
+                            {line.comment || "—"}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -807,18 +813,6 @@ export default function BuildingSalaryPayrollDetail() {
                           }}
                         >
                           Добавить корректировку
-                        </button>
-                      )}
-                      {payroll?.status === "approved" && (
-                        <button
-                          type="button"
-                          className="add-product-page__submit-btn"
-                          onClick={() => {
-                            setDetailLineId(null);
-                            openPayments(detailLineId);
-                          }}
-                        >
-                          Выплаты
                         </button>
                       )}
                       <button
