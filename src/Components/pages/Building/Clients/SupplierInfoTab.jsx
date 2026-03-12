@@ -39,16 +39,7 @@ const buildFormFromSupplier = (supplier) => ({
     bic: supplier.bank_details?.bic || "",
     swift: supplier.bank_details?.swift || "",
   },
-  supplied_materials: Array.isArray(supplier.supplied_materials)
-    ? supplier.supplied_materials.map((m) => ({ ...m }))
-    : [],
-  delivery: {
-    delivery_available: supplier.delivery?.delivery_available ?? false,
-    delivery_regions: Array.isArray(supplier.delivery?.delivery_regions)
-      ? [...supplier.delivery.delivery_regions]
-      : [],
-    delivery_time_days: supplier.delivery?.delivery_time_days ?? "",
-  },
+  // supplied_materials и delivery перенесены в отдельный таб
   warehouse: {
     has_warehouse: supplier.warehouse?.has_warehouse ?? false,
     warehouse_address: supplier.warehouse?.warehouse_address || "",
@@ -76,16 +67,6 @@ export default function SupplierInfoTab({ supplier }) {
   const [newFileTitle, setNewFileTitle] = useState("");
 
   const supplierId = supplier.id ?? supplier.uuid;
-
-  const extendedMaterials = useMemo(() => {
-    if (!isEditing) return form.supplied_materials || [];
-    const list = Array.isArray(form.supplied_materials)
-      ? [...form.supplied_materials]
-      : [];
-    // Добавляем одну пустую строку для быстрого ввода
-    list.push({ name: "", brand: "", unit: "", price: "", currency: "KGS" });
-    return list;
-  }, [form.supplied_materials, isEditing]);
 
   const handleChange = (key) => (e) => {
     const value = e.target.value;
@@ -155,32 +136,6 @@ export default function SupplierInfoTab({ supplier }) {
     setForm((prev) => ({
       ...prev,
       warehouse: { ...(prev.warehouse || {}), [field]: value },
-    }));
-  };
-
-  const handleMaterialFieldChange = (index, field) => (e) => {
-    const value = e.target.value;
-    setForm((prev) => {
-      const list = Array.isArray(prev.supplied_materials)
-        ? [...prev.supplied_materials]
-        : [];
-      const current = { ...(list[index] || {}) };
-      current[field] = value;
-      if (index >= list.length) {
-        list.push(current);
-      } else {
-        list[index] = current;
-      }
-      return { ...prev, supplied_materials: list };
-    });
-  };
-
-  const handleRemoveMaterial = (index) => () => {
-    setForm((prev) => ({
-      ...prev,
-      supplied_materials: (prev.supplied_materials || []).filter(
-        (_, i) => i !== index,
-      ),
     }));
   };
 
@@ -256,24 +211,7 @@ export default function SupplierInfoTab({ supplier }) {
         form.year_founded && !Number.isNaN(Number(form.year_founded))
           ? Number(form.year_founded)
           : null,
-      supplied_materials: (form.supplied_materials || [])
-        .filter((m) => (m.name || "").trim())
-        .map((m) => ({
-          ...m,
-          price:
-            m.price && !Number.isNaN(Number(m.price))
-              ? Number(m.price)
-              : null,
-          currency: "KGS",
-        })),
-      delivery: {
-        ...(form.delivery || {}),
-        delivery_time_days:
-          form.delivery?.delivery_time_days &&
-          !Number.isNaN(Number(form.delivery.delivery_time_days))
-            ? Number(form.delivery.delivery_time_days)
-            : null,
-      },
+      // supplied_materials и delivery обновляются на вкладке материалов
       warehouse: {
         ...(form.warehouse || {}),
         storage_capacity_tons:
@@ -567,165 +505,7 @@ export default function SupplierInfoTab({ supplier }) {
         </details>
       </section>
 
-      <section className="sell-form__section">
-        <details open={isEditing}>
-          <summary
-            className="sell-form__sectionTitle"
-            style={{ fontSize: 16, fontWeight: 600 }}
-          >
-            Поставляемые материалы
-          </summary>
-        {(!form.supplied_materials ||
-          form.supplied_materials.length === 0) && (
-          <div className="client-detail__row">
-            <span className="sell-form__label" />
-            <span>Материалы не указаны.</span>
-          </div>
-        )}
-        {Array.isArray(extendedMaterials) &&
-          extendedMaterials.map((m, idx) => (
-            // последняя строка — пустая, без кнопки удаления
-            <div
-              key={idx}
-              className="client-detail__row"
-              style={{ flexDirection: "column", alignItems: "stretch", gap: 6 }}
-            >
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input
-                  className="add-product-page__input"
-                  placeholder="Наименование"
-                  value={m.name || ""}
-                  onChange={handleMaterialFieldChange(idx, "name")}
-                  disabled={!isEditing}
-                  style={{ flex: 2, minWidth: 140 }}
-                />
-                <input
-                  className="add-product-page__input"
-                  placeholder="Бренд"
-                  value={m.brand || ""}
-                  onChange={handleMaterialFieldChange(idx, "brand")}
-                  disabled={!isEditing}
-                  style={{ flex: 2, minWidth: 140 }}
-                />
-                <input
-                  className="add-product-page__input"
-                  placeholder="Ед. изм."
-                  value={m.unit || ""}
-                  onChange={handleMaterialFieldChange(idx, "unit")}
-                  disabled={!isEditing}
-                  style={{ flex: 1, minWidth: 80 }}
-                />
-                <input
-                  className="add-product-page__input"
-                  placeholder="Цена"
-                  value={m.price ?? ""}
-                  onChange={handleMaterialFieldChange(idx, "price")}
-                  disabled={!isEditing}
-                  style={{ flex: 1, minWidth: 90 }}
-                />
-                <input
-                  className="add-product-page__input"
-                  placeholder="Валюта"
-                  value="KGS"
-                  disabled
-                  style={{ flex: 1, minWidth: 80 }}
-                />
-                {isEditing && idx < (form.supplied_materials || []).length && (
-                  <button
-                    type="button"
-                    className="add-product-page__cancel-btn"
-                    onClick={handleRemoveMaterial(idx)}
-                  >
-                    Удалить
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </details>
-      </section>
-
-      <section className="sell-form__section">
-        <details open={isEditing}>
-          <summary
-            className="sell-form__sectionTitle"
-            style={{ fontSize: 16, fontWeight: 600 }}
-          >
-            Доставка
-          </summary>
-        <div className="client-detail__row">
-          <span className="sell-form__label">Доставка доступна</span>
-          <label className="clients-toolbar__check">
-            <input
-              type="checkbox"
-              checked={!!form.delivery.delivery_available}
-              onChange={handleDeliveryFieldChange("delivery_available")}
-              disabled={!isEditing}
-            />
-            <span />
-          </label>
-        </div>
-        <div className="client-detail__row">
-          <span className="sell-form__label">Регионы доставки</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {(!form.delivery.delivery_regions ||
-              form.delivery.delivery_regions.length === 0) && (
-              <div className="client-detail__row">
-                <span>Регионы не указаны.</span>
-              </div>
-            )}
-            {Array.isArray(form.delivery.delivery_regions) &&
-              form.delivery.delivery_regions.map((r, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
-                    marginBottom: 4,
-                  }}
-                >
-                  <input
-                    className="add-product-page__input"
-                    value={r || ""}
-                    onChange={handleDeliveryRegionChange(idx)}
-                    disabled={!isEditing}
-                  />
-                  {isEditing && (
-                    <button
-                      type="button"
-                      className="add-product-page__cancel-btn"
-                      onClick={handleRemoveDeliveryRegion(idx)}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            {isEditing && (
-              <button
-                type="button"
-                className="add-product-page__submit-btn"
-                onClick={handleAddDeliveryRegion}
-              >
-                Добавить регион
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="client-detail__row">
-          <span className="sell-form__label">Срок доставки (дней)</span>
-          <input
-            className="add-product-page__input"
-            type="number"
-            min={0}
-            value={form.delivery.delivery_time_days}
-            onChange={handleDeliveryFieldChange("delivery_time_days")}
-            disabled={!isEditing}
-          />
-        </div>
-        </details>
-      </section>
+      {/* Поставляемые материалы и доставка вынесены на отдельный таб */}
 
       <section className="sell-form__section">
         <details open={isEditing}>

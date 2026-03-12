@@ -10,6 +10,7 @@ import {
   fetchBuildingProcurementById,
   submitBuildingProcurementToCash,
 } from "@/store/creators/building/procurementsCreators";
+import { fetchBuildingSuppliers } from "@/store/creators/building/suppliersCreators";
 import {
   createBuildingProcurementItem,
   deleteBuildingProcurementItem,
@@ -18,6 +19,7 @@ import {
 } from "@/store/creators/building/procurementItemsCreators";
 import { fetchBuildingWorkflowEvents } from "@/store/creators/building/workflowCreators";
 import { useBuildingProcurements } from "@/store/slices/building/procurementsSlice";
+import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
 import { useBuildingProcurementItems } from "@/store/slices/building/procurementItemsSlice";
 import { useBuildingWorkflowEvents } from "@/store/slices/building/workflowEventsSlice";
 import {
@@ -28,6 +30,7 @@ import {
   statusLabel,
 } from "../shared/constants";
 import DataContainer from "@/Components/common/DataContainer/DataContainer";
+import api from "../../../../api";
 
 const ITEM_INITIAL = {
   name: "",
@@ -99,6 +102,7 @@ export default function BuildingProcurementDetail() {
   } = useBuildingProcurements();
   const procurementItemsState = useBuildingProcurementItems();
   const workflowEventsState = useBuildingWorkflowEvents();
+  const suppliersState = useBuildingSuppliers();
 
   const procurement = useMemo(() => {
     const currentId = current?.id ?? current?.uuid;
@@ -126,16 +130,49 @@ export default function BuildingProcurementDetail() {
   const [itemForm, setItemForm] = useState(ITEM_INITIAL);
   const [itemError, setItemError] = useState(null);
   const [openHistoryModal, setOpenHistoryModal] = useState(false);
+  const [files, setFiles] = useState([]);
+  const [filesError, setFilesError] = useState(null);
+  const [fileModalOpen, setFileModalOpen] = useState(false);
+  const [fileUploading, setFileUploading] = useState(false);
+  const [newFileTitle, setNewFileTitle] = useState("");
+  const [newFile, setNewFile] = useState(null);
 
   const busySubmitToCash =
     procurementId != null && submittingToCashIds?.[procurementId] === true;
   const busyCreateTransfer =
     procurementId != null && creatingTransferIds?.[procurementId] === true;
 
+  const [openSupplierId, setOpenSupplierId] = useState(null);
+
   useEffect(() => {
     if (!procurementId) return;
     dispatch(fetchBuildingProcurementById(procurementId));
   }, [dispatch, procurementId]);
+
+  useEffect(() => {
+    if (!procurement || !Array.isArray(procurement.files)) {
+      setFiles([]);
+      return;
+    }
+    setFiles(procurement.files);
+  }, [procurement]);
+
+  useEffect(() => {
+    if (!procurement) return;
+    if (procurement.status !== "draft") return;
+    const rcId =
+      procurement.residential_complex ||
+      procurement.residential_complex_id ||
+      selectedProjectId;
+    if (!rcId) return;
+    dispatch(
+      fetchBuildingSuppliers({
+        residential_complex: rcId,
+        status: "active",
+        page_size: 50,
+      }),
+    );
+  }, [dispatch, procurement, selectedProjectId]);
 
   useEffect(() => {
     if (!procurementId) return;
@@ -164,6 +201,67 @@ export default function BuildingProcurementDetail() {
     const num = Number(normalized);
     if (!Number.isFinite(num)) return null;
     return normalized;
+  };
+
+  const getFileUrl = (file) =>
+    String(file?.file_url || file?.file || file?.url || "");
+
+  const getFileExtension = (url) => {
+    try {
+      const clean = url.split("?")[0];
+      const parts = clean.split(".");
+      if (parts.length < 2) return "";
+      return parts[parts.length - 1].toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+
+  const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+
+  const getFileTypeLabel = (ext) => {
+    if (!ext) return "FILE";
+    if (IMAGE_EXTENSIONS.includes(ext)) return "IMG";
+    if (["pdf"].includes(ext)) return "PDF";
+    if (["doc", "docx"].includes(ext)) return "DOC";
+    if (["xls", "xlsx"].includes(ext)) return "XLS";
+    return ext.toUpperCase();
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!file || !procurementId) return;
+    setFilesError(null);
+    try {
+      setFileUploading(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("title", newFileTitle.trim() || file.name);
+      const { data } = await api.post(
+        `/building/procurements/${procurementId}/files/`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
+      // Бек возвращает обновлённый объект закупки с полем files
+      if (data && Array.isArray(data.files)) {
+        setFiles(data.files);
+      } else if (data) {
+        // fallback: если вдруг вернулся только один файл
+        setFiles((prev) =>
+          data ? [data, ...(Array.isArray(prev) ? prev : [])] : prev,
+        );
+      }
+      setFileModalOpen(false);
+      setNewFileTitle("");
+      setNewFile(null);
+    } catch (err) {
+      setFilesError(
+        validateResErrors(err, "Не удалось прикрепить файл к закупке"),
+      );
+    } finally {
+      setFileUploading(false);
+    }
   };
 
   const onSubmitToCash = () => {
@@ -198,9 +296,18 @@ export default function BuildingProcurementDetail() {
     });
   };
 
-  const openCreateItem = () => {
+  const openCreateItem = (preset) => {
     setEditingItem(null);
-    setItemForm({ ...ITEM_INITIAL, order: (itemsBucket?.list?.length || 0) + 1 });
+    const baseOrder = (itemsBucket?.list?.length || 0) + 1;
+    if (preset && typeof preset === "object") {
+      setItemForm({
+        ...ITEM_INITIAL,
+        ...preset,
+        order: baseOrder,
+      });
+    } else {
+      setItemForm({ ...ITEM_INITIAL, order: baseOrder });
+    }
     setItemError(null);
     setOpenItemModal(true);
   };
@@ -476,6 +583,295 @@ export default function BuildingProcurementDetail() {
         </div>
       </DataContainer>
 
+      <DataContainer>
+        <div className="building-page__card">
+          <div
+            className="building-page__actions"
+            style={{ justifyContent: "space-between" }}
+          >
+            <h3 className="building-page__cardTitle" style={{ margin: 0 }}>
+              Файлы по закупке
+            </h3>
+            <button
+              type="button"
+              className="building-btn building-btn--primary"
+              onClick={() => {
+                setNewFileTitle("");
+                setNewFile(null);
+                setFilesError(null);
+                setFileModalOpen(true);
+              }}
+            >
+              Прикрепить файл
+            </button>
+          </div>
+          {filesError && (
+            <div className="building-page__error">{String(filesError)}</div>
+          )}
+          {(!files || files.length === 0) && (
+            <div className="building-page__muted">
+              Файлы к этой закупке ещё не прикреплены.
+            </div>
+          )}
+          {files && files.length > 0 && (
+            <div
+              className="building-table building-table--shadow"
+              style={{ marginTop: 8 }}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>Файл</th>
+                    <th>Тип</th>
+                    <th>Создан</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {files.map((f) => {
+                    const url = getFileUrl(f);
+                    const ext = getFileExtension(url);
+                    const isImage = IMAGE_EXTENSIONS.includes(ext);
+                    return (
+                      <tr key={f.id ?? f.uuid ?? url}>
+                        <td>
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2"
+                            >
+                              {isImage ? (
+                                <img
+                                  src={url}
+                                  alt={f.title || f.filename || "file"}
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    objectFit: "cover",
+                                    borderRadius: 6,
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 6,
+                                    background: "#e2e8f0",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: "#0f172a",
+                                  }}
+                                >
+                                  {getFileTypeLabel(ext)}
+                                </span>
+                              )}
+                              <span>{f.title || f.filename || "Файл"}</span>
+                            </a>
+                          ) : (
+                            <span>{f.title || f.filename || "Файл"}</span>
+                          )}
+                        </td>
+                        <td>{getFileTypeLabel(ext)}</td>
+                        <td>{asDateTime(f.created_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </DataContainer>
+
+      {procurement?.status === "draft" && (
+        <DataContainer>
+          <div className="building-page__card">
+            <h3 className="building-page__cardTitle" style={{ marginTop: 0 }}>
+              Поставщики для этой закупки
+            </h3>
+            <div
+              className="building-page__row"
+              style={{ display: "block" }}
+            >
+              <div className="building-page__label">
+                Активные поставщики по текущему ЖК
+              </div>
+              {suppliersState.loading && (
+                <div className="building-page__muted">Загрузка...</div>
+              )}
+              {suppliersState.error && (
+                <div className="building-page__error">
+                  {String(suppliersState.error)}
+                </div>
+              )}
+              {!suppliersState.loading &&
+                (suppliersState.list || []).length === 0 && (
+                  <div className="building-page__muted">
+                    Подходящие поставщики не найдены.
+                  </div>
+                )}
+              {(() => {
+                const allSuppliers = suppliersState.list || [];
+                const filtered =
+                  procurement?.supplier
+                    ? allSuppliers.filter(
+                        (s) =>
+                          String(s.id ?? s.uuid) ===
+                          String(procurement.supplier),
+                      )
+                    : allSuppliers;
+                if (!filtered.length) return null;
+                return (
+                <div
+                  className="building-table building-table--shadow"
+                  style={{ marginTop: 4 }}
+                >
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style={{ width: "35%" }}>Поставщик</th>
+                        <th style={{ width: "20%" }}>Тип</th>
+                        <th>Материалы</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((s) => {
+                        const sid = s.id ?? s.uuid;
+                        const isOpen =
+                          openSupplierId &&
+                          String(openSupplierId) === String(sid);
+                        const materials = Array.isArray(s.supplied_materials)
+                          ? s.supplied_materials
+                          : [];
+                        return (
+                          <React.Fragment key={sid}>
+                            <tr
+                              className="cursor-pointer"
+                              onClick={() =>
+                                setOpenSupplierId(
+                                  isOpen ? null : sid,
+                                )
+                              }
+                            >
+                              <td>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    style={{
+                                      display: "inline-block",
+                                      width: 10,
+                                      height: 10,
+                                      borderRadius: "999px",
+                                      background: isOpen
+                                        ? "#0f172a"
+                                        : "#cbd5f5",
+                                    }}
+                                  />
+                                  <span>
+                                    {s.company_name || s.name || "—"}
+                                  </span>
+                                </div>
+                              </td>
+                              <td>{s.supplier_type_display || s.supplier_type || "—"}</td>
+                              <td>
+                                {materials.length > 0
+                                  ? `${materials.length} материал(ов)`
+                                  : "Материалы не заданы"}
+                              </td>
+                            </tr>
+                            {isOpen && materials.length > 0 && (
+                              <tr>
+                                <td colSpan={3}>
+                                  <div
+                                    style={{
+                                      padding: "8px 12px",
+                                      background: "#f8fafc",
+                                      borderRadius: 12,
+                                    }}
+                                  >
+                                    <div
+                                      className="building-page__label"
+                                      style={{ marginBottom: 4 }}
+                                    >
+                                      Поставляемые материалы
+                                    </div>
+                                    <div
+                                      className="building-table"
+                                      style={{
+                                        maxHeight: 220,
+                                        overflowY: "auto",
+                                      }}
+                                    >
+                                      <table>
+                                        <thead>
+                                          <tr>
+                                            <th>Наименование</th>
+                                            <th>Ед.</th>
+                                            <th>Цена</th>
+                                            <th />
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {materials.map((m, idx) => (
+                                            <tr key={idx}>
+                                              <td>{m.name || "—"}</td>
+                                              <td>{m.unit || "—"}</td>
+                                              <td>
+                                                {m.price != null &&
+                                                !Number.isNaN(m.price)
+                                                  ? `${m.price} KGS`
+                                                  : "—"}
+                                              </td>
+                                              <td>
+                                                <button
+                                                  type="button"
+                                                  className="building-btn building-btn--primary"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openCreateItem({
+                                                      ...ITEM_INITIAL,
+                                                      name: m.name || "",
+                                                      unit: m.unit || "",
+                                                      price:
+                                                        m.price != null &&
+                                                        !Number.isNaN(
+                                                          m.price,
+                                                        )
+                                                          ? String(m.price)
+                                                          : "",
+                                                      note: m.brand || "",
+                                                    });
+                                                  }}
+                                                >
+                                                  Добавить в позиции
+                                                </button>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                );
+              })()}
+            </div>
+          </div>
+        </DataContainer>
+      )}
+
       <Modal
         open={openHistoryModal}
         onClose={() => setOpenHistoryModal(false)}
@@ -511,6 +907,74 @@ export default function BuildingProcurementDetail() {
             </div>
           ))}
         </div>
+      </Modal>
+      <Modal
+        open={fileModalOpen}
+        onClose={() => {
+          if (fileUploading) return;
+          setFileModalOpen(false);
+          setNewFile(null);
+          setNewFileTitle("");
+        }}
+        title="Прикрепить файл к закупке"
+      >
+        <form
+          className="building-page"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newFile) {
+              handleFileUpload(newFile);
+            }
+          }}
+        >
+          <label>
+            <div className="building-page__label">Файл</div>
+            <input
+              type="file"
+              className="building-page__input"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setNewFile(file);
+                if (file && !newFileTitle) {
+                  setNewFileTitle(file.name);
+                }
+              }}
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Название</div>
+            <input
+              className="building-page__input"
+              value={newFileTitle}
+              onChange={(e) => setNewFileTitle(e.target.value)}
+              placeholder="Название файла (необязательно)"
+            />
+          </label>
+          {filesError && (
+            <div className="building-page__error">{String(filesError)}</div>
+          )}
+          <div className="building-page__actions">
+            <button
+              type="button"
+              className="building-btn"
+              onClick={() => {
+                if (fileUploading) return;
+                setFileModalOpen(false);
+                setNewFile(null);
+                setNewFileTitle("");
+              }}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="building-btn building-btn--primary"
+              disabled={fileUploading || !newFile}
+            >
+              {fileUploading ? "Загрузка..." : "Прикрепить"}
+            </button>
+          </div>
+        </form>
       </Modal>
       <Modal
         open={openItemModal}

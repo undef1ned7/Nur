@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { asDateTime } from "../shared/constants";
+import { useNavigate } from "react-router-dom";
 import {
   fetchBuildingContractors,
   deleteBuildingContractor,
@@ -18,6 +19,7 @@ const VIEW_MODES = {
 
 export default function ContractorsTab() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { selectedProjectId } = useBuildingProjects();
   const {
     list: items,
@@ -150,7 +152,13 @@ export default function ContractorsTab() {
               {items.map((c) => {
                 const id = c.id ?? c.uuid;
                 return (
-                  <tr key={id} className="client-detail__tableRow">
+                  <tr
+                    key={id}
+                    className="client-detail__tableRow cursor-pointer"
+                    onClick={() =>
+                      navigate(`/crm/building/clients/contractors/${id}`)
+                    }
+                  >
                     <td>{c.company_name || "—"}</td>
                     <td>{c.contractor_type || "—"}</td>
                     <td>{c.contact_person || "—"}</td>

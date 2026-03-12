@@ -2,58 +2,61 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../../api";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
-import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
-import SupplierInfoTab from "./SupplierInfoTab";
-import SupplierHistoryTab from "./SupplierHistoryTab";
-import SupplierMaterialsTab from "./SupplierMaterialsTab";
+import { useBuildingContractors } from "@/store/slices/building/contractorsSlice";
+import ContractorInfoTab from "./ContractorInfoTab";
+import ContractorEquipmentTab from "./ContractorEquipmentTab";
 
-export default function SupplierDetailPage() {
+export default function ContractorDetailPage() {
   const { id } = useParams();
-  const supplierId = id ? String(id) : null;
+  const contractorId = id ? String(id) : null;
   const navigate = useNavigate();
 
-  const { list: suppliersList } = useBuildingSuppliers();
+  const { list: contractorsList } = useBuildingContractors();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const initialSupplier = useMemo(() => {
-    if (!supplierId) return null;
-    const arr = Array.isArray(suppliersList) ? suppliersList : [];
+  const initialContractor = useMemo(() => {
+    if (!contractorId) return null;
+    const arr = Array.isArray(contractorsList) ? contractorsList : [];
     return (
-      arr.find((s) => String(s?.id ?? s?.uuid) === String(supplierId)) || null
+      arr.find((c) => String(c?.id ?? c?.uuid) === String(contractorId)) || null
     );
-  }, [suppliersList, supplierId]);
+  }, [contractorsList, contractorId]);
 
-  const [supplier, setSupplier] = useState(initialSupplier);
-  const [loading, setLoading] = useState(!initialSupplier);
+  const [contractor, setContractor] = useState(initialContractor);
+  const [loading, setLoading] = useState(!initialContractor);
   const [error, setError] = useState(null);
+
   const initialTab = (() => {
     const fromUrl = searchParams.get("tab");
-    if (fromUrl === "history" || fromUrl === "materials") return fromUrl;
+    if (fromUrl === "work-history" || fromUrl === "equipment") return fromUrl;
     return "info";
   })();
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const handleTabChange = (nextTab) => {
     setActiveTab(nextTab);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (nextTab === "info") {
-        next.delete("tab");
-      } else {
-        next.set("tab", nextTab);
-      }
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextTab === "info") {
+          next.delete("tab");
+        } else {
+          next.set("tab", nextTab);
+        }
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   useEffect(() => {
-    const loadSupplier = async () => {
-      if (!supplierId || supplier) return;
+    const loadContractor = async () => {
+      if (!contractorId || contractor) return;
       setLoading(true);
       setError(null);
       try {
-        const { data } = await api.get(`/building/suppliers/${supplierId}/`);
-        setSupplier(data || null);
+        const { data } = await api.get(`/building/contractors/${contractorId}/`);
+        setContractor(data || null);
       } catch (err) {
         setError(err);
       } finally {
@@ -61,12 +64,12 @@ export default function SupplierDetailPage() {
       }
     };
 
-    loadSupplier();
+    loadContractor();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierId]);
+  }, [contractorId]);
 
   const handleBack = () => {
-    navigate("/crm/building/clients?tab=suppliers");
+    navigate("/crm/building/clients?tab=contractors");
   };
 
   return (
@@ -74,10 +77,10 @@ export default function SupplierDetailPage() {
       <header className="sell-header">
         <div className="sell-header__content">
           <h1 className="sell-header__title">
-            {supplier?.company_name || "Поставщик"}
+            {contractor?.company_name || "Подрядчик"}
           </h1>
           <p className="sell-header__subtitle">
-            Детальная информация о поставщике
+            Детальная информация о подрядчике
           </p>
         </div>
         <button
@@ -85,7 +88,7 @@ export default function SupplierDetailPage() {
           className="sell-header__btn sell-header__btn--secondary"
           onClick={handleBack}
         >
-          ← К списку поставщиков
+          ← К списку подрядчиков
         </button>
       </header>
 
@@ -99,29 +102,30 @@ export default function SupplierDetailPage() {
           }
           onClick={() => handleTabChange("info")}
         >
-          Информация о поставщике
+          Информация о подрядчике
+        </button>
+        {/* Заглушки для будущих вкладок истории и оборудования */}
+        <button
+          type="button"
+          className={
+            activeTab === "work-history"
+              ? "client-detail__tab client-detail__tab--active"
+              : "client-detail__tab"
+          }
+          onClick={() => handleTabChange("work-history")}
+        >
+          История работ
         </button>
         <button
           type="button"
           className={
-            activeTab === "history"
+            activeTab === "equipment"
               ? "client-detail__tab client-detail__tab--active"
               : "client-detail__tab"
           }
-          onClick={() => handleTabChange("history")}
+          onClick={() => handleTabChange("equipment")}
         >
-          История поставок
-        </button>
-        <button
-          type="button"
-          className={
-            activeTab === "materials"
-              ? "client-detail__tab client-detail__tab--active"
-              : "client-detail__tab"
-          }
-          onClick={() => handleTabChange("materials")}
-        >
-          Материалы и доставка
+          Оборудование и специализации
         </button>
       </div>
 
@@ -131,30 +135,34 @@ export default function SupplierDetailPage() {
             <div className="sell-loading">
               <div className="sell-loading__spinner" />
               <p className="sell-loading__text">
-                Загрузка информации о поставщике...
+                Загрузка информации о подрядчике...
               </p>
             </div>
           )}
           {error && (
             <div className="building-page__error">
               {String(
-                validateResErrors(error, "Не удалось загрузить поставщика"),
+                validateResErrors(error, "Не удалось загрузить подрядчика"),
               )}
             </div>
           )}
-          {supplier && !loading && <SupplierInfoTab supplier={supplier} />}
+          {contractor && !loading && (
+            <ContractorInfoTab contractor={contractor} />
+          )}
         </div>
       )}
 
-      {activeTab === "history" && supplierId && (
+      {activeTab === "work-history" && (
         <div className="sell-card client-detail__section">
-          <SupplierHistoryTab supplierId={supplierId} />
+          <div className="building-page__muted">
+            История работ подрядчика будет реализована отдельно.
+          </div>
         </div>
       )}
 
-      {activeTab === "materials" && supplier && (
+      {activeTab === "equipment" && contractor && (
         <div className="sell-card client-detail__card">
-          <SupplierMaterialsTab supplier={supplier} />
+          <ContractorEquipmentTab contractor={contractor} />
         </div>
       )}
     </div>

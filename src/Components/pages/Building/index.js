@@ -7,6 +7,7 @@ import BuildingClients from "./Clients";
 import SupplierCreatePage from "./Clients/SupplierCreatePage";
 import SupplierDetailPage from "./Clients/SupplierDetailPage";
 import ContractorCreatePage from "./Clients/ContractorCreatePage";
+import ContractorDetailPage from "./Clients/ContractorDetailPage";
 import BuildingClientDetail from "./Clients/Detail";
 import BuildingNotification from "./Notification";
 import BuildingTaskDetail from "./Notification/Detail";
@@ -39,6 +40,7 @@ export {
   SupplierCreatePage,
   SupplierDetailPage,
   ContractorCreatePage,
+  ContractorDetailPage,
   BuildingClientDetail,
   BuildingNotification,
   BuildingTaskDetail,
