@@ -45,7 +45,7 @@ export async function createDebt({
   amount,
   debtMonths = 0,
   firstDueDate = null,
-  phone = '',
+  phone = "",
   name = "",
   note = "",
 }) {
@@ -108,13 +108,13 @@ const Sell = () => {
     historyObjectsCount,
     historyObjectsNext,
     historyObjectsPrevious,
-    loading
+    loading,
   } = useSale();
 
   // Получаем текущую страницу из URL
   const currentPage = useMemo(
     () => parseInt(searchParams.get("page") || "1", 10),
-    [searchParams]
+    [searchParams],
   );
 
   const [showDetailSell, setShowDetailSell] = useState(false);
@@ -199,23 +199,25 @@ const Sell = () => {
     count,
     totalPages,
     hasNextPage,
-    hasPrevPage
+    hasPrevPage,
   } = useMemo(() => {
     const sectorName = company?.sector?.name?.trim().toLowerCase() ?? "";
     const isBuildingCompany = sectorName === "строительная компания";
     const hidden = hiddenIds;
     const filterSell = (Array.isArray(history) ? history : []).filter(
       (item) =>
-        item.status !== "canceled" && !hidden.has(String(item?.id ?? ""))
+        item.status !== "canceled" && !hidden.has(String(item?.id ?? "")),
     );
-    const filterObjects = (Array.isArray(historyObjects) ? historyObjects : []).filter(
-      (item) => !hidden.has(String(item?.id ?? ""))
-    );
+    const filterObjects = (
+      Array.isArray(historyObjects) ? historyObjects : []
+    ).filter((item) => !hidden.has(String(item?.id ?? "")));
     const filterField = isBuildingCompany ? filterObjects : filterSell;
     const count = isBuildingCompany ? historyObjectsCount : historyCount;
     const next = isBuildingCompany ? historyObjectsNext : historyNext;
-    const previous = isBuildingCompany ? historyObjectsPrevious : historyPrevious;
-    const totalPages = count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1
+    const previous = isBuildingCompany
+      ? historyObjectsPrevious
+      : historyPrevious;
+    const totalPages = count && PAGE_SIZE ? Math.ceil(count / PAGE_SIZE) : 1;
     return {
       sectorName,
       isBuildingCompany,
@@ -226,8 +228,8 @@ const Sell = () => {
       previous,
       totalPages,
       hasNextPage: !!next,
-      hasPrevPage: !!previous
-    }
+      hasPrevPage: !!previous,
+    };
   }, [
     company,
     history,
@@ -239,7 +241,7 @@ const Sell = () => {
     historyPrevious,
     historyCount,
     historyNext,
-  ])
+  ]);
   // Синхронизация URL с состоянием страницы
 
   useEffect(() => {
@@ -267,7 +269,7 @@ const Sell = () => {
     }
     setSearchParams(params, { replace: true });
     // Плавно прокручиваем страницу вверх при смене страницы
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // поиск по истории (дебаунс)
@@ -289,7 +291,7 @@ const Sell = () => {
 
   // Плавно прокручиваем страницу вверх при изменении страницы
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPage]);
 
   useEffect(() => {
@@ -334,10 +336,10 @@ const Sell = () => {
     setShowRefundModal(true);
   };
 
-
-
   const formatMoney = (v) => {
-    const s = String(v ?? "").trim().replace(/,/g, ".");
+    const s = String(v ?? "")
+      .trim()
+      .replace(/,/g, ".");
     const n = Number(s);
     if (!Number.isFinite(n)) return String(v ?? "-");
     return n.toLocaleString("ru-RU", {
@@ -408,7 +410,7 @@ const Sell = () => {
     } catch (err) {
       console.error("Failed to add cashflow:", err);
       setError(
-        "Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз."
+        "Не удалось добавить операцию по кассе. Пожалуйста, проверьте данные и попробуйте еще раз.",
       );
     }
   };
@@ -420,23 +422,61 @@ const Sell = () => {
       return;
     try {
       setBulkDeleting(true);
-      const res = await fetch(
-        "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+      const ids = Array.from(selectedIds);
+
+      const doRequest = async (allowPaid) => {
+        const res = await fetch(
+          "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            },
+            credentials: "include",
+            body: JSON.stringify({
+              ids,
+              allow_paid: allowPaid,
+            }),
           },
-          credentials: "include",
-          body: JSON.stringify({
-            ids: Array.from(selectedIds),
-            allow_paid: false,
-          }),
+        );
+        return res;
+      };
+
+      let res = await doRequest(false);
+
+      if (!res.ok && res.status === 400) {
+        let data = null;
+        try {
+          data = await res.json();
+        } catch {
+          // оставляем data = null
         }
-      );
-      if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+
+        const paidIds = Array.isArray(data?.paid_ids) ? data.paid_ids : [];
+        if (paidIds.length > 0) {
+          const msg =
+            data?.detail ||
+            "Среди выбранных продаж есть оплаченные. Удалить их тоже?";
+          const confirmPaid = window.confirm(
+            `${msg}\n\nОплаченные продажи:\n${paidIds.join("\n")}`,
+          );
+          if (!confirmPaid) {
+            alert("Удаление отменено. Оплаченные продажи не были удалены.");
+            return;
+          }
+          res = await doRequest(true);
+        } else {
+          throw new Error(data?.detail || "Запрос отклонён (400)");
+        }
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+
       clearSelection();
       alert("Выбранные записи удалены");
       dispatch(historySellProduct({ search: "", page: currentPage }));
@@ -456,20 +496,59 @@ const Sell = () => {
       const list = Array.isArray(filterField) ? filterField : [];
       const ids = list.map((i) => i.id);
       if (ids.length === 0) throw new Error("Нечего удалять");
-      const res = await fetch(
-        "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+
+      const doRequest = async (allowPaid) => {
+        const res = await fetch(
+          "https://app.nurcrm.kg/api/main/sales/bulk-delete/",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            },
+            credentials: "include",
+            body: JSON.stringify({ ids, allow_paid: allowPaid }),
           },
-          credentials: "include",
-          body: JSON.stringify({ ids, allow_paid: false }),
+        );
+        return res;
+      };
+
+      let res = await doRequest(false);
+
+      if (!res.ok && res.status === 400) {
+        let data = null;
+        try {
+          data = await res.json();
+        } catch {
+          // оставляем data = null
         }
-      );
-      if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
+
+        const paidIds = Array.isArray(data?.paid_ids) ? data.paid_ids : [];
+        if (paidIds.length > 0) {
+          const msg =
+            data?.detail ||
+            "Среди переданных продаж есть оплаченные. Удалить их тоже?";
+          const confirmPaid = window.confirm(
+            `${msg}\n\nОплаченные продажи:\n${paidIds.join("\n")}`,
+          );
+          if (!confirmPaid) {
+            alert(
+              "Очистка отменена. Оплаченные продажи не были удалены, история сохранена.",
+            );
+            return;
+          }
+          res = await doRequest(true);
+        } else {
+          throw new Error(data?.detail || "Запрос отклонён (400)");
+        }
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+
       clearSelection();
       alert("История удалена");
       // После удаления всех записей возвращаемся на первую страницу
@@ -526,13 +605,23 @@ const Sell = () => {
         <div className="sell__header">
           <div className="sell__header-left">
             <div className="sell__header-input">
-              <input className="w-full" onChange={onChange} type="text" placeholder="Поиск" />
+              <input
+                className="w-full"
+                onChange={onChange}
+                type="text"
+                placeholder="Поиск"
+              />
               <span>
                 <Search size={15} color="#91929E" />
               </span>
             </div>
           </div>
-          <button className="sell__header-btn " onClick={() => navigate("start")}>Начать продажу</button>
+          <button
+            className="sell__header-btn "
+            onClick={() => navigate("start")}
+          >
+            Начать продажу
+          </button>
           {selectedIds.size > 0 ? (
             <SelectionActions pageItems={filterField} />
           ) : (
@@ -542,8 +631,7 @@ const Sell = () => {
                   className="sklad__add"
                   onClick={() => setShowBuilding(true)}
                 >
-                  <Plus size={16} style={{ marginRight: 4 }} /> Продать
-                  квартиру
+                  <Plus size={16} style={{ marginRight: 4 }} /> Продать квартиру
                 </button>
               ) : (
                 <>
@@ -557,7 +645,6 @@ const Sell = () => {
               )}
             </>
           )}
-
         </div>
         <div className="sell__history">
           <div className="sell__history-toolbar">
@@ -574,7 +661,11 @@ const Sell = () => {
             </label>
 
             <div className="sell__history-toolbarRight">
-              <div className="sell__viewToggle" role="group" aria-label="Вид списка">
+              <div
+                className="sell__viewToggle"
+                role="group"
+                aria-label="Вид списка"
+              >
                 <button
                   type="button"
                   className={`sell__viewBtn ${
@@ -665,15 +756,15 @@ const Sell = () => {
                                 {statusLabel}
                               </span>
                             </td>
-                        
+
                             <td className="sellTable__title">
                               {item.first_item_name || item.title || "—"}
                             </td>
-                           
-                            <td>{translatePaymentMethod(item.payment_method)}</td>
-                            <td className="">
-                              {formatMoney(item.total)} сом
+
+                            <td>
+                              {translatePaymentMethod(item.payment_method)}
                             </td>
+                            <td className="">{formatMoney(item.total)} сом</td>
                             <td className="sellTable__count">
                               {itemsCount !== null ? itemsCount : "—"}
                             </td>
@@ -810,7 +901,6 @@ const Sell = () => {
                 </div>
               )}
             </DataContainer>
-
           )}
         </div>
 
@@ -833,7 +923,11 @@ const Sell = () => {
               type="button"
               className="sell__pagination-btn"
               onClick={() => handlePageChange(currentPage + 1)}
-              disabled={loading || !hasNextPage || (totalPages && currentPage >= totalPages)}
+              disabled={
+                loading ||
+                !hasNextPage ||
+                (totalPages && currentPage >= totalPages)
+              }
             >
               Вперед
             </button>
