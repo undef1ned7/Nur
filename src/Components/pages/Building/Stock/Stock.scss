@@ -1,27 +1,6 @@
 @import "../CashRegister/CashRegister.scss";
 
-/* Кнопка «Назад» на детальной странице (как в Warehouse/Stocks) */
-.warehouse-header__back {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  background: #f3f4f6;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-  flex-shrink: 0;
-  margin-bottom: 16px;
-
-  &:hover {
-    background: #e5e7eb;
-  }
-}
-
+/* Дополнительные стили для карточек складов (если нужны переопределения) */
 .stock-card {
   cursor: pointer;
 }

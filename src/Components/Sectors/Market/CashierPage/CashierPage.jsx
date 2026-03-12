@@ -22,8 +22,9 @@ import {
   sendBarCode,
   startSale,
   updateManualFilling,
+  updateProductInCart,
 } from "../../../../store/creators/saleThunk";
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import { fetchShiftsAsync } from "../../../../store/creators/shiftThunk";
 import { getCashBoxes, useCash } from "../../../../store/slices/cashSlice";
 import api from "../../../../api";
@@ -49,7 +50,7 @@ import sleep from "../../../../../tools/sleep";
 import { useAlert } from "../../../../hooks/useDialog";
 
 const CashierPage = () => {
-  const alert = useAlert()
+  const alert = useAlert();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const {
@@ -176,8 +177,6 @@ const CashierPage = () => {
   const openShiftId = openShift?.id;
   const openShiftStatus = openShift?.status;
 
-
-
   const [searchParams, setSearchParams] = useSearchParams();
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10);
   const [searchTerm, setSearchTerm] = useState("");
@@ -187,6 +186,9 @@ const CashierPage = () => {
   const [cart, setCart] = useState([]);
   const cartOrderRef = React.useRef([]); // Сохраняем порядок элементов корзины
   const [cartQuantities, setCartQuantities] = useState({}); // Локальные значения количества для каждого товара
+  const [cartPrices, setCartPrices] = useState({}); // Локальные значения цены за единицу (unit_price)
+  const [cartDiscounts, setCartDiscounts] = useState({}); // Локальные значения скидки на позицию (discount_total)
+  const [cartDiscountModes, setCartDiscountModes] = useState({}); // Режим скидки по позиции: "amount" (сом) или "percent"
   const lastSearchInputTime = React.useRef(0); // Время последнего ввода в поле поиска (для защиты от открытия страницы оплаты при сканировании)
   const searchInputRef = React.useRef(null); // Ref для поля поиска
   const lastScanTimeRef = React.useRef(0); // Время последнего сканирования (как в SellMainStart.jsx)
@@ -206,6 +208,7 @@ const CashierPage = () => {
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountValue, setDiscountValue] = useState("");
+  const [discountMode, setDiscountMode] = useState("amount"); // "amount" | "percent"
   const [customService, setCustomService] = useState({
     name: "",
     price: "",
@@ -217,7 +220,6 @@ const CashierPage = () => {
     title: "",
     message: "",
   });
-
 
   const [mobileProductsList, setMobileProductsList] = useState(false);
   // Функция для показа AlertModal
@@ -240,13 +242,13 @@ const CashierPage = () => {
     if (currentSale?.id && openShiftId) {
       try {
         const currentDiscount = normalizePrice(
-          currentSale?.order_discount_total || 0
+          currentSale?.order_discount_total || 0,
         );
         await dispatch(
           startSale({
             discount_total: currentDiscount,
             shift: openShiftId,
-          })
+          }),
         ).unwrap();
       } catch (error) {
         console.error("Ошибка при обновлении продажи:", error);
@@ -254,19 +256,30 @@ const CashierPage = () => {
     }
   }, [openShiftId, currentSale]);
 
-  const debouncedDiscount = useDebounce((discount) => {
+  const debouncedDiscount = useDebounce((payload) => {
     if (!currentSale?.id || !openShiftId) return;
     dispatch(
       startSale({
-        discount_total: normalizePrice(parseFloat(discount) || 0),
+        ...payload,
         shift: openShiftId,
-      })
+      }),
     );
   }, 600);
 
-  const handleDiscountChange = (discount) => {
-    const discountNum = parseFloat(discount) || 0;
-    debouncedDiscount(discountNum);
+  const handleDiscountChange = (discount, mode = "amount") => {
+    const num = parseFloat(discount) || 0;
+
+    if (mode === "percent") {
+      // В процентах отправляем order_discount_percent
+      debouncedDiscount({
+        order_discount_percent: num,
+      });
+    } else {
+      // В сомах отправляем order_discount_total
+      debouncedDiscount({
+        order_discount_total: normalizePrice(num),
+      });
+    }
   };
 
   // Функция для добавления доп. услуги
@@ -284,7 +297,7 @@ const CashierPage = () => {
         showAlert(
           "error",
           "Ошибка",
-          "Корзина не инициализирована. Пожалуйста, подождите..."
+          "Корзина не инициализирована. Пожалуйста, подождите...",
         );
         return;
       }
@@ -294,7 +307,7 @@ const CashierPage = () => {
           name: customService.name.trim(),
           price: normalizePrice(customService.price.trim()),
           quantity: normalizeQuantity(Number(customService.quantity) || 1),
-        })
+        }),
       ).unwrap();
       await refreshSale();
       setCustomService({ name: "", price: "", quantity: "1" });
@@ -306,8 +319,8 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         error?.data?.detail ||
-        error?.message ||
-        "Ошибка при добавлении дополнительной услуги"
+          error?.message ||
+          "Ошибка при добавлении дополнительной услуги",
       );
     }
   };
@@ -375,7 +388,7 @@ const CashierPage = () => {
 
       // Проверяем наличие служебных символов в штрих-коде
       const hasInvalidPattern = invalidPatterns.some((pattern) =>
-        barcode.includes(pattern)
+        barcode.includes(pattern),
       );
 
       // Проверяем, что штрих-код содержит только допустимые символы
@@ -386,7 +399,7 @@ const CashierPage = () => {
         // Это не валидный штрих-код, игнорируем
         console.warn(
           "Некорректный штрих-код (содержит служебные символы):",
-          barcode
+          barcode,
         );
         return;
       }
@@ -403,7 +416,7 @@ const CashierPage = () => {
         showAlert(
           "warning",
           "Нет открытой смены",
-          "Для работы с кассой необходимо начать смену"
+          "Для работы с кассой необходимо начать смену",
         );
         isScanningRef.current = false;
         return;
@@ -420,7 +433,7 @@ const CashierPage = () => {
             startSale({
               discount_total: 0,
               shift: openShiftId,
-            })
+            }),
           ).unwrap();
           saleId = result?.id;
         }
@@ -434,7 +447,7 @@ const CashierPage = () => {
         // Проверяем наличие товара ПЕРЕД добавлением в корзину
         // Ищем товар в списке продуктов по штрих-коду
         const scannedProduct = products.find(
-          (p) => p.barcode === barcode || p.barcode?.toString() === barcode
+          (p) => p.barcode === barcode || p.barcode?.toString() === barcode,
         );
 
         if (scannedProduct) {
@@ -445,7 +458,7 @@ const CashierPage = () => {
             showAlert(
               "warning",
               "Товар отсутствует",
-              "Товар отсутствует в наличии"
+              "Товар отсутствует в наличии",
             );
             barcodeProcessingRef.current = false;
             setScannedBarcode("");
@@ -455,7 +468,7 @@ const CashierPage = () => {
 
         // Добавляем товар по штрих-коду
         const res = await dispatch(
-          sendBarCode({ barcode, id: saleId })
+          sendBarCode({ barcode, id: saleId }),
         ).unwrap();
 
         if (res?.error) {
@@ -467,7 +480,7 @@ const CashierPage = () => {
         } else {
           // Обновляем продажу после добавления товара
           await dispatch(
-            startSale({ discount_total: 0, shift: openShiftId })
+            startSale({ discount_total: 0, shift: openShiftId }),
           ).unwrap();
           // Обновляем время последнего сканирования после успешного добавления
           // Это защитит от открытия страницы оплаты при Enter от сканера
@@ -480,7 +493,7 @@ const CashierPage = () => {
         showAlert(
           "error",
           "Ошибка сканирования",
-          error?.message || "Не удалось добавить товар по штрих-коду"
+          error?.message || "Не удалось добавить товар по штрих-коду",
         );
       } finally {
         barcodeProcessingRef.current = false;
@@ -605,7 +618,11 @@ const CashierPage = () => {
         const apiCart = items.map((item) => {
           const qty = normalizeQuantity(parseFloat(item.quantity || 0));
           const price = normalizePrice(
-            parseFloat(item.unit_price || item.price || 0)
+            parseFloat(item.unit_price || item.price || 0),
+          );
+          // line_discount — это именно "скидка, написанная продавцом"
+          const discountTotal = normalizePrice(
+            parseFloat(item.line_discount || item.discount_total || 0),
           );
           const productId = item.product || item.product_id;
           const cartItemId = item.id;
@@ -620,6 +637,7 @@ const CashierPage = () => {
             name: item.product_name || item.display_name || item.name || "—",
             price: price,
             quantity: qty,
+            discountTotal,
             unit: item.unit || "шт",
             image:
               item.primary_image_url ||
@@ -649,14 +667,14 @@ const CashierPage = () => {
           // Сначала добавляем элементы в сохраненном порядке
           cartOrderRef.current.forEach((savedProductId) => {
             const item = uniqueApiCart.find(
-              (cartItem) => cartItem.id === savedProductId
+              (cartItem) => cartItem.id === savedProductId,
             );
             if (item && !processedProductIds.has(item.id)) {
               orderedCart.push(item);
               processedProductIds.add(item.id);
             }
           });
-      }
+        }
 
         // Затем добавляем новые элементы, которых нет в сохраненном порядке
         uniqueApiCart.forEach((item) => {
@@ -669,12 +687,36 @@ const CashierPage = () => {
         // Обновляем сохраненный порядок
         cartOrderRef.current = orderedCart.map((item) => item.id);
 
-        // Обновляем локальные значения количества
+        // Обновляем локальные значения количества, цены и скидки
         const newQuantities = {};
+        const newPrices = {};
         orderedCart.forEach((item) => {
           newQuantities[item.id] = formatQuantity(item.quantity || 0);
+          newPrices[item.id] = formatPrice(item.price ?? 0);
         });
         setCartQuantities((prev) => ({ ...prev, ...newQuantities }));
+        setCartPrices((prev) => ({ ...prev, ...newPrices }));
+        // Скидки по строкам: не перезатираем то, что уже ввёл продавец.
+        setCartDiscounts((prev) => {
+          const next = { ...prev };
+          orderedCart.forEach((item) => {
+            if (next[item.id] === undefined) {
+              next[item.id] = formatPrice(item.discountTotal ?? 0);
+            }
+          });
+          return next;
+        });
+
+        // Режим скидки по умолчанию — в сомах
+        setCartDiscountModes((prev) => {
+          const next = { ...prev };
+          orderedCart.forEach((item) => {
+            if (!next[item.id]) {
+              next[item.id] = "amount";
+            }
+          });
+          return next;
+        });
 
         setCart(orderedCart);
       } else {
@@ -698,13 +740,25 @@ const CashierPage = () => {
           deleteProductInCart({
             id: currentSale.id,
             productId: cartItem.itemId,
-          })
+          }),
         );
-        cartOrderRef.current = cartOrderRef.current.filter((id) => id !== cartItem.id);
+        cartOrderRef.current = cartOrderRef.current.filter(
+          (id) => id !== cartItem.id,
+        );
         setCartQuantities((prev) => {
           const q = { ...prev };
           delete q[cartItem.id];
           return q;
+        });
+        setCartPrices((prev) => {
+          const next = { ...prev };
+          delete next[cartItem.id];
+          return next;
+        });
+        setCartDiscounts((prev) => {
+          const next = { ...prev };
+          delete next[cartItem.id];
+          return next;
         });
       } else {
         await dispatch(
@@ -712,8 +766,7 @@ const CashierPage = () => {
             id: currentSale.id,
             productId: cartItem.itemId,
             quantity: newQuantity,
-            discount_total: 0,
-          })
+          }),
         );
         setCartQuantities((prev) => ({
           ...prev,
@@ -725,7 +778,8 @@ const CashierPage = () => {
       showAlert(
         "error",
         "Ошибка",
-        "Ошибка при обновлении количества: " + (error.message || "Неизвестная ошибка")
+        "Ошибка при обновлении количества: " +
+          (error.message || "Неизвестная ошибка"),
       );
     }
   };
@@ -736,7 +790,7 @@ const CashierPage = () => {
 
     try {
       const qtyNum = normalizeQuantity(
-        Math.max(0, parseFloat(newQuantity) || 0)
+        Math.max(0, parseFloat(newQuantity) || 0),
       );
 
       if (qtyNum === 0) {
@@ -749,8 +803,7 @@ const CashierPage = () => {
           id: currentSale.id,
           productId: cartItem.itemId,
           quantity: qtyNum,
-          discount_total: 0,
-        })
+        }),
       );
       setCartQuantities((prev) => ({
         ...prev,
@@ -762,7 +815,8 @@ const CashierPage = () => {
       showAlert(
         "error",
         "Ошибка",
-        "Ошибка при обновлении количества: " + (error.message || "Неизвестная ошибка")
+        "Ошибка при обновлении количества: " +
+          (error.message || "Неизвестная ошибка"),
       );
     }
   };
@@ -776,9 +830,21 @@ const CashierPage = () => {
         deleteProductInCart({
           id: currentSale.id,
           productId: cartItem.itemId,
-        })
+        }),
       );
-      cartOrderRef.current = cartOrderRef.current.filter((id) => id !== cartItem.id);
+      cartOrderRef.current = cartOrderRef.current.filter(
+        (id) => id !== cartItem.id,
+      );
+      setCartPrices((prev) => {
+        const next = { ...prev };
+        delete next[cartItem.id];
+        return next;
+      });
+      setCartDiscounts((prev) => {
+        const next = { ...prev };
+        delete next[cartItem.id];
+        return next;
+      });
       setCartQuantities((prev) => {
         const q = { ...prev };
         delete q[cartItem.id];
@@ -789,11 +855,10 @@ const CashierPage = () => {
       showAlert(
         "error",
         "Ошибка",
-        "Ошибка при удалении: " + (error.message || "Неизвестная ошибка")
+        "Ошибка при удалении: " + (error.message || "Неизвестная ошибка"),
       );
     }
   };
-
 
   // Расчет пагинации
   // Используем фиксированный размер страницы
@@ -1017,10 +1082,8 @@ const CashierPage = () => {
 
   useEffect(() => {
     if (!openShiftId) return;
-    dispatch(
-      startSale({ discount_total: 0, shift: openShiftId })
-    );
-  }, [openShiftId])
+    dispatch(startSale({ discount_total: 0, shift: openShiftId }));
+  }, [openShiftId]);
 
   const addToCart = async (product) => {
     // Проверяем наличие товара
@@ -1039,7 +1102,7 @@ const CashierPage = () => {
         showAlert(
           "warning",
           "Нет открытой смены",
-          "Для работы с кассой необходимо начать смену"
+          "Для работы с кассой необходимо начать смену",
         );
         return;
       }
@@ -1049,14 +1112,14 @@ const CashierPage = () => {
       // Если продажа еще не создана, создаем её
       if (!saleId) {
         const result = await dispatch(
-          startSale({ discount_total: 0, shift: openShiftId })
+          startSale({ discount_total: 0, shift: openShiftId }),
         );
         if (result.type === "sale/start/rejected") {
           showAlert(
             "error",
             "Ошибка",
             "Ошибка при создании продажи: " +
-            (result.payload?.message || "Неизвестная ошибка")
+              (result.payload?.message || "Неизвестная ошибка"),
           );
           return;
         }
@@ -1072,7 +1135,7 @@ const CashierPage = () => {
       // startSale возвращает items напрямую, а не cart.items
       const items = currentSale?.items || currentSale?.cart?.items || [];
       const existingItem = items.find(
-        (item) => item.product === product.id || item.product_id === product.id
+        (item) => item.product === product.id || item.product_id === product.id,
       );
 
       if (existingItem) {
@@ -1085,8 +1148,7 @@ const CashierPage = () => {
             id: saleId,
             productId: product.id,
             quantity: newQuantity,
-            discount_total: 0,
-          })
+          }),
         );
         // Обновляем продажу после успешного обновления
         // await refreshSale();
@@ -1097,8 +1159,7 @@ const CashierPage = () => {
             id: saleId,
             productId: product.id,
             quantity: normalizeQuantity(1),
-            discount_total: 0,
-          })
+          }),
         );
         // Обновляем продажу после успешного добавления
         // cartOrderRef будет обновлен автоматически в useEffect при обновлении currentSale
@@ -1110,7 +1171,7 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         "Ошибка при добавлении товара: " +
-        (error.message || "Неизвестная ошибка")
+          (error.message || "Неизвестная ошибка"),
       );
     }
   };
@@ -1126,7 +1187,7 @@ const CashierPage = () => {
       // startSale возвращает items напрямую, а не cart.items
       const items = currentSale?.items || currentSale?.cart?.items || [];
       const existingItem = items.find(
-        (item) => item.product === productId || item.product_id === productId
+        (item) => item.product === productId || item.product_id === productId,
       );
 
       if (!existingItem) return;
@@ -1144,7 +1205,7 @@ const CashierPage = () => {
           showAlert(
             "warning",
             "Товар отсутствует",
-            "Товар отсутствует в наличии"
+            "Товар отсутствует в наличии",
           );
           return;
         }
@@ -1153,7 +1214,7 @@ const CashierPage = () => {
           showAlert(
             "warning",
             "Недостаточно товара",
-            `Доступно только ${availableQuantity} ${product.unit || "шт"}`
+            `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
           );
           return;
         }
@@ -1165,11 +1226,11 @@ const CashierPage = () => {
           deleteProductInCart({
             id: currentSale.id,
             productId: productId,
-          })
+          }),
         );
         // Удаляем товар из сохраненного порядка
         cartOrderRef.current = cartOrderRef.current.filter(
-          (id) => id !== productId
+          (id) => id !== productId,
         );
         // Удаляем из локальных значений количества
         setCartQuantities((prev) => {
@@ -1186,8 +1247,7 @@ const CashierPage = () => {
             id: currentSale.id,
             productId: productId,
             quantity: newQuantity,
-            discount_total: 0,
-          })
+          }),
         );
         // Обновляем локальное значение количества
         setCartQuantities((prev) => ({
@@ -1203,7 +1263,7 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         "Ошибка при обновлении количества: " +
-        (error.message || "Неизтвестная ошибка")
+          (error.message || "Неизтвестная ошибка"),
       );
     }
   };
@@ -1218,7 +1278,7 @@ const CashierPage = () => {
       if (!product) return;
 
       const qtyNum = normalizeQuantity(
-        Math.max(0, parseFloat(newQuantity) || 0)
+        Math.max(0, parseFloat(newQuantity) || 0),
       );
 
       // Проверяем наличие
@@ -1227,7 +1287,7 @@ const CashierPage = () => {
         showAlert(
           "warning",
           "Недостаточно товара",
-          `Доступно только ${availableQuantity} ${product.unit || "шт"}`
+          `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
         );
         return;
       }
@@ -1241,8 +1301,7 @@ const CashierPage = () => {
             id: currentSale.id,
             productId: productId,
             quantity: qtyNum,
-            discount_total: 0,
-          })
+          }),
         );
         // Обновляем локальное значение количества
         setCartQuantities((prev) => ({
@@ -1258,7 +1317,7 @@ const CashierPage = () => {
         "error",
         "Ошибка",
         "Ошибка при обновлении количества: " +
-        (error.message || "Неизвестная ошибка")
+          (error.message || "Неизвестная ошибка"),
       );
     }
   };
@@ -1272,17 +1331,27 @@ const CashierPage = () => {
         deleteProductInCart({
           id: currentSale.id,
           productId: productId,
-        })
+        }),
       );
       // Удаляем товар из сохраненного порядка
       cartOrderRef.current = cartOrderRef.current.filter(
-        (id) => id !== productId
+        (id) => id !== productId,
       );
-      // Удаляем из локальных значений количества
+      // Удаляем из локальных значений количества, цены и скидки
       setCartQuantities((prev) => {
         const newQuantities = { ...prev };
         delete newQuantities[productId];
         return newQuantities;
+      });
+      setCartPrices((prev) => {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      });
+      setCartDiscounts((prev) => {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
       });
       // Обновляем продажу после успешного удаления
       // await refreshSale();
@@ -1291,8 +1360,93 @@ const CashierPage = () => {
       showAlert(
         "error",
         "Ошибка",
-        "Ошибка при удалении товара: " + (error.message || "Неизвестная ошибка")
+        "Ошибка при удалении товара: " +
+          (error.message || "Неизвестная ошибка"),
       );
+    }
+  };
+
+  // PATCH позиции: цена за единицу (unit_price). Цена не может быть ниже product.price (проверка на бэке).
+  const patchCartItemPrice = async (item, value) => {
+    if (!currentSale?.id) return;
+    const cartItemId = item.isCustom ? item.itemId : item.id;
+    const num = normalizePrice(parseFloat(value) || 0);
+    if (!item.isCustom && item.productId) {
+      const product = products.find((p) => p.id === item.productId);
+      if (product) {
+        const minPrice = parseFloat(product.price || 0);
+        if (minPrice > 0 && num < minPrice) {
+          showAlert(
+            "warning",
+            "Минимальная цена",
+            `Цена не может быть ниже базовой: ${formatPrice(minPrice)} сом`,
+          );
+          setCartPrices((prev) => ({
+            ...prev,
+            [item.id]: formatPrice(item.price ?? 0),
+          }));
+          return;
+        }
+      }
+    }
+    try {
+      await dispatch(
+        updateProductInCart({
+          id: currentSale.id,
+          productId: cartItemId,
+          data: { unit_price: String(num.toFixed(2)) },
+        }),
+      ).unwrap();
+      setCartPrices((prev) => ({ ...prev, [item.id]: formatPrice(num) }));
+      await refreshSale();
+    } catch (err) {
+      console.error("Ошибка при изменении цены:", err);
+      showAlert("error", "Ошибка", err?.message || "Не удалось изменить цену");
+      setCartPrices((prev) => ({
+        ...prev,
+        [item.id]: formatPrice(item.price ?? 0),
+      }));
+    }
+  };
+
+  // PATCH позиции: скидка на позицию (discount_total).
+  // value — абсолютная скидка в сомах; displayValue — то, что показываем в инпуте (например, %).
+  const patchCartItemDiscount = async (item, value, options = {}) => {
+    const { mode = "amount", displayValue } = options;
+    if (!currentSale?.id) return;
+    const cartItemId = item.isCustom ? item.itemId : item.id;
+    const num = Math.max(0, normalizePrice(parseFloat(value) || 0));
+    try {
+      await dispatch(
+        updateProductInCart({
+          id: currentSale.id,
+          productId: cartItemId,
+          data: { discount_total: String(num.toFixed(2)) },
+        }),
+      ).unwrap();
+      setCartDiscounts((prev) => {
+        // В режиме процентов сохраняем именно введённое значение (проценты),
+        // в режиме суммы — форматированную сумму.
+        if (mode === "percent" && displayValue !== undefined) {
+          return {
+            ...prev,
+            [item.id]: displayValue,
+          };
+        }
+        return { ...prev, [item.id]: formatPrice(num) };
+      });
+      await refreshSale();
+    } catch (err) {
+      console.error("Ошибка при изменении скидки:", err);
+      showAlert(
+        "error",
+        "Ошибка",
+        err?.message || "Не удалось изменить скидку",
+      );
+      setCartDiscounts((prev) => ({
+        ...prev,
+        [item.id]: formatPrice(item.discountTotal ?? 0),
+      }));
     }
   };
 
@@ -1324,27 +1478,31 @@ const CashierPage = () => {
   };
 
   const filteredProducts = useMemo(() => {
-    const cartItemsMap = new Map(currentSale?.items?.map(el => [el.product, { qty: parseFloat(el.quantity), item: el }]))
-    return products.map(el => {
-      const qty = parseFloat(el.quantity);
-      const cartItem = cartItemsMap.get(el.id)
-      const cartQty = cartItem?.qty || 0;
-      const primaryImg = el.images.find(el => el.is_primary)
-      return {
-        ...el,
-        quantity: qty - cartQty,
-        isCart: !!cartQty,
-        cartItem: cartItem?.item,
-        img: primaryImg?.image_url ?? el.images[0]?.image_url ?? '/images/placeholder.avif'
-      }
-    })
-      .sort((a, b) => {
-        if (a.cartItem) return -1;
-        if (b.cartItem) return 1;
-        return 0;
+    const cartItemsMap = new Map(
+      currentSale?.items?.map((el) => [
+        el.product,
+        { qty: parseFloat(el.quantity), item: el },
+      ]),
+    );
+    return products
+      .map((el) => {
+        const qty = parseFloat(el.quantity);
+        const cartItem = cartItemsMap.get(el.id);
+        const cartQty = cartItem?.qty || 0;
+        const primaryImg = el.images.find((el) => el.is_primary);
+        return {
+          ...el,
+          quantity: qty - cartQty,
+          isCart: !!cartQty,
+          cartItem: cartItem?.item,
+          img:
+            primaryImg?.image_url ??
+            el.images[0]?.image_url ??
+            "/images/placeholder.avif",
+        };
       })
-      .filter(el => !!el.quantity)
-  }, [products, currentSale])
+      .filter((el) => !!el.quantity);
+  }, [products, currentSale]);
   if (showShiftPage) {
     return <ShiftPage onBack={() => setShowShiftPage(false)} />;
   }
@@ -1405,7 +1563,7 @@ const CashierPage = () => {
           // Важно: создаем новую корзину БЕЗ скидки (discount_total: 0)
           if (openShiftId) {
             await dispatch(
-              startSale({ discount_total: 0, shift: openShiftId })
+              startSale({ discount_total: 0, shift: openShiftId }),
             );
             // Не вызываем refreshSale() здесь, так как он использует старую скидку из currentSale
             // startSale уже обновляет состояние продажи
@@ -1416,7 +1574,7 @@ const CashierPage = () => {
           } catch (e) {
             console.error(
               "Не удалось обновить список товаров после продажи:",
-              e
+              e,
             );
           }
         }}
@@ -1489,9 +1647,16 @@ const CashierPage = () => {
       </div>
 
       <div className="cashier-page__content">
-        <div className={`cashier-page__products ${mobileProductsList ? 'active' : ''} `}>
+        <div
+          className={`cashier-page__products ${mobileProductsList ? "active" : ""} `}
+        >
           <div className="mobile-list-btn flex w-full justify-center py-2 md:hidden!">
-            <Button onClick={() => setMobileProductsList(false)} className="mx-auto">Скрыть</Button>
+            <Button
+              onClick={() => setMobileProductsList(false)}
+              className="mx-auto"
+            >
+              Скрыть
+            </Button>
           </div>
           <div className="cashier-page__search">
             <Search size={20} />
@@ -1583,8 +1748,9 @@ const CashierPage = () => {
                 return (
                   <div
                     key={product.id}
-                    className={`cashier-page__product-card ${cartItem ? "cashier-page__product-card--selected" : ""
-                      }`}
+                    className={`cashier-page__product-card ${
+                      cartItem ? "cashier-page__product-card--selected" : ""
+                    }`}
                     onClick={() => addToCart(product)}
                   >
                     {cartItem && (
@@ -1637,7 +1803,13 @@ const CashierPage = () => {
             </div>
           )}
         </div>
-        <Button className="min-[769px]:hidden!" onClick={() => setMobileProductsList(true)} color="info">Добавить товар</Button>
+        <Button
+          className="min-[769px]:hidden!"
+          onClick={() => setMobileProductsList(true)}
+          color="info"
+        >
+          Добавить товар
+        </Button>
         <div className="cashier-page__cart">
           <div className="cashier-page__cart-header">
             <h2 className="cashier-page__cart-title">Корзина</h2>
@@ -1654,7 +1826,18 @@ const CashierPage = () => {
             <button
               className="cashier-page__cart-action-btn"
               onClick={() => {
-                setDiscountValue(currentSale?.order_discount_total || "");
+                // Инициализируем модалку текущими данными
+                if (currentSale?.order_discount_percent) {
+                  setDiscountMode("percent");
+                  setDiscountValue(
+                    String(currentSale.order_discount_percent || ""),
+                  );
+                } else {
+                  setDiscountMode("amount");
+                  setDiscountValue(
+                    String(currentSale?.order_discount_total || ""),
+                  );
+                }
                 setShowDiscountModal(true);
               }}
               title="Добавить общую скидку"
@@ -1676,160 +1859,339 @@ const CashierPage = () => {
             ) : (
               cart.map((item) => (
                 <div key={item.id} className="cashier-page__cart-item">
-                  <div className="cashier-page__cart-item-info">
-                    <div className="cashier-page__cart-item-name">
-                      {item.name}
+                  <div className="cashier-page__cart-item-main">
+                    <div className="cashier-page__cart-item-head">
+                      <span className="cashier-page__cart-item-name">
+                        {item.name}
+                      </span>
+                      <div className="cashier-page__cart-item-head-right">
+                        <div className="cashier-page__cart-item-discount-modes">
+                          <button
+                            type="button"
+                            className={`cashier-page__cart-item-discount-mode-btn ${
+                              (cartDiscountModes[item.id] || "amount") ===
+                              "amount"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setCartDiscountModes((prev) => ({
+                                ...prev,
+                                [item.id]: "amount",
+                              }))
+                            }
+                          >
+                            сом
+                          </button>
+                          <button
+                            type="button"
+                            className={`cashier-page__cart-item-discount-mode-btn ${
+                              cartDiscountModes[item.id] === "percent"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setCartDiscountModes((prev) => ({
+                                ...prev,
+                                [item.id]: "percent",
+                              }))
+                            }
+                          >
+                            %
+                          </button>
+                        </div>
+                        <span className="cashier-page__cart-item-total">
+                          {item.discountTotal > 0 ? (
+                            <>
+                              <span
+                                style={{
+                                  textDecoration: "line-through",
+                                  opacity: 0.7,
+                                  marginRight: 6,
+                                }}
+                              >
+                                {Number(
+                                  ((item.price || 0) * item.quantity).toFixed(
+                                    2,
+                                  ),
+                                )}{" "}
+                                сом
+                              </span>
+                              <span>
+                                {Number(
+                                  (
+                                    (item.price || 0) * item.quantity -
+                                    (item.discountTotal || 0)
+                                  ).toFixed(2),
+                                )}{" "}
+                                сом
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              {Number(
+                                (
+                                  (item.price || 0) * item.quantity -
+                                  (item.discountTotal || 0)
+                                ).toFixed(2),
+                              )}{" "}
+                              сом
+                            </>
+                          )}
+                        </span>
+                      </div>
                     </div>
-                    <div className="cashier-page__cart-item-controls">
-                      <button
-                        className="cashier-page__cart-item-btn"
-                        onClick={() => {
-                          if (item.isCustom) return updateCustomQuantityByDelta(item, -1);
-                          return updateQuantity(item.id, -1);
-                        }}
-                      >
-                        <Minus size={16} />
-                      </button>
-                      <input
-                        type="text"
-                        className="cashier-page__cart-item-quantity-input"
-                        value={
-                          cartQuantities[item.id] ??
-                          formatQuantity(item.quantity || 0)
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
+                    <div className="cashier-page__cart-item-row">
+                      <label className="cashier-page__cart-item-field">
+                        <span className="cashier-page__cart-item-field-label">
+                          Цена
+                        </span>
+                        <input
+                          type="text"
+                          className="cashier-page__cart-item-price-input"
+                          value={
+                            cartPrices[item.id] ?? formatPrice(item.price ?? 0)
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (
+                              v === "" ||
+                              v === "-" ||
+                              /^\d*\.?\d*$/.test(v)
+                            ) {
+                              setCartPrices((prev) => ({
+                                ...prev,
+                                [item.id]: v,
+                              }));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const v = e.target.value;
+                            const num = parseFloat(v);
+                            if (v !== "" && !isNaN(num) && num !== item.price) {
+                              patchCartItemPrice(item, v);
+                            } else {
+                              setCartPrices((prev) => ({
+                                ...prev,
+                                [item.id]: formatPrice(item.price ?? 0),
+                              }));
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.target.blur();
+                          }}
+                        />
+                      </label>
+                      <label className="cashier-page__cart-item-field">
+                        <span className="cashier-page__cart-item-field-label">
+                          Скидка
+                        </span>
+                        <input
+                          type="text"
+                          className="cashier-page__cart-item-price-input"
+                          value={cartDiscounts[item.id] ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            // Разрешаем только число, пустую строку и "сырой" ввод до валидации
+                            if (
+                              v === "" ||
+                              v === "-" ||
+                              /^\d*\.?\d*$/.test(v)
+                            ) {
+                              setCartDiscounts((prev) => ({
+                                ...prev,
+                                [item.id]: v,
+                              }));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const v = e.target.value;
+                            const mode = cartDiscountModes[item.id] || "amount";
+                            const num = parseFloat(v);
 
-                          // Если поле пустое, разрешаем ввод (для очистки)
-                          if (value === "" || value === "-") {
+                            // Текущее значение скидки в сомах
+                            const current = parseFloat(item.discountTotal ?? 0);
+
+                            if (v === "" || isNaN(num) || num < 0) {
+                              return;
+                            }
+
+                            if (mode === "percent") {
+                              const lineTotal =
+                                (item.price || 0) * (item.quantity || 0);
+                              if (lineTotal <= 0) return;
+
+                              let discountSom =
+                                (lineTotal * Math.max(0, num)) / 100;
+
+                              // Не даём скидке превышать сумму строки
+                              if (discountSom > lineTotal) {
+                                discountSom = lineTotal;
+                              }
+
+                              if (discountSom !== current) {
+                                patchCartItemDiscount(item, discountSom, {
+                                  mode: "percent",
+                                  displayValue: v,
+                                });
+                              }
+                            } else {
+                              // Режим суммы в сомах
+                              if (num !== current) {
+                                patchCartItemDiscount(item, v);
+                              }
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.target.blur();
+                          }}
+                        />
+                      </label>
+                      <div className="cashier-page__cart-item-controls">
+                        <button
+                          type="button"
+                          className="cashier-page__cart-item-btn"
+                          onClick={() => {
+                            if (item.isCustom)
+                              return updateCustomQuantityByDelta(item, -1);
+                            return updateQuantity(item.id, -1);
+                          }}
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <input
+                          type="text"
+                          className="cashier-page__cart-item-quantity-input"
+                          value={
+                            cartQuantities[item.id] ??
+                            formatQuantity(item.quantity || 0)
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === "" || value === "-") {
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: value,
+                              }));
+                              return;
+                            }
+                            const numValue = parseFloat(value);
+                            if (isNaN(numValue)) return;
+                            if (!item.isCustom) {
+                              const product = products.find(
+                                (p) => p.id === item.id,
+                              );
+                              if (product) {
+                                const availableQuantity = parseFloat(
+                                  product.quantity || 0,
+                                );
+                                if (
+                                  availableQuantity > 0 &&
+                                  numValue > availableQuantity
+                                ) {
+                                  setCartQuantities((prev) => ({
+                                    ...prev,
+                                    [item.id]: String(availableQuantity),
+                                  }));
+                                  showAlert(
+                                    "warning",
+                                    "Недостаточно товара",
+                                    `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
+                                  );
+                                  return;
+                                }
+                              }
+                            }
+                            if (numValue < 0) {
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: "0",
+                              }));
+                              return;
+                            }
                             setCartQuantities((prev) => ({
                               ...prev,
                               [item.id]: value,
                             }));
-                            return;
-                          }
-
-                          // Проверяем, что введено число
-                          const numValue = parseFloat(value);
-                          if (isNaN(numValue)) {
-                            return; // Не обновляем, если не число
-                          }
-
-                          // Находим товар для проверки максимального количества
-                          if (!item.isCustom) {
-                            const product = products.find((p) => p.id === item.id);
-                            if (product) {
-                              const availableQuantity = parseFloat(product.quantity || 0);
-
-                              // Если есть ограничение по количеству, не позволяем ввести больше
-                              if (availableQuantity > 0 && numValue > availableQuantity) {
-                                // Ограничиваем максимальным доступным количеством
-                                setCartQuantities((prev) => ({
-                                  ...prev,
-                                  [item.id]: String(availableQuantity),
-                                }));
-                                showAlert(
-                                  "warning",
-                                  "Недостаточно товара",
-                                  `Доступно только ${availableQuantity} ${product.unit || "шт"}`
+                          }}
+                          onBlur={async (e) => {
+                            const value = e.target.value;
+                            const qtyNum = normalizeQuantity(
+                              Math.max(0, parseFloat(value) || 0),
+                            );
+                            if (!item.isCustom) {
+                              const product = products.find(
+                                (p) => p.id === item.id,
+                              );
+                              if (product) {
+                                const availableQuantity = parseFloat(
+                                  product.quantity || 0,
                                 );
-                                return;
+                                if (
+                                  availableQuantity > 0 &&
+                                  qtyNum > availableQuantity
+                                ) {
+                                  showAlert(
+                                    "warning",
+                                    "Недостаточно товара",
+                                    `Доступно только ${availableQuantity} ${product.unit || "шт"}`,
+                                  );
+                                  setCartQuantities((prev) => ({
+                                    ...prev,
+                                    [item.id]: formatQuantity(
+                                      item.quantity || 0,
+                                    ),
+                                  }));
+                                  return;
+                                }
                               }
                             }
-                          }
-
-                          // Разрешаем ввод только положительных чисел
-                          if (numValue < 0) {
-                            setCartQuantities((prev) => ({
-                              ...prev,
-                              [item.id]: "0",
-                            }));
-                            return;
-                          }
-
-                          setCartQuantities((prev) => ({
-                            ...prev,
-                            [item.id]: value,
-                          }));
-                        }}
-                        onBlur={async (e) => {
-                          const value = e.target.value;
-                          const qtyNum = normalizeQuantity(
-                            Math.max(0, parseFloat(value) || 0)
-                          );
-
-                          // Находим товар для проверки наличия
-                          if (!item.isCustom) {
-                            const product = products.find((p) => p.id === item.id);
-                            if (product) {
-                              const availableQuantity = parseFloat(product.quantity || 0);
-                              if (availableQuantity > 0 && qtyNum > availableQuantity) {
-                                showAlert(
-                                  "warning",
-                                  "Недостаточно товара",
-                                  `Доступно только ${availableQuantity} ${product.unit || "шт"}`
-                                );
-                                setCartQuantities((prev) => ({
-                                  ...prev,
-                                  [item.id]: formatQuantity(item.quantity || 0),
-                                }));
-                                return;
+                            if (qtyNum === 0) {
+                              if (item.isCustom) {
+                                await removeCustomFromCart(item);
+                              } else {
+                                await removeFromCart(item.id);
                               }
-                            }
-                          }
-
-                          if (qtyNum === 0) {
-                            if (item.isCustom) {
-                              await removeCustomFromCart(item);
+                            } else if (qtyNum !== item.quantity) {
+                              if (item.isCustom) {
+                                await updateCustomQuantityDirect(item, qtyNum);
+                              } else {
+                                await updateQuantityDirect(item.id, qtyNum);
+                              }
                             } else {
-                              await removeFromCart(item.id);
+                              setCartQuantities((prev) => ({
+                                ...prev,
+                                [item.id]: formatQuantity(item.quantity || 0),
+                              }));
                             }
-                          } else if (qtyNum !== item.quantity) {
-                            if (item.isCustom) {
-                              await updateCustomQuantityDirect(item, qtyNum);
-                            } else {
-                              await updateQuantityDirect(item.id, qtyNum);
-                            }
-                          } else {
-                            // Если количество не изменилось, просто обновляем локальное значение
-                            setCartQuantities((prev) => ({
-                              ...prev,
-                              [item.id]: formatQuantity(item.quantity || 0),
-                            }));
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.target.blur();
-                          }
-                        }}
-                        min="0"
-                        step="1"
-                      />
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.target.blur();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="cashier-page__cart-item-btn"
+                          onClick={() => {
+                            if (item.isCustom)
+                              return updateCustomQuantityByDelta(item, 1);
+                            return updateQuantity(item.id, 1);
+                          }}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
                       <button
-                        className="cashier-page__cart-item-btn"
+                        type="button"
+                        className="cashier-page__cart-item-remove"
                         onClick={() => {
-                          if (item.isCustom) return updateCustomQuantityByDelta(item, 1);
-                          return updateQuantity(item.id, 1);
+                          if (item.isCustom) return removeCustomFromCart(item);
+                          return removeFromCart(item.id);
                         }}
+                        title="Удалить"
                       >
-                        <Plus size={16} />
+                        <Trash2 size={16} />
                       </button>
-                    </div>
-                  </div>
-                  <div className="cashier-page__cart-item-actions">
-                    <button
-                      className="cashier-page__cart-item-remove"
-                      onClick={() => {
-                        if (item.isCustom) return removeCustomFromCart(item);
-                        return removeFromCart(item.id);
-                      }}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                    <div className="cashier-page__cart-item-price">
-                      {Number(((item.price || 0) * item.quantity).toFixed(3))}{" "}
-                      сом
                     </div>
                   </div>
                 </div>
@@ -1909,15 +2271,15 @@ const CashierPage = () => {
           show={showDiscountModal}
           onClose={() => {
             setShowDiscountModal(false);
-            setDiscountValue("");
           }}
           discountValue={discountValue}
           setDiscountValue={setDiscountValue}
           currentSubtotal={currentSale?.subtotal || 0}
+          mode={discountMode}
+          setMode={setDiscountMode}
           onApply={(discount) => {
-            handleDiscountChange(discount);
+            handleDiscountChange(discount, discountMode);
             setShowDiscountModal(false);
-            setDiscountValue("");
           }}
         />
       )}
