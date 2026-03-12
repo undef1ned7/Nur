@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ClipboardList } from "lucide-react";
+import { ArrowLeft, ClipboardList, FilePlus, Pencil, Package, Copy } from "lucide-react";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -10,9 +10,16 @@ import { useBuildingWorkEntries } from "@/store/slices/building/workEntriesSlice
 import {
   fetchBuildingWorkEntryById,
   createBuildingWorkEntryPhoto,
+  createBuildingWorkEntryFile,
+  createWorkEntryWarehouseRequest,
+  updateBuildingWorkEntry,
 } from "@/store/creators/building/workEntriesCreators";
-import { asDateTime } from "../shared/constants";
-import { Copy } from "lucide-react";
+import { fetchBuildingWarehouses } from "@/store/creators/building/warehousesCreators";
+import { fetchBuildingWarehouseStockItems } from "@/store/creators/building/stockCreators";
+import { useBuildingWarehouses } from "@/store/slices/building/warehousesSlice";
+import { useBuildingStock } from "@/store/slices/building/stockSlice";
+import { asDateTime, statusLabel } from "../shared/constants";
+import api from "../../../../api";
 import "./Detail.scss";
 
 const CATEGORY_LABELS = {
@@ -21,6 +28,22 @@ const CATEGORY_LABELS = {
   defect: "Дефект",
   report: "Отчёт",
   other: "Другое",
+};
+
+const WORK_STATUS_LABELS = {
+  planned: "Запланировано",
+  in_progress: "В работе",
+  paused: "Приостановлено",
+  completed: "Завершено",
+  cancelled: "Отменено",
+};
+
+const WAREHOUSE_REQUEST_STATUS_LABELS = {
+  pending: "Ожидает склада",
+  approved: "Одобрена",
+  rejected: "Отклонена",
+  partially_approved: "Частично выдано",
+  completed: "Всё выдано",
 };
 
 export default function BuildingWorkProcessDetail() {
@@ -42,10 +65,70 @@ export default function BuildingWorkProcessDetail() {
   const [openPreviewModal, setOpenPreviewModal] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState(null);
 
+  const [openFileModal, setOpenFileModal] = useState(false);
+  const [attachFile, setAttachFile] = useState(null);
+  const [attachFileTitle, setAttachFileTitle] = useState("");
+  const [fileError, setFileError] = useState(null);
+  const [fileUploading, setFileUploading] = useState(false);
+
+  const [openWarehouseModal, setOpenWarehouseModal] = useState(false);
+  const [warehouseRequestWarehouse, setWarehouseRequestWarehouse] = useState("");
+  const [warehouseRequestItems, setWarehouseRequestItems] = useState([
+    { stock_item: "", quantity: "", unit: "" },
+  ]);
+  const [warehouseRequestComment, setWarehouseRequestComment] = useState("");
+  const [warehouseRequestError, setWarehouseRequestError] = useState(null);
+  const [warehouseRequestSubmitting, setWarehouseRequestSubmitting] = useState(false);
+
+  const [warehouseRequests, setWarehouseRequests] = useState([]);
+  const [warehouseRequestsLoading, setWarehouseRequestsLoading] = useState(false);
+  const [warehouseRequestsError, setWarehouseRequestsError] = useState(null);
+
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState(null);
+
+  const { list: warehousesList } = useBuildingWarehouses();
+  const { items: stockItemsList } = useBuildingStock();
+
   useEffect(() => {
     if (!entryId) return;
     dispatch(fetchBuildingWorkEntryById(entryId));
   }, [dispatch, entryId]);
+
+  useEffect(() => {
+    if (!entryId) return;
+    const loadRequests = async () => {
+      setWarehouseRequestsLoading(true);
+      setWarehouseRequestsError(null);
+      try {
+        const { data } = await api.get(
+          "/building/work-entries/warehouse-requests/",
+          {
+            params: {
+              work_entry: entryId,
+              page_size: 50,
+            },
+          },
+        );
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+          ? data
+          : [];
+        setWarehouseRequests(list);
+      } catch (err) {
+        setWarehouseRequestsError(
+          validateResErrors(
+            err,
+            "Не удалось загрузить заявки на материалы",
+          ),
+        );
+      } finally {
+        setWarehouseRequestsLoading(false);
+      }
+    };
+    loadRequests();
+  }, [entryId]);
 
   const selectedProjectName = useMemo(() => {
     if (!selectedProjectId) return "—";
@@ -61,10 +144,41 @@ export default function BuildingWorkProcessDetail() {
       ? current
       : current;
 
-  const photos = useMemo(
-    () => (Array.isArray(entry?.photos) ? entry.photos : []),
-    [entry],
-  );
+  const rcId = entry?.residential_complex ?? entry?.residential_complex_id ?? selectedProjectId;
+  useEffect(() => {
+    if (!rcId) return;
+    dispatch(
+      fetchBuildingWarehouses({
+        residential_complex: rcId,
+        is_active: true,
+        page_size: 100,
+      }),
+    );
+  }, [dispatch, rcId]);
+
+  useEffect(() => {
+    if (!warehouseRequestWarehouse) return;
+    dispatch(
+      fetchBuildingWarehouseStockItems({
+        warehouse: warehouseRequestWarehouse,
+        page_size: 500,
+      }),
+    );
+  }, [dispatch, warehouseRequestWarehouse]);
+
+  const photos = useMemo(() => {
+    const raw = entry?.photos;
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray(raw.results)) return raw.results;
+    return [];
+  }, [entry]);
+
+  const files = useMemo(() => {
+    const raw = entry?.files;
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray(raw.results)) return raw.results;
+    return [];
+  }, [entry]);
 
   const handleBack = () => {
     navigate("/crm/building/work");
@@ -156,6 +270,199 @@ export default function BuildingWorkProcessDetail() {
     }
   };
 
+  const handleFileAttachSubmit = async (e) => {
+    e.preventDefault();
+    if (!entryId) return;
+    if (!attachFile) {
+      setFileError("Выберите файл");
+      return;
+    }
+    setFileError(null);
+    setFileUploading(true);
+    try {
+      const res = await dispatch(
+        createBuildingWorkEntryFile({
+          id: entryId,
+          file: attachFile,
+          title: attachFileTitle.trim() || undefined,
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Файл прикреплён");
+        setAttachFile(null);
+        setAttachFileTitle("");
+        setOpenFileModal(false);
+        dispatch(fetchBuildingWorkEntryById(entryId));
+      } else {
+        setFileError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось прикрепить файл",
+          ),
+        );
+      }
+    } catch (err) {
+      setFileError(validateResErrors(err, "Не удалось прикрепить файл"));
+    } finally {
+      setFileUploading(false);
+    }
+  };
+
+  const closeFileModal = () => {
+    setOpenFileModal(false);
+    setAttachFile(null);
+    setAttachFileTitle("");
+    setFileError(null);
+  };
+
+  const getFileUrl = (f) =>
+    f?.file_url ?? f?.url ?? f?.file ?? (typeof f === "string" ? f : "");
+
+  const getFileName = (f) => {
+    if (f?.title) return f.title;
+    const url = getFileUrl(f);
+    if (!url) return "Файл";
+    const clean = url.split("#")[0].split("?")[0];
+    const parts = clean.split("/");
+    const last = parts[parts.length - 1] || "Файл";
+    return last;
+  };
+
+  const openWarehouseRequestModal = () => {
+    setWarehouseRequestWarehouse("");
+    setWarehouseRequestItems([{ stock_item: "", quantity: "", unit: "" }]);
+    setWarehouseRequestComment("");
+    setWarehouseRequestError(null);
+    setOpenWarehouseModal(true);
+  };
+
+  const addWarehouseRequestRow = () => {
+    setWarehouseRequestItems((prev) => [
+      ...prev,
+      { stock_item: "", quantity: "", unit: "" },
+    ]);
+  };
+
+  const updateWarehouseRequestItem = (index, field, value) => {
+    setWarehouseRequestItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...(next[index] || {}), [field]: value };
+      return next;
+    });
+  };
+
+  const removeWarehouseRequestRow = (index) => {
+    setWarehouseRequestItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleWarehouseRequestSubmit = async (e) => {
+    e.preventDefault();
+    if (!entryId) return;
+    if (!warehouseRequestWarehouse) {
+      setWarehouseRequestError("Выберите склад");
+      return;
+    }
+    const items = warehouseRequestItems
+      .map((row) => ({
+        stock_item: row.stock_item || null,
+        quantity: row.quantity ? String(row.quantity) : null,
+        unit: (row.unit || "").trim() || null,
+      }))
+      .filter((row) => row.stock_item && row.quantity);
+    if (items.length === 0) {
+      setWarehouseRequestError("Добавьте хотя бы одну позицию с количеством");
+      return;
+    }
+    setWarehouseRequestError(null);
+    setWarehouseRequestSubmitting(true);
+    try {
+      const res = await dispatch(
+        createWorkEntryWarehouseRequest({
+          id: entryId,
+          payload: {
+            warehouse: warehouseRequestWarehouse,
+            items,
+            comment: warehouseRequestComment.trim() || undefined,
+          },
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Заявка на склад создана");
+        setOpenWarehouseModal(false);
+        // Перезагружаем список заявок для этого процесса работ
+        try {
+          const { data } = await api.get(
+            "/building/work-entries/warehouse-requests/",
+            {
+              params: {
+                work_entry: entryId,
+                page_size: 50,
+              },
+            },
+          );
+          const list = Array.isArray(data?.results)
+            ? data.results
+            : Array.isArray(data)
+            ? data
+            : [];
+          setWarehouseRequests(list);
+        } catch (err) {
+          // тихо игнорируем, форма уже успешно создала заявку
+          // и при следующей загрузке страницы данные подтянутся
+        }
+      } else {
+        setWarehouseRequestError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось создать заявку",
+          ),
+        );
+      }
+    } catch (err) {
+      setWarehouseRequestError(
+        validateResErrors(err, "Не удалось создать заявку"),
+      );
+    } finally {
+      setWarehouseRequestSubmitting(false);
+    }
+  };
+
+  const handleEditClick = () => {
+    navigate(`/crm/building/work?edit=${entryId}`, { state: { openEditId: entryId } });
+  };
+
+  const handleStatusChange = async (e) => {
+    const value = e.target.value;
+    if (!entryId) return;
+    setStatusSaving(true);
+    setStatusError(null);
+    try {
+      const res = await dispatch(
+        updateBuildingWorkEntry({
+          id: entryId,
+          payload: { work_status: value },
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Статус процесса работ обновлён");
+        dispatch(fetchBuildingWorkEntryById(entryId));
+      } else {
+        setStatusError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось обновить статус процесса",
+          ),
+        );
+      }
+    } catch (err) {
+      setStatusError(
+        validateResErrors(err, "Не удалось обновить статус процесса"),
+      );
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
   return (
     <div className="add-product-page work-detail">
       <div className="add-product-page__header">
@@ -176,28 +483,34 @@ export default function BuildingWorkProcessDetail() {
               Запись процесса работ
             </h1>
             <p className="add-product-page__subtitle">
-              ЖК: <b>{selectedProjectName}</b>
+              ЖК: <b>{entry?.residential_complex_name || selectedProjectName}</b>
               {entry?.category && (
                 <> • {CATEGORY_LABELS[entry.category] || entry.category}</>
               )}
             </p>
           </div>
         </div>
-        <div className="work-detail__section-actions" style={{ marginTop: 16 }}>
+        <div className="work-detail__section-actions" style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+       
           <button
             type="button"
-            className="add-product-page__cancel-btn"
-            onClick={handleBack}
+            className="add-product-page__submit-btn"
+            onClick={handleEditClick}
+            disabled={!entry}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            Назад к списку
+            <Pencil size={18} />
+            Редактировать
           </button>
           <button
             type="button"
             className="add-product-page__submit-btn"
-            onClick={() => setOpenPhotoModal(true)}
+            onClick={openWarehouseRequestModal}
             disabled={!entry}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            Добавить фото
+            <Package size={18} />
+            Заявка на склад
           </button>
         </div>
       </div>
@@ -215,6 +528,88 @@ export default function BuildingWorkProcessDetail() {
 
       {entry && (
         <div className="add-product-page__content">
+          <div
+            className="work-detail__status-track"
+            style={{
+              marginTop: 4,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: "#64748b",
+                marginBottom: 6,
+              }}
+            >
+              Процесс работ
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              {["cancelled", "planned", "in_progress", "paused", "completed"].map(
+                (statusKey, index, arr) => {
+                  const isActive = entry?.work_status === statusKey;
+                  const colors = {
+                    cancelled: "#b91c1c",
+                    planned: "#6b7280",
+                    in_progress: "#2563eb",
+                    paused: "#d97706",
+                    completed: "#15803d",
+                  };
+                  const circleColor = colors[statusKey] || "#64748b";
+                  return (
+                    <React.Fragment key={statusKey}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          minWidth: 0,
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "999px",
+                            border: "2px solid",
+                            borderColor: isActive ? circleColor : "#cbd5e1",
+                            backgroundColor: isActive ? circleColor : "#ffffff",
+                          }}
+                        />
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 11,
+                            color: isActive ? circleColor : "#94a3b8",
+                            maxWidth: 90,
+                            lineHeight: 1.25,
+                          }}
+                        >
+                          {WORK_STATUS_LABELS[statusKey] || statusKey}
+                        </div>
+                      </div>
+                      {index < arr.length - 1 && (
+                        <div
+                          style={{
+                            flex: 1,
+                            height: 1,
+                            background: "#e2e8f0",
+                          }}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                },
+              )}
+            </div>
+          </div>
           <div className="add-product-page__section">
             <div className="add-product-page__section-header">
               <div className="add-product-page__section-number">1</div>
@@ -243,6 +638,83 @@ export default function BuildingWorkProcessDetail() {
               }}
             >
               <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Жилой комплекс</label>
+                <div className="work-detail__value">
+                  {entry?.residential_complex_name || "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Категория</label>
+                <div className="work-detail__value">
+                  {CATEGORY_LABELS[entry?.category] || entry?.category || "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Статус работ</label>
+                <select
+                  className="add-product-page__input"
+                  value={entry?.work_status || "planned"}
+                  onChange={handleStatusChange}
+                  disabled={statusSaving}
+                >
+                  {Object.entries(WORK_STATUS_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                {statusError && (
+                  <div
+                    className="add-product-page__error"
+                    style={{ marginTop: 4 }}
+                  >
+                    {String(statusError)}
+                  </div>
+                )}
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Подрядчик</label>
+                <div className="work-detail__value">
+                  {entry?.contractor_display ?? entry?.contractor_name ?? "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Клиент</label>
+                <div className="work-detail__value">
+                  {entry?.client_display ?? entry?.client_name ?? "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Договор</label>
+                <div className="work-detail__value">
+                  {entry?.treaty_display ?? entry?.treaty_number ?? entry?.treaty_title ?? "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Сумма договора</label>
+                <div className="work-detail__value">
+                  {entry?.contract_amount != null && entry.contract_amount !== ""
+                    ? Number(entry.contract_amount).toLocaleString("ru-RU")
+                    : "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Начало работ</label>
+                <div className="work-detail__value">
+                  {entry?.contract_term_start
+                    ? String(entry.contract_term_start).slice(0, 10)
+                    : "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Окончание работ</label>
+                <div className="work-detail__value">
+                  {entry?.contract_term_end
+                    ? String(entry.contract_term_end).slice(0, 10)
+                    : "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
                 <label className="add-product-page__label">Автор</label>
                 <div className="work-detail__value">
                   {entry.created_by_display || "—"}
@@ -260,9 +732,27 @@ export default function BuildingWorkProcessDetail() {
           </div>
 
           <div className="add-product-page__section" style={{ marginTop: 24 }}>
-            <div className="add-product-page__section-header">
-              <div className="add-product-page__section-number">2</div>
-              <h3 className="add-product-page__section-title">Фотоотчёт</h3>
+            <div
+              className="add-product-page__section-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="add-product-page__section-number">2</div>
+                <h3 className="add-product-page__section-title">Фотоотчёт</h3>
+              </div>
+              <button
+                type="button"
+                className="add-product-page__submit-btn"
+                onClick={() => setOpenPhotoModal(true)}
+                disabled={!entry}
+              >
+                Добавить фото
+              </button>
             </div>
             {photos.length === 0 ? (
               <div className="work-detail__muted">
@@ -313,6 +803,232 @@ export default function BuildingWorkProcessDetail() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+
+          <div className="add-product-page__section" style={{ marginTop: 24 }}>
+            <div
+              className="add-product-page__section-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="add-product-page__section-number">3</div>
+                <h3 className="add-product-page__section-title">
+                  Прикреплённые файлы
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="add-product-page__submit-btn"
+                onClick={() => setOpenFileModal(true)}
+                disabled={!entry}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <FilePlus size={18} />
+                Прикрепить файл
+              </button>
+            </div>
+            {files.length === 0 ? (
+              <div className="work-detail__muted">
+                Файлов пока нет. Используйте кнопку «Прикрепить файл» выше.
+              </div>
+            ) : (
+              <div
+                style={{
+                  overflowX: "auto",
+                  paddingBottom: 4,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "stretch",
+                    minHeight: 120,
+                  }}
+                >
+                  {files.map((f) => {
+                    const fid = f?.id ?? f?.uuid;
+                    const url = getFileUrl(f);
+                    const name = getFileName(f);
+                    const clean = url ? url.split("#")[0].split("?")[0] : "";
+                    const ext =
+                      clean && clean.includes(".")
+                        ? clean.split(".").pop().toLowerCase()
+                        : "";
+                    const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(
+                      ext,
+                    );
+                    return (
+                      <div
+                        key={fid}
+                        style={{
+                          flex: "0 0 200px",
+                          borderRadius: 12,
+                          border: "1px solid #e2e8f0",
+                          background: "#ffffff",
+                          padding: 10,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            borderRadius: 8,
+                            border: "1px dashed #e2e8f0",
+                            background: "#f8fafc",
+                            height: 90,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            overflow: "hidden",
+                          }}
+                        >
+                          {url && isImage ? (
+                            <img
+                              src={url}
+                              alt={name}
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "#64748b",
+                              }}
+                            >
+                              {ext ? ext.toUpperCase() : "FILE"}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                            fontSize: 12,
+                          }}
+                        >
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                color: "#2563eb",
+                                textDecoration: "underline",
+                                wordBreak: "break-all",
+                              }}
+                            >
+                              {name}
+                            </a>
+                          ) : (
+                            <span>{name}</span>
+                          )}
+                          {f?.created_at && (
+                            <span style={{ fontSize: 11, color: "#94a3b8" }}>
+                              {asDateTime(f.created_at)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="add-product-page__section" style={{ marginTop: 24 }}>
+            <div
+              className="add-product-page__section-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="add-product-page__section-number">4</div>
+                <h3 className="add-product-page__section-title">
+                  Склад: заявки на материалы
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="add-product-page__submit-btn"
+                onClick={() => setOpenWarehouseModal(true)}
+                disabled={!entry}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <Package size={18} />
+                Заявка на склад
+              </button>
+            </div>
+            {warehouseRequestsLoading ? (
+              <div className="work-detail__muted">
+                Загрузка заявок на материалы...
+              </div>
+            ) : warehouseRequestsError ? (
+              <div className="add-product-page__error">
+                {String(warehouseRequestsError)}
+              </div>
+            ) : warehouseRequests.length === 0 ? (
+              <div className="work-detail__muted">
+                Заявки на материалы для этого процесса ещё не созданы.
+              </div>
+            ) : (
+              <div
+                className="building-table building-table--shadow"
+                style={{ marginTop: 8 }}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Склад</th>
+                      <th>Статус</th>
+                      <th>Позиции</th>
+                      <th>Создана</th>
+                      <th>Обновлена</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {warehouseRequests.map((req, index) => {
+                      const items = Array.isArray(req.items) ? req.items : [];
+                      const statusText = statusLabel(
+                        req.status,
+                        WAREHOUSE_REQUEST_STATUS_LABELS,
+                      );
+                      return (
+                        <tr key={req.id ?? req.uuid ?? index}>
+                          <td>{index + 1}</td>
+                          <td>{req.warehouse_name || req.warehouse || "—"}</td>
+                          <td>{statusText}</td>
+                          <td>
+                            {items.length > 0
+                              ? `${items.length} поз.`
+                              : "Позиции не заданы"}
+                          </td>
+                          <td>{asDateTime(req.created_at)}</td>
+                          <td>{asDateTime(req.updated_at)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -399,6 +1115,189 @@ export default function BuildingWorkProcessDetail() {
           </div>
         </form>
       </Modal>
+      <Modal
+        open={openFileModal}
+        onClose={closeFileModal}
+        title="Прикрепить файл"
+      >
+        <form
+          className="add-product-page add-product-page--modal-form"
+          onSubmit={handleFileAttachSubmit}
+        >
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Файл</label>
+            <input
+              type="file"
+              className="add-product-page__input"
+              onChange={(e) => setAttachFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Название (необязательно)</label>
+            <input
+              className="add-product-page__input"
+              value={attachFileTitle}
+              onChange={(e) => setAttachFileTitle(e.target.value)}
+              placeholder="Например: Договор, Акт"
+            />
+          </div>
+          {fileError && (
+            <div className="add-product-page__error">{String(fileError)}</div>
+          )}
+          <div className="add-product-page__actions">
+            <button
+              type="button"
+              className="add-product-page__cancel-btn"
+              onClick={closeFileModal}
+              disabled={fileUploading}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="add-product-page__submit-btn"
+              disabled={fileUploading}
+            >
+              {fileUploading ? "Загрузка..." : "Прикрепить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={openWarehouseModal}
+        onClose={() => {
+          setOpenWarehouseModal(false);
+          setWarehouseRequestError(null);
+        }}
+        title="Заявка на склад"
+      >
+        <form
+          className="add-product-page add-product-page--modal-form"
+          onSubmit={handleWarehouseRequestSubmit}
+        >
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Склад</label>
+            <select
+              className="add-product-page__input"
+              value={warehouseRequestWarehouse}
+              onChange={(e) => setWarehouseRequestWarehouse(e.target.value)}
+            >
+              <option value="">— Выберите склад —</option>
+              {(Array.isArray(warehousesList) ? warehousesList : []).map((w) => {
+                const wid = w?.id ?? w?.uuid;
+                return (
+                  <option key={wid} value={wid}>
+                    {w?.name ?? wid}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Позиции</label>
+            {warehouseRequestItems.map((row, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 80px 80px auto",
+                  gap: 8,
+                  alignItems: "end",
+                  marginBottom: 8,
+                }}
+              >
+                <select
+                  className="add-product-page__input"
+                  value={row.stock_item}
+                  onChange={(e) =>
+                    updateWarehouseRequestItem(index, "stock_item", e.target.value)
+                  }
+                >
+                  <option value="">— Товар —</option>
+                  {(Array.isArray(stockItemsList) ? stockItemsList : []).map((item) => {
+                    const iid = item?.id ?? item?.uuid ?? item?.stock_item;
+                    return (
+                      <option key={iid} value={iid}>
+                        {item?.name ?? item?.title ?? item?.nomenclature_name ?? iid}
+                      </option>
+                    );
+                  })}
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  className="add-product-page__input"
+                  placeholder="Кол-во"
+                  value={row.quantity}
+                  onChange={(e) =>
+                    updateWarehouseRequestItem(index, "quantity", e.target.value)
+                  }
+                />
+                <input
+                  type="text"
+                  className="add-product-page__input"
+                  placeholder="Ед."
+                  value={row.unit}
+                  onChange={(e) =>
+                    updateWarehouseRequestItem(index, "unit", e.target.value)
+                  }
+                />
+                <button
+                  type="button"
+                  className="add-product-page__cancel-btn"
+                  onClick={() => removeWarehouseRequestRow(index)}
+                  disabled={warehouseRequestItems.length <= 1}
+                >
+                  Удалить
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              style={{ marginTop: 4 }}
+              onClick={addWarehouseRequestRow}
+            >
+              Добавить позицию
+            </button>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Комментарий</label>
+            <textarea
+              className="add-product-page__input"
+              rows={2}
+              value={warehouseRequestComment}
+              onChange={(e) => setWarehouseRequestComment(e.target.value)}
+              placeholder="Необязательно"
+            />
+          </div>
+          {warehouseRequestError && (
+            <div className="add-product-page__error">
+              {String(warehouseRequestError)}
+            </div>
+          )}
+          <div className="add-product-page__actions">
+            <button
+              type="button"
+              className="add-product-page__cancel-btn"
+              onClick={() => setOpenWarehouseModal(false)}
+              disabled={warehouseRequestSubmitting}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="add-product-page__submit-btn"
+              disabled={warehouseRequestSubmitting}
+            >
+              {warehouseRequestSubmitting ? "Создание..." : "Создать заявку"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       <Modal
         open={openPreviewModal}
         onClose={() => {

@@ -39,6 +39,8 @@ import buildingWorkEntriesReducer from "./slices/building/workEntriesSlice";
 import buildingApartmentsReducer from "./slices/building/apartmentsSlice";
 import buildingDrawingsReducer from "./slices/building/drawingsSlice";
 import buildingClientsReducer from "./slices/building/clientsSlice";
+import buildingSuppliersReducer from "./slices/building/suppliersSlice";
+import buildingContractorsReducer from "./slices/building/contractorsSlice";
 import buildingTreatiesReducer from "./slices/building/treatiesSlice";
 import buildingTasksReducer from "./slices/building/tasksSlice";
 import buildingSalaryReducer from "./slices/building/salarySlice";
@@ -87,6 +89,8 @@ const store = configureStore({
     buildingApartments: buildingApartmentsReducer,
     buildingDrawings: buildingDrawingsReducer,
     buildingClients: buildingClientsReducer,
+    buildingSuppliers: buildingSuppliersReducer,
+    buildingContractors: buildingContractorsReducer,
     buildingTreaties: buildingTreatiesReducer,
     buildingTasks: buildingTasksReducer,
     buildingSalary: buildingSalaryReducer,

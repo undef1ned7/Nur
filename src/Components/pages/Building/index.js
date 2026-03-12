@@ -4,6 +4,10 @@ import BuildingCashRegister from "./CashRegister";
 import BuildingCashRegisterTreatyDetail from "./CashRegister/TreatyDetail";
 import BuildingCashRegisterSalaryPayrollPaymentsPage from "./CashRegister/SalaryPayrollPaymentsPage";
 import BuildingClients from "./Clients";
+import SupplierCreatePage from "./Clients/SupplierCreatePage";
+import SupplierDetailPage from "./Clients/SupplierDetailPage";
+import ContractorCreatePage from "./Clients/ContractorCreatePage";
+import ContractorDetailPage from "./Clients/ContractorDetailPage";
 import BuildingClientDetail from "./Clients/Detail";
 import BuildingNotification from "./Notification";
 import BuildingTaskDetail from "./Notification/Detail";
@@ -33,6 +37,10 @@ export {
   BuildingCashRegisterTreatyDetail,
   BuildingCashRegisterSalaryPayrollPaymentsPage,
   BuildingClients,
+  SupplierCreatePage,
+  SupplierDetailPage,
+  ContractorCreatePage,
+  ContractorDetailPage,
   BuildingClientDetail,
   BuildingNotification,
   BuildingTaskDetail,

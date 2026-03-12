@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import ProcurementsTab from "./ProcurementsTab";
 import InstallmentsTab from "./InstallmentsTab";
@@ -25,12 +25,36 @@ const SUBTITLES = {
 
 export default function BuildingCashRegister() {
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { selectedProjectId } = useBuildingProjects();
-  const [activeTab, setActiveTab] = useState(TAB_PROCUREMENTS);
+  const initialTabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    [TAB_PROCUREMENTS, TAB_INSTALLMENTS, TAB_ADVANCES, TAB_SALARY].includes(
+      initialTabFromUrl,
+    )
+      ? initialTabFromUrl
+      : TAB_PROCUREMENTS,
+  );
+
+  const handleTabChange = (nextTab) => {
+    setActiveTab(nextTab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextTab === TAB_PROCUREMENTS) {
+          next.delete("tab");
+        } else {
+          next.set("tab", nextTab);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   useEffect(() => {
     if (location.state?.tab === "salary") {
-      setActiveTab(TAB_SALARY);
+      handleTabChange(TAB_SALARY);
     }
   }, [location.state?.tab]);
 
@@ -54,7 +78,7 @@ export default function BuildingCashRegister() {
       >
         <button
           type="button"
-          onClick={() => setActiveTab(TAB_PROCUREMENTS)}
+          onClick={() => handleTabChange(TAB_PROCUREMENTS)}
           className={
             activeTab === TAB_PROCUREMENTS
               ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
@@ -71,7 +95,7 @@ export default function BuildingCashRegister() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab(TAB_INSTALLMENTS)}
+          onClick={() => handleTabChange(TAB_INSTALLMENTS)}
           className={
             activeTab === TAB_INSTALLMENTS
               ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
@@ -88,7 +112,7 @@ export default function BuildingCashRegister() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab(TAB_ADVANCES)}
+          onClick={() => handleTabChange(TAB_ADVANCES)}
           className={
             activeTab === TAB_ADVANCES
               ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
@@ -105,7 +129,7 @@ export default function BuildingCashRegister() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab(TAB_SALARY)}
+          onClick={() => handleTabChange(TAB_SALARY)}
           className={
             activeTab === TAB_SALARY
               ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"

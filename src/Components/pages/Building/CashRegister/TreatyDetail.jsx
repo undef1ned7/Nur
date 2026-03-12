@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { fetchBuildingTreatyById } from "@/store/creators/building/treatiesCreators";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -13,12 +13,32 @@ export default function CashRegisterTreatyDetail() {
   const { treatyId } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const id = treatyId ? String(treatyId) : null;
 
   const [treaty, setTreaty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState(TAB_CLIENT);
+  const initialTabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    initialTabFromUrl === TAB_INSTALLMENTS ? TAB_INSTALLMENTS : TAB_CLIENT,
+  );
+
+  const handleTabChange = (nextTab) => {
+    setActiveTab(nextTab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextTab === TAB_CLIENT) {
+          next.delete("tab");
+        } else {
+          next.set("tab", nextTab);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const fetchTreaty = useCallback(async () => {
     if (!id) return;
@@ -117,7 +137,7 @@ export default function CashRegisterTreatyDetail() {
       >
         <button
           type="button"
-          onClick={() => setActiveTab(TAB_CLIENT)}
+          onClick={() => handleTabChange(TAB_CLIENT)}
           className={
             activeTab === TAB_CLIENT
               ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
@@ -134,7 +154,7 @@ export default function CashRegisterTreatyDetail() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab(TAB_INSTALLMENTS)}
+          onClick={() => handleTabChange(TAB_INSTALLMENTS)}
           className={
             activeTab === TAB_INSTALLMENTS
               ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"

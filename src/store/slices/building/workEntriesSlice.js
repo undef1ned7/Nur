@@ -8,6 +8,7 @@ import {
   deleteBuildingWorkEntry,
   fetchBuildingWorkEntryById,
   createBuildingWorkEntryPhoto,
+  createBuildingWorkEntryFile,
 } from "../../creators/building/workEntriesCreators";
 
 const initialState = {
@@ -92,6 +93,12 @@ const buildingWorkEntriesSlice = createSlice({
         const id = action.meta.arg?.id;
         if (id != null) delete state.updatingIds[id];
         state.list = upsertById(state.list, action.payload);
+        if (
+          state.current &&
+          String(state.current.id ?? state.current.uuid) === String(id)
+        ) {
+          state.current = { ...state.current, ...action.payload };
+        }
       })
       .addCase(updateBuildingWorkEntry.rejected, (state, action) => {
         const id = action.meta.arg?.id;
@@ -154,6 +161,28 @@ const buildingWorkEntriesSlice = createSlice({
           return {
             ...x,
             photos: [photo, ...prev],
+          };
+        });
+      })
+      .addCase(createBuildingWorkEntryFile.fulfilled, (state, action) => {
+        const { entryId, file } = action.payload || {};
+        if (!entryId || !file) return;
+        if (
+          state.current &&
+          String(state.current.id ?? state.current.uuid) === String(entryId)
+        ) {
+          const prev = Array.isArray(state.current.files)
+            ? state.current.files
+            : [];
+          state.current.files = [file, ...prev];
+        }
+        state.list = (state.list || []).map((x) => {
+          const xid = x?.id ?? x?.uuid;
+          if (String(xid) !== String(entryId)) return x;
+          const prev = Array.isArray(x.files) ? x.files : [];
+          return {
+            ...x,
+            files: [file, ...prev],
           };
         });
       });

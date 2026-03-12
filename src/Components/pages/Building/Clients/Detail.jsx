@@ -1,36 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useDispatch } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
-import { useAlert } from "@/hooks/useDialog";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../../api";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { useBuildingClients } from "@/store/slices/building/clientsSlice";
-
-const OPERATION_TYPE_LABELS = {
-  sale: "Покупка",
-  booking: "Бронирование",
-};
-
-const PAYMENT_TYPE_LABELS = {
-  cash: "Полная оплата",
-  installment: "Рассрочка",
-};
-
-const STATUS_LABELS = {
-  draft: "Черновик",
-  active: "Активен",
-  cancelled: "Отменён",
-  completed: "Завершён",
-};
+import ClientInfoTab from "./ClientInfoTab";
+import ClientTreatiesTab from "./ClientTreatiesTab";
 
 export default function BuildingClientDetail() {
   const { id } = useParams();
   const clientId = id ? String(id) : null;
-  const dispatch = useDispatch(); // на будущее, если захотим рефрешить списки
   const navigate = useNavigate();
-  const alert = useAlert();
 
   const { list: clientsList } = useBuildingClients();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const initialClient = useMemo(() => {
     if (!clientId) return null;
@@ -41,18 +23,29 @@ export default function BuildingClientDetail() {
   }, [clientsList, clientId]);
 
   const [client, setClient] = useState(initialClient);
-  const [clientLoading, setClientLoading] = useState(!initialClient);
+  const [clientLoading, setClientLoading] = useState(false);
   const [clientError, setClientError] = useState(null);
+  const initialTab = (() => {
+    const fromUrl = searchParams.get("tab");
+    return fromUrl === "treaties" ? "treaties" : "info";
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
 
-  const [allTreaties, setAllTreaties] = useState({
-    loading: false,
-    loaded: false,
-    error: null,
-    items: [],
-  });
+  const handleTabChange = (nextTab) => {
+    setActiveTab(nextTab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nextTab === "info") {
+        next.delete("tab");
+      } else {
+        next.set("tab", nextTab);
+      }
+      return next;
+    }, { replace: true });
+  };
 
   const loadClient = async () => {
-    if (!clientId || client) return;
+    if (!clientId) return;
     setClientLoading(true);
     setClientError(null);
     try {
@@ -94,7 +87,7 @@ export default function BuildingClientDetail() {
   };
 
   useEffect(() => {
-    if (!client && clientId) {
+    if (clientId) {
       loadClient();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,84 +96,6 @@ export default function BuildingClientDetail() {
   const handleBack = () => {
     navigate("/crm/building/clients");
   };
-
-  const treatiesByCategory = useMemo(() => {
-    const arr = Array.isArray(allTreaties.items) ? allTreaties.items : [];
-    const purchases = arr.filter((t) => t.operation_type === "sale");
-    const bookings = arr.filter((t) => t.operation_type === "booking");
-    const installments = arr.filter((t) => t.payment_type === "installment");
-    return { all: arr, purchases, bookings, installments };
-  }, [allTreaties.items]);
-
-  const renderTreatiesTable = (items) => {
-    if (!items || items.length === 0) {
-      return (
-        <div className="client-detail__empty">
-          Договоров пока нет.
-        </div>
-      );
-    }
-    return (
-      <div className="client-detail__tableWrap">
-        <table className="client-detail__table">
-          <thead>
-            <tr>
-              <th>Номер</th>
-              <th>ЖК</th>
-              <th>Квартира</th>
-              <th>Тип операции</th>
-              <th>Тип оплаты</th>
-              <th>Сумма</th>
-              <th>Статус</th>
-              <th>Дата</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((treaty) => {
-              const tid = treaty.id ?? treaty.uuid;
-              return (
-                <tr
-                  key={tid}
-                  className="client-detail__tableRow"
-                  onClick={() =>
-                    tid && navigate(`/crm/building/treaty/${tid}`)
-                  }
-                >
-                  <td>{treaty.number || "—"}</td>
-                  <td>{treaty.residential_complex_display || "—"}</td>
-                  <td>{treaty.apartment_display || "—"}</td>
-                  <td>
-                    {OPERATION_TYPE_LABELS[treaty.operation_type] ||
-                      treaty.operation_type ||
-                      "—"}
-                  </td>
-                  <td>
-                    {PAYMENT_TYPE_LABELS[treaty.payment_type] ||
-                      treaty.payment_type ||
-                      "—"}
-                  </td>
-                  <td>{treaty.total_amount || "—"}</td>
-                  <td>
-                    {STATUS_LABELS[treaty.status] ||
-                      treaty.status ||
-                      "—"}
-                  </td>
-                  <td>{treaty.created_at || "—"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
-  const renderTreatiesLoading = () => (
-    <div className="sell-loading">
-      <div className="sell-loading__spinner" />
-      <p className="sell-loading__text">Загрузка договоров...</p>
-    </div>
-  );
 
   return (
     <div className="building-page building-page--clients-detail">
@@ -202,155 +117,58 @@ export default function BuildingClientDetail() {
         </button>
       </header>
 
-      <div className="sell-card client-detail__card">
-        {clientLoading && (
-          <div className="sell-loading">
-            <div className="sell-loading__spinner" />
-            <p className="sell-loading__text">Загрузка информации о клиенте...</p>
-          </div>
-        )}
-        {clientError && (
-          <div className="building-page__error">
-            {String(
-              validateResErrors(
-                clientError,
-                "Не удалось загрузить клиента",
-              ),
-            )}
-          </div>
-        )}
-        {client && !clientLoading && (
-          <div className="sell-form client-detail__form">
-            <section className="sell-form__section">
-              <h4 className="sell-form__sectionTitle">Контакты</h4>
-              <div className="client-detail__row">
-                <span className="sell-form__label">Имя / название</span>
-                <span>{client.name || "—"}</span>
-              </div>
-              <div className="client-detail__row">
-                <span className="sell-form__label">Телефон</span>
-                <span>{client.phone || "—"}</span>
-              </div>
-              <div className="client-detail__row">
-                <span className="sell-form__label">Email</span>
-                <span>{client.email || "—"}</span>
-              </div>
-            </section>
-            <section className="sell-form__section">
-              <h4 className="sell-form__sectionTitle">Реквизиты</h4>
-              <div className="client-detail__row">
-                <span className="sell-form__label">ИНН</span>
-                <span>{client.inn || "—"}</span>
-              </div>
-              <div className="client-detail__row">
-                <span className="sell-form__label">Адрес</span>
-                <span>{client.address || "—"}</span>
-              </div>
-            </section>
-            <section className="sell-form__section">
-              <h4 className="sell-form__sectionTitle">Прочее</h4>
-              <div className="client-detail__row">
-                <span className="sell-form__label">Заметки</span>
-                <span>{client.notes || "—"}</span>
-              </div>
-              <div className="client-detail__row">
-                <span className="sell-form__label">Статус</span>
-                <span>
-                  {client.is_active ? (
-                    <span className="clients-table__status clients-table__status--active">
-                      Активен
-                    </span>
-                  ) : (
-                    <span className="clients-table__status clients-table__status--inactive">
-                      Отключён
-                    </span>
-                  )}
-                </span>
-              </div>
-            </section>
-          </div>
-        )}
+      <div className="client-detail__tabs">
+        <button
+          type="button"
+          className={
+            activeTab === "info"
+              ? "client-detail__tab client-detail__tab--active"
+              : "client-detail__tab"
+          }
+          onClick={() => handleTabChange("info")}
+        >
+          Информация о клиенте
+        </button>
+        <button
+          type="button"
+          className={
+            activeTab === "treaties"
+              ? "client-detail__tab client-detail__tab--active"
+              : "client-detail__tab"
+          }
+          onClick={() => handleTabChange("treaties")}
+        >
+          Договора
+        </button>
       </div>
 
-      <div className="sell-card client-detail__section">
-        <details
-          className="client-detail__details"
-          onToggle={(e) => {
-            if (e.currentTarget.open) loadTreatiesForClient();
-          }}
-        >
-          <summary className="client-detail__summary">
-            Все договоры клиента
-          </summary>
-          {allTreaties.loading && renderTreatiesLoading()}
-          {allTreaties.error && (
+      {activeTab === "info" && (
+        <div className="sell-card client-detail__card">
+          {clientLoading && (
+            <div className="sell-loading">
+              <div className="sell-loading__spinner" />
+              <p className="sell-loading__text">Загрузка информации о клиенте...</p>
+            </div>
+          )}
+          {clientError && (
             <div className="building-page__error">
               {String(
                 validateResErrors(
-                  allTreaties.error,
-                  "Не удалось загрузить договоры",
+                  clientError,
+                  "Не удалось загрузить клиента",
                 ),
               )}
             </div>
           )}
-          {!allTreaties.loading && !allTreaties.error &&
-            renderTreatiesTable(treatiesByCategory.all)}
-        </details>
-      </div>
+          {client && !clientLoading && <ClientInfoTab client={client} />}
+        </div>
+      )}
 
-      <div className="sell-card client-detail__section">
-        <details
-          className="client-detail__details"
-          onToggle={(e) => {
-            if (e.currentTarget.open && !allTreaties.loaded) {
-              loadTreatiesForClient();
-            }
-          }}
-        >
-          <summary className="client-detail__summary">
-            Покупки (продажи)
-          </summary>
-          {allTreaties.loading && !allTreaties.loaded && renderTreatiesLoading()}
-          {allTreaties.loaded &&
-            renderTreatiesTable(treatiesByCategory.purchases)}
-        </details>
-      </div>
-
-      <div className="sell-card client-detail__section">
-        <details
-          className="client-detail__details"
-          onToggle={(e) => {
-            if (e.currentTarget.open && !allTreaties.loaded) {
-              loadTreatiesForClient();
-            }
-          }}
-        >
-          <summary className="client-detail__summary">
-            Бронирования
-          </summary>
-          {allTreaties.loading && !allTreaties.loaded && renderTreatiesLoading()}
-          {allTreaties.loaded &&
-            renderTreatiesTable(treatiesByCategory.bookings)}
-        </details>
-      </div>
-
-      <div className="sell-card client-detail__section">
-        <details
-          className="client-detail__details"
-          onToggle={(e) => {
-            if (e.currentTarget.open && !allTreaties.loaded) {
-              loadTreatiesForClient();
-            }
-          }}
-        >
-          <summary className="client-detail__summary">
-            Рассрочки
-          </summary>
-          {allTreaties.loading && !allTreaties.loaded && renderTreatiesLoading()}
-          {allTreaties.loaded &&
-            renderTreatiesTable(treatiesByCategory.installments)}
-        </details>
-      </div>
+      {activeTab === "treaties" && (
+        <div className="sell-card client-detail__section">
+          <ClientTreatiesTab clientId={clientId} />
+        </div>
+      )}
     </div>
   );
 }

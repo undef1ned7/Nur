@@ -86,4 +86,42 @@ export const createBuildingWorkEntryPhoto = createAsyncThunk(
   }
 );
 
+export const createBuildingWorkEntryFile = createAsyncThunk(
+  "buildingWorkEntries/createFile",
+  async ({ id, file, title }, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      if (title) formData.append("title", title);
+      const { data } = await api.post(
+        `${BASE}/work-entries/${id}/files/`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return { entryId: id, file: data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  }
+);
+
+export const createWorkEntryWarehouseRequest = createAsyncThunk(
+  "buildingWorkEntries/createWarehouseRequest",
+  async ({ id, payload }, { rejectWithValue }) => {
+    try {
+      const { data } = await api.post(
+        `${BASE}/work-entries/${id}/warehouse-requests/`,
+        payload
+      );
+      return { entryId: id, request: data };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data || err?.message || err);
+    }
+  }
+);
+
 

@@ -22,6 +22,8 @@ import {
   statusLabel,
 } from "../shared/constants";
 import { useBuildingProcurements } from "@/store/slices/building/procurementsSlice";
+import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
+import { fetchBuildingSuppliers } from "@/store/creators/building/suppliersCreators";
 import { useNavigate } from "react-router-dom";
 import "./Procurement.scss";
 
@@ -100,6 +102,7 @@ export default function BuildingProcurement() {
     creatingTransferIds,
     actionError,
   } = useBuildingProcurements();
+  const suppliersState = useBuildingSuppliers();
   const {
     list: warehouses,
     loading: warehousesLoading,
@@ -109,6 +112,7 @@ export default function BuildingProcurement() {
   const [filters, setFilters] = useState({ search: "", status: "" });
   const [openCreate, setOpenCreate] = useState(false);
   const [createForm, setCreateForm] = useState(CREATE_INITIAL);
+  const [createSupplierId, setCreateSupplierId] = useState("");
   const [transferModal, setTransferModal] = useState({
     open: false,
     procurement: null,
@@ -154,6 +158,18 @@ export default function BuildingProcurement() {
     );
   }, [dispatch, filters.search, filters.status, page, selectedProjectId]);
 
+  useEffect(() => {
+    if (!openCreate) return;
+    if (!selectedProjectId) return;
+    dispatch(
+      fetchBuildingSuppliers({
+        residential_complex: selectedProjectId,
+        status: "active",
+        page_size: 100,
+      }),
+    );
+  }, [dispatch, openCreate, selectedProjectId]);
+
   const onCreate = async (e) => {
     e.preventDefault();
     if (!selectedProjectId) {
@@ -162,18 +178,22 @@ export default function BuildingProcurement() {
     }
     if (!String(createForm.title).trim()) return;
 
+    const payload = {
+      residential_complex: selectedProjectId,
+      title: String(createForm.title || "").trim(),
+      comment: String(createForm.comment || "").trim(),
+    };
+    if (createSupplierId) {
+      payload.supplier = createSupplierId;
+    }
+
     try {
-      const res = await dispatch(
-        createBuildingProcurement({
-          residential_complex: selectedProjectId,
-          title: String(createForm.title || "").trim(),
-          comment: String(createForm.comment || "").trim(),
-        }),
-      );
+      const res = await dispatch(createBuildingProcurement(payload));
       if (res.meta.requestStatus === "fulfilled") {
         const created = res.payload;
         const newId = created?.id ?? created?.uuid;
         setCreateForm(CREATE_INITIAL);
+        setCreateSupplierId("");
         setOpenCreate(false);
         alert("Закупка успешно создана");
         if (newId) {
@@ -650,6 +670,29 @@ export default function BuildingProcurement() {
         title="Создать закупку"
       >
         <form className="building-page" onSubmit={onCreate}>
+          <label>
+            <div className="building-page__label">
+              Поставщик (опционально)
+            </div>
+            <select
+              className="building-page__select"
+              value={createSupplierId}
+              onChange={(e) => setCreateSupplierId(e.target.value)}
+              disabled={!selectedProjectId || suppliersState.loading}
+            >
+              <option value="">Без привязки к поставщику</option>
+              {(suppliersState.list || []).map((s) => (
+                <option key={s.id ?? s.uuid} value={s.id ?? s.uuid}>
+                  {s.company_name || s.name || "—"}
+                </option>
+              ))}
+            </select>
+            {suppliersState.error && (
+              <div className="building-page__error" style={{ marginTop: 4 }}>
+                {String(suppliersState.error)}
+              </div>
+            )}
+          </label>
           <label>
             <div className="building-page__label">Название</div>
             <input

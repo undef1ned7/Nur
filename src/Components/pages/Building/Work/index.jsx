@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ClipboardList, LayoutGrid, Table2 } from "lucide-react";
 import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import Modal from "@/Components/common/Modal/Modal";
@@ -10,10 +10,17 @@ import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import { useBuildingWorkEntries } from "@/store/slices/building/workEntriesSlice";
 import {
   fetchBuildingWorkEntries,
+  fetchBuildingWorkEntryById,
   createBuildingWorkEntry,
   updateBuildingWorkEntry,
   deleteBuildingWorkEntry,
 } from "@/store/creators/building/workEntriesCreators";
+import { fetchBuildingContractors } from "@/store/creators/building/contractorsCreators";
+import { fetchBuildingClients } from "@/store/creators/building/clientsCreators";
+import { fetchBuildingTreaties } from "@/store/creators/building/treatiesCreators";
+import { useBuildingContractors } from "@/store/slices/building/contractorsSlice";
+import { useBuildingClients } from "@/store/slices/building/clientsSlice";
+import { useBuildingTreaties } from "@/store/slices/building/treatiesSlice";
 import { getPageCount, DEFAULT_PAGE_SIZE } from "../shared/api";
 import BuildingPagination from "../shared/Pagination";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -32,7 +39,23 @@ const CATEGORY_LABELS = {
   other: "Другое",
 };
 
+const WORK_STATUS_LABELS = {
+  planned: "Запланировано",
+  in_progress: "В работе",
+  paused: "Приостановлено",
+  completed: "Завершено",
+  cancelled: "Отменено",
+};
+
 const FORM_INITIAL = {
+  residential_complex: "",
+  contractor: "",
+  contract_amount: "",
+  contract_term_start: "",
+  contract_term_end: "",
+  work_status: "planned",
+  client: "",
+  treaty: "",
   category: "note",
   title: "",
   description: "",
@@ -45,6 +68,7 @@ export default function BuildingWorkProcess() {
   const alert = useAlert();
   const confirm = useConfirm();
   const { selectedProjectId, items: projects } = useBuildingProjects();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     list,
     count,
@@ -54,12 +78,18 @@ export default function BuildingWorkProcess() {
     updatingIds,
     deletingIds,
     actionError,
+    current: currentEntry,
   } = useBuildingWorkEntries();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [workStatusFilter, setWorkStatusFilter] = useState("");
   const debouncedSearch = useDebouncedValue(search, 400);
+
+  const { list: contractorsList } = useBuildingContractors();
+  const { list: clientsList } = useBuildingClients();
+  const { list: treatiesList } = useBuildingTreaties();
 
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -94,15 +124,65 @@ export default function BuildingWorkProcess() {
 
   useEffect(() => {
     if (!selectedProjectId) return;
+    dispatch(fetchBuildingContractors({ residential_complex: selectedProjectId }));
+    dispatch(fetchBuildingClients({ residential_complex: selectedProjectId }));
+    dispatch(fetchBuildingTreaties({ residential_complex: selectedProjectId }));
+  }, [dispatch, selectedProjectId]);
+
+  useEffect(() => {
+    if (!selectedProjectId) return;
     const params = {
       residential_complex: selectedProjectId,
       category: category || undefined,
+      work_status: workStatusFilter || undefined,
       search: debouncedSearch || undefined,
       page,
       page_size: DEFAULT_PAGE_SIZE,
     };
     dispatch(fetchBuildingWorkEntries(params));
-  }, [dispatch, selectedProjectId, category, debouncedSearch, page]);
+  }, [dispatch, selectedProjectId, category, workStatusFilter, debouncedSearch, page]);
+
+  const editIdFromUrl = searchParams.get("edit");
+  useEffect(() => {
+    if (!editIdFromUrl) return;
+    dispatch(fetchBuildingWorkEntryById(editIdFromUrl));
+  }, [dispatch, editIdFromUrl]);
+
+  useEffect(() => {
+    if (!editIdFromUrl || !currentEntry) return;
+    const id = currentEntry?.id ?? currentEntry?.uuid;
+    if (String(id) !== String(editIdFromUrl)) return;
+    const entry = currentEntry;
+    setEditing(entry);
+    const rcId = entry?.residential_complex ?? entry?.residential_complex_id ?? selectedProjectId ?? "";
+    setForm({
+      residential_complex: rcId || selectedProjectId || "",
+      contractor: entry?.contractor ?? entry?.contractor_id ?? "",
+      contract_amount: entry?.contract_amount != null ? String(entry.contract_amount) : "",
+      contract_term_start: entry?.contract_term_start
+        ? String(entry.contract_term_start).slice(0, 10)
+        : "",
+      contract_term_end: entry?.contract_term_end
+        ? String(entry.contract_term_end).slice(0, 10)
+        : "",
+      work_status: entry?.work_status || "planned",
+      client: entry?.client ?? entry?.client_id ?? "",
+      treaty: entry?.treaty ?? entry?.treaty_id ?? "",
+      category: entry?.category || "note",
+      title: entry?.title || "",
+      description: entry?.description || "",
+      occurred_at: entry?.occurred_at
+        ? String(entry.occurred_at).slice(0, 16)
+        : "",
+    });
+    setFormError(null);
+    setOpenModal(true);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("edit");
+      return next;
+    });
+  }, [editIdFromUrl, currentEntry, selectedProjectId, setSearchParams]);
 
   const openCreate = () => {
     if (!selectedProjectId) {
@@ -110,19 +190,36 @@ export default function BuildingWorkProcess() {
       return;
     }
     setEditing(null);
-    setForm(FORM_INITIAL);
+    setForm({
+      ...FORM_INITIAL,
+      residential_complex: selectedProjectId,
+      work_status: "planned",
+    });
     setFormError(null);
     setOpenModal(true);
   };
 
   const openEdit = (entry) => {
     setEditing(entry);
+    const rcId = entry?.residential_complex ?? entry?.residential_complex_id ?? selectedProjectId ?? "";
     setForm({
+      residential_complex: rcId || selectedProjectId || "",
+      contractor: entry?.contractor ?? entry?.contractor_id ?? "",
+      contract_amount: entry?.contract_amount != null ? String(entry.contract_amount) : "",
+      contract_term_start: entry?.contract_term_start
+        ? String(entry.contract_term_start).slice(0, 10)
+        : "",
+      contract_term_end: entry?.contract_term_end
+        ? String(entry.contract_term_end).slice(0, 10)
+        : "",
+      work_status: entry?.work_status || "planned",
+      client: entry?.client ?? entry?.client_id ?? "",
+      treaty: entry?.treaty ?? entry?.treaty_id ?? "",
       category: entry?.category || "note",
       title: entry?.title || "",
       description: entry?.description || "",
       occurred_at: entry?.occurred_at
-        ? entry.occurred_at.slice(0, 16)
+        ? String(entry.occurred_at).slice(0, 16)
         : "",
     });
     setFormError(null);
@@ -151,8 +248,19 @@ export default function BuildingWorkProcess() {
       setFormError("Название обязательно");
       return;
     }
+    const rcId = form.residential_complex || selectedProjectId;
     const payload = {
-      residential_complex: selectedProjectId,
+      residential_complex: rcId || null,
+      contractor: form.contractor || null,
+      contract_amount:
+        form.contract_amount !== "" && !Number.isNaN(Number(form.contract_amount))
+          ? String(form.contract_amount)
+          : null,
+      contract_term_start: form.contract_term_start || null,
+      contract_term_end: form.contract_term_end || null,
+      work_status: form.work_status || "planned",
+      client: form.client || null,
+      treaty: form.treaty || null,
       category: form.category || "note",
       title: String(form.title || "").trim(),
       description: String(form.description || "").trim() || "",
@@ -176,6 +284,7 @@ export default function BuildingWorkProcess() {
           fetchBuildingWorkEntries({
             residential_complex: selectedProjectId,
             category: category || undefined,
+            work_status: workStatusFilter || undefined,
             search: debouncedSearch || undefined,
             page: 1,
             page_size: DEFAULT_PAGE_SIZE,
@@ -302,6 +411,21 @@ export default function BuildingWorkProcess() {
               </option>
             ))}
           </select>
+          <select
+            className="warehouse-filter-modal__select-small"
+            value={workStatusFilter}
+            onChange={(e) => {
+              setPage(1);
+              setWorkStatusFilter(e.target.value);
+            }}
+          >
+            <option value="">Все статусы</option>
+            {Object.entries(WORK_STATUS_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
           <div className="ml-auto flex items-center gap-2 warehouse-view-buttons">
             <button
               type="button"
@@ -347,6 +471,7 @@ export default function BuildingWorkProcess() {
                 <tr>
                   <th>Дата</th>
                   <th>Категория</th>
+                  <th>Статус</th>
                   <th>Название</th>
                   <th>Описание</th>
                   <th>Автор</th>
@@ -356,19 +481,19 @@ export default function BuildingWorkProcess() {
               <tbody>
                 {!selectedProjectId ? (
                   <tr>
-                    <td colSpan={6} className="warehouse-table__empty">
+                    <td colSpan={7} className="warehouse-table__empty">
                       Выберите жилой комплекс в шапке раздела.
                     </td>
                   </tr>
                 ) : loading && list.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="warehouse-table__loading">
+                    <td colSpan={7} className="warehouse-table__loading">
                       Загрузка...
                     </td>
                   </tr>
                 ) : !loading && list.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="warehouse-table__empty">
+                    <td colSpan={7} className="warehouse-table__empty">
                       Записей пока нет.
                     </td>
                   </tr>
@@ -392,6 +517,11 @@ export default function BuildingWorkProcess() {
                         <td>
                           {CATEGORY_LABELS[entry?.category] ||
                             entry?.category ||
+                            "—"}
+                        </td>
+                        <td>
+                          {WORK_STATUS_LABELS[entry?.work_status] ||
+                            entry?.work_status ||
                             "—"}
                         </td>
                         <td>{entry?.title || "—"}</td>
@@ -463,6 +593,11 @@ export default function BuildingWorkProcess() {
                             entry?.category ||
                             "—"}
                         </span>
+                      </div>
+                      <div className="mt-2 text-xs text-slate-600">
+                        {WORK_STATUS_LABELS[entry?.work_status] ||
+                          entry?.work_status ||
+                          "—"}
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
                         <div className="rounded-xl bg-slate-50 p-2">
@@ -540,6 +675,124 @@ export default function BuildingWorkProcess() {
           className="add-product-page add-product-page--modal-form"
           onSubmit={handleSubmit}
         >
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Жилой комплекс</label>
+            <select
+              className="add-product-page__input"
+              value={form.residential_complex}
+              onChange={handleFormChange("residential_complex")}
+            >
+              <option value="">—</option>
+              {(Array.isArray(projects) ? projects : []).map((p) => {
+                const pid = p?.id ?? p?.uuid;
+                return (
+                  <option key={pid} value={pid}>
+                    {p?.name || pid}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Подрядчик</label>
+            <select
+              className="add-product-page__input"
+              value={form.contractor}
+              onChange={handleFormChange("contractor")}
+            >
+              <option value="">—</option>
+              {(Array.isArray(contractorsList) ? contractorsList : []).map((c) => {
+                const cid = c?.id ?? c?.uuid;
+                return (
+                  <option key={cid} value={cid}>
+                    {c?.company_name ?? c?.name ?? c?.title ?? cid}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Клиент</label>
+            <select
+              className="add-product-page__input"
+              value={form.client}
+              onChange={handleFormChange("client")}
+            >
+              <option value="">—</option>
+              {(Array.isArray(clientsList) ? clientsList : []).map((c) => {
+                const cid = c?.id ?? c?.uuid;
+                return (
+                  <option key={cid} value={cid}>
+                    {c?.name ?? c?.title ?? cid}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Договор</label>
+            <select
+              className="add-product-page__input"
+              value={form.treaty}
+              onChange={handleFormChange("treaty")}
+            >
+              <option value="">—</option>
+              {(Array.isArray(treatiesList) ? treatiesList : []).map((t) => {
+                const tid = t?.id ?? t?.uuid;
+                return (
+                  <option key={tid} value={tid}>
+                    {t?.number ?? t?.title ?? tid}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Статус работ</label>
+            <select
+              className="add-product-page__input"
+              value={form.work_status}
+              onChange={handleFormChange("work_status")}
+            >
+              {Object.entries(WORK_STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Сумма договора</label>
+            <input
+              type="number"
+              step="0.01"
+              min={0}
+              className="add-product-page__input"
+              value={form.contract_amount}
+              onChange={handleFormChange("contract_amount")}
+              placeholder="0"
+            />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Начало работ</label>
+              <input
+                type="date"
+                className="add-product-page__input"
+                value={form.contract_term_start}
+                onChange={handleFormChange("contract_term_start")}
+              />
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Окончание работ</label>
+              <input
+                type="date"
+                className="add-product-page__input"
+                value={form.contract_term_end}
+                onChange={handleFormChange("contract_term_end")}
+              />
+            </div>
+          </div>
           <div className="add-product-page__form-group">
             <label className="add-product-page__label">Категория</label>
             <select

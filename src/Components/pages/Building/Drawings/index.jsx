@@ -267,6 +267,19 @@ export default function BuildingDrawings() {
     setOpenPreviewModal(true);
   };
 
+  const isImageUrl = (url) => {
+    if (!url) return false;
+    try {
+      const clean = url.split("?")[0].split("#")[0];
+      const parts = clean.split(".");
+      if (parts.length < 2) return false;
+      const ext = parts[parts.length - 1].toLowerCase();
+      return ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext);
+    } catch {
+      return false;
+    }
+  };
+
   return (
     <div className="building-page building-page--drawings">
       <header className="sell-header">
@@ -388,16 +401,27 @@ export default function BuildingDrawings() {
                     const busy =
                       updatingIds?.[id] === true || deletingIds?.[id] === true;
                     const url = drawing?.file_url || drawing?.file || "";
+                    const isImage = isImageUrl(url);
                     return (
                       <tr key={id} className="drawings-table__row">
                         <td>
                           {url ? (
-                            <img
-                              src={url}
-                              alt={drawing?.title || "Чертёж"}
-                              className="drawings-table__previewImg"
-                              onClick={() => handleOpenPreview(drawing)}
-                            />
+                            isImage ? (
+                              <img
+                                src={url}
+                                alt={drawing?.title || "Чертёж"}
+                                className="drawings-table__previewImg"
+                                onClick={() => handleOpenPreview(drawing)}
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                className="drawings-table__fileBadge"
+                                onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+                              >
+                                FILE
+                              </button>
+                            )
                           ) : (
                             "—"
                           )}
@@ -450,15 +474,37 @@ export default function BuildingDrawings() {
                 const busy =
                   updatingIds?.[id] === true || deletingIds?.[id] === true;
                 const url = drawing?.file_url || drawing?.file || "";
+                const isImage = isImageUrl(url);
                 return (
                   <div key={id} className="drawings-grid__card">
                     {url ? (
-                      <img
-                        src={url}
-                        alt={drawing?.title || "Чертёж"}
-                        className="drawings-grid__cardPreview"
-                        onClick={() => handleOpenPreview(drawing)}
-                      />
+                      isImage ? (
+                        <img
+                          src={url}
+                          alt={drawing?.title || "Чертёж"}
+                          className="drawings-grid__cardPreview"
+                          onClick={() => handleOpenPreview(drawing)}
+                        />
+                      ) : (
+                        <div
+                          className="drawings-grid__cardPreview"
+                          style={{
+                            cursor: "pointer",
+                            background: "rgba(15, 23, 42, 0.06)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            color: "rgba(15, 23, 42, 0.8)",
+                            fontWeight: 600,
+                          }}
+                          onClick={() =>
+                            window.open(url, "_blank", "noopener,noreferrer")
+                          }
+                        >
+                          Открыть файл
+                        </div>
+                      )
                     ) : (
                       <div
                         className="drawings-grid__cardPreview"
@@ -472,7 +518,7 @@ export default function BuildingDrawings() {
                           color: "rgba(11, 35, 68, 0.5)",
                         }}
                       >
-                        Нет превью
+                        Нет файла
                       </div>
                     )}
                     <div className="drawings-grid__cardHead">
@@ -504,7 +550,11 @@ export default function BuildingDrawings() {
                         <button
                           type="button"
                           className="drawings-grid__cardBtn"
-                          onClick={() => handleOpenPreview(drawing)}
+                          onClick={() =>
+                            isImage
+                              ? handleOpenPreview(drawing)
+                              : window.open(url, "_blank", "noopener,noreferrer")
+                          }
                         >
                           Открыть
                         </button>
@@ -633,19 +683,94 @@ export default function BuildingDrawings() {
       >
         {previewDrawing && (
           <div className="building-page">
-            <div
-              style={{
-                width: "100%",
-                maxHeight: "70vh",
-                overflow: "auto",
-              }}
-            >
-              <img
-                src={previewDrawing.url}
-                alt={previewDrawing.title || "Чертёж"}
-                style={{ width: "100%", height: "auto" }}
-              />
-            </div>
+            {isImageUrl(previewDrawing.url) ? (
+              <div
+                style={{
+                  width: "100%",
+                  maxHeight: "70vh",
+                  overflow: "auto",
+                }}
+              >
+                <img
+                  src={previewDrawing.url}
+                  alt={previewDrawing.title || "Чертёж"}
+                  style={{ width: "100%", height: "auto" }}
+                />
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: 16,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    padding: 16,
+                    borderRadius: 12,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: "#e2e8f0",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "#0f172a",
+                      }}
+                    >
+                      FILE
+                    </span>
+                    <a
+                      href={previewDrawing.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        color: "#1d4ed8",
+                        textDecoration: "underline",
+                        wordBreak: "break-all",
+                        fontSize: 13,
+                      }}
+                    >
+                      Открыть файл
+                    </a>
+                  </div>
+                  <button
+                    type="button"
+                    className="building-btn"
+                    onClick={() =>
+                      window.open(
+                        previewDrawing.url,
+                        "_blank",
+                        "noopener,noreferrer",
+                      )
+                    }
+                  >
+                    Скачать / открыть
+                  </button>
+                </div>
+              </div>
+            )}
             {previewDrawing.description && (
               <div className="building-page__label" style={{ marginTop: 8 }}>
                 {previewDrawing.description}
