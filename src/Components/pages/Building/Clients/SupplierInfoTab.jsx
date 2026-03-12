@@ -65,6 +65,7 @@ export default function SupplierInfoTab({ supplier }) {
   const [fileError, setFileError] = useState(null);
   const [fileModalOpen, setFileModalOpen] = useState(false);
   const [newFileTitle, setNewFileTitle] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
 
   const supplierId = supplier.id ?? supplier.uuid;
 
@@ -159,12 +160,16 @@ export default function SupplierInfoTab({ supplier }) {
           headers: { "Content-Type": "multipart/form-data" },
         },
       );
-      const created = data || null;
-      setFiles((prev) =>
-        created ? [created, ...(Array.isArray(prev) ? prev : [])] : prev,
-      );
+      setFiles((prev) => {
+        if (data && Array.isArray(data.files)) {
+          return data.files;
+        }
+        const created = data || null;
+        return created ? [created, ...(Array.isArray(prev) ? prev : [])] : prev;
+      });
       setFileModalOpen(false);
       setNewFileTitle("");
+      setSelectedFile(null);
     } catch (err) {
       setFileError(
         validateResErrors(err, "Не удалось прикрепить файл поставщика"),
@@ -588,75 +593,105 @@ export default function SupplierInfoTab({ supplier }) {
               <span className="sell-form__label" />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
-                  className="building-treaty-files"
-                  style={{ width: "100%" }}
+                  style={{
+                    overflowX: "auto",
+                    paddingBottom: 4,
+                  }}
                 >
-                  <ul className="building-treaty-filesList">
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "stretch",
+                      minHeight: 120,
+                    }}
+                  >
                     {files.map((f) => {
                       const key = f.id ?? f.uuid ?? f.file;
                       const url = getFileUrl(f);
                       const ext = getFileExtension(url);
                       const isImage = IMAGE_EXTENSIONS.includes(ext);
                       const iconLabel = getFileTypeLabel(ext);
-                      const title = f.title || "Файл";
+                      const title =
+                        f.title ||
+                        (url
+                          ? url
+                              .split("#")[0]
+                              .split("?")[0]
+                              .split("/")
+                              .pop() || "Файл"
+                          : "Файл");
                       return (
-                        <li key={key} className="building-treaty-filesItem">
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
+                        <div
+                          key={key}
+                          style={{
+                            flex: "0 0 200px",
+                            borderRadius: 12,
+                            border: "1px solid #e2e8f0",
+                            background: "#ffffff",
+                            padding: 10,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                          }}
+                        >
+                          <div
                             style={{
+                              borderRadius: 8,
+                              border: "1px dashed #e2e8f0",
+                              background: "#f8fafc",
+                              height: 90,
                               display: "flex",
                               alignItems: "center",
-                              gap: 8,
-                              textDecoration: "none",
-                              color: "inherit",
-                              flex: 1,
-                              minWidth: 0,
+                              justifyContent: "center",
+                              overflow: "hidden",
                             }}
                           >
-                            <div
-                              style={{
-                                width: 72,
-                                height: 72,
-                                borderRadius: 4,
-                                overflow: "hidden",
-                                border: "1px solid #d9d9d9",
-                                backgroundColor: isImage ? "#f0f2f5" : "#e5e7eb",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              {isImage ? (
-                                <img
-                                  src={url}
-                                  alt={title}
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                  }}
-                                />
-                              ) : (
-                                <span
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: 600,
-                                    color: "#111827",
-                                  }}
-                                >
-                                  {iconLabel}
-                                </span>
-                              )}
-                            </div>
-                            <span
-                              className="building-treaty-filesItemName"
-                              title={title}
-                            >
-                              {title}
-                            </span>
+                            {url && isImage ? (
+                              <img
+                                src={url}
+                                alt={title}
+                                style={{
+                                  maxWidth: "100%",
+                                  maxHeight: "100%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: "#64748b",
+                                }}
+                              >
+                                {iconLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 4,
+                              fontSize: 12,
+                            }}
+                          >
+                            {url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  color: "#2563eb",
+                                  textDecoration: "underline",
+                                  wordBreak: "break-all",
+                                }}
+                              >
+                                {title}
+                              </a>
+                            ) : (
+                              <span>{title}</span>
+                            )}
                             <span
                               style={{
                                 fontSize: 11,
@@ -666,11 +701,11 @@ export default function SupplierInfoTab({ supplier }) {
                             >
                               {asDateTime(f.created_at)}
                             </span>
-                          </a>
-                        </li>
+                          </div>
+                        </div>
                       );
                     })}
-                  </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -712,11 +747,9 @@ export default function SupplierInfoTab({ supplier }) {
                 type="file"
                 className="add-product-page__input"
                 disabled={fileUploading}
-                onChange={async (e) => {
+                onChange={(e) => {
                   const file = e.target.files?.[0] || null;
-                  if (!file) return;
-                  await handleFileUpload(file);
-                  if (e.target) e.target.value = "";
+                  setSelectedFile(file || null);
                 }}
               />
             </div>
@@ -735,10 +768,22 @@ export default function SupplierInfoTab({ supplier }) {
                 setFileModalOpen(false);
                 setNewFileTitle("");
                 setFileError(null);
+                setSelectedFile(null);
               }}
               disabled={fileUploading}
             >
               Отмена
+            </button>
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              disabled={fileUploading || !selectedFile}
+              onClick={() => {
+                if (!selectedFile || fileUploading) return;
+                void handleFileUpload(selectedFile);
+              }}
+            >
+              {fileUploading ? "Загрузка..." : "Прикрепить"}
             </button>
           </div>
         </div>

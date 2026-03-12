@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, ClipboardList, FilePlus, Pencil, Package } from "lucide-react";
+import { ArrowLeft, ClipboardList, FilePlus, Pencil, Package, Copy } from "lucide-react";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert } from "@/hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
@@ -12,13 +12,14 @@ import {
   createBuildingWorkEntryPhoto,
   createBuildingWorkEntryFile,
   createWorkEntryWarehouseRequest,
+  updateBuildingWorkEntry,
 } from "@/store/creators/building/workEntriesCreators";
 import { fetchBuildingWarehouses } from "@/store/creators/building/warehousesCreators";
 import { fetchBuildingWarehouseStockItems } from "@/store/creators/building/stockCreators";
 import { useBuildingWarehouses } from "@/store/slices/building/warehousesSlice";
 import { useBuildingStock } from "@/store/slices/building/stockSlice";
-import { asDateTime } from "../shared/constants";
-import { Copy } from "lucide-react";
+import { asDateTime, statusLabel } from "../shared/constants";
+import api from "../../../../api";
 import "./Detail.scss";
 
 const CATEGORY_LABELS = {
@@ -35,6 +36,14 @@ const WORK_STATUS_LABELS = {
   paused: "Приостановлено",
   completed: "Завершено",
   cancelled: "Отменено",
+};
+
+const WAREHOUSE_REQUEST_STATUS_LABELS = {
+  pending: "Ожидает склада",
+  approved: "Одобрена",
+  rejected: "Отклонена",
+  partially_approved: "Частично выдано",
+  completed: "Всё выдано",
 };
 
 export default function BuildingWorkProcessDetail() {
@@ -71,6 +80,13 @@ export default function BuildingWorkProcessDetail() {
   const [warehouseRequestError, setWarehouseRequestError] = useState(null);
   const [warehouseRequestSubmitting, setWarehouseRequestSubmitting] = useState(false);
 
+  const [warehouseRequests, setWarehouseRequests] = useState([]);
+  const [warehouseRequestsLoading, setWarehouseRequestsLoading] = useState(false);
+  const [warehouseRequestsError, setWarehouseRequestsError] = useState(null);
+
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState(null);
+
   const { list: warehousesList } = useBuildingWarehouses();
   const { items: stockItemsList } = useBuildingStock();
 
@@ -78,6 +94,41 @@ export default function BuildingWorkProcessDetail() {
     if (!entryId) return;
     dispatch(fetchBuildingWorkEntryById(entryId));
   }, [dispatch, entryId]);
+
+  useEffect(() => {
+    if (!entryId) return;
+    const loadRequests = async () => {
+      setWarehouseRequestsLoading(true);
+      setWarehouseRequestsError(null);
+      try {
+        const { data } = await api.get(
+          "/building/work-entries/warehouse-requests/",
+          {
+            params: {
+              work_entry: entryId,
+              page_size: 50,
+            },
+          },
+        );
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+          ? data
+          : [];
+        setWarehouseRequests(list);
+      } catch (err) {
+        setWarehouseRequestsError(
+          validateResErrors(
+            err,
+            "Не удалось загрузить заявки на материалы",
+          ),
+        );
+      } finally {
+        setWarehouseRequestsLoading(false);
+      }
+    };
+    loadRequests();
+  }, [entryId]);
 
   const selectedProjectName = useMemo(() => {
     if (!selectedProjectId) return "—";
@@ -115,15 +166,19 @@ export default function BuildingWorkProcessDetail() {
     );
   }, [dispatch, warehouseRequestWarehouse]);
 
-  const photos = useMemo(
-    () => (Array.isArray(entry?.photos) ? entry.photos : []),
-    [entry],
-  );
+  const photos = useMemo(() => {
+    const raw = entry?.photos;
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray(raw.results)) return raw.results;
+    return [];
+  }, [entry]);
 
-  const files = useMemo(
-    () => (Array.isArray(entry?.files) ? entry.files : []),
-    [entry],
-  );
+  const files = useMemo(() => {
+    const raw = entry?.files;
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray(raw.results)) return raw.results;
+    return [];
+  }, [entry]);
 
   const handleBack = () => {
     navigate("/crm/building/work");
@@ -263,6 +318,16 @@ export default function BuildingWorkProcessDetail() {
   const getFileUrl = (f) =>
     f?.file_url ?? f?.url ?? f?.file ?? (typeof f === "string" ? f : "");
 
+  const getFileName = (f) => {
+    if (f?.title) return f.title;
+    const url = getFileUrl(f);
+    if (!url) return "Файл";
+    const clean = url.split("#")[0].split("?")[0];
+    const parts = clean.split("/");
+    const last = parts[parts.length - 1] || "Файл";
+    return last;
+  };
+
   const openWarehouseRequestModal = () => {
     setWarehouseRequestWarehouse("");
     setWarehouseRequestItems([{ stock_item: "", quantity: "", unit: "" }]);
@@ -324,6 +389,27 @@ export default function BuildingWorkProcessDetail() {
       if (res.meta.requestStatus === "fulfilled") {
         alert("Заявка на склад создана");
         setOpenWarehouseModal(false);
+        // Перезагружаем список заявок для этого процесса работ
+        try {
+          const { data } = await api.get(
+            "/building/work-entries/warehouse-requests/",
+            {
+              params: {
+                work_entry: entryId,
+                page_size: 50,
+              },
+            },
+          );
+          const list = Array.isArray(data?.results)
+            ? data.results
+            : Array.isArray(data)
+            ? data
+            : [];
+          setWarehouseRequests(list);
+        } catch (err) {
+          // тихо игнорируем, форма уже успешно создала заявку
+          // и при следующей загрузке страницы данные подтянутся
+        }
       } else {
         setWarehouseRequestError(
           validateResErrors(
@@ -343,6 +429,38 @@ export default function BuildingWorkProcessDetail() {
 
   const handleEditClick = () => {
     navigate(`/crm/building/work?edit=${entryId}`, { state: { openEditId: entryId } });
+  };
+
+  const handleStatusChange = async (e) => {
+    const value = e.target.value;
+    if (!entryId) return;
+    setStatusSaving(true);
+    setStatusError(null);
+    try {
+      const res = await dispatch(
+        updateBuildingWorkEntry({
+          id: entryId,
+          payload: { work_status: value },
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Статус процесса работ обновлён");
+        dispatch(fetchBuildingWorkEntryById(entryId));
+      } else {
+        setStatusError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось обновить статус процесса",
+          ),
+        );
+      }
+    } catch (err) {
+      setStatusError(
+        validateResErrors(err, "Не удалось обновить статус процесса"),
+      );
+    } finally {
+      setStatusSaving(false);
+    }
   };
 
   return (
@@ -369,20 +487,11 @@ export default function BuildingWorkProcessDetail() {
               {entry?.category && (
                 <> • {CATEGORY_LABELS[entry.category] || entry.category}</>
               )}
-              {entry?.work_status && (
-                <> • {WORK_STATUS_LABELS[entry.work_status] || entry.work_status}</>
-              )}
             </p>
           </div>
         </div>
         <div className="work-detail__section-actions" style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            type="button"
-            className="add-product-page__cancel-btn"
-            onClick={handleBack}
-          >
-            Назад к списку
-          </button>
+       
           <button
             type="button"
             className="add-product-page__submit-btn"
@@ -392,24 +501,6 @@ export default function BuildingWorkProcessDetail() {
           >
             <Pencil size={18} />
             Редактировать
-          </button>
-          <button
-            type="button"
-            className="add-product-page__submit-btn"
-            onClick={() => setOpenPhotoModal(true)}
-            disabled={!entry}
-          >
-            Добавить фото
-          </button>
-          <button
-            type="button"
-            className="add-product-page__submit-btn"
-            onClick={() => setOpenFileModal(true)}
-            disabled={!entry}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            <FilePlus size={18} />
-            Прикрепить файл
           </button>
           <button
             type="button"
@@ -437,6 +528,88 @@ export default function BuildingWorkProcessDetail() {
 
       {entry && (
         <div className="add-product-page__content">
+          <div
+            className="work-detail__status-track"
+            style={{
+              marginTop: 4,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: "#64748b",
+                marginBottom: 6,
+              }}
+            >
+              Процесс работ
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              {["cancelled", "planned", "in_progress", "paused", "completed"].map(
+                (statusKey, index, arr) => {
+                  const isActive = entry?.work_status === statusKey;
+                  const colors = {
+                    cancelled: "#b91c1c",
+                    planned: "#6b7280",
+                    in_progress: "#2563eb",
+                    paused: "#d97706",
+                    completed: "#15803d",
+                  };
+                  const circleColor = colors[statusKey] || "#64748b";
+                  return (
+                    <React.Fragment key={statusKey}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          minWidth: 0,
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "999px",
+                            border: "2px solid",
+                            borderColor: isActive ? circleColor : "#cbd5e1",
+                            backgroundColor: isActive ? circleColor : "#ffffff",
+                          }}
+                        />
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 11,
+                            color: isActive ? circleColor : "#94a3b8",
+                            maxWidth: 90,
+                            lineHeight: 1.25,
+                          }}
+                        >
+                          {WORK_STATUS_LABELS[statusKey] || statusKey}
+                        </div>
+                      </div>
+                      {index < arr.length - 1 && (
+                        <div
+                          style={{
+                            flex: 1,
+                            height: 1,
+                            background: "#e2e8f0",
+                          }}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                },
+              )}
+            </div>
+          </div>
           <div className="add-product-page__section">
             <div className="add-product-page__section-header">
               <div className="add-product-page__section-number">1</div>
@@ -478,9 +651,26 @@ export default function BuildingWorkProcessDetail() {
               </div>
               <div className="add-product-page__form-group">
                 <label className="add-product-page__label">Статус работ</label>
-                <div className="work-detail__value">
-                  {WORK_STATUS_LABELS[entry?.work_status] || entry?.work_status || "—"}
-                </div>
+                <select
+                  className="add-product-page__input"
+                  value={entry?.work_status || "planned"}
+                  onChange={handleStatusChange}
+                  disabled={statusSaving}
+                >
+                  {Object.entries(WORK_STATUS_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                {statusError && (
+                  <div
+                    className="add-product-page__error"
+                    style={{ marginTop: 4 }}
+                  >
+                    {String(statusError)}
+                  </div>
+                )}
               </div>
               <div className="add-product-page__form-group">
                 <label className="add-product-page__label">Подрядчик</label>
@@ -542,9 +732,27 @@ export default function BuildingWorkProcessDetail() {
           </div>
 
           <div className="add-product-page__section" style={{ marginTop: 24 }}>
-            <div className="add-product-page__section-header">
-              <div className="add-product-page__section-number">2</div>
-              <h3 className="add-product-page__section-title">Фотоотчёт</h3>
+            <div
+              className="add-product-page__section-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="add-product-page__section-number">2</div>
+                <h3 className="add-product-page__section-title">Фотоотчёт</h3>
+              </div>
+              <button
+                type="button"
+                className="add-product-page__submit-btn"
+                onClick={() => setOpenPhotoModal(true)}
+                disabled={!entry}
+              >
+                Добавить фото
+              </button>
             </div>
             {photos.length === 0 ? (
               <div className="work-detail__muted">
@@ -600,53 +808,228 @@ export default function BuildingWorkProcessDetail() {
           </div>
 
           <div className="add-product-page__section" style={{ marginTop: 24 }}>
-            <div className="add-product-page__section-header">
-              <div className="add-product-page__section-number">3</div>
-              <h3 className="add-product-page__section-title">Прикреплённые файлы</h3>
+            <div
+              className="add-product-page__section-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="add-product-page__section-number">3</div>
+                <h3 className="add-product-page__section-title">
+                  Прикреплённые файлы
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="add-product-page__submit-btn"
+                onClick={() => setOpenFileModal(true)}
+                disabled={!entry}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <FilePlus size={18} />
+                Прикрепить файл
+              </button>
             </div>
             {files.length === 0 ? (
               <div className="work-detail__muted">
                 Файлов пока нет. Используйте кнопку «Прикрепить файл» выше.
               </div>
             ) : (
-              <ul className="work-detail__file-list" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {files.map((f) => {
-                  const fid = f?.id ?? f?.uuid;
-                  const url = getFileUrl(f);
-                  const label = f?.title ?? f?.name ?? f?.file_name ?? "Файл";
-                  return (
-                    <li
-                      key={fid}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "8px 0",
-                        borderBottom: "1px solid #e2e8f0",
-                      }}
-                    >
-                      {url ? (
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="work-detail__file-link"
-                          style={{ color: "#2563eb", textDecoration: "underline" }}
+              <div
+                style={{
+                  overflowX: "auto",
+                  paddingBottom: 4,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "stretch",
+                    minHeight: 120,
+                  }}
+                >
+                  {files.map((f) => {
+                    const fid = f?.id ?? f?.uuid;
+                    const url = getFileUrl(f);
+                    const name = getFileName(f);
+                    const clean = url ? url.split("#")[0].split("?")[0] : "";
+                    const ext =
+                      clean && clean.includes(".")
+                        ? clean.split(".").pop().toLowerCase()
+                        : "";
+                    const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(
+                      ext,
+                    );
+                    return (
+                      <div
+                        key={fid}
+                        style={{
+                          flex: "0 0 200px",
+                          borderRadius: 12,
+                          border: "1px solid #e2e8f0",
+                          background: "#ffffff",
+                          padding: 10,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            borderRadius: 8,
+                            border: "1px dashed #e2e8f0",
+                            background: "#f8fafc",
+                            height: 90,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            overflow: "hidden",
+                          }}
                         >
-                          {label}
-                        </a>
-                      ) : (
-                        <span>{label}</span>
-                      )}
-                      {f?.created_at && (
-                        <span style={{ fontSize: 12, color: "#64748b" }}>
-                          {asDateTime(f.created_at)}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                          {url && isImage ? (
+                            <img
+                              src={url}
+                              alt={name}
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                color: "#64748b",
+                              }}
+                            >
+                              {ext ? ext.toUpperCase() : "FILE"}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                            fontSize: 12,
+                          }}
+                        >
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                color: "#2563eb",
+                                textDecoration: "underline",
+                                wordBreak: "break-all",
+                              }}
+                            >
+                              {name}
+                            </a>
+                          ) : (
+                            <span>{name}</span>
+                          )}
+                          {f?.created_at && (
+                            <span style={{ fontSize: 11, color: "#94a3b8" }}>
+                              {asDateTime(f.created_at)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="add-product-page__section" style={{ marginTop: 24 }}>
+            <div
+              className="add-product-page__section-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="add-product-page__section-number">4</div>
+                <h3 className="add-product-page__section-title">
+                  Склад: заявки на материалы
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="add-product-page__submit-btn"
+                onClick={() => setOpenWarehouseModal(true)}
+                disabled={!entry}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <Package size={18} />
+                Заявка на склад
+              </button>
+            </div>
+            {warehouseRequestsLoading ? (
+              <div className="work-detail__muted">
+                Загрузка заявок на материалы...
+              </div>
+            ) : warehouseRequestsError ? (
+              <div className="add-product-page__error">
+                {String(warehouseRequestsError)}
+              </div>
+            ) : warehouseRequests.length === 0 ? (
+              <div className="work-detail__muted">
+                Заявки на материалы для этого процесса ещё не созданы.
+              </div>
+            ) : (
+              <div
+                className="building-table building-table--shadow"
+                style={{ marginTop: 8 }}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Склад</th>
+                      <th>Статус</th>
+                      <th>Позиции</th>
+                      <th>Создана</th>
+                      <th>Обновлена</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {warehouseRequests.map((req, index) => {
+                      const items = Array.isArray(req.items) ? req.items : [];
+                      const statusText = statusLabel(
+                        req.status,
+                        WAREHOUSE_REQUEST_STATUS_LABELS,
+                      );
+                      return (
+                        <tr key={req.id ?? req.uuid ?? index}>
+                          <td>{index + 1}</td>
+                          <td>{req.warehouse_name || req.warehouse || "—"}</td>
+                          <td>{statusText}</td>
+                          <td>
+                            {items.length > 0
+                              ? `${items.length} поз.`
+                              : "Позиции не заданы"}
+                          </td>
+                          <td>{asDateTime(req.created_at)}</td>
+                          <td>{asDateTime(req.updated_at)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

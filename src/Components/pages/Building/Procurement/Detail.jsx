@@ -143,6 +143,11 @@ export default function BuildingProcurementDetail() {
     procurementId != null && creatingTransferIds?.[procurementId] === true;
 
   const [openSupplierId, setOpenSupplierId] = useState(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editComment, setEditComment] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState(null);
 
   useEffect(() => {
     if (!procurementId) return;
@@ -218,6 +223,42 @@ export default function BuildingProcurementDetail() {
   };
 
   const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+
+  const openEditProcurement = () => {
+    if (!procurement) return;
+    setEditTitle(procurement.title || "");
+    setEditComment(procurement.comment || "");
+    setEditError(null);
+    setEditModalOpen(true);
+  };
+
+  const submitEditProcurement = async (e) => {
+    e.preventDefault();
+    if (!procurementId) return;
+    const title = String(editTitle || "").trim();
+    const comment = String(editComment || "").trim();
+    if (!title) {
+      setEditError("Название обязательно");
+      return;
+    }
+    try {
+      setEditSaving(true);
+      setEditError(null);
+      await api.patch(`/building/procurements/${procurementId}/`, {
+        title,
+        comment,
+      });
+      alert("Закупка обновлена");
+      setEditModalOpen(false);
+      dispatch(fetchBuildingProcurementById(procurementId));
+    } catch (err) {
+      setEditError(
+        validateResErrors(err, "Не удалось обновить закупку"),
+      );
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const getFileTypeLabel = (ext) => {
     if (!ext) return "FILE";
@@ -444,6 +485,15 @@ export default function BuildingProcurementDetail() {
           >
             Назад
           </button>
+          {procurement && procurement.status === "draft" && (
+            <button
+              type="button"
+              className="building-btn"
+              onClick={openEditProcurement}
+            >
+              Редактировать
+            </button>
+          )}
           <button
             type="button"
             className="building-btn"
@@ -748,6 +798,16 @@ export default function BuildingProcurementDetail() {
                         const materials = Array.isArray(s.supplied_materials)
                           ? s.supplied_materials
                           : [];
+                        const SUPPLIER_TYPE_LABELS = {
+                          materials_supplier: "Поставщик материалов",
+                          equipment_supplier: "Поставщик оборудования",
+                          other: "Другой",
+                        };
+                        const typeLabel =
+                          SUPPLIER_TYPE_LABELS[s.supplier_type] ||
+                          s.supplier_type_display ||
+                          s.supplier_type ||
+                          "—";
                         return (
                           <React.Fragment key={sid}>
                             <tr
@@ -776,7 +836,7 @@ export default function BuildingProcurementDetail() {
                                   </span>
                                 </div>
                               </td>
-                              <td>{s.supplier_type_display || s.supplier_type || "—"}</td>
+                              <td>{typeLabel}</td>
                               <td>
                                 {materials.length > 0
                                   ? `${materials.length} материал(ов)`
@@ -871,6 +931,65 @@ export default function BuildingProcurementDetail() {
           </div>
         </DataContainer>
       )}
+
+      <Modal
+        open={editModalOpen}
+        onClose={() => {
+          if (editSaving) return;
+          setEditModalOpen(false);
+          setEditError(null);
+        }}
+        title="Редактировать закупку"
+      >
+        <form className="building-page" onSubmit={submitEditProcurement}>
+          <label>
+            <div className="building-page__label">Название</div>
+            <input
+              className="building-page__input"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Название закупки"
+              required
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Комментарий</div>
+            <textarea
+              className="building-page__input"
+              value={editComment}
+              onChange={(e) => setEditComment(e.target.value)}
+              placeholder="Комментарий (необязательно)"
+              rows={3}
+            />
+          </label>
+          {editError && (
+            <div className="building-page__error" style={{ marginTop: 8 }}>
+              {String(editError)}
+            </div>
+          )}
+          <div className="building-page__actions" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="building-btn"
+              onClick={() => {
+                if (editSaving) return;
+                setEditModalOpen(false);
+                setEditError(null);
+              }}
+              disabled={editSaving}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="building-btn building-btn--primary"
+              disabled={editSaving}
+            >
+              {editSaving ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         open={openHistoryModal}

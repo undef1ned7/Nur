@@ -23,7 +23,7 @@ export default function BuildingClientDetail() {
   }, [clientsList, clientId]);
 
   const [client, setClient] = useState(initialClient);
-  const [clientLoading, setClientLoading] = useState(!initialClient);
+  const [clientLoading, setClientLoading] = useState(false);
   const [clientError, setClientError] = useState(null);
   const initialTab = (() => {
     const fromUrl = searchParams.get("tab");
@@ -45,7 +45,7 @@ export default function BuildingClientDetail() {
   };
 
   const loadClient = async () => {
-    if (!clientId || client) return;
+    if (!clientId) return;
     setClientLoading(true);
     setClientError(null);
     try {
@@ -87,7 +87,7 @@ export default function BuildingClientDetail() {
   };
 
   useEffect(() => {
-    if (!client && clientId) {
+    if (clientId) {
       loadClient();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

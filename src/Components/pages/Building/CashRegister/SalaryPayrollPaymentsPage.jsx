@@ -14,6 +14,7 @@ import {
   createBuildingPayrollLinePayment,
   approveBuildingPayroll,
 } from "@/store/creators/building/salaryCreators";
+import { bulkStatusBuildingCashFlows } from "@/api/building";
 import { fetchBuildingProjects } from "@/store/creators/building/projectsCreators";
 import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import "./CashRegister.scss";
@@ -141,6 +142,26 @@ export default function CashRegisterSalaryPayrollPaymentsPage() {
           }),
         );
         if (res.meta.requestStatus === "fulfilled") {
+          const payment = res.payload?.data;
+          // Если backend создал связанное движение по кассе в статусе pending — сразу одобрим его
+          try {
+            const cashflowId = payment?.cashflow;
+            if (cashflowId) {
+              await bulkStatusBuildingCashFlows({
+                items: [{ id: cashflowId, status: "approved" }],
+              });
+            }
+          } catch (err) {
+            // Если не удалось одобрить движение по кассе, просто покажем ошибку, но саму выплату не откатываем
+            alert(
+              validateResErrors(
+                err,
+                "Выплата создана, но не удалось провести расход по кассе",
+              ),
+              true,
+            );
+          }
+
           alert(isDraftPeriod ? "Аванс выдан" : "Выплата создана");
           setPaymentModalLineId(null);
           setPayAmount("");

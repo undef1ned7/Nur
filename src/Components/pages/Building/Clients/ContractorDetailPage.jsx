@@ -5,6 +5,7 @@ import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { useBuildingContractors } from "@/store/slices/building/contractorsSlice";
 import ContractorInfoTab from "./ContractorInfoTab";
 import ContractorEquipmentTab from "./ContractorEquipmentTab";
+import ContractorHistoryTab from "./ContractorHistoryTab";
 
 export default function ContractorDetailPage() {
   const { id } = useParams();
@@ -153,10 +154,8 @@ export default function ContractorDetailPage() {
       )}
 
       {activeTab === "work-history" && (
-        <div className="sell-card client-detail__section">
-          <div className="building-page__muted">
-            История работ подрядчика будет реализована отдельно.
-          </div>
+        <div className="sell-card client-detail__card">
+          <ContractorHistoryTab contractorId={contractorId} />
         </div>
       )}
 

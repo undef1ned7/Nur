@@ -11,6 +11,8 @@ import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebounce";
+import { useConfirm } from "@/hooks/useDialog";
+import BuildingActionsMenu from "../shared/ActionsMenu";
 
 const VIEW_MODES = {
   TABLE: "table",
@@ -20,6 +22,7 @@ const VIEW_MODES = {
 export default function SuppliersTab() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { selectedProjectId } = useBuildingProjects();
   const {
     list: items,
@@ -34,6 +37,12 @@ export default function SuppliersTab() {
 
   const debouncedSearch = useDebouncedValue(search, 400);
 
+  const renderStatus = (status) => {
+    if (status === "active") return "Активен";
+    if (status === "inactive") return "Отключён";
+    return status || "—";
+  };
+
   useEffect(() => {
     if (!selectedProjectId) return;
     dispatch(
@@ -45,12 +54,23 @@ export default function SuppliersTab() {
     );
   }, [dispatch, selectedProjectId, debouncedSearch, onlyActive]);
 
-  const handleDelete = async (supplier) => {
+  const handleDelete = (supplier) => {
     const id = supplier?.id ?? supplier?.uuid;
     if (!id) return;
-    // Подтверждение можно добавить позже через useConfirm
-    await dispatch(deleteBuildingSupplier(id));
-    dispatch(fetchBuildingSuppliers());
+    confirm(
+      `Удалить поставщика «${supplier?.company_name || "поставщик"}»?`,
+      async (ok) => {
+        if (!ok) return;
+        await dispatch(deleteBuildingSupplier(id));
+        dispatch(
+          fetchBuildingSuppliers({
+            residential_complex: selectedProjectId,
+            search: debouncedSearch.trim() || undefined,
+            status: onlyActive ? "active" : undefined,
+          }),
+        );
+      },
+    );
   };
 
   if (!selectedProjectId) {
@@ -99,7 +119,7 @@ export default function SuppliersTab() {
               onClick={() => setViewMode(VIEW_MODES.CARDS)}
             >
               <LayoutGrid size={16} style={{ marginRight: 6 }} />
-              Список
+              Карточки
             </button>
           </div>
           <label className="clients-toolbar__check">
@@ -135,50 +155,168 @@ export default function SuppliersTab() {
         </div>
       )}
       {!loading && !error && items.length > 0 && (
-        <div className="client-detail__tableWrap">
-          <table className="client-detail__table">
-            <thead>
-              <tr>
-                <th>Компания</th>
-                <th>Контактное лицо</th>
-                <th>Телефон</th>
-                <th>Email</th>
-                <th>Город</th>
-                <th>Статус</th>
-                <th>Создан</th>
-              </tr>
-            </thead>
-            <tbody>
+        <>
+          {viewMode === VIEW_MODES.TABLE ? (
+            <div className="client-detail__tableWrap">
+              <table className="client-detail__table">
+                <thead>
+                  <tr>
+                    <th>Компания</th>
+                    <th>Контактное лицо</th>
+                    <th>Телефон</th>
+                    <th>Email</th>
+                    <th>Город</th>
+                    <th>Статус</th>
+                    <th>Создан</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((s) => {
+                    const id = s.id ?? s.uuid;
+                    const busy = id != null && deletingId === id;
+                    return (
+                      <tr
+                        key={id}
+                        className="client-detail__tableRow"
+                        onClick={() =>
+                          navigate(`/crm/building/clients/suppliers/${id}`)
+                        }
+                        style={{ cursor: "pointer" }}
+                      >
+                        <td>{s.company_name || "—"}</td>
+                        <td>
+                          {s.contact_person || s.position
+                            ? `${s.contact_person || ""}${
+                                s.position ? `, ${s.position}` : ""
+                              }`
+                            : "—"}
+                        </td>
+                        <td>{s.phone || "—"}</td>
+                        <td>{s.email || "—"}</td>
+                        <td>{s.city || "—"}</td>
+                        <td>{renderStatus(s.status)}</td>
+                        <td
+                          className="clients-table__actionsCol"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <BuildingActionsMenu
+                            actions={[
+                              {
+                                label: "Открыть",
+                                onClick: () =>
+                                  navigate(
+                                    `/crm/building/clients/suppliers/${id}`,
+                                  ),
+                                disabled: busy,
+                              },
+                              {
+                                label: "Удалить",
+                                onClick: () => handleDelete(s),
+                                disabled: busy,
+                                danger: true,
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="clients-grid">
               {items.map((s) => {
                 const id = s.id ?? s.uuid;
+                const busy = id != null && deletingId === id;
+                const contact =
+                  s.contact_person || s.position
+                    ? `${s.contact_person || ""}${
+                        s.position ? `, ${s.position}` : ""
+                      }`
+                    : "—";
                 return (
-                  <tr
+                  <div
                     key={id}
-                    className="client-detail__tableRow"
+                    className="clients-grid__card"
                     onClick={() =>
                       navigate(`/crm/building/clients/suppliers/${id}`)
                     }
-                    style={{ cursor: "pointer" }}
                   >
-                    <td>{s.company_name || "—"}</td>
-                    <td>
-                      {s.contact_person || s.position
-                        ? `${s.contact_person || ""}${
-                            s.position ? `, ${s.position}` : ""
-                          }`
-                        : "—"}
-                    </td>
-                    <td>{s.phone || "—"}</td>
-                    <td>{s.email || "—"}</td>
-                    <td>{s.city || "—"}</td>
-                    <td>{s.status || "—"}</td>
-                    <td>{asDateTime(s.created_at)}</td>
-                  </tr>
+                    <div className="clients-grid__cardHead">
+                      <div className="clients-grid__cardName">
+                        {s.company_name || "Без названия"}
+                      </div>
+                      <div
+                        className="clients-grid__cardMeta"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="clients-table__status">
+                          {renderStatus(s.status)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="clients-grid__cardBody">
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">
+                          Контакт
+                        </span>
+                        {contact}
+                      </div>
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">
+                          Телефон
+                        </span>
+                        {s.phone || "—"}
+                      </div>
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">Email</span>
+                        {s.email || "—"}
+                      </div>
+                      {s.city && (
+                        <div className="clients-grid__cardRow">
+                          <span className="clients-grid__cardLabel">
+                            Город
+                          </span>
+                          {s.city}
+                        </div>
+                      )}
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">
+                          Создан
+                        </span>
+                        {asDateTime(s.created_at)}
+                      </div>
+                    </div>
+                    <div
+                      className="clients-grid__cardActions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="clients-grid__cardBtn"
+                        disabled={busy}
+                        onClick={() =>
+                          navigate(`/crm/building/clients/suppliers/${id}`)
+                        }
+                      >
+                        Открыть
+                      </button>
+                      <button
+                        type="button"
+                        className="clients-grid__cardBtn clients-grid__cardBtn--danger"
+                        disabled={busy}
+                        onClick={() => handleDelete(s)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

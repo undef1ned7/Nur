@@ -11,6 +11,8 @@ import { useBuildingContractors } from "@/store/slices/building/contractorsSlice
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import { LayoutGrid, Table2 } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebounce";
+import { useConfirm } from "@/hooks/useDialog";
+import BuildingActionsMenu from "../shared/ActionsMenu";
 
 const VIEW_MODES = {
   TABLE: "table",
@@ -20,6 +22,7 @@ const VIEW_MODES = {
 export default function ContractorsTab() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { selectedProjectId } = useBuildingProjects();
   const {
     list: items,
@@ -34,6 +37,12 @@ export default function ContractorsTab() {
 
   const debouncedSearch = useDebouncedValue(search, 400);
 
+  const renderStatus = (status) => {
+    if (status === "active") return "Активен";
+    if (status === "inactive") return "Отключён";
+    return status || "—";
+  };
+
   useEffect(() => {
     if (!selectedProjectId) return;
     dispatch(
@@ -45,11 +54,23 @@ export default function ContractorsTab() {
     );
   }, [dispatch, selectedProjectId, debouncedSearch, onlyActive]);
 
-  const handleDelete = async (contractor) => {
+  const handleDelete = (contractor) => {
     const id = contractor?.id ?? contractor?.uuid;
     if (!id) return;
-    await dispatch(deleteBuildingContractor(id));
-    dispatch(fetchBuildingContractors());
+    confirm(
+      `Удалить подрядчика «${contractor?.company_name || "подрядчик"}»?`,
+      async (ok) => {
+        if (!ok) return;
+        await dispatch(deleteBuildingContractor(id));
+        dispatch(
+          fetchBuildingContractors({
+            residential_complex: selectedProjectId,
+            search: debouncedSearch.trim() || undefined,
+            status: onlyActive ? "active" : undefined,
+          }),
+        );
+      },
+    );
   };
 
   if (!selectedProjectId) {
@@ -98,7 +119,7 @@ export default function ContractorsTab() {
               onClick={() => setViewMode(VIEW_MODES.CARDS)}
             >
               <LayoutGrid size={16} style={{ marginRight: 6 }} />
-              Список
+              Карточки
             </button>
           </div>
           <label className="clients-toolbar__check">
@@ -134,45 +155,165 @@ export default function ContractorsTab() {
         </div>
       )}
       {!loading && !error && items.length > 0 && (
-        <div className="client-detail__tableWrap">
-          <table className="client-detail__table">
-            <thead>
-              <tr>
-                <th>Компания</th>
-                <th>Тип</th>
-                <th>Контактное лицо</th>
-                <th>Телефон</th>
-                <th>Город</th>
-                <th>Сотрудников</th>
-                <th>Статус</th>
-                <th>Создан</th>
-              </tr>
-            </thead>
-            <tbody>
+        <>
+          {viewMode === VIEW_MODES.TABLE ? (
+            <div className="client-detail__tableWrap">
+              <table className="client-detail__table">
+                <thead>
+                  <tr>
+                    <th>Компания</th>
+                    <th>Тип</th>
+                    <th>Контактное лицо</th>
+                    <th>Телефон</th>
+                    <th>Город</th>
+                    <th>Сотрудников</th>
+                    <th>Статус</th>
+                    <th>Создан</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((c) => {
+                    const id = c.id ?? c.uuid;
+                    const busy = id != null && deletingId === id;
+                    return (
+                      <tr
+                        key={id}
+                        className="client-detail__tableRow cursor-pointer"
+                        onClick={() =>
+                          navigate(`/crm/building/clients/contractors/${id}`)
+                        }
+                      >
+                        <td>{c.company_name || "—"}</td>
+                        <td>{c.contractor_type || "—"}</td>
+                        <td>{c.contact_person || "—"}</td>
+                        <td>{c.phone || "—"}</td>
+                        <td>{c.city || "—"}</td>
+                        <td>{c.employees != null ? c.employees : "—"}</td>
+                        <td>{renderStatus(c.status)}</td>
+                        <td
+                          className="clients-table__actionsCol"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <BuildingActionsMenu
+                            actions={[
+                              {
+                                label: "Открыть",
+                                onClick: () =>
+                                  navigate(
+                                    `/crm/building/clients/contractors/${id}`,
+                                  ),
+                                disabled: busy,
+                              },
+                              {
+                                label: "Удалить",
+                                onClick: () => handleDelete(c),
+                                disabled: busy,
+                                danger: true,
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="clients-grid">
               {items.map((c) => {
                 const id = c.id ?? c.uuid;
+                const busy = id != null && deletingId === id;
                 return (
-                  <tr
+                  <div
                     key={id}
-                    className="client-detail__tableRow cursor-pointer"
+                    className="clients-grid__card"
                     onClick={() =>
                       navigate(`/crm/building/clients/contractors/${id}`)
                     }
                   >
-                    <td>{c.company_name || "—"}</td>
-                    <td>{c.contractor_type || "—"}</td>
-                    <td>{c.contact_person || "—"}</td>
-                    <td>{c.phone || "—"}</td>
-                    <td>{c.city || "—"}</td>
-                    <td>{c.employees != null ? c.employees : "—"}</td>
-                    <td>{c.status || "—"}</td>
-                    <td>{asDateTime(c.created_at)}</td>
-                  </tr>
+                    <div className="clients-grid__cardHead">
+                      <div className="clients-grid__cardName">
+                        {c.company_name || "Без названия"}
+                      </div>
+                      <div
+                        className="clients-grid__cardMeta"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {c.status && (
+                          <span className="clients-table__status">
+                            {renderStatus(c.status)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="clients-grid__cardBody">
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">Тип</span>
+                        {c.contractor_type || "Тип не указан"}
+                      </div>
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">
+                          Контакт
+                        </span>
+                        {c.contact_person || "—"}
+                      </div>
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">
+                          Телефон
+                        </span>
+                        {c.phone || "—"}
+                      </div>
+                      {c.city && (
+                        <div className="clients-grid__cardRow">
+                          <span className="clients-grid__cardLabel">
+                            Город
+                          </span>
+                          {c.city}
+                        </div>
+                      )}
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">
+                          Сотрудников
+                        </span>
+                        {c.employees != null ? c.employees : "—"}
+                      </div>
+                      <div className="clients-grid__cardRow">
+                        <span className="clients-grid__cardLabel">
+                          Создан
+                        </span>
+                        {asDateTime(c.created_at)}
+                      </div>
+                    </div>
+                    <div
+                      className="clients-grid__cardActions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="clients-grid__cardBtn"
+                        disabled={busy}
+                        onClick={() =>
+                          navigate(`/crm/building/clients/contractors/${id}`)
+                        }
+                      >
+                        Открыть
+                      </button>
+                      <button
+                        type="button"
+                        className="clients-grid__cardBtn clients-grid__cardBtn--danger"
+                        disabled={busy}
+                        onClick={() => handleDelete(c)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
