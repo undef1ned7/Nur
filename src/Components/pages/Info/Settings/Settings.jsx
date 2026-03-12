@@ -1372,7 +1372,7 @@ const Settings = () => {
       score: company?.score || "",
       bik: company?.bik || "",
       address: company?.address || "",
-      whatsapp_phone: company?.whatsapp_phone || "",
+      phones_howcase: company?.phones_howcase || "",
     });
   }, [company]);
 
@@ -1459,7 +1459,7 @@ const Settings = () => {
       score: company?.score || "",
       bik: company?.bik || "",
       address: company?.address || "",
-      whatsapp_phone: company?.whatsapp_phone || "",
+      phones_howcase: company?.phones_howcase || "",
     });
   };
 
@@ -1715,7 +1715,7 @@ const Settings = () => {
                     placeholder: "Введите адрес",
                   },
                   {
-                    id: "whatsapp_phone",
+                  id: "phones_howcase",
                     label: "Телефоны для витрины (WhatsApp)",
                     placeholder: "Введите телефоны для витрины (WhatsApp)",
                   },

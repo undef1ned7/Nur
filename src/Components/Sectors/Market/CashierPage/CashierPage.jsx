@@ -188,6 +188,7 @@ const CashierPage = () => {
   const [cartQuantities, setCartQuantities] = useState({}); // Локальные значения количества для каждого товара
   const [cartPrices, setCartPrices] = useState({}); // Локальные значения цены за единицу (unit_price)
   const [cartDiscounts, setCartDiscounts] = useState({}); // Локальные значения скидки на позицию (discount_total)
+  const [cartDiscountModes, setCartDiscountModes] = useState({}); // Режим скидки по позиции: "amount" (сом) или "percent"
   const lastSearchInputTime = React.useRef(0); // Время последнего ввода в поле поиска (для защиты от открытия страницы оплаты при сканировании)
   const searchInputRef = React.useRef(null); // Ref для поля поиска
   const lastScanTimeRef = React.useRef(0); // Время последнего сканирования (как в SellMainStart.jsx)
@@ -207,6 +208,7 @@ const CashierPage = () => {
   const [showCustomServiceModal, setShowCustomServiceModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountValue, setDiscountValue] = useState("");
+  const [discountMode, setDiscountMode] = useState("amount"); // "amount" | "percent"
   const [customService, setCustomService] = useState({
     name: "",
     price: "",
@@ -254,19 +256,30 @@ const CashierPage = () => {
     }
   }, [openShiftId, currentSale]);
 
-  const debouncedDiscount = useDebounce((discount) => {
+  const debouncedDiscount = useDebounce((payload) => {
     if (!currentSale?.id || !openShiftId) return;
     dispatch(
       startSale({
-        discount_total: normalizePrice(parseFloat(discount) || 0),
+        ...payload,
         shift: openShiftId,
       }),
     );
   }, 600);
 
-  const handleDiscountChange = (discount) => {
-    const discountNum = parseFloat(discount) || 0;
-    debouncedDiscount(discountNum);
+  const handleDiscountChange = (discount, mode = "amount") => {
+    const num = parseFloat(discount) || 0;
+
+    if (mode === "percent") {
+      // В процентах отправляем order_discount_percent
+      debouncedDiscount({
+        order_discount_percent: num,
+      });
+    } else {
+      // В сомах отправляем order_discount_total
+      debouncedDiscount({
+        order_discount_total: normalizePrice(num),
+      });
+    }
   };
 
   // Функция для добавления доп. услуги
@@ -607,8 +620,9 @@ const CashierPage = () => {
           const price = normalizePrice(
             parseFloat(item.unit_price || item.price || 0),
           );
+          // line_discount — это именно "скидка, написанная продавцом"
           const discountTotal = normalizePrice(
-            parseFloat(item.discount_total || 0),
+            parseFloat(item.line_discount || item.discount_total || 0),
           );
           const productId = item.product || item.product_id;
           const cartItemId = item.id;
@@ -676,15 +690,33 @@ const CashierPage = () => {
         // Обновляем локальные значения количества, цены и скидки
         const newQuantities = {};
         const newPrices = {};
-        const newDiscounts = {};
         orderedCart.forEach((item) => {
           newQuantities[item.id] = formatQuantity(item.quantity || 0);
           newPrices[item.id] = formatPrice(item.price ?? 0);
-          newDiscounts[item.id] = formatPrice(item.discountTotal ?? 0);
         });
         setCartQuantities((prev) => ({ ...prev, ...newQuantities }));
         setCartPrices((prev) => ({ ...prev, ...newPrices }));
-        setCartDiscounts((prev) => ({ ...prev, ...newDiscounts }));
+        // Скидки по строкам: не перезатираем то, что уже ввёл продавец.
+        setCartDiscounts((prev) => {
+          const next = { ...prev };
+          orderedCart.forEach((item) => {
+            if (next[item.id] === undefined) {
+              next[item.id] = formatPrice(item.discountTotal ?? 0);
+            }
+          });
+          return next;
+        });
+
+        // Режим скидки по умолчанию — в сомах
+        setCartDiscountModes((prev) => {
+          const next = { ...prev };
+          orderedCart.forEach((item) => {
+            if (!next[item.id]) {
+              next[item.id] = "amount";
+            }
+          });
+          return next;
+        });
 
         setCart(orderedCart);
       } else {
@@ -734,7 +766,6 @@ const CashierPage = () => {
             id: currentSale.id,
             productId: cartItem.itemId,
             quantity: newQuantity,
-            discount_total: 0,
           }),
         );
         setCartQuantities((prev) => ({
@@ -772,7 +803,6 @@ const CashierPage = () => {
           id: currentSale.id,
           productId: cartItem.itemId,
           quantity: qtyNum,
-          discount_total: 0,
         }),
       );
       setCartQuantities((prev) => ({
@@ -1118,7 +1148,6 @@ const CashierPage = () => {
             id: saleId,
             productId: product.id,
             quantity: newQuantity,
-            discount_total: 0,
           }),
         );
         // Обновляем продажу после успешного обновления
@@ -1130,7 +1159,6 @@ const CashierPage = () => {
             id: saleId,
             productId: product.id,
             quantity: normalizeQuantity(1),
-            discount_total: 0,
           }),
         );
         // Обновляем продажу после успешного добавления
@@ -1219,7 +1247,6 @@ const CashierPage = () => {
             id: currentSale.id,
             productId: productId,
             quantity: newQuantity,
-            discount_total: 0,
           }),
         );
         // Обновляем локальное значение количества
@@ -1274,7 +1301,6 @@ const CashierPage = () => {
             id: currentSale.id,
             productId: productId,
             quantity: qtyNum,
-            discount_total: 0,
           }),
         );
         // Обновляем локальное значение количества
@@ -1384,7 +1410,9 @@ const CashierPage = () => {
   };
 
   // PATCH позиции: скидка на позицию (discount_total).
-  const patchCartItemDiscount = async (item, value) => {
+  // value — абсолютная скидка в сомах; displayValue — то, что показываем в инпуте (например, %).
+  const patchCartItemDiscount = async (item, value, options = {}) => {
+    const { mode = "amount", displayValue } = options;
     if (!currentSale?.id) return;
     const cartItemId = item.isCustom ? item.itemId : item.id;
     const num = Math.max(0, normalizePrice(parseFloat(value) || 0));
@@ -1396,7 +1424,17 @@ const CashierPage = () => {
           data: { discount_total: String(num.toFixed(2)) },
         }),
       ).unwrap();
-      setCartDiscounts((prev) => ({ ...prev, [item.id]: formatPrice(num) }));
+      setCartDiscounts((prev) => {
+        // В режиме процентов сохраняем именно введённое значение (проценты),
+        // в режиме суммы — форматированную сумму.
+        if (mode === "percent" && displayValue !== undefined) {
+          return {
+            ...prev,
+            [item.id]: displayValue,
+          };
+        }
+        return { ...prev, [item.id]: formatPrice(num) };
+      });
       await refreshSale();
     } catch (err) {
       console.error("Ошибка при изменении скидки:", err);
@@ -1462,11 +1500,6 @@ const CashierPage = () => {
             el.images[0]?.image_url ??
             "/images/placeholder.avif",
         };
-      })
-      .sort((a, b) => {
-        if (a.cartItem) return -1;
-        if (b.cartItem) return 1;
-        return 0;
       })
       .filter((el) => !!el.quantity);
   }, [products, currentSale]);
@@ -1793,7 +1826,18 @@ const CashierPage = () => {
             <button
               className="cashier-page__cart-action-btn"
               onClick={() => {
-                setDiscountValue(currentSale?.order_discount_total || "");
+                // Инициализируем модалку текущими данными
+                if (currentSale?.order_discount_percent) {
+                  setDiscountMode("percent");
+                  setDiscountValue(
+                    String(currentSale.order_discount_percent || ""),
+                  );
+                } else {
+                  setDiscountMode("amount");
+                  setDiscountValue(
+                    String(currentSale?.order_discount_total || ""),
+                  );
+                }
                 setShowDiscountModal(true);
               }}
               title="Добавить общую скидку"
@@ -1820,15 +1864,82 @@ const CashierPage = () => {
                       <span className="cashier-page__cart-item-name">
                         {item.name}
                       </span>
-                      <span className="cashier-page__cart-item-total">
-                        {Number(
-                          (
-                            (item.price || 0) * item.quantity -
-                            (item.discountTotal || 0)
-                          ).toFixed(2),
-                        )}{" "}
-                        сом
-                      </span>
+                      <div className="cashier-page__cart-item-head-right">
+                        <div className="cashier-page__cart-item-discount-modes">
+                          <button
+                            type="button"
+                            className={`cashier-page__cart-item-discount-mode-btn ${
+                              (cartDiscountModes[item.id] || "amount") ===
+                              "amount"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setCartDiscountModes((prev) => ({
+                                ...prev,
+                                [item.id]: "amount",
+                              }))
+                            }
+                          >
+                            сом
+                          </button>
+                          <button
+                            type="button"
+                            className={`cashier-page__cart-item-discount-mode-btn ${
+                              cartDiscountModes[item.id] === "percent"
+                                ? "active"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              setCartDiscountModes((prev) => ({
+                                ...prev,
+                                [item.id]: "percent",
+                              }))
+                            }
+                          >
+                            %
+                          </button>
+                        </div>
+                        <span className="cashier-page__cart-item-total">
+                          {item.discountTotal > 0 ? (
+                            <>
+                              <span
+                                style={{
+                                  textDecoration: "line-through",
+                                  opacity: 0.7,
+                                  marginRight: 6,
+                                }}
+                              >
+                                {Number(
+                                  ((item.price || 0) * item.quantity).toFixed(
+                                    2,
+                                  ),
+                                )}{" "}
+                                сом
+                              </span>
+                              <span>
+                                {Number(
+                                  (
+                                    (item.price || 0) * item.quantity -
+                                    (item.discountTotal || 0)
+                                  ).toFixed(2),
+                                )}{" "}
+                                сом
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              {Number(
+                                (
+                                  (item.price || 0) * item.quantity -
+                                  (item.discountTotal || 0)
+                                ).toFixed(2),
+                              )}{" "}
+                              сом
+                            </>
+                          )}
+                        </span>
+                      </div>
                     </div>
                     <div className="cashier-page__cart-item-row">
                       <label className="cashier-page__cart-item-field">
@@ -1878,12 +1989,10 @@ const CashierPage = () => {
                         <input
                           type="text"
                           className="cashier-page__cart-item-price-input"
-                          value={
-                            cartDiscounts[item.id] ??
-                            formatPrice(item.discountTotal ?? 0)
-                          }
+                          value={cartDiscounts[item.id] ?? ""}
                           onChange={(e) => {
                             const v = e.target.value;
+                            // Разрешаем только число, пустую строку и "сырой" ввод до валидации
                             if (
                               v === "" ||
                               v === "-" ||
@@ -1897,20 +2006,40 @@ const CashierPage = () => {
                           }}
                           onBlur={(e) => {
                             const v = e.target.value;
+                            const mode = cartDiscountModes[item.id] || "amount";
                             const num = parseFloat(v);
+
+                            // Текущее значение скидки в сомах
                             const current = parseFloat(item.discountTotal ?? 0);
-                            if (
-                              v !== "" &&
-                              !isNaN(num) &&
-                              num >= 0 &&
-                              num !== current
-                            ) {
-                              patchCartItemDiscount(item, v);
+
+                            if (v === "" || isNaN(num) || num < 0) {
+                              return;
+                            }
+
+                            if (mode === "percent") {
+                              const lineTotal =
+                                (item.price || 0) * (item.quantity || 0);
+                              if (lineTotal <= 0) return;
+
+                              let discountSom =
+                                (lineTotal * Math.max(0, num)) / 100;
+
+                              // Не даём скидке превышать сумму строки
+                              if (discountSom > lineTotal) {
+                                discountSom = lineTotal;
+                              }
+
+                              if (discountSom !== current) {
+                                patchCartItemDiscount(item, discountSom, {
+                                  mode: "percent",
+                                  displayValue: v,
+                                });
+                              }
                             } else {
-                              setCartDiscounts((prev) => ({
-                                ...prev,
-                                [item.id]: formatPrice(item.discountTotal ?? 0),
-                              }));
+                              // Режим суммы в сомах
+                              if (num !== current) {
+                                patchCartItemDiscount(item, v);
+                              }
                             }
                           }}
                           onKeyDown={(e) => {
@@ -2142,15 +2271,15 @@ const CashierPage = () => {
           show={showDiscountModal}
           onClose={() => {
             setShowDiscountModal(false);
-            setDiscountValue("");
           }}
           discountValue={discountValue}
           setDiscountValue={setDiscountValue}
           currentSubtotal={currentSale?.subtotal || 0}
+          mode={discountMode}
+          setMode={setDiscountMode}
           onApply={(discount) => {
-            handleDiscountChange(discount);
+            handleDiscountChange(discount, discountMode);
             setShowDiscountModal(false);
-            setDiscountValue("");
           }}
         />
       )}

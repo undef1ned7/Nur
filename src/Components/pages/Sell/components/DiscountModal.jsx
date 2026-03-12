@@ -7,6 +7,8 @@ const DiscountModal = ({
   setDiscountValue,
   currentSubtotal,
   onApply,
+  mode = "amount", // "amount" | "percent"
+  setMode, // опционально, если нужно менять режим из модалки
 }) => {
   if (!show) return null;
 
@@ -19,8 +21,28 @@ const DiscountModal = ({
       title={"Общая скидка"}
     >
       <div className="start__discount min-w-75">
+        <div style={{ marginBottom: "10px", display: "flex", gap: "8px" }}>
+          <button
+            type="button"
+            className={`sell__reset ${
+              mode === "amount" ? "start__total-pay" : ""
+            }`}
+            onClick={() => setMode && setMode("amount")}
+          >
+            Сумма
+          </button>
+          <button
+            type="button"
+            className={`sell__reset ${
+              mode === "percent" ? "start__total-pay" : ""
+            }`}
+            onClick={() => setMode && setMode("percent")}
+          >
+            Процент
+          </button>
+        </div>
         <div>
-          <label>Сумма скидки</label>
+          <label>{mode === "percent" ? "Скидка, %" : "Сумма скидки"}</label>
           <input
             className="sell__header-input"
             type="number"
@@ -32,11 +54,15 @@ const DiscountModal = ({
               }
             }}
             value={discountValue}
-            onChange={(e) => setDiscountValue(e.target.value.replace(/\D/g, ""))}
-            placeholder="Введите сумму скидки"
+            onChange={(e) => setDiscountValue(e.target.value)}
+            placeholder={
+              mode === "percent"
+                ? "Введите скидку в %"
+                : "Введите сумму скидки"
+            }
             autoFocus
           />
-          {currentSubtotal && (
+          {currentSubtotal && mode === "amount" && (
             <p style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}>
               Сумма без скидки: {currentSubtotal}
             </p>
