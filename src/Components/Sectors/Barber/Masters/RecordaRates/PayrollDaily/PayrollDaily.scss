@@ -1,5 +1,5 @@
 /* PayrollDaily.scss */
-@import "../../../styles/barbershop.scss";
+@use "../../../styles/barbershop.scss" as *;
 
 .barberpayrolldaily {
   color: var(--text);

@@ -1,4 +1,4 @@
-@import "../../../../assets/scss/variables";
+@use "../../../../assets/scss/variables" as *;
 
 /* Стили страницы чертежей: повторяют структуру Clients (sell-header, sell-card в shared).
    Ниже — только классы для toolbar, таблицы и карточек чертежей. */

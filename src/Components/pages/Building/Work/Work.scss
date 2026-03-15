@@ -1,6 +1,6 @@
-@import "../../../../assets/scss/variables";
-@import "../CashRegister/CashRegister.scss";
-@import "../../../Deposits/Sklad/AddProductPage.scss";
+@use "../../../../assets/scss/variables" as *;
+@use "../CashRegister/CashRegister.scss" as *;
+@use "../../../Deposits/Sklad/AddProductPage.scss" as *;
 
 .add-product-page--modal-form {
   min-height: auto;

@@ -1,4 +1,4 @@
-@import "../CashRegister/CashRegister.scss";
+@use "../CashRegister/CashRegister.scss" as *;
 
 /* Дополнительные стили для карточек складов (если нужны переопределения) */
 .stock-card {
