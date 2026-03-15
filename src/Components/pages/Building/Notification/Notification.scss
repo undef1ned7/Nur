@@ -1,4 +1,4 @@
-@import "../CashRegister/CashRegister.scss";
+@use "../CashRegister/CashRegister.scss" as *;
 
 /* Календарь напоминаний */
 .building-notification-calendar {

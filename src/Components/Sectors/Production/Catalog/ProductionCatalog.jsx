@@ -180,7 +180,7 @@ const ProductCard = ({
     // Разрешаем пустое значение или 0 во время ввода
     if (newQuantity === "" || isNaN(newQuantity) || newQuantity <= 0) {
       setQuantity("");
-      showQuantityControls(false)
+      showQuantityControls(false);
       return;
     }
     const qty = Math.min(maxQuantity || 999, Math.max(1, newQuantity));
@@ -203,13 +203,13 @@ const ProductCard = ({
   const handleDecrement = (e) => {
     e.stopPropagation();
     if (quantity > 0) {
-      setQuantity(prev => {
+      setQuantity((prev) => {
         let last = quantity - 1;
         if (last < 1) {
           setShowQuantityControls(false);
           return 1;
         }
-        return quantity - 1
+        return quantity - 1;
       });
     }
   };
@@ -274,8 +274,9 @@ const ProductCard = ({
 
   return (
     <div
-      className={`product-card ${isDragging ? "dragging" : ""} ${isLongPress ? "long-press" : ""
-        }`}
+      className={`product-card ${isDragging ? "dragging" : ""} ${
+        isLongPress ? "long-press" : ""
+      }`}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -391,7 +392,7 @@ const ProductCard = ({
                     value={quantity}
                     onChange={(e) =>
                       handleQuantityChange(
-                        e.target.value === "" ? "" : Number(e.target.value)
+                        e.target.value === "" ? "" : Number(e.target.value),
                       )
                     }
                     onBlur={handleQuantityBlur}
@@ -543,11 +544,11 @@ const ProductDetailModal = ({
       }
       if (hasImages && imagesList.length > 0) {
         setCurrentImageIndex((prev) =>
-          prev === imagesList.length - 1 ? 0 : prev + 1
+          prev === imagesList.length - 1 ? 0 : prev + 1,
         );
       }
     },
-    [hasImages, imagesList.length]
+    [hasImages, imagesList.length],
   );
 
   const handleFullScreenPrev = useCallback(
@@ -557,11 +558,11 @@ const ProductDetailModal = ({
       }
       if (hasImages && imagesList.length > 0) {
         setCurrentImageIndex((prev) =>
-          prev === 0 ? imagesList.length - 1 : prev - 1
+          prev === 0 ? imagesList.length - 1 : prev - 1,
         );
       }
     },
-    [hasImages, imagesList.length]
+    [hasImages, imagesList.length],
   );
 
   // ХУКИ — всегда до любых return
@@ -579,9 +580,9 @@ const ProductDetailModal = ({
       if (e.key === "Escape") {
         handleCloseFullScreen();
       } else if (e.key === "ArrowLeft") {
-        handleFullScreenPrev({ stopPropagation: () => { } });
+        handleFullScreenPrev({ stopPropagation: () => {} });
       } else if (e.key === "ArrowRight") {
-        handleFullScreenNext({ stopPropagation: () => { } });
+        handleFullScreenNext({ stopPropagation: () => {} });
       }
     };
 
@@ -602,14 +603,14 @@ const ProductDetailModal = ({
   const nextImage = () => {
     if (!hasImages) return;
     setCurrentImageIndex((prev) =>
-      prev === imagesList.length - 1 ? 0 : prev + 1
+      prev === imagesList.length - 1 ? 0 : prev + 1,
     );
   };
 
   const prevImage = () => {
     if (!hasImages) return;
     setCurrentImageIndex((prev) =>
-      prev === 0 ? imagesList.length - 1 : prev - 1
+      prev === 0 ? imagesList.length - 1 : prev - 1,
     );
   };
 
@@ -673,8 +674,9 @@ const ProductDetailModal = ({
                     key={image.id || index}
                     src={image.image_url || "https://via.placeholder.com/100"}
                     alt={`${product.name} ${index + 1}`}
-                    className={`thumbnail ${index === currentImageIndex ? "active" : ""
-                      }`}
+                    className={`thumbnail ${
+                      index === currentImageIndex ? "active" : ""
+                    }`}
                     onClick={() => setCurrentImageIndex(index)}
                   />
                 ))}
@@ -731,8 +733,9 @@ const ProductDetailModal = ({
                           image.image_url || "https://via.placeholder.com/100"
                         }
                         alt={`${product.name} ${index + 1}`}
-                        className={`fullscreen-thumbnail ${index === currentImageIndex ? "active" : ""
-                          }`}
+                        className={`fullscreen-thumbnail ${
+                          index === currentImageIndex ? "active" : ""
+                        }`}
                         onClick={(e) =>
                           handleFullScreenThumbnailClick(e, index)
                         }
@@ -813,7 +816,7 @@ const ProductDetailModal = ({
                     value={quantity}
                     onChange={(e) =>
                       handleQuantityChange(
-                        e.target.value === "" ? "" : Number(e.target.value)
+                        e.target.value === "" ? "" : Number(e.target.value),
                       )
                     }
                     onBlur={handleQuantityBlur}
@@ -887,7 +890,7 @@ const ProductionCatalog = () => {
   const alert = useAlert();
   const dispatch = useDispatch();
   const { products, loading, error, selectedProduct, filters } = useSelector(
-    (state) => state.catalog
+    (state) => state.catalog,
   );
   const { shifts, currentShift } = useShifts();
   const { list: cashBoxes } = useCash();
@@ -896,7 +899,7 @@ const ProductionCatalog = () => {
   // console.log(1, products);
 
   const cartItemsCount = useSelector(selectCartItemsCount);
-  const agentCart = useAgentCart()
+  const agentCart = useAgentCart();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -904,9 +907,9 @@ const ProductionCatalog = () => {
   const [viewMode, setViewMode] = useState("cards"); // 'grid' or 'list'
   const { isMobile } = useResize(({ isMobile }) => {
     if (isMobile) {
-      setViewMode('cards')
+      setViewMode("cards");
     }
-  })
+  });
 
   const [showFilters, setShowFilters] = useState(false);
   // const [showCart, setShowCart] = useState(false);
@@ -926,23 +929,26 @@ const ProductionCatalog = () => {
       ? products.results
       : Array.isArray(products)
         ? products
-        : []
-    return data.map(product => {
-      const hasInAgentProducts = agentProductsMap.has(product.id);
-      const agentQty = hasInAgentProducts
-        ? agentProductsMap.get(product.id) ?? 0
-        : 0;
+        : [];
+    return data
+      .map((product) => {
+        const hasInAgentProducts = agentProductsMap.has(product.id);
+        const agentQty = hasInAgentProducts
+          ? (agentProductsMap.get(product.id) ?? 0)
+          : 0;
 
-      const cartQty = agentCart?.items?.find(cartP => cartP.product === product.id)?.quantity || 0;
+        const cartQty =
+          agentCart?.items?.find((cartP) => cartP.product === product.id)
+            ?.quantity || 0;
 
-      const enrichedProduct = {
-        ...product,
-        quantity: agentQty - cartQty,
-        isAvailableInAgent: hasInAgentProducts,
-      };
-      return enrichedProduct
-    })
-      .filter(el => !!el.quantity)
+        const enrichedProduct = {
+          ...product,
+          quantity: agentQty - cartQty,
+          isAvailableInAgent: hasInAgentProducts,
+        };
+        return enrichedProduct;
+      })
+      .filter((el) => !!el.quantity);
   }, [agentProductsMap, products, agentCart]);
 
   // Функция для получения товаров из корзины и обновления счетчика
@@ -950,7 +956,7 @@ const ProductionCatalog = () => {
     try {
       // Используем getAgentCart для получения активной корзины
       const cart = await dispatch(
-        getAgentCart({ agent: null, order_discount_total: "0.00" })
+        getAgentCart({ agent: null, order_discount_total: "0.00" }),
       ).unwrap();
       if (cart?.items && Array.isArray(cart.items)) {
         // Подсчитываем общее количество товаров в корзине
@@ -966,7 +972,10 @@ const ProductionCatalog = () => {
         setAgentCartItemsCount(0);
       }
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при получении корзины");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при получении корзины",
+      );
       alert(errorMessage, true);
       setAgentCartItemsCount(0);
     }
@@ -988,7 +997,10 @@ const ProductionCatalog = () => {
         setAgentProductsMap(map);
       }
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при получении агентских продуктов");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при получении агентских продуктов",
+      );
       alert(errorMessage, true);
     }
   }, [dispatch]);
@@ -1042,7 +1054,7 @@ const ProductionCatalog = () => {
     (async () => {
       try {
         const cart = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" })
+          getAgentCart({ agent: null, order_discount_total: "0.00" }),
         ).unwrap();
 
         const id = cart?.id || null;
@@ -1050,12 +1062,15 @@ const ProductionCatalog = () => {
           setAgentCartId(id);
           localStorage.setItem("agentCartId", id);
           setAgentCartItemsCount(
-            Array.isArray(cart?.items) ? cart.items.length : 0
+            Array.isArray(cart?.items) ? cart.items.length : 0,
           );
         }
       } catch (e) {
         // ignore; will fallback to local cart until user retries
-        const errorMessage = validateResErrors(e, "Ошибка при инициализации корзины");
+        const errorMessage = validateResErrors(
+          e,
+          "Ошибка при инициализации корзины",
+        );
         alert(errorMessage, true);
       }
     })();
@@ -1125,7 +1140,7 @@ const ProductionCatalog = () => {
     if (draggedItem && draggedItem !== targetProductId) {
       const draggedIndex = productsList.findIndex((p) => p.id === draggedItem);
       const targetIndex = productsList.findIndex(
-        (p) => p.id === targetProductId
+        (p) => p.id === targetProductId,
       );
 
       const newProducts = [...productsList];
@@ -1146,7 +1161,10 @@ const ProductionCatalog = () => {
       try {
         await dispatch(updateProductsOrder(productsOrder));
       } catch (error) {
-        const errorMessage = validateResErrors(error, "Ошибка при обновлении порядка товаров");
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при обновлении порядка товаров",
+        );
         alert(errorMessage, true);
       }
     }
@@ -1187,15 +1205,18 @@ const ProductionCatalog = () => {
       : 1;
     const canPrev = Boolean(products?.previous) || page > 1;
     const canNext = Boolean(products?.next) || page < totalPages;
-    return { totalPages, canNext, canPrev }
+    return { totalPages, canNext, canPrev };
   }, [productsList, products, page]);
 
-  const gotoPage = useCallback((p) => {
-    const target = Math.min(Math.max(1, p), totalPages);
-    setPage(target);
-    // keep current filters applied
-    dispatch(fetchProducts({ ...(filters || {}), page: target }));
-  }, [totalPages, filters]);
+  const gotoPage = useCallback(
+    (p) => {
+      const target = Math.min(Math.max(1, p), totalPages);
+      setPage(target);
+      // keep current filters applied
+      dispatch(fetchProducts({ ...(filters || {}), page: target }));
+    },
+    [totalPages, filters],
+  );
 
   const handleAddToCart = async (product, quantity = 1) => {
     try {
@@ -1207,7 +1228,7 @@ const ProductionCatalog = () => {
           startAgentCart({
             agent: null,
             order_discount_total: "0.00",
-          })
+          }),
         ).unwrap();
         cartId = created?.id || null;
         if (cartId) {
@@ -1226,7 +1247,7 @@ const ProductionCatalog = () => {
             // Можно передать discount_total и unit_price, если нужны
             // discount_total: product.discount_total,
             // unit_price: product.price,
-          })
+          }),
         ).unwrap();
 
         // Используем возвращенные данные для обновления счетчика
@@ -1248,13 +1269,15 @@ const ProductionCatalog = () => {
             cartBtn.style.transform = "scale(1)";
           }, 200);
         }
-
       } else {
         // Fallback to local cart if agent cart creation failed
         dispatch(addToCart({ product, quantity, store: "Default Store" }));
       }
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при добавлении в корзину");
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при добавлении в корзину",
+      );
       alert(errorMessage, true);
       // Fallback to local cart on error
       if (error?.status >= 500) {
@@ -1279,7 +1302,7 @@ const ProductionCatalog = () => {
       availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
       if (!availableCashBoxes || availableCashBoxes.length === 0) {
         throw new Error(
-          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены."
+          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены.",
         );
       }
     }
@@ -1303,7 +1326,7 @@ const ProductionCatalog = () => {
         cashbox: cashboxId,
         cashier: cashierId,
         opening_cash: "0",
-      })
+      }),
     ).unwrap();
 
     // Обновляем список смен
@@ -1323,7 +1346,7 @@ const ProductionCatalog = () => {
         startAgentCart({
           agent: null,
           order_discount_total: "0.00",
-        })
+        }),
       ).unwrap();
       const tempCartId = created?.id || null;
 
@@ -1340,7 +1363,7 @@ const ProductionCatalog = () => {
           cartId: tempCartId,
           product_id: product.id,
           quantity: quantity,
-        })
+        }),
       ).unwrap();
 
       // Оформляем заказ без клиента (используя тот же метод, что и в Cart.jsx)
@@ -1349,13 +1372,13 @@ const ProductionCatalog = () => {
           cartId: tempCartId,
           print_receipt: false,
           // client_id не передаем, так как это быстрый заказ без корзины
-        })
+        }),
       ).unwrap();
 
       // Показываем уведомление об успешной отправке
       setAlertType("success");
       setAlertMessage(
-        `Заказ на товар "${product.name}" (${quantity} шт.) успешно отправлен!`
+        `Заказ на товар "${product.name}" (${quantity} шт.) успешно отправлен!`,
       );
       setAlertOpen(true);
 
@@ -1364,7 +1387,7 @@ const ProductionCatalog = () => {
         startAgentCart({
           agent: null,
           order_discount_total: "0.00",
-        })
+        }),
       ).unwrap();
       if (newCart?.id) {
         localStorage.setItem("agentCartId", newCart.id);
@@ -1376,7 +1399,10 @@ const ProductionCatalog = () => {
       dispatch(fetchProducts());
       refreshAgentProducts();
     } catch (error) {
-      const errorMessage = validateResErrors(error, "Ошибка при добавлении в корзину без сохранения");  
+      const errorMessage = validateResErrors(
+        error,
+        "Ошибка при добавлении в корзину без сохранения",
+      );
       alert(errorMessage, true);
     }
   };
@@ -1390,7 +1416,7 @@ const ProductionCatalog = () => {
           startAgentCart({
             agent: null,
             order_discount_total: "0.00",
-          })
+          }),
         ).unwrap();
         cid = created?.id || null;
         if (cid) {
@@ -1434,7 +1460,7 @@ const ProductionCatalog = () => {
 
   useEffect(() => {
     refreshAgentProducts();
-  }, [])
+  }, []);
   return (
     <div className="production-catalog">
       {/* <div className="catalog-header">
@@ -1485,31 +1511,30 @@ const ProductionCatalog = () => {
               Корзина
               {(agentCartItemsCount > 0 || cartItemsCount > 0) && (
                 <span className="cart-badge">
-                  {agentCartItemsCount > 0 ? agentCartItemsCount : cartItemsCount}
+                  {agentCartItemsCount > 0
+                    ? agentCartItemsCount
+                    : cartItemsCount}
                 </span>
               )}
             </button>
           )}
 
-          {
-            !isMobile && (
-              <div className="view-mode-toggle">
-                <button
-                  className={`view-btn ${viewMode === "cards" ? "active" : ""}`}
-                  onClick={() => setViewMode("cards")}
-                >
-                  <Grid size={20} />
-                </button>
-                <button
-                  className={`view-btn ${viewMode === "list" ? "active" : ""}`}
-                  onClick={() => setViewMode("list")}
-                >
-                  <List size={20} />
-                </button>
-              </div>
-            )
-          }
-
+          {!isMobile && (
+            <div className="view-mode-toggle">
+              <button
+                className={`view-btn ${viewMode === "cards" ? "active" : ""}`}
+                onClick={() => setViewMode("cards")}
+              >
+                <Grid size={20} />
+              </button>
+              <button
+                className={`view-btn ${viewMode === "list" ? "active" : ""}`}
+                onClick={() => setViewMode("list")}
+              >
+                <List size={20} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1580,15 +1605,13 @@ const ProductionCatalog = () => {
           {productsList.length === 0 ? (
             <div className="empty-state">
               <p>
-                {
-                  debouncedSearchQuery ? 'Товары не найдены' : 'Список товаров пуст'
-                }
+                {debouncedSearchQuery
+                  ? "Товары не найдены"
+                  : "Список товаров пуст"}
               </p>
-              {
-                debouncedSearchQuery && (
-                  <button onClick={clearAllFilters}>Показать все товары</button>
-                )
-              }
+              {debouncedSearchQuery && (
+                <button onClick={clearAllFilters}>Показать все товары</button>
+              )}
             </div>
           ) : (
             <div className={`products-grid ${viewMode}`}>
@@ -1603,7 +1626,9 @@ const ProductionCatalog = () => {
                     <ProductCard
                       product={enrichedProduct}
                       onView={handleViewProduct}
-                      onDragStart={(e) => handleDragStart(e, enrichedProduct.id)}
+                      onDragStart={(e) =>
+                        handleDragStart(e, enrichedProduct.id)
+                      }
                       onDragEnd={handleDragEnd}
                       isDragging={draggedItem === enrichedProduct.id}
                       onAddToCart={handleAddToCart}
@@ -1669,12 +1694,12 @@ const ProductionCatalog = () => {
         product={
           selectedProduct
             ? {
-              ...selectedProduct,
-              quantity: agentProductsMap.has(selectedProduct.id)
-                ? agentProductsMap.get(selectedProduct.id) ?? 0
-                : 0,
-              isAvailableInAgent: agentProductsMap.has(selectedProduct.id),
-            }
+                ...selectedProduct,
+                quantity: agentProductsMap.has(selectedProduct.id)
+                  ? (agentProductsMap.get(selectedProduct.id) ?? 0)
+                  : 0,
+                isAvailableInAgent: agentProductsMap.has(selectedProduct.id),
+              }
             : null
         }
         isOpen={isModalOpen}
