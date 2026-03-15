@@ -45,7 +45,6 @@ import "./Cart.scss";
 import { useAlert, useConfirm } from "../../../../hooks/useDialog";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 
-
 const CartItem = ({
   item,
   onUpdateQuantity,
@@ -53,13 +52,18 @@ const CartItem = ({
   maxStock,
   onRemoveItem,
   editable,
+  discountMode = "amount",
+  discountValue = "",
+  onDiscountModeChange,
+  onDiscountChange,
+  onDiscountBlur,
 }) => {
   const confirm = useConfirm();
   const [quantity, setQuantity] = useState(
-    Number(item.quantity ?? item.quantity_requested ?? 0)
+    Number(item.quantity ?? item.quantity_requested ?? 0),
   );
   const [giftQty, setGiftQty] = useState(
-    typeof item.gift_quantity === "number" ? Number(item.gift_quantity) : 0
+    typeof item.gift_quantity === "number" ? Number(item.gift_quantity) : 0,
   );
 
   // Синхронизируем состояние с props при изменении item
@@ -95,7 +99,7 @@ const CartItem = ({
     console.log("CartItem: incrementing", item.id, "to", newQuantity);
     onUpdateQuantity(item.id, newQuantity);
   };
-  
+
   const handleDecrement = (e, id) => {
     e.stopPropagation();
     if (!editable) {
@@ -151,7 +155,7 @@ const CartItem = ({
       if (result) {
         onRemoveItem(item.id);
       }
-    })
+    });
   }, []);
   const handleGiftIncrement = (e) => {
     e.stopPropagation();
@@ -188,8 +192,10 @@ const CartItem = ({
           {item.product?.category || "Без категории"}
         </p> */}
         <div className="item-price">
-          {(Number(item.unit_price || item.price_snapshot || 0) *
-            Number(item.quantity || 0) || 0).toFixed(2)}{" "}
+          {(
+            Number(item.unit_price || item.price_snapshot || 0) *
+              Number(item.quantity || 0) || 0
+          ).toFixed(2)}{" "}
           KGS
         </div>
         {/* <div className="item-rating">
@@ -198,59 +204,88 @@ const CartItem = ({
         </div> */}
 
         <div className="item-actions">
-          <div className="quantity-controls">
-            <button
-              className="quantity-btn"
-              onClick={(e) => handleDecrement(e, item.id)}
-              disabled={quantity <= 0 || !editable}
-              type="button"
-              title="Уменьшить количество"
-            >
-              <Minus size={16} />
-            </button>
-            <input
-              type="number"
-              value={quantity}
-              onChange={handleQuantityInputChange}
-              onBlur={handleQuantityInputBlur}
-              onKeyDown={handleQuantityInputKeyDown}
-              onClick={(e) => e.stopPropagation()}
-              className="quantity-input"
-              disabled={!editable}
-              max={maxStock}
-            />
-            <button
-              className="quantity-btn"
-              onClick={handleIncrement}
-              disabled={!editable}
-              type="button"
-              title="Увеличить количество"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
+          <div className="item-actions-main">
+            <div className="quantity-controls">
+              <button
+                className="quantity-btn"
+                onClick={(e) => handleDecrement(e, item.id)}
+                disabled={quantity <= 0 || !editable}
+                type="button"
+                title="Уменьшить количество"
+              >
+                <Minus size={16} />
+              </button>
+              <input
+                type="number"
+                value={quantity}
+                onChange={handleQuantityInputChange}
+                onBlur={handleQuantityInputBlur}
+                onKeyDown={handleQuantityInputKeyDown}
+                onClick={(e) => e.stopPropagation()}
+                className="quantity-input"
+                disabled={!editable}
+                max={maxStock}
+              />
+              <button
+                className="quantity-btn"
+                onClick={handleIncrement}
+                disabled={!editable}
+                type="button"
+                title="Увеличить количество"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
 
-          {/* <div className="quantity-controls" style={{ marginLeft: 12 }}>
-            <button
-              className="quantity-btn"
-              onClick={handleGiftDecrement}
-              disabled={!editable || giftQty <= 0}
-              type="button"
-              title="Уменьшить подарок"
-            >
-              <Minus size={16} />
-            </button>
-            <span className="quantity">{giftQty}</span>
-            <button
-              className="quantity-btn"
-              onClick={handleGiftIncrement}
-              disabled={!editable}
-              type="button"
-              title="Добавить в подарок"
-            >
-              <Plus size={16} />
-            </button>
-          </div> */}
+            {editable && (
+              <div className="item-discount">
+                <div className="item-discount-toggle">
+                  <button
+                    type="button"
+                    className={`item-discount-toggle__btn ${
+                      (discountMode || "amount") === "amount"
+                        ? "item-discount-toggle__btn--active"
+                        : ""
+                    }`}
+                    onClick={() => onDiscountModeChange?.("amount")}
+                  >
+                    сом
+                  </button>
+                  <button
+                    type="button"
+                    className={`item-discount-toggle__btn ${
+                      discountMode === "percent"
+                        ? "item-discount-toggle__btn--active"
+                        : ""
+                    }`}
+                    onClick={() => onDiscountModeChange?.("percent")}
+                  >
+                    %
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  className="item-discount-input"
+                  value={discountValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "" || v === "-" || /^\d*\.?\d*$/.test(v)) {
+                      onDiscountChange?.(v);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    onDiscountBlur?.(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.target.blur();
+                  }}
+                  placeholder={
+                    discountMode === "percent" ? "Скидка, %" : "Скидка, сом"
+                  }
+                />
+              </div>
+            )}
+          </div>
 
           <button
             className="remove-btn"
@@ -265,7 +300,9 @@ const CartItem = ({
 
         <div className="item-info">
           <p className="gift">Подарок: {Number(giftQty).toLocaleString()}</p>
-          <p className="gift">В наличии: {Number(maxStock + +item.quantity).toLocaleString()}</p>
+          <p className="gift">
+            В наличии: {Number(maxStock + +item.quantity).toLocaleString()}
+          </p>
           <p className="total-qty">
             Итого шт: {Number(item.quantity || 0).toLocaleString()}
           </p>
@@ -273,7 +310,7 @@ const CartItem = ({
             Общий:{" "}
             {Number(
               Number(item.unit_price || item.price_snapshot || 0) *
-              (Number(item.quantity || 0) + Number(giftQty || 0))
+                (Number(item.quantity || 0) + Number(giftQty || 0)),
             ).toLocaleString()}
             .00
           </p>
@@ -554,15 +591,16 @@ const ClientSelector = ({
                     return (
                       <button
                         key={client?.id ?? `${name}-${client?.address ?? ""}`}
-                        className={`client-option ${selectedClient?.id && client?.id
-                          ? selectedClient.id === client.id
-                            ? "selected"
-                            : ""
-                          : getClientName(selectedClient) === name &&
-                            selectedClient?.address === client?.address
-                            ? "selected"
-                            : ""
-                          }`}
+                        className={`client-option ${
+                          selectedClient?.id && client?.id
+                            ? selectedClient.id === client.id
+                              ? "selected"
+                              : ""
+                            : getClientName(selectedClient) === name &&
+                                selectedClient?.address === client?.address
+                              ? "selected"
+                              : ""
+                        }`}
                         onClick={() => {
                           onClientSelect(client);
                           setIsOpen(false);
@@ -610,33 +648,34 @@ const OrderSummary = ({
   const cartItems = useSelector(selectCartItems);
   const totalQuantityLocal = useSelector(selectCartItemsCount);
   const subtotalLocal = useSelector(selectCartTotal);
-  const { discount,
+  const {
+    discount,
     usingServer,
     isEditable,
     isDraft,
     isApproved,
     isRejected,
-    isSubmitted } = useMemo(() => {
-      const discount = 0; // Моковая скидка
-      const usingServer = Array.isArray(items) && items.length > 0;
-      // Корзина редактируема, если статус "draft" или "active"
-      const isEditable = status === "draft" || status === "active";
-      const isDraft = status === "draft";
-      const isSubmitted = status === "submitted";
-      const isApproved = status === "approved";
-      const isRejected = status === "rejected";
+    isSubmitted,
+  } = useMemo(() => {
+    const discount = 0; // Моковая скидка
+    const usingServer = Array.isArray(items) && items.length > 0;
+    // Корзина редактируема, если статус "draft" или "active"
+    const isEditable = status === "draft" || status === "active";
+    const isDraft = status === "draft";
+    const isSubmitted = status === "submitted";
+    const isApproved = status === "approved";
+    const isRejected = status === "rejected";
 
-      return {
-        discount,
-        usingServer,
-        isEditable,
-        isDraft,
-        isApproved,
-        isRejected,
-        isSubmitted
-      }
-    })
-
+    return {
+      discount,
+      usingServer,
+      isEditable,
+      isDraft,
+      isApproved,
+      isRejected,
+      isSubmitted,
+    };
+  });
 
   const { qty, amount } = (() => {
     if (!usingServer) {
@@ -832,7 +871,7 @@ const Cart = ({
   totalItemsCount = 0,
   onMobileViewChange,
 }) => {
-  const alert  = useAlert();
+  const alert = useAlert();
   const confirm = useConfirm();
   const dispatch = useDispatch();
   const { list: clients, loading: clientsLoading } = useClient();
@@ -858,6 +897,11 @@ const Cart = ({
   const [debtMonths, setDebtMonths] = useState("");
   const [firstDueDate, setFirstDueDate] = useState("");
   const [prepaymentAmount, setPrepaymentAmount] = useState("");
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountMode, setDiscountMode] = useState("amount"); // "amount" | "percent"
+  const [itemDiscounts, setItemDiscounts] = useState({});
+  const [itemDiscountModes, setItemDiscountModes] = useState({});
 
   // Проверяем, мобильное ли это устройство
   const [isMobile, setIsMobile] = useState(false);
@@ -919,7 +963,7 @@ const Cart = ({
         setLoadingAgentItems(true);
         // Используем getAgentCart (legacy /cart/start/) как единственный источник истины
         const cart = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" })
+          getAgentCart({ agent: null, order_discount_total: "0.00" }),
         ).unwrap();
 
         if (cart?.id) {
@@ -935,7 +979,10 @@ const Cart = ({
           setAgentItems([]);
         }
       } catch (e) {
-        const errorMessage = validateResErrors(e, "Ошибка при загрузке корзины");
+        const errorMessage = validateResErrors(
+          e,
+          "Ошибка при загрузке корзины",
+        );
         alert(errorMessage, true);
       } finally {
         setLoadingAgentItems(false);
@@ -967,10 +1014,10 @@ const Cart = ({
             cartId: agentCartId,
             itemId: itemId,
             quantity: newQuantity,
-          })
+          }),
         ).unwrap();
         console.log("Cart: update response", updated);
-        setAgentCartItemsCount(updated?.items?.length || 0)
+        setAgentCartItemsCount(updated?.items?.length || 0);
         // Используем возвращенные данные корзины
         if (updated) {
           setAgentCart(updated);
@@ -978,13 +1025,16 @@ const Cart = ({
         } else {
           // Если данных нет, обновляем через getAgentCart
           const refreshed = await dispatch(
-            getAgentCart({ agent: null, order_discount_total: "0.00" })
+            getAgentCart({ agent: null, order_discount_total: "0.00" }),
           ).unwrap();
           setAgentCart(refreshed);
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
         }
       } catch (e) {
-        const errorMessage = validateResErrors(e, "Ошибка при обновлении количества");
+        const errorMessage = validateResErrors(
+          e,
+          "Ошибка при обновлении количества",
+        );
         alert(errorMessage, true);
         // Восстанавливаем предыдущее значение при ошибке
       }
@@ -1008,7 +1058,7 @@ const Cart = ({
           itemId: itemId,
           quantity: currentItem.quantity || 1,
           gift_quantity: gift_quantity,
-        })
+        }),
       ).unwrap();
 
       // Используем возвращенные данные корзины
@@ -1018,13 +1068,16 @@ const Cart = ({
       } else {
         // Если данных нет, обновляем через getAgentCart
         const refreshed = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" })
+          getAgentCart({ agent: null, order_discount_total: "0.00" }),
         ).unwrap();
         setAgentCart(refreshed);
         setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
       }
     } catch (e) {
-      const errorMessage = validateResErrors(e, "Ошибка при обновлении количества");
+      const errorMessage = validateResErrors(
+        e,
+        "Ошибка при обновлении количества",
+      );
       alert(errorMessage, true);
     }
   };
@@ -1034,17 +1087,19 @@ const Cart = ({
       try {
         // Используем removeItemFromAgentCart - возвращает обновленную корзину
         const updated = await dispatch(
-          removeItemFromAgentCart({ cartId: agentCartId, itemId })
+          removeItemFromAgentCart({ cartId: agentCartId, itemId }),
         ).unwrap();
         // Используем возвращенные данные корзины
         if (updated) {
-          setAgentCartItemsCount(updated.items.reduce((acc, item) => acc + item.quantity, 0))
+          setAgentCartItemsCount(
+            updated.items.reduce((acc, item) => acc + item.quantity, 0),
+          );
           setAgentCart(updated);
           setAgentItems(Array.isArray(updated.items) ? updated.items : []);
         } else {
           // Если данных нет, обновляем через getAgentCart
           const refreshed = await dispatch(
-            getAgentCart({ agent: null, order_discount_total: "0.00" })
+            getAgentCart({ agent: null, order_discount_total: "0.00" }),
           ).unwrap();
           setAgentCart(refreshed);
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
@@ -1065,12 +1120,15 @@ const Cart = ({
       (async () => {
         try {
           const cart = await dispatch(
-            getAgentCart({ agent: null, order_discount_total: "0.00" })
+            getAgentCart({ agent: null, order_discount_total: "0.00" }),
           ).unwrap();
           setAgentCart(cart);
           setAgentItems(Array.isArray(cart.items) ? cart.items : []);
         } catch (e) {
-          const errorMessage = validateResErrors(e, "Ошибка при обновлении корзины");
+          const errorMessage = validateResErrors(
+            e,
+            "Ошибка при обновлении корзины",
+          );
           alert(errorMessage, true);
         }
       })();
@@ -1084,7 +1142,7 @@ const Cart = ({
       // legacy endpoint /cart/start/ сам создаёт/возвращает активную корзину,
       // поэтому НЕ требуем наличия cartId заранее.
       const cart = await dispatch(
-        getAgentCart({ agent: null, order_discount_total: "0.00" })
+        getAgentCart({ agent: null, order_discount_total: "0.00" }),
       ).unwrap();
       if (cart?.id) {
         setAgentCart(cart);
@@ -1098,7 +1156,10 @@ const Cart = ({
         setAgentItems([]);
       }
     } catch (e) {
-      const errorMessage = validateResErrors(e, "Ошибка при обновлении корзины");
+      const errorMessage = validateResErrors(
+        e,
+        "Ошибка при обновлении корзины",
+      );
       alert(errorMessage, true);
     } finally {
       setLoadingAgentItems(false);
@@ -1119,6 +1180,35 @@ const Cart = ({
     }
   }, [isMobile, isOrderSectionOpen, refreshCart]);
 
+  // Инициализируем локальные скидки по позициям при загрузке корзины
+  useEffect(() => {
+    if (!agentItems) return;
+    setItemDiscounts((prev) => {
+      const next = { ...prev };
+      agentItems.forEach((it) => {
+        if (next[it.id] === undefined) {
+          const raw =
+            typeof it.line_discount === "number"
+              ? it.line_discount
+              : it.discount_total;
+          if (raw != null) {
+            next[it.id] = String(raw);
+          }
+        }
+      });
+      return next;
+    });
+    setItemDiscountModes((prev) => {
+      const next = { ...prev };
+      agentItems.forEach((it) => {
+        if (!next[it.id]) {
+          next[it.id] = "amount";
+        }
+      });
+      return next;
+    });
+  }, [agentItems]);
+
   const handleClientSelect = async (client) => {
     dispatch(selectClient(client));
     if (agentCartId && client?.id) {
@@ -1126,11 +1216,14 @@ const Cart = ({
         // Обновляем клиента (пока просто обновляем корзину)
         // Примечание: если API поддерживает обновление клиента через отдельный эндпойнт, можно добавить
         const updated = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" })
+          getAgentCart({ agent: null, order_discount_total: "0.00" }),
         ).unwrap();
         setAgentCart((prev) => (prev ? { ...prev, client } : prev));
-      } catch (e) { 
-        const errorMessage = validateResErrors(e, "Ошибка при обновлении клиента");
+      } catch (e) {
+        const errorMessage = validateResErrors(
+          e,
+          "Ошибка при обновлении клиента",
+        );
         alert(errorMessage, true);
       }
     }
@@ -1159,7 +1252,7 @@ const Cart = ({
       availableCashBoxes = await dispatch(getCashBoxes()).unwrap();
       if (!availableCashBoxes || availableCashBoxes.length === 0) {
         throw new Error(
-          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены."
+          "Нет доступных касс. Пожалуйста, создайте кассу перед началом смены.",
         );
       }
     }
@@ -1183,7 +1276,7 @@ const Cart = ({
         cashbox: cashboxId,
         cashier: cashierId,
         opening_cash: "0",
-      })
+      }),
     ).unwrap();
 
     // Обновляем список смен
@@ -1229,7 +1322,7 @@ const Cart = ({
             onNotify &&
               onNotify(
                 "error",
-                "Сумма предоплаты не может превышать общую сумму"
+                "Сумма предоплаты не может превышать общую сумму",
               );
             setSubmitting(false);
             return;
@@ -1239,8 +1332,9 @@ const Cart = ({
         // Создаем сделку
         const dealPayload = {
           clientId: selectedClient.id,
-          title: `${paymentType} ${selectedClient.full_name || selectedClient.phone || "Клиент"
-            }`,
+          title: `${paymentType} ${
+            selectedClient.full_name || selectedClient.phone || "Клиент"
+          }`,
           statusRu: paymentType,
           amount: totalAmount,
           debtMonths: Number(debtMonths || 0),
@@ -1260,12 +1354,12 @@ const Cart = ({
           cartId: agentCartId,
           client_id: selectedClient.id,
           print_receipt: false,
-        })
+        }),
       ).unwrap();
 
       // После успешного чекаута обновляем данные корзины
       const updated = await dispatch(
-        getAgentCart({ agent: null, order_discount_total: "0.00" })
+        getAgentCart({ agent: null, order_discount_total: "0.00" }),
       ).unwrap();
 
       setAgentCart(updated || res || null);
@@ -1277,7 +1371,7 @@ const Cart = ({
       onNotify &&
         onNotify(
           "success",
-          paymentType ? `Долг успешно создан` : "Заказ успешно оформлен"
+          paymentType ? `Долг успешно создан` : "Заказ успешно оформлен",
         );
       // Clear local state so next open uses a new draft id from parent
       setAgentCartId(null);
@@ -1299,6 +1393,61 @@ const Cart = ({
       onNotify && onNotify("error", errorMessage);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleApplyItemDiscount = async (item, rawValue) => {
+    const mode = itemDiscountModes[item.id] || "amount";
+    const num = parseFloat(rawValue);
+    const current = parseFloat(item.discount_total || 0);
+
+    if (!agentCartId) return;
+    if (rawValue === "" || isNaN(num) || num < 0) return;
+
+    let discountSom = num;
+    const lineTotal =
+      Number(item.unit_price || item.price_snapshot || 0) *
+      Number(item.quantity || 0);
+
+    if (mode === "percent") {
+      if (lineTotal <= 0) return;
+      discountSom = (lineTotal * Math.max(0, num)) / 100;
+      if (discountSom > lineTotal) {
+        discountSom = lineTotal;
+      }
+    }
+
+    if (discountSom === current) return;
+
+    try {
+      const updated = await dispatch(
+        updateAgentCartItemQuantity({
+          cartId: agentCartId,
+          itemId: item.id,
+          quantity: item.quantity || 1,
+          discount_total: String(discountSom.toFixed(2)),
+        }),
+      ).unwrap();
+
+      if (updated) {
+        setAgentCart(updated);
+        setAgentItems(Array.isArray(updated.items) ? updated.items : []);
+        setItemDiscounts((prev) => ({
+          ...prev,
+          [item.id]:
+            mode === "percent" ? rawValue : String(discountSom.toFixed(2)),
+        }));
+      }
+    } catch (e) {
+      const errorMessage = validateResErrors(
+        e,
+        "Ошибка при изменении скидки по позиции",
+      );
+      alert(errorMessage, true);
+      setItemDiscounts((prev) => ({
+        ...prev,
+        [item.id]: String(item.discount_total || 0),
+      }));
     }
   };
 
@@ -1680,13 +1829,13 @@ const Cart = ({
       document.body.style.overscrollBehaviorY = "";
     };
   }, [isOrderSectionOpen, isMobile]);
-  
+
   // Список товаров в корзине (переиспользуемый компонент)
   const cartItemsList = (
     <div className="cart-column cart-items-column">
       <div className="cart-items-section">
         {(agentItems || []).length === 0 &&
-          (cartItemsLocal || []).length === 0 ? (
+        (cartItemsLocal || []).length === 0 ? (
           <div className="empty-cart">
             <ShoppingCart className="mx-auto" size={64} />
             <h3>Корзина пуста</h3>
@@ -1702,8 +1851,12 @@ const Cart = ({
             const isEditable =
               !agentCart || cartStatus === "draft" || cartStatus === "active";
 
-            const maxStockTotal = productsList?.find(el => el.id === item.product)?.quantity || 0
-            
+            const maxStockTotal =
+              productsList?.find((el) => el.id === item.product)?.quantity || 0;
+
+            const discountMode = itemDiscountModes[item.id] || "amount";
+            const discountValue = itemDiscounts[item.id] ?? "";
+
             return (
               <CartItem
                 key={item.id}
@@ -1713,6 +1866,21 @@ const Cart = ({
                 onUpdateGift={handleUpdateGift}
                 onRemoveItem={handleRemoveItem}
                 editable={isEditable}
+                discountMode={discountMode}
+                discountValue={discountValue}
+                onDiscountModeChange={(mode) =>
+                  setItemDiscountModes((prev) => ({
+                    ...prev,
+                    [item.id]: mode,
+                  }))
+                }
+                onDiscountChange={(v) =>
+                  setItemDiscounts((prev) => ({
+                    ...prev,
+                    [item.id]: v,
+                  }))
+                }
+                onDiscountBlur={(v) => handleApplyItemDiscount(item, v)}
               />
             );
           })
@@ -1810,8 +1978,9 @@ const Cart = ({
       {/* Секция заказа внизу экрана - для мобильных/планшетов */}
       {isMobile && (
         <div
-          className={`mobile-order-section ${isOrderSectionOpen ? "open" : ""
-            } ${isClosing ? "closing" : ""} z-100!`}
+          className={`mobile-order-section ${
+            isOrderSectionOpen ? "open" : ""
+          } ${isClosing ? "closing" : ""} z-100!`}
           onTouchStart={handleOrderTouchStart}
           onTouchMove={handleOrderTouchMove}
           onTouchEnd={handleOrderTouchEnd}
@@ -1846,7 +2015,7 @@ const Cart = ({
               if (isOrderSectionOpen && !isClosing && orderSwipeProgress > 0) {
                 return `translateY(${Math.min(
                   orderSwipeProgress * 0.5,
-                  50
+                  50,
                 )}px)`;
               }
 
@@ -1930,7 +2099,7 @@ const Cart = ({
             for (const it of agentItems) {
               const price = Number(it?.unit_price || it?.price_snapshot || 0);
               const baseQty = Number(
-                it?.quantity || it?.quantity_requested || 0
+                it?.quantity || it?.quantity_requested || 0,
               );
               total += price * baseQty;
             }

@@ -615,12 +615,13 @@ const CashierPage = () => {
       const items = currentSale.items || currentSale.cart?.items || [];
 
       if (items.length > 0) {
+        // MARKET_POS_CART: unit_price — базовая цена, line_discount — скидка на строку (сумма).
+        // line_total = (unit_price × quantity) - line_discount
         const apiCart = items.map((item) => {
           const qty = normalizeQuantity(parseFloat(item.quantity || 0));
           const price = normalizePrice(
             parseFloat(item.unit_price || item.price || 0),
           );
-          // line_discount — это именно "скидка, написанная продавцом"
           const discountTotal = normalizePrice(
             parseFloat(item.line_discount || item.discount_total || 0),
           );
@@ -1366,27 +1367,29 @@ const CashierPage = () => {
     }
   };
 
-  // PATCH позиции: цена за единицу (unit_price). Цена не может быть ниже product.price (проверка на бэке).
+  // PATCH: только unit_price (MARKET_POS_CART — цена и скидка меняются независимо).
+  // Без скидки по строке — цена не может быть ниже закупочной; при наличии скидки — можно.
   const patchCartItemPrice = async (item, value) => {
     if (!currentSale?.id) return;
     const cartItemId = item.isCustom ? item.itemId : item.id;
     const num = normalizePrice(parseFloat(value) || 0);
-    if (!item.isCustom && item.productId) {
+    const hasDiscount = parseFloat(item.discountTotal ?? 0) > 0;
+    if (!item.isCustom && item.productId && !hasDiscount) {
       const product = products.find((p) => p.id === item.productId);
-      if (product) {
-        const minPrice = parseFloat(product.price || 0);
-        if (minPrice > 0 && num < minPrice) {
-          showAlert(
-            "warning",
-            "Минимальная цена",
-            `Цена не может быть ниже базовой: ${formatPrice(minPrice)} сом`,
-          );
-          setCartPrices((prev) => ({
-            ...prev,
-            [item.id]: formatPrice(item.price ?? 0),
-          }));
-          return;
-        }
+      const purchasePrice = product
+        ? parseFloat(product.purchase_price)
+        : NaN;
+      if (!isNaN(purchasePrice) && num < purchasePrice) {
+        showAlert(
+          "warning",
+          "Закупочная цена",
+          `Цена не может быть ниже закупочной (${formatPrice(purchasePrice)} сом). При необходимости используйте скидку.`,
+        );
+        setCartPrices((prev) => ({
+          ...prev,
+          [item.id]: formatPrice(item.price ?? 0),
+        }));
+        return;
       }
     }
     try {
@@ -1409,19 +1412,30 @@ const CashierPage = () => {
     }
   };
 
-  // PATCH позиции: скидка на позицию (discount_total).
-  // value — абсолютная скидка в сомах; displayValue — то, что показываем в инпуте (например, %).
+  // PATCH: только discount_total (MARKET_POS_CART — цена и скидка меняются независимо).
+  // API хранит line_discount (сумма); в запросе — discount_total. Итог по строке: (unit_price × quantity) - line_discount.
+  // Скидка не может превышать сумму строки (итог не уходит в минус).
   const patchCartItemDiscount = async (item, value, options = {}) => {
     const { mode = "amount", displayValue } = options;
     if (!currentSale?.id) return;
     const cartItemId = item.isCustom ? item.itemId : item.id;
-    const num = Math.max(0, normalizePrice(parseFloat(value) || 0));
+    const lineTotal = (item.price || 0) * (item.quantity || 0);
+    let num = Math.max(0, normalizePrice(parseFloat(value) || 0));
+    if (num > lineTotal) {
+      num = lineTotal;
+      showAlert(
+        "warning",
+        "Скидка",
+        `Скидка не может быть больше суммы по строке (${formatPrice(lineTotal)} сом). Установлено ${formatPrice(lineTotal)} сом.`,
+      );
+    }
+    const data = { discount_total: String(num.toFixed(2)) };
     try {
       await dispatch(
         updateProductInCart({
           id: currentSale.id,
           productId: cartItemId,
-          data: { discount_total: String(num.toFixed(2)) },
+          data,
         }),
       ).unwrap();
       setCartDiscounts((prev) => {
@@ -1874,12 +1888,34 @@ const CashierPage = () => {
                                 ? "active"
                                 : ""
                             }`}
-                            onClick={() =>
+                            onClick={() => {
+                              const lineTotal =
+                                (item.price || 0) * (item.quantity || 0);
+                              const lineDiscount = parseFloat(
+                                item.discountTotal ?? 0,
+                              );
+                              const discountToShow =
+                                lineTotal > 0 && lineDiscount > lineTotal
+                                  ? lineTotal
+                                  : lineDiscount;
                               setCartDiscountModes((prev) => ({
                                 ...prev,
                                 [item.id]: "amount",
-                              }))
-                            }
+                              }));
+                              setCartDiscounts((prev) => ({
+                                ...prev,
+                                [item.id]: formatPrice(discountToShow),
+                              }));
+                              if (
+                                lineTotal > 0 &&
+                                lineDiscount > lineTotal
+                              ) {
+                                patchCartItemDiscount(
+                                  item,
+                                  lineTotal,
+                                );
+                              }
+                            }}
                           >
                             сом
                           </button>
@@ -1890,12 +1926,55 @@ const CashierPage = () => {
                                 ? "active"
                                 : ""
                             }`}
-                            onClick={() =>
+                            onClick={() => {
+                              const wasAmount =
+                                (cartDiscountModes[item.id] || "amount") ===
+                                "amount";
+                              const lineTotal =
+                                (item.price || 0) * (item.quantity || 0);
+                              const currentInput =
+                                cartDiscounts[item.id] ??
+                                formatPrice(item.discountTotal ?? 0);
+                              const num = parseFloat(currentInput);
+
                               setCartDiscountModes((prev) => ({
                                 ...prev,
                                 [item.id]: "percent",
-                              }))
-                            }
+                              }));
+
+                              if (wasAmount && !isNaN(num) && num >= 0 && lineTotal > 0) {
+                                const pct = Math.min(100, num);
+                                const displayPct =
+                                  pct === 100 ? "100" : String(pct).replace(/\.?0+$/, "") || "0";
+                                const discountSom = (lineTotal * pct) / 100;
+                                setCartDiscounts((prev) => ({
+                                  ...prev,
+                                  [item.id]: displayPct,
+                                }));
+                                patchCartItemDiscount(item, discountSom, {
+                                  mode: "percent",
+                                  displayValue: displayPct,
+                                });
+                              } else {
+                                const discountSom = parseFloat(
+                                  item.discountTotal ?? 0,
+                                );
+                                const pct =
+                                  lineTotal > 0 && discountSom > 0
+                                    ? String(
+                                        Number(
+                                          ((discountSom / lineTotal) * 100).toFixed(
+                                            2,
+                                          ),
+                                        ).replace(/\.?0+$/, ""),
+                                      )
+                                    : "";
+                                setCartDiscounts((prev) => ({
+                                  ...prev,
+                                  [item.id]: pct,
+                                }));
+                              }
+                            }}
                           >
                             %
                           </button>
@@ -2008,27 +2087,33 @@ const CashierPage = () => {
                             const v = e.target.value;
                             const mode = cartDiscountModes[item.id] || "amount";
                             const num = parseFloat(v);
-
-                            // Текущее значение скидки в сомах
                             const current = parseFloat(item.discountTotal ?? 0);
+                            const lineTotal =
+                              (item.price || 0) * (item.quantity || 0);
 
-                            if (v === "" || isNaN(num) || num < 0) {
+                            // Пустое поле — скидка 0 (по доке отправляем только discount_total)
+                            if (v === "") {
+                              if (current !== 0) {
+                                patchCartItemDiscount(item, 0, {
+                                  mode,
+                                  displayValue: "",
+                                });
+                              } else {
+                                setCartDiscounts((prev) => ({
+                                  ...prev,
+                                  [item.id]: "",
+                                }));
+                              }
                               return;
                             }
+                            if (isNaN(num) || num < 0) return;
 
                             if (mode === "percent") {
-                              const lineTotal =
-                                (item.price || 0) * (item.quantity || 0);
                               if (lineTotal <= 0) return;
-
                               let discountSom =
                                 (lineTotal * Math.max(0, num)) / 100;
-
-                              // Не даём скидке превышать сумму строки
-                              if (discountSom > lineTotal) {
+                              if (discountSom > lineTotal)
                                 discountSom = lineTotal;
-                              }
-
                               if (discountSom !== current) {
                                 patchCartItemDiscount(item, discountSom, {
                                   mode: "percent",
@@ -2036,7 +2121,6 @@ const CashierPage = () => {
                                 });
                               }
                             } else {
-                              // Режим суммы в сомах
                               if (num !== current) {
                                 patchCartItemDiscount(item, v);
                               }

@@ -239,6 +239,14 @@
         align-items: center;
         justify-content: space-between;
         margin-top: 10px;
+        gap: 12px;
+
+        .item-actions-main {
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          gap: 10px;
+        }
 
         .quantity-controls {
           display: flex;
@@ -327,6 +335,60 @@
             transform: scale(1.05);
           }
         }
+
+        .item-discount {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 6px;
+          border-radius: 8px;
+          background: #f8f9fa;
+          border: 1px solid #e9ecef;
+
+          &-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 2px;
+            border-radius: 999px;
+            background: #eef1f4;
+
+            &__btn {
+              border: none;
+              padding: 2px 8px;
+              border-radius: 999px;
+              font-size: 11px;
+              line-height: 1.2;
+              background: transparent;
+              color: #4b5563;
+              cursor: pointer;
+              transition: background 0.15s ease, color 0.15s ease;
+
+              &--active {
+                background: #ffd600;
+                color: #111827;
+                font-weight: 700;
+              }
+            }
+          }
+
+          &-input {
+            width: 82px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            font-size: 13px;
+            text-align: right;
+            color: #333;
+            background: #fff;
+            outline: none;
+            transition: border-color 0.15s ease;
+
+            &:focus {
+              border-color: #ffd600;
+            }
+          }
+        }
       }
 
       .item-info {
@@ -342,6 +404,55 @@
           .store-name {
             color: #ffd600;
             font-weight: 600;
+          }
+        }
+
+        .item-discount {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: nowrap;
+
+          &-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 2px;
+            border-radius: 999px;
+            background: #f1f3f5;
+
+            &__btn {
+              border: none;
+              padding: 2px 8px;
+              border-radius: 999px;
+              font-size: 11px;
+              line-height: 1.2;
+              background: transparent;
+              color: #4b5563;
+              cursor: pointer;
+              transition: background 0.15s ease, color 0.15s ease;
+
+              &--active {
+                background: #ffd600;
+                color: #111827;
+                font-weight: 600;
+              }
+            }
+          }
+
+          &-input {
+            width: 72px;
+            padding: 4px 6px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            font-size: 13px;
+            text-align: right;
+            outline: none;
+            transition: border-color 0.15s ease;
+
+            &:focus {
+              border-color: #cbd5e1;
+            }
           }
         }
       }
