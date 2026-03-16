@@ -136,7 +136,7 @@ export const MENU_CONFIG = {
         label: "Сотрудники",
         to: "/crm/building/employees",
         icon: menuIcons.user,
-        permission: "can_view_employees", 
+        permission: "can_view_employees",
         implemented: true,
       },
       {
@@ -667,6 +667,13 @@ export const MENU_CONFIG = {
         to: "/crm/production/warehouse",
         icon: menuIcons.warehouse,
         permission: "can_view_products",
+        implemented: true,
+      },
+      {
+        label: "Продажи",
+        to: "/crm/production/sell",
+        icon: menuIcons.shoppingCart,
+        permission: "can_view_sale",
         implemented: true,
       },
       {

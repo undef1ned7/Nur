@@ -66,19 +66,22 @@ export const startSale = createAsyncThunk(
       if (state?.sale?.startSaleLoading) return false;
       return true;
     },
-  }
+  },
 );
 
 export const updateSale = createAsyncThunk(
   "sale/update",
   async ({ id, data }, { rejectWithValue }) => {
     try {
-      const { data: response } = await api.patch(`/main/pos/sales/${id}/`, data);
+      const { data: response } = await api.patch(
+        `/main/pos/sales/${id}/`,
+        data,
+      );
       return response;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const getSale = createAsyncThunk(
@@ -90,7 +93,7 @@ export const getSale = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const manualFilling = createAsyncThunk(
@@ -99,13 +102,13 @@ export const manualFilling = createAsyncThunk(
     try {
       const { data: response } = await api.post(
         `/main/pos/sales/${id}/add-item/`,
-        { product_id: productId, quantity, discount_total }
+        { product_id: productId, quantity, discount_total },
       );
       return response;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const updateManualFilling = createAsyncThunk(
@@ -114,25 +117,27 @@ export const updateManualFilling = createAsyncThunk(
     try {
       const { data: response } = await api.patch(
         `/main/pos/carts/${id}/items/${productId}/`,
-        { discount_total, quantity }
+        { discount_total, quantity },
       );
       return response;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const deleteProductInCart = createAsyncThunk(
   "sale/deleteProductInCart",
   async ({ id, productId }, { rejectWithValue }) => {
     try {
-      const {data} =await api.delete(`/main/pos/carts/${id}/items/${productId}/`);
+      const { data } = await api.delete(
+        `/main/pos/carts/${id}/items/${productId}/`,
+      );
       return data;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const deleteSale = createAsyncThunk(
@@ -143,7 +148,7 @@ export const deleteSale = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const updateProductInCart = createAsyncThunk(
@@ -154,7 +159,7 @@ export const updateProductInCart = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const sendBarCode = createAsyncThunk(
@@ -168,7 +173,7 @@ export const sendBarCode = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const doSearch = createAsyncThunk(
@@ -182,7 +187,7 @@ export const doSearch = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const historySellProduct = createAsyncThunk(
@@ -199,7 +204,7 @@ export const historySellProduct = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 // Thunk для загрузки документов (чеков) с пагинацией
@@ -217,7 +222,7 @@ export const fetchDocuments = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const updateSellProduct = createAsyncThunk(
@@ -226,13 +231,13 @@ export const updateSellProduct = createAsyncThunk(
     try {
       const { data: response } = await api.patch(
         `/main/pos/sales/${id}/`,
-        updatedData
+        updatedData,
       );
       return response;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const historySellObjects = createAsyncThunk(
@@ -249,7 +254,7 @@ export const historySellObjects = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const historySellProductDetail = createAsyncThunk(
@@ -261,7 +266,7 @@ export const historySellProductDetail = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const historySellObjectDetail = createAsyncThunk(
@@ -273,14 +278,14 @@ export const historySellObjectDetail = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const productCheckout = createAsyncThunk(
   "products/productCheckout",
   async (
     { id, bool, clientId, payment_method, cash_received },
-    { rejectWithValue }
+    { rejectWithValue },
   ) => {
     try {
       const payload = {
@@ -291,13 +296,13 @@ export const productCheckout = createAsyncThunk(
       };
       const { data } = await api.post(
         `main/pos/sales/${id}/checkout/`,
-        payload
+        payload,
       );
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const getProductCheckout = createAsyncThunk(
@@ -311,7 +316,7 @@ export const getProductCheckout = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const getProductInvoice = createAsyncThunk(
@@ -325,7 +330,7 @@ export const getProductInvoice = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 // Получение JSON данных накладной
@@ -338,7 +343,7 @@ export const getInvoiceJson = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 // Получение JSON данных чека
@@ -351,7 +356,7 @@ export const getReceiptJson = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 // ===== Object sales (строительные объекты) =====
@@ -364,7 +369,7 @@ export const getObjects = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
-  }
+  },
 );
 
 export const createObject = createAsyncThunk(
@@ -376,7 +381,7 @@ export const createObject = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const startSellObjects = createAsyncThunk(
@@ -389,7 +394,7 @@ export const startSellObjects = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const objectCartAddItem = createAsyncThunk(
@@ -399,13 +404,13 @@ export const objectCartAddItem = createAsyncThunk(
       const body = product ?? data; // поддержка обоих вариантов
       const { data: response } = await api.post(
         `/main/object-sales/${id}/items/`,
-        body
+        body,
       );
       return response;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const addCustomItem = createAsyncThunk(
@@ -421,7 +426,7 @@ export const addCustomItem = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
 
 export const createDeal = createAsyncThunk(
@@ -436,7 +441,7 @@ export const createDeal = createAsyncThunk(
       prepayment,
       first_due_date, // <=== ДОБАВИЛИ
     }, // prepayment и debtMonths могут приходить вместе
-    { rejectWithValue }
+    { rejectWithValue },
   ) => {
     try {
       const kind = ruStatusToKind(statusRu);
@@ -478,11 +483,11 @@ export const createDeal = createAsyncThunk(
 
       const { data } = await api.post(
         `/main/clients/${clientId}/deals/`,
-        payload
+        payload,
       );
       return data;
     } catch (error) {
       return rejectWithValue(plainAxiosError(error));
     }
-  }
+  },
 );
