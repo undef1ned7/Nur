@@ -205,9 +205,79 @@ export const approveBuildingAdvanceRequest = async (id, payload = {}) => {
 /**
  * Отклонить заявку на аванс. POST /api/building/salary/advance-requests/{id}/reject/
  */
-export const rejectBuildingAdvanceRequest = async (id) => {
+export const rejectBuildingAdvanceRequest = async (id, payload = {}) => {
   const { data } = await api.post(
     `/building/salary/advance-requests/${id}/reject/`,
+    payload,
+  );
+  return data;
+};
+
+/**
+ * Заявки на кассу (cash-register/requests).
+ * GET /api/building/cash-register/requests/
+ * Фильтры: request_type, status, cashbox, residential_complex, treaty, client, work_entry
+ */
+export const getBuildingCashRegisterRequests = async (params = {}) => {
+  const { data } = await api.get("/building/cash-register/requests/", {
+    params,
+  });
+  const list = data?.results ?? data;
+  return Array.isArray(list) ? list : [];
+};
+
+/**
+ * Создать заявку на кассу. POST /api/building/cash-register/requests/
+ * payload: { request_type, treaty, apartment, client, cashbox, shift, amount, comment }
+ */
+export const createBuildingCashRegisterRequest = async (payload = {}) => {
+  const { data } = await api.post("/building/cash-register/requests/", payload);
+  return data;
+};
+
+/**
+ * Одобрить заявку на кассу. POST /api/building/cash-register/requests/{id}/approve/
+ * Тело (опционально): { cashbox, shift, paid_at, comment }
+ */
+export const approveBuildingCashRegisterRequest = async (id, payload = {}) => {
+  const { data } = await api.post(
+    `/building/cash-register/requests/${id}/approve/`,
+    payload,
+  );
+  return data;
+};
+
+/**
+ * Отклонить заявку на кассу. POST /api/building/cash-register/requests/{id}/reject/
+ * Тело (опционально): { reason }
+ */
+export const rejectBuildingCashRegisterRequest = async (id, payload = {}) => {
+  const { data } = await api.post(
+    `/building/cash-register/requests/${id}/reject/`,
+    payload,
+  );
+  return data;
+};
+
+/**
+ * Детали заявки на кассу (в т.ч. файлы). GET /api/building/cash-register/requests/{id}/
+ */
+export const getBuildingCashRegisterRequest = async (id) => {
+  const { data } = await api.get(`/building/cash-register/requests/${id}/`);
+  return data;
+};
+
+/**
+ * Прикрепить файл к заявке на кассу. POST /api/building/cash-register/requests/{id}/files/
+ * formData: { file: File, title?: string }
+ */
+export const uploadBuildingCashRegisterRequestFile = async (requestId, formData) => {
+  const { data } = await api.post(
+    `/building/cash-register/requests/${requestId}/files/`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
   );
   return data;
 };
@@ -230,5 +300,11 @@ export default {
   getBuildingAdvanceRequests,
   approveBuildingAdvanceRequest,
   rejectBuildingAdvanceRequest,
+  getBuildingCashRegisterRequests,
+  createBuildingCashRegisterRequest,
+  approveBuildingCashRegisterRequest,
+  rejectBuildingCashRegisterRequest,
+  getBuildingCashRegisterRequest,
+  uploadBuildingCashRegisterRequestFile,
 };
 

@@ -261,6 +261,7 @@ const CreateSaleDocument = () => {
   const [showProductSelectModal, setShowProductSelectModal] = useState(false);
   const [productSelectModalProduct, setProductSelectModalProduct] = useState(null);
   const [productSelectModalQty, setProductSelectModalQty] = useState("1");
+  const productSelectQtyInputRef = useRef(null);
   const [showExitModal, setShowExitModal] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [activeGroupKeyForKeyboard, setActiveGroupKeyForKeyboard] = useState("");
@@ -285,6 +286,18 @@ const CreateSaleDocument = () => {
   useEffect(() => {
     warehouseRef.current = warehouse;
   }, [warehouse]);
+
+  useEffect(() => {
+    if (!showProductSelectModal) return;
+    // Даем React отрисовать модалку, потом фокус + выделение текста
+    const t = setTimeout(() => {
+      const el = productSelectQtyInputRef.current;
+      if (!el) return;
+      el.focus();
+      el.select?.();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [showProductSelectModal]);
 
   // При открытии модалки предоплаты подставляем текущее значение
   useEffect(() => {
@@ -2985,6 +2998,7 @@ const CreateSaleDocument = () => {
             </div>
             <div className="create-sale-document__prepayment-modal-content">
               <input
+                ref={productSelectQtyInputRef}
                 type="text"
                 inputMode="decimal"
                 className="create-sale-document__prepayment-modal-input"
@@ -2999,13 +3013,14 @@ const CreateSaleDocument = () => {
                     if (!isNaN(num) && num >= 0) setProductSelectModalQty(v);
                   }
                 }}
-                autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
+                    e.stopPropagation();
                     handleConfirmProductSelect();
                   } else if (e.key === "Escape") {
                     e.preventDefault();
+                    e.stopPropagation();
                     closeProductSelectModal();
                   }
                 }}

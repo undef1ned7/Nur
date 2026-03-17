@@ -76,4 +76,113 @@
     font-size: 14px;
     padding: 12px 0;
   }
+
+  &__status-block {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+
+  &__status-track {
+    width: 100%;
+  }
+
+  &__status-track-title {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 10px;
+  }
+
+  &__status-track-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
+  &__status-track-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    flex-shrink: 0;
+
+    &--done {
+      .treaty-detail__status-track-dot {
+        border-color: #15803d;
+        background: #15803d;
+      }
+      .treaty-detail__status-track-label {
+        color: #15803d;
+      }
+    }
+
+    &--current {
+      .treaty-detail__status-track-dot {
+        border-color: #2563eb;
+        background: #2563eb;
+      }
+      .treaty-detail__status-track-label {
+        color: #1e40af;
+        font-weight: 600;
+      }
+    }
+
+    &--cancelled {
+      .treaty-detail__status-track-dot {
+        border-color: #b91c1c;
+        background: #b91c1c;
+      }
+      .treaty-detail__status-track-label {
+        color: #b91c1c;
+      }
+    }
+  }
+
+  &__status-track-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    border: 2px solid #cbd5e1;
+    background: #fff;
+    flex-shrink: 0;
+  }
+
+  &__status-track-label {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+    max-width: 90px;
+    line-height: 1.25;
+  }
+
+  &__status-track-badge {
+    margin-top: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  &__status-track-connector {
+    flex: 0 0 24px;
+    height: 1px;
+    background: #e2e8f0;
+  }
+
+  &__status-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
 }

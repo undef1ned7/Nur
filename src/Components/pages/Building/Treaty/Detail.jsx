@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FileText } from "lucide-react";
 import Modal from "@/Components/common/Modal/Modal";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
@@ -10,13 +10,20 @@ import {
   fetchBuildingTreatyById,
   createBuildingTreatyFile,
 } from "../../../../store/creators/building/treatiesCreators";
-import { fetchBuildingClients } from "../../../../store/creators/building/clientsCreators";
+import {
+  getBuildingCashboxes,
+  createBuildingCashRegisterRequest,
+  uploadBuildingCashRegisterRequestFile,
+} from "@/api/building";
+import {
+  fetchBuildingClients,
+  createBuildingClient,
+} from "../../../../store/creators/building/clientsCreators";
 import { fetchBuildingApartments } from "../../../../store/creators/building/apartmentsCreators";
 import { useBuildingTreaties } from "../../../../store/slices/building/treatiesSlice";
 import { useBuildingClients } from "../../../../store/slices/building/clientsSlice";
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
 import { useBuildingApartments } from "../../../../store/slices/building/apartmentsSlice";
-import InstallmentPaymentsModal from "./InstallmentPaymentsModal";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import "./Detail.scss";
 
@@ -30,6 +37,7 @@ const STATUS_LABELS = {
 const OPERATION_TYPE_LABELS = {
   sale: "Продажа",
   booking: "Бронь",
+  other: "Прочее",
 };
 
 const PAYMENT_TYPE_LABELS = {
@@ -107,6 +115,7 @@ const FORM_INITIAL = {
 
 export default function BuildingTreatyDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const isNew = !id;
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -120,6 +129,8 @@ export default function BuildingTreatyDetail() {
 
   const [form, setForm] = useState(FORM_INITIAL);
   const [installments, setInstallments] = useState([]);
+  /** Строки графика, где сумму меняли вручную — при перераспределении не трогаем */
+  const [installmentManual, setInstallmentManual] = useState({});
   const [formError, setFormError] = useState(null);
 
   const [firstInstallmentDate, setFirstInstallmentDate] = useState("");
@@ -129,10 +140,25 @@ export default function BuildingTreatyDetail() {
   const [fileUploadError, setFileUploadError] = useState(null);
   const [fileUploading, setFileUploading] = useState(false);
   const [fileModalOpen, setFileModalOpen] = useState(false);
+  /** Файлы, прикреплённые до сохранения договора (только для нового договора) */
+  const [pendingFiles, setPendingFiles] = useState([]);
 
-  const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
-  const [paymentsModalInstallment, setPaymentsModalInstallment] =
-    useState(null);
+  const [openAddClientModal, setOpenAddClientModal] = useState(false);
+  const [addClientForm, setAddClientForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+  });
+  const [addClientError, setAddClientError] = useState(null);
+  const [addClientSubmitting, setAddClientSubmitting] = useState(false);
+
+  const [signModalOpen, setSignModalOpen] = useState(false);
+  const [signCashboxes, setSignCashboxes] = useState([]);
+  const [signCashbox, setSignCashbox] = useState("");
+  const [signComment, setSignComment] = useState("");
+  const [signFiles, setSignFiles] = useState([]);
+  const [signSubmitting, setSignSubmitting] = useState(false);
+  const [signError, setSignError] = useState(null);
 
   const selectedProjectName = useMemo(() => {
     if (!selectedProjectId) return "—";
@@ -211,20 +237,27 @@ export default function BuildingTreatyDetail() {
     current?.apartment_floor,
   ]);
 
-  const isReadOnly =
-    !isNew && (current?.status === "signed" || current?.status === "cancelled");
+  /** Редактировать данные можно только в режиме черновика (или при создании) */
+  const isDraft = isNew || current?.status === "draft";
+  const isReadOnly = !isDraft;
+
+  const urlOperationType = searchParams.get("operation_type");
 
   useEffect(() => {
     if (!isNew && id) {
       dispatch(fetchBuildingTreatyById(id));
     } else if (isNew) {
+      const opType = urlOperationType === "booking" || urlOperationType === "other"
+        ? urlOperationType
+        : "sale";
       setForm((prev) => ({
         ...prev,
         residential_complex: selectedProjectId || "",
         number: prev.number || generateTreatyNumber(),
+        operation_type: opType,
       }));
     }
-  }, [dispatch, id, isNew, selectedProjectId]);
+  }, [dispatch, id, isNew, selectedProjectId, urlOperationType]);
 
   useEffect(() => {
     const complexId =
@@ -282,47 +315,241 @@ export default function BuildingTreatyDetail() {
     }
   }, [isNew, current, id]);
 
+  useEffect(() => {
+    if (!signModalOpen) return;
+    const rcId =
+      form.residential_complex ||
+      current?.residential_complex ||
+      selectedProjectId ||
+      null;
+    let cancelled = false;
+    setSignError(null);
+    setSignComment("");
+    setSignFiles([]);
+    setSignCashboxes([]);
+    setSignCashbox("");
+    getBuildingCashboxes(rcId ? { residential_complex: rcId } : {})
+      .then((list) => {
+        if (cancelled) return;
+        const arr = Array.isArray(list) ? list : [];
+        setSignCashboxes(arr);
+        const first = arr[0];
+        const firstId = first?.id ?? first?.uuid ?? "";
+        if (firstId) setSignCashbox(firstId);
+      })
+      .catch(() => {
+        if (!cancelled) setSignCashboxes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    signModalOpen,
+    form.residential_complex,
+    current?.residential_complex,
+    selectedProjectId,
+  ]);
+
+  const updateStatusOnly = async (nextStatus) => {
+    if (!current) return false;
+    const treatyId = current?.id ?? current?.uuid ?? id;
+    if (!treatyId) return false;
+    try {
+      const res = await dispatch(
+        updateBuildingTreaty({ id: treatyId, data: { status: nextStatus } }),
+      );
+      if (res.meta.requestStatus === "fulfilled") {
+        alert("Статус договора обновлён");
+        setForm((prev) => ({ ...prev, status: nextStatus }));
+        dispatch(fetchBuildingTreatyById(treatyId));
+        return true;
+      }
+      alert(
+        validateResErrors(
+          res.payload || res.error,
+          "Не удалось обновить статус договора",
+        ),
+        true,
+      );
+      return false;
+    } catch (err) {
+      alert(validateResErrors(err, "Не удалось обновить статус договора"), true);
+      return false;
+    }
+  };
+
+  const handleCancelTreaty = () => {
+    if (!current) return;
+    confirm("Отменить договор?", async (ok) => {
+      if (!ok) return;
+      await updateStatusOnly("cancelled");
+    });
+  };
+
+  const handleActivateTreaty = () => {
+    if (!current) return;
+    confirm("Активировать договор?", async (ok) => {
+      if (!ok) return;
+      await updateStatusOnly("active");
+    });
+  };
+
+  const openSignModal = () => {
+    if (!current) return;
+    setSignModalOpen(true);
+  };
+
+  const handleSignSubmit = async (e) => {
+    e.preventDefault();
+    if (!current) return;
+    const treatyId = current?.id ?? current?.uuid ?? id;
+    if (!treatyId) return;
+
+    const amountTotal = Number(current?.amount ?? form.amount ?? 0);
+    const down = Number(current?.down_payment ?? form.down_payment ?? 0);
+    const paymentType = current?.payment_type ?? form.payment_type;
+    const aptId = current?.apartment ?? form.apartment ?? null;
+    const clientId = current?.client ?? form.client ?? null;
+
+    if (!signCashbox) {
+      setSignError("Выберите кассу");
+      return;
+    }
+
+    let requestType = null;
+    let requestAmount = null;
+    if (paymentType === "full") {
+      requestType = "apartment_sale";
+      requestAmount = amountTotal;
+    } else if (paymentType === "installment" && down > 0) {
+      requestType = "installment_initial_payment";
+      requestAmount = down;
+    }
+
+    setSignSubmitting(true);
+    setSignError(null);
+    try {
+      // 1) создаём заявку в кассу, если требуется
+      let createdRequestId = null;
+      if (requestType && requestAmount > 0) {
+        const created = await createBuildingCashRegisterRequest({
+          request_type: requestType,
+          treaty: treatyId,
+          apartment: aptId || undefined,
+          client: clientId || undefined,
+          cashbox: signCashbox,
+          shift: null,
+          amount: Number(requestAmount).toFixed(2),
+          comment: signComment.trim() || undefined,
+        });
+        createdRequestId = created?.id ?? created?.uuid ?? null;
+
+        if (createdRequestId && signFiles.length > 0) {
+          // eslint-disable-next-line no-restricted-syntax
+          for (const file of signFiles) {
+            if (!file) continue;
+            // eslint-disable-next-line no-await-in-loop
+            await uploadBuildingCashRegisterRequestFile(
+              createdRequestId,
+              (() => {
+                const fd = new FormData();
+                fd.append("file", file);
+                fd.append("title", file.name || "Файл");
+                return fd;
+              })(),
+            );
+          }
+        }
+      }
+
+      // 2) подписываем договор
+      const ok = await updateStatusOnly("signed");
+      if (ok) {
+        setSignModalOpen(false);
+        setSignFiles([]);
+      }
+    } catch (err) {
+      const msg = validateResErrors(
+        err?.response?.data ?? err,
+        "Не удалось подписать договор / создать заявку в кассу",
+      );
+      setSignError(String(msg));
+      alert(msg, true);
+    } finally {
+      setSignSubmitting(false);
+    }
+  };
+
+  const getInstallmentTotalCents = () => {
+    const amountTotal = Number(form.amount || 0);
+    const down = Number(form.down_payment || 0);
+    if (!Number.isFinite(amountTotal) || !Number.isFinite(down)) return null;
+    const remain = amountTotal - down;
+    const cents = Math.round(remain * 100);
+    return cents > 0 ? cents : null;
+  };
+
+  const redistributeInstallments = (rows, manualMap, totalCents) => {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!totalCents || totalCents <= 0 || list.length === 0) return list;
+    const isManual = (order) => Boolean(manualMap?.[String(order)]);
+    let fixedCents = 0;
+    const auto = [];
+    list.forEach((r) => {
+      const order = r?.order;
+      if (order != null && isManual(order)) {
+        const v = Number(r?.amount || 0);
+        fixedCents += Math.round((Number.isFinite(v) ? v : 0) * 100);
+      } else {
+        auto.push(r);
+      }
+    });
+    if (auto.length === 0) return list;
+    const remainingForAuto = totalCents - fixedCents;
+    const safeRemain = remainingForAuto > 0 ? remainingForAuto : 0;
+    const baseCents = Math.floor(safeRemain / auto.length);
+    let used = 0;
+    const lastAutoIdx = auto.length - 1;
+    const autoCentsByOrder = {};
+    auto.forEach((r, idx) => {
+      const isLast = idx === lastAutoIdx;
+      const cents = isLast ? safeRemain - used : baseCents;
+      used += cents;
+      autoCentsByOrder[String(r?.order)] = cents;
+    });
+    return list.map((r) => {
+      const order = r?.order;
+      if (order == null || isManual(order)) return r;
+      const cents = autoCentsByOrder[String(order)] ?? 0;
+      return { ...r, amount: (cents / 100).toFixed(2) };
+    });
+  };
+
+  const handleInstallmentDueDateChange = (idx, value) => {
+    setInstallments((prev) =>
+      prev.map((row, i) =>
+        i === idx ? { ...row, due_date: value || "" } : row,
+      ),
+    );
+  };
+
+  const handleInstallmentAmountChange = (idx, value) => {
+    const order = installments[idx]?.order ?? idx + 1;
+    setInstallmentManual((prev) => ({ ...prev, [String(order)]: true }));
+    setInstallments((prev) => {
+      const next = prev.map((row, i) =>
+        i === idx ? { ...row, amount: value !== "" ? String(value) : "" } : row,
+      );
+      const totalCents = getInstallmentTotalCents();
+      if (!totalCents) return next;
+      const manualMap = { ...installmentManual, [String(order)]: true };
+      return redistributeInstallments(next, manualMap, totalCents);
+    });
+  };
+
   const handleFormChange = (key) => (e) => {
     const value =
       key === "auto_create_in_erp" ? e.target.checked : e.target.value;
-
-    if (key === "status" && !isNew && current && value !== form.status) {
-      const fromLabel =
-        STATUS_LABELS[form.status] || form.status || "неизвестен";
-      const toLabel = STATUS_LABELS[value] || value || "неизвестен";
-      confirm(
-        `Изменить статус договора c «${fromLabel}» на «${toLabel}»?`,
-        async (ok) => {
-          if (!ok) return;
-          const treatyId = current.id ?? current.uuid ?? id;
-          if (!treatyId) return;
-          try {
-            const payload = { status: value };
-            const res = await dispatch(
-              updateBuildingTreaty({ id: treatyId, data: payload }),
-            );
-            if (res.meta.requestStatus === "fulfilled") {
-              alert("Статус договора обновлён");
-              setForm((prev) => ({ ...prev, status: value }));
-            } else {
-              alert(
-                validateResErrors(
-                  res.payload || res.error,
-                  "Не удалось обновить статус договора",
-                ),
-                true,
-              );
-            }
-          } catch (err) {
-            alert(
-              validateResErrors(err, "Не удалось обновить статус договора"),
-              true,
-            );
-          }
-        },
-      );
-      return;
-    }
 
     setForm((prev) => {
       const next = { ...prev, [key]: value };
@@ -336,6 +563,11 @@ export default function BuildingTreatyDetail() {
   useEffect(() => {
     if (form.payment_type !== "installment") {
       setInstallments([]);
+      setInstallmentManual({});
+      return;
+    }
+    // Для существующего договора с рассрочкой не пересчитываем — даты редактируются вручную
+    if (!isNew && current && Array.isArray(current.installments) && current.installments.length > 0) {
       return;
     }
     const amountTotal = Number(form.amount || 0);
@@ -343,12 +575,14 @@ export default function BuildingTreatyDetail() {
     const n = Number(installmentMonths) || 0;
     if (!firstInstallmentDate || !amountTotal || !n || down >= amountTotal) {
       setInstallments([]);
+      setInstallmentManual({});
       return;
     }
     const remain = amountTotal - down;
     const totalCents = Math.round(remain * 100);
     if (totalCents <= 0) {
       setInstallments([]);
+      setInstallmentManual({});
       return;
     }
     const baseCents = Math.floor(totalCents / n);
@@ -357,6 +591,7 @@ export default function BuildingTreatyDetail() {
     const start = new Date(firstInstallmentDate);
     if (Number.isNaN(start.getTime())) {
       setInstallments([]);
+      setInstallmentManual({});
       return;
     }
     for (let i = 0; i < n; i += 1) {
@@ -376,6 +611,7 @@ export default function BuildingTreatyDetail() {
       });
     }
     setInstallments(rows);
+    setInstallmentManual({});
   }, [
     form.payment_type,
     form.amount,
@@ -386,12 +622,15 @@ export default function BuildingTreatyDetail() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.residential_complex || !String(form.title || "").trim()) {
+      setFormError("Заполните ЖК и наименование договора");
+      return;
+    }
     if (
-      !form.residential_complex ||
-      !form.client ||
-      !String(form.title || "").trim()
+      form.operation_type !== "other" &&
+      !form.client
     ) {
-      setFormError("Заполните ЖК, клиента и наименование договора");
+      setFormError("Выберите клиента для договора продажи/брони");
       return;
     }
 
@@ -456,6 +695,18 @@ export default function BuildingTreatyDetail() {
       if (res.meta.requestStatus === "fulfilled") {
         const newTreaty = res.payload;
         const newId = newTreaty?.id ?? newTreaty?.uuid;
+        if (isNew && newId && pendingFiles.length > 0) {
+          for (const pf of pendingFiles) {
+            await dispatch(
+              createBuildingTreatyFile({
+                treatyId: newId,
+                file: pf.file,
+                title: pf.title || undefined,
+              }),
+            );
+          }
+          setPendingFiles([]);
+        }
         alert(isNew ? "Договор создан" : "Договор обновлён");
         if (newId) {
           navigate(`/crm/building/treaty/${newId}`);
@@ -477,13 +728,22 @@ export default function BuildingTreatyDetail() {
 
   const handleFileSubmit = async (e) => {
     e.preventDefault();
-    if (!current) return;
-    const treatyId = current?.id ?? current?.uuid;
-    if (!treatyId || !fileForm.file) {
+    if (!fileForm.file) {
       setFileUploadError("Выберите файл");
       return;
     }
     setFileUploadError(null);
+    if (isNew) {
+      setPendingFiles((prev) => [
+        ...prev,
+        { file: fileForm.file, title: fileForm.title?.trim() || "" },
+      ]);
+      setFileForm({ file: null, title: "" });
+      setFileModalOpen(false);
+      return;
+    }
+    const treatyId = current?.id ?? current?.uuid;
+    if (!treatyId) return;
     setFileUploading(true);
     try {
       const res = await dispatch(
@@ -513,13 +773,79 @@ export default function BuildingTreatyDetail() {
     }
   };
 
-  const files = Array.isArray(current?.files) ? current.files : [];
-
-  const openInstallmentPayments = (installment) => {
-    if (!installment) return;
-    setPaymentsModalInstallment(installment);
-    setPaymentsModalOpen(true);
+  const removePendingFile = (index) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const handleAddClientFieldChange = (field) => (e) => {
+    setAddClientForm((prev) => ({ ...prev, [field]: e.target.value }));
+    setAddClientError(null);
+  };
+
+  const handleAddClientSubmit = async (e) => {
+    e.preventDefault();
+    setAddClientError(null);
+    const name = String(addClientForm.name || "").trim();
+    if (!name) {
+      setAddClientError("Имя / название обязательно");
+      return;
+    }
+    const rcId = form.residential_complex || selectedProjectId;
+    if (!rcId) {
+      setAddClientError("Сначала выберите жилой комплекс");
+      return;
+    }
+    try {
+      setAddClientSubmitting(true);
+      const res = await dispatch(
+        createBuildingClient({
+          name,
+          phone: addClientForm.phone?.trim() || undefined,
+          email: addClientForm.email?.trim() || undefined,
+          is_active: true,
+          ...(rcId ? { residential_complex: rcId } : {}),
+        }),
+      );
+      if (res.meta.requestStatus === "fulfilled" && res.payload) {
+        const newId = res.payload?.id ?? res.payload?.uuid;
+        if (newId) {
+          setForm((prev) => ({ ...prev, client: String(newId) }));
+          dispatch(
+            fetchBuildingClients({
+              residential_complex: rcId,
+              page_size: 500,
+            }),
+          );
+        }
+        setOpenAddClientModal(false);
+        setAddClientForm({ name: "", phone: "", email: "" });
+        alert("Клиент добавлен");
+      } else {
+        setAddClientError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось создать клиента",
+          ),
+        );
+      }
+    } catch (err) {
+      setAddClientError(
+        validateResErrors(err, "Не удалось создать клиента"),
+      );
+    } finally {
+      setAddClientSubmitting(false);
+    }
+  };
+
+  const closeAddClientModal = () => {
+    if (!addClientSubmitting) {
+      setOpenAddClientModal(false);
+      setAddClientForm({ name: "", phone: "", email: "" });
+      setAddClientError(null);
+    }
+  };
+
+  const files = Array.isArray(current?.files) ? current.files : [];
 
   const handleDownloadSchedulePdf = () => {
     if (!installments.length) {
@@ -583,9 +909,12 @@ export default function BuildingTreatyDetail() {
     win.focus();
     win.print();
   };
-  const disabled = useMemo(() => {
-    return !isNew && (current?.status === "signed" || current?.status === "cancelled");
-  }, [isNew, current?.status]);
+  const disabled = useMemo(() => !isDraft, [isDraft]);
+
+  const canCancel = !isNew && current && current?.status !== "cancelled";
+  const canActivate = !isNew && current && current?.status === "draft";
+  const canSign = !isNew && current && current?.status === "active";
+
   return (
     <div className="add-product-page treaty-detail">
       <div className="add-product-page__header">
@@ -641,6 +970,79 @@ export default function BuildingTreatyDetail() {
           <div className="treaty-detail__muted">Загрузка договора...</div>
         ) : (
           <form onSubmit={handleSubmit}>
+            {!isNew && current && (
+              <div className="treaty-detail__status-block">
+                <div className="treaty-detail__status-track">
+                  <div className="treaty-detail__status-track-title">
+                    Процесс договора
+                  </div>
+                  <div className="treaty-detail__status-track-row">
+                    {current.status === "cancelled" ? (
+                      <div className="treaty-detail__status-track-step treaty-detail__status-track-step--cancelled">
+                        <div className="treaty-detail__status-track-dot" />
+                        <div className="treaty-detail__status-track-label">
+                          {STATUS_LABELS.cancelled}
+                        </div>
+                      </div>
+                    ) : (
+                      ["draft", "active", "signed"].map((s, idx, arr) => {
+                        const isActive = String(current.status) === String(s);
+                        const isDone =
+                          (s === "draft" && (current.status === "active" || current.status === "signed")) ||
+                          (s === "active" && current.status === "signed");
+                        const label = STATUS_LABELS[s] || s;
+                        return (
+                          <React.Fragment key={s}>
+                            <div
+                              className={`treaty-detail__status-track-step ${isActive ? "treaty-detail__status-track-step--current" : ""} ${isDone ? "treaty-detail__status-track-step--done" : ""}`}
+                            >
+                              <div className="treaty-detail__status-track-dot" />
+                              <div className="treaty-detail__status-track-label">
+                                {label}
+                              </div>
+                              {isActive && (
+                                <span className="treaty-detail__status-track-badge">
+                                  В работе
+                                </span>
+                              )}
+                            </div>
+                            {idx < arr.length - 1 && (
+                              <div className="treaty-detail__status-track-connector" />
+                            )}
+                          </React.Fragment>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                <div className="treaty-detail__status-actions">
+                  <button
+                    type="button"
+                    className="add-product-page__cancel-btn"
+                    onClick={handleCancelTreaty}
+                    disabled={!canCancel || currentLoading}
+                  >
+                    Отменить договор
+                  </button>
+                  <button
+                    type="button"
+                    className="add-product-page__submit-btn"
+                    onClick={handleActivateTreaty}
+                    disabled={!canActivate || currentLoading}
+                  >
+                    Активировать
+                  </button>
+                  <button
+                    type="button"
+                    className="add-product-page__submit-btn"
+                    onClick={openSignModal}
+                    disabled={!canSign || currentLoading}
+                  >
+                    Подписать
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="add-product-page__section">
               <div className="add-product-page__section-header mt-4">
                 <div className="add-product-page__section-number">1</div>
@@ -667,21 +1069,35 @@ export default function BuildingTreatyDetail() {
                   </select>
                 </div>
                 <div className="add-product-page__form-group">
-                  <label className="add-product-page__label">Клиент *</label>
-                  <select
-                    className="add-product-page__input"
-                    value={form.client}
-                    onChange={handleFormChange("client")}
-                    required
-                    disabled={disabled}
-                  >
-                    <option value="">Выберите клиента</option>
-                    {clientsOptions.map((c) => (
-                      <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
-                        {c.name || "—"}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="add-product-page__label">
+                    Клиент{form.operation_type !== "other" ? " *" : ""}
+                  </label>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select
+                      className="add-product-page__input"
+                      value={form.client}
+                      onChange={handleFormChange("client")}
+                      required={form.operation_type !== "other"}
+                      disabled={disabled}
+                      style={{ flex: "1 1 200px", minWidth: 0 }}
+                    >
+                      <option value="">Выберите клиента</option>
+                      {clientsOptions.map((c) => (
+                        <option key={c.id ?? c.uuid} value={c.id ?? c.uuid}>
+                          {c.name || "—"}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="add-product-page__submit-btn"
+                      style={{ whiteSpace: "nowrap" }}
+                      onClick={() => setOpenAddClientModal(true)}
+                      disabled={disabled}
+                    >
+                      Добавить клиента
+                    </button>
+                  </div>
                 </div>
                 <div className="add-product-page__form-group">
                   <label className="add-product-page__label">
@@ -694,21 +1110,6 @@ export default function BuildingTreatyDetail() {
                     placeholder="ДГ-001"
                     disabled={disabled}
                   />
-                </div>
-                <div className="add-product-page__form-group">
-                  <label className="add-product-page__label">Статус</label>
-                  <select
-                    className="add-product-page__input"
-                    value={form.status}
-                    onChange={handleFormChange("status")}
-                    disabled={disabled}
-                  >
-                    {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
             </div>
@@ -899,6 +1300,7 @@ export default function BuildingTreatyDetail() {
                       className="add-product-page__input"
                       value={firstInstallmentDate}
                       onChange={(e) => setFirstInstallmentDate(e.target.value)}
+                      disabled={disabled}
                     />
                   </div>
                   <div
@@ -921,6 +1323,7 @@ export default function BuildingTreatyDetail() {
                             : 1,
                         )
                       }
+                      disabled={disabled}
                     />
                   </div>
                 </div>
@@ -943,8 +1346,44 @@ export default function BuildingTreatyDetail() {
                         {installments.map((row, idx) => (
                           <tr key={idx}>
                             <td>{row.order ?? idx + 1}</td>
-                            <td>{row.due_date}</td>
-                            <td>{row.amount}</td>
+                            <td>
+                              {isDraft ? (
+                                <input
+                                  type="date"
+                                  className="add-product-page__input"
+                                  value={row.due_date || ""}
+                                  onChange={(e) =>
+                                    handleInstallmentDueDateChange(
+                                      idx,
+                                      e.target.value,
+                                    )
+                                  }
+                                  style={{ minWidth: 140 }}
+                                />
+                              ) : (
+                                row.due_date || "—"
+                              )}
+                            </td>
+                            <td>
+                              {isDraft ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className="add-product-page__input"
+                                  value={row.amount || ""}
+                                  onChange={(e) =>
+                                    handleInstallmentAmountChange(
+                                      idx,
+                                      e.target.value,
+                                    )
+                                  }
+                                  style={{ minWidth: 100 }}
+                                />
+                              ) : (
+                                row.amount || "—"
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -986,123 +1425,24 @@ export default function BuildingTreatyDetail() {
         )}
       </div>
 
-      {!isNew &&
-        current?.payment_type === "installment" &&
-        Array.isArray(current?.installments) &&
-        current.installments.length > 0 && (
-          <div className="add-product-page__content" style={{ marginTop: 24 }}>
-            <div className="add-product-page__section">
-              <div className="add-product-page__section-header !mb-0">
-                <h3 className="add-product-page__section-title">
-                  Рассрочка по договору
-                </h3>
-              </div>
-              <div className="treaty-detail__table-wrap">
-                <table className="treaty-detail__table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Дата платежа</th>
-                      <th>Сумма</th>
-                      <th>Оплачено</th>
-                      <th>Остаток</th>
-                      <th>Статус</th>
-                      <th>Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {current.installments.map((it, idx) => {
-                      const total = Number(it.amount || 0);
-                      const paid = Number(it.paid_amount || 0);
-                      const remain = Number.isFinite(total - paid)
-                        ? Math.max(0, total - paid)
-                        : 0;
-                      const status =
-                        it.status || (remain <= 0 ? "paid" : "planned");
-                      const isPaid = status === "paid";
-                      return (
-                        <tr key={it.id ?? it.uuid ?? idx}>
-                          <td>{it.order ?? idx + 1}</td>
-                          <td>{it.due_date || "—"}</td>
-                          <td>{it.amount ?? "0.00"}</td>
-                          <td>{it.paid_amount ?? "0.00"}</td>
-                          <td>{remain.toFixed(2)}</td>
-                          <td>
-                            {isPaid ? (
-                              <span
-                                style={{
-                                  display: "inline-block",
-                                  padding: "2px 8px",
-                                  borderRadius: 999,
-                                  fontSize: 12,
-                                  backgroundColor: "#dcfce7",
-                                  color: "#166534",
-                                }}
-                              >
-                                Оплачен
-                              </span>
-                            ) : (
-                              <span
-                                style={{
-                                  display: "inline-block",
-                                  padding: "2px 8px",
-                                  borderRadius: 999,
-                                  fontSize: 12,
-                                  backgroundColor: "#fef3c7",
-                                  color: "#92400e",
-                                }}
-                              >
-                                Запланирован
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            {!isPaid && remain > 0 ? (
-                              <button
-                                type="button"
-                                className="add-product-page__submit-btn"
-                                onClick={() => openInstallmentPayments(it)}
-                              >
-                                Оплатить
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="add-product-page__cancel-btn"
-                                onClick={() => openInstallmentPayments(it)}
-                              >
-                                Платежи
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+      <div className="add-product-page__content" style={{ marginTop: 24 }}>
+        <div className="add-product-page__section">
+          <div className="treaty-detail__section-actions">
+            <h3 className="treaty-detail__section-title-inline">
+              Файлы договора
+            </h3>
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              onClick={() => setFileModalOpen(true)}
+            >
+              Прикрепить файл
+            </button>
           </div>
-        )}
-
-      {!isNew && (
-        <div className="add-product-page__content" style={{ marginTop: 24 }}>
-          <div className="add-product-page__section">
-            <div className="treaty-detail__section-actions">
-              <h3 className="treaty-detail__section-title-inline">
-                Файлы договора
-              </h3>
-              <button
-                type="button"
-                className="add-product-page__submit-btn"
-                onClick={() => setFileModalOpen(true)}
-              >
-                Прикрепить файл
-              </button>
-            </div>
-            {files.length === 0 ? (
+          {isNew ? (
+            pendingFiles.length === 0 ? (
               <div className="treaty-detail__muted">
-                Файлы ещё не прикреплены.
+                Файлы можно прикрепить до или после сохранения договора.
               </div>
             ) : (
               <div className="treaty-detail__table-wrap">
@@ -1111,95 +1451,202 @@ export default function BuildingTreatyDetail() {
                     <tr>
                       <th>Название</th>
                       <th>Файл</th>
+                      <th style={{ width: 80 }} />
                     </tr>
                   </thead>
                   <tbody>
-                    {files.map((f) => {
-                      const key = f.id ?? f.uuid ?? f.file;
-                      const url = getFileUrl(f);
-                      const ext = getFileExtension(url);
-                      const isImage = IMAGE_EXTENSIONS.includes(ext);
-                      const iconLabel = getFileTypeLabel(ext);
-                      const title = f.title || "Файл";
-                      return (
-                        <tr key={key}>
-                          <td>{title}</td>
-                          <td>
-                            {url ? (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  display: "inline-block",
-                                  textDecoration: "none",
-                                  color: "inherit",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: 72,
-                                    height: 72,
-                                    borderRadius: 4,
-                                    overflow: "hidden",
-                                    border: "1px solid #d9d9d9",
-                                    backgroundColor: isImage
-                                      ? "#f0f2f5"
-                                      : "#e5e7eb",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  {isImage ? (
-                                    <img
-                                      src={url}
-                                      alt={title}
-                                      style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        objectFit: "cover",
-                                      }}
-                                    />
-                                  ) : (
-                                    <span
-                                      style={{
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        color: "#111827",
-                                      }}
-                                    >
-                                      {iconLabel}
-                                    </span>
-                                  )}
-                                </div>
-                                <div
-                                  style={{
-                                    marginTop: 4,
-                                    maxWidth: 140,
-                                    fontSize: 12,
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                  }}
-                                >
-                                  {title}
-                                </div>
-                              </a>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {pendingFiles.map((pf, index) => (
+                      <tr key={index}>
+                        <td>{pf.title || pf.file?.name || "Файл"}</td>
+                        <td>
+                          <span className="treaty-detail__muted">
+                            {pf.file?.name ?? "—"}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="add-product-page__cancel-btn"
+                            onClick={() => removePendingFile(index)}
+                          >
+                            Удалить
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
+            )
+          ) : files.length === 0 ? (
+            <div className="treaty-detail__muted">
+              Файлы ещё не прикреплены.
+            </div>
+          ) : (
+            <div className="treaty-detail__table-wrap">
+              <table className="treaty-detail__table">
+                <thead>
+                  <tr>
+                    <th>Название</th>
+                    <th>Файл</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {files.map((f) => {
+                    const key = f.id ?? f.uuid ?? f.file;
+                    const url = getFileUrl(f);
+                    const ext = getFileExtension(url);
+                    const isImage = IMAGE_EXTENSIONS.includes(ext);
+                    const iconLabel = getFileTypeLabel(ext);
+                    const title = f.title || "Файл";
+                    return (
+                      <tr key={key}>
+                        <td>{title}</td>
+                        <td>
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: "inline-block",
+                                textDecoration: "none",
+                                color: "inherit",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 72,
+                                  height: 72,
+                                  borderRadius: 4,
+                                  overflow: "hidden",
+                                  border: "1px solid #d9d9d9",
+                                  backgroundColor: isImage
+                                    ? "#f0f2f5"
+                                    : "#e5e7eb",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {isImage ? (
+                                  <img
+                                    src={url}
+                                    alt={title}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      color: "#111827",
+                                    }}
+                                  >
+                                    {iconLabel}
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  maxWidth: 140,
+                                  fontSize: 12,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {title}
+                              </div>
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      <Modal
+        open={openAddClientModal}
+        onClose={closeAddClientModal}
+        title="Добавить клиента"
+        wrapperId="treaty-add-client-modal"
+        closeOnOverlayClick={!addClientSubmitting}
+      >
+        <form
+          className="add-product-page add-product-page--modal-form"
+          onSubmit={handleAddClientSubmit}
+        >
+          <p className="treaty-detail__muted" style={{ marginBottom: 16 }}>
+            Укажите минимальные данные. Остальное можно заполнить в карточке клиента позже.
+          </p>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Имя / название *</label>
+            <input
+              type="text"
+              className="add-product-page__input"
+              value={addClientForm.name}
+              onChange={handleAddClientFieldChange("name")}
+              placeholder="ФИО или название организации"
+              autoFocus
+            />
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Телефон</label>
+            <input
+              type="text"
+              className="add-product-page__input"
+              value={addClientForm.phone}
+              onChange={handleAddClientFieldChange("phone")}
+              placeholder="+996..."
+            />
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Email</label>
+            <input
+              type="text"
+              className="add-product-page__input"
+              value={addClientForm.email}
+              onChange={handleAddClientFieldChange("email")}
+              placeholder="email@example.com"
+            />
+          </div>
+          {addClientError && (
+            <div className="add-product-page__error" style={{ marginBottom: 12 }}>
+              {String(addClientError)}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+            <button
+              type="button"
+              className="add-product-page__cancel-btn"
+              onClick={closeAddClientModal}
+              disabled={addClientSubmitting}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="add-product-page__submit-btn"
+              disabled={addClientSubmitting}
+            >
+              {addClientSubmitting ? "Создание..." : "Добавить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         open={fileModalOpen}
@@ -1263,14 +1710,119 @@ export default function BuildingTreatyDetail() {
         </form>
       </Modal>
 
-      {!isNew && paymentsModalInstallment && (
-        <InstallmentPaymentsModal
-          open={paymentsModalOpen}
-          onClose={() => setPaymentsModalOpen(false)}
-          installment={paymentsModalInstallment}
-          treaty={current}
-        />
-      )}
+      <Modal
+        open={signModalOpen}
+        onClose={() => (signSubmitting ? null : setSignModalOpen(false))}
+        title="Подписать договор и создать заявку в кассу"
+      >
+        <form
+          className="add-product-page add-product-page--modal-form"
+          onSubmit={handleSignSubmit}
+        >
+          <div className="add-product-page__muted" style={{ marginBottom: 8 }}>
+            При подписании будет создана заявка на кассу для одобрения оплаты.
+            {current?.payment_type === "installment"
+              ? " При рассрочке заявка создаётся только на первоначальный взнос (если он указан)."
+              : ""}
+          </div>
+
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Касса *</label>
+            <select
+              className="add-product-page__input"
+              value={signCashbox}
+              onChange={(e) => setSignCashbox(e.target.value)}
+              required
+              disabled={signSubmitting}
+            >
+              <option value="">Выберите кассу</option>
+              {(signCashboxes || []).map((c) => {
+                const cid = c?.id ?? c?.uuid;
+                if (!cid) return null;
+                return (
+                  <option key={cid} value={cid}>
+                    {c?.name || "Касса"}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Комментарий (необязательно)</label>
+            <textarea
+              className="add-product-page__input"
+              rows={3}
+              value={signComment}
+              onChange={(e) => setSignComment(e.target.value)}
+              disabled={signSubmitting}
+              placeholder="Например: Оплата по договору"
+              style={{ resize: "vertical" }}
+            />
+          </div>
+
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">
+              Файлы для одобрения (необязательно)
+            </label>
+            <input
+              type="file"
+              className="add-product-page__input"
+              multiple
+              onChange={(e) => {
+                const added = Array.from(e.target.files || []);
+                setSignFiles((prev) => [...(prev || []), ...added]);
+                e.target.value = "";
+              }}
+              disabled={signSubmitting}
+            />
+            {signFiles.length > 0 && (
+              <ul style={{ marginTop: 8, paddingLeft: 18 }}>
+                {signFiles.map((f, idx) => (
+                  <li key={`${f.name}-${idx}`}>
+                    {f.name}{" "}
+                    <button
+                      type="button"
+                      className="add-product-page__cancel-btn"
+                      style={{ padding: "2px 8px", marginLeft: 8 }}
+                      onClick={() =>
+                        setSignFiles((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      disabled={signSubmitting}
+                    >
+                      удалить
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {signError && (
+            <div className="add-product-page__error" style={{ marginTop: 8 }}>
+              {String(signError)}
+            </div>
+          )}
+
+          <div className="add-product-page__actions" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="add-product-page__cancel-btn"
+              onClick={() => setSignModalOpen(false)}
+              disabled={signSubmitting}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="add-product-page__submit-btn"
+              disabled={signSubmitting}
+            >
+              {signSubmitting ? "Подписание..." : "Подписать"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -109,6 +109,8 @@ export default function BuildingTreaty() {
 
   const [installments, setInstallments] = useState([]);
 
+  const [openTypeModal, setOpenTypeModal] = useState(false);
+
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -221,7 +223,13 @@ export default function BuildingTreaty() {
       alert("Сначала выберите жилой комплекс в шапке раздела", true);
       return;
     }
-    navigate("/crm/building/treaty/new");
+    setOpenTypeModal(true);
+  };
+
+  const chooseNewTreatyType = (operationType) => {
+    setOpenTypeModal(false);
+    const q = new URLSearchParams({ operation_type: operationType }).toString();
+    navigate(`/crm/building/treaty/new?${q}`);
   };
 
   const openEdit = (treaty) => {
@@ -526,6 +534,45 @@ export default function BuildingTreaty() {
         </button>
       </div>
 
+      <Modal
+        open={openTypeModal}
+        onClose={() => setOpenTypeModal(false)}
+        title="Тип договора"
+        wrapperId="treaty-type-modal"
+      >
+        <div className="add-product-page add-product-page--modal-form" style={{ padding: "8px 0" }}>
+          <p className="treaty-detail__muted" style={{ marginBottom: 16 }}>
+            Выберите тип договора для перехода на страницу создания.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              style={{ justifyContent: "center" }}
+              onClick={() => chooseNewTreatyType("sale")}
+            >
+              Продажа
+            </button>
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              style={{ justifyContent: "center" }}
+              onClick={() => chooseNewTreatyType("booking")}
+            >
+              Бронь
+            </button>
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              style={{ justifyContent: "center" }}
+              onClick={() => chooseNewTreatyType("other")}
+            >
+              Прочее
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="warehouse-search-section">
         <div className="warehouse-search">
           <input
@@ -628,7 +675,11 @@ export default function BuildingTreaty() {
       <DataContainer>
         <div className="warehouse-table-container w-full">
           {viewMode === VIEW_MODES.TABLE ? (
-            <table className="warehouse-table w-full">
+            <div
+              className="building-treaty-table-scroll"
+              style={{ overflowX: "auto", overflowY: "visible", width: "100%" }}
+            >
+              <table className="warehouse-table w-full building-treaty-table">
               <thead>
                 <tr>
                   <th>Номер</th>
@@ -746,7 +797,7 @@ export default function BuildingTreaty() {
                               {
                                 label: "Удалить",
                                 onClick: () => handleDelete(t),
-                                disabled: busy,
+                                disabled: busy || t?.status !== "draft",
                                 danger: true,
                               },
                             ]}
@@ -757,7 +808,8 @@ export default function BuildingTreaty() {
                   })
                 )}
               </tbody>
-            </table>
+              </table>
+            </div>
           ) : (
             <div className="warehouse-cards grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 p-4">
               {!selectedProjectId ? (
@@ -828,8 +880,8 @@ export default function BuildingTreaty() {
                         </button>
                         <button
                           type="button"
-                          className="px-3 py-2 flex-1 rounded-lg bg-red-500 text-xs font-semibold text-white hover:bg-red-600"
-                          disabled={busy}
+                          className="px-3 py-2 flex-1 rounded-lg bg-red-500 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={busy || t?.status !== "draft"}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDelete(t);
