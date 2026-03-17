@@ -9,7 +9,10 @@ import {
   BarChart3,
   RefreshCw,
   Filter,
-  Calendar,
+  TrendingUp,
+  Warehouse,
+  Wallet,
+  Receipt,
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -37,7 +40,7 @@ ChartJS.register(
   BarElement,
   ArcElement,
   Tooltip,
-  Legend
+  Legend,
 );
 
 const ProductionAnalytics = () => {
@@ -50,7 +53,7 @@ const ProductionAnalytics = () => {
     error,
   } = useSelector((state) => state.analytics.productionAnalytics);
   const filters = useSelector(
-    (state) => state.analytics.productionAnalytics.filters
+    (state) => state.analytics.productionAnalytics.filters,
   );
 
   const [showFilters, setShowFilters] = useState(false);
@@ -120,28 +123,30 @@ const ProductionAnalytics = () => {
     });
   };
 
-  // Загрузка данных через Redux
+  // Загрузка данных через Redux (параметры по Owner Analytics API)
   const fetchData = () => {
     const params = {
       period,
       group_by: groupBy,
     };
 
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
+    if (period === "day") {
+      params.date = date || new Date().toISOString().slice(0, 10);
+    } else {
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+    }
 
-    // Обновляем фильтры в Redux
     dispatch(
       setProductionAnalyticsFilters({
         period,
-        date: "",
+        date: period === "day" ? date : "",
         date_from: dateFrom,
         date_to: dateTo,
         group_by: groupBy,
-      })
+      }),
     );
 
-    // Загружаем данные через Redux
     dispatch(fetchProductionAnalytics(params));
   };
 
@@ -181,7 +186,7 @@ const ProductionAnalytics = () => {
 
     return {
       labels: transfers.map((item) =>
-        formatDateForDisplay(item.date, groupByType)
+        formatDateForDisplay(item.date, groupByType),
       ),
       datasets: [
         {
@@ -270,7 +275,7 @@ const ProductionAnalytics = () => {
 
     return {
       labels: distribution.map(
-        (item) => `${item.product_name} ${item.percent?.toFixed(1) || 0}%`
+        (item) => `${item.product_name} ${item.percent?.toFixed(1) || 0}%`,
       ),
       datasets: [
         {
@@ -295,7 +300,7 @@ const ProductionAnalytics = () => {
         callbacks: {
           label: function (context) {
             return `${context.dataset.label}: ${formatNumber(
-              context.parsed.y
+              context.parsed.y,
             )}`;
           },
         },
@@ -353,7 +358,7 @@ const ProductionAnalytics = () => {
             const total = context.dataset.data.reduce((a, b) => a + b, 0);
             const percent = ((context.parsed / total) * 100).toFixed(1);
             return `${context.label}: ${formatMoney(
-              context.parsed
+              context.parsed,
             )} сом (${percent}%)`;
           },
         },
@@ -363,62 +368,64 @@ const ProductionAnalytics = () => {
 
   // Применение фильтров при изменении периода
   const handlePeriodChange = (newPeriod) => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (newPeriod === "day" && !date) setDate(today);
     setPeriod(newPeriod);
 
-    // Применяем фильтры сразу
-    const params = {
-      period: newPeriod,
-      group_by: groupBy,
-    };
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
+    const params = { period: newPeriod, group_by: groupBy };
+    if (newPeriod === "day") {
+      params.date = date || today;
+    } else {
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+    }
 
     dispatch(
       setProductionAnalyticsFilters({
         period: newPeriod,
-        date: "",
+        date: newPeriod === "day" ? (date || today) : "",
         date_from: dateFrom,
         date_to: dateTo,
         group_by: groupBy,
-      })
+      }),
     );
 
-    // Применяем фильтры только если обе даты заполнены
-    if (dateFrom && dateTo) {
-      dispatch(fetchProductionAnalytics(params));
-    }
+    const canFetch = newPeriod === "day" || (dateFrom && dateTo);
+    if (canFetch) dispatch(fetchProductionAnalytics(params));
   };
 
   // Применение фильтров при изменении группировки
   const handleGroupByChange = (newGroupBy) => {
     setGroupBy(newGroupBy);
 
-    // Применяем фильтры сразу
-    const params = {
-      period,
-      group_by: newGroupBy,
-    };
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
+    const params = { period, group_by: newGroupBy };
+    if (period === "day") {
+      if (date) params.date = date;
+    } else {
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+    }
 
     dispatch(
       setProductionAnalyticsFilters({
         period,
-        date: "",
+        date: period === "day" ? date : "",
         date_from: dateFrom,
         date_to: dateTo,
         group_by: newGroupBy,
-      })
+      }),
     );
 
-    // Применяем фильтры только если обе даты заполнены
-    if (dateFrom && dateTo) {
+    const canFetch = period === "day" ? true : dateFrom && dateTo;
+    if (canFetch) {
       dispatch(fetchProductionAnalytics(params));
     }
   };
 
   const handleResetFilters = () => {
+    const today = new Date().toISOString().slice(0, 10);
     setPeriod("month");
+    setDate(today);
     setDateFrom("");
     setDateTo("");
     setGroupBy("day");
@@ -429,8 +436,9 @@ const ProductionAnalytics = () => {
         date_from: "",
         date_to: "",
         group_by: "day",
-      })
+      }),
     );
+    dispatch(fetchProductionAnalytics({ period: "month", group_by: "day" }));
   };
 
   // Получаем сообщение об ошибке
@@ -560,7 +568,6 @@ const ProductionAnalytics = () => {
           </button>
         </div>
       )}
-
       {/* Панель фильтров с селектами */}
       {showFilters && (
         <div
@@ -612,103 +619,146 @@ const ProductionAnalytics = () => {
               </select>
             </div>
 
-            {/* Дата от */}
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#333",
-                }}
-              >
-                Дата от
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => {
-                  setDateFrom(e.target.value);
-                  // Применяем фильтры при изменении даты
-                  const params = {
-                    period,
-                    group_by: groupBy,
-                    date_from: e.target.value,
-                    date_to: dateTo,
-                  };
-                  dispatch(
-                    setProductionAnalyticsFilters({
-                      period,
-                      date: "",
-                      date_from: e.target.value,
-                      date_to: dateTo,
-                      group_by: groupBy,
-                    })
-                  );
-                  if (e.target.value && dateTo) {
+            {/* Для period=day — одна дата */}
+            {period === "day" && (
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#333",
+                  }}
+                >
+                  Дата
+                </label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setDate(v);
+                    dispatch(
+                      setProductionAnalyticsFilters({
+                        period,
+                        date: v,
+                        date_from: dateFrom,
+                        date_to: dateTo,
+                        group_by: groupBy,
+                      }),
+                    );
+                    const params = { period, group_by: groupBy, date: v };
                     dispatch(fetchProductionAnalytics(params));
-                  }
-                }}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  border: "1px solid #e0e0e0",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
-              />
-            </div>
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #e0e0e0",
+                    borderRadius: "6px",
+                    fontSize: "14px",
+                    cursor: "pointer",
+                  }}
+                />
+              </div>
+            )}
 
-            {/* Дата до */}
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "8px",
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  color: "#333",
-                }}
-              >
-                Дата до
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => {
-                  setDateTo(e.target.value);
-                  // Применяем фильтры при изменении даты
-                  const params = {
-                    period,
-                    group_by: groupBy,
-                    date_from: dateFrom,
-                    date_to: e.target.value,
-                  };
-                  dispatch(
-                    setProductionAnalyticsFilters({
-                      period,
-                      date: "",
-                      date_from: dateFrom,
-                      date_to: e.target.value,
-                      group_by: groupBy,
-                    })
-                  );
-                  if (dateFrom && e.target.value) {
-                    dispatch(fetchProductionAnalytics(params));
-                  }
-                }}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  border: "1px solid #e0e0e0",
-                  borderRadius: "6px",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                }}
-              />
-            </div>
+            {/* Дата от (для week / month / custom) */}
+            {period !== "day" && (
+              <>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "8px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#333",
+                    }}
+                  >
+                    Дата от
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setDateFrom(v);
+                      const params = {
+                        period,
+                        group_by: groupBy,
+                        date_from: v,
+                        date_to: dateTo,
+                      };
+                      dispatch(
+                        setProductionAnalyticsFilters({
+                          period,
+                          date: "",
+                          date_from: v,
+                          date_to: dateTo,
+                          group_by: groupBy,
+                        }),
+                      );
+                      if (v && dateTo) dispatch(fetchProductionAnalytics(params));
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1px solid #e0e0e0",
+                      borderRadius: "6px",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "8px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      color: "#333",
+                    }}
+                  >
+                    Дата до
+                  </label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setDateTo(v);
+                      const params = {
+                        period,
+                        group_by: groupBy,
+                        date_from: dateFrom,
+                        date_to: v,
+                      };
+                      dispatch(
+                        setProductionAnalyticsFilters({
+                          period,
+                          date: "",
+                          date_from: dateFrom,
+                          date_to: v,
+                          group_by: groupBy,
+                        }),
+                      );
+                      if (dateFrom && v) dispatch(fetchProductionAnalytics(params));
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1px solid #e0e0e0",
+                      borderRadius: "6px",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                    }}
+                  />
+                </div>
+              </>
+            )}
 
             {/* Селект группировки */}
             <div>
@@ -845,7 +895,6 @@ const ProductionAnalytics = () => {
           </div>
         </div>
       )}
-
       {/* Верхние карточки-метрики */}
       <div className="agent-analytics__metrics">
         <div className="agent-analytics__metric-card">
@@ -921,8 +970,46 @@ const ProductionAnalytics = () => {
             </span>
           </div>
         </div>
-      </div>
 
+        <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--green">
+            <TrendingUp size={24} />
+          </div>
+          <div>
+            <h3>Валовая прибыль</h3>
+            <p>{formatMoney(summary.gross_profit || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Выручка − себестоимость
+            </span>
+          </div>
+        </div>
+
+        <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
+            <Warehouse size={24} />
+          </div>
+          <div>
+            <h3>Стоимость склада</h3>
+            <p>{formatMoney(summary.stock_value || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Остатки × закупочная цена
+            </span>
+          </div>
+        </div>
+
+        <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
+            <Wallet size={24} />
+          </div>
+          <div>
+            <h3>Общий долг</h3>
+            <p>{formatMoney(summary.total_debt || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Непогашенные долги
+            </span>
+          </div>
+        </div>
+      </div>
       {/* Блок с перемещениями и распределением продаж */}
       <div className="agent-analytics__section">
         <div className="agent-analytics__charts">
@@ -944,7 +1031,6 @@ const ProductionAnalytics = () => {
           </div>
         </div>
       </div>
-
       {/* Продажи по датам */}
       <div className="agent-analytics__section">
         <h2 className="agent-analytics__section-title">
@@ -959,7 +1045,6 @@ const ProductionAnalytics = () => {
           </div>
         </div>
       </div>
-
       {/* Таблицы: топы по товарам и пользователям */}
       <div className="agent-analytics__section">
         {/* <div className="agent-analytics__charts"> */}
@@ -982,7 +1067,7 @@ const ProductionAnalytics = () => {
                   charts.top_products_by_sales.map((product, index) => {
                     const totalAmount = charts.top_products_by_sales.reduce(
                       (sum, p) => sum + parseFloat(p.amount || 0),
-                      0
+                      0,
                     );
                     const percent =
                       totalAmount > 0
@@ -1013,7 +1098,6 @@ const ProductionAnalytics = () => {
         </div>
         {/* </div> */}
       </div>
-
       <div className="agent-analytics__section">
         <div className="agent-analytics__table-card">
           <h3 className="agent-analytics__table-title">
@@ -1051,7 +1135,6 @@ const ProductionAnalytics = () => {
           </div>
         </div>
       </div>
-
       <div className="agent-analytics__section">
         <div className="agent-analytics__table-card">
           <h3 className="agent-analytics__table-title">
@@ -1073,6 +1156,46 @@ const ProductionAnalytics = () => {
                       <td>{user.user_name || "—"}</td>
                       <td>{formatNumber(user.sales_count || 0)}</td>
                       <td>{formatMoney(user.sales_amount || 0)} сом</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: "center" }}>
+                      Нет данных
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Статьи расходов (expense_breakdown по API) */}
+      <div className="agent-analytics__section">
+        <div className="agent-analytics__table-card">
+          <h3 className="agent-analytics__table-title">
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+              <Receipt size={20} />
+              Статьи расходов
+            </span>
+          </h3>
+          <div className="agent-analytics__table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Статья</th>
+                  <th>Сумма (сом)</th>
+                  <th>Операций</th>
+                </tr>
+              </thead>
+              <tbody>
+                {charts.expense_breakdown?.length > 0 ? (
+                  charts.expense_breakdown.map((row, index) => (
+                    <tr key={index}>
+                      <td>{row.name || "Без названия"}</td>
+                      <td>{formatMoney(row.total || 0)} сом</td>
+                      <td>{formatNumber(row.count || 0)}</td>
                     </tr>
                   ))
                 ) : (

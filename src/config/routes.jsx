@@ -156,6 +156,7 @@ import ProductionCatalog from "../Components/Sectors/Production/Catalog/Producti
 import ProductionRequest from "../Components/Sectors/Production/Request/ProductionRequest";
 import AgentAnalytics from "../Components/Sectors/Production/Analytics/AgentAnalytics";
 import ProductionAnalytics from "../Components/Sectors/Production/Analytics/ProductionAnalytics";
+import ProductionSell from "../Components/Sectors/Production/Sell/ProductionSell";
 
 // Pilorama
 import PiloramaWarehouse from "../Components/Sectors/Pilorama/PiloramaWarehouse/PiloramaWarehouse";
@@ -430,7 +431,7 @@ export const crmRoutes = (profile) => [
 
   // Barber routes
   createProtectedRoute("barber/services", BarberServices),
-  createProtectedRoute("barber/warehouse", Sklad),  
+  createProtectedRoute("barber/warehouse", Sklad),
   createProtectedRoute("barber/masters", MastersTabs),
   createProtectedRoute("barber/history", BarberHistory),
   createProtectedRoute("documents", BarberDocuments),
@@ -475,8 +476,14 @@ export const crmRoutes = (profile) => [
     {[
       createProtectedRoute("analytics", BuildingAnalytics),
       createProtectedRoute("cash-register", BuildingCashRegister),
-      createProtectedRoute("cash-register/treaty/:treatyId", BuildingCashRegisterTreatyDetail),
-      createProtectedRoute("cash-register/salary-payroll/:payrollId", BuildingCashRegisterSalaryPayrollPaymentsPage),
+      createProtectedRoute(
+        "cash-register/treaty/:treatyId",
+        BuildingCashRegisterTreatyDetail,
+      ),
+      createProtectedRoute(
+        "cash-register/salary-payroll/:payrollId",
+        BuildingCashRegisterSalaryPayrollPaymentsPage,
+      ),
       createProtectedRoute("clients", BuildingClients),
       createProtectedRoute("clients/:id", BuildingClientDetail),
       createProtectedRoute("clients/suppliers/new", SupplierCreatePage),
@@ -495,14 +502,8 @@ export const crmRoutes = (profile) => [
       createProtectedRoute("projects/:id", BuildingProjectDetail),
       createProtectedRoute("drawings", BuildingDrawings),
       createProtectedRoute("salary", BuildingSalary),
-      createProtectedRoute(
-        "salary/employee/:id",
-        BuildingSalaryEmployeeDetail,
-      ),
-      createProtectedRoute(
-        "salary/payroll/:id",
-        BuildingSalaryPayrollDetail,
-      ),
+      createProtectedRoute("salary/employee/:id", BuildingSalaryEmployeeDetail),
+      createProtectedRoute("salary/payroll/:id", BuildingSalaryPayrollDetail),
       createProtectedRoute(
         "salary/payroll/:payrollId/line/:lineId",
         BuildingSalaryLineDetail,
@@ -640,6 +641,7 @@ export const crmRoutes = (profile) => [
   createProtectedRoute("production/agents", ProductionAgents),
   createProtectedRoute("production/catalog", ProductionCatalog),
   createProtectedRoute("production/request", ProductionRequest),
+  createProtectedRoute("production/sell", ProductionSell),
 
   // Pilorama routes
   createProtectedRoute("pilorama/warehouse", PiloramaWarehouse),
