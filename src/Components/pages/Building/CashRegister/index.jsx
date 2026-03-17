@@ -5,12 +5,15 @@ import ProcurementsTab from "./ProcurementsTab";
 import InstallmentsTab from "./InstallmentsTab";
 import SalaryPaymentsTab from "./SalaryPaymentsTab";
 import AdvanceRequestsTab from "./AdvanceRequestsTab";
+import CashHistoryTab from "./CashHistoryTab";
 import "./CashRegister.scss";
 
 const TAB_PROCUREMENTS = "procurements";
 const TAB_INSTALLMENTS = "installments";
 const TAB_ADVANCES = "advances";
+const TAB_SALES = "sales";
 const TAB_SALARY = "salary";
+const TAB_HISTORY = "history";
 
 const SUBTITLES = {
   [TAB_PROCUREMENTS]:
@@ -18,9 +21,13 @@ const SUBTITLES = {
   [TAB_INSTALLMENTS]:
     "Подписанные договора на рассрочку для приёма платежей.",
   [TAB_ADVANCES]:
-    "Заявки на аванс сотрудникам. Одобрение или отклонение.",
+    "Заявки на кассу (продажи, авансы, оплаты) и заявки на аванс по ЗП. Одобрение или отклонение с проведением по кассе.",
+  [TAB_SALES]:
+    "Заявки по продажам квартир и первоначальным взносам (рассрочка), ожидающие одобрения кассы.",
   [TAB_SALARY]:
     "Утверждённые периоды зарплаты по выбранному ЖК — переход к выплатам сотрудникам.",
+  [TAB_HISTORY]:
+    "Движения по кассам выбранного ЖК (приходы и расходы).",
 };
 
 export default function BuildingCashRegister() {
@@ -29,9 +36,14 @@ export default function BuildingCashRegister() {
   const { selectedProjectId } = useBuildingProjects();
   const initialTabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(
-    [TAB_PROCUREMENTS, TAB_INSTALLMENTS, TAB_ADVANCES, TAB_SALARY].includes(
-      initialTabFromUrl,
-    )
+    [
+      TAB_PROCUREMENTS,
+      TAB_INSTALLMENTS,
+      TAB_ADVANCES,
+      TAB_SALES,
+      TAB_SALARY,
+      TAB_HISTORY,
+    ].includes(initialTabFromUrl)
       ? initialTabFromUrl
       : TAB_PROCUREMENTS,
   );
@@ -129,6 +141,23 @@ export default function BuildingCashRegister() {
         </button>
         <button
           type="button"
+          onClick={() => handleTabChange(TAB_SALES)}
+          className={
+            activeTab === TAB_SALES
+              ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
+              : "warehouse-view-btn bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }
+          style={{
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: "1px solid",
+            fontWeight: 500,
+          }}
+        >
+          Продажи
+        </button>
+        <button
+          type="button"
           onClick={() => handleTabChange(TAB_SALARY)}
           className={
             activeTab === TAB_SALARY
@@ -144,6 +173,23 @@ export default function BuildingCashRegister() {
         >
           Выплаты зарплат
         </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange(TAB_HISTORY)}
+          className={
+            activeTab === TAB_HISTORY
+              ? "warehouse-view-btn bg-slate-900 text-white border-slate-900"
+              : "warehouse-view-btn bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }
+          style={{
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: "1px solid",
+            fontWeight: 500,
+          }}
+        >
+          История кассы
+        </button>
       </div>
 
       {activeTab === TAB_PROCUREMENTS && (
@@ -155,8 +201,18 @@ export default function BuildingCashRegister() {
       {activeTab === TAB_ADVANCES && (
         <AdvanceRequestsTab selectedProjectId={selectedProjectId} />
       )}
+      {activeTab === TAB_SALES && (
+        <AdvanceRequestsTab
+          selectedProjectId={selectedProjectId}
+          cashRequestTypes={["apartment_sale", "installment_initial_payment"]}
+          hideSalary
+        />
+      )}
       {activeTab === TAB_SALARY && (
         <SalaryPaymentsTab selectedProjectId={selectedProjectId} />
+      )}
+      {activeTab === TAB_HISTORY && (
+        <CashHistoryTab selectedProjectId={selectedProjectId} />
       )}
     </div>
   );

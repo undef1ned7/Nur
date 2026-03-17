@@ -4,3 +4,10 @@
 .stock-card {
   cursor: pointer;
 }
+
+/* Уменьшенный шрифт в таблицах на странице склада */
+.building-table--small th,
+.building-table--small td {
+  font-size: 12px;
+  padding: 6px 8px;
+}

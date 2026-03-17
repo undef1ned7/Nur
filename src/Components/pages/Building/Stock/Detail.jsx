@@ -31,6 +31,7 @@ import api from "../../../../api";
 import StockBalancesTab from "./StockBalancesTab";
 import StockHistoryTab from "./StockHistoryTab";
 import { useDebouncedValue } from "@/hooks/useDebounce";
+import { Trash2 } from "lucide-react";
 
 const DECISION_INITIAL = {
   transfer: null,
@@ -85,10 +86,30 @@ export default function BuildingStockDetail() {
   const [transfersTab, setTransfersTab] = useState("pending"); // "pending" | "processed"
   const [mainTab, setMainTab] = useState("balances"); // "balances" | "history"
 
+  const [transferToWorkModalOpen, setTransferToWorkModalOpen] = useState(false);
+  const [transferWorkEntryId, setTransferWorkEntryId] = useState("");
+  const [transferWorkSearch, setTransferWorkSearch] = useState("");
+  const [transferWorkOptions, setTransferWorkOptions] = useState([]);
+  const [transferWorkLoading, setTransferWorkLoading] = useState(false);
+  const [transferWorkError, setTransferWorkError] = useState(null);
+  const [transferItems, setTransferItems] = useState([]);
+  const [transferComment, setTransferComment] = useState("");
+  const [transferError, setTransferError] = useState(null);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [addPositionModalOpen, setAddPositionModalOpen] = useState(false);
+  const [addPositionSearch, setAddPositionSearch] = useState("");
+  const [transferWorkPickerOpen, setTransferWorkPickerOpen] = useState(false);
+  const [selectItemModalOpen, setSelectItemModalOpen] = useState(false);
+  const [selectItemRowIndex, setSelectItemRowIndex] = useState(0);
+  const [selectItemSearch, setSelectItemSearch] = useState("");
+
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [decisionModal, setDecisionModal] = useState(DECISION_INITIAL);
   const debouncedSearch = useDebouncedValue(search, 400);
+  const debouncedWorkSearch = useDebouncedValue(transferWorkSearch, 400);
+  const debouncedItemSearch = useDebouncedValue(selectItemSearch, 400);
+  const debouncedAddPositionSearch = useDebouncedValue(addPositionSearch, 300);
 
   const totalPages = useMemo(
     () => getPageCount(transfersTotalCount, DEFAULT_PAGE_SIZE),
@@ -99,6 +120,50 @@ export default function BuildingStockDetail() {
     if (!warehouseId) return;
     dispatch(fetchBuildingWarehouseById(warehouseId));
   }, [dispatch, warehouseId]);
+
+  // Загрузка процессов работ для выбранного ЖК (через склад)
+  useEffect(() => {
+    if (!transferToWorkModalOpen) return;
+    const rcId =
+      warehouse?.residential_complex ||
+      warehouse?.residential_complex_id ||
+      null;
+    if (!rcId) return;
+    const loadWorkEntries = async () => {
+      setTransferWorkLoading(true);
+      setTransferWorkError(null);
+      try {
+        const { data } = await api.get("/building/work-entries/", {
+          params: {
+            residential_complex: rcId,
+            search: debouncedWorkSearch || undefined,
+            page_size: 20,
+          },
+        });
+        const list = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data)
+          ? data
+          : [];
+        setTransferWorkOptions(
+          list.filter(
+            (e) =>
+              e.work_status !== "cancelled" && e.work_status !== "completed",
+          ),
+        );
+      } catch (err) {
+        setTransferWorkError(
+          validateResErrors(
+            err,
+            "Не удалось загрузить процессы работ для выбора",
+          ),
+        );
+      } finally {
+        setTransferWorkLoading(false);
+      }
+    };
+    loadWorkEntries();
+  }, [transferToWorkModalOpen, warehouse, debouncedWorkSearch]);
 
   useEffect(() => {
     if (!warehouseId) return;
@@ -418,6 +483,14 @@ export default function BuildingStockDetail() {
           <button
             type="button"
             className="building-btn"
+            onClick={() => setTransferToWorkModalOpen(true)}
+            disabled={!warehouseId}
+          >
+            Передать в процесс работ
+          </button>
+          <button
+            type="button"
+            className="building-btn"
             onClick={() => setTransfersModalOpen(true)}
           >
             Передачи
@@ -551,7 +624,7 @@ export default function BuildingStockDetail() {
             </div>
           )}
           {!requestsLoading && !requestsError && requests.length > 0 && (
-            <div className="building-table building-table--shadow">
+            <div className="building-table building-table--shadow building-table--small">
               <table>
                 <thead>
                   <tr>
@@ -630,6 +703,125 @@ export default function BuildingStockDetail() {
         </div>
       </Modal>
       <Modal
+        open={selectItemModalOpen}
+        onClose={() => {
+          setSelectItemModalOpen(false);
+          setSelectItemSearch("");
+        }}
+        title="Выбрать позицию склада"
+      >
+        <div className="building-page">
+          <div className="building-page__filters" style={{ marginBottom: 8 }}>
+            <input
+              className="building-page__input"
+              value={selectItemSearch}
+              onChange={(e) => setSelectItemSearch(e.target.value)}
+              placeholder="Поиск по названию товара"
+            />
+          </div>
+          {itemsLoading && (
+            <div className="building-page__muted">Загрузка остатков...</div>
+          )}
+          {itemsError && (
+            <div className="building-page__error">
+              {String(
+                validateResErrors(
+                  itemsError,
+                  "Не удалось загрузить остатки склада",
+                ),
+              )}
+            </div>
+          )}
+          {!itemsLoading && !itemsError && stockItems.length === 0 && (
+            <div className="building-page__muted">Нет позиций на складе.</div>
+          )}
+          {!itemsLoading && !itemsError && stockItems.length > 0 && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                gap: 14,
+                maxHeight: 380,
+                overflowY: "auto",
+              }}
+            >
+              {stockItems
+                .filter((item) => {
+                  const q = debouncedItemSearch
+                    .toLowerCase()
+                    .trim();
+                  if (!q) return true;
+                  const hay = `${item?.name || ""} ${
+                    item?.warehouse_name || ""
+                  }`
+                    .toLowerCase()
+                    .trim();
+                  return hay.includes(q);
+                })
+                .map((item) => {
+                  const iid =
+                    item?.id ?? item?.uuid ?? item?.stock_item ?? "";
+                  const name = item?.name || "Товар";
+                  const qty = item?.quantity || item?.qty || "0";
+                  const unit = item?.unit || "";
+                  return (
+                    <button
+                      key={iid}
+                      type="button"
+                      className="building-page__card"
+                      style={{
+                        textAlign: "left",
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid #e5e7eb",
+                        background: "#ffffff",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        setTransferItems((prev) => {
+                          const next = [...prev];
+                          const row = next[selectItemRowIndex] || {
+                            nomenclature: "",
+                            quantity: "",
+                            unit: "",
+                          };
+                          next[selectItemRowIndex] = {
+                            ...row,
+                            nomenclature: iid,
+                            unit: row.unit || unit,
+                          };
+                          return next;
+                        });
+                        setSelectItemModalOpen(false);
+                        setSelectItemSearch("");
+                      }}
+                    >
+                      <div
+                        className="building-page__value"
+                        style={{ marginBottom: 6, fontSize: 14 }}
+                      >
+                        {name}
+                      </div>
+                      <div
+                        className="building-page__label"
+                        style={{ fontSize: 12 }}
+                      >
+                        Остаток: {qty} {unit}
+                      </div>
+                      <div
+                        className="building-page__label"
+                        style={{ fontSize: 12 }}
+                      >
+                        Склад: {item?.warehouse_name || "—"}
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      </Modal>
+      <Modal
         open={transfersModalOpen}
         onClose={() => setTransfersModalOpen(false)}
         title="Передачи на склад"
@@ -696,7 +888,7 @@ export default function BuildingStockDetail() {
 
           {!loading && transfers.length > 0 && (
             <>
-              <div className="building-table building-table--shadow">
+              <div className="building-table building-table--shadow building-table--small">
                 <table>
                   <thead>
                     <tr>
@@ -778,6 +970,480 @@ export default function BuildingStockDetail() {
           )}
         </div>
       </Modal>
+
+      <Modal
+        open={transferToWorkModalOpen}
+        onClose={() => {
+          if (transferSubmitting) return;
+          setTransferToWorkModalOpen(false);
+          setTransferError(null);
+          setTransferWorkEntryId("");
+          setTransferWorkSearch("");
+          setTransferItems([]);
+          setTransferComment("");
+          setAddPositionModalOpen(false);
+          setAddPositionSearch("");
+          setTransferWorkPickerOpen(false);
+        }}
+        title="Передача материалов в процесс работ"
+      >
+        <form
+          className="building-page"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!warehouseId) return;
+            const workEntry = transferWorkEntryId.trim();
+            if (!workEntry) {
+              setTransferError("Выберите процесс работ");
+              return;
+            }
+            const balanceErrors = transferItems
+              .map((row, i) => {
+                const q = parseFloat(String(row.quantity).replace(",", "."));
+                const maxQ = Number(row.balance);
+                if (Number.isNaN(q) || q <= 0)
+                  return `Укажите количество для позиции «${row.name || row.nomenclature}»`;
+                if (!Number.isFinite(maxQ) || q > maxQ)
+                  return `Количество не может превышать остаток на складе (${maxQ}) для «${row.name || row.nomenclature}»`;
+                return null;
+              })
+              .filter(Boolean);
+            if (balanceErrors.length > 0) {
+              setTransferError(balanceErrors[0]);
+              return;
+            }
+            const items = transferItems
+              .map((row) => ({
+                nomenclature: String(row.nomenclature).trim(),
+                quantity: String(row.quantity).trim(),
+                unit: String(row.unit || "").trim(),
+              }))
+              .filter((row) => row.nomenclature && row.quantity);
+            if (items.length === 0) {
+              setTransferError("Добавьте хотя бы одну позицию и укажите количество.");
+              return;
+            }
+            setTransferSubmitting(true);
+            setTransferError(null);
+            try {
+              await api.post(
+                "/building/warehouse-movements/transfer-to-work-entry/",
+                {
+                  work_entry: workEntry,
+                  warehouse: warehouseId,
+                  items,
+                  comment: transferComment.trim() || undefined,
+                },
+              );
+              alert("Материалы переданы в процесс работ");
+              setTransferToWorkModalOpen(false);
+              setTransferWorkEntryId("");
+              setTransferWorkSearch("");
+              setTransferItems([]);
+              setTransferComment("");
+              setAddPositionModalOpen(false);
+              setAddPositionSearch("");
+              reloadBalances();
+              reloadMoves();
+            } catch (err) {
+              setTransferError(
+                validateResErrors(
+                  err,
+                  "Не удалось создать передачу в процесс работ",
+                ),
+              );
+            } finally {
+              setTransferSubmitting(false);
+            }
+          }}
+        >
+          <div className="building-page__filters" style={{ marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <label className="building-page__label">Процесс работ</label>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <div
+                  className="building-page__input"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    background: "#fff",
+                    cursor: "default",
+                    minHeight: 40,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {transferWorkOptions.find(
+                    (e) => (e?.uuid ?? e?.id) === transferWorkEntryId,
+                  )?.title ||
+                    transferWorkOptions.find(
+                      (e) => (e?.uuid ?? e?.id) === transferWorkEntryId,
+                    )?.description ||
+                    transferWorkEntryId ||
+                    "Выберите процесс работ"}
+                </div>
+                <button
+                  type="button"
+                  className="building-btn building-btn--primary"
+                  onClick={() => setTransferWorkPickerOpen(true)}
+                >
+                  Выбрать
+                </button>
+              </div>
+              {transferWorkLoading && (
+                <div className="building-page__muted" style={{ marginTop: 4 }}>
+                  Загрузка...
+                </div>
+              )}
+              {transferWorkError && (
+                <div className="building-page__error" style={{ marginTop: 4 }}>
+                  {String(transferWorkError)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div
+            className="building-page__filters"
+            style={{ flexDirection: "column", gap: 12 }}
+          >
+            <div className="building-page__label">Позиции</div>
+            {transferItems.map((row, index) => {
+              const maxQty = Number(row.balance);
+              const isOver = (() => {
+                const q = parseFloat(String(row.quantity).replace(",", "."));
+                return !Number.isNaN(q) && Number.isFinite(maxQty) && q > maxQty;
+              })();
+              return (
+                <div
+                  key={index}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    padding: "10px 12px",
+                    border: "1px solid rgba(11, 35, 68, 0.12)",
+                    borderRadius: 8,
+                    background: "rgba(11, 35, 68, 0.02)",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <label className="building-page__muted" style={{ fontSize: 12, marginBottom: 4, display: "block" }}>
+                        Наименование
+                      </label>
+                      <div style={{ fontSize: 13, color: "#0b2344" }}>
+                        {row.name || row.nomenclature || "—"}
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      <label className="building-page__muted" style={{ fontSize: 12, marginBottom: 4, display: "block" }}>
+                        Ед.
+                      </label>
+                      <div style={{ fontSize: 13, color: "#0b2344" }}>
+                        {row.unit || "—"}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <label className="building-page__muted" style={{ fontSize: 12, marginBottom: 4, display: "block" }}>
+                        Количество {Number.isFinite(maxQty) ? `(макс. ${maxQty})` : ""}
+                      </label>
+                      <input
+                        className="building-page__input"
+                        type="number"
+                        min={0}
+                        max={Number.isFinite(maxQty) ? maxQty : undefined}
+                        step="any"
+                        value={row.quantity}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setTransferItems((prev) => {
+                            const next = [...prev];
+                            next[index] = { ...next[index], quantity: val };
+                            return next;
+                          });
+                        }}
+                        placeholder="0"
+                        style={{
+                          width: "100%",
+                          boxSizing: "border-box",
+                          textAlign: "right",
+                          fontSize: 13,
+                          ...(isOver ? { borderColor: "var(--danger, #c00)", color: "var(--danger, #c00)" } : {}),
+                        }}
+                      />
+                      {isOver && (
+                        <div className="building-page__error" style={{ fontSize: 12, marginTop: 4 }}>
+                          Больше остатка на складе ({maxQty})
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="building-btn"
+                      onClick={() => {
+                        setTransferItems((prev) => prev.filter((_, i) => i !== index));
+                      }}
+                      title="Удалить"
+                      style={{
+                        padding: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--danger, #c00)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              className="building-btn"
+              style={{ marginTop: 4, alignSelf: "flex-start" }}
+              onClick={() => setAddPositionModalOpen(true)}
+            >
+              Добавить позицию
+            </button>
+          </div>
+
+          <div className="building-page__filters" style={{ marginTop: 12 }}>
+            <div style={{ width: "100%" }}>
+              <label className="building-page__label">Комментарий</label>
+              <textarea
+                className="building-page__textarea"
+                rows={3}
+                value={transferComment}
+                onChange={(e) => setTransferComment(e.target.value)}
+                placeholder="Необязательно"
+              />
+            </div>
+          </div>
+
+          {transferError && (
+            <div className="building-page__error" style={{ marginTop: 8 }}>
+              {String(transferError)}
+            </div>
+          )}
+
+          <div className="building-page__actions" style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              className="building-btn"
+              onClick={() => {
+                if (transferSubmitting) return;
+                setTransferToWorkModalOpen(false);
+                setTransferError(null);
+                setTransferWorkEntryId("");
+                setTransferWorkSearch("");
+                setTransferItems([]);
+                setTransferComment("");
+                setAddPositionModalOpen(false);
+                setAddPositionSearch("");
+              }}
+              disabled={transferSubmitting}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="building-btn building-btn--primary"
+              disabled={transferSubmitting}
+            >
+              {transferSubmitting ? "Создание..." : "Создать передачу"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={transferWorkPickerOpen}
+        onClose={() => setTransferWorkPickerOpen(false)}
+        title="Выбрать процесс работ"
+      >
+        <div className="building-page">
+          <div className="building-page__filters" style={{ marginBottom: 8 }}>
+            <input
+              className="building-page__input"
+              value={transferWorkSearch}
+              onChange={(e) => setTransferWorkSearch(e.target.value)}
+              placeholder="Поиск по процессам работ..."
+            />
+          </div>
+          {transferWorkLoading && (
+            <div className="building-page__muted">Загрузка...</div>
+          )}
+          {transferWorkError && (
+            <div className="building-page__error">
+              {String(transferWorkError)}
+            </div>
+          )}
+          {!transferWorkLoading && !transferWorkError && transferWorkOptions.length === 0 && (
+            <div className="building-page__muted">
+              Процессы работ не найдены. Введите другой поиск.
+            </div>
+          )}
+          {!transferWorkLoading && !transferWorkError && transferWorkOptions.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                maxHeight: 360,
+                overflowY: "auto",
+              }}
+            >
+              {transferWorkOptions.map((entry) => {
+                const uid = entry?.uuid ?? entry?.id ?? "";
+                const label =
+                  entry?.title ||
+                  entry?.description ||
+                  uid ||
+                  "Без названия";
+                return (
+                  <button
+                    key={uid}
+                    type="button"
+                    className="building-page__card"
+                    style={{
+                      textAlign: "left",
+                      padding: 12,
+                      borderRadius: 12,
+                      border: "1px solid #e5e7eb",
+                      background: transferWorkEntryId === uid ? "rgba(11, 35, 68, 0.06)" : "#ffffff",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      setTransferWorkEntryId(uid);
+                      setTransferWorkPickerOpen(false);
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>
+                      {label}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={addPositionModalOpen}
+        onClose={() => {
+          setAddPositionModalOpen(false);
+          setAddPositionSearch("");
+        }}
+        title="Выбрать позицию со склада"
+      >
+        <div className="building-page">
+          <div className="building-page__filters" style={{ marginBottom: 8 }}>
+            <input
+              className="building-page__input"
+              value={addPositionSearch}
+              onChange={(e) => setAddPositionSearch(e.target.value)}
+              placeholder="Поиск по названию"
+            />
+          </div>
+          {itemsLoading && (
+            <div className="building-page__muted">Загрузка остатков...</div>
+          )}
+          {itemsError && (
+            <div className="building-page__error">
+              {String(validateResErrors(itemsError, "Не удалось загрузить остатки склада"))}
+            </div>
+          )}
+          {!itemsLoading && !itemsError && stockItems.length === 0 && (
+            <div className="building-page__muted">Нет позиций на складе.</div>
+          )}
+          {!itemsLoading && !itemsError && stockItems.length > 0 && (() => {
+            const addedIds = new Set(
+              transferItems.map((r) => String(r.nomenclature).trim()).filter(Boolean),
+            );
+            const filtered = stockItems
+              .filter((item) => {
+                const q = debouncedAddPositionSearch.toLowerCase().trim();
+                if (q) {
+                  const hay = `${item?.name || ""} ${item?.warehouse_name || ""}`.toLowerCase();
+                  if (!hay.includes(q)) return false;
+                }
+                const iid = item?.id ?? item?.uuid ?? item?.stock_item ?? "";
+                return !addedIds.has(String(iid));
+              })
+              .map((item) => {
+                const iid = item?.id ?? item?.uuid ?? item?.stock_item ?? "";
+                const name = item?.name || "Товар";
+                const qty = Number(item?.quantity ?? item?.qty ?? 0);
+                const unit = item?.unit || "";
+                return { iid, name, qty, unit, item };
+              });
+            if (filtered.length === 0) {
+              return (
+                <div className="building-page__muted">
+                  {addedIds.size > 0 && !debouncedAddPositionSearch
+                    ? "Все позиции уже добавлены. Укажите поиск или удалите позицию из списка."
+                    : "Нет подходящих позиций."}
+                </div>
+              );
+            }
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  maxHeight: 360,
+                  overflowY: "auto",
+                }}
+              >
+                {filtered.map(({ iid, name, qty, unit }) => (
+                  <button
+                    key={iid}
+                    type="button"
+                    className="building-page__card"
+                    style={{
+                      textAlign: "left",
+                      padding: 12,
+                      borderRadius: 12,
+                      border: "1px solid #e5e7eb",
+                      background: "#ffffff",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      setTransferItems((prev) => [
+                        ...prev,
+                        {
+                          nomenclature: iid,
+                          name,
+                          quantity: "",
+                          unit,
+                          balance: qty,
+                        },
+                      ]);
+                      setAddPositionModalOpen(false);
+                      setAddPositionSearch("");
+                    }}
+                  >
+                    <div style={{ marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+                      {name}
+                    </div>
+                    <div className="building-page__muted" style={{ fontSize: 12 }}>
+                      Остаток: {qty} {unit}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      </Modal>
+
       {mainTab === "balances" && (
         <StockBalancesTab
           items={stockItems}

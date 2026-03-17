@@ -1,6 +1,22 @@
 @import "../../../../assets/scss/variables";
 @import "../CashRegister/CashRegister.scss";
 
+/* Горизонтальный скролл таблицы договоров */
+.building-page--treaties .warehouse-table-container {
+  overflow: visible;
+}
+
+.building-treaty-table-scroll {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.building-treaty-table {
+  min-width: 900px;
+  width: 100%;
+}
+
 .building-treaty {
   padding: 16px 0 24px;
 

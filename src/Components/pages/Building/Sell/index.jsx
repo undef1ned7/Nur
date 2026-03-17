@@ -92,12 +92,66 @@ export default function BuildingSell() {
   const [treatyClient, setTreatyClient] = useState("");
   const [treatyAmount, setTreatyAmount] = useState("");
   const [treatyDownPayment, setTreatyDownPayment] = useState("");
+  const [treatyDownPaymentPercent, setTreatyDownPaymentPercent] = useState("");
   const [firstInstallmentDate, setFirstInstallmentDate] = useState("");
   const [installmentMonths, setInstallmentMonths] = useState(12);
   const [installments, setInstallments] = useState([]);
+  // { [order:number]: true } — строки, где сумму меняли вручную, не перераспределяем
+  const [installmentManual, setInstallmentManual] = useState({});
   const [treatyFiles, setTreatyFiles] = useState([]);
   const [treatyError, setTreatyError] = useState(null);
   const [creatingTreaty, setCreatingTreaty] = useState(false);
+
+  const getInstallmentTotalCents = () => {
+    const amountTotal = Number(treatyAmount || 0);
+    const down = Number(treatyDownPayment || 0);
+    if (!Number.isFinite(amountTotal) || !Number.isFinite(down)) return null;
+    const remain = amountTotal - down;
+    const cents = Math.round(remain * 100);
+    return cents > 0 ? cents : null;
+  };
+
+  const redistributeInstallments = (rows, manualMap, totalCents) => {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!totalCents || totalCents <= 0 || list.length === 0) return list;
+
+    const isManual = (order) => Boolean(manualMap?.[String(order)]);
+    let fixedCents = 0;
+    const auto = [];
+
+    list.forEach((r) => {
+      const order = r?.order;
+      if (order != null && isManual(order)) {
+        const v = Number(r?.amount || 0);
+        fixedCents += Math.round((Number.isFinite(v) ? v : 0) * 100);
+      } else {
+        auto.push(r);
+      }
+    });
+
+    if (auto.length === 0) return list;
+
+    const remainingForAuto = totalCents - fixedCents;
+    const safeRemain = remainingForAuto > 0 ? remainingForAuto : 0;
+    const baseCents = Math.floor(safeRemain / auto.length);
+    let used = 0;
+    const lastAutoIdx = auto.length - 1;
+
+    const autoCentsByOrder = {};
+    auto.forEach((r, idx) => {
+      const isLast = idx === lastAutoIdx;
+      const cents = isLast ? safeRemain - used : baseCents;
+      used += cents;
+      autoCentsByOrder[String(r?.order)] = cents;
+    });
+
+    return list.map((r) => {
+      const order = r?.order;
+      if (order == null || isManual(order)) return r;
+      const cents = autoCentsByOrder[String(order)] ?? 0;
+      return { ...r, amount: (cents / 100).toFixed(2) };
+    });
+  };
 
   useEffect(() => {
     dispatch(fetchBuildingClients());
@@ -120,6 +174,7 @@ export default function BuildingSell() {
   useEffect(() => {
     if (treatyPaymentType !== "installment") {
       setInstallments([]);
+      setInstallmentManual({});
       return;
     }
     const amountTotal = Number(treatyAmount || 0);
@@ -130,12 +185,14 @@ export default function BuildingSell() {
     );
     if (!firstInstallmentDate || !amountTotal || down >= amountTotal) {
       setInstallments([]);
+      setInstallmentManual({});
       return;
     }
     const remain = amountTotal - down;
     const totalCents = Math.round(remain * 100);
     if (totalCents <= 0) {
       setInstallments([]);
+      setInstallmentManual({});
       return;
     }
     const baseCents = Math.floor(totalCents / n);
@@ -144,6 +201,7 @@ export default function BuildingSell() {
     const start = new Date(firstInstallmentDate);
     if (Number.isNaN(start.getTime())) {
       setInstallments([]);
+      setInstallmentManual({});
       return;
     }
     for (let i = 0; i < n; i += 1) {
@@ -163,6 +221,7 @@ export default function BuildingSell() {
       });
     }
     setInstallments(rows);
+    setInstallmentManual({});
   }, [
     treatyPaymentType,
     treatyAmount,
@@ -346,6 +405,7 @@ export default function BuildingSell() {
     setTreatyClient("");
     setTreatyAmount(apt?.price ? String(apt.price) : "");
     setTreatyDownPayment("");
+    setTreatyDownPaymentPercent("");
     setFirstInstallmentDate("");
     setInstallmentMonths(12);
     setInstallments([]);
@@ -353,6 +413,25 @@ export default function BuildingSell() {
     setTreatyError(null);
     setTreatyModalOpen(true);
   };
+
+  useEffect(() => {
+    if (treatyPaymentType !== "installment") {
+      setTreatyDownPaymentPercent("");
+      return;
+    }
+    const total = Number(treatyAmount || 0);
+    const down = Number(treatyDownPayment || 0);
+    if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(down) || down < 0) {
+      setTreatyDownPaymentPercent("");
+      return;
+    }
+    const pct = (down / total) * 100;
+    if (!Number.isFinite(pct)) {
+      setTreatyDownPaymentPercent("");
+      return;
+    }
+    setTreatyDownPaymentPercent(pct.toFixed(2));
+  }, [treatyPaymentType, treatyAmount, treatyDownPayment]);
 
   const handleCreateTreaty = async (e) => {
     e.preventDefault();
@@ -482,6 +561,20 @@ export default function BuildingSell() {
     } finally {
       setCreatingTreaty(false);
     }
+  };
+
+  const handleInstallmentAmountChange = (order) => (e) => {
+    const value = e.target.value;
+    const totalCents = getInstallmentTotalCents();
+    setInstallmentManual((prev) => ({ ...(prev || {}), [String(order)]: true }));
+    setInstallments((prev) => {
+      const next = (prev || []).map((row) =>
+        row?.order === order ? { ...row, amount: value } : row,
+      );
+      if (!totalCents) return next;
+      const manualMap = { ...(installmentManual || {}), [String(order)]: true };
+      return redistributeInstallments(next, manualMap, totalCents);
+    });
   };
 
   return (
@@ -1001,15 +1094,38 @@ export default function BuildingSell() {
                   <div className="sell-form__label">
                     Первоначальный взнос
                   </div>
-                  <input
-                    className="building-page__input"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={treatyDownPayment}
-                    onChange={(e) => setTreatyDownPayment(e.target.value)}
-                    placeholder="Например: 30000.00"
-                  />
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <input
+                      className="building-page__input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={treatyDownPayment}
+                      onChange={(e) => setTreatyDownPayment(e.target.value)}
+                      placeholder="Сумма, например: 30000.00"
+                      style={{ flex: "1 1 220px" }}
+                    />
+                    <input
+                      className="building-page__input"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={treatyDownPaymentPercent}
+                      onChange={(e) => {
+                        const vRaw = e.target.value;
+                        setTreatyDownPaymentPercent(vRaw);
+                        const pct = Number(vRaw || 0);
+                        const total = Number(treatyAmount || 0);
+                        if (!Number.isFinite(pct) || !Number.isFinite(total) || total <= 0) return;
+                        const nextDown = (total * pct) / 100;
+                        setTreatyDownPayment(nextDown.toFixed(2));
+                      }}
+                      placeholder="%"
+                      style={{ width: 140 }}
+                      title="Процент от суммы договора"
+                    />
+                  </div>
                 </label>
                 <div
                   style={{
@@ -1070,7 +1186,16 @@ export default function BuildingSell() {
                           <tr key={row.order}>
                             <td>{row.order}</td>
                             <td>{row.due_date}</td>
-                            <td>{row.amount}</td>
+                            <td>
+                              <input
+                                className="building-page__input"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={row.amount}
+                                onChange={handleInstallmentAmountChange(row.order)}
+                              />
+                            </td>
                           </tr>
                         ))}
                       </tbody>

@@ -15,11 +15,12 @@ import {
   updateBuildingWorkEntry,
   deleteBuildingWorkEntry,
 } from "@/store/creators/building/workEntriesCreators";
-import { fetchBuildingContractors } from "@/store/creators/building/contractorsCreators";
-import { fetchBuildingClients } from "@/store/creators/building/clientsCreators";
+import {
+  fetchBuildingContractors,
+  createBuildingContractor,
+} from "@/store/creators/building/contractorsCreators";
 import { fetchBuildingTreaties } from "@/store/creators/building/treatiesCreators";
 import { useBuildingContractors } from "@/store/slices/building/contractorsSlice";
-import { useBuildingClients } from "@/store/slices/building/clientsSlice";
 import { useBuildingTreaties } from "@/store/slices/building/treatiesSlice";
 import { getPageCount, DEFAULT_PAGE_SIZE } from "../shared/api";
 import BuildingPagination from "../shared/Pagination";
@@ -53,8 +54,6 @@ const FORM_INITIAL = {
   contract_amount: "",
   contract_term_start: "",
   contract_term_end: "",
-  work_status: "planned",
-  client: "",
   treaty: "",
   category: "note",
   title: "",
@@ -88,13 +87,21 @@ export default function BuildingWorkProcess() {
   const debouncedSearch = useDebouncedValue(search, 400);
 
   const { list: contractorsList } = useBuildingContractors();
-  const { list: clientsList } = useBuildingClients();
   const { list: treatiesList } = useBuildingTreaties();
 
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(FORM_INITIAL);
   const [formError, setFormError] = useState(null);
+
+  const [openAddContractorModal, setOpenAddContractorModal] = useState(false);
+  const [addContractorForm, setAddContractorForm] = useState({
+    company_name: "",
+    contact_person: "",
+    phone: "",
+  });
+  const [addContractorError, setAddContractorError] = useState(null);
+  const [addContractorSubmitting, setAddContractorSubmitting] = useState(false);
 
   const [viewMode, setViewMode] = useState(() => {
     if (typeof window === "undefined") return VIEW_MODES.TABLE;
@@ -125,7 +132,6 @@ export default function BuildingWorkProcess() {
   useEffect(() => {
     if (!selectedProjectId) return;
     dispatch(fetchBuildingContractors({ residential_complex: selectedProjectId }));
-    dispatch(fetchBuildingClients({ residential_complex: selectedProjectId }));
     dispatch(fetchBuildingTreaties({ residential_complex: selectedProjectId }));
   }, [dispatch, selectedProjectId]);
 
@@ -153,6 +159,14 @@ export default function BuildingWorkProcess() {
     const id = currentEntry?.id ?? currentEntry?.uuid;
     if (String(id) !== String(editIdFromUrl)) return;
     const entry = currentEntry;
+    if (entry?.work_status !== "planned") {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        return next;
+      });
+      return;
+    }
     setEditing(entry);
     const rcId = entry?.residential_complex ?? entry?.residential_complex_id ?? selectedProjectId ?? "";
     setForm({
@@ -165,8 +179,6 @@ export default function BuildingWorkProcess() {
       contract_term_end: entry?.contract_term_end
         ? String(entry.contract_term_end).slice(0, 10)
         : "",
-      work_status: entry?.work_status || "planned",
-      client: entry?.client ?? entry?.client_id ?? "",
       treaty: entry?.treaty ?? entry?.treaty_id ?? "",
       category: entry?.category || "note",
       title: entry?.title || "",
@@ -193,7 +205,6 @@ export default function BuildingWorkProcess() {
     setForm({
       ...FORM_INITIAL,
       residential_complex: selectedProjectId,
-      work_status: "planned",
     });
     setFormError(null);
     setOpenModal(true);
@@ -212,8 +223,6 @@ export default function BuildingWorkProcess() {
       contract_term_end: entry?.contract_term_end
         ? String(entry.contract_term_end).slice(0, 10)
         : "",
-      work_status: entry?.work_status || "planned",
-      client: entry?.client ?? entry?.client_id ?? "",
       treaty: entry?.treaty ?? entry?.treaty_id ?? "",
       category: entry?.category || "note",
       title: entry?.title || "",
@@ -238,6 +247,63 @@ export default function BuildingWorkProcess() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleAddContractorFieldChange = (field) => (e) => {
+    setAddContractorForm((prev) => ({ ...prev, [field]: e.target.value }));
+    setAddContractorError(null);
+  };
+
+  const handleAddContractorSubmit = async (e) => {
+    e.preventDefault();
+    setAddContractorError(null);
+    const name = String(addContractorForm.company_name || "").trim();
+    if (!name) {
+      setAddContractorError("Название организации обязательно");
+      return;
+    }
+    try {
+      setAddContractorSubmitting(true);
+      const res = await dispatch(
+        createBuildingContractor({
+          company_name: name,
+          contact_person: addContractorForm.contact_person?.trim() || "",
+          phone: addContractorForm.phone?.trim() || "",
+          status: "active",
+        })
+      );
+      if (res.meta.requestStatus === "fulfilled" && res.payload) {
+        const newId = res.payload?.id ?? res.payload?.uuid;
+        if (newId) {
+          setForm((prev) => ({ ...prev, contractor: String(newId) }));
+          dispatch(fetchBuildingContractors());
+        }
+        setOpenAddContractorModal(false);
+        setAddContractorForm({ company_name: "", contact_person: "", phone: "" });
+        alert("Подрядчик добавлен");
+      } else {
+        setAddContractorError(
+          validateResErrors(
+            res.payload || res.error,
+            "Не удалось создать подрядчика"
+          )
+        );
+      }
+    } catch (err) {
+      setAddContractorError(
+        validateResErrors(err, "Не удалось создать подрядчика")
+      );
+    } finally {
+      setAddContractorSubmitting(false);
+    }
+  };
+
+  const closeAddContractorModal = () => {
+    if (!addContractorSubmitting) {
+      setOpenAddContractorModal(false);
+      setAddContractorForm({ company_name: "", contact_person: "", phone: "" });
+      setAddContractorError(null);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProjectId) {
@@ -258,8 +324,8 @@ export default function BuildingWorkProcess() {
           : null,
       contract_term_start: form.contract_term_start || null,
       contract_term_end: form.contract_term_end || null,
-      work_status: form.work_status || "planned",
-      client: form.client || null,
+      work_status: editing ? (editing?.work_status || "planned") : "planned",
+      client: null,
       treaty: form.treaty || null,
       category: form.category || "note",
       title: String(form.title || "").trim(),
@@ -535,7 +601,7 @@ export default function BuildingWorkProcess() {
                                 onClick: () =>
                                   navigate(`/crm/building/work/${id}`),
                               },
-                              {
+                              entry?.work_status === "planned" && {
                                 label: "Изменить",
                                 onClick: () => openEdit(entry),
                                 disabled: busy,
@@ -546,7 +612,7 @@ export default function BuildingWorkProcess() {
                                 disabled: busy,
                                 danger: true,
                               },
-                            ]}
+                            ].filter(Boolean)}
                           />
                         </td>
                       </tr>
@@ -616,17 +682,19 @@ export default function BuildingWorkProcess() {
                         </div>
                       </div>
                       <div className="flex gap-2 mt-2">
-                        <button
-                          type="button"
-                          className="px-3 py-2 flex-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-                          disabled={busy}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEdit(entry);
-                          }}
-                        >
-                          Изменить
-                        </button>
+                        {entry?.work_status === "planned" && (
+                          <button
+                            type="button"
+                            className="px-3 py-2 flex-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                            disabled={busy}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(entry);
+                            }}
+                          >
+                            Изменить
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="px-3 py-2 flex-1 rounded-lg bg-red-500 text-xs font-semibold text-white hover:bg-red-600"
@@ -695,39 +763,32 @@ export default function BuildingWorkProcess() {
           </div>
           <div className="add-product-page__form-group">
             <label className="add-product-page__label">Подрядчик</label>
-            <select
-              className="add-product-page__input"
-              value={form.contractor}
-              onChange={handleFormChange("contractor")}
-            >
-              <option value="">—</option>
-              {(Array.isArray(contractorsList) ? contractorsList : []).map((c) => {
-                const cid = c?.id ?? c?.uuid;
-                return (
-                  <option key={cid} value={cid}>
-                    {c?.company_name ?? c?.name ?? c?.title ?? cid}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-          <div className="add-product-page__form-group">
-            <label className="add-product-page__label">Клиент</label>
-            <select
-              className="add-product-page__input"
-              value={form.client}
-              onChange={handleFormChange("client")}
-            >
-              <option value="">—</option>
-              {(Array.isArray(clientsList) ? clientsList : []).map((c) => {
-                const cid = c?.id ?? c?.uuid;
-                return (
-                  <option key={cid} value={cid}>
-                    {c?.name ?? c?.title ?? cid}
-                  </option>
-                );
-              })}
-            </select>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <select
+                className="add-product-page__input"
+                value={form.contractor}
+                onChange={handleFormChange("contractor")}
+                style={{ flex: "1 1 200px", minWidth: 0 }}
+              >
+                <option value="">—</option>
+                {(Array.isArray(contractorsList) ? contractorsList : []).map((c) => {
+                  const cid = c?.id ?? c?.uuid;
+                  return (
+                    <option key={cid} value={cid}>
+                      {c?.company_name ?? c?.name ?? c?.title ?? cid}
+                    </option>
+                  );
+                })}
+              </select>
+              <button
+                type="button"
+                className="sell-header__btn sell-header__btn--secondary"
+                style={{ whiteSpace: "nowrap" }}
+                onClick={() => setOpenAddContractorModal(true)}
+              >
+                Добавить подрядчика
+              </button>
+            </div>
           </div>
           <div className="add-product-page__form-group">
             <label className="add-product-page__label">Договор</label>
@@ -745,20 +806,6 @@ export default function BuildingWorkProcess() {
                   </option>
                 );
               })}
-            </select>
-          </div>
-          <div className="add-product-page__form-group">
-            <label className="add-product-page__label">Статус работ</label>
-            <select
-              className="add-product-page__input"
-              value={form.work_status}
-              onChange={handleFormChange("work_status")}
-            >
-              {Object.entries(WORK_STATUS_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
             </select>
           </div>
           <div className="add-product-page__form-group">
@@ -855,6 +902,73 @@ export default function BuildingWorkProcess() {
               disabled={creating}
             >
               {creating ? "Сохранение..." : "Сохранить"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={openAddContractorModal}
+        onClose={closeAddContractorModal}
+        title="Добавить подрядчика"
+        wrapperId="work-add-contractor-modal"
+        closeOnOverlayClick={!addContractorSubmitting}
+      >
+        <form onSubmit={handleAddContractorSubmit} className="add-product-page__form">
+          <p style={{ marginBottom: 16, color: "var(--text-secondary, #666)" }}>
+            Укажите минимальные данные. Остальное можно заполнить в карточке подрядчика позже.
+          </p>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Название организации *</label>
+            <input
+              type="text"
+              className="add-product-page__input"
+              value={addContractorForm.company_name}
+              onChange={handleAddContractorFieldChange("company_name")}
+              placeholder="Например: ОсОО СтройГарант"
+              autoFocus
+            />
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Контактное лицо</label>
+            <input
+              type="text"
+              className="add-product-page__input"
+              value={addContractorForm.contact_person}
+              onChange={handleAddContractorFieldChange("contact_person")}
+              placeholder="ФИО"
+            />
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">Телефон</label>
+            <input
+              type="text"
+              className="add-product-page__input"
+              value={addContractorForm.phone}
+              onChange={handleAddContractorFieldChange("phone")}
+              placeholder="+996..."
+            />
+          </div>
+          {addContractorError && (
+            <div className="add-product-page__error" style={{ marginBottom: 12 }}>
+              {String(addContractorError)}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+            <button
+              type="button"
+              className="sell-header__btn sell-header__btn--secondary"
+              onClick={closeAddContractorModal}
+              disabled={addContractorSubmitting}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="add-product-page__submit-btn"
+              disabled={addContractorSubmitting}
+            >
+              {addContractorSubmitting ? "Создание..." : "Добавить"}
             </button>
           </div>
         </form>
