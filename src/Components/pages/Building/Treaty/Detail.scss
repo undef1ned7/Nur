@@ -1,4 +1,4 @@
-@import "../../../Deposits/Sklad/AddProductPage.scss";
+@use "../../../Deposits/Sklad/AddProductPage.scss" as *;
 
 .add-product-page--modal-form {
   min-height: auto;

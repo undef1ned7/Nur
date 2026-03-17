@@ -1,9 +1,9 @@
+@use "./shared/shared.scss" as *;
 
 .building-layout {
   border-top: 1px solid $building-primary;
   padding: 16px 0;
 }
-@import "./shared/shared.scss";
 
 
 .building-layout__gate {
