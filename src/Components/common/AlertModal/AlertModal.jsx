@@ -47,6 +47,7 @@ const AlertModal = ({
   if (!open) return null;
   const styles = TYPE_STYLES[type] || TYPE_STYLES.info;
   const handle = onConfirm || onClose;
+  const ALERT_Z_INDEX = 100000;
 
   return (
     <ReactPortal wrapperId="alert_modal">
@@ -54,7 +55,7 @@ const AlertModal = ({
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: 1000,
+          zIndex: ALERT_Z_INDEX,
           display: "flex",
           alignItems: "center",
         }}
@@ -74,13 +75,13 @@ const AlertModal = ({
             position: "relative",
             width: "min(420px, 92vw)",
             margin: "10vh auto 0",
-            maxHeight: '500px',
+            maxHeight: "500px",
             background: "#fff",
             borderRadius: 16,
             boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
             padding: 24,
-            overflowY: 'auto',
-            zIndex: 1001,
+            overflowY: "auto",
+            zIndex: ALERT_Z_INDEX + 1,
             textAlign: "center",
           }}
         >
@@ -111,7 +112,13 @@ const AlertModal = ({
             </h3>
           ) : null}
           <p
-            style={{ whiteSpace: 'pre-wrap',margin: 0, fontSize: 16, fontWeight: 600, color: "#111827" }}
+            style={{
+              whiteSpace: "pre-wrap",
+              margin: 0,
+              fontSize: 16,
+              fontWeight: 600,
+              color: "#111827",
+            }}
           >
             {message}
           </p>
@@ -137,7 +144,6 @@ const AlertModal = ({
         </div>
       </div>
     </ReactPortal>
-
   );
 };
 
