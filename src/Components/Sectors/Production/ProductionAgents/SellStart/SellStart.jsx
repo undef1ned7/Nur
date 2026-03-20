@@ -1,5 +1,5 @@
 // src/Components/Sectors/Production/ProductionAgents/UniversalModal/SellStart.jsx
-import { Minus, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import {
@@ -29,7 +29,15 @@ import {
 } from "../../../../../store/creators/clientCreators";
 import {
   createDeal,
+  addCustomItem,
+  deleteProductInCart,
+  getSale,
   getProductCheckout, // будем получать чек в JSON/PDF
+  manualFilling,
+  productCheckout,
+  startSale,
+  updateManualFilling,
+  updateProductInCart,
 } from "../../../../../store/creators/saleThunk";
 import { useAgent } from "../../../../../store/slices/agentSlice";
 import { useAgentCart } from "../../../../../store/slices/agentCartSlice";
@@ -38,6 +46,7 @@ import {
   getCashBoxes,
   useCash,
 } from "../../../../../store/slices/cashSlice";
+import { useSale } from "../../../../../store/slices/saleSlice";
 import { useClient } from "../../../../../store/slices/ClientSlice";
 import { useUser } from "../../../../../store/slices/userSlice";
 import UniversalModal from "../UniversalModal/UniversalModal";
@@ -46,12 +55,31 @@ import AlertModal from "../../../../common/AlertModal/AlertModal";
 import axios from "axios";
 import api from "../../../../../api";
 import { validateResErrors } from "../../../../../../tools/validateResErrors";
+import "../../../Market/CashierPage/CashierPage.scss";
+import "./SellStartCashier.scss";
 
 const cx = (...args) => args.filter(Boolean).join(" ");
 const toNum = (v) => {
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
+
+const formatSom = (value) =>
+  Number(value || 0).toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
+
+const paymentBanks = [
+  { id: "mbank", name: "МБанк" },
+  { id: "optima", name: "Оптима Банк" },
+  { id: "obank", name: "О-Банк" },
+  { id: "bakai", name: "Бакай Банк" },
+  { id: "demir", name: "Демир Банк" },
+  { id: "other", name: "Другой банк" },
+];
 
 /* ============================================================
    A) WebUSB + ESC/POS helpers (автоподключение, JSON и PDF)
@@ -517,16 +545,34 @@ async function printReceiptJSONViaUSB(payload) {
    B) Компонент SellStart
    ============================================================ */
 
-const SellStart = ({ show, setShow }) => {
+const normalizeCatalogProducts = (data) => {
+  const list = Array.isArray(data?.results)
+    ? data.results
+    : Array.isArray(data)
+      ? data
+      : [];
+
+  return list.map((item) => ({
+    ...item,
+    product: item.product ?? item.id,
+    product_name: item.product_name ?? item.name ?? item.title ?? "Без названия",
+  }));
+};
+
+const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   const { company } = useUser();
   const { list: cashBoxes } = useCash();
-  const { start, products } = useAgent();
+  const { start: agentStart, products } = useAgent();
+  const { start: marketStart } = useSale();
   const agentCart = useAgentCart();
   const { 0: agentListProducts, 1: setAgentListProducts } = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const { list: clients = [] } = useClient();
 
   // Определяем, какую корзину использовать
   const isPilorama = company.sector.name === "Пилорама";
+  const isMarketPosMode = useMainProductsList && !isPilorama;
+  const start = isMarketPosMode ? marketStart : agentStart;
   const [clientId, setClientId] = useState("");
   const [debtMonths, setDebtMonths] = useState("");
   const [form, setForm] = useState({
@@ -579,6 +625,12 @@ const SellStart = ({ show, setShow }) => {
     price: "",
     quantity: "1",
   });
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [receiptWithCheck, setReceiptWithCheck] = useState(true);
+  const [selectedBank, setSelectedBank] = useState("");
+  const [debtInitialPayment, setDebtInitialPayment] = useState("");
+  const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate());
 
   // Количество товаров для таблицы
   const [itemQuantities, setItemQuantities] = useState({});
@@ -620,6 +672,16 @@ const SellStart = ({ show, setShow }) => {
           discount_total: v,
         }),
       );
+    } else if (isMarketPosMode && selectedItem && start?.id) {
+      dispatch(
+        updateProductInCart({
+          id: start.id,
+          productId: selectedItem.product ?? selectedItem.product_id ?? selectedItem.id,
+          data: { discount_total: v },
+        }),
+      ).then(() => {
+        dispatch(getSale({ id: start.id }));
+      });
     } else {
       dispatch(
         manualFillingInAgent({
@@ -634,13 +696,38 @@ const SellStart = ({ show, setShow }) => {
 
   const onProductDiscountChange = (e) => debouncedDiscount(e.target.value);
 
+  const loadMainProducts = async (params = {}) => {
+    try {
+      const { data } = await api.get("/main/products/list/", { params });
+      setCatalogProducts(normalizeCatalogProducts(data));
+    } catch (e) {
+      const errorMessage = validateResErrors(
+        e,
+        "Ошибка при загрузке списка товаров",
+      );
+      setAlert({
+        open: true,
+        type: "error",
+        message: errorMessage,
+      });
+    }
+  };
+
   const debouncedSearch = useDebounce((v) => {
+    if (useMainProductsList && !isPilorama) {
+      loadMainProducts(v ? { search: v } : {});
+      return;
+    }
     dispatch(doSearchInAgent({ search: v }));
   }, 600);
 
   const onChange = (e) => debouncedSearch(e.target.value);
   const onDiscountChange = (e) => debouncedDiscount1(e.target.value);
   const debouncedDiscount1 = useDebounce((v) => {
+    if (isMarketPosMode) {
+      dispatch(startSale(Number(v) || 0));
+      return;
+    }
     dispatch(startSaleInAgent(v));
     dispatch(getAgentCart({ order_discount_total: v }));
   }, 600);
@@ -651,6 +738,12 @@ const SellStart = ({ show, setShow }) => {
         dispatch(
           getAgentCart({ agent: selectedAgent, order_discount_total: "0.00" }),
         );
+      }
+    } else if (isMarketPosMode) {
+      if (start?.id) {
+        dispatch(getSale({ id: start.id }));
+      } else {
+        dispatch(startSale());
       }
     } else {
       dispatch(startSaleInAgent());
@@ -738,6 +831,37 @@ const SellStart = ({ show, setShow }) => {
       });
       return;
     }
+    if (isMarketPosMode && start?.id) {
+      try {
+        await dispatch(
+          addCustomItem({
+            id: start.id,
+            name: customItem.name.trim(),
+            price: customItem.price.trim(),
+            quantity: Number(customItem.quantity) || 1,
+          }),
+        ).unwrap();
+        setCustomItem({ name: "", price: "", quantity: "1" });
+        setShowCustomItemModal(false);
+        onRefresh();
+        setAlert({
+          open: true,
+          type: "success",
+          message: "Кастомная позиция добавлена в корзину",
+        });
+      } catch (error) {
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при добавлении кастомной позиции",
+        );
+        setAlert({
+          open: true,
+          type: "error",
+          message: errorMessage,
+        });
+      }
+      return;
+    }
     if (!isPilorama || !agentCart.currentCart?.id) {
       setAlert({
         open: true,
@@ -781,10 +905,12 @@ const SellStart = ({ show, setShow }) => {
     dispatch(getCashBoxes());
     if (isPilorama) {
       setShowAgentModal(true);
+    } else if (useMainProductsList) {
+      loadMainProducts();
     } else {
       dispatch(doSearchInAgent());
     }
-  }, [dispatch, isPilorama]);
+  }, [dispatch, isPilorama, useMainProductsList]);
 
   // Автоматически выбираем первую кассу по индексу
   useEffect(() => {
@@ -868,6 +994,28 @@ const SellStart = ({ show, setShow }) => {
           message: errorMessage,
         });
       }
+    } else if (isMarketPosMode) {
+      if (!start?.id) return;
+      try {
+        await dispatch(
+          updateManualFilling({
+            id: start.id,
+            productId: item.product ?? item.product_id ?? item.id,
+            quantity: (Number(item.quantity) || 0) + 1,
+          }),
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при увеличении количества",
+        );
+        setAlert({
+          open: true,
+          type: "error",
+          message: errorMessage,
+        });
+      }
     } else {
       if (!start?.id) return;
       try {
@@ -921,6 +1069,39 @@ const SellStart = ({ show, setShow }) => {
           message: errorMessage,
         });
       }
+    } else if (isMarketPosMode) {
+      if (!start?.id) return;
+      const currentQty = Number(item.quantity) || 0;
+      const next = Math.max(0, currentQty - 1);
+      try {
+        if (next === 0) {
+          await dispatch(
+            deleteProductInCart({
+              id: start.id,
+              productId: item.product ?? item.product_id ?? item.id,
+            }),
+          ).unwrap();
+        } else {
+          await dispatch(
+            updateManualFilling({
+              id: start.id,
+              productId: item.product ?? item.product_id ?? item.id,
+              quantity: next,
+            }),
+          ).unwrap();
+        }
+        onRefresh();
+      } catch (error) {
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при уменьшении количества",
+        );
+        setAlert({
+          open: true,
+          type: "error",
+          message: errorMessage,
+        });
+      }
     } else {
       if (!start?.id) return;
       const currentQty = Number(item.quantity) || 0;
@@ -956,6 +1137,30 @@ const SellStart = ({ show, setShow }) => {
           removeItemFromAgentCart({
             cartId: agentCart.currentCart.id,
             itemId: item.id,
+          }),
+        ).unwrap();
+        onRefresh();
+        if (selectedId === item.id) {
+          setSelectedId(null);
+        }
+      } catch (error) {
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при удалении товара",
+        );
+        setAlert({
+          open: true,
+          type: "error",
+          message: errorMessage,
+        });
+      }
+    } else if (isMarketPosMode) {
+      if (!start?.id) return;
+      try {
+        await dispatch(
+          deleteProductInCart({
+            id: start.id,
+            productId: item.product ?? item.product_id ?? item.id,
           }),
         ).unwrap();
         onRefresh();
@@ -1034,6 +1239,43 @@ const SellStart = ({ show, setShow }) => {
           updateAgentCartItemQuantity({
             cartId: agentCart.currentCart.id,
             itemId: item.id,
+            quantity: qtyNum,
+          }),
+        ).unwrap();
+        onRefresh();
+      } catch (error) {
+        const errorMessage = validateResErrors(
+          error,
+          "Ошибка при обновлении количества",
+        );
+        setAlert({
+          open: true,
+          type: "error",
+          message: errorMessage,
+        });
+      }
+    } else if (isMarketPosMode) {
+      if (!start?.id) return;
+      const inputValue = itemQuantities[item.id] || "";
+      let qtyNum;
+      if (inputValue === "" || inputValue === "0") {
+        qtyNum = item.quantity || 0;
+      } else {
+        qtyNum = Math.max(0, toNum(inputValue));
+      }
+      setItemQuantities((prev) => ({
+        ...prev,
+        [item.id]: String(qtyNum),
+      }));
+      if (qtyNum === 0) {
+        await handleRemoveItem(item);
+        return;
+      }
+      try {
+        await dispatch(
+          updateManualFilling({
+            id: start.id,
+            productId: item.product ?? item.product_id ?? item.id,
             quantity: qtyNum,
           }),
         ).unwrap();
@@ -1170,7 +1412,11 @@ const SellStart = ({ show, setShow }) => {
     setErrors(validate(form));
   };
 
-  const filterData = isPilorama ? agentListProducts?.products : products;
+  const filterData = isPilorama
+    ? agentListProducts?.products
+    : useMainProductsList
+      ? catalogProducts
+      : products;
   const currentCart = isPilorama ? agentCart.currentCart : start;
   const currentItems = isPilorama ? agentCart.items : start?.items || [];
   const currentSubtotal = isPilorama ? agentCart.subtotal : start?.subtotal;
@@ -1200,7 +1446,7 @@ const SellStart = ({ show, setShow }) => {
       setAlert({
         open: true,
         type: "success",
-        message: "Клиент успешно удален!",
+        message: "Клиент успешно добавлен!",
       });
       dispatch(fetchClientsAsync());
       setShowNewClientModal(false);
@@ -1328,6 +1574,14 @@ const SellStart = ({ show, setShow }) => {
             agent: selectedAgent,
           }),
         );
+      } else if (isMarketPosMode) {
+        result = await run(
+          productCheckout({
+            id: start?.id,
+            bool: withReceipt,
+            clientId: clientId,
+          }),
+        );
       } else {
         result = await run(
           productCheckoutInAgent({
@@ -1359,9 +1613,9 @@ const SellStart = ({ show, setShow }) => {
       setShow(false);
 
       // Если надо печатать — получаем чек и шлём в принтер через WebUSB
-      if (withReceipt && result?.sale_id) {
+      if (withReceipt && (result?.sale_id || start?.id)) {
         try {
-          const resp = await run(getProductCheckout(result.sale_id));
+          const resp = await run(getProductCheckout(result?.sale_id || start?.id));
           await handleCheckoutResponseForPrinting(resp);
         } catch (e) {
           console.error("Печать чека не удалась:", e);
@@ -1390,6 +1644,783 @@ const SellStart = ({ show, setShow }) => {
       });
     }
   };
+
+  const handleMarketPosPayment = async () => {
+    if (!start?.id) return;
+    if (!cashData.cashbox) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Касса не выбрана. Создайте кассу в разделе «Кассы».",
+      });
+      return;
+    }
+    if (!currentItems?.length) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Добавьте товар для проведения операции",
+      });
+      return;
+    }
+
+    const totalNumber = Number(currentTotal || 0);
+    const initialPaymentNumber = Number(
+      String(debtInitialPayment || "0")
+        .replace(/\s/g, "")
+        .replace(/,/g, "."),
+    );
+
+    if (paymentMethod === "debt") {
+      if (!clientId) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Для оформления долга выберите клиента",
+        });
+        return;
+      }
+      if (!debtMonths || Number(debtMonths) <= 0) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Введите корректный срок долга",
+        });
+        return;
+      }
+      if (!firstPaymentDate) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Укажите дату первой оплаты",
+        });
+        return;
+      }
+      if (initialPaymentNumber < 0 || initialPaymentNumber > totalNumber) {
+        setAlert({
+          open: true,
+          type: "error",
+          message: "Первоначальная оплата указана неверно",
+        });
+        return;
+      }
+    }
+
+    if (paymentMethod === "cashless" && !selectedBank) {
+      setAlert({
+        open: true,
+        type: "error",
+        message: "Выберите банк для безналичной оплаты",
+      });
+      return;
+    }
+
+    try {
+      const supportedBanks = ["mbank", "optima", "obank", "bakai"];
+      const paymentMethodApi =
+        paymentMethod === "cash"
+          ? "cash"
+          : paymentMethod === "cashless"
+            ? supportedBanks.includes(selectedBank)
+              ? selectedBank
+              : "transfer"
+            : "debt";
+
+      const cashReceivedValue =
+        paymentMethod === "cash"
+          ? totalNumber
+          : paymentMethod === "debt"
+            ? totalNumber
+            : null;
+
+      const result = await run(
+        productCheckout({
+          id: start.id,
+          bool: receiptWithCheck,
+          clientId: clientId || null,
+          payment_method: paymentMethodApi,
+          cash_received: cashReceivedValue,
+        }),
+      );
+
+      if (paymentMethod === "debt" && clientId) {
+        const initialPaid = Math.max(0, initialPaymentNumber || 0);
+        const remainingDebt = Math.max(0, totalNumber - initialPaid);
+
+        try {
+          if (
+            company?.subscription_plan?.name === "Старт" &&
+            remainingDebt > 0
+          ) {
+            await api.post("/main/debts/", {
+              name: pickClient?.full_name || pickClient?.name || "Клиент",
+              phone: pickClient?.phone || "",
+              due_date: firstPaymentDate,
+              amount: remainingDebt.toFixed(2),
+            });
+          }
+
+          await dispatch(
+            createDeal({
+              clientId,
+              title: `${initialPaid > 0 ? "Предоплата" : "Долги"} ${pickClient?.full_name || "Клиент"}`,
+              statusRu: initialPaid > 0 ? "Предоплата" : "Долги",
+              amount: totalNumber,
+              prepayment: initialPaid > 0 ? initialPaid : undefined,
+              debtMonths: Number(debtMonths || 1),
+              first_due_date: firstPaymentDate,
+            }),
+          ).unwrap();
+        } catch (debtError) {
+          const errorMessage = validateResErrors(
+            debtError,
+            "Оплата оформлена, но долг зарегистрировать не удалось",
+          );
+          setAlert({
+            open: true,
+            type: "error",
+            message: errorMessage,
+          });
+        }
+      }
+
+      const cashFlowAmount =
+        paymentMethod === "debt"
+          ? Math.max(0, initialPaymentNumber || 0)
+          : totalNumber;
+
+      if (cashFlowAmount > 0) {
+        await run(
+          addCashFlows({
+            ...cashData,
+            cashbox: selectCashBox || cashData.cashbox,
+            type: "income",
+            name: cashData.name === "" ? "Продажа" : cashData.name,
+            amount: cashFlowAmount,
+            source_cashbox_flow_id: result?.sale_id || result?.id,
+            source_business_operation_id:
+              cashData.source_business_operation_id || "Продажа производство",
+            status:
+              company?.subscription_plan?.name === "Старт"
+                ? "approved"
+                : "pending",
+          }),
+        );
+      }
+
+      setShowPaymentModal(false);
+      setShow(false);
+
+      if (receiptWithCheck && (result?.sale_id || start?.id)) {
+        try {
+          const resp = await run(getProductCheckout(result?.sale_id || start?.id));
+          await handleCheckoutResponseForPrinting(resp);
+        } catch (e) {
+          console.error("Печать чека не удалась:", e);
+        }
+      }
+
+      setAlert({
+        open: true,
+        type: "success",
+        message: "Оплата успешно проведена",
+      });
+    } catch (e) {
+      setAlert({
+        open: true,
+        type: "error",
+        message:
+          e?.data?.detail || e?.message || "Не удалось провести оплату",
+      });
+    }
+  };
+
+  const openPaymentModal = () => {
+    setPaymentMethod("cash");
+    setReceiptWithCheck(true);
+    setSelectedBank("");
+    setDebtInitialPayment("");
+    setFirstPaymentDate(getTodayIsoDate());
+    setShowPaymentModal(true);
+  };
+
+  const handleCatalogProductAdd = async (product) => {
+    if (isPilorama) {
+      await dispatch(
+        addProductToAgentCart({
+          cartId: agentCart.currentCart?.id,
+          product_id: product.product,
+          quantity: 1,
+          agent: selectedAgent,
+        }),
+      ).unwrap();
+      onRefresh();
+      return;
+    }
+
+    if (isMarketPosMode) {
+      if (!start?.id) return;
+      const productId = product.product ?? product.id;
+      const existingItem = currentItems.find(
+        (item) =>
+          String(item.product ?? item.product_id ?? item.id) ===
+          String(productId),
+      );
+
+      if (existingItem) {
+        await dispatch(
+          updateManualFilling({
+            id: start.id,
+            productId,
+            quantity: (Number(existingItem.quantity) || 0) + 1,
+          }),
+        ).unwrap();
+      } else {
+        await dispatch(
+          manualFilling({
+            id: start.id,
+            productId,
+            quantity: 1,
+          }),
+        ).unwrap();
+      }
+      onRefresh();
+      return;
+    }
+
+    await dispatch(
+      manualFillingInAgent({
+        id: start.id,
+        productId: product.product,
+      }),
+    ).unwrap();
+    dispatch(startSaleInAgent());
+  };
+
+  const getCartQuantityByProduct = (productId) => {
+    const cartItem = currentItems.find(
+      (item) => String(item.product ?? item.id) === String(productId),
+    );
+    return Number(cartItem?.quantity || 0);
+  };
+
+  const selectedClientName =
+    filterClient.find((client) => String(client.id) === String(clientId))
+      ?.full_name || "Клиент не выбран";
+
+  if (useMainProductsList) {
+    return (
+      <div className="cashier-page sellstart-cashier">
+        <div className="cashier-page__header">
+          <div className="cashier-page__header-left">
+            <button
+              type="button"
+              className="cashier-page__back-btn"
+              onClick={() => setShow(false)}
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="cashier-page__title">Продажа</h1>
+              <p className="cashier-page__subtitle">
+                {selectedClientName} • Позиций: {currentItems.length}
+              </p>
+            </div>
+          </div>
+          <div className="cashier-page__header-right" />
+        </div>
+
+        <div className="cashier-page__content">
+          <div className="cashier-page__products">
+            <div className="cashier-page__search">
+              <Search size={20} />
+              <input
+                type="text"
+                placeholder="Поиск товаров..."
+                onChange={onChange}
+                className="cashier-page__search-input"
+              />
+            </div>
+
+            <div className="cashier-page__products-grid">
+              {filterData?.length ? (
+                filterData.map((product) => {
+                  const cartQty = getCartQuantityByProduct(product.product);
+                  return (
+                    <div
+                      key={product.product}
+                      className={`cashier-page__product-card ${
+                        cartQty > 0
+                          ? "cashier-page__product-card--selected"
+                          : ""
+                      }`}
+                      onClick={() => handleCatalogProductAdd(product)}
+                    >
+                      {cartQty > 0 && (
+                        <div className="cashier-page__product-badge">{cartQty}</div>
+                      )}
+                      <div className="cashier-page__product-name">
+                        {product.product_name || "—"}
+                      </div>
+                      <div className="cashier-page__product-price">
+                        {formatSom(product.price || product.unit_price)} сом
+                      </div>
+                      <div className="cashier-page__product-stock">
+                        Остаток:{" "}
+                        {product.quantity ??
+                          product.qty_on_hand ??
+                          product.stock ??
+                          0}{" "}
+                        {product.unit || "шт"}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="cashier-page__products-empty">
+                  Товары не найдены
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="cashier-page__cart">
+            <div className="cashier-page__cart-header">
+              <h2 className="cashier-page__cart-title">Корзина</h2>
+            </div>
+
+            <div className="cashier-page__cart-actions sellstart-cashier__cart-actions">
+              <input
+                type="text"
+                className="sellstart-cashier__discount-input"
+                placeholder="Общая скидка"
+                onChange={onDiscountChange}
+              />
+              {isPilorama && (
+                <button
+                  type="button"
+                  className="cashier-page__cart-action-btn"
+                  onClick={() => setShowCustomItemModal(true)}
+                >
+                  Кастомная позиция
+                </button>
+              )}
+            </div>
+
+            <div className="cashier-page__cart-items">
+              {currentItems.length === 0 ? (
+                <div className="cashier-page__cart-empty">
+                  Корзина пока пустая
+                </div>
+              ) : (
+                currentItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`cashier-page__cart-item ${
+                      selectedId === item.id
+                        ? "sellstart-cashier__cart-item--selected"
+                        : ""
+                    }`}
+                    onClick={() => handleRowClick(item)}
+                  >
+                    <div className="cashier-page__cart-item-main">
+                      <div className="cashier-page__cart-item-head">
+                        <div className="cashier-page__cart-item-name">
+                          {item.product_name ?? item.display_name}
+                        </div>
+                        <div className="cashier-page__cart-item-total">
+                          {formatSom(
+                            Number(item.unit_price || 0) *
+                              Number(item.quantity || 0),
+                          )}{" "}
+                          сом
+                        </div>
+                      </div>
+
+                      <div className="cashier-page__cart-item-row">
+                        <div className="cashier-page__cart-item-field">
+                          <span className="cashier-page__cart-item-field-label">
+                            Цена
+                          </span>
+                          <input
+                            className="cashier-page__cart-item-price-input"
+                            value={item.unit_price ?? ""}
+                            readOnly
+                          />
+                        </div>
+
+                        <div className="cashier-page__cart-item-field">
+                          <span className="cashier-page__cart-item-field-label">
+                            Количество
+                          </span>
+                          <div className="cashier-page__cart-item-controls">
+                            <button
+                              type="button"
+                              className="cashier-page__cart-item-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDecreaseQty(item);
+                              }}
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={itemQuantities[item.id] ?? item.quantity ?? ""}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleItemQtyChange(item, e.target.value);
+                              }}
+                              onBlur={(e) => {
+                                e.stopPropagation();
+                                handleItemQtyBlur(item);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="cashier-page__cart-item-quantity-input"
+                            />
+                            <button
+                              type="button"
+                              className="cashier-page__cart-item-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleIncreaseQty(item);
+                              }}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="cashier-page__cart-item-field sellstart-cashier__line-discount">
+                          <span className="cashier-page__cart-item-field-label">
+                            Скидка
+                          </span>
+                          <input
+                            type="text"
+                            className="cashier-page__cart-item-price-input"
+                            placeholder="0"
+                            defaultValue={item.discount_total ?? ""}
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={() => setSelectedId(item.id)}
+                            onChange={(e) => {
+                              setSelectedId(item.id);
+                              onProductDiscountChange(e);
+                            }}
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          className="cashier-page__cart-item-remove"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveItem(item);
+                          }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="cashier-page__cart-footer">
+              <div className="sellstart-cashier__summary-row">
+                <span>Без скидок</span>
+                <span>{formatSom(currentSubtotal)} сом</span>
+              </div>
+              <div className="cashier-page__cart-discount">
+                <span>Скидка</span>
+                <span>{formatSom(currentDiscount)} сом</span>
+              </div>
+              <div className="cashier-page__cart-total">
+                <span>ИТОГО</span>
+                <span>{formatSom(currentTotal)} сом</span>
+              </div>
+              <div className="sellstart-cashier__checkout-actions">
+                <button
+                  type="button"
+                  className="cashier-page__checkout-btn"
+                  onClick={openPaymentModal}
+                  disabled={isPilorama ? !agentCart.currentCart?.id : !start?.id}
+                >
+                  Оплатить
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {showPaymentModal && (
+          <UniversalModal
+            onClose={() => setShowPaymentModal(false)}
+            title="Способ оплаты"
+            className="sellstart-cashier__payment-modal"
+          >
+            <div className="sellstart-cashier__payment-body">
+              <div className="sellstart-cashier__payment-methods">
+                <button
+                  type="button"
+                  className={`sellstart-cashier__payment-method ${paymentMethod === "cash" ? "active" : ""}`}
+                  onClick={() => setPaymentMethod("cash")}
+                >
+                  Наличные
+                </button>
+                <button
+                  type="button"
+                  className={`sellstart-cashier__payment-method ${paymentMethod === "cashless" ? "active" : ""}`}
+                  onClick={() => setPaymentMethod("cashless")}
+                >
+                  Безналичный расчет
+                </button>
+                <button
+                  type="button"
+                  className={`sellstart-cashier__payment-method ${paymentMethod === "debt" ? "active" : ""}`}
+                  onClick={() => setPaymentMethod("debt")}
+                >
+                  В долг
+                </button>
+              </div>
+
+              <div className="sellstart-cashier__payment-grid">
+                <div className="sellstart-cashier__payment-field sellstart-cashier__payment-field--full">
+                  <label>Клиент</label>
+                  <div className="sellstart-cashier__client-row">
+                    <select
+                      value={clientId}
+                      onChange={(e) => {
+                        setClientId(e.target.value);
+                        setSelectClient(e.target.value);
+                      }}
+                      className="sellstart-cashier__select"
+                    >
+                      <option value="">Выберите клиента</option>
+                      {filterClient.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.full_name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="sellstart-cashier__client-add-btn"
+                      onClick={() => setShowNewClientModal(true)}
+                      title="Добавить клиента"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sellstart-cashier__payment-field">
+                  <label>Печать чека</label>
+                  <select
+                    value={receiptWithCheck ? "yes" : "no"}
+                    onChange={(e) => setReceiptWithCheck(e.target.value === "yes")}
+                    className="sellstart-cashier__select"
+                  >
+                    <option value="yes">С чеком</option>
+                    <option value="no">Без чека</option>
+                  </select>
+                </div>
+
+                {paymentMethod === "cashless" && (
+                  <div className="sellstart-cashier__payment-field">
+                    <label>Банк / способ перевода</label>
+                    <select
+                      value={selectedBank}
+                      onChange={(e) => setSelectedBank(e.target.value)}
+                      className="sellstart-cashier__select"
+                    >
+                      <option value="">Выберите банк</option>
+                      {paymentBanks.map((bank) => (
+                        <option key={bank.id} value={bank.id}>
+                          {bank.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {paymentMethod === "debt" && (
+                  <>
+                    <div className="sellstart-cashier__payment-field">
+                      <label>Первоначальная оплата</label>
+                      <input
+                        type="text"
+                        value={debtInitialPayment}
+                        onChange={(e) => setDebtInitialPayment(e.target.value)}
+                        className="sellstart-cashier__discount-input"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="sellstart-cashier__payment-field">
+                      <label>Дата первой оплаты</label>
+                      <input
+                        type="date"
+                        value={firstPaymentDate}
+                        onChange={(e) => setFirstPaymentDate(e.target.value)}
+                        className="sellstart-cashier__discount-input"
+                      />
+                    </div>
+                    <div className="sellstart-cashier__payment-field">
+                      <label>Срок долга (мес.)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={debtMonths}
+                        onChange={(e) => setDebtMonths(e.target.value)}
+                        className="sellstart-cashier__discount-input"
+                        placeholder="1"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="sellstart-cashier__payment-summary">
+                <div>
+                  <span>К оплате</span>
+                  <strong>{formatSom(currentTotal)} сом</strong>
+                </div>
+                {paymentMethod === "cash" && (
+                  <div>
+                    <span>Наличными</span>
+                    <strong>{formatSom(currentTotal)} сом</strong>
+                  </div>
+                )}
+                {paymentMethod === "cashless" && selectedBank && (
+                  <div>
+                    <span>Безналичный расчет</span>
+                    <strong>
+                      {paymentBanks.find((bank) => bank.id === selectedBank)?.name ||
+                        "Перевод"}
+                    </strong>
+                  </div>
+                )}
+                {paymentMethod === "debt" && (
+                  <div>
+                    <span>Остаток долга</span>
+                    <strong>
+                      {formatSom(
+                        Math.max(
+                          0,
+                          Number(currentTotal || 0) -
+                            Number(
+                              String(debtInitialPayment || "0").replace(/,/g, "."),
+                            ),
+                        ),
+                      )}{" "}
+                      сом
+                    </strong>
+                  </div>
+                )}
+              </div>
+
+              <div className="sellstart-cashier__payment-actions">
+                <button
+                  type="button"
+                  className="sell__reset"
+                  onClick={() => setShowPaymentModal(false)}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="cashier-page__checkout-btn sellstart-cashier__modal-pay-btn"
+                  onClick={handleMarketPosPayment}
+                  disabled={paymentMethod === "debt" && !clientId}
+                >
+                  Подтвердить оплату
+                </button>
+              </div>
+            </div>
+          </UniversalModal>
+        )}
+
+        {showNewClientModal && (
+          <UniversalModal
+            onClose={() => setShowNewClientModal(false)}
+            title={"Добавить клиента"}
+          >
+            <form className="start__clientForm" onSubmit={onSubmit}>
+              <div>
+                <label>ФИО</label>
+                <input
+                  className={cx(
+                    "sell__header-input",
+                    (touched.full_name || submitTried) &&
+                      errors.full_name &&
+                      "error",
+                  )}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  value={form.full_name}
+                  type="text"
+                  placeholder="ФИО"
+                  name="full_name"
+                />
+                {(touched.full_name || submitTried) && errors.full_name ? (
+                  <p className="sell__header-necessarily">{errors.full_name}</p>
+                ) : (
+                  <p className="sell__header-necessarily">*</p>
+                )}
+              </div>
+              <div>
+                <label>Телефон</label>
+                <input
+                  className={cx(
+                    "sell__header-input",
+                    (touched.phone || submitTried) && errors.phone && "error",
+                  )}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  value={form.phone}
+                  type="text"
+                  name="phone"
+                  placeholder="Телефон"
+                />
+                {(touched.phone || submitTried) && errors.phone ? (
+                  <p className="sell__header-necessarily">{errors.phone}</p>
+                ) : (
+                  <p className="sell__header-necessarily">*</p>
+                )}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  columnGap: "10px",
+                  justifyContent: "end",
+                }}
+              >
+                <button
+                  className="sell__reset"
+                  type="button"
+                  onClick={() => setShowNewClientModal(false)}
+                >
+                  Отмена
+                </button>
+                <button className="start__total-pay" style={{ width: "auto" }}>
+                  Создать
+                </button>
+              </div>
+            </form>
+          </UniversalModal>
+        )}
+
+        <AlertModal
+          open={alert.open}
+          type={alert.type}
+          message={alert.message}
+          okText="Ok"
+          onClose={() => setAlert((a) => ({ ...a, open: false }))}
+        />
+      </div>
+    );
+  }
 
   return (
     <section className="sell start">
@@ -1696,7 +2727,7 @@ const SellStart = ({ show, setShow }) => {
                       {product.product_name} (остаток: {product.qty_on_hand})
                     </button>
                   ))
-              : products?.map((product) => (
+              : filterData?.map((product) => (
                   <button
                     key={product.product}
                     className={cx(

@@ -26,6 +26,7 @@ import { getPageCount, DEFAULT_PAGE_SIZE } from "../shared/api";
 import BuildingPagination from "../shared/Pagination";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
 import { asDateTime } from "../shared/constants";
+import { WORK_PROCUREMENT_PAYMENT_MODE_OPTIONS } from "../shared/buildingSpecOptions";
 import BuildingActionsMenu from "../shared/ActionsMenu";
 import "./Work.scss";
 
@@ -54,7 +55,11 @@ const FORM_INITIAL = {
   contract_amount: "",
   contract_term_start: "",
   contract_term_end: "",
+  payment_mode: "cash",
   treaty: "",
+  treaty_auto_create: true,
+  treaty_type: "construction_department",
+  treaty_title: "",
   category: "note",
   title: "",
   description: "",
@@ -179,7 +184,11 @@ export default function BuildingWorkProcess() {
       contract_term_end: entry?.contract_term_end
         ? String(entry.contract_term_end).slice(0, 10)
         : "",
+      payment_mode: entry?.payment_mode || "cash",
       treaty: entry?.treaty ?? entry?.treaty_id ?? "",
+      treaty_auto_create: Boolean(entry?.treaty_auto_create),
+      treaty_type: entry?.treaty_type || "construction_department",
+      treaty_title: entry?.treaty_title || "",
       category: entry?.category || "note",
       title: entry?.title || "",
       description: entry?.description || "",
@@ -223,7 +232,11 @@ export default function BuildingWorkProcess() {
       contract_term_end: entry?.contract_term_end
         ? String(entry.contract_term_end).slice(0, 10)
         : "",
+      payment_mode: entry?.payment_mode || "cash",
       treaty: entry?.treaty ?? entry?.treaty_id ?? "",
+      treaty_auto_create: Boolean(entry?.treaty_auto_create),
+      treaty_type: entry?.treaty_type || "construction_department",
+      treaty_title: entry?.treaty_title || "",
       category: entry?.category || "note",
       title: entry?.title || "",
       description: entry?.description || "",
@@ -243,7 +256,8 @@ export default function BuildingWorkProcess() {
   };
 
   const handleFormChange = (key) => (e) => {
-    const value = e.target.value;
+    const target = e.target;
+    const value = target.type === "checkbox" ? target.checked : target.value;
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -315,6 +329,7 @@ export default function BuildingWorkProcess() {
       return;
     }
     const rcId = form.residential_complex || selectedProjectId;
+    const shouldAutoCreateTreaty = !String(form.treaty || "").trim();
     const payload = {
       residential_complex: rcId || null,
       contractor: form.contractor || null,
@@ -324,9 +339,19 @@ export default function BuildingWorkProcess() {
           : null,
       contract_term_start: form.contract_term_start || null,
       contract_term_end: form.contract_term_end || null,
+      payment_mode: form.payment_mode || "cash",
       work_status: editing ? (editing?.work_status || "planned") : "planned",
       client: null,
       treaty: form.treaty || null,
+      treaty_auto_create: shouldAutoCreateTreaty,
+      treaty_type: shouldAutoCreateTreaty
+        ? "construction_department"
+        : null,
+      treaty_title: shouldAutoCreateTreaty
+        ? String(form.treaty_title || "").trim() ||
+          String(form.title || "").trim() ||
+          null
+        : null,
       category: form.category || "note",
       title: String(form.title || "").trim(),
       description: String(form.description || "").trim() || "",
@@ -791,13 +816,29 @@ export default function BuildingWorkProcess() {
             </div>
           </div>
           <div className="add-product-page__form-group">
-            <label className="add-product-page__label">Договор</label>
+            <label className="add-product-page__label">Режим оплаты</label>
+            <select
+              className="add-product-page__input"
+              value={form.payment_mode}
+              onChange={handleFormChange("payment_mode")}
+            >
+              {WORK_PROCUREMENT_PAYMENT_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="add-product-page__form-group">
+            <label className="add-product-page__label">
+              Договор
+            </label>
             <select
               className="add-product-page__input"
               value={form.treaty}
               onChange={handleFormChange("treaty")}
             >
-              <option value="">—</option>
+              <option value="">Создать автоматически</option>
               {(Array.isArray(treatiesList) ? treatiesList : []).map((t) => {
                 const tid = t?.id ?? t?.uuid;
                 return (
@@ -807,6 +848,9 @@ export default function BuildingWorkProcess() {
                 );
               })}
             </select>
+            <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>
+              Если договор не выбран, он создастся автоматически по данным процесса работ.
+            </div>
           </div>
           <div className="add-product-page__form-group">
             <label className="add-product-page__label">Сумма договора</label>

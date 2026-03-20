@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { useAlert } from "@/hooks/useDialog";
+import buildingAPI from "@/api/building";
 import { useBuildingProjects } from "@/store/slices/building/projectsSlice";
 import { useBuildingApartments } from "@/store/slices/building/apartmentsSlice";
 import {
@@ -73,6 +74,9 @@ export default function BuildingSell() {
 
   const [floor, setFloor] = useState("");
   const [status, setStatus] = useState("");
+  const [block, setBlock] = useState("");
+  const [blockStats, setBlockStats] = useState([]);
+  const [blockStatsLoading, setBlockStatsLoading] = useState(false);
 
   const [clientSearch, setClientSearch] = useState("");
   const [clientSelectOpen, setClientSelectOpen] = useState(false);
@@ -236,16 +240,40 @@ export default function BuildingSell() {
   }, [dispatch, selectedProjectId]);
 
   useEffect(() => {
+    if (!selectedProjectId) {
+      setBlockStats([]);
+      return;
+    }
+    let cancelled = false;
+    setBlockStatsLoading(true);
+    buildingAPI
+      .getBuildingBlocksStats(selectedProjectId)
+      .then((data) => {
+        if (!cancelled) setBlockStats(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setBlockStats([]);
+      })
+      .finally(() => {
+        if (!cancelled) setBlockStatsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId]);
+
+  useEffect(() => {
     if (!selectedProjectId) return;
     const params = {
       residential_complex: selectedProjectId,
       page: 1,
       page_size: SELL_PAGE_SIZE,
       floor: floor || undefined,
+      block: block || undefined,
       status: status || undefined,
     };
     dispatch(fetchBuildingApartments(params));
-  }, [dispatch, selectedProjectId, floor, status]);
+  }, [dispatch, selectedProjectId, floor, block, status]);
 
   /** Таблица-шахматка: этажи → квартиры по порядку */
   const { floorRows, maxApartments } = useMemo(() => {
@@ -278,6 +306,17 @@ export default function BuildingSell() {
       ) || null,
     [projects, selectedProjectId],
   );
+
+  const availableBlocks = useMemo(() => {
+    const values = new Set();
+    (Array.isArray(blockStats) ? blockStats : []).forEach((item) => {
+      if (item?.block) values.add(String(item.block));
+    });
+    (Array.isArray(list) ? list : []).forEach((item) => {
+      if (item?.block) values.add(String(item.block));
+    });
+    return Array.from(values);
+  }, [blockStats, list]);
 
   const clientsOptions = useMemo(
     () =>
@@ -545,6 +584,7 @@ export default function BuildingSell() {
           page: 1,
           page_size: SELL_PAGE_SIZE,
           floor: floor || undefined,
+          block: block || undefined,
           status: status || undefined,
         };
         dispatch(fetchBuildingApartments(params));
@@ -638,6 +678,22 @@ export default function BuildingSell() {
                   {Object.entries(APARTMENT_STATUS_LABELS).map(([key, label]) => (
                     <option key={key} value={key}>
                       {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="sell-toolbar__label">
+                <span className="sell-toolbar__labelText">Блок</span>
+                <select
+                  className="sell-toolbar__select"
+                  value={block}
+                  onChange={(e) => setBlock(e.target.value)}
+                  disabled={blockStatsLoading}
+                >
+                  <option value="">Все блоки</option>
+                  {availableBlocks.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
                     </option>
                   ))}
                 </select>
@@ -778,6 +834,18 @@ export default function BuildingSell() {
                               <span className="building-sell-plan__aptNum">
                                 {apt?.number ?? "—"}
                               </span>
+                              {apt?.block && (
+                                <span
+                                  style={{
+                                    display: "block",
+                                    marginTop: 4,
+                                    fontSize: 11,
+                                    opacity: 0.8,
+                                  }}
+                                >
+                                  {apt.block}
+                                </span>
+                              )}
                               {isNavigating && (
                                 <span
                                   className="building-sell-plan__cellLoading"
@@ -810,6 +878,7 @@ export default function BuildingSell() {
             <p className="sell-choice__info">
               Этаж {choiceApartment?.floor ?? "—"}, площадь{" "}
               {choiceApartment?.area ?? "—"} м²
+              {choiceApartment?.block ? `, ${choiceApartment.block}` : ""}
             </p>
             <p className="sell-choice__prompt">Что оформить?</p>
             <div className="sell-choice__actions">
@@ -856,6 +925,7 @@ export default function BuildingSell() {
               Квартира {treatyApartment.number || "—"}, этаж{" "}
               {treatyApartment.floor ?? "—"}, площадь{" "}
               {treatyApartment.area ?? "—"} м²
+              {treatyApartment.block ? `, ${treatyApartment.block}` : ""}
             </div>
             <section className="sell-form__section">
               <h4 className="sell-form__sectionTitle">Клиент</h4>

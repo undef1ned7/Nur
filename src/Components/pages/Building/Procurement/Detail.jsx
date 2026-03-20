@@ -11,6 +11,7 @@ import {
   submitBuildingProcurementToCash,
 } from "@/store/creators/building/procurementsCreators";
 import { fetchBuildingSuppliers } from "@/store/creators/building/suppliersCreators";
+import { fetchBuildingTreaties } from "@/store/creators/building/treatiesCreators";
 import {
   createBuildingProcurementItem,
   deleteBuildingProcurementItem,
@@ -20,6 +21,7 @@ import {
 import { fetchBuildingWorkflowEvents } from "@/store/creators/building/workflowCreators";
 import { useBuildingProcurements } from "@/store/slices/building/procurementsSlice";
 import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
+import { useBuildingTreaties } from "@/store/slices/building/treatiesSlice";
 import { useBuildingProcurementItems } from "@/store/slices/building/procurementItemsSlice";
 import { useBuildingWorkflowEvents } from "@/store/slices/building/workflowEventsSlice";
 import {
@@ -29,6 +31,12 @@ import {
   asDateTime,
   statusLabel,
 } from "../shared/constants";
+import {
+  TREATY_TYPE_LABELS,
+  TREATY_TYPE_OPTIONS,
+  WORK_PROCUREMENT_PAYMENT_MODE_LABELS,
+  WORK_PROCUREMENT_PAYMENT_MODE_OPTIONS,
+} from "../shared/buildingSpecOptions";
 import DataContainer from "@/Components/common/DataContainer/DataContainer";
 import api from "../../../../api";
 
@@ -103,6 +111,7 @@ export default function BuildingProcurementDetail() {
   const procurementItemsState = useBuildingProcurementItems();
   const workflowEventsState = useBuildingWorkflowEvents();
   const suppliersState = useBuildingSuppliers();
+  const treatiesState = useBuildingTreaties();
 
   const procurement = useMemo(() => {
     const currentId = current?.id ?? current?.uuid;
@@ -146,6 +155,11 @@ export default function BuildingProcurementDetail() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editComment, setEditComment] = useState("");
+  const [editPaymentMode, setEditPaymentMode] = useState("cash");
+  const [editTreaty, setEditTreaty] = useState("");
+  const [editTreatyAutoCreate, setEditTreatyAutoCreate] = useState(false);
+  const [editTreatyType, setEditTreatyType] = useState("procurement");
+  const [editTreatyTitle, setEditTreatyTitle] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -175,6 +189,12 @@ export default function BuildingProcurementDetail() {
         residential_complex: rcId,
         status: "active",
         page_size: 50,
+      }),
+    );
+    dispatch(
+      fetchBuildingTreaties({
+        residential_complex: rcId,
+        page_size: 100,
       }),
     );
   }, [dispatch, procurement, selectedProjectId]);
@@ -228,6 +248,11 @@ export default function BuildingProcurementDetail() {
     if (!procurement) return;
     setEditTitle(procurement.title || "");
     setEditComment(procurement.comment || "");
+    setEditPaymentMode(procurement.payment_mode || "cash");
+    setEditTreaty(procurement.treaty ?? procurement.treaty_id ?? "");
+    setEditTreatyAutoCreate(Boolean(procurement.treaty_auto_create));
+    setEditTreatyType(procurement.treaty_type || "procurement");
+    setEditTreatyTitle(procurement.treaty_title || "");
     setEditError(null);
     setEditModalOpen(true);
   };
@@ -247,6 +272,15 @@ export default function BuildingProcurementDetail() {
       await api.patch(`/building/procurements/${procurementId}/`, {
         title,
         comment,
+        payment_mode: editPaymentMode || "cash",
+        treaty: editTreatyAutoCreate ? null : editTreaty || null,
+        treaty_auto_create: Boolean(editTreatyAutoCreate),
+        treaty_type: editTreatyAutoCreate
+          ? editTreatyType || "procurement"
+          : null,
+        treaty_title: editTreatyAutoCreate
+          ? String(editTreatyTitle || "").trim() || title
+          : null,
       });
       alert("Закупка обновлена");
       setEditModalOpen(false);
@@ -523,6 +557,59 @@ export default function BuildingProcurementDetail() {
           )}
         </div>
       </div>
+
+      <DataContainer>
+        <div className="building-page__card">
+          <h3 className="building-page__cardTitle" style={{ marginTop: 0 }}>
+            Основные данные
+          </h3>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 16,
+            }}
+          >
+            <div>
+              <div className="building-page__muted">Поставщик</div>
+              <div>{procurement?.supplier_name || procurement?.supplier_display || "—"}</div>
+            </div>
+            <div>
+              <div className="building-page__muted">Режим оплаты</div>
+              <div>
+                {WORK_PROCUREMENT_PAYMENT_MODE_LABELS[procurement?.payment_mode] ||
+                  procurement?.payment_mode ||
+                  "—"}
+              </div>
+            </div>
+            <div>
+              <div className="building-page__muted">Автосоздание договора</div>
+              <div>{procurement?.treaty_auto_create ? "Да" : "Нет"}</div>
+            </div>
+            <div>
+              <div className="building-page__muted">Тип договора</div>
+              <div>
+                {TREATY_TYPE_LABELS[procurement?.treaty_type] ||
+                  procurement?.treaty_type ||
+                  "—"}
+              </div>
+            </div>
+            <div>
+              <div className="building-page__muted">Текущий договор</div>
+              <div>
+                {procurement?.treaty_display ||
+                  procurement?.treaty_number ||
+                  procurement?.treaty_title ||
+                  "—"}
+              </div>
+            </div>
+            <div>
+              <div className="building-page__muted">Новый договор</div>
+              <div>{procurement?.treaty_title || procurement?.treaty_display || "—"}</div>
+            </div>
+          </div>
+        </div>
+      </DataContainer>
 
       <DataContainer>
         <div className="building-page__card">
@@ -962,6 +1049,79 @@ export default function BuildingProcurementDetail() {
               rows={3}
             />
           </label>
+          <label>
+            <div className="building-page__label">Режим оплаты</div>
+            <select
+              className="building-page__select"
+              value={editPaymentMode}
+              onChange={(e) => setEditPaymentMode(e.target.value)}
+            >
+              {WORK_PROCUREMENT_PAYMENT_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <div className="building-page__label">Существующий договор</div>
+            <select
+              className="building-page__select"
+              value={editTreaty}
+              onChange={(e) => {
+                setEditTreaty(e.target.value);
+                if (e.target.value) setEditTreatyAutoCreate(false);
+              }}
+              disabled={Boolean(editTreatyAutoCreate) || treatiesState.loading}
+            >
+              <option value="">Без договора</option>
+              {(treatiesState.list || []).map((treaty) => (
+                <option key={treaty.id ?? treaty.uuid} value={treaty.id ?? treaty.uuid}>
+                  {treaty.number || treaty.title || treaty.id || treaty.uuid}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={Boolean(editTreatyAutoCreate)}
+              onChange={(e) => {
+                setEditTreatyAutoCreate(e.target.checked);
+                if (e.target.checked) setEditTreaty("");
+              }}
+            />
+            <span className="building-page__label" style={{ margin: 0 }}>
+              Создать договор автоматически
+            </span>
+          </label>
+          {editTreatyAutoCreate && (
+            <>
+              <label>
+                <div className="building-page__label">Тип договора</div>
+                <select
+                  className="building-page__select"
+                  value={editTreatyType}
+                  onChange={(e) => setEditTreatyType(e.target.value)}
+                >
+                  {TREATY_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <div className="building-page__label">Название нового договора</div>
+                <input
+                  className="building-page__input"
+                  value={editTreatyTitle}
+                  onChange={(e) => setEditTreatyTitle(e.target.value)}
+                  placeholder="Если пусто, возьмём название закупки"
+                />
+              </label>
+            </>
+          )}
           {editError && (
             <div className="building-page__error" style={{ marginTop: 8 }}>
               {String(editError)}

@@ -73,3 +73,16 @@
 
 .production-sell {
 }
+
+.production-sell__start-btn {
+  margin-left: auto;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 992px) {
+  .production-sell__start-btn {
+    margin-left: 0;
+    width: 100%;
+  }
+}

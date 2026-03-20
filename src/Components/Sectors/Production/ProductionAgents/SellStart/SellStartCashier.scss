@@ -1,0 +1,204 @@
+.sellstart-cashier {
+  &__header-btn {
+    background: #111827;
+
+    &:hover {
+      background: #000;
+    }
+  }
+
+  &__cart-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__select,
+  &__discount-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 14px;
+    color: #111827;
+    outline: none;
+
+    &:focus {
+      border-color: #f7d617;
+    }
+  }
+
+  &__line-discount {
+    min-width: 88px;
+  }
+
+  &__cart-item--selected {
+    border-color: #f7d617;
+    background: #fffbeb;
+  }
+
+  &__summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__checkout-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  &__checkout-btn--secondary {
+    background: #fff;
+    border: 1px solid #d1d5db;
+
+    &:hover {
+      background: #f9fafb;
+    }
+  }
+
+  &__payment-body {
+    min-width: min(680px, 88vw);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  &__payment-methods {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  &__payment-method {
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #111827;
+    border-radius: 10px;
+    padding: 14px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: 0.2s ease;
+
+    &.active {
+      background: #f7d617;
+      border-color: #f7d617;
+    }
+  }
+
+  &__payment-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  &__payment-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    label {
+      color: #374151;
+      font-size: 13px;
+      font-weight: 600;
+    }
+  }
+
+  &__payment-field--full {
+    grid-column: 1 / -1;
+  }
+
+  &__client-row {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  &__client-add-btn {
+    flex: 0 0 48px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #111827;
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+    transition: 0.2s ease;
+
+    &:hover {
+      background: #000;
+    }
+  }
+
+  &__payment-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #f9fafb;
+
+    div {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    span {
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    strong {
+      color: #111827;
+      font-size: 18px;
+    }
+  }
+
+  &__payment-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  &__modal-pay-btn {
+    width: auto;
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sellstart-cashier {
+    &__payment-body {
+      min-width: auto;
+    }
+
+    &__payment-methods,
+    &__payment-grid {
+      grid-template-columns: 1fr;
+    }
+
+    &__payment-summary,
+    &__payment-actions {
+      flex-direction: column;
+    }
+
+    &__client-row {
+      align-items: stretch;
+    }
+
+    &__client-add-btn {
+      flex-basis: 44px;
+      min-height: 44px;
+    }
+
+    &__modal-pay-btn {
+      min-width: 100%;
+    }
+  }
+}

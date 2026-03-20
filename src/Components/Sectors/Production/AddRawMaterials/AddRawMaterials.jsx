@@ -7,6 +7,10 @@ import {
   useCash,
 } from "../../../../store/slices/cashSlice";
 import { useUser } from "../../../../store/slices/userSlice";
+import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
+import { createDeal } from "../../../../store/creators/saleThunk";
+import { useClient } from "../../../../store/slices/ClientSlice";
+import api from "../../../../api";
 import {
   updateItemsMake,
   updateProductAsync,
@@ -18,12 +22,14 @@ const toNum = (v) => {
   const n = Number(String(v ?? "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
+const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 
 const AddRawMaterials = ({ onClose, onChanged, item }) => {
   const alert = useAlert();
   const dispatch = useDispatch();
   const { list: cashBoxes } = useCash();
   const { company } = useUser();
+  const { list: clients = [] } = useClient();
 
   // если item не передан — блокируем форму
   const { itemId, itemName } = useMemo(() => ({ itemId: item.id, itemName: item.name }), [item]);
@@ -36,13 +42,27 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
   );
   const [selectCashBox, setSelectCashBox] = useState("");
   const [error, setError] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [paymentType, setPaymentType] = useState("full");
+  const [debtMonths, setDebtMonths] = useState("1");
+  const [prepayment, setPrepayment] = useState("");
+  const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate());
 
   const stockQty = useMemo(() => toNum(item?.quantity), [item]);
   const { q, rp } = useMemo(() => ({ q: toNum(qty), rp: toNum(retailPrice) }), [qty, retailPrice]);
   const expense = useMemo(() => +(q * rp).toFixed(2), [q, rp]);
+  const suppliers = useMemo(
+    () => (Array.isArray(clients) ? clients : []).filter((c) => c.type === "suppliers"),
+    [clients],
+  );
+  const selectedSupplier = useMemo(
+    () => suppliers.find((s) => String(s.id) === String(supplierId)),
+    [suppliers, supplierId],
+  );
 
   useEffect(() => {
     dispatch(getCashBoxes());
+    dispatch(fetchClientsAsync());
   }, [dispatch]);
 
   // Автоматически выбираем первую кассу по индексу
@@ -63,16 +83,30 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
     if (!Number.isInteger(q)) return "Количество должно быть целым числом";
     // if (!pp || pp <= 0) return "Введите корректную закупочную цену";
     if (!rp || rp <= 0) return "Введите корректную цену";
+    if ((paymentType === "debt" || paymentType === "prepayment") && !supplierId) {
+      return "Выберите поставщика";
+    }
+    if ((paymentType === "debt" || paymentType === "prepayment") && (!debtMonths || Number(debtMonths) <= 0)) {
+      return "Укажите срок долга";
+    }
+    if ((paymentType === "debt" || paymentType === "prepayment") && !firstPaymentDate) {
+      return "Укажите дату первой оплаты";
+    }
+    if (paymentType === "prepayment") {
+      const prepaymentValue = toNum(prepayment);
+      if (prepaymentValue <= 0) return "Укажите сумму предоплаты";
+      if (prepaymentValue > expense) return "Предоплата не может быть больше общей суммы";
+    }
     // Проверяем кассу только если кассы уже загружены (не undefined) и есть, но касса не выбрана
     // Если кассы еще загружаются (cashBoxes undefined), не блокируем кнопку
-    if (Array.isArray(cashBoxes) && cashBoxes.length > 0 && !selectCashBox) {
+    if (paymentType !== "debt" && Array.isArray(cashBoxes) && cashBoxes.length > 0 && !selectCashBox) {
       return "Касса не выбрана. Создайте кассу в разделе «Кассы».";
     }
-    if (Array.isArray(cashBoxes) && cashBoxes.length === 0) {
+    if (paymentType !== "debt" && Array.isArray(cashBoxes) && cashBoxes.length === 0) {
       return "Нет доступных касс. Создайте кассу в разделе «Кассы».";
     }
     return "";
-  }, [itemId, q, rp, cashBoxes, selectCashBox]);
+  }, [itemId, q, rp, cashBoxes, selectCashBox, paymentType, supplierId, debtMonths, prepayment, expense, firstPaymentDate]);
 
   const onFormSubmit = async (e) => {
     e.preventDefault();
@@ -83,7 +117,7 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
     }
 
     // Дополнительная проверка кассы перед выполнением операции
-    if (!selectCashBox) {
+    if (paymentType !== "debt" && !selectCashBox) {
       setError("Касса не выбрана. Создайте кассу в разделе «Кассы».");
       return;
     }
@@ -102,20 +136,47 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
         })
       ).unwrap();
 
-      // списываем расход из кассы (закупка по себестоимости)
-      await dispatch(
-        addCashFlows({
-          cashbox: selectCashBox,
-          type: "expense",
-          name: `Закупка товара: ${itemName}`,
-          amount: expense,
-          status:
-            company?.subscription_plan?.name === "Старт"
-              ? "approved"
-              : "pending",
-          // description: `Закупка ${q} шт. × ${pp} = ${expense}`,
-        })
-      ).unwrap();
+      if ((paymentType === "debt" || paymentType === "prepayment") && supplierId) {
+        const prepaymentValue = toNum(prepayment);
+        const remainingDebt =
+          paymentType === "prepayment" ? Math.max(0, expense - prepaymentValue) : expense;
+
+        if (company?.subscription_plan?.name === "Старт" && remainingDebt > 0) {
+          await api.post("/main/debts/", {
+            name: selectedSupplier?.full_name || selectedSupplier?.name || "Поставщик",
+            phone: selectedSupplier?.phone || "",
+            due_date: firstPaymentDate,
+            amount: remainingDebt,
+          });
+        }
+
+        await dispatch(
+          createDeal({
+            clientId: supplierId,
+            title: `${paymentType === "prepayment" ? "Предоплата" : "Долги"} ${selectedSupplier?.full_name || itemName}`,
+            statusRu: paymentType === "prepayment" ? "Предоплата" : "Долги",
+            amount: expense,
+            prepayment: paymentType === "prepayment" ? prepaymentValue : undefined,
+            debtMonths: Number(debtMonths || 1),
+            first_due_date: firstPaymentDate,
+          }),
+        ).unwrap();
+      }
+
+      if (paymentType !== "debt") {
+        await dispatch(
+          addCashFlows({
+            cashbox: selectCashBox,
+            type: "expense",
+            name: `Закупка товара: ${itemName}`,
+            amount: paymentType === "prepayment" ? toNum(prepayment) : expense,
+            status:
+              company?.subscription_plan?.name === "Старт"
+                ? "approved"
+                : "pending",
+          })
+        ).unwrap();
+      }
       alert('Товар добавлен!', () => {
         onChanged?.();
         onClose?.();
@@ -178,10 +239,90 @@ const AddRawMaterials = ({ onClose, onChanged, item }) => {
             disabled={!itemId}
           />
 
+          <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
+            Поставщик
+          </label>
+          <select
+            style={{ width: "100%" }}
+            className="border rounded-lg p-2"
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+          >
+            <option value="">-- Выберите поставщика --</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.full_name}
+              </option>
+            ))}
+          </select>
+
+          {!!supplierId && (
+            <>
+              <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
+                Тип оплаты
+              </label>
+              <select
+                style={{ width: "100%" }}
+                className="border rounded-lg p-2"
+                value={paymentType}
+                onChange={(e) => setPaymentType(e.target.value)}
+              >
+                <option value="full">Полная оплата</option>
+                <option value="prepayment">Предоплата</option>
+                <option value="debt">В долг</option>
+              </select>
+
+              {(paymentType === "debt" || paymentType === "prepayment") && (
+                <>
+                  {paymentType === "prepayment" && (
+                    <>
+                      <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
+                        Предоплата
+                      </label>
+                      <input
+                        style={{ width: "100%" }}
+                        type="number"
+                        className="border rounded-lg p-2"
+                        value={prepayment}
+                        onChange={(e) => setPrepayment(e.target.value)}
+                        min={0}
+                        step="0.01"
+                      />
+                    </>
+                  )}
+
+                  <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
+                    Срок долга (мес.)
+                  </label>
+                  <input
+                    style={{ width: "100%" }}
+                    type="number"
+                    className="border rounded-lg p-2"
+                    value={debtMonths}
+                    onChange={(e) => setDebtMonths(e.target.value)}
+                    min={1}
+                    step={1}
+                  />
+
+                  <label htmlFor="" style={{ margin: "10px 0 5px", display: "block" }}>
+                    Дата первой оплаты
+                  </label>
+                  <input
+                    style={{ width: "100%" }}
+                    type="date"
+                    className="border rounded-lg p-2"
+                    value={firstPaymentDate}
+                    onChange={(e) => setFirstPaymentDate(e.target.value)}
+                  />
+                </>
+              )}
+            </>
+          )}
+
           {/* касса автоматически выбирается - скрыто от пользователя */}
 
           <div style={{ marginTop: 12 }}>
-            Итог к списанию: <b>{Number.isFinite(expense) ? expense : 0}</b>
+            Итог к списанию: <b>{Number.isFinite(paymentType === "prepayment" ? toNum(prepayment) : expense) ? (paymentType === "prepayment" ? toNum(prepayment) : expense) : 0}</b>
           </div>
 
           {error && (

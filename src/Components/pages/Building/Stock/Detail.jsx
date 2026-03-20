@@ -93,6 +93,7 @@ export default function BuildingStockDetail() {
   const [transferWorkLoading, setTransferWorkLoading] = useState(false);
   const [transferWorkError, setTransferWorkError] = useState(null);
   const [transferItems, setTransferItems] = useState([]);
+  const [transferIssuedTo, setTransferIssuedTo] = useState("");
   const [transferComment, setTransferComment] = useState("");
   const [transferError, setTransferError] = useState(null);
   const [transferSubmitting, setTransferSubmitting] = useState(false);
@@ -106,6 +107,7 @@ export default function BuildingStockDetail() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [decisionModal, setDecisionModal] = useState(DECISION_INITIAL);
+  const [requestIssuedToMap, setRequestIssuedToMap] = useState({});
   const debouncedSearch = useDebouncedValue(search, 400);
   const debouncedWorkSearch = useDebouncedValue(transferWorkSearch, 400);
   const debouncedItemSearch = useDebouncedValue(selectItemSearch, 400);
@@ -244,6 +246,7 @@ export default function BuildingStockDetail() {
       // Явно передаём процесс работ и склад, чтобы удовлетворить валидацию backend
       work_entry: req.work_entry,
       warehouse: warehouseId,
+      issued_to: requestIssuedToMap[String(requestId)]?.trim() || undefined,
       items: items.map((it) => ({
         nomenclature: it.nomenclature || it.stock_item || it.id,
         quantity: String(it.quantity ?? ""),
@@ -259,6 +262,11 @@ export default function BuildingStockDetail() {
         payload,
       );
       alert("Материалы по заявке выданы со склада");
+      setRequestIssuedToMap((prev) => {
+        const next = { ...prev };
+        delete next[String(requestId)];
+        return next;
+      });
       await reloadRequests();
       // обновим остатки и движения склада
       dispatch(
@@ -682,15 +690,35 @@ export default function BuildingStockDetail() {
                         <td>{asDateTime(req.updated_at)}</td>
                         <td>
                           {canIssue && (
-                            <button
-                              type="button"
-                              className="building-btn building-btn--primary"
-                              style={{ padding: "4px 10px", fontSize: 12 }}
-                              disabled={busy}
-                              onClick={() => handleIssueRequest(req)}
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 6,
+                              }}
                             >
-                              {busy ? "Выдача..." : "Выдать материалы"}
-                            </button>
+                              <input
+                                className="building-page__input"
+                                value={requestIssuedToMap[String(req.id ?? req.uuid)] || ""}
+                                onChange={(e) =>
+                                  setRequestIssuedToMap((prev) => ({
+                                    ...prev,
+                                    [String(req.id ?? req.uuid)]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Кому передали"
+                                style={{ minWidth: 160 }}
+                              />
+                              <button
+                                type="button"
+                                className="building-btn building-btn--primary"
+                                style={{ padding: "4px 10px", fontSize: 12 }}
+                                disabled={busy}
+                                onClick={() => handleIssueRequest(req)}
+                              >
+                                {busy ? "Выдача..." : "Выдать материалы"}
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -1031,6 +1059,7 @@ export default function BuildingStockDetail() {
                 {
                   work_entry: workEntry,
                   warehouse: warehouseId,
+                  issued_to: transferIssuedTo.trim() || undefined,
                   items,
                   comment: transferComment.trim() || undefined,
                 },
@@ -1040,6 +1069,7 @@ export default function BuildingStockDetail() {
               setTransferWorkEntryId("");
               setTransferWorkSearch("");
               setTransferItems([]);
+              setTransferIssuedTo("");
               setTransferComment("");
               setAddPositionModalOpen(false);
               setAddPositionSearch("");
@@ -1105,7 +1135,7 @@ export default function BuildingStockDetail() {
 
           <div
             className="building-page__filters"
-            style={{ flexDirection: "column", gap: 12 }}
+            style={{ gridTemplateColumns: "1fr", gap: 12 }}
           >
             <div className="building-page__label">Позиции</div>
             {transferItems.map((row, index) => {
@@ -1120,66 +1150,87 @@ export default function BuildingStockDetail() {
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: 8,
-                    padding: "10px 12px",
+                    gap: 12,
+                    padding: "12px",
                     border: "1px solid rgba(11, 35, 68, 0.12)",
-                    borderRadius: 8,
+                    borderRadius: 12,
                     background: "rgba(11, 35, 68, 0.02)",
                   }}
                 >
-                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <label className="building-page__muted" style={{ fontSize: 12, marginBottom: 4, display: "block" }}>
-                        Наименование
-                      </label>
-                      <div style={{ fontSize: 13, color: "#0b2344" }}>
-                        {row.name || row.nomenclature || "—"}
-                      </div>
-                    </div>
-                    <div style={{ flexShrink: 0 }}>
-                      <label className="building-page__muted" style={{ fontSize: 12, marginBottom: 4, display: "block" }}>
-                        Ед.
-                      </label>
-                      <div style={{ fontSize: 13, color: "#0b2344" }}>
-                        {row.unit || "—"}
-                      </div>
+                  <div>
+                    <label
+                      className="building-page__muted"
+                      style={{ fontSize: 12, marginBottom: 4, display: "block" }}
+                    >
+                      Наименование
+                    </label>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        color: "#0b2344",
+                        fontWeight: 600,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {row.name || row.nomenclature || "—"}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <label className="building-page__muted" style={{ fontSize: 12, marginBottom: 4, display: "block" }}>
-                        Количество {Number.isFinite(maxQty) ? `(макс. ${maxQty})` : ""}
-                      </label>
-                      <input
-                        className="building-page__input"
-                        type="number"
-                        min={0}
-                        max={Number.isFinite(maxQty) ? maxQty : undefined}
-                        step="any"
-                        value={row.quantity}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setTransferItems((prev) => {
-                            const next = [...prev];
-                            next[index] = { ...next[index], quantity: val };
-                            return next;
-                          });
-                        }}
-                        placeholder="0"
-                        style={{
-                          width: "100%",
-                          boxSizing: "border-box",
-                          textAlign: "right",
-                          fontSize: 13,
-                          ...(isOver ? { borderColor: "var(--danger, #c00)", color: "var(--danger, #c00)" } : {}),
-                        }}
-                      />
-                      {isOver && (
-                        <div className="building-page__error" style={{ fontSize: 12, marginTop: 4 }}>
-                          Больше остатка на складе ({maxQty})
-                        </div>
-                      )}
+                  <div>
+                    <label
+                      className="building-page__muted"
+                      style={{ fontSize: 12, marginBottom: 4, display: "block" }}
+                    >
+                      Ед. измерения
+                    </label>
+                    <div style={{ fontSize: 13, color: "#0b2344" }}>
+                      {row.unit || "—"}
                     </div>
+                  </div>
+                  <div>
+                    <label
+                      className="building-page__muted"
+                      style={{ fontSize: 12, marginBottom: 4, display: "block" }}
+                    >
+                      Количество {Number.isFinite(maxQty) ? `(макс. ${maxQty})` : ""}
+                    </label>
+                    <input
+                      className="building-page__input"
+                      type="number"
+                      min={0}
+                      max={Number.isFinite(maxQty) ? maxQty : undefined}
+                      step="any"
+                      value={row.quantity}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTransferItems((prev) => {
+                          const next = [...prev];
+                          next[index] = { ...next[index], quantity: val };
+                          return next;
+                        });
+                      }}
+                      placeholder="0"
+                      style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        fontSize: 13,
+                        ...(isOver
+                          ? {
+                              borderColor: "var(--danger, #c00)",
+                              color: "var(--danger, #c00)",
+                            }
+                          : {}),
+                      }}
+                    />
+                    {isOver && (
+                      <div
+                        className="building-page__error"
+                        style={{ fontSize: 12, marginTop: 4 }}
+                      >
+                        Больше остатка на складе ({maxQty})
+                      </div>
+                    )}
+                  </div>
+                  <div>
                     <button
                       type="button"
                       className="building-btn"
@@ -1188,15 +1239,16 @@ export default function BuildingStockDetail() {
                       }}
                       title="Удалить"
                       style={{
-                        padding: 8,
-                        display: "flex",
+                        width: "100%",
+                        display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        gap: 8,
                         color: "var(--danger, #c00)",
-                        flexShrink: 0,
                       }}
                     >
                       <Trash2 size={18} />
+                      Удалить позицию
                     </button>
                   </div>
                 </div>
@@ -1205,11 +1257,23 @@ export default function BuildingStockDetail() {
             <button
               type="button"
               className="building-btn"
-              style={{ marginTop: 4, alignSelf: "flex-start" }}
+              style={{ marginTop: 4, width: "100%", justifyContent: "center" }}
               onClick={() => setAddPositionModalOpen(true)}
             >
               Добавить позицию
             </button>
+          </div>
+
+          <div className="building-page__filters" style={{ marginTop: 12 }}>
+            <div style={{ width: "100%" }}>
+              <label className="building-page__label">Кому передали</label>
+              <input
+                className="building-page__input"
+                value={transferIssuedTo}
+                onChange={(e) => setTransferIssuedTo(e.target.value)}
+                placeholder="ФИО / кому передали"
+              />
+            </div>
           </div>
 
           <div className="building-page__filters" style={{ marginTop: 12 }}>
@@ -1242,6 +1306,7 @@ export default function BuildingStockDetail() {
                 setTransferWorkEntryId("");
                 setTransferWorkSearch("");
                 setTransferItems([]);
+                setTransferIssuedTo("");
                 setTransferComment("");
                 setAddPositionModalOpen(false);
                 setAddPositionSearch("");

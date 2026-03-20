@@ -84,12 +84,6 @@ export default function InstallmentPaymentCreateModal({
       setLocalError("Сумма должна быть больше 0");
       return;
     }
-    if (remaining > 0 && value > remaining + 1e-6) {
-      setLocalError(
-        `Сумма не может превышать остаток ${remaining.toFixed(2)}`,
-      );
-      return;
-    }
     if (!cashbox) {
       setLocalError("Выберите кассу");
       return;
@@ -116,7 +110,20 @@ export default function InstallmentPaymentCreateModal({
         }),
       );
       if (res.meta.requestStatus === "fulfilled") {
-        alert("Оплата внесена");
+        const applied = Array.isArray(res.payload?.data?.applied)
+          ? res.payload.data.applied
+          : [];
+        const unusedAmount = Number(res.payload?.data?.unused_amount || 0);
+        const carriedToNextInstallments = applied.length > 1;
+
+        let successMessage = "Оплата внесена";
+        if (carriedToNextInstallments) {
+          successMessage = `Оплата внесена и распределена на ${applied.length} взноса`;
+        } else if (unusedAmount > 0) {
+          successMessage = `Оплата внесена. Неиспользованный остаток: ${unusedAmount.toFixed(2)}`;
+        }
+
+        alert(successMessage);
         onSuccess?.();
         onClose?.();
       } else {
@@ -161,6 +168,10 @@ export default function InstallmentPaymentCreateModal({
             onChange={(e) => setAmount(e.target.value)}
             placeholder={remaining > 0 ? remaining.toFixed(2) : "0.00"}
           />
+          <div className="building-page__muted" style={{ marginTop: 6 }}>
+            Можно указать сумму больше остатка текущего взноса. Переплата
+            автоматически перенесётся на следующие взносы.
+          </div>
         </label>
 
         <label>

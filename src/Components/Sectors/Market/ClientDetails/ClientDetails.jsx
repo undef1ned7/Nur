@@ -369,6 +369,20 @@ export default function MarketClientDetails() {
             </div>
 
             <div className="client-details__info-item">
+              <div className="client-details__info-label">Email</div>
+              <div className="client-details__info-value">
+                {client?.email || "—"}
+              </div>
+            </div>
+
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">Дата</div>
+              <div className="client-details__info-value">
+                {toIsoDate10(client?.date) || "—"}
+              </div>
+            </div>
+
+            <div className="client-details__info-item">
               <div className="client-details__info-label">Статус</div>
               <div className="client-details__info-value">
                 {kindTranslate[client?.status] || client?.status || "—"}
@@ -379,6 +393,48 @@ export default function MarketClientDetails() {
               >
                 Редактировать
               </button>
+            </div>
+
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">ОсОО</div>
+              <div className="client-details__info-value">
+                {client?.llc || "—"}
+              </div>
+            </div>
+
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">ИНН</div>
+              <div className="client-details__info-value">
+                {client?.inn || "—"}
+              </div>
+            </div>
+
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">ОКПО</div>
+              <div className="client-details__info-value">
+                {client?.okpo || "—"}
+              </div>
+            </div>
+
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">Счет</div>
+              <div className="client-details__info-value">
+                {client?.score || "—"}
+              </div>
+            </div>
+
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">БИК</div>
+              <div className="client-details__info-value">
+                {client?.bik || "—"}
+              </div>
+            </div>
+
+            <div className="client-details__info-item">
+              <div className="client-details__info-label">Адрес</div>
+              <div className="client-details__info-value">
+                {client?.address || "—"}
+              </div>
             </div>
           </div>
 
