@@ -20,6 +20,11 @@ import { useBuildingWarehouses } from "@/store/slices/building/warehousesSlice";
 import { useBuildingStock } from "@/store/slices/building/stockSlice";
 import { asDateTime, statusLabel } from "../shared/constants";
 import {
+  TREATY_TYPE_LABELS,
+  WORK_PROCUREMENT_PAYMENT_MODE_LABELS,
+} from "../shared/buildingSpecOptions";
+import buildingAPI from "../../../../api/building";
+import {
   getBuildingCashboxes,
   getBuildingCashRegisterRequests,
   uploadBuildingCashRegisterRequestFile,
@@ -49,6 +54,26 @@ const WAREHOUSE_REQUEST_STATUS_LABELS = {
   rejected: "Отклонена",
   partially_approved: "Частично выдано",
   completed: "Всё выдано",
+};
+
+const getCashRequestWorkEntryId = (request) => {
+  const rawWorkEntryId =
+    request?.work_entry_id ??
+    request?.work_entry?.id ??
+    request?.work_entry?.uuid ??
+    request?.work_entry;
+  return rawWorkEntryId == null ? "" : String(rawWorkEntryId);
+};
+
+const isApprovedAdvanceForWorkEntry = (request, expectedEntryId) => {
+  if (!expectedEntryId) return false;
+  const requestType = String(request?.request_type ?? "").toLowerCase();
+  const status = String(request?.status ?? "").toLowerCase();
+  return (
+    requestType === "advance" &&
+    status === "approved" &&
+    getCashRequestWorkEntryId(request) === String(expectedEntryId)
+  );
 };
 
 export default function BuildingWorkProcessDetail() {
@@ -89,6 +114,9 @@ export default function BuildingWorkProcessDetail() {
   const [warehouseRequests, setWarehouseRequests] = useState([]);
   const [warehouseRequestsLoading, setWarehouseRequestsLoading] = useState(false);
   const [warehouseRequestsError, setWarehouseRequestsError] = useState(null);
+  const [warehouseReceipts, setWarehouseReceipts] = useState([]);
+  const [warehouseReceiptsLoading, setWarehouseReceiptsLoading] = useState(false);
+  const [warehouseReceiptsError, setWarehouseReceiptsError] = useState(null);
 
   const [advanceModalOpen, setAdvanceModalOpen] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState("");
@@ -106,6 +134,15 @@ export default function BuildingWorkProcessDetail() {
   const [approvedAdvanceLoading, setApprovedAdvanceLoading] = useState(false);
 
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [payoutModalOpen, setPayoutModalOpen] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState("");
+  const [payoutCashbox, setPayoutCashbox] = useState("");
+  const [payoutCreatedRequestId, setPayoutCreatedRequestId] = useState(null);
+  const [payoutFile, setPayoutFile] = useState(null);
+  const [payoutFileTitle, setPayoutFileTitle] = useState("");
+  const [payoutFileUploading, setPayoutFileUploading] = useState(false);
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false);
+  const [payoutError, setPayoutError] = useState(null);
 
   const { list: warehousesList } = useBuildingWarehouses();
   const { items: stockItemsList } = useBuildingStock();
@@ -148,6 +185,33 @@ export default function BuildingWorkProcessDetail() {
       }
     };
     loadRequests();
+  }, [entryId]);
+
+  useEffect(() => {
+    if (!entryId) return;
+    let cancelled = false;
+    setWarehouseReceiptsLoading(true);
+    setWarehouseReceiptsError(null);
+    buildingAPI
+      .getBuildingWorkEntryWarehouseReceipts(entryId)
+      .then((data) => {
+        if (!cancelled) {
+          setWarehouseReceipts(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setWarehouseReceiptsError(
+            validateResErrors(err, "Не удалось загрузить полученные материалы"),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setWarehouseReceiptsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [entryId]);
 
   const selectedProjectName = useMemo(() => {
@@ -463,6 +527,11 @@ export default function BuildingWorkProcessDetail() {
 
   const isPlanned = entry?.work_status === "planned";
   const isCancelled = entry?.work_status === "cancelled";
+  const isCompleted = entry?.work_status === "completed";
+  const remainingContractAmount = Math.max(
+    0,
+    (Number(entry?.contract_amount) || 0) - (Number(approvedAdvanceSum) || 0),
+  );
 
   const handleStartWork = () => {
     confirm("Перевести процесс работ в статус «В работе»?", async (ok) => {
@@ -555,12 +624,30 @@ export default function BuildingWorkProcessDetail() {
     });
   };
 
+  const handleCompleteWork = () => {
+    if (!entryId) return;
+    if (!(entry?.contractor ?? entry?.contractor_id)) {
+      alert("Чтобы завершить работу, сначала укажите подрядчика", true);
+      return;
+    }
+    if (!(Number(entry?.contract_amount) > 0)) {
+      alert("Чтобы завершить работу, сначала укажите сумму договора", true);
+      return;
+    }
+    setPayoutAmount(
+      remainingContractAmount > 0 ? String(remainingContractAmount.toFixed(2)) : "",
+    );
+    setPayoutCashbox("");
+    setPayoutError(null);
+    setPayoutModalOpen(true);
+  };
+
   useEffect(() => {
-    if (!advanceModalOpen || !rcId) return;
+    if ((!advanceModalOpen && !payoutModalOpen) || !rcId) return;
     getBuildingCashboxes({ residential_complex: rcId })
       .then((list) => setAdvanceCashboxes(Array.isArray(list) ? list : []))
       .catch(() => setAdvanceCashboxes([]));
-  }, [advanceModalOpen, rcId]);
+  }, [advanceModalOpen, payoutModalOpen, rcId]);
 
   useEffect(() => {
     if (!entryId) return;
@@ -572,7 +659,10 @@ export default function BuildingWorkProcessDetail() {
       status: "approved",
     })
       .then((list) => {
-        const sum = (list || []).reduce(
+        const currentEntryAdvances = (list || []).filter((request) =>
+          isApprovedAdvanceForWorkEntry(request, entryId),
+        );
+        const sum = currentEntryAdvances.reduce(
           (acc, r) => acc + (parseFloat(r?.amount) || 0),
           0,
         );
@@ -593,8 +683,13 @@ export default function BuildingWorkProcessDetail() {
       setAdvanceError("Укажите сумму аванса");
       return;
     }
+    if (!advanceFile) {
+      setAdvanceError("Прикрепите файл к заявке на аванс");
+      return;
+    }
     setAdvanceSubmitting(true);
     setAdvanceError(null);
+    setAdvanceFileError(null);
     try {
       const { data } = await api.post("/building/cash-register/requests/", {
         request_type: "advance",
@@ -603,13 +698,25 @@ export default function BuildingWorkProcessDetail() {
         cashbox: advanceCashbox,
       });
       const createdId = data?.id ?? data?.uuid;
-      if (createdId) {
+      if (!createdId) {
+        setAdvanceError("Не удалось получить ID созданной заявки для прикрепления файла");
+        return;
+      }
+      try {
+        const formData = new FormData();
+        formData.append("file", advanceFile);
+        if (advanceFileTitle.trim()) formData.append("title", advanceFileTitle.trim());
+        await uploadBuildingCashRegisterRequestFile(createdId, formData);
+        alert("Заявка на аванс создана, файл прикреплен");
+        closeAdvanceModal();
+      } catch (uploadErr) {
         setAdvanceCreatedRequestId(createdId);
-      } else {
-        alert("Заявка на аванс создана. Ожидает одобрения кассы.");
-        setAdvanceModalOpen(false);
-        setAdvanceAmount("");
-        setAdvanceCashbox("");
+        setAdvanceFileError(
+          validateResErrors(
+            uploadErr,
+            "Заявка создана, но не удалось прикрепить файл. Загрузите файл, чтобы завершить оформление",
+          ),
+        );
       }
     } catch (err) {
       setAdvanceError(
@@ -630,9 +737,8 @@ export default function BuildingWorkProcessDetail() {
       formData.append("file", advanceFile);
       if (advanceFileTitle.trim()) formData.append("title", advanceFileTitle.trim());
       await uploadBuildingCashRegisterRequestFile(advanceCreatedRequestId, formData);
-      setAdvanceFile(null);
-      setAdvanceFileTitle("");
-      if (e.target?.reset) e.target.reset();
+      alert("Файл прикреплен к заявке на аванс");
+      closeAdvanceModal();
     } catch (err) {
       setAdvanceFileError(
         validateResErrors(err, "Не удалось загрузить файл"),
@@ -651,6 +757,116 @@ export default function BuildingWorkProcessDetail() {
     setAdvanceFile(null);
     setAdvanceFileTitle("");
     setAdvanceFileError(null);
+  };
+
+  const closePayoutModal = () => {
+    setPayoutModalOpen(false);
+    setPayoutAmount("");
+    setPayoutCashbox("");
+    setPayoutCreatedRequestId(null);
+    setPayoutFile(null);
+    setPayoutFileTitle("");
+    setPayoutError(null);
+  };
+
+  const finalizePayoutCompletion = async () => {
+    const res = await dispatch(
+      updateBuildingWorkEntry({ id: entryId, payload: { work_status: "completed" } }),
+    );
+    if (res?.meta?.requestStatus === "fulfilled") {
+      alert("Заявка на выплату создана, файл прикреплен, работа завершена");
+      closePayoutModal();
+      dispatch(fetchBuildingWorkEntryById(entryId));
+      return true;
+    }
+    setPayoutError(
+      validateResErrors(
+        res?.payload || res?.error,
+        "Заявка и файл сохранены, но не удалось завершить работу",
+      ),
+    );
+    return false;
+  };
+
+  const handlePayoutSubmit = async (e) => {
+    e.preventDefault();
+    if (!entryId || !payoutCashbox) {
+      setPayoutError("Выберите кассу");
+      return;
+    }
+    const contractorId = entry?.contractor ?? entry?.contractor_id;
+    if (!contractorId) {
+      setPayoutError("Подрядчик не указан");
+      return;
+    }
+    const amount = String(payoutAmount || "").trim();
+    if (!amount || Number.isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+      setPayoutError("Укажите сумму выплаты");
+      return;
+    }
+    if (!payoutFile) {
+      setPayoutError("Прикрепите файл к заявке на выплату");
+      return;
+    }
+    setPayoutSubmitting(true);
+    setPayoutError(null);
+    try {
+      const { data } = await api.post("/building/cash-register/requests/", {
+        request_type: "contractor_payment",
+        work_entry: entryId,
+        contractor: contractorId,
+        amount,
+        cashbox: payoutCashbox,
+        comment: "Оплата по договору с подрядчиком",
+      });
+      const createdId = data?.id ?? data?.uuid;
+      if (!createdId) {
+        setPayoutError("Не удалось получить ID созданной заявки для прикрепления файла");
+        return;
+      }
+      try {
+        const formData = new FormData();
+        formData.append("file", payoutFile);
+        if (payoutFileTitle.trim()) formData.append("title", payoutFileTitle.trim());
+        await uploadBuildingCashRegisterRequestFile(createdId, formData);
+      } catch (uploadErr) {
+        setPayoutCreatedRequestId(createdId);
+        setPayoutError(
+          validateResErrors(
+            uploadErr,
+            "Заявка создана, но не удалось прикрепить файл. Загрузите файл, чтобы завершить работу",
+          ),
+        );
+        return;
+      }
+      await finalizePayoutCompletion();
+    } catch (err) {
+      setPayoutError(
+        validateResErrors(err, "Не удалось создать заявку на выплату"),
+      );
+    } finally {
+      setPayoutSubmitting(false);
+    }
+  };
+
+  const handlePayoutFileUpload = async (e) => {
+    e.preventDefault();
+    if (!payoutCreatedRequestId || !payoutFile) return;
+    setPayoutFileUploading(true);
+    setPayoutError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", payoutFile);
+      if (payoutFileTitle.trim()) formData.append("title", payoutFileTitle.trim());
+      await uploadBuildingCashRegisterRequestFile(payoutCreatedRequestId, formData);
+      await finalizePayoutCompletion();
+    } catch (err) {
+      setPayoutError(
+        validateResErrors(err, "Не удалось прикрепить файл к заявке на выплату"),
+      );
+    } finally {
+      setPayoutFileUploading(false);
+    }
   };
 
   return (
@@ -729,7 +945,19 @@ export default function BuildingWorkProcessDetail() {
               В работу
             </button>
           )}
-          {!isCancelled && (
+          {(isInProgress || isPaused) && !isCancelled && (
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              onClick={handleCompleteWork}
+              disabled={!entry || statusUpdating}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <ClipboardList size={18} />
+              Завершить работу
+            </button>
+          )}
+          {!isCancelled && !isCompleted && (
             <button
               type="button"
               className="add-product-page__cancel-btn"
@@ -751,21 +979,23 @@ export default function BuildingWorkProcessDetail() {
             <Package size={18} />
             Заявка на склад
           </button>
-          <button
-            type="button"
-            className="add-product-page__submit-btn"
-            onClick={() => {
-              setAdvanceAmount("");
-              setAdvanceCashbox("");
-              setAdvanceError(null);
-              setAdvanceModalOpen(true);
-            }}
-            disabled={!entry}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
-            <Banknote size={18} />
-            Получить аванс
-          </button>
+          {!isCancelled && !isCompleted && (
+            <button
+              type="button"
+              className="add-product-page__submit-btn"
+              onClick={() => {
+                setAdvanceAmount("");
+                setAdvanceCashbox("");
+                setAdvanceError(null);
+                setAdvanceModalOpen(true);
+              }}
+              disabled={!entry}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Banknote size={18} />
+              Получить аванс
+            </button>
+          )}
         </div>
       </div>
 
@@ -913,6 +1143,30 @@ export default function BuildingWorkProcessDetail() {
                 <label className="add-product-page__label">Договор</label>
                 <div className="work-detail__value">
                   {entry?.treaty_display ?? entry?.treaty_number ?? entry?.treaty_title ?? "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Режим оплаты</label>
+                <div className="work-detail__value">
+                  {WORK_PROCUREMENT_PAYMENT_MODE_LABELS[entry?.payment_mode] ||
+                    entry?.payment_mode ||
+                    "—"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">
+                  Автосоздание договора
+                </label>
+                <div className="work-detail__value">
+                  {entry?.treaty_auto_create ? "Да" : "Нет"}
+                </div>
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Тип договора</label>
+                <div className="work-detail__value">
+                  {TREATY_TYPE_LABELS[entry?.treaty_type] ||
+                    entry?.treaty_type ||
+                    "—"}
                 </div>
               </div>
               <div className="add-product-page__form-group">
@@ -1283,6 +1537,131 @@ export default function BuildingWorkProcessDetail() {
               </div>
             )}
           </div>
+
+          <div className="add-product-page__section" style={{ marginTop: 24 }}>
+            <div
+              className="add-product-page__section-header"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="add-product-page__section-number">5</div>
+                <h3 className="add-product-page__section-title">
+                  Получено со склада
+                </h3>
+              </div>
+            </div>
+            {warehouseReceiptsLoading ? (
+              <div className="work-detail__muted">Загрузка полученных материалов...</div>
+            ) : warehouseReceiptsError ? (
+              <div className="add-product-page__error">
+                {String(warehouseReceiptsError)}
+              </div>
+            ) : warehouseReceipts.length === 0 ? (
+              <div className="work-detail__muted">
+                По этому процессу работ пока ничего не выдано со склада.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                {warehouseReceipts.map((receipt, index) => {
+                  const items = Array.isArray(receipt?.items) ? receipt.items : [];
+                  const filesList = Array.isArray(receipt?.files) ? receipt.files : [];
+                  return (
+                    <div
+                      key={receipt?.warehouse_movement_id ?? receipt?.id ?? index}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 12,
+                        padding: 14,
+                        background: "#fff",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                          gap: 12,
+                        }}
+                      >
+                        <div>
+                          <div className="building-page__muted">Склад</div>
+                          <div>{receipt?.warehouse_name || receipt?.warehouse || "—"}</div>
+                        </div>
+                        <div>
+                          <div className="building-page__muted">Кому передали</div>
+                          <div>{receipt?.issued_to || "—"}</div>
+                        </div>
+                        <div>
+                          <div className="building-page__muted">Дата выдачи</div>
+                          <div>{asDateTime(receipt?.issued_at || receipt?.created_at)}</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 12 }}>
+                        <div className="building-page__muted" style={{ marginBottom: 6 }}>
+                          Позиции
+                        </div>
+                        {items.length === 0 ? (
+                          <div className="work-detail__muted">Позиции не указаны.</div>
+                        ) : (
+                          <div className="building-table building-table--shadow">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th>Наименование</th>
+                                  <th>Количество</th>
+                                  <th>Ед.</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {items.map((item, itemIndex) => (
+                                  <tr
+                                    key={
+                                      item?.nomenclature ??
+                                      item?.id ??
+                                      `${index}-${itemIndex}`
+                                    }
+                                  >
+                                    <td>{item?.name || item?.title || item?.nomenclature || "—"}</td>
+                                    <td>{item?.quantity ?? "—"}</td>
+                                    <td>{item?.unit || "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                      {filesList.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div className="building-page__muted" style={{ marginBottom: 6 }}>
+                            Файлы
+                          </div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {filesList.map((file, fileIndex) => (
+                              <a
+                                key={file?.id ?? file?.uuid ?? fileIndex}
+                                href={getFileUrl(file)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="building-btn"
+                              >
+                                {getFileName(file)}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
@@ -1611,7 +1990,7 @@ export default function BuildingWorkProcessDetail() {
         {advanceCreatedRequestId ? (
           <div className="building-page">
             <p className="building-page__muted" style={{ marginBottom: 16 }}>
-              Заявка на аванс создана. Ожидает одобрения кассы. При необходимости прикрепите файлы.
+              Заявка на аванс уже создана, но файл не прикрепился. Загрузите файл к этой заявке, чтобы завершить оформление.
             </p>
             <form onSubmit={handleAdvanceFileUpload}>
               <div className="add-product-page__form-group">
@@ -1643,19 +2022,10 @@ export default function BuildingWorkProcessDetail() {
                   className="add-product-page__submit-btn"
                   disabled={advanceFileUploading || !advanceFile}
                 >
-                  {advanceFileUploading ? "Загрузка..." : "Прикрепить файл"}
+                  {advanceFileUploading ? "Загрузка..." : "Прикрепить файл к заявке"}
                 </button>
               </div>
             </form>
-            <div className="add-product-page__actions" style={{ marginTop: 16 }}>
-              <button
-                type="button"
-                className="add-product-page__submit-btn"
-                onClick={closeAdvanceModal}
-              >
-                Готово
-              </button>
-            </div>
           </div>
         ) : (
           <form className="building-page" onSubmit={handleAdvanceSubmit}>
@@ -1711,9 +2081,32 @@ export default function BuildingWorkProcessDetail() {
                 })}
               </select>
             </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Файл</label>
+              <input
+                type="file"
+                className="add-product-page__input"
+                onChange={(e) => setAdvanceFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Подпись файла (необязательно)</label>
+              <input
+                type="text"
+                className="add-product-page__input"
+                value={advanceFileTitle}
+                onChange={(e) => setAdvanceFileTitle(e.target.value)}
+                placeholder="Например: Договор, Акт"
+              />
+            </div>
             {advanceError && (
               <div className="add-product-page__error" style={{ marginBottom: 12 }}>
                 {String(advanceError)}
+              </div>
+            )}
+            {advanceFileError && (
+              <div className="add-product-page__error" style={{ marginBottom: 12 }}>
+                {String(advanceFileError)}
               </div>
             )}
             <div className="add-product-page__actions" style={{ marginTop: 12 }}>
@@ -1731,6 +2124,164 @@ export default function BuildingWorkProcessDetail() {
                 disabled={advanceSubmitting}
               >
                 {advanceSubmitting ? "Создание..." : "Создать заявку на аванс"}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      <Modal
+        open={payoutModalOpen}
+        onClose={() => {
+          if (payoutSubmitting || payoutFileUploading) return;
+          closePayoutModal();
+        }}
+        title="Выплата подрядчику"
+      >
+        {payoutCreatedRequestId ? (
+          <div className="building-page">
+            <p className="building-page__muted" style={{ marginBottom: 16 }}>
+              Заявка на выплату уже создана, но файл не прикрепился. Загрузите файл к этой заявке, чтобы завершить работу.
+            </p>
+            <form onSubmit={handlePayoutFileUpload}>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Файл</label>
+                <input
+                  type="file"
+                  className="add-product-page__input"
+                  onChange={(e) => setPayoutFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+              <div className="add-product-page__form-group">
+                <label className="add-product-page__label">Подпись файла (необязательно)</label>
+                <input
+                  type="text"
+                  className="add-product-page__input"
+                  value={payoutFileTitle}
+                  onChange={(e) => setPayoutFileTitle(e.target.value)}
+                  placeholder="Например: Акт, Договор"
+                />
+              </div>
+              {payoutError && (
+                <div className="add-product-page__error" style={{ marginBottom: 12 }}>
+                  {String(payoutError)}
+                </div>
+              )}
+              <div className="add-product-page__actions" style={{ marginTop: 12 }}>
+                <button
+                  type="submit"
+                  className="add-product-page__submit-btn"
+                  disabled={payoutFileUploading || !payoutFile}
+                >
+                  {payoutFileUploading ? "Загрузка..." : "Прикрепить файл и завершить"}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <form className="building-page" onSubmit={handlePayoutSubmit}>
+            {entry && entry?.contract_amount != null && entry.contract_amount !== "" && (
+              <div
+                className="work-detail__advance-summary"
+                style={{
+                  marginBottom: 16,
+                  padding: 12,
+                  background: "var(--surface-secondary, #f1f5f9)",
+                  borderRadius: 8,
+                }}
+              >
+                <div className="add-product-page__form-group" style={{ marginBottom: 8 }}>
+                  <label className="add-product-page__label">Сумма договора</label>
+                  <div className="work-detail__value">
+                    {Number(entry.contract_amount).toLocaleString("ru-RU")}
+                  </div>
+                </div>
+                <div className="add-product-page__form-group" style={{ marginBottom: 8 }}>
+                  <label className="add-product-page__label">− Выдано авансов</label>
+                  <div className="work-detail__value">
+                    {approvedAdvanceLoading
+                      ? "…"
+                      : approvedAdvanceSum != null && approvedAdvanceSum > 0
+                        ? Number(approvedAdvanceSum).toLocaleString("ru-RU")
+                        : "0"}
+                  </div>
+                </div>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">= Остаток к выплате</label>
+                  <div className="work-detail__value">
+                    {approvedAdvanceLoading ? "…" : remainingContractAmount.toLocaleString("ru-RU")}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Сумма выплаты</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="add-product-page__input"
+                value={payoutAmount}
+                onChange={(e) => setPayoutAmount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Касса</label>
+              <select
+                className="add-product-page__input"
+                value={payoutCashbox}
+                onChange={(e) => setPayoutCashbox(e.target.value)}
+              >
+                <option value="">Выберите кассу</option>
+                {advanceCashboxes.map((c) => {
+                  const cid = c?.id ?? c?.uuid ?? "";
+                  return (
+                    <option key={cid} value={cid}>
+                      {c?.name ?? c?.title ?? cid}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Файл</label>
+              <input
+                type="file"
+                className="add-product-page__input"
+                onChange={(e) => setPayoutFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div className="add-product-page__form-group">
+              <label className="add-product-page__label">Подпись файла (необязательно)</label>
+              <input
+                type="text"
+                className="add-product-page__input"
+                value={payoutFileTitle}
+                onChange={(e) => setPayoutFileTitle(e.target.value)}
+                placeholder="Например: Акт, Договор"
+              />
+            </div>
+            {payoutError && (
+              <div className="add-product-page__error" style={{ marginBottom: 12 }}>
+                {String(payoutError)}
+              </div>
+            )}
+            <div className="add-product-page__actions" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="add-product-page__cancel-btn"
+                onClick={closePayoutModal}
+                disabled={payoutSubmitting}
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                className="add-product-page__submit-btn"
+                disabled={payoutSubmitting}
+              >
+                {payoutSubmitting ? "Создание..." : "Отправить выплату и завершить"}
               </button>
             </div>
           </form>

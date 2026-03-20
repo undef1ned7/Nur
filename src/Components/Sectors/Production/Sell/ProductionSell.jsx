@@ -1,7 +1,9 @@
 import { Search } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDebounce } from "../../../../hooks/useDebounce";
 import { getAgentSalesList, agentSaleReturn } from "../../../../api/agentSales";
+import { useUser } from "../../../../store/slices/userSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import ProductionSellDetail from "./ProductionSellDetail";
 import "../../../pages/Sell/sell.scss";
@@ -38,6 +40,8 @@ const paymentMethodTranslate = {
 };
 
 const ProductionSell = () => {
+  const navigate = useNavigate();
+  const { profile } = useUser();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -164,6 +168,8 @@ const ProductionSell = () => {
     sale?.items?.[0]?.name ??
     "—";
 
+  const isOwner = profile?.role === "owner";
+
   return (
     <div>
       <div className="sell__header">
@@ -184,6 +190,15 @@ const ProductionSell = () => {
             </span>
           </div>
         </div>
+        {isOwner && (
+          <button
+            type="button"
+            className="sell__header-btn production-sell__start-btn"
+            onClick={() => navigate("start")}
+          >
+            Начать продажу
+          </button>
+        )}
       </div>
 
       <div className="sell__history production-sell">

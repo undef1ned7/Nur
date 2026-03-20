@@ -282,6 +282,93 @@ export const uploadBuildingCashRegisterRequestFile = async (requestId, formData)
   return data;
 };
 
+/**
+ * Статистика квартир по блокам.
+ * GET /api/building/objects/{residential_complex_id}/blocks/stats/
+ */
+export const getBuildingBlocksStats = async (
+  residentialComplexId,
+  params = {},
+) => {
+  const { data } = await api.get(
+    `/building/objects/${residentialComplexId}/blocks/stats/`,
+    { params },
+  );
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data)) return data;
+  return [];
+};
+
+/**
+ * Что было выдано со склада по процессу работ.
+ * GET /api/building/work-entries/{id}/warehouse-receipts/
+ */
+export const getBuildingWorkEntryWarehouseReceipts = async (workEntryId) => {
+  const { data } = await api.get(
+    `/building/work-entries/${workEntryId}/warehouse-receipts/`,
+  );
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data)) return data;
+  return Array.isArray(data?.items) ? data.items : [];
+};
+
+/**
+ * Получить АВР процесса работ.
+ * GET /api/building/work-entries/{id}/acceptance/
+ */
+export const getBuildingWorkEntryAcceptance = async (workEntryId) => {
+  const { data } = await api.get(`/building/work-entries/${workEntryId}/acceptance/`);
+  return data;
+};
+
+/**
+ * Создать АВР процесса работ.
+ * POST /api/building/work-entries/{id}/acceptance/
+ */
+export const saveBuildingWorkEntryAcceptance = async (
+  workEntryId,
+  payload = {},
+) => {
+  const { data } = await api.post(
+    `/building/work-entries/${workEntryId}/acceptance/`,
+    payload,
+  );
+  return data;
+};
+
+/**
+ * Обновить АВР процесса работ.
+ * PATCH /api/building/work-entry-acceptance/{id}/
+ */
+export const updateBuildingWorkEntryAcceptance = async (
+  acceptanceId,
+  payload = {},
+) => {
+  const { data } = await api.patch(
+    `/building/work-entry-acceptance/${acceptanceId}/`,
+    payload,
+  );
+  return data;
+};
+
+/**
+ * Прикрепить файл к АВР.
+ * POST /api/building/work-entry-acceptance/{id}/files/
+ */
+export const uploadBuildingWorkEntryAcceptanceFile = async (
+  acceptanceId,
+  formData,
+) => {
+  const { data } = await api.post(
+    `/building/work-entry-acceptance/${acceptanceId}/files/`,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
+  return data;
+};
+
 export default {
   getInstallmentPayments,
   createInstallmentPayment,
@@ -306,5 +393,11 @@ export default {
   rejectBuildingCashRegisterRequest,
   getBuildingCashRegisterRequest,
   uploadBuildingCashRegisterRequestFile,
+  getBuildingBlocksStats,
+  getBuildingWorkEntryWarehouseReceipts,
+  getBuildingWorkEntryAcceptance,
+  saveBuildingWorkEntryAcceptance,
+  updateBuildingWorkEntryAcceptance,
+  uploadBuildingWorkEntryAcceptanceFile,
 };
 

@@ -14,6 +14,13 @@ export default function ClientEditModal({
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editDate, setEditDate] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [editLlc, setEditLlc] = useState("");
+  const [editInn, setEditInn] = useState("");
+  const [editOkpo, setEditOkpo] = useState("");
+  const [editScore, setEditScore] = useState("");
+  const [editBik, setEditBik] = useState("");
+  const [editAddress, setEditAddress] = useState("");
   const [saveClientErr, setSaveClientErr] = useState("");
   const [savingClient, setSavingClient] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({
@@ -28,6 +35,13 @@ export default function ClientEditModal({
     setEditPhone(client?.phone || "");
     setEditEmail(client?.email || "");
     setEditDate(toIsoDate10(client?.date) || "");
+    setEditStatus(client?.status || "");
+    setEditLlc(client?.llc || "");
+    setEditInn(client?.inn || "");
+    setEditOkpo(client?.okpo || "");
+    setEditScore(client?.score || "");
+    setEditBik(client?.bik || "");
+    setEditAddress(client?.address || "");
     setSaveClientErr("");
   }, [open, client]);
 
@@ -36,12 +50,34 @@ export default function ClientEditModal({
   const requiredOk =
     String(editFio).trim().length > 0 && String(editPhone).trim().length > 0;
 
-  const updateClientApi = async (clientId, { full_name, phone, email, date }) => {
+  const updateClientApi = async (
+    clientId,
+    {
+      full_name,
+      phone,
+      email,
+      date,
+      status,
+      llc,
+      inn,
+      okpo,
+      score,
+      bik,
+      address,
+    },
+  ) => {
     const payload = {
       full_name: String(full_name || "").trim(),
       phone: String(phone || "").trim(),
-      ...(email ? { email: String(email).trim() } : {}),
-      ...(date ? { date: toIsoDate10(date) } : {}),
+      email: String(email || "").trim(),
+      date: date ? toIsoDate10(date) : "",
+      status: String(status || "").trim(),
+      llc: String(llc || "").trim(),
+      inn: String(inn || "").trim(),
+      okpo: String(okpo || "").trim(),
+      score: String(score || "").trim(),
+      bik: String(bik || "").trim(),
+      address: String(address || "").trim(),
     };
     const res = await api.put(`/main/clients/${clientId}/`, payload);
     return res?.data || payload;
@@ -65,6 +101,13 @@ export default function ClientEditModal({
         phone: editPhone,
         email: editEmail,
         date: editDate,
+        status: editStatus,
+        llc: editLlc,
+        inn: editInn,
+        okpo: editOkpo,
+        score: editScore,
+        bik: editBik,
+        address: editAddress,
       });
 
       onUpdated?.({
@@ -75,6 +118,13 @@ export default function ClientEditModal({
         phone: updated.phone || editPhone,
         email: updated.email ?? editEmail,
         date: toIsoDate10(updated.date || editDate),
+        status: updated.status ?? editStatus,
+        llc: updated.llc ?? editLlc,
+        inn: updated.inn ?? editInn,
+        okpo: updated.okpo ?? editOkpo,
+        score: updated.score ?? editScore,
+        bik: updated.bik ?? editBik,
+        address: updated.address ?? editAddress,
       });
 
       onClose?.();
@@ -183,6 +233,83 @@ export default function ClientEditModal({
               <div className="client-edit-modal__hint hint">
                 Например: <b>21.08.2025</b> (сохранится как 2025-08-21)
               </div>
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">Статус</span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value)}
+                placeholder="new"
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">ОсОО</span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editLlc}
+                onChange={(e) => setEditLlc(e.target.value)}
+                placeholder="ОсОО"
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">ИНН</span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editInn}
+                onChange={(e) => setEditInn(e.target.value)}
+                placeholder="ИНН"
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">ОКПО</span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editOkpo}
+                onChange={(e) => setEditOkpo(e.target.value)}
+                placeholder="ОКПО"
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">Счет</span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editScore}
+                onChange={(e) => setEditScore(e.target.value)}
+                placeholder="Расчетный счет"
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">БИК</span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editBik}
+                onChange={(e) => setEditBik(e.target.value)}
+                placeholder="БИК"
+              />
+            </label>
+
+            <label className="client-edit-modal__field field">
+              <span className="client-edit-modal__label">Адрес</span>
+              <input
+                type="text"
+                className="client-edit-modal__input"
+                value={editAddress}
+                onChange={(e) => setEditAddress(e.target.value)}
+                placeholder="Адрес"
+              />
             </label>
           </div>
         </div>

@@ -28,6 +28,7 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
   const dispatch = useDispatch();
   const { company } = useUser();
   const { pathname } = useLocation();
+  const isProductionWarehouse = pathname === "/crm/production/warehouse";
 
   // себестоимость за 1 шт (или price для производства)
   const unitCost = useMemo(
@@ -106,8 +107,9 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
         })
       ).unwrap();
 
-      // отправка в аналитику (расход по себестоимости)
-      if (selectCashBox && expense > 0) {
+      // На производственном складе списание не должно попадать в кассовый расход.
+      // Для остальных складов сохраняем прежнее поведение.
+      if (!isProductionWarehouse && selectCashBox && expense > 0) {
         try {
           await dispatch(
             addCashFlows({
@@ -241,8 +243,9 @@ const MarriageModal = ({ onClose, onChanged, item }) => {
               inputMode="numeric"
             />
             <div className="marriage-modal__hint">
-              Списание уменьшает остаток и фиксирует расход по себестоимости. Возврат
-              уменьшает остаток и делает приход в кассу.
+              {isProductionWarehouse
+                ? "Списание уменьшает только остаток товара на складе. Возврат уменьшает остаток и делает приход в кассу."
+                : "Списание уменьшает остаток и фиксирует расход по себестоимости. Возврат уменьшает остаток и делает приход в кассу."}
             </div>
           </div>
 

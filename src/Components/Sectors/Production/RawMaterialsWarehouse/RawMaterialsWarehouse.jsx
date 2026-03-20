@@ -10,6 +10,8 @@ import {
   updateItemsMake,
   deleteItemsMake,
 } from "../../../../store/creators/productCreators";
+import { fetchClientsAsync } from "../../../../store/creators/clientCreators";
+import { createDeal } from "../../../../store/creators/saleThunk";
 import {
   addCashFlows,
   getCashBoxes,
@@ -17,12 +19,14 @@ import {
 } from "../../../../store/slices/cashSlice";
 import { Plus, X, Search, LayoutGrid, Table2 } from "lucide-react";
 import { useUser } from "../../../../store/slices/userSlice";
+import { useClient } from "../../../../store/slices/ClientSlice";
 import AddRawMaterials from "../AddRawMaterials/AddRawMaterials";
 import "../../Market/Warehouse/Warehouse.scss";
 import { useAlert, useConfirm, useErrorModal } from "../../../../hooks/useDialog";
 import useResize from "../../../../hooks/useResize";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import api from "../../../../api";
 
 /* ---------- helpers ---------- */
 const toStartOfDay = (d) => {
@@ -39,6 +43,7 @@ const safeDate = (s) => {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 };
+const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 
 /* =========================================
    AddModal — добавление сырья
@@ -47,12 +52,18 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
   const alert = useAlert()
   const error = useErrorModal()
   const { company } = useUser();
+  const { list: clients = [] } = useClient();
   const [state, setState] = useState({
     name: "",
     price: "",
     quantity: "",
     unit: "",
+    client: "",
   });
+  const [paymentType, setPaymentType] = useState("full");
+  const [debtMonths, setDebtMonths] = useState("1");
+  const [prepayment, setPrepayment] = useState("");
+  const [firstPaymentDate, setFirstPaymentDate] = useState(getTodayIsoDate());
   const dispatch = useDispatch();
   const [cashData, setCashData] = useState({
     cashbox: "",
@@ -64,6 +75,14 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
     status:
       company?.subscription_plan?.name === "Старт" ? "approved" : "pending",
   });
+  const suppliers = useMemo(
+    () => (Array.isArray(clients) ? clients : []).filter((c) => c.type === "suppliers"),
+    [clients],
+  );
+  const selectedSupplier = useMemo(
+    () => suppliers.find((s) => String(s.id) === String(state.client)),
+    [suppliers, state.client],
+  );
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -73,16 +92,77 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
+      const totalAmount =
+        (Number(state?.price) || 0) * (Number(state?.quantity) || 0);
+
+      if (paymentType === "debt" || paymentType === "prepayment") {
+        if (!state.client) {
+          error("Выберите поставщика для этой операции");
+          return;
+        }
+        if (!debtMonths || Number(debtMonths) <= 0) {
+          error("Введите корректный срок долга");
+          return;
+        }
+        if (!firstPaymentDate) {
+          error("Укажите дату первой оплаты");
+          return;
+        }
+      }
+      if (paymentType === "prepayment") {
+        const prepaymentValue = Number(prepayment || 0);
+        if (!prepaymentValue || prepaymentValue <= 0) {
+          error("Введите корректную сумму предоплаты");
+          return;
+        }
+        if (prepaymentValue > totalAmount) {
+          error("Сумма предоплаты не может превышать общую сумму");
+          return;
+        }
+      }
+
       // EDIT: count -> quantity
       const result = await dispatch(createItemMake(state)).unwrap();
 
-      await dispatch(
-        addCashFlows({
-          ...cashData,
-          amount: (Number(state?.price) || 0) * (Number(state?.quantity) || 0),
-          source_cashbox_flow_id: result.id,
-        })
-      ).unwrap();
+      if ((paymentType === "debt" || paymentType === "prepayment") && state.client) {
+        const prepaymentValue = Number(prepayment || 0);
+        const remainingDebt =
+          paymentType === "prepayment"
+            ? Math.max(0, totalAmount - prepaymentValue)
+            : totalAmount;
+
+        if (company?.subscription_plan?.name === "Старт" && remainingDebt > 0) {
+          await api.post("/main/debts/", {
+            name: selectedSupplier?.full_name || selectedSupplier?.name || "Поставщик",
+            phone: selectedSupplier?.phone || "",
+            due_date: firstPaymentDate,
+            amount: remainingDebt,
+          });
+        }
+
+        await dispatch(
+          createDeal({
+            clientId: state.client,
+            title: `${paymentType === "prepayment" ? "Предоплата" : "Долг"} ${selectedSupplier?.full_name || state.name || "Поставщик"}`,
+            statusRu: paymentType === "prepayment" ? "Предоплата" : "Долги",
+            amount: totalAmount,
+            debtMonths: Number(debtMonths || 1),
+            prepayment: paymentType === "prepayment" ? prepaymentValue : undefined,
+            first_due_date: firstPaymentDate,
+          }),
+        ).unwrap();
+      }
+
+      if (paymentType !== "debt") {
+        await dispatch(
+          addCashFlows({
+            ...cashData,
+            amount: paymentType === "prepayment" ? Number(prepayment || 0) : totalAmount,
+            source_cashbox_flow_id: result.id,
+          })
+        ).unwrap();
+      }
+
       alert('Сырье добавлен!', () => {
         onSaved?.();
         onClose();
@@ -101,6 +181,10 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
       amount: state.price,
     }));
   }, [state, selectCashBox]);
+
+  useEffect(() => {
+    dispatch(fetchClientsAsync());
+  }, [dispatch]);
 
   return (
     <div className="add-modal raw-modal">
@@ -171,6 +255,81 @@ const AddModal = ({ onClose, selectCashBox, onSaved }) => {
             className="add-modal__input"
           />
         </div>
+
+        <div className="add-modal__section">
+          <label>Поставщик</label>
+          <select
+            name="client"
+            value={state.client}
+            onChange={onChange}
+            className="add-modal__input"
+          >
+            <option value="">-- Выберите поставщика --</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {!!state.client && (
+          <>
+            <div className="add-modal__section">
+              <label>Тип оплаты *</label>
+              <select
+                value={paymentType}
+                onChange={(e) => setPaymentType(e.target.value)}
+                className="add-modal__input"
+              >
+                <option value="full">Полная оплата</option>
+                <option value="prepayment">Предоплата</option>
+                <option value="debt">В долг</option>
+              </select>
+            </div>
+
+            {(paymentType === "debt" || paymentType === "prepayment") && (
+              <>
+                {paymentType === "prepayment" && (
+                  <div className="add-modal__section">
+                    <label>Сумма предоплаты *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={prepayment}
+                      onChange={(e) => setPrepayment(e.target.value)}
+                      className="add-modal__input"
+                      placeholder="Сумма предоплаты"
+                    />
+                  </div>
+                )}
+                <div className="add-modal__section">
+                  <label>Срок долга (мес.) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={debtMonths}
+                    onChange={(e) => setDebtMonths(e.target.value)}
+                    className="add-modal__input"
+                    placeholder="Срок долга"
+                  />
+                </div>
+
+                <div className="add-modal__section">
+                  <label>Дата первой оплаты *</label>
+                  <input
+                    type="date"
+                    value={firstPaymentDate}
+                    onChange={(e) => setFirstPaymentDate(e.target.value)}
+                    className="add-modal__input"
+                  />
+                </div>
+              </>
+            )}
+          </>
+        )}
 
         <div className="add-modal__footer">
           <button className="add-modal__cancel" onClick={onClose} type="button">

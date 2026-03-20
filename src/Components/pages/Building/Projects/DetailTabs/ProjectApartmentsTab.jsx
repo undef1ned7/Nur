@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useAlert, useConfirm } from "@/hooks/useDialog";
 import Modal from "@/Components/common/Modal/Modal";
+import buildingAPI from "@/api/building";
 import { useBuildingApartments } from "@/store/slices/building/apartmentsSlice";
 import {
   fetchBuildingApartments,
@@ -16,6 +17,7 @@ import { validateResErrors } from "../../../../../../tools/validateResErrors";
 
 const APARTMENT_INITIAL = {
   floor: "",
+  block: "",
   number: "",
   rooms: "",
   area: "",
@@ -50,6 +52,9 @@ export default function ProjectApartmentsTab({ residentialId }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(APARTMENT_INITIAL);
   const [formError, setFormError] = useState(null);
+  const [blockFilter, setBlockFilter] = useState("");
+  const [blockStats, setBlockStats] = useState([]);
+  const [blockStatsLoading, setBlockStatsLoading] = useState(false);
 
   const totalPages = useMemo(
     () => getPageCount(count, DEFAULT_PAGE_SIZE),
@@ -89,11 +94,45 @@ export default function ProjectApartmentsTab({ residentialId }) {
     dispatch(
       fetchBuildingApartments({
         residential_complex: residentialId,
+        block: blockFilter || undefined,
         page,
         page_size: DEFAULT_PAGE_SIZE,
       }),
     );
-  }, [dispatch, residentialId, page]);
+  }, [dispatch, residentialId, page, blockFilter]);
+
+  useEffect(() => {
+    if (!residentialId) return;
+    let cancelled = false;
+    setBlockStatsLoading(true);
+    buildingAPI
+      .getBuildingBlocksStats(residentialId)
+      .then((data) => {
+        if (!cancelled) {
+          setBlockStats(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setBlockStats([]);
+      })
+      .finally(() => {
+        if (!cancelled) setBlockStatsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [residentialId]);
+
+  const availableBlocks = useMemo(() => {
+    const values = new Set();
+    (Array.isArray(blockStats) ? blockStats : []).forEach((item) => {
+      if (item?.block) values.add(String(item.block));
+    });
+    (Array.isArray(list) ? list : []).forEach((item) => {
+      if (item?.block) values.add(String(item.block));
+    });
+    return Array.from(values);
+  }, [blockStats, list]);
 
   const handleFormChange = (key) => (e) => {
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
@@ -113,6 +152,7 @@ export default function ProjectApartmentsTab({ residentialId }) {
     setEditing(apartment);
     setForm({
       floor: apartment?.floor ?? "",
+      block: apartment?.block ?? "",
       number: apartment?.number ?? "",
       rooms: apartment?.rooms ?? "",
       area: apartment?.area ?? "",
@@ -141,6 +181,7 @@ export default function ProjectApartmentsTab({ residentialId }) {
     const payload = {
       residential_complex: residentialId,
       floor: form.floor || null,
+      block: String(form.block || "").trim() || null,
       number: String(form.number || "").trim(),
       rooms: form.rooms || null,
       area: form.area || null,
@@ -166,6 +207,7 @@ export default function ProjectApartmentsTab({ residentialId }) {
         dispatch(
           fetchBuildingApartments({
             residential_complex: residentialId,
+            block: blockFilter || undefined,
             page: 1,
             page_size: DEFAULT_PAGE_SIZE,
           }),
@@ -200,6 +242,7 @@ export default function ProjectApartmentsTab({ residentialId }) {
             dispatch(
               fetchBuildingApartments({
                 residential_complex: residentialId,
+                block: blockFilter || undefined,
                 page,
                 page_size: DEFAULT_PAGE_SIZE,
               }),
@@ -261,6 +304,69 @@ export default function ProjectApartmentsTab({ residentialId }) {
           Продана
         </span>
       </div>
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          flexWrap: "wrap",
+          marginBottom: 16,
+        }}
+      >
+        <label style={{ minWidth: 240 }}>
+          <div className="building-page__label">Фильтр по блоку</div>
+          <select
+            className="building-page__select"
+            value={blockFilter}
+            onChange={(e) => {
+              setBlockFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Все блоки</option>
+            {availableBlocks.map((block) => (
+              <option key={block} value={block}>
+                {block}
+              </option>
+            ))}
+          </select>
+        </label>
+        {blockStatsLoading ? (
+          <div className="building-page__muted">Загрузка статистики по блокам...</div>
+        ) : blockStats.length > 0 ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flex: 1 }}>
+            {blockStats.map((item) => (
+              <button
+                key={item?.block || "no-block"}
+                type="button"
+                className="building-page__card"
+                style={{
+                  minWidth: 180,
+                  textAlign: "left",
+                  border:
+                    blockFilter === item?.block
+                      ? "1px solid #0284c7"
+                      : "1px solid rgba(11, 35, 68, 0.08)",
+                }}
+                onClick={() => {
+                  setBlockFilter((prev) =>
+                    prev === item?.block ? "" : item?.block || "",
+                  );
+                  setPage(1);
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>{item?.block || "Без блока"}</div>
+                <div className="building-page__muted">
+                  Всего: {item?.total ?? 0} | Доступно: {item?.available ?? 0}
+                </div>
+                <div className="building-page__muted">
+                  Бронь: {item?.reserved ?? 0} | Продано: {item?.sold ?? 0}
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
       {!loading && list.length > 0 && (
         <div className="building-sell-plan-wrap">
           <div className="building-sell-plan building-table">
@@ -317,6 +423,18 @@ export default function ProjectApartmentsTab({ residentialId }) {
                             <span className="building-sell-plan__aptNum">
                               {apt?.number ?? "—"}
                             </span>
+                            {apt?.block && (
+                              <span
+                                style={{
+                                  display: "block",
+                                  marginTop: 4,
+                                  fontSize: 11,
+                                  opacity: 0.8,
+                                }}
+                              >
+                                {apt.block}
+                              </span>
+                            )}
                           </div>
                         </td>
                       );
@@ -373,6 +491,15 @@ export default function ProjectApartmentsTab({ residentialId }) {
               value={form.floor}
               onChange={handleFormChange("floor")}
               type="number"
+            />
+          </label>
+          <label>
+            <div className="building-page__label">Блок</div>
+            <input
+              className="building-page__input"
+              value={form.block}
+              onChange={handleFormChange("block")}
+              placeholder="Блок А / Подъезд 1 / Секция 2"
             />
           </label>
           <label>

@@ -99,6 +99,7 @@ const RoleSelect = ({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const refWrap = useRef(null);
+  const refSearchInput = useRef(null);
 
   const labelByKey = useMemo(() => {
     const m = new Map();
@@ -131,6 +132,21 @@ const RoleSelect = ({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => {
+      if (refSearchInput.current) {
+        refSearchInput.current.focus();
+        refSearchInput.current.scrollIntoView({
+          block: "start",
+          inline: "nearest",
+          behavior: "smooth",
+        });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
   return (
     <div
       className={`barbermasters__select ${open ? "is-open" : ""} ${className}`}
@@ -158,11 +174,11 @@ const RoleSelect = ({
           <div className="barbermasters__selectSearch">
             <FaSearch className="barbermasters__selectSearchIcon" />
             <input
+              ref={refSearchInput}
               className="barbermasters__selectSearchInput"
               placeholder="Поиск роли…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              autoFocus
             />
           </div>
 

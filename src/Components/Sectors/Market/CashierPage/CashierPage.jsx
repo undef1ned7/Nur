@@ -236,6 +236,21 @@ const CashierPage = () => {
     setAlertModal((prev) => ({ ...prev, open: false }));
   };
 
+  const handleProductCardClick = async (product, event) => {
+    const timeSinceLastScan = Date.now() - lastScanTimeRef.current;
+
+    // Некоторые сканеры отправляют завершающий Enter/клик, из-за чего
+    // товар под курсором может случайно добавиться в корзину.
+    // Игнорируем такие клики во время сканирования и сразу после него.
+    if (barcodeProcessingRef.current || isScanningRef.current || timeSinceLastScan < 700) {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      return;
+    }
+
+    await addToCart(product);
+  };
+
   // Функция для обновления продажи после запросов
   const refreshSale = useCallback(async () => {
     // Не обновляем продажу, если нет открытой смены
@@ -1713,15 +1728,19 @@ const CashierPage = () => {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
+                  const now = Date.now();
+                  const timeSinceLastInput = now - lastSearchInputTime.current;
+                  const isScannerSubmit =
+                    barcodeProcessingRef.current ||
+                    isScanningRef.current ||
+                    scanKeysRef.current.count >= 6;
 
                   // Если в поле поиска есть текст и нажат Enter, это может быть сканирование
                   // Обновляем время сканирования как fallback (на случай, если onScanned еще не сработал)
                   if (searchTerm.length > 0) {
-                    const timeSinceLastInput =
-                      Date.now() - lastSearchInputTime.current;
                     // Если ввод был недавно (менее 500мс), считаем это сканированием
                     if (timeSinceLastInput < 500) {
-                      lastScanTimeRef.current = Date.now();
+                      lastScanTimeRef.current = now;
                       isScanningRef.current = true;
                       // Сбрасываем флаг через 2 секунды
                       setTimeout(() => {
@@ -1731,7 +1750,16 @@ const CashierPage = () => {
                   }
 
                   // Обновляем время последнего ввода (сканер завершает ввод Enter'ом)
-                  lastSearchInputTime.current = Date.now();
+                  lastSearchInputTime.current = now;
+
+                  // Во время сканирования не берем первый товар из списка поиска:
+                  // сканер сам добавляет товар через sendBarCode по точному barcode.
+                  if (isScannerSubmit || timeSinceLastInput < 500) {
+                    setSearchTerm("");
+                    searchClearedAfterScanRef.current = true;
+                    scanKeysRef.current.count = 0;
+                    return;
+                  }
 
                   // Если есть найденные товары, добавляем первый в корзину
                   if (filteredProducts.length > 0) {
@@ -1765,7 +1793,7 @@ const CashierPage = () => {
                     className={`cashier-page__product-card ${
                       cartItem ? "cashier-page__product-card--selected" : ""
                     }`}
-                    onClick={() => addToCart(product)}
+                    onClick={(e) => handleProductCardClick(product, e)}
                   >
                     {cartItem && (
                       <div className="cashier-page__product-badge">

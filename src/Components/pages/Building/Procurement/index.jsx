@@ -21,15 +21,26 @@ import {
   asDateTime,
   statusLabel,
 } from "../shared/constants";
+import {
+  TREATY_TYPE_OPTIONS,
+  WORK_PROCUREMENT_PAYMENT_MODE_OPTIONS,
+} from "../shared/buildingSpecOptions";
 import { useBuildingProcurements } from "@/store/slices/building/procurementsSlice";
 import { useBuildingSuppliers } from "@/store/slices/building/suppliersSlice";
 import { fetchBuildingSuppliers } from "@/store/creators/building/suppliersCreators";
+import { fetchBuildingTreaties } from "@/store/creators/building/treatiesCreators";
 import { useNavigate } from "react-router-dom";
+import { useBuildingTreaties } from "@/store/slices/building/treatiesSlice";
 import "./Procurement.scss";
 
 const CREATE_INITIAL = {
   title: "",
   comment: "",
+  payment_mode: "cash",
+  treaty: "",
+  treaty_auto_create: false,
+  treaty_type: "procurement",
+  treaty_title: "",
 };
 
 const VIEW_MODES = {
@@ -103,6 +114,7 @@ export default function BuildingProcurement() {
     actionError,
   } = useBuildingProcurements();
   const suppliersState = useBuildingSuppliers();
+  const treatiesState = useBuildingTreaties();
   const {
     list: warehouses,
     loading: warehousesLoading,
@@ -168,6 +180,12 @@ export default function BuildingProcurement() {
         page_size: 100,
       }),
     );
+    dispatch(
+      fetchBuildingTreaties({
+        residential_complex: selectedProjectId,
+        page_size: 100,
+      }),
+    );
   }, [dispatch, openCreate, selectedProjectId]);
 
   const onCreate = async (e) => {
@@ -182,6 +200,17 @@ export default function BuildingProcurement() {
       residential_complex: selectedProjectId,
       title: String(createForm.title || "").trim(),
       comment: String(createForm.comment || "").trim(),
+      payment_mode: createForm.payment_mode || "cash",
+      treaty: createForm.treaty_auto_create ? null : createForm.treaty || null,
+      treaty_auto_create: Boolean(createForm.treaty_auto_create),
+      treaty_type: createForm.treaty_auto_create
+        ? createForm.treaty_type || "procurement"
+        : null,
+      treaty_title: createForm.treaty_auto_create
+        ? String(createForm.treaty_title || "").trim() ||
+          String(createForm.title || "").trim() ||
+          null
+        : null,
     };
     if (createSupplierId) {
       payload.supplier = createSupplierId;
@@ -715,6 +744,104 @@ export default function BuildingProcurement() {
               }
             />
           </label>
+          <label>
+            <div className="building-page__label">Режим оплаты</div>
+            <select
+              className="building-page__select"
+              value={createForm.payment_mode}
+              onChange={(e) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  payment_mode: e.target.value,
+                }))
+              }
+            >
+              {WORK_PROCUREMENT_PAYMENT_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <div className="building-page__label">Существующий договор</div>
+            <select
+              className="building-page__select"
+              value={createForm.treaty}
+              onChange={(e) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  treaty: e.target.value,
+                  treaty_auto_create: e.target.value
+                    ? false
+                    : prev.treaty_auto_create,
+                }))
+              }
+              disabled={Boolean(createForm.treaty_auto_create) || treatiesState.loading}
+            >
+              <option value="">Без договора</option>
+              {(treatiesState.list || []).map((treaty) => (
+                <option key={treaty.id ?? treaty.uuid} value={treaty.id ?? treaty.uuid}>
+                  {treaty.number || treaty.title || treaty.id || treaty.uuid}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label
+            style={{ display: "flex", gap: 8, alignItems: "center" }}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(createForm.treaty_auto_create)}
+              onChange={(e) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  treaty: e.target.checked ? "" : prev.treaty,
+                  treaty_auto_create: e.target.checked,
+                }))
+              }
+            />
+            <span className="building-page__label" style={{ margin: 0 }}>
+              Создать договор автоматически
+            </span>
+          </label>
+          {createForm.treaty_auto_create && (
+            <>
+              <label>
+                <div className="building-page__label">Тип договора</div>
+                <select
+                  className="building-page__select"
+                  value={createForm.treaty_type}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      treaty_type: e.target.value,
+                    }))
+                  }
+                >
+                  {TREATY_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <div className="building-page__label">Название нового договора</div>
+                <input
+                  className="building-page__input"
+                  value={createForm.treaty_title}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({
+                      ...prev,
+                      treaty_title: e.target.value,
+                    }))
+                  }
+                  placeholder="Если пусто, возьмём название закупки"
+                />
+              </label>
+            </>
+          )}
           {(createErrorFromSlice || actionError) && (
             <div className="building-page__error">
               {String(

@@ -62,7 +62,11 @@ const Layout = () => {
   const location = useLocation();
 
   const isHidden = useMemo(() => {
-    return location.pathname.startsWith("/crm/market/cashier") || location.pathname.startsWith("/crm/sell/start");
+    return (
+      location.pathname.startsWith("/crm/market/cashier") ||
+      location.pathname.startsWith("/crm/sell/start") ||
+      location.pathname.startsWith("/crm/production/sell/start")
+    );
   }, [location.pathname]);
 
   useEffect(() => {

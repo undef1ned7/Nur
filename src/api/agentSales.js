@@ -30,3 +30,12 @@ export const agentSaleReturn = async (saleId) => {
   const { data } = await api.post(`/main/agents/me/sales/${saleId}/return/`);
   return data;
 };
+
+/**
+ * Получить JSON данные накладной по продаже
+ * @param {string} saleId - UUID продажи
+ */
+export const getAgentSaleInvoiceJson = async (saleId) => {
+  const { data } = await api.get(`/main/sales/json/${saleId}/invoice/`);
+  return data;
+};

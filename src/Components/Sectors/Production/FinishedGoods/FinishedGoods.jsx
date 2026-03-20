@@ -179,7 +179,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
-  const [dealStatus, setDealStatus] = useState("");
+  const [dealStatus, setDealStatus] = useState("Полная оплата");
   const [debtMonths, setDebtMonths] = useState("");
   const [prepayment, setPrepayment] = useState("");
 
@@ -234,7 +234,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
     // Поставщик: при смене/очистке сбрасываем зависимые поля долга/предоплаты
     if (name === "client") {
       setProduct((prev) => ({ ...prev, [name]: value }));
-      setDealStatus("");
+      setDealStatus("Полная оплата");
       setDebtMonths("");
       setPrepayment("");
       return;
@@ -395,12 +395,6 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       return false;
     }
 
-    // Если выбран поставщик — тип оплаты обязателен
-    if (product.client && !dealStatus?.trim()) {
-      error("При выбранном поставщике укажите тип оплаты.");
-      return false;
-    }
-
     // Долги: срок долга обязателен (только если выбран поставщик)
     if (product.client && dealStatus === "Долги") {
       if (!debtMonths || Number(debtMonths) < 1) {
@@ -486,7 +480,7 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
 
     setCreating(true);
     try {
-      if (product.client !== "") {
+      if (product.client !== "" && dealStatus !== "Полная оплата") {
         // ВАЖНО: расчёт суммы для поставщика — по закупочной цене (а не по розничной)
         const purchaseTotal =
           Number(product.purchase_price || 0) * Number(product.quantity || 0);
@@ -527,12 +521,18 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
       };
 
       const created = await dispatch(createProductAsync(payload)).unwrap();
-      const amount = (product?.purchase_price * product?.quantity).toFixed(2);
-      if (amount > 0) {
+      const purchaseTotal = Number(product?.purchase_price || 0) * Number(product?.quantity || 0);
+      const amountForCash =
+        dealStatus === "Долги"
+          ? 0
+          : dealStatus === "Предоплата"
+            ? Number(prepayment || 0)
+            : purchaseTotal;
+      if (amountForCash > 0) {
         await dispatch(
           addCashFlows({
             ...cashData,
-            amount: amount,
+            amount: amountForCash.toFixed(2),
             source_cashbox_flow_id: created.id,
           })
         ).unwrap();
@@ -791,9 +791,8 @@ const AddModal = ({ onClose, onSaveSuccess, selectCashBox }) => {
                   className="finished-goods-add-modal__input"
                   value={dealStatus}
                   onChange={(e) => setDealStatus(e.target.value)}
-                  required
                 >
-                  <option value="">-- Выберите тип оплаты --</option>
+                  <option value="Полная оплата">Полная оплата</option>
                   {DEAL_STATUS_RU?.map((opt) => (
                     <option key={opt} value={opt}>
                       {opt}

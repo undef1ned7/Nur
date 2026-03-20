@@ -1,17 +1,18 @@
-import React, { useEffect, useMemo } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { fetchBuildingProjects } from "../../../store/creators/building/projectsCreators";
 import {
     setSelectedBuildingProjectId,
     useBuildingProjects,
 } from "../../../store/slices/building/projectsSlice";
+import CreateProjectModal from "./Projects/components/Create";
 import "./style.scss";
 
 export default function BuildingLayout() {
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const location = useLocation();
+    const [openCreate, setOpenCreate] = useState(false);
 
     const { items, selectedProjectId, loading, loaded } = useBuildingProjects();
 
@@ -25,6 +26,21 @@ export default function BuildingLayout() {
         if (projectsList.length > 0) return;
         dispatch(fetchBuildingProjects());
     }, [dispatch, loading, loaded, projectsList.length]);
+
+    useEffect(() => {
+        if (location?.state?.openCreate) {
+            setOpenCreate(true);
+        }
+    }, [location?.state]);
+
+    const handleCreated = (project) => {
+        const pid = project?.id ?? project?.uuid;
+        dispatch(fetchBuildingProjects());
+        if (pid) {
+            dispatch(setSelectedBuildingProjectId(String(pid)));
+        }
+        setOpenCreate(false);
+    };
 
     if (selectedProjectId) {
         return (
@@ -76,15 +92,18 @@ export default function BuildingLayout() {
                         <button
                             type="button"
                             className="building-layout__btn building-layout__btn--primary"
-                            onClick={() =>
-                                navigate("/crm/building/projects", { state: { openCreate: true } })
-                            }
+                            onClick={() => setOpenCreate(true)}
                         >
                             Добавить проект
                         </button>
                     </div>
                 </div>
             </div>
+            <CreateProjectModal
+                open={openCreate}
+                onClose={() => setOpenCreate(false)}
+                onCreated={handleCreated}
+            />
         </div>
     );
 }
