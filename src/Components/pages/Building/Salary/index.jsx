@@ -54,7 +54,9 @@ export default function BuildingSalary() {
   const [payrollStatusFilter, setPayrollStatusFilter] = useState("");
   const [isCreatePeriodModalOpen, setIsCreatePeriodModalOpen] = useState(false);
   const [payrollViewMode, setPayrollViewMode] = useState(() =>
-    typeof window !== "undefined" && window.innerWidth < 768 ? "cards" : "table",
+    typeof window !== "undefined" && window.innerWidth < 768
+      ? "cards"
+      : "table",
   );
 
   const getMonthPeriod = (monthOffset) => {
@@ -68,8 +70,18 @@ export default function BuildingSalary() {
     const start = `${first.getFullYear()}-${pad(first.getMonth() + 1)}-${pad(first.getDate())}`;
     const end = `${last.getFullYear()}-${pad(last.getMonth() + 1)}-${pad(last.getDate())}`;
     const monthNames = [
-      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+      "Январь",
+      "Февраль",
+      "Март",
+      "Апрель",
+      "Май",
+      "Июнь",
+      "Июль",
+      "Август",
+      "Сентябрь",
+      "Октябрь",
+      "Ноябрь",
+      "Декабрь",
     ];
     const monthLabel = `${monthNames[month]} ${year}`;
     const title = `ЗП за ${monthNames[month].toLowerCase()} ${year}`;
@@ -141,21 +153,24 @@ export default function BuildingSalary() {
   const handleApprovePayroll = (payroll) => {
     const id = payroll?.id ?? payroll?.uuid;
     if (!id) return;
-    confirm("Утвердить период начислений? После утверждения можно будет создавать выплаты.", async (ok) => {
-      if (!ok) return;
-      const res = await dispatch(approveBuildingPayroll(id));
-      if (res.meta.requestStatus === "fulfilled") {
-        alert("Период утвержден");
-      } else {
-        alert(
-          validateResErrors(
-            res.payload || res.error,
-            "Не удалось утвердить период",
-          ),
-          true,
-        );
-      }
-    });
+    confirm(
+      "Утвердить период начислений? После утверждения можно будет создавать выплаты.",
+      async (ok) => {
+        if (!ok) return;
+        const res = await dispatch(approveBuildingPayroll(id));
+        if (res.meta.requestStatus === "fulfilled") {
+          alert("Период утвержден");
+        } else {
+          alert(
+            validateResErrors(
+              res.payload || res.error,
+              "Не удалось утвердить период",
+            ),
+            true,
+          );
+        }
+      },
+    );
   };
 
   const handleDeletePayroll = async (payroll) => {
@@ -378,7 +393,9 @@ export default function BuildingSalary() {
           {activeTab === "payrolls" && payrollViewMode === "cards" && (
             <div className="salary-cards">
               {payrollsLoading ? (
-                <div className="salary-cards__loading">Загрузка периодов...</div>
+                <div className="salary-cards__loading">
+                  Загрузка периодов...
+                </div>
               ) : payrollsError ? (
                 <div className="salary-cards__error">
                   {String(
@@ -399,7 +416,9 @@ export default function BuildingSalary() {
                     <div
                       key={id}
                       className="salary-card"
-                      onClick={() => navigate(`/crm/building/salary/payroll/${id}`)}
+                      onClick={() =>
+                        navigate(`/crm/building/salary/payroll/${id}`)
+                      }
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
@@ -410,12 +429,17 @@ export default function BuildingSalary() {
                       }}
                     >
                       <div className="salary-card__main">
-                        <div className="salary-card__title">{p.title || "—"}</div>
+                        <div className="salary-card__title">
+                          {p.title || "—"}
+                        </div>
                         <div className="salary-card__period">
                           {p.period_start} — {p.period_end}
                         </div>
-                        <span className={`salary-card__status salary-card__status--${p.status || "draft"}`}>
-                          {PAYROLL_STATUS_LABELS[p.status] || PAYROLL_STATUS_LABELS.draft}
+                        <span
+                          className={`salary-card__status salary-card__status--${p.status || "draft"}`}
+                        >
+                          {PAYROLL_STATUS_LABELS[p.status] ||
+                            PAYROLL_STATUS_LABELS.draft}
                         </span>
                       </div>
                       <div
@@ -425,7 +449,9 @@ export default function BuildingSalary() {
                         <button
                           type="button"
                           className="salary-card__btn salary-card__btn--primary"
-                          onClick={() => navigate(`/crm/building/salary/payroll/${id}`)}
+                          onClick={() =>
+                            navigate(`/crm/building/salary/payroll/${id}`)
+                          }
                         >
                           Детали
                         </button>
@@ -587,7 +613,6 @@ export default function BuildingSalary() {
               }
             }}
           >
-          
             <label>
               <div className="building-page__label">Название периода *</div>
               <input
@@ -597,7 +622,10 @@ export default function BuildingSalary() {
                 placeholder="Например: ЗП за март 2026"
               />
             </label>
-            <div className="building-page__form-group" style={{ marginBottom: 12 }}>
+            <div
+              className="building-page__form-group"
+              style={{ marginBottom: 12 }}
+            >
               <div className="building-page__label">Быстрый выбор периода</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 <button
@@ -622,7 +650,10 @@ export default function BuildingSalary() {
                   {getMonthPeriod(2).monthLabel}
                 </button>
               </div>
-              <div className="building-page__muted" style={{ marginTop: 6, fontSize: 12 }}>
+              <div
+                className="building-page__muted"
+                style={{ marginTop: 6, fontSize: 12 }}
+              >
                 Либо укажите даты вручную ниже.
               </div>
             </div>
