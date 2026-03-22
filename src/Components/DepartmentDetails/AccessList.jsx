@@ -286,8 +286,14 @@ const SECTOR_ACCESS_TYPES = {
 const getAllAccessTypes = (sectorName, tariff = null) => {
   const basicAccess = [...BASIC_ACCESS_TYPES];
 
-  // Для тарифа "Старт" возвращаем только базовые доступы
+  // Для тарифа "Старт" — только базовые; кафе дополняем сектором без кухни
   if (tariff === "Старт") {
+    if (sectorName === "Кафе") {
+      const cafeNoCook = (SECTOR_ACCESS_TYPES["Кафе"] || []).filter(
+        (a) => a.backendKey !== "can_view_cafe_cook",
+      );
+      return [...basicAccess, ...cafeNoCook];
+    }
     return basicAccess;
   }
 

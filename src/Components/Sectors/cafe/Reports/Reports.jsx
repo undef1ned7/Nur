@@ -22,6 +22,8 @@ import {
 import api from "../../../../api";
 import "./reports.scss";
 import { Modal, ReportsModalContent } from "./ReportsModals";
+import { useUser } from "../../../../store/slices/userSlice";
+import { isStartPlan } from "../../../../utils/subscriptionPlan";
 
 Chart.register(
   LineController,
@@ -199,6 +201,12 @@ const sumBy = (arr, key) => arr.reduce((acc, x) => acc + toNum(x?.[key]), 0);
 
 /* ===== component ===== */
 const Reports = () => {
+  const { tariff, company } = useUser();
+  const hideKitchenStaffKpi = useMemo(
+    () => isStartPlan(tariff || company?.subscription_plan?.name),
+    [tariff, company?.subscription_plan?.name],
+  );
+
   const chartRef = useRef(null);
   const chartInstanceRef = useRef(null);
 
@@ -287,7 +295,12 @@ const Reports = () => {
       setLowStock(Array.isArray(listFrom(rLowStock)) ? listFrom(rLowStock) : []);
 
       fetchGuestsCount().catch(() => {});
-      fetchKitchenAnalytics().catch(() => {});
+      if (!hideKitchenStaffKpi) {
+        fetchKitchenAnalytics().catch(() => {});
+      } else {
+        setCooksRows([]);
+        setWaitersRows([]);
+      }
     } catch (e) {
       console.error("Reports fetchAll error:", e);
       setSalesSummary({ orders_count: 0, items_qty: 0, revenue: "0.00" });
@@ -296,7 +309,7 @@ const Reports = () => {
     } finally {
       setLoading(false);
     }
-  }, [params, fetchGuestsCount, fetchKitchenAnalytics]);
+  }, [params, fetchGuestsCount, fetchKitchenAnalytics, hideKitchenStaffKpi]);
 
   const fetchRevenueSeries = useCallback(async () => {
     if (!dateFrom || !dateTo) {
@@ -512,7 +525,7 @@ const Reports = () => {
                   fetchAll();
                   fetchRevenueSeries();
                 }}
-                disabled={loading || kitchenLoading}
+                disabled={loading || (!hideKitchenStaffKpi && kitchenLoading)}
                 type="button"
               >
                 <FaSync /> Обновить
@@ -556,40 +569,42 @@ const Reports = () => {
           </button>
         </div>
 
-        {/* KPI kitchen */}
-        <div className="cafeAnalytics__kpis cafeAnalytics__kpis--2">
-          <button
-            className="cafeAnalytics__kpi cafeAnalytics__kpi--kitchen"
-            type="button"
-            onClick={() => openModal("cooks")}
-            disabled={kitchenLoading}
-          >
-            <div className="cafeAnalytics__kpiTop">
-              <div className="cafeAnalytics__kpiLabel">ПОВАРА</div>
-              <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
-                <FaUsers />
+        {/* KPI kitchen — не в тарифе «Старт» */}
+        {!hideKitchenStaffKpi && (
+          <div className="cafeAnalytics__kpis cafeAnalytics__kpis--2">
+            <button
+              className="cafeAnalytics__kpi cafeAnalytics__kpi--kitchen"
+              type="button"
+              onClick={() => openModal("cooks")}
+              disabled={kitchenLoading}
+            >
+              <div className="cafeAnalytics__kpiTop">
+                <div className="cafeAnalytics__kpiLabel">ПОВАРА</div>
+                <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
+                  <FaUsers />
+                </div>
               </div>
-            </div>
-            <div className="cafeAnalytics__kpiValue">{fmtInt(cooksCount)}</div>
-            <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Сводка и рейтинг"}</div>
-          </button>
+              <div className="cafeAnalytics__kpiValue">{fmtInt(cooksCount)}</div>
+              <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Сводка и рейтинг"}</div>
+            </button>
 
-          <button
-            className="cafeAnalytics__kpi cafeAnalytics__kpi--kitchen"
-            type="button"
-            onClick={() => openModal("waiters")}
-            disabled={kitchenLoading}
-          >
-            <div className="cafeAnalytics__kpiTop">
-              <div className="cafeAnalytics__kpiLabel">ОФИЦИАНТЫ</div>
-              <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
-                <FaUsers />
+            <button
+              className="cafeAnalytics__kpi cafeAnalytics__kpi--kitchen"
+              type="button"
+              onClick={() => openModal("waiters")}
+              disabled={kitchenLoading}
+            >
+              <div className="cafeAnalytics__kpiTop">
+                <div className="cafeAnalytics__kpiLabel">ОФИЦИАНТЫ</div>
+                <div className="cafeAnalytics__kpiIcon cafeAnalytics__kpiIcon--yellow">
+                  <FaUsers />
+                </div>
               </div>
-            </div>
-            <div className="cafeAnalytics__kpiValue">{fmtInt(waitersCount)}</div>
-            <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Выручка, чеки, позиции"}</div>
-          </button>
-        </div>
+              <div className="cafeAnalytics__kpiValue">{fmtInt(waitersCount)}</div>
+              <div className="cafeAnalytics__kpiHint">{kitchenLoading ? "Загрузка…" : "Выручка, чеки, позиции"}</div>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Chart */}

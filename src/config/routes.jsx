@@ -100,7 +100,7 @@ import MarketAnalytics from "../Components/Sectors/Market/Analytics/Analytics";
 // Cafe
 import CafeAnalytics from "../Components/Sectors/cafe/CafeAnalytics/CafeAnalytics";
 import CafeDocuments from "../Components/Sectors/cafe/Documents/Documents";
-import Cook from "../Components/Sectors/cafe/Cook/Cook";
+import CafeCookRoute from "../Components/Sectors/cafe/Cook/CafeCookRoute";
 import CafeInventory from "../Components/Sectors/cafe/Inventory/CafeInventory";
 import CafeMenu from "../Components/Sectors/cafe/Menu/Menu";
 import CafeOrders from "../Components/Sectors/cafe/Orders/Orders";
@@ -526,7 +526,7 @@ export const crmRoutes = (profile) => [
     {[
       createProtectedRoute("analytics", CafeAnalytics),
       createProtectedRoute("documents", CafeDocuments),
-      createProtectedRoute("cook", Cook),
+      createProtectedRoute("cook", CafeCookRoute),
       createProtectedRoute("inventory", CafeInventory),
       createProtectedRoute("menu", CafeMenu),
       <Route path="orders" key={"cafe/orders"} element={<CafeOrdersLayout />}>

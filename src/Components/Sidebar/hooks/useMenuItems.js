@@ -19,13 +19,23 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     HIDE_RULES.forEach((rule) => {
       const { when = {}, hide = {} } = rule;
       const sectorOk = !when.sector || when.sector === sector;
+      const sectorNotInOk =
+        !when.sectorNotIn ||
+        !sector ||
+        !when.sectorNotIn.includes(sector);
       const tariffOk = !when.tariff || when.tariff === tariff;
       const tariffInOk =
         !when.tariffIn || (tariff && when.tariffIn.includes(tariff));
       const tariffNotInOk =
         !when.tariffNotIn || (tariff && !when.tariffNotIn.includes(tariff));
 
-      if (sectorOk && tariffOk && tariffInOk && tariffNotInOk) {
+      if (
+        sectorOk &&
+        sectorNotInOk &&
+        tariffOk &&
+        tariffInOk &&
+        tariffNotInOk
+      ) {
         (hide.labels || []).forEach((l) => result.labels.add(l));
         (hide.toIncludes || []).forEach((p) => result.toIncludes.push(p));
       }
@@ -66,10 +76,15 @@ export const useMenuItems = (company, sector, tariff, profile = null) => {
     const configKey = sectorMapping[sectorKey] || sectorKey;
     const sectorConfig = MENU_CONFIG.sector[configKey] || [];
 
-    // Для тарифа "Старт" показываем только аналитику маркета
+    // Для тарифа "Старт": магазин — только аналитика маркета; кафе — все пункты кроме кухни (повар/KDS)
     if (tariff === "Старт") {
+      if (configKey === "cafe") {
+        return sectorConfig.filter((item) => {
+          if (item.to === "/crm/cafe/cook") return false;
+          return hasPermission(item.permission);
+        });
+      }
       const filteredItems = sectorConfig.filter((item) => {
-        // Показываем только аналитику маркета
         if (item.to === "/crm/market/analytics") {
           return hasPermission(item.permission);
         }

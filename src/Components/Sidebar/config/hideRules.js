@@ -10,7 +10,7 @@ export const HIDE_RULES = [
     },
   },
   {
-    when: { tariff: "Старт" },
+    when: { tariff: "Старт", sectorNotIn: ["Кафе"] },
     hide: {
       labels: [
         "Обзор",
@@ -21,6 +21,31 @@ export const HIDE_RULES = [
         "Отделы",
         "Аналитика Отделов",
         "Филиалы",
+      ],
+    },
+  },
+  {
+    when: { tariff: "Старт", sector: "Кафе" },
+    hide: {
+      labels: [
+        "Обзор",
+        "Сотрудники",
+        "Бронирование",
+        "Клиенты",
+        "Отделы",
+        "Аналитика Отделов",
+        "Филиалы",
+      ],
+      toIncludes: [
+        "/crm/debts",
+        "/crm/cafe/reports",
+        "/crm/cafe/payroll",
+        "/crm/cafe/purchasing",
+        "/crm/zakaz",
+        "/crm/cafe/reservations",
+        "/crm/sklad",
+        "/crm/analytics",
+        "/crm/kassa",
       ],
     },
   },
@@ -39,7 +64,7 @@ export const HIDE_RULES = [
     },
   },
   {
-    when: { sector: "Кафе" },
+    when: { sector: "Кафе", tariffNotIn: ["Старт"] },
     hide: {
       toIncludes: [
         "/crm/zakaz",
