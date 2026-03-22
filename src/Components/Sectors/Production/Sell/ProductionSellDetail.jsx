@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   getAgentSaleInvoiceJson,
   getAgentSaleDetail,
+  getAllProductionSaleDetail,
   agentSaleReturn,
 } from "../../../../api/agentSales";
 import { useUser } from "../../../../store/slices/userSlice";
@@ -16,7 +17,12 @@ const kindTranslate = {
   debt: "Долг",
 };
 
-const ProductionSellDetail = ({ onClose, id, onReturnSuccess }) => {
+const ProductionSellDetail = ({
+  onClose,
+  id,
+  onReturnSuccess,
+  useGlobalAccess = false,
+}) => {
   const { company, profile } = useUser();
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +31,20 @@ const ProductionSellDetail = ({ onClose, id, onReturnSuccess }) => {
   const [error, setError] = useState("");
 
   const formatMoney = (value) => Number(value || 0).toFixed(2);
-  const discountTotal = Number(sale?.discount_total || 0);
+  const itemsDiscountTotal = Array.isArray(sale?.items)
+    ? sale.items.reduce(
+        (sum, item) =>
+          sum +
+          Number(
+            item?.line_discount ??
+              item?.discount_total ??
+              item?.line_discount_total ??
+              0,
+          ),
+        0,
+      )
+    : 0;
+  const discountTotal = Number(sale?.discount_total ?? itemsDiscountTotal ?? 0);
   const taxTotal = Number(sale?.tax_total || 0);
   const subtotal = Number(sale?.subtotal || 0);
   const total = Number(sale?.total || 0);
@@ -39,7 +58,10 @@ const ProductionSellDetail = ({ onClose, id, onReturnSuccess }) => {
     }
     let cancelled = false;
     setError("");
-    getAgentSaleDetail(id)
+    const loadSale = useGlobalAccess
+      ? getAllProductionSaleDetail(id)
+      : getAgentSaleDetail(id);
+    loadSale
       .then((data) => {
         if (!cancelled) setSale(data);
       })
@@ -58,7 +80,7 @@ const ProductionSellDetail = ({ onClose, id, onReturnSuccess }) => {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, useGlobalAccess]);
 
   const handleReturn = async () => {
     if (!id || !sale) return;
@@ -101,6 +123,7 @@ const ProductionSellDetail = ({ onClose, id, onReturnSuccess }) => {
 
       const productionInvoiceData = {
         ...invoiceData,
+        sale,
         seller: {
           ...invoiceData?.seller,
           address: invoiceData?.seller?.address || company?.address || null,
@@ -215,14 +238,40 @@ const ProductionSellDetail = ({ onClose, id, onReturnSuccess }) => {
                       {idx + 1}. {product.product_name ?? product.name ?? "—"}
                     </p>
                     <div>
+                      {(() => {
+                        const qty = Number(product.quantity || 0);
+                        const unitPrice = Number(product.unit_price || 0);
+                        const lineDiscount = Number(
+                          product.line_discount ??
+                            product.discount_total ??
+                            product.line_discount_total ??
+                            0,
+                        );
+                        const lineBase = qty * unitPrice;
+                        const lineTotal = Math.max(0, lineBase - lineDiscount);
+                        return (
                       <p className="receipt__item-price">
-                        {product.quantity} × {product.unit_price} ={" "}
-                        {(
-                          Number(product.quantity || 0) *
-                          Number(product.unit_price || 0)
-                        ).toFixed(2)}{" "}
-                        сом
+                            {qty} × {unitPrice.toFixed(2)} = {lineTotal.toFixed(2)} сом
                       </p>
+                        );
+                      })()}
+                      {Number(
+                        product.line_discount ??
+                          product.discount_total ??
+                          product.line_discount_total ??
+                          0,
+                      ) > 0 && (
+                        <p className="receipt__item-price">
+                          Скидка по позиции:{" "}
+                          {formatMoney(
+                            product.line_discount ??
+                              product.discount_total ??
+                              product.line_discount_total ??
+                              0,
+                          )}{" "}
+                          сом
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

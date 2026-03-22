@@ -44,10 +44,11 @@ export const startSale = createAsyncThunk(
           ? { discount_total: Number(args) || 0 }
           : args || {};
 
-      const { discount_total = 0, shift = null } = normalized;
-      const payload = {
-        order_discount_total: discount_total,
-      };
+      const { discount_total, shift = null, ...rest } = normalized;
+      const payload = { ...rest };
+      if (discount_total !== undefined && payload.order_discount_total === undefined) {
+        payload.order_discount_total = discount_total;
+      }
       // Если передан shift, добавляем его в payload
       if (shift) {
         payload.shift = shift;

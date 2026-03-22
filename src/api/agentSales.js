@@ -13,12 +13,22 @@ export const getAgentSalesList = async (params = {}) => {
   return data;
 };
 
+export const getAllProductionSalesList = async (params = {}) => {
+  const { data } = await api.get("/main/pos/sales/", { params });
+  return data;
+};
+
 /**
  * Детали продажи агента
  * @param {string} saleId - UUID продажи
  */
 export const getAgentSaleDetail = async (saleId) => {
   const { data } = await api.get(`/main/agents/me/sales/${saleId}/`);
+  return data;
+};
+
+export const getAllProductionSaleDetail = async (saleId) => {
+  const { data } = await api.get(`/main/pos/sales/${saleId}/`);
   return data;
 };
 

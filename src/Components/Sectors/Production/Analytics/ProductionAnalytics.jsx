@@ -998,6 +998,32 @@ const ProductionAnalytics = () => {
         </div>
 
         <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--purple">
+            <Receipt size={24} />
+          </div>
+          <div>
+            <h3>Дебиторская</h3>
+            <p>{formatMoney(summary.accounts_receivable || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Долги клиентов
+            </span>
+          </div>
+        </div>
+
+        <div className="agent-analytics__metric-card">
+          <div className="agent-analytics__metric-icon agent-analytics__metric-icon--light-blue">
+            <Wallet size={24} />
+          </div>
+          <div>
+            <h3>Кредиторская</h3>
+            <p>{formatMoney(summary.accounts_payable || 0)} сом</p>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Наши обязательства
+            </span>
+          </div>
+        </div>
+
+        <div className="agent-analytics__metric-card">
           <div className="agent-analytics__metric-icon agent-analytics__metric-icon--orange">
             <Wallet size={24} />
           </div>

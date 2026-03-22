@@ -76,6 +76,9 @@ const isApprovedAdvanceForWorkEntry = (request, expectedEntryId) => {
   );
 };
 
+const isBarterMode = (paymentMode) =>
+  String(paymentMode || "").toLowerCase() === "barter";
+
 export default function BuildingWorkProcessDetail() {
   const { id } = useParams();
   const entryId = id ? String(id) : null;
@@ -528,6 +531,7 @@ export default function BuildingWorkProcessDetail() {
   const isPlanned = entry?.work_status === "planned";
   const isCancelled = entry?.work_status === "cancelled";
   const isCompleted = entry?.work_status === "completed";
+  const barterMode = isBarterMode(entry?.payment_mode);
   const remainingContractAmount = Math.max(
     0,
     (Number(entry?.contract_amount) || 0) - (Number(approvedAdvanceSum) || 0),
@@ -626,12 +630,76 @@ export default function BuildingWorkProcessDetail() {
 
   const handleCompleteWork = () => {
     if (!entryId) return;
-    if (!(entry?.contractor ?? entry?.contractor_id)) {
-      alert("Чтобы завершить работу, сначала укажите подрядчика", true);
+    const contractorId = entry?.contractor ?? entry?.contractor_id;
+    const hasContractAmount = Number(entry?.contract_amount) > 0;
+
+    if (!contractorId || !hasContractAmount) {
+      confirm(
+        "Завершить процесс работ без оформления выплаты через кассу?",
+        async (ok) => {
+          if (!ok || !entryId) return;
+          setStatusUpdating(true);
+          try {
+            const res = await dispatch(
+              updateBuildingWorkEntry({
+                id: entryId,
+                payload: { work_status: "completed" },
+              }),
+            );
+            if (res?.meta?.requestStatus === "fulfilled") {
+              alert("Работа завершена");
+              dispatch(fetchBuildingWorkEntryById(entryId));
+            } else {
+              alert(
+                validateResErrors(
+                  res?.payload || res?.error,
+                  "Не удалось завершить работу",
+                ),
+                true,
+              );
+            }
+          } catch (err) {
+            alert(validateResErrors(err, "Не удалось завершить работу"), true);
+          } finally {
+            setStatusUpdating(false);
+          }
+        },
+      );
       return;
     }
-    if (!(Number(entry?.contract_amount) > 0)) {
-      alert("Чтобы завершить работу, сначала укажите сумму договора", true);
+
+    if (barterMode) {
+      confirm(
+        "Завершить работу в режиме «Бартер» без создания заявки на выплату?",
+        async (ok) => {
+          if (!ok || !entryId) return;
+          setStatusUpdating(true);
+          try {
+            const res = await dispatch(
+              updateBuildingWorkEntry({
+                id: entryId,
+                payload: { work_status: "completed" },
+              }),
+            );
+            if (res?.meta?.requestStatus === "fulfilled") {
+              alert("Работа завершена в режиме бартер");
+              dispatch(fetchBuildingWorkEntryById(entryId));
+            } else {
+              alert(
+                validateResErrors(
+                  res?.payload || res?.error,
+                  "Не удалось завершить работу",
+                ),
+                true,
+              );
+            }
+          } catch (err) {
+            alert(validateResErrors(err, "Не удалось завершить работу"), true);
+          } finally {
+            setStatusUpdating(false);
+          }
+        },
+      );
       return;
     }
     setPayoutAmount(
@@ -1153,6 +1221,15 @@ export default function BuildingWorkProcessDetail() {
                     "—"}
                 </div>
               </div>
+              {barterMode && (
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">Особенность оплаты</label>
+                  <div className="work-detail__value">
+                    При завершении работы выплата через кассу не создаётся,
+                    сумма попадёт в взаиморасчёты как бартер.
+                  </div>
+                </div>
+              )}
               <div className="add-product-page__form-group">
                 <label className="add-product-page__label">
                   Автосоздание договора
