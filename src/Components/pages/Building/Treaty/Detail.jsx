@@ -25,6 +25,11 @@ import { useBuildingClients } from "../../../../store/slices/building/clientsSli
 import { useBuildingProjects } from "../../../../store/slices/building/projectsSlice";
 import { useBuildingApartments } from "../../../../store/slices/building/apartmentsSlice";
 import { validateResErrors } from "../../../../../tools/validateResErrors";
+import {
+  TREATY_TYPE_LABELS,
+  TREATY_TYPE_OPTIONS,
+} from "../shared/buildingSpecOptions";
+import api from "../../../../api";
 import "./Detail.scss";
 
 const STATUS_LABELS = {
@@ -75,6 +80,21 @@ const getFileTypeLabel = (ext) => {
   return ext.toUpperCase().slice(0, 4);
 };
 
+const normalizeGroupTree = (value) => {
+  if (Array.isArray(value?.results)) return value.results;
+  if (Array.isArray(value)) return value;
+  return [];
+};
+
+const flattenGroupTree = (groups, depth = 0) =>
+  groups.flatMap((group) => [
+    { ...group, depth },
+    ...flattenGroupTree(
+      Array.isArray(group?.children) ? group.children : [],
+      depth + 1,
+    ),
+  ]);
+
 const generateTreatyNumber = () => {
   let raw = "";
   try {
@@ -104,6 +124,8 @@ const FORM_INITIAL = {
   title: "",
   description: "",
   amount: "",
+  treaty_type: "other",
+  group: "",
   operation_type: "sale",
   payment_type: "full",
   apartment: "",
@@ -142,6 +164,9 @@ export default function BuildingTreatyDetail() {
   const [fileModalOpen, setFileModalOpen] = useState(false);
   /** Файлы, прикреплённые до сохранения договора (только для нового договора) */
   const [pendingFiles, setPendingFiles] = useState([]);
+  const [groupsTree, setGroupsTree] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState(null);
 
   const [openAddClientModal, setOpenAddClientModal] = useState(false);
   const [addClientForm, setAddClientForm] = useState({
@@ -237,27 +262,47 @@ export default function BuildingTreatyDetail() {
     current?.apartment_floor,
   ]);
 
+  const flatGroupOptions = useMemo(
+    () => flattenGroupTree(normalizeGroupTree(groupsTree)),
+    [groupsTree],
+  );
+
   /** Редактировать данные можно только в режиме черновика (или при создании) */
   const isDraft = isNew || current?.status === "draft";
   const isReadOnly = !isDraft;
 
   const urlOperationType = searchParams.get("operation_type");
+  const urlTreatyType = searchParams.get("treaty_type");
 
   useEffect(() => {
     if (!isNew && id) {
       dispatch(fetchBuildingTreatyById(id));
     } else if (isNew) {
-      const opType = urlOperationType === "booking" || urlOperationType === "other"
-        ? urlOperationType
-        : "sale";
+      const treatyType = TREATY_TYPE_OPTIONS.some(
+        (option) => option.value === urlTreatyType,
+      )
+        ? urlTreatyType
+        : "other";
+      const opType =
+        urlOperationType === "booking" || urlOperationType === "other"
+          ? urlOperationType
+          : "sale";
       setForm((prev) => ({
         ...prev,
         residential_complex: selectedProjectId || "",
         number: prev.number || generateTreatyNumber(),
+        treaty_type: treatyType,
         operation_type: opType,
       }));
     }
-  }, [dispatch, id, isNew, selectedProjectId, urlOperationType]);
+  }, [
+    dispatch,
+    id,
+    isNew,
+    selectedProjectId,
+    urlOperationType,
+    urlTreatyType,
+  ]);
 
   useEffect(() => {
     const complexId =
@@ -282,6 +327,43 @@ export default function BuildingTreatyDetail() {
   ]);
 
   useEffect(() => {
+    const complexId =
+      form.residential_complex ||
+      current?.residential_complex ||
+      selectedProjectId;
+    if (!complexId) {
+      setGroupsTree([]);
+      return;
+    }
+    let cancelled = false;
+    setGroupsLoading(true);
+    setGroupsError(null);
+    api
+      .get("/building/treaty-groups/", {
+        params: {
+          residential_complex: complexId,
+          tree: true,
+        },
+      })
+      .then((response) => {
+        if (cancelled) return;
+        setGroupsTree(normalizeGroupTree(response?.data));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setGroupsError(err);
+        setGroupsTree([]);
+      })
+      .finally(() => {
+        if (!cancelled) setGroupsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.residential_complex, current?.residential_complex, selectedProjectId]);
+
+  useEffect(() => {
     if (isNew || !current) return;
     const currentId = current?.id ?? current?.uuid;
     if (id && currentId && String(currentId) !== String(id)) return;
@@ -292,6 +374,8 @@ export default function BuildingTreatyDetail() {
       title: current?.title || "",
       description: current?.description || "",
       amount: current?.amount || "",
+      treaty_type: current?.treaty_type || "other",
+      group: current?.group || "",
       operation_type: current?.operation_type || "sale",
       payment_type: current?.payment_type || "full",
       apartment: current?.apartment || "",
@@ -674,6 +758,8 @@ export default function BuildingTreatyDetail() {
 
     const payload = {
       ...form,
+      treaty_type: form.treaty_type || "other",
+      group: form.group || null,
       number:
         form.number && String(form.number).trim()
           ? String(form.number).trim()
@@ -1110,6 +1196,53 @@ export default function BuildingTreatyDetail() {
                     placeholder="ДГ-001"
                     disabled={disabled}
                   />
+                </div>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">
+                    Категория договора
+                  </label>
+                  <select
+                    className="add-product-page__input"
+                    value={form.treaty_type}
+                    onChange={handleFormChange("treaty_type")}
+                    disabled={disabled}
+                  >
+                    {TREATY_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="add-product-page__form-group">
+                  <label className="add-product-page__label">Папка</label>
+                  <select
+                    className="add-product-page__input"
+                    value={form.group}
+                    onChange={handleFormChange("group")}
+                    disabled={disabled || groupsLoading}
+                  >
+                    <option value="">Без папки</option>
+                    {flatGroupOptions.map((group) => {
+                      const groupId = group?.id ?? group?.uuid;
+                      return (
+                        <option key={groupId} value={groupId}>
+                          {"".padStart((group.depth || 0) * 2, " ")}
+                          {group?.title || "Папка"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {groupsError && (
+                    <div className="add-product-page__error" style={{ marginTop: 6 }}>
+                      {String(
+                        validateResErrors(
+                          groupsError,
+                          "Не удалось загрузить папки договоров",
+                        ),
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

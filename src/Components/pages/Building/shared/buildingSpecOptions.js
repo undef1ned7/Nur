@@ -16,6 +16,7 @@ export const TREATY_TYPE_OPTIONS = Object.entries(TREATY_TYPE_LABELS).map(
 export const WORK_PROCUREMENT_PAYMENT_MODE_LABELS = {
   cash: "Наличные",
   debt: "В долг",
+  barter: "Бартер",
   mixed: "Смешанная",
 };
 

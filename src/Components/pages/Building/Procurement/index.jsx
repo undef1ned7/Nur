@@ -63,6 +63,9 @@ const statusClass = (status) => {
   return "building-page__status";
 };
 
+const isBarterMode = (paymentMode) =>
+  String(paymentMode || "").toLowerCase() === "barter";
+
 function ProcurementPagination({ page, totalPages, count, loading, onChange }) {
   if (!totalPages || totalPages <= 1) return null;
 
@@ -338,12 +341,26 @@ export default function BuildingProcurement() {
   const renderActions = (procurement) => {
     const status = procurement?.status;
     const pid = procurement?.id ?? procurement?.uuid;
+    const barterMode = isBarterMode(procurement?.payment_mode);
     if (status === "draft") {
+      if (barterMode) {
+        const busy = pid != null && creatingTransferIds?.[pid] === true;
+        return (
+          <button
+            type="button"
+            className="building-btn building-btn--primary py-2!"
+            onClick={() => openTransferModal(procurement)}
+            disabled={busy}
+          >
+            {busy ? "Создание..." : "Отправить на склад"}
+          </button>
+        );
+      }
       const busy = pid != null && submittingToCashIds?.[pid] === true;
       return (
         <button
           type="button"
-          className="building-btn building-btn--primary !py-2"
+          className="building-btn building-btn--primary py-2!"
           onClick={() => onSubmitToCash(procurement)}
           disabled={busy}
         >
@@ -356,7 +373,7 @@ export default function BuildingProcurement() {
       return (
         <button
           type="button"
-          className="building-btn building-btn--primary !py-2"
+          className="building-btn building-btn--primary py-2!"
           onClick={() => openTransferModal(procurement)}
           disabled={busy}
         >
@@ -379,7 +396,8 @@ export default function BuildingProcurement() {
             <h1 className="warehouse-header__title">Закупки строительства</h1>
             <p className="warehouse-header__subtitle">
               ЖК: <b>{selectedProjectName}</b>. Управляйте заявками, отправкой в
-              кассу и созданием передач на склад.
+              кассу и созданием передач на склад. Бартерные закупки можно
+              отправлять на склад сразу, без кассы.
             </p>
           </div>
         </div>

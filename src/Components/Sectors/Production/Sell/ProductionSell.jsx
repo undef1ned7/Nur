@@ -2,7 +2,11 @@ import { Search } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDebounce } from "../../../../hooks/useDebounce";
-import { getAgentSalesList, agentSaleReturn } from "../../../../api/agentSales";
+import {
+  getAgentSalesList,
+  getAllProductionSalesList,
+  agentSaleReturn,
+} from "../../../../api/agentSales";
 import { useUser } from "../../../../store/slices/userSlice";
 import DataContainer from "../../../common/DataContainer/DataContainer";
 import ProductionSellDetail from "./ProductionSellDetail";
@@ -58,6 +62,14 @@ const ProductionSell = () => {
   const [returningId, setReturningId] = useState(null);
 
   const debouncedSetSearch = useDebounce((value) => setSearch(value), 500);
+  const isOwner = profile?.role === "owner";
+  const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
+
+  const fetchSalesList = useCallback(
+    (params) =>
+      isOwnerOrAdmin ? getAllProductionSalesList(params) : getAgentSalesList(params),
+    [isOwnerOrAdmin],
+  );
 
   const fetchList = useCallback(() => {
     setLoading(true);
@@ -68,7 +80,7 @@ const ProductionSell = () => {
     if (status) params.status = status;
     if (search) params.search = search;
 
-    getAgentSalesList(params)
+    fetchSalesList(params)
       .then((data) => {
         const arr = Array.isArray(data) ? data : (data?.results ?? []);
         setList(arr);
@@ -82,7 +94,7 @@ const ProductionSell = () => {
         setList([]);
       })
       .finally(() => setLoading(false));
-  }, [start, end, status, ordering, search]);
+  }, [fetchSalesList, start, end, status, ordering, search]);
 
   const canReturnSale = (sale) => {
     const s = (sale?.status || "").toLowerCase();
@@ -167,8 +179,6 @@ const ProductionSell = () => {
     sale?.items?.[0]?.product_name ??
     sale?.items?.[0]?.name ??
     "—";
-
-  const isOwner = profile?.role === "owner";
 
   return (
     <div>
@@ -471,6 +481,7 @@ const ProductionSell = () => {
       {showDetail && detailId && (
         <ProductionSellDetail
           id={detailId}
+          useGlobalAccess={isOwnerOrAdmin}
           onClose={() => {
             setShowDetail(false);
             setDetailId("");

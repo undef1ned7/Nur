@@ -62,6 +62,9 @@ const statusClass = (status) => {
   return "building-page__status";
 };
 
+const isBarterMode = (paymentMode) =>
+  String(paymentMode || "").toLowerCase() === "barter";
+
 const historyActionLabel = (action) => {
   const map = {
     procurement_created: "Закупка создана",
@@ -150,6 +153,7 @@ export default function BuildingProcurementDetail() {
     procurementId != null && submittingToCashIds?.[procurementId] === true;
   const busyCreateTransfer =
     procurementId != null && creatingTransferIds?.[procurementId] === true;
+  const barterMode = isBarterMode(procurement?.payment_mode);
 
   const [openSupplierId, setOpenSupplierId] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -535,7 +539,7 @@ export default function BuildingProcurementDetail() {
           >
             История действий
           </button>
-          {procurement?.status === "draft" && (
+          {procurement?.status === "draft" && !barterMode && (
             <button
               type="button"
               className="building-btn building-btn--primary"
@@ -545,14 +549,19 @@ export default function BuildingProcurementDetail() {
               {busySubmitToCash ? "Отправка..." : "Отправить в кассу"}
             </button>
           )}
-          {procurement?.status === "cash_approved" && (
+          {((procurement?.status === "draft" && barterMode) ||
+            procurement?.status === "cash_approved") && (
             <button
               type="button"
               className="building-btn building-btn--primary"
               disabled={busyCreateTransfer}
               onClick={onCreateTransfer}
             >
-              {busyCreateTransfer ? "Создание..." : "Создать передачу"}
+              {busyCreateTransfer
+                ? "Создание..."
+                : barterMode && procurement?.status === "draft"
+                  ? "Отправить на склад"
+                  : "Создать передачу"}
             </button>
           )}
         </div>
@@ -570,6 +579,20 @@ export default function BuildingProcurementDetail() {
               gap: 16,
             }}
           >
+            {barterMode && (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  padding: 12,
+                  borderRadius: 12,
+                  background: "#eff6ff",
+                  color: "#1e3a8a",
+                }}
+              >
+                Для бартерной закупки заявка в кассу не требуется: материалы
+                можно сразу отправить на склад.
+              </div>
+            )}
             <div>
               <div className="building-page__muted">Поставщик</div>
               <div>{procurement?.supplier_name || procurement?.supplier_display || "—"}</div>

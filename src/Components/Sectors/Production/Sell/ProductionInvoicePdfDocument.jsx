@@ -288,6 +288,10 @@ export default function ProductionInvoicePdfDocument({ data }) {
 
   const totals = data?.totals || {};
   const total = Number(totals.total || 0);
+  const subtotal = Number(totals.subtotal ?? totals.amount ?? 0);
+  const totalDiscount = Number(
+    totals.discount_total ?? totals.order_discount_total ?? data?.sale?.discount_total ?? 0,
+  );
 
   const items = Array.isArray(data?.items)
     ? data.items.map((it) => {
@@ -296,6 +300,9 @@ export default function ProductionInvoicePdfDocument({ data }) {
         const lineTotal = Number(it.total ?? it.line_total ?? qty * unit);
         const itemDiscountPercent = Number(
           it.discount_percent ?? it.discount ?? 0,
+        );
+        const itemDiscountAmount = Number(
+          it.discount_total ?? it.line_discount ?? it.line_discount_total ?? 0,
         );
 
         let priceNoDiscount = Number(
@@ -313,6 +320,7 @@ export default function ProductionInvoicePdfDocument({ data }) {
           unit_price: unit,
           price_no_discount: priceNoDiscount,
           discount: itemDiscountPercent,
+          discount_amount: itemDiscountAmount,
           total: lineTotal,
           unit: it.unit || "ШТ",
           article: it.article || "",
@@ -496,7 +504,11 @@ export default function ProductionInvoicePdfDocument({ data }) {
               </View>
               <View style={[s.tableCell, s.colDiscount]}>
                 <Text style={{ textAlign: "right" }}>
-                  {it.discount > 0 ? `${n2(it.discount)}%` : "—"}
+                  {it.discount > 0
+                    ? `${n2(it.discount)}%`
+                    : it.discount_amount > 0
+                      ? `${n2(it.discount_amount)}`
+                      : "—"}
                 </Text>
               </View>
               <View style={[s.tableCell, s.colPrice]}>
@@ -544,6 +556,18 @@ export default function ProductionInvoicePdfDocument({ data }) {
         </View>
 
         <View style={s.totalsSection}>
+          {subtotal > 0 && (
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Подытог:</Text>
+              <Text style={s.totalValue}>{n2(subtotal)}</Text>
+            </View>
+          )}
+          {totalDiscount > 0 && (
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Скидка:</Text>
+              <Text style={s.totalValue}>-{n2(totalDiscount)}</Text>
+            </View>
+          )}
           <View style={[s.totalRow, s.totalBold]}>
             <Text style={[s.totalLabel, s.totalBold]}>ИТОГО:</Text>
             <Text style={[s.totalValue, s.totalBold]}>{n2(total)}</Text>

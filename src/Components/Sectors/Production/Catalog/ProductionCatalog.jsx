@@ -956,7 +956,7 @@ const ProductionCatalog = () => {
     try {
       // Используем getAgentCart для получения активной корзины
       const cart = await dispatch(
-        getAgentCart({ agent: null, order_discount_total: "0.00" }),
+        getAgentCart({ agent: null }),
       ).unwrap();
       if (cart?.items && Array.isArray(cart.items)) {
         // Подсчитываем общее количество товаров в корзине
@@ -1054,7 +1054,7 @@ const ProductionCatalog = () => {
     (async () => {
       try {
         const cart = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" }),
+          getAgentCart({ agent: null }),
         ).unwrap();
 
         const id = cart?.id || null;
