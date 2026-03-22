@@ -86,13 +86,14 @@ export const addCustomItemToAgentCart = createAsyncThunk(
 export const checkoutAgentCart = createAsyncThunk(
   "agentCart/checkout",
   async (
-    { cartId, print_receipt = false, client_id, department_id, agent },
+    { cartId, print_receipt = false, client_id, client, department_id, agent },
     { rejectWithValue }
   ) => {
     try {
       const { data } = await agentCartApi.checkoutAgentCart(cartId, {
         print_receipt,
         ...(client_id && { client_id }),
+        ...(client && { client }),
         ...(department_id && { department_id }),
         ...(agent && { agent }),
         payment_method: "transfer",

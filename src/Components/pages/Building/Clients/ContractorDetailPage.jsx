@@ -6,6 +6,7 @@ import { useBuildingContractors } from "@/store/slices/building/contractorsSlice
 import ContractorInfoTab from "./ContractorInfoTab";
 import ContractorEquipmentTab from "./ContractorEquipmentTab";
 import ContractorHistoryTab from "./ContractorHistoryTab";
+import CounterpartySettlementsTab from "./CounterpartySettlementsTab";
 
 export default function ContractorDetailPage() {
   const { id } = useParams();
@@ -29,7 +30,13 @@ export default function ContractorDetailPage() {
 
   const initialTab = (() => {
     const fromUrl = searchParams.get("tab");
-    if (fromUrl === "work-history" || fromUrl === "equipment") return fromUrl;
+    if (
+      fromUrl === "work-history" ||
+      fromUrl === "equipment" ||
+      fromUrl === "settlements"
+    ) {
+      return fromUrl;
+    }
     return "info";
   })();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -128,6 +135,17 @@ export default function ContractorDetailPage() {
         >
           Оборудование и специализации
         </button>
+        <button
+          type="button"
+          className={
+            activeTab === "settlements"
+              ? "client-detail__tab client-detail__tab--active"
+              : "client-detail__tab"
+          }
+          onClick={() => handleTabChange("settlements")}
+        >
+          Взаиморасчёты
+        </button>
       </div>
 
       {activeTab === "info" && (
@@ -162,6 +180,15 @@ export default function ContractorDetailPage() {
       {activeTab === "equipment" && contractor && (
         <div className="sell-card client-detail__card">
           <ContractorEquipmentTab contractor={contractor} />
+        </div>
+      )}
+
+      {activeTab === "settlements" && contractorId && (
+        <div className="sell-card client-detail__card">
+          <CounterpartySettlementsTab
+            counterpartyType="contractor"
+            counterpartyId={contractorId}
+          />
         </div>
       )}
     </div>

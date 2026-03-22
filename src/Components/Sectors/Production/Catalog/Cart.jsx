@@ -633,6 +633,7 @@ const ClientSelector = ({
 const OrderSummary = ({
   selectedClient,
   items,
+  agentCart,
   status,
   onSubmit,
   submitting,
@@ -657,8 +658,24 @@ const OrderSummary = ({
     isRejected,
     isSubmitted,
   } = useMemo(() => {
-    const discount = 0; // Моковая скидка
     const usingServer = Array.isArray(items) && items.length > 0;
+    const lineDiscount = usingServer
+      ? (items || []).reduce(
+          (sum, it) =>
+            sum +
+            Number(
+              it?.line_discount ??
+                it?.discount_total ??
+                it?.line_discount_total ??
+                0,
+            ),
+          0,
+        )
+      : 0;
+    const orderDiscount = Number(
+      agentCart?.order_discount_total ?? agentCart?.discount_total ?? 0,
+    );
+    const discount = lineDiscount + orderDiscount;
     // Корзина редактируема, если статус "draft" или "active"
     const isEditable = status === "draft" || status === "active";
     const isDraft = status === "draft";
@@ -694,7 +711,14 @@ const OrderSummary = ({
     return { qty: q, amount: a };
   })();
 
-  const total = amount - discount;
+  const total = usingServer
+    ? Number(agentCart?.total || Math.max(0, amount - discount))
+    : Math.max(0, amount - discount);
+  const money = (value) =>
+    Number(value || 0).toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
   return (
     <div className="order-summary">
@@ -707,17 +731,19 @@ const OrderSummary = ({
           </span>
         </div>
         <div className="summary-row">
-          <span>Стоимость: {total.toLocaleString()}.00 KGS</span>
+          <span>Стоимость: {money(amount)} KGS</span>
         </div>
-        {/* <div className="summary-row discount">
-          <span>Скидка: - {discount.toLocaleString()}.00 KGS</span>
-        </div> */}
+        {discount > 0 && (
+          <div className="summary-row discount">
+            <span>Скидка: - {money(discount)} KGS</span>
+          </div>
+        )}
       </div>
 
       <div className="summary-divider"></div>
 
       <div className="total-amount">
-        <span>К оплате: {total.toLocaleString()}.00 KGS</span>
+        <span>К оплате: {money(total)} KGS</span>
       </div>
 
       {/* Выбор типа оплаты */}
@@ -963,7 +989,7 @@ const Cart = ({
         setLoadingAgentItems(true);
         // Используем getAgentCart (legacy /cart/start/) как единственный источник истины
         const cart = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" }),
+          getAgentCart({ agent: null }),
         ).unwrap();
 
         if (cart?.id) {
@@ -1025,7 +1051,7 @@ const Cart = ({
         } else {
           // Если данных нет, обновляем через getAgentCart
           const refreshed = await dispatch(
-            getAgentCart({ agent: null, order_discount_total: "0.00" }),
+            getAgentCart({ agent: null }),
           ).unwrap();
           setAgentCart(refreshed);
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
@@ -1068,7 +1094,7 @@ const Cart = ({
       } else {
         // Если данных нет, обновляем через getAgentCart
         const refreshed = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" }),
+          getAgentCart({ agent: null }),
         ).unwrap();
         setAgentCart(refreshed);
         setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
@@ -1099,7 +1125,7 @@ const Cart = ({
         } else {
           // Если данных нет, обновляем через getAgentCart
           const refreshed = await dispatch(
-            getAgentCart({ agent: null, order_discount_total: "0.00" }),
+            getAgentCart({ agent: null }),
           ).unwrap();
           setAgentCart(refreshed);
           setAgentItems(Array.isArray(refreshed.items) ? refreshed.items : []);
@@ -1120,7 +1146,7 @@ const Cart = ({
       (async () => {
         try {
           const cart = await dispatch(
-            getAgentCart({ agent: null, order_discount_total: "0.00" }),
+            getAgentCart({ agent: null }),
           ).unwrap();
           setAgentCart(cart);
           setAgentItems(Array.isArray(cart.items) ? cart.items : []);
@@ -1142,7 +1168,7 @@ const Cart = ({
       // legacy endpoint /cart/start/ сам создаёт/возвращает активную корзину,
       // поэтому НЕ требуем наличия cartId заранее.
       const cart = await dispatch(
-        getAgentCart({ agent: null, order_discount_total: "0.00" }),
+        getAgentCart({ agent: null }),
       ).unwrap();
       if (cart?.id) {
         setAgentCart(cart);
@@ -1216,7 +1242,7 @@ const Cart = ({
         // Обновляем клиента (пока просто обновляем корзину)
         // Примечание: если API поддерживает обновление клиента через отдельный эндпойнт, можно добавить
         const updated = await dispatch(
-          getAgentCart({ agent: null, order_discount_total: "0.00" }),
+          getAgentCart({ agent: null }),
         ).unwrap();
         setAgentCart((prev) => (prev ? { ...prev, client } : prev));
       } catch (e) {
@@ -1353,6 +1379,7 @@ const Cart = ({
         checkoutAgentCart({
           cartId: agentCartId,
           client_id: selectedClient.id,
+          client: selectedClient.id,
           print_receipt: false,
         }),
       ).unwrap();
@@ -1903,6 +1930,7 @@ const Cart = ({
       <OrderSummary
         selectedClient={selectedClient}
         items={agentItems}
+        agentCart={agentCart}
         status={agentCart?.status || "draft"}
         onSubmit={handleSubmit}
         submitting={submitting}
@@ -2096,13 +2124,7 @@ const Cart = ({
           let total = 0;
 
           if (usingServer) {
-            for (const it of agentItems) {
-              const price = Number(it?.unit_price || it?.price_snapshot || 0);
-              const baseQty = Number(
-                it?.quantity || it?.quantity_requested || 0,
-              );
-              total += price * baseQty;
-            }
+            total = Number(agentCart?.total || 0);
           } else {
             total = subtotalLocal || 0;
           }
@@ -2137,7 +2159,11 @@ const Cart = ({
                     <span className="cart-trigger-label">Корзина</span>
                     {total > 0 && (
                       <span className="cart-trigger-total">
-                        К оплате: {total.toLocaleString()}.00 KGS
+                        К оплате: {Number(total || 0).toLocaleString("ru-RU", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        KGS
                       </span>
                     )}
                   </div>

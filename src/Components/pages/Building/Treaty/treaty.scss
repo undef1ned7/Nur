@@ -17,6 +17,37 @@
   width: 100%;
 }
 
+.building-page--treaties .stocksGroups {
+  overflow-x: auto;
+}
+
+.building-page--treaties .stocksGroups__tree {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.building-page--treaties .stocksGroups__item {
+  width: max-content;
+  min-width: 100%;
+  grid-template-columns: 18px 20px max-content auto auto;
+  white-space: nowrap;
+}
+
+.building-page--treaties .stocksGroups__nameContainer {
+  min-width: max-content;
+  flex-wrap: nowrap;
+}
+
+.building-page--treaties .stocksGroups__name {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.building-page--treaties .stocksGroups__inlineCreate {
+  min-width: max-content;
+}
+
 .building-treaty {
   padding: 16px 0 24px;
 

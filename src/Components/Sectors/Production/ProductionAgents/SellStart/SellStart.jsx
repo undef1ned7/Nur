@@ -70,6 +70,23 @@ const formatSom = (value) =>
     maximumFractionDigits: 2,
   });
 
+const formatInputDecimal = (value) => Number(value || 0).toFixed(2);
+const trimTrailingZeros = (value) =>
+  String(value ?? "").replace(/(\.\d*?[1-9])0+$|\.0+$/u, "$1");
+
+const clampDiscountAmount = (subtotal, discountAmount) =>
+  Math.max(0, Math.min(toNum(subtotal), toNum(discountAmount)));
+
+const getDiscountAmountByMode = ({ subtotal, value, mode }) => {
+  if (mode === "percent") {
+    return clampDiscountAmount(
+      subtotal,
+      (toNum(subtotal) * Math.max(0, toNum(value))) / 100,
+    );
+  }
+  return clampDiscountAmount(subtotal, value);
+};
+
 const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 
 const paymentBanks = [
@@ -627,6 +644,8 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   });
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [orderDiscountValue, setOrderDiscountValue] = useState("");
+  const [orderDiscountMode, setOrderDiscountMode] = useState("amount");
   const [receiptWithCheck, setReceiptWithCheck] = useState(true);
   const [selectedBank, setSelectedBank] = useState("");
   const [debtInitialPayment, setDebtInitialPayment] = useState("");
@@ -634,6 +653,9 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
 
   // Количество товаров для таблицы
   const [itemQuantities, setItemQuantities] = useState({});
+  const [cartPrices, setCartPrices] = useState({});
+  const [cartDiscounts, setCartDiscounts] = useState({});
+  const [cartDiscountModes, setCartDiscountModes] = useState({});
 
   const [selectedId, setSelectedId] = useState(null);
   const selectedItem = useMemo(() => {
@@ -722,15 +744,33 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
   }, 600);
 
   const onChange = (e) => debouncedSearch(e.target.value);
-  const onDiscountChange = (e) => debouncedDiscount1(e.target.value);
-  const debouncedDiscount1 = useDebounce((v) => {
+  const debouncedDiscount1 = useDebounce(({ value, mode, subtotal }) => {
+    const discountTotal = getDiscountAmountByMode({
+      subtotal,
+      value,
+      mode,
+    }).toFixed(2);
     if (isMarketPosMode) {
-      dispatch(startSale(Number(v) || 0));
+      if (mode === "percent") {
+        dispatch(startSale({ order_discount_percent: Math.max(0, toNum(value)) }));
+      } else {
+        dispatch(startSale({ order_discount_total: discountTotal }));
+      }
       return;
     }
-    dispatch(startSaleInAgent(v));
-    dispatch(getAgentCart({ order_discount_total: v }));
+    dispatch(startSaleInAgent(discountTotal));
+    dispatch(getAgentCart({ order_discount_total: discountTotal }));
   }, 600);
+
+  const onDiscountChange = (e) => {
+    const nextValue = e.target.value;
+    setOrderDiscountValue(nextValue);
+    debouncedDiscount1({
+      value: nextValue,
+      mode: orderDiscountMode,
+      subtotal: currentSubtotal,
+    });
+  };
 
   const onRefresh = () => {
     if (isPilorama) {
@@ -1331,6 +1371,91 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     }
   };
 
+  const patchCartItemPrice = async (item, value) => {
+    if (!isMarketPosMode || !start?.id) return;
+    const productId = item.product ?? item.product_id ?? item.id;
+    const num = Math.max(0, toNum(value));
+    try {
+      await dispatch(
+        updateProductInCart({
+          id: start.id,
+          productId,
+          data: { unit_price: num.toFixed(2) },
+        }),
+      ).unwrap();
+      setCartPrices((prev) => ({
+        ...prev,
+        [item.id]: formatInputDecimal(num),
+      }));
+      onRefresh();
+    } catch (error) {
+      const errorMessage = validateResErrors(
+        error,
+        "Не удалось изменить цену",
+      );
+      setAlert({
+        open: true,
+        type: "error",
+        message: errorMessage,
+      });
+      setCartPrices((prev) => ({
+        ...prev,
+        [item.id]: formatInputDecimal(item.unit_price ?? item.price ?? 0),
+      }));
+    }
+  };
+
+  const patchCartItemDiscount = async (item, value, options = {}) => {
+    const { mode = "amount", displayValue } = options;
+    if (!isMarketPosMode || !start?.id) return;
+    const productId = item.product ?? item.product_id ?? item.id;
+    const lineTotal = previewCartMetrics.byId[item.id]?.lineTotal ??
+      toNum(item.unit_price ?? item.price) * toNum(item.quantity);
+    const discountAmount =
+      mode === "percent"
+        ? clampDiscountAmount(lineTotal, (lineTotal * Math.max(0, toNum(value))) / 100)
+        : clampDiscountAmount(lineTotal, value);
+    try {
+      await dispatch(
+        updateProductInCart({
+          id: start.id,
+          productId,
+          data: { discount_total: discountAmount.toFixed(2) },
+        }),
+      ).unwrap();
+      setCartDiscounts((prev) => ({
+        ...prev,
+        [item.id]:
+          mode === "percent"
+            ? displayValue ?? trimTrailingZeros(String(value))
+            : discountAmount > 0
+              ? formatInputDecimal(discountAmount)
+              : "",
+      }));
+      onRefresh();
+    } catch (error) {
+      const errorMessage = validateResErrors(
+        error,
+        "Не удалось изменить скидку",
+      );
+      setAlert({
+        open: true,
+        type: "error",
+        message: errorMessage,
+      });
+      setCartDiscounts((prev) => ({
+        ...prev,
+        [item.id]: toNum(item.discount_total ?? item.discountTotal) > 0
+          ? formatInputDecimal(item.discount_total ?? item.discountTotal)
+          : "",
+      }));
+      setCartDiscountModes((prev) => ({
+        ...prev,
+        [item.id]: "amount",
+      }));
+    }
+  };
+
   // Старые функции для обратной совместимости (если используются где-то еще)
   const incQty = () => {
     if (!selectedItem) return;
@@ -1424,6 +1549,141 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
     ? agentCart.order_discount_total
     : start?.order_discount_total;
   const currentTotal = isPilorama ? agentCart.total : start?.total;
+  const currentDiscountNumber = toNum(currentDiscount);
+  const currentDiscountPercent = isMarketPosMode
+    ? Math.max(0, toNum(start?.order_discount_percent))
+    : 0;
+
+  const previewCartMetrics = useMemo(() => {
+    const byId = {};
+    let baseSubtotal = 0;
+    let lineDiscountTotal = 0;
+
+    currentItems.forEach((item) => {
+      const itemId = item.id;
+      const rawQty = itemQuantities[itemId];
+      const rawPrice = cartPrices[itemId];
+      const rawDiscount = cartDiscounts[itemId];
+      const discountMode = cartDiscountModes[itemId] || "amount";
+
+      const quantity =
+        rawQty === undefined || rawQty === "" || rawQty === "-"
+          ? toNum(item.quantity)
+          : Math.max(0, toNum(rawQty));
+      const price =
+        rawPrice === undefined || rawPrice === "" || rawPrice === "-"
+          ? toNum(item.unit_price ?? item.price)
+          : Math.max(0, toNum(rawPrice));
+      const lineTotal = price * quantity;
+
+      let discountAmount = 0;
+      if (rawDiscount === undefined) {
+        discountAmount = clampDiscountAmount(
+          lineTotal,
+          item.discount_total ?? item.discountTotal ?? 0,
+        );
+      } else if (rawDiscount === "" || rawDiscount === "-") {
+        discountAmount = 0;
+      } else if (discountMode === "percent") {
+        discountAmount = clampDiscountAmount(
+          lineTotal,
+          (lineTotal * Math.max(0, toNum(rawDiscount))) / 100,
+        );
+      } else {
+        discountAmount = clampDiscountAmount(lineTotal, rawDiscount);
+      }
+
+      const lineNet = Math.max(0, lineTotal - discountAmount);
+      baseSubtotal += lineTotal;
+      lineDiscountTotal += discountAmount;
+      byId[itemId] = {
+        quantity,
+        price,
+        lineTotal,
+        discountAmount,
+        lineNet,
+      };
+    });
+
+    const subtotalAfterLineDiscounts = Math.max(0, baseSubtotal - lineDiscountTotal);
+    const orderDiscountAmount =
+      orderDiscountValue === ""
+        ? isMarketPosMode && currentDiscountPercent > 0
+          ? getDiscountAmountByMode({
+              subtotal: subtotalAfterLineDiscounts,
+              value: currentDiscountPercent,
+              mode: "percent",
+            })
+          : clampDiscountAmount(subtotalAfterLineDiscounts, currentDiscountNumber)
+        : getDiscountAmountByMode({
+            subtotal: subtotalAfterLineDiscounts,
+            value: orderDiscountValue,
+            mode: orderDiscountMode,
+          });
+
+    return {
+      byId,
+      baseSubtotal,
+      lineDiscountTotal,
+      orderDiscountAmount,
+      totalDiscount: lineDiscountTotal + orderDiscountAmount,
+      total: Math.max(0, subtotalAfterLineDiscounts - orderDiscountAmount),
+    };
+  }, [
+    cartDiscountModes,
+    cartDiscounts,
+    cartPrices,
+    currentDiscountNumber,
+    currentDiscountPercent,
+    currentItems,
+    isMarketPosMode,
+    itemQuantities,
+    orderDiscountMode,
+    orderDiscountValue,
+  ]);
+
+  const subtotalNumber = previewCartMetrics.baseSubtotal;
+  const displayDiscount = previewCartMetrics.totalDiscount;
+  const displayTotal = previewCartMetrics.total;
+  const previewDiscountAmount = previewCartMetrics.orderDiscountAmount;
+
+  useEffect(() => {
+    if (isMarketPosMode && currentDiscountPercent > 0) {
+      setOrderDiscountMode("percent");
+      setOrderDiscountValue(String(start?.order_discount_percent ?? ""));
+      return;
+    }
+    setOrderDiscountMode("amount");
+    setOrderDiscountValue(
+      currentDiscountNumber > 0 ? String(currentDiscountNumber) : "",
+    );
+  }, [
+    currentDiscountNumber,
+    currentDiscountPercent,
+    isMarketPosMode,
+    start?.order_discount_percent,
+  ]);
+
+  const handleOrderDiscountModeChange = (nextMode) => {
+    if (nextMode === orderDiscountMode) return;
+    const nextValue =
+      orderDiscountValue === ""
+        ? ""
+        : nextMode === "percent"
+          ? subtotalNumber > 0
+            ? ((previewDiscountAmount / subtotalNumber) * 100).toFixed(2)
+            : ""
+          : previewDiscountAmount > 0
+            ? previewDiscountAmount.toFixed(2)
+            : "";
+    setOrderDiscountMode(nextMode);
+    setOrderDiscountValue(nextValue);
+    debouncedDiscount1({
+      value: nextValue,
+      mode: nextMode,
+      subtotal: currentSubtotal,
+    });
+  };
 
   // Инициализация локальных значений количества для элементов таблицы
   useEffect(() => {
@@ -1433,6 +1693,37 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
       quantities[item.id] = String(item.quantity ?? "");
     });
     setItemQuantities(quantities);
+  }, [currentItems]);
+
+  useEffect(() => {
+    const items = currentItems || [];
+    setCartPrices((prev) => {
+      const next = {};
+      items.forEach((item) => {
+        next[item.id] =
+          prev[item.id] ?? formatInputDecimal(item.unit_price ?? item.price ?? 0);
+      });
+      return next;
+    });
+    setCartDiscountModes((prev) => {
+      const next = {};
+      items.forEach((item) => {
+        next[item.id] = prev[item.id] || "amount";
+      });
+      return next;
+    });
+    setCartDiscounts((prev) => {
+      const next = {};
+      items.forEach((item) => {
+        if (prev[item.id] !== undefined) {
+          next[item.id] = prev[item.id];
+        } else {
+          const discount = toNum(item.discount_total ?? item.discountTotal);
+          next[item.id] = discount > 0 ? formatInputDecimal(discount) : "";
+        }
+      });
+      return next;
+    });
   }, [currentItems]);
 
   const onSubmit = async (e) => {
@@ -1990,10 +2281,55 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
             </div>
 
             <div className="cashier-page__cart-actions sellstart-cashier__cart-actions">
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 10,
+                  background: "#fff",
+                }}
+              >
+                <button
+                  type="button"
+                  className="cashier-page__cart-action-btn"
+                  style={{
+                    padding: "6px 10px",
+                    minHeight: "auto",
+                    background:
+                      orderDiscountMode === "amount" ? "#f7d74f" : "#fff",
+                  }}
+                  onClick={() => handleOrderDiscountModeChange("amount")}
+                >
+                  сом
+                </button>
+                <button
+                  type="button"
+                  className="cashier-page__cart-action-btn"
+                  style={{
+                    padding: "6px 10px",
+                    minHeight: "auto",
+                    background:
+                      orderDiscountMode === "percent" ? "#f7d74f" : "#fff",
+                  }}
+                  onClick={() => handleOrderDiscountModeChange("percent")}
+                >
+                  %
+                </button>
+              </div>
               <input
-                type="text"
+                type="number"
+                min="0"
+                step="0.01"
                 className="sellstart-cashier__discount-input"
-                placeholder="Общая скидка"
+                placeholder={
+                  orderDiscountMode === "percent"
+                    ? "Общая скидка, %"
+                    : "Общая скидка, сом"
+                }
+                value={orderDiscountValue}
                 onChange={onDiscountChange}
               />
               {isPilorama && (
@@ -2013,132 +2349,292 @@ const SellStart = ({ show, setShow, useMainProductsList = false }) => {
                   Корзина пока пустая
                 </div>
               ) : (
-                currentItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`cashier-page__cart-item ${
-                      selectedId === item.id
-                        ? "sellstart-cashier__cart-item--selected"
-                        : ""
-                    }`}
-                    onClick={() => handleRowClick(item)}
-                  >
-                    <div className="cashier-page__cart-item-main">
-                      <div className="cashier-page__cart-item-head">
-                        <div className="cashier-page__cart-item-name">
-                          {item.product_name ?? item.display_name}
-                        </div>
-                        <div className="cashier-page__cart-item-total">
-                          {formatSom(
-                            Number(item.unit_price || 0) *
-                              Number(item.quantity || 0),
-                          )}{" "}
-                          сом
-                        </div>
-                      </div>
-
-                      <div className="cashier-page__cart-item-row">
-                        <div className="cashier-page__cart-item-field">
-                          <span className="cashier-page__cart-item-field-label">
-                            Цена
-                          </span>
-                          <input
-                            className="cashier-page__cart-item-price-input"
-                            value={item.unit_price ?? ""}
-                            readOnly
-                          />
-                        </div>
-
-                        <div className="cashier-page__cart-item-field">
-                          <span className="cashier-page__cart-item-field-label">
-                            Количество
-                          </span>
-                          <div className="cashier-page__cart-item-controls">
-                            <button
-                              type="button"
-                              className="cashier-page__cart-item-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDecreaseQty(item);
-                              }}
-                            >
-                              <Minus size={14} />
-                            </button>
-                            <input
-                              type="number"
-                              min="0"
-                              value={itemQuantities[item.id] ?? item.quantity ?? ""}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleItemQtyChange(item, e.target.value);
-                              }}
-                              onBlur={(e) => {
-                                e.stopPropagation();
-                                handleItemQtyBlur(item);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="cashier-page__cart-item-quantity-input"
-                            />
-                            <button
-                              type="button"
-                              className="cashier-page__cart-item-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleIncreaseQty(item);
-                              }}
-                            >
-                              <Plus size={14} />
-                            </button>
+                currentItems.map((item) => {
+                  const previewItem = previewCartMetrics.byId[item.id] || {
+                    quantity: toNum(item.quantity),
+                    price: toNum(item.unit_price ?? item.price),
+                    lineTotal:
+                      toNum(item.unit_price ?? item.price) * toNum(item.quantity),
+                    discountAmount: clampDiscountAmount(
+                      toNum(item.unit_price ?? item.price) * toNum(item.quantity),
+                      item.discount_total ?? item.discountTotal ?? 0,
+                    ),
+                    lineNet:
+                      toNum(item.unit_price ?? item.price) * toNum(item.quantity),
+                  };
+                  const discountMode = cartDiscountModes[item.id] || "amount";
+                  return (
+                    <div
+                      key={item.id}
+                      className={`cashier-page__cart-item ${
+                        selectedId === item.id
+                          ? "sellstart-cashier__cart-item--selected"
+                          : ""
+                      }`}
+                      onClick={() => handleRowClick(item)}
+                    >
+                      <div className="cashier-page__cart-item-main">
+                        <div className="cashier-page__cart-item-head">
+                          <div className="cashier-page__cart-item-name">
+                            {item.product_name ?? item.display_name}
+                          </div>
+                          <div className="cashier-page__cart-item-head-right">
+                            <div className="cashier-page__cart-item-discount-modes">
+                              <button
+                                type="button"
+                                className={`cashier-page__cart-item-discount-mode-btn ${
+                                  discountMode === "amount" ? "active" : ""
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCartDiscountModes((prev) => ({
+                                    ...prev,
+                                    [item.id]: "amount",
+                                  }));
+                                  setCartDiscounts((prev) => ({
+                                    ...prev,
+                                    [item.id]:
+                                      previewItem.discountAmount > 0
+                                        ? formatInputDecimal(
+                                            previewItem.discountAmount,
+                                          )
+                                        : "",
+                                  }));
+                                }}
+                              >
+                                сом
+                              </button>
+                              <button
+                                type="button"
+                                className={`cashier-page__cart-item-discount-mode-btn ${
+                                  discountMode === "percent" ? "active" : ""
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const percentValue =
+                                    previewItem.lineTotal > 0 &&
+                                    previewItem.discountAmount > 0
+                                      ? trimTrailingZeros(
+                                          (
+                                            (previewItem.discountAmount /
+                                              previewItem.lineTotal) *
+                                            100
+                                          ).toFixed(2),
+                                        )
+                                      : "";
+                                  setCartDiscountModes((prev) => ({
+                                    ...prev,
+                                    [item.id]: "percent",
+                                  }));
+                                  setCartDiscounts((prev) => ({
+                                    ...prev,
+                                    [item.id]: percentValue,
+                                  }));
+                                }}
+                              >
+                                %
+                              </button>
+                            </div>
+                            <div className="cashier-page__cart-item-total">
+                              {previewItem.discountAmount > 0 ? (
+                                <>
+                                  <span
+                                    style={{
+                                      textDecoration: "line-through",
+                                      opacity: 0.7,
+                                      marginRight: 6,
+                                    }}
+                                  >
+                                    {formatSom(previewItem.lineTotal)} сом
+                                  </span>
+                                  <span>{formatSom(previewItem.lineNet)} сом</span>
+                                </>
+                              ) : (
+                                <span>{formatSom(previewItem.lineNet)} сом</span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        <div className="cashier-page__cart-item-field sellstart-cashier__line-discount">
-                          <span className="cashier-page__cart-item-field-label">
-                            Скидка
-                          </span>
-                          <input
-                            type="text"
-                            className="cashier-page__cart-item-price-input"
-                            placeholder="0"
-                            defaultValue={item.discount_total ?? ""}
-                            onClick={(e) => e.stopPropagation()}
-                            onFocus={() => setSelectedId(item.id)}
-                            onChange={(e) => {
-                              setSelectedId(item.id);
-                              onProductDiscountChange(e);
-                            }}
-                          />
-                        </div>
+                        <div className="cashier-page__cart-item-row">
+                          <div className="cashier-page__cart-item-field">
+                            <span className="cashier-page__cart-item-field-label">
+                              Цена
+                            </span>
+                            <input
+                              type="text"
+                              className="cashier-page__cart-item-price-input"
+                              value={cartPrices[item.id] ?? ""}
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={() => setSelectedId(item.id)}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (
+                                  value === "" ||
+                                  value === "-" ||
+                                  /^\d*\.?\d*$/.test(value)
+                                ) {
+                                  setSelectedId(item.id);
+                                  setCartPrices((prev) => ({
+                                    ...prev,
+                                    [item.id]: value,
+                                  }));
+                                }
+                              }}
+                              onBlur={(e) => {
+                                e.stopPropagation();
+                                const value = e.target.value;
+                                const numericValue = toNum(value);
+                                if (
+                                  value !== "" &&
+                                  value !== "-" &&
+                                  numericValue !==
+                                    toNum(item.unit_price ?? item.price)
+                                ) {
+                                  patchCartItemPrice(item, value);
+                                } else {
+                                  setCartPrices((prev) => ({
+                                    ...prev,
+                                    [item.id]: formatInputDecimal(
+                                      item.unit_price ?? item.price ?? 0,
+                                    ),
+                                  }));
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.currentTarget.blur();
+                              }}
+                            />
+                          </div>
 
-                        <button
-                          type="button"
-                          className="cashier-page__cart-item-remove"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveItem(item);
-                          }}
-                        >
-                          <X size={16} />
-                        </button>
+                          <div className="cashier-page__cart-item-field">
+                            <span className="cashier-page__cart-item-field-label">
+                              Количество
+                            </span>
+                            <div className="cashier-page__cart-item-controls">
+                              <button
+                                type="button"
+                                className="cashier-page__cart-item-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDecreaseQty(item);
+                                }}
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                value={itemQuantities[item.id] ?? item.quantity ?? ""}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleItemQtyChange(item, e.target.value);
+                                }}
+                                onBlur={(e) => {
+                                  e.stopPropagation();
+                                  handleItemQtyBlur(item);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="cashier-page__cart-item-quantity-input"
+                              />
+                              <button
+                                type="button"
+                                className="cashier-page__cart-item-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleIncreaseQty(item);
+                                }}
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="cashier-page__cart-item-field sellstart-cashier__line-discount">
+                            <span className="cashier-page__cart-item-field-label">
+                              Скидка
+                            </span>
+                            <input
+                              type="text"
+                              className="cashier-page__cart-item-price-input"
+                              placeholder={discountMode === "percent" ? "%" : "0"}
+                              value={cartDiscounts[item.id] ?? ""}
+                              onClick={(e) => e.stopPropagation()}
+                              onFocus={() => setSelectedId(item.id)}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                if (
+                                  value === "" ||
+                                  value === "-" ||
+                                  /^\d*\.?\d*$/.test(value)
+                                ) {
+                                  setSelectedId(item.id);
+                                  setCartDiscounts((prev) => ({
+                                    ...prev,
+                                    [item.id]: value,
+                                  }));
+                                }
+                              }}
+                              onBlur={(e) => {
+                                e.stopPropagation();
+                                const value = e.target.value;
+                                if (value === "") {
+                                  if (previewItem.discountAmount !== 0) {
+                                    patchCartItemDiscount(item, 0, {
+                                      mode: discountMode,
+                                      displayValue: "",
+                                    });
+                                  }
+                                  return;
+                                }
+                                if (value === "-" || Number.isNaN(toNum(value))) return;
+                                if (discountMode === "percent") {
+                                  patchCartItemDiscount(item, value, {
+                                    mode: "percent",
+                                    displayValue: trimTrailingZeros(value),
+                                  });
+                                } else {
+                                  patchCartItemDiscount(item, value, {
+                                    mode: "amount",
+                                  });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.currentTarget.blur();
+                              }}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            className="cashier-page__cart-item-remove"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveItem(item);
+                            }}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
             <div className="cashier-page__cart-footer">
               <div className="sellstart-cashier__summary-row">
                 <span>Без скидок</span>
-                <span>{formatSom(currentSubtotal)} сом</span>
+                <span>{formatSom(subtotalNumber)} сом</span>
               </div>
               <div className="cashier-page__cart-discount">
                 <span>Скидка</span>
-                <span>{formatSom(currentDiscount)} сом</span>
+                <span>{formatSom(displayDiscount)} сом</span>
               </div>
               <div className="cashier-page__cart-total">
                 <span>ИТОГО</span>
-                <span>{formatSom(currentTotal)} сом</span>
+                <span>{formatSom(displayTotal)} сом</span>
               </div>
               <div className="sellstart-cashier__checkout-actions">
                 <button
